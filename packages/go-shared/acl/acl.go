@@ -25,6 +25,8 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Error code constants emitted by [RequireInstanceAdmin] via
@@ -139,7 +141,7 @@ func RequireInstanceAdmin(cfg Config) func(http.Handler) http.Handler {
 					"instance admin lookup failed",
 					slog.Group("acl",
 						slog.String("check", "instance_admin"),
-						slog.Uint64("user_id", uint64(uid)),
+						logutil.LogNumber("user_id", uid),
 						slog.String("error", err.Error()),
 					),
 				)
@@ -152,7 +154,7 @@ func RequireInstanceAdmin(cfg Config) func(http.Handler) http.Handler {
 					"instance admin check denied",
 					slog.Group("acl",
 						slog.String("check", "instance_admin"),
-						slog.Uint64("user_id", uint64(uid)),
+						logutil.LogNumber("user_id", uid),
 						slog.String("reason", "not_instance_admin"),
 					),
 				)

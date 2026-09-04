@@ -200,7 +200,7 @@ func waitForMetricsReady(t *testing.T, port string, timeout time.Duration) strin
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(url)
+		resp, err := http.Get(url) //#nosec G107 -- the URL is the loopback metrics endpoint this test just started
 		if err == nil && resp.StatusCode == http.StatusOK {
 			body, readErr := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()

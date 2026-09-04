@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
@@ -221,7 +222,7 @@ func (e *Emitter) resolveUser(ctx context.Context, snowflake string) (resolverRe
 	default:
 		body := truncatedBody(resp.Body)
 		e.logger.WarnContext(ctx, "presence-discord: lookup non-2xx",
-			slog.Int("status", resp.StatusCode),
+			logutil.LogNumber("status", resp.StatusCode),
 			slog.String("body", body),
 		)
 		obs.EventsTotal.WithLabelValues("signal_failed").Inc()
@@ -319,11 +320,11 @@ func buildLookupURL(baseURL, snowflake string) (string, error) {
 // offending values, which are workspace content and need not be ASCII,
 // and a byte cut would put U+FFFD at the end of the log line.
 func truncatedBody(r io.Reader) string {
-	const max = 512
-	buf := make([]byte, max+1)
+	const maxBodyBytes = 512
+	buf := make([]byte, maxBodyBytes+1)
 	n, _ := io.ReadFull(r, buf)
-	if n > max {
-		return stringutil.TruncateBytes(string(buf[:n]), max) + "...(truncated)"
+	if n > maxBodyBytes {
+		return stringutil.TruncateBytes(string(buf[:n]), maxBodyBytes) + "...(truncated)"
 	}
 	return string(buf[:n])
 }

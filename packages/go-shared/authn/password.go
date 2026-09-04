@@ -96,7 +96,7 @@ func VerifyPassword(encoded, password string) (bool, error) {
 	if err != nil {
 		return false, ErrInvalidPasswordHash
 	}
-	got := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(want)))
+	got := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(want))) //#nosec G115 -- the decoded hash is a fixed-width digest, so its length fits uint32
 	if subtle.ConstantTimeCompare(want, got) == 1 {
 		return true, nil
 	}

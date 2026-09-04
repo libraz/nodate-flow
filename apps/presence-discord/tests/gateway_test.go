@@ -260,7 +260,7 @@ func presenceFor(snowflake, status string) *discordgo.PresenceUpdate {
 // drains the debouncer; tests register it via t.Cleanup.
 func buildGateway(t *testing.T, fake *fakeFlowAPI, window time.Duration) (*gateway.Gateway, context.CancelFunc) {
 	t.Helper()
-	cfg := &config.Config{
+	cfg := &config.Config{ //#nosec G101 -- fixture values for a fake gateway, no live credential
 		DiscordBotToken:    "fake-discord-bot-token",
 		FlowAPIBaseURL:     fake.BaseURL(),
 		FlowAPISignalToken: signalTokenFixture,
@@ -566,7 +566,7 @@ func TestGateway_SessionFactoryInvokedOnStart(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeFlowAPI(t)
-	cfg := &config.Config{
+	cfg := &config.Config{ //#nosec G101 -- fixture values for a fake gateway, no live credential
 		DiscordBotToken:    "fake-discord-bot-token",
 		FlowAPIBaseURL:     fake.BaseURL(),
 		FlowAPISignalToken: signalTokenFixture,

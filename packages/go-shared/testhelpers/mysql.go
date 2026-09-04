@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	// Registers the "mysql" driver with database/sql for the handles this
+	// package hands back; nothing here references the package by name.
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"

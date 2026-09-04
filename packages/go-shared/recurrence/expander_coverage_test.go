@@ -362,7 +362,7 @@ func findExpanders(t *testing.T, root string) []expander {
 				if strings.Contains(name, ".test.") || strings.Contains(name, ".d.ts") {
 					return nil
 				}
-				raw, readErr := os.ReadFile(path) //#nosec G304 -- repository path
+				raw, readErr := os.ReadFile(path) //#nosec G304,G122 -- repository path walked at test time
 				if readErr != nil {
 					return readErr
 				}

@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Event is the canonical shape passed to Append. Optional FKs accept
@@ -138,7 +139,7 @@ func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.P
 	if err != nil {
 		slog.ErrorContext(ctx, "eventlog: append failed",
 			slog.String("type", string(evt.Type)),
-			slog.Uint64("workspace_id", uint64(evt.WorkspaceID)),
+			logutil.LogNumber("workspace_id", evt.WorkspaceID),
 			slog.String("error", err.Error()))
 		return fail(err)
 	}

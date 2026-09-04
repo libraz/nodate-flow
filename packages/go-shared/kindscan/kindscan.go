@@ -249,7 +249,7 @@ func Packages(root string) ([]string, error) {
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		src, rerr := os.ReadFile(filepath.Clean(path))
+		src, rerr := os.ReadFile(filepath.Clean(path)) //#nosec G122 -- the walk root is the repository source tree, fixed by the caller
 		if rerr != nil {
 			return rerr
 		}

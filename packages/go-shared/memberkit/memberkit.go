@@ -180,7 +180,7 @@ func createCalendar(ctx context.Context, tx TX, wsID uint32, kind, name, color s
 	if err != nil {
 		return 0, fmt.Errorf("memberkit: LastInsertId: %w", err)
 	}
-	return uint32(id), nil
+	return uint32(id), nil //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative and calendars.id is INT UNSIGNED
 }
 
 // createSubscription inserts (or re-enables) a calendar_subscriptions

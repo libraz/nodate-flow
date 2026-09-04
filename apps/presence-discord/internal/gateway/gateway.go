@@ -37,6 +37,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/presence-discord/internal/config"
 	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // sessionAdapter is the narrow surface Gateway needs from a
@@ -164,7 +165,7 @@ func (g *Gateway) Start(ctx context.Context) error {
 	obs.GatewayUp.Set(1)
 	g.logger.Info("presence-discord gateway connected",
 		slog.String("flow_api_base_url", g.cfg.FlowAPIBaseURL),
-		slog.Int("debounce_seconds", g.cfg.DebounceSeconds),
+		logutil.LogNumber("debounce_seconds", g.cfg.DebounceSeconds),
 	)
 
 	<-ctx.Done()

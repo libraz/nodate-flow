@@ -48,6 +48,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -250,7 +251,7 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 				if s.Logger != nil {
 					s.Logger.WarnContext(ctx, "calendar_event_day: expand event failed",
 						slog.Any("err", expandErr),
-						slog.Uint64("workspace_internal_id", uint64(workspaceID)),
+						logutil.LogNumber("workspace_internal_id", workspaceID),
 						slog.String("event_public_id", c.event.PublicID.String()),
 						slog.String("event_day", d.day),
 					)

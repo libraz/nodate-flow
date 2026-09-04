@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Message is the minimal structured representation of an outbound
@@ -35,8 +37,8 @@ func (m Message) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("from", m.From),
 		slog.Any("to", to),
-		slog.Int("subject_len", len(m.Subject)),
-		slog.Int("body_bytes", len(m.Body)),
+		logutil.LogNumber("subject_len", len(m.Subject)),
+		logutil.LogNumber("body_bytes", len(m.Body)),
 	)
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
 
@@ -171,7 +172,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 			// permanently.
 			j.Logger.WarnContext(ctx, "calendar_event_day: workspace tick failed",
 				slog.Any("err", err),
-				slog.Uint64("workspace_internal_id", uint64(ws.ID)),
+				logutil.LogNumber("workspace_internal_id", ws.ID),
 				slog.String("workspace_public_id", ws.PublicID.String()),
 			)
 			continue
@@ -294,7 +295,7 @@ func (j *Job) spanForWorkspace(ctx context.Context, workspaceID uint32, now time
 	if err != nil {
 		j.Logger.WarnContext(ctx, "calendar_event_day: cursor load failed, scanning the full catch-up window",
 			slog.Any("err", err),
-			slog.Uint64("workspace_internal_id", uint64(workspaceID)),
+			logutil.LogNumber("workspace_internal_id", workspaceID),
 		)
 		last = time.Time{}
 	}

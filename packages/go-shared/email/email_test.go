@@ -191,7 +191,7 @@ func TestSMTPSenderAuthenticatesWhenConfigured(t *testing.T) {
 func TestMessage_LogValue_ExcludesBody(t *testing.T) {
 	t.Parallel()
 
-	const secretBody = "click https://example.com/verify?t=super-secret-magic-token-xyz"
+	const secretBody = "click https://example.com/verify?t=super-secret-magic-token-xyz" //#nosec G101 -- the needle the assertion looks for, not a credential
 	const secretReplyTo = "task-routing-token-abcdef"
 
 	m := Message{

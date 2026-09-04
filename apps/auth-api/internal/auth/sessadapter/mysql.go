@@ -30,7 +30,7 @@ func (a *queriesAdapter) CreateSession(ctx context.Context, p sessionstore.Creat
 		UserID:      p.UserID,
 		RefreshHash: p.RefreshHash,
 		UserAgent:   p.UserAgent,
-		IpAddress:   p.IpAddress,
+		IpAddress:   p.IPAddress,
 		ExpiresAt:   p.ExpiresAt,
 	})
 }
@@ -46,7 +46,7 @@ func (a *queriesAdapter) FindSessionByRefreshHash(ctx context.Context, refreshHa
 		UserID:      row.UserID,
 		RefreshHash: row.RefreshHash,
 		UserAgent:   row.UserAgent,
-		IpAddress:   row.IpAddress,
+		IPAddress:   row.IpAddress,
 		ExpiresAt:   row.ExpiresAt,
 		RevokedAt:   row.RevokedAt,
 		LastUsedAt:  row.LastUsedAt,
@@ -85,7 +85,7 @@ func (a *queriesAdapter) ListSessionsForUser(ctx context.Context, userID uint32,
 		out[i] = sessionstore.ListSessionsForUserRow{
 			PublicID:   r.PublicID,
 			UserAgent:  r.UserAgent,
-			IpAddress:  r.IpAddress,
+			IPAddress:  r.IpAddress,
 			ExpiresAt:  r.ExpiresAt,
 			LastUsedAt: r.LastUsedAt,
 			CreatedAt:  r.CreatedAt,

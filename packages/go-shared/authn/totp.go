@@ -56,7 +56,7 @@ func TotpCode(secret []byte, t time.Time) string {
 
 // totpAt computes the HOTP/TOTP 6-digit code at the given unix time.
 func totpAt(secret []byte, t time.Time) string {
-	counter := uint64(t.Unix() / totpPeriod)
+	counter := uint64(t.Unix() / totpPeriod) //#nosec G115 -- callers pass wall-clock times after the unix epoch, so the quotient is non-negative
 	buf := make([]byte, 8)
 	for i := 7; i >= 0; i-- {
 		buf[i] = byte(counter & 0xff)

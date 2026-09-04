@@ -108,7 +108,7 @@ func TestGatewayBootsAndExposesMetrics(t *testing.T) {
 
 	port := freePort(t)
 	addr := "127.0.0.1:" + strconv.Itoa(port)
-	cfg := &config.Config{
+	cfg := &config.Config{ //#nosec G101 -- fixture values for a gateway that never connects, no live credential
 		DiscordBotToken:    "fake-token-not-used",
 		FlowAPIBaseURL:     "http://flow-api:8080",
 		FlowAPISignalToken: "",

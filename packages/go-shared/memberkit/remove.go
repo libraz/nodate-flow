@@ -107,61 +107,63 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	}
 
 	// Step 1: soft-disable subscriptions. Leaf rows, safe first.
-	if n, err := execCount(ctx, tx,
+	n, err := execCount(ctx, tx,
 		`UPDATE calendar_subscriptions SET enabled = FALSE
 		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE`,
-		args.WorkspaceID, args.UserID); err != nil {
+		args.WorkspaceID, args.UserID)
+	if err != nil {
 		return res, fmt.Errorf("memberkit: disable subscriptions: %w", err)
-	} else {
-		res.SubscriptionsDisabled = n
 	}
+	res.SubscriptionsDisabled = n
 
 	// Step 2: soft-disable personal calendars. Events on the
 	// calendar stay enabled — other users may be attendees and an
 	// audit trail is more useful than pretending the events never
 	// happened.
-	if n, err := execCount(ctx, tx,
+	n, err = execCount(ctx, tx,
 		`UPDATE calendars SET enabled = FALSE
 		 WHERE workspace_id = ? AND kind = 'personal'
 		   AND owner_user_id = ? AND enabled = TRUE`,
-		args.WorkspaceID, args.UserID); err != nil {
+		args.WorkspaceID, args.UserID)
+	if err != nil {
 		return res, fmt.Errorf("memberkit: disable personal calendars: %w", err)
-	} else {
-		res.PersonalCalsDisabled = n
 	}
+	res.PersonalCalsDisabled = n
 
 	// Step 3: soft-disable task_actors rows.
-	if n, err := execCount(ctx, tx,
+	n, err = execCount(ctx, tx,
 		`UPDATE task_actors SET enabled = FALSE
 		 WHERE user_id = ?
 		   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = ?)
 		   AND enabled = TRUE`,
-		args.UserID, args.WorkspaceID); err != nil {
+		args.UserID, args.WorkspaceID)
+	if err != nil {
 		return res, fmt.Errorf("memberkit: disable task_actors: %w", err)
-	} else {
-		res.TaskActorsDisabled = n
 	}
+	res.TaskActorsDisabled = n
 
 	// Step 4: soft-disable project_members rows.
-	if n, err := execCount(ctx, tx,
+	n, err = execCount(ctx, tx,
 		`UPDATE project_members SET enabled = FALSE
 		 WHERE user_id = ?
 		   AND project_id IN (SELECT id FROM projects WHERE workspace_id = ?)
 		   AND enabled = TRUE`,
-		args.UserID, args.WorkspaceID); err != nil {
+		args.UserID, args.WorkspaceID)
+	if err != nil {
 		return res, fmt.Errorf("memberkit: disable project_members: %w", err)
-	} else {
-		res.ProjectMembersDisabled = n
 	}
+	res.ProjectMembersDisabled = n
 
 	// Step 5: soft-disable the member row itself last so the earlier
 	// steps can still JOIN to workspace_members if they ever need to.
-	if n, err := execCount(ctx, tx,
+	n, err = execCount(ctx, tx,
 		`UPDATE workspace_members SET enabled = FALSE
 		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE`,
-		args.WorkspaceID, args.UserID); err != nil {
+		args.WorkspaceID, args.UserID)
+	if err != nil {
 		return res, fmt.Errorf("memberkit: disable member: %w", err)
-	} else if n > 0 {
+	}
+	if n > 0 {
 		res.MemberDisabled = true
 	}
 

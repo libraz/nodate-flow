@@ -37,6 +37,8 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // commitHooks collects callbacks to run only after the enclosing
@@ -328,7 +330,7 @@ func Do(ctx context.Context, label string, fn func(ctx context.Context) error) e
 			if attempt > 1 {
 				slog.InfoContext(ctx, "dbretry: succeeded after retry",
 					slog.String("op", label),
-					slog.Int("attempt", attempt))
+					logutil.LogNumber("attempt", attempt))
 			}
 			return nil
 		}
@@ -341,7 +343,7 @@ func Do(ctx context.Context, label string, fn func(ctx context.Context) error) e
 		}
 		slog.WarnContext(ctx, "dbretry: transient mysql error, retrying",
 			slog.String("op", label),
-			slog.Int("attempt", attempt),
+			logutil.LogNumber("attempt", attempt),
 			slog.String("err", err.Error()))
 		// Jittered linear back-off: base * attempt * (0.5..1.5).
 		// math/rand/v2 is concurrency-safe and seeded automatically; no
@@ -356,7 +358,7 @@ func Do(ctx context.Context, label string, fn func(ctx context.Context) error) e
 	}
 	slog.ErrorContext(ctx, "dbretry: exhausted retries",
 		slog.String("op", label),
-		slog.Int("attempts", MaxAttempts),
+		logutil.LogNumber("attempts", MaxAttempts),
 		slog.String("err", lastErr.Error()))
 	return lastErr
 }

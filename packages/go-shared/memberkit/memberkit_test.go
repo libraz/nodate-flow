@@ -39,7 +39,7 @@ type wsFixture struct {
 	actorID uint32
 }
 
-func seedWorkspace(t *testing.T, ctx context.Context, db *sql.DB, country string) wsFixture {
+func seedWorkspace(ctx context.Context, t *testing.T, db *sql.DB, country string) wsFixture {
 	t.Helper()
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	exec := func(q string, args ...any) int64 {
@@ -58,11 +58,13 @@ func seedWorkspace(t *testing.T, ctx context.Context, db *sql.DB, country string
 	if country != "" {
 		countryArg = country
 	}
+	//#nosec G115 -- test-scoped LastInsertId fits uint32
 	wsID := uint32(exec(
 		`INSERT INTO workspaces (public_id, slug, name, timezone, country)
 		 VALUES (?, ?, ?, 'UTC', ?)`,
 		dbtype.New(), "ws-"+suffix[:10], "MemberKit Test "+suffix, countryArg,
 	))
+	//#nosec G115 -- test-scoped LastInsertId fits uint32
 	actorID := uint32(exec(
 		`INSERT INTO users (public_id, email, display_name, locale, timezone)
 		 VALUES (?, ?, ?, 'en', 'UTC')`,
@@ -76,7 +78,7 @@ func seedWorkspace(t *testing.T, ctx context.Context, db *sql.DB, country string
 	return wsFixture{wsID: wsID, actorID: actorID}
 }
 
-func seedUser(t *testing.T, ctx context.Context, db *sql.DB) uint32 {
+func seedUser(ctx context.Context, t *testing.T, db *sql.DB) uint32 {
 	t.Helper()
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	res, err := db.ExecContext(ctx,
@@ -91,7 +93,7 @@ func seedUser(t *testing.T, ctx context.Context, db *sql.DB) uint32 {
 	if err != nil {
 		t.Fatalf("seed user LastInsertId: %v", err)
 	}
-	return uint32(id)
+	return uint32(id) //#nosec G115 -- test-scoped LastInsertId fits uint32
 }
 
 func purgeWorkspace(t *testing.T, db *sql.DB, wsID uint32) {
@@ -138,10 +140,10 @@ func withTx(t *testing.T, db *sql.DB, fn func(tx *dbretry.Tx)) {
 func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	userID := seedUser(t, ctx, db)
+	userID := seedUser(ctx, t, db)
 
 	var res AddWorkspaceMemberResult
 	withTx(t, db, func(tx *dbretry.Tx) {
@@ -219,10 +221,10 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 func TestAddWorkspaceMember_IdempotentOnExistingEnabled(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	userID := seedUser(t, ctx, db)
+	userID := seedUser(ctx, t, db)
 
 	var first, second AddWorkspaceMemberResult
 	withTx(t, db, func(tx *dbretry.Tx) {
@@ -273,10 +275,10 @@ func TestAddWorkspaceMember_IdempotentOnExistingEnabled(t *testing.T) {
 func TestRemoveWorkspaceMember_CascadesSoftDisable(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	userID := seedUser(t, ctx, db)
+	userID := seedUser(ctx, t, db)
 
 	// Add the user with a personal calendar + subscription.
 	withTx(t, db, func(tx *dbretry.Tx) {
@@ -368,10 +370,10 @@ func TestRemoveWorkspaceMember_CascadesSoftDisable(t *testing.T) {
 func TestRemoveWorkspaceMember_ReturnsNotFoundForUnknownUser(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	bogusUser := seedUser(t, ctx, db) // exists but never joined the ws
+	bogusUser := seedUser(ctx, t, db) // exists but never joined the ws
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
@@ -389,10 +391,10 @@ func TestRemoveWorkspaceMember_ReturnsNotFoundForUnknownUser(t *testing.T) {
 func TestUpdateMemberRole_ChangesRoleAndLogsEvent(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	userID := seedUser(t, ctx, db)
+	userID := seedUser(ctx, t, db)
 	withTx(t, db, func(tx *dbretry.Tx) {
 		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
@@ -437,9 +439,9 @@ func TestUpdateMemberRole_ChangesRoleAndLogsEvent(t *testing.T) {
 // addOwner seeds a second enabled owner so the last-owner guard does
 // not trip in tests that act on a non-last owner. Returns the new
 // user's internal id.
-func addOwner(t *testing.T, ctx context.Context, db *sql.DB, wsID uint32) uint32 {
+func addOwner(ctx context.Context, t *testing.T, db *sql.DB, wsID uint32) uint32 {
 	t.Helper()
-	uid := seedUser(t, ctx, db)
+	uid := seedUser(ctx, t, db)
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
 		 VALUES (?, ?, ?, 'owner', NOW())`,
@@ -455,7 +457,7 @@ func addOwner(t *testing.T, ctx context.Context, db *sql.DB, wsID uint32) uint32
 func TestUpdateMemberRole_SelfModifyRejected(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	withTx(t, db, func(tx *dbretry.Tx) {
@@ -482,11 +484,11 @@ func TestUpdateMemberRole_SelfModifyRejected(t *testing.T) {
 func TestUpdateMemberRole_DemoteLastOwnerRejected(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	// A different actor demotes the sole owner.
-	otherOwner := addOwner(t, ctx, db, ws.wsID)
+	otherOwner := addOwner(ctx, t, db, ws.wsID)
 	// Now there are two owners; remove the second so actorID is the
 	// last owner, then have otherOwner attempt the demote.
 	if _, err := db.ExecContext(ctx,
@@ -511,10 +513,10 @@ func TestUpdateMemberRole_DemoteLastOwnerRejected(t *testing.T) {
 func TestUpdateMemberRole_DemoteNonLastOwnerOK(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	secondOwner := addOwner(t, ctx, db, ws.wsID)
+	secondOwner := addOwner(ctx, t, db, ws.wsID)
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
@@ -539,7 +541,7 @@ func TestUpdateMemberRole_DemoteNonLastOwnerOK(t *testing.T) {
 func TestRemoveWorkspaceMember_SelfModifyRejected(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	withTx(t, db, func(tx *dbretry.Tx) {
@@ -565,11 +567,11 @@ func TestRemoveWorkspaceMember_SelfModifyRejected(t *testing.T) {
 func TestRemoveWorkspaceMember_LastOwnerRejected(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
 	// A separate admin actor attempts to remove the sole owner.
-	adminActor := seedUser(t, ctx, db)
+	adminActor := seedUser(ctx, t, db)
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
 		 VALUES (?, ?, ?, 'admin', NOW())`,
@@ -600,10 +602,10 @@ func TestRemoveWorkspaceMember_LastOwnerRejected(t *testing.T) {
 func TestRemoveWorkspaceMember_NonLastOwnerOK(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	secondOwner := addOwner(t, ctx, db, ws.wsID)
+	secondOwner := addOwner(ctx, t, db, ws.wsID)
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		res, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
@@ -623,10 +625,10 @@ func TestRemoveWorkspaceMember_NonLastOwnerOK(t *testing.T) {
 func TestUpdateMemberRole_SameRoleIsNoop(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	userID := seedUser(t, ctx, db)
+	userID := seedUser(ctx, t, db)
 	withTx(t, db, func(tx *dbretry.Tx) {
 		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
 			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,

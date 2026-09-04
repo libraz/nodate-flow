@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
 
@@ -145,12 +146,12 @@ func (c *SignalsClient) PostSignal(ctx context.Context, body PostSignalBody) err
 		c.Logger.DebugContext(ctx, "calendar_event_day: signal posted",
 			slog.String("kind", body.Kind),
 			slog.String("subject_id", body.SubjectID),
-			slog.Int("status", resp.StatusCode),
+			logutil.LogNumber("status", resp.StatusCode),
 		)
 		return nil
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
 		c.Logger.WarnContext(ctx, "calendar_event_day: flow-api rejected signal",
-			slog.Int("status", resp.StatusCode),
+			logutil.LogNumber("status", resp.StatusCode),
 			slog.String("kind", body.Kind),
 			slog.String("external_id", body.ExternalID),
 			slog.String("body_preview", string(preview)),
@@ -160,7 +161,7 @@ func (c *SignalsClient) PostSignal(ctx context.Context, body PostSignalBody) err
 		// 5xx and other unexpected statuses — log and bubble up so the
 		// tick is marked failed; next tick will retry and dedupe.
 		c.Logger.WarnContext(ctx, "calendar_event_day: flow-api 5xx posting signal",
-			slog.Int("status", resp.StatusCode),
+			logutil.LogNumber("status", resp.StatusCode),
 			slog.String("kind", body.Kind),
 			slog.String("external_id", body.ExternalID),
 			slog.String("body_preview", string(preview)),

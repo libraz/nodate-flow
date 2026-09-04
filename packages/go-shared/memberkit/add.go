@@ -130,7 +130,7 @@ func AddWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args AddWorkspaceMe
 		if err != nil {
 			return res, fmt.Errorf("memberkit: insert member LastInsertId: %w", err)
 		}
-		res.MemberID = uint32(id)
+		res.MemberID = uint32(id) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative and workspace_members.id is INT UNSIGNED
 		res.MemberPublicID = pubID
 		res.CreatedMember = true
 	default:

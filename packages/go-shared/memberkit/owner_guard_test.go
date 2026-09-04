@@ -12,9 +12,9 @@ import (
 
 // addAdmin seeds a workspace member at the admin role and returns their
 // internal user id.
-func addAdmin(t *testing.T, ctx context.Context, db *sql.DB, wsID uint32) uint32 {
+func addAdmin(ctx context.Context, t *testing.T, db *sql.DB, wsID uint32) uint32 {
 	t.Helper()
-	uid := seedUser(t, ctx, db)
+	uid := seedUser(ctx, t, db)
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
 		 VALUES (?, ?, ?, 'admin', NOW())`,
@@ -24,7 +24,7 @@ func addAdmin(t *testing.T, ctx context.Context, db *sql.DB, wsID uint32) uint32
 	return uid
 }
 
-func memberRole(t *testing.T, ctx context.Context, db *sql.DB, wsID, uid uint32) string {
+func memberRole(ctx context.Context, t *testing.T, db *sql.DB, wsID, uid uint32) string {
 	t.Helper()
 	var role string
 	if err := db.QueryRowContext(ctx,
@@ -45,11 +45,11 @@ func memberRole(t *testing.T, ctx context.Context, db *sql.DB, wsID, uid uint32)
 func TestUpdateMemberRole_AdminCannotDemoteOwner(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	secondOwner := addOwner(t, ctx, db, ws.wsID)
-	admin := addAdmin(t, ctx, db, ws.wsID)
+	secondOwner := addOwner(ctx, t, db, ws.wsID)
+	admin := addAdmin(ctx, t, db, ws.wsID)
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
@@ -61,7 +61,7 @@ func TestUpdateMemberRole_AdminCannotDemoteOwner(t *testing.T) {
 		}
 	})
 
-	if got := memberRole(t, ctx, db, ws.wsID, secondOwner); got != "owner" {
+	if got := memberRole(ctx, t, db, ws.wsID, secondOwner); got != "owner" {
 		t.Errorf("the owner must keep their role after a blocked demote, got %q", got)
 	}
 }
@@ -73,11 +73,11 @@ func TestUpdateMemberRole_AdminCannotDemoteOwner(t *testing.T) {
 func TestRemoveWorkspaceMember_AdminCannotRemoveOwner(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	secondOwner := addOwner(t, ctx, db, ws.wsID)
-	admin := addAdmin(t, ctx, db, ws.wsID)
+	secondOwner := addOwner(ctx, t, db, ws.wsID)
+	admin := addAdmin(ctx, t, db, ws.wsID)
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
@@ -105,10 +105,10 @@ func TestRemoveWorkspaceMember_AdminCannotRemoveOwner(t *testing.T) {
 func TestUpdateMemberRole_OwnerMayDemoteCoOwner(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	secondOwner := addOwner(t, ctx, db, ws.wsID)
+	secondOwner := addOwner(ctx, t, db, ws.wsID)
 
 	withTx(t, db, func(tx *dbretry.Tx) {
 		if err := UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{
@@ -119,7 +119,7 @@ func TestUpdateMemberRole_OwnerMayDemoteCoOwner(t *testing.T) {
 		}
 	})
 
-	if got := memberRole(t, ctx, db, ws.wsID, secondOwner); got != "member" {
+	if got := memberRole(ctx, t, db, ws.wsID, secondOwner); got != "member" {
 		t.Errorf("expected role=member after the demote, got %q", got)
 	}
 }
@@ -130,11 +130,11 @@ func TestUpdateMemberRole_OwnerMayDemoteCoOwner(t *testing.T) {
 func TestUpdateMemberRole_AdminMayStillManageMembers(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
-	ws := seedWorkspace(t, ctx, db, "")
+	ws := seedWorkspace(ctx, t, db, "")
 	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
 
-	admin := addAdmin(t, ctx, db, ws.wsID)
-	target := seedUser(t, ctx, db)
+	admin := addAdmin(ctx, t, db, ws.wsID)
+	target := seedUser(ctx, t, db)
 	if _, err := db.ExecContext(ctx,
 		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
 		 VALUES (?, ?, ?, 'member', NOW())`,
@@ -151,7 +151,7 @@ func TestUpdateMemberRole_AdminMayStillManageMembers(t *testing.T) {
 		}
 	})
 
-	if got := memberRole(t, ctx, db, ws.wsID, target); got != "guest" {
+	if got := memberRole(ctx, t, db, ws.wsID, target); got != "guest" {
 		t.Errorf("expected role=guest after the admin's change, got %q", got)
 	}
 }

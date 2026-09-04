@@ -54,7 +54,7 @@ type CreateSessionParams struct {
 	UserID      uint32
 	RefreshHash string
 	UserAgent   sql.NullString
-	IpAddress   sql.NullString
+	IPAddress   sql.NullString
 	ExpiresAt   time.Time
 }
 
@@ -66,7 +66,7 @@ type FindSessionByRefreshHashRow struct {
 	UserID      uint32
 	RefreshHash string
 	UserAgent   sql.NullString
-	IpAddress   sql.NullString
+	IPAddress   sql.NullString
 	ExpiresAt   time.Time
 	RevokedAt   sql.NullTime
 	LastUsedAt  sql.NullTime
@@ -94,7 +94,7 @@ type FindAnySessionByRefreshHashRow struct {
 type ListSessionsForUserRow struct {
 	PublicID   dbtype.PublicID
 	UserAgent  sql.NullString
-	IpAddress  sql.NullString
+	IPAddress  sql.NullString
 	ExpiresAt  time.Time
 	LastUsedAt sql.NullTime
 	CreatedAt  time.Time
@@ -124,7 +124,7 @@ func (s *MySQLStore) Create(ctx context.Context, p CreateParams) (uint32, error)
 		// sessions.ip_address is VARBINARY(16): the text form of a real
 		// IPv6 address does not fit and MySQL rejects the whole insert
 		// in STRICT mode, which would fail the login that issued it.
-		IpAddress: dbtype.NullStringFromIP(p.IPAddress),
+		IPAddress: dbtype.NullStringFromIP(p.IPAddress),
 		ExpiresAt: p.ExpiresAt,
 	})
 	if err != nil {
@@ -148,7 +148,7 @@ func (s *MySQLStore) FindByRefreshHash(ctx context.Context, hash string) (*Sessi
 		UserID:      row.UserID,
 		RefreshHash: row.RefreshHash,
 		UserAgent:   row.UserAgent.String,
-		IPAddress:   dbtype.IPStringFromNullString(row.IpAddress),
+		IPAddress:   dbtype.IPStringFromNullString(row.IPAddress),
 		ExpiresAt:   row.ExpiresAt,
 		RevokedAt:   nullTimePtr(row.RevokedAt),
 		LastUsedAt:  nullTimePtr(row.LastUsedAt),
@@ -260,7 +260,7 @@ func (s *MySQLStore) ListActive(ctx context.Context, userID uint32) ([]Session, 
 			PublicID:   r.PublicID,
 			UserID:     userID,
 			UserAgent:  r.UserAgent.String,
-			IPAddress:  dbtype.IPStringFromNullString(r.IpAddress),
+			IPAddress:  dbtype.IPStringFromNullString(r.IPAddress),
 			ExpiresAt:  r.ExpiresAt,
 			LastUsedAt: nullTimePtr(r.LastUsedAt),
 			CreatedAt:  r.CreatedAt,
