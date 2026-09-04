@@ -213,7 +213,9 @@ func registerTools(h *Handler) {
 		description:   "Ask the workspace LLM to propose tasks from free text. Requires a configured AI provider.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"source": stringSchema("Input text to propose tasks from.", Constraints{MinLength: intPtr(1)}),
+			// The whole text is sent to the provider as one prompt, so the
+			// bound is what a caller may spend in a single call.
+			"source": stringSchema("Input text to propose tasks from.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(50000)}),
 		}, []string{"source"}),
 		run: runProposeTasksFrom,
 	})
@@ -241,15 +243,18 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"parentTaskId": stringSchema("Parent task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"steps": map[string]any{
-				"type":        "array",
-				"description": "Step definitions to create as child tasks.",
-				"items": objectSchema(map[string]any{
+			// Each step becomes a child task created inside one transaction
+			// that holds the project row to number them, so the length of
+			// this array is how long every other writer of the project
+			// waits. The lower bound is the one the REST apply-steps body
+			// states: a call with no steps asks for nothing.
+			"steps": arraySchema("Step definitions to create as child tasks.",
+				objectSchema(map[string]any{
 					"title":       stringSchema("Step title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 					"description": stringSchema("Step description (optional).", Constraints{MaxLength: intPtr(50000)}),
 					"priority":    intSchema("Step priority 0..4 (optional).", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 				}, []string{"title"}),
-			},
+				Constraints{MinItems: intPtr(1), MaxItems: intPtr(100)}),
 		}, []string{"parentTaskId", "steps"}),
 		run: runApplySteps,
 	})
@@ -267,7 +272,10 @@ func registerTools(h *Handler) {
 		description:   "Compile a natural-language query into a validated Lens view JSON.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"prompt": stringSchema("Natural-language description of the desired view.", Constraints{MinLength: intPtr(1)}),
+			// The bound is what the REST compile-lens body declares. Both
+			// routes hand the prompt to the same compiler, so a prompt one
+			// accepts has to be one the other accepts too.
+			"prompt": stringSchema("Natural-language description of the desired view.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 		}, []string{"prompt"}),
 		run: runProposeLens,
 	})
@@ -373,13 +381,16 @@ func registerTools(h *Handler) {
 		description:   "Generate a wiki page using AI based on project or task context.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"contextDescription": stringSchema("What the page should be about.", Constraints{MinLength: intPtr(1)}),
+			// The instruction bound is what the REST page-generation body
+			// declares for the same prompt.
+			"contextDescription": stringSchema("What the page should be about.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(10000)}),
 			"projectId":          stringSchema("Optional project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"taskIds": map[string]any{
-				"type":        "array",
-				"description": "Optional task public ids (UUID v7) to include as context.",
-				"items":       stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			},
+			// Every id here is fetched and its content goes into the prompt
+			// sent to the provider, so the length of this array is what the
+			// workspace is billed for on a call it did not size.
+			"taskIds": arraySchema("Optional task public ids (UUID v7) to include as context.",
+				stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+				Constraints{MaxItems: intPtr(50)}),
 		}, []string{"contextDescription"}),
 		run: runGeneratePage,
 	})
@@ -436,8 +447,12 @@ func registerTools(h *Handler) {
 			// calendar_events.location and calendar_events.block_label. Both are
 			// narrow columns, so a value past them is refused by the driver
 			// rather than by the schema unless the bound is advertised here.
-			"location":   stringSchema("Event location.", Constraints{MaxLength: intPtr(500)}),
-			"memo":       stringSchema("Event memo/notes."),
+			"location": stringSchema("Event location.", Constraints{MaxLength: intPtr(500)}),
+			// The memo column is MEDIUMTEXT and would take far more, so this
+			// bound is on what one call may carry rather than on the column.
+			// update_calendar_event states the same one: a memo one write
+			// tool accepts has to be one the other accepts too.
+			"memo":       stringSchema("Event memo/notes.", Constraints{MaxLength: intPtr(10000)}),
 			"blockLabel": stringSchema("Label for block-type events.", Constraints{MaxLength: intPtr(100)}),
 		}, []string{"calendarId", "title"}),
 		run: runCreateCalendarEvent,
@@ -458,7 +473,7 @@ func registerTools(h *Handler) {
 			"flexibility": stringSchema("New answer to whether the commitment can be moved. Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),
 			"visibility":  stringSchema("New answer to who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
 			"location":    stringSchema("New location.", Constraints{MaxLength: intPtr(500)}),
-			"memo":        stringSchema("New memo/notes."),
+			"memo":        stringSchema("New memo/notes.", Constraints{MaxLength: intPtr(10000)}),
 			"blockLabel":  stringSchema("New block label.", Constraints{MaxLength: intPtr(100)}),
 		}, []string{"eventId"}),
 		run: runUpdateCalendarEvent,
@@ -534,8 +549,14 @@ func registerTools(h *Handler) {
 			// The name bound is the width of labels.name, which is also what the
 			// REST label inputs declare. A wider bound here would accept a name
 			// the column cannot store and fail in the driver instead.
-			"name":        stringSchema("Label name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(64)}),
-			"color":       stringSchema("Hex color (e.g. #ef4444). Optional.", Constraints{Pattern: `^#[0-9a-fA-F]{6}$`}),
+			"name": stringSchema("Label name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(64)}),
+			// The pattern already fixes the length at seven, but the bound is
+			// stated so that a check reading declared numbers can see it
+			// without inferring a length out of a regular expression. The
+			// number is the one the REST label inputs declare for the same
+			// column, since two surfaces stating different bounds for one
+			// column means one of them is wrong.
+			"color":       stringSchema("Hex color (e.g. #ef4444). Optional.", Constraints{Pattern: `^#[0-9a-fA-F]{6}$`, MaxLength: intPtr(16)}),
 			"description": stringSchema("Optional description.", Constraints{MaxLength: intPtr(255)}),
 		}, []string{"name"}),
 		run: runCreateLabel,
@@ -708,9 +729,11 @@ func registerTools(h *Handler) {
 		description:   "Create a new import job.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"source":     stringSchema("Import source: github, jira, linear, or csv.", Constraints{Pattern: `^(github|jira|linear|csv)$`}),
-			"projectId":  stringSchema("Project public id (UUID v7) to import into. Optional.", Constraints{Pattern: publicIDPattern}),
-			"configJson": stringSchema("JSON string with source-specific configuration. Optional."),
+			"source":    stringSchema("Import source: github, jira, linear, or csv.", Constraints{Pattern: `^(github|jira|linear|csv)$`}),
+			"projectId": stringSchema("Project public id (UUID v7) to import into. Optional.", Constraints{Pattern: publicIDPattern}),
+			// The configuration is stored as JSON and read back by the
+			// importer, so the bound is on the document one call may carry.
+			"configJson": stringSchema("JSON string with source-specific configuration. Optional.", Constraints{MaxLength: intPtr(20000)}),
 		}, []string{"source"}),
 		run: runCreateImportJob,
 	})
@@ -735,6 +758,14 @@ type Constraints struct {
 	// names them. Build it from the generated column constants so the
 	// advertised set cannot fall behind the column.
 	Enum []string
+	// MinItems and MaxItems bound how many elements an array argument
+	// carries. A length is not decoration on an array the way it is on
+	// a string: the tool does work per element inside the one call —
+	// a row inserted under a lock, an id fetched and pasted into an LLM
+	// prompt — so an unbounded array lets the caller choose how much
+	// work, and how long a lock is held, on the server's behalf.
+	MinItems *int
+	MaxItems *int
 }
 
 func intPtr(v int) *int { return &v }
@@ -833,6 +864,22 @@ func boolSchema(desc string) map[string]any {
 	return map[string]any{"type": "boolean", "description": desc}
 }
 
+// arraySchema builds an array property from the schema its elements take.
+//
+// It exists so an array is bounded the same way a string is. Written as a
+// bare map literal an array has no constraint surface at all, and every
+// one of them was therefore unbounded by construction rather than by
+// choice — while the string beside it went through Constraints and got a
+// length. Going through a helper is what makes "how many elements" a
+// question the next array has to answer.
+func arraySchema(desc string, items map[string]any, c ...Constraints) map[string]any {
+	out := map[string]any{"type": "array", "description": desc, "items": items}
+	if len(c) > 0 {
+		applyArrayConstraints(out, c[0])
+	}
+	return out
+}
+
 func applyStringConstraints(out map[string]any, c Constraints) {
 	if len(c.Enum) > 0 {
 		out["enum"] = c.Enum
@@ -854,6 +901,15 @@ func applyIntConstraints(out map[string]any, c Constraints) {
 	}
 	if c.Max != nil {
 		out["maximum"] = *c.Max
+	}
+}
+
+func applyArrayConstraints(out map[string]any, c Constraints) {
+	if c.MinItems != nil {
+		out["minItems"] = *c.MinItems
+	}
+	if c.MaxItems != nil {
+		out["maxItems"] = *c.MaxItems
 	}
 }
 

@@ -99,6 +99,18 @@ func TestCreateTaskPriorityIsBounded(t *testing.T) {
 	})
 }
 
+// repeatAny builds an argument array of a given length. A count bound is
+// the one constraint whose test cases cannot be written out, and writing
+// them by hand at the boundary is how a test ends up asserting a
+// different number than the schema declares.
+func repeatAny(v any, n int) []any {
+	out := make([]any, n)
+	for i := range out {
+		out[i] = v
+	}
+	return out
+}
+
 func TestSchemaConstraintsAreEnforced(t *testing.T) {
 	t.Parallel()
 
@@ -239,6 +251,34 @@ func TestSchemaConstraintsAreEnforced(t *testing.T) {
 			name: "public ids inside a string array",
 			tool: "generate_page",
 			args: map[string]any{"contextDescription": "release notes", "taskIds": []any{publicID}},
+		},
+		{
+			name:    "more steps than one request may create",
+			tool:    "apply_steps",
+			args:    map[string]any{"parentTaskId": publicID, "steps": repeatAny(map[string]any{"title": "step"}, 101)},
+			wantErr: true,
+		},
+		{
+			name: "as many steps as one request may create",
+			tool: "apply_steps",
+			args: map[string]any{"parentTaskId": publicID, "steps": repeatAny(map[string]any{"title": "step"}, 100)},
+		},
+		{
+			name:    "no steps at all",
+			tool:    "apply_steps",
+			args:    map[string]any{"parentTaskId": publicID, "steps": []any{}},
+			wantErr: true,
+		},
+		{
+			name:    "more context tasks than the prompt may carry",
+			tool:    "generate_page",
+			args:    map[string]any{"contextDescription": "release notes", "taskIds": repeatAny(publicID, 51)},
+			wantErr: true,
+		},
+		{
+			name: "as many context tasks as the prompt may carry",
+			tool: "generate_page",
+			args: map[string]any{"contextDescription": "release notes", "taskIds": repeatAny(publicID, 50)},
 		},
 		{
 			name: "unknown argument is ignored, not refused",

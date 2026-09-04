@@ -33,10 +33,11 @@ import (
 //
 // Only the keyword subset the schema helpers in tools.go can emit is
 // interpreted (type, required, enum, pattern, minLength, maxLength,
-// minimum, maximum, properties, items). An unrecognised keyword is
-// ignored rather than treated as a failure, so adding one to a schema
-// never rejects previously valid calls by accident — but it also never
-// silently starts enforcing something. [TestToolSchemaKeywordsAreEnforced]
+// minimum, maximum, minItems, maxItems, properties, items). An
+// unrecognised keyword is ignored rather than treated as a failure, so
+// adding one to a schema never rejects previously valid calls by
+// accident — but it also never silently starts enforcing something.
+// [TestToolSchemaKeywordsAreEnforced]
 // closes that gap from the other side by failing when a schema uses a
 // keyword this validator does not implement.
 
@@ -55,6 +56,8 @@ var validationKeywords = map[string]bool{
 	"maxLength":   true,
 	"minimum":     true,
 	"maximum":     true,
+	"minItems":    true,
+	"maxItems":    true,
 }
 
 // patternCache memoises compiled schema patterns. Schemas are built once
@@ -132,6 +135,22 @@ func validateValue(schema map[string]any, value any, path string) error {
 		arr, ok := value.([]any)
 		if !ok {
 			return argumentsInvalid(path, "expected an array")
+		}
+		// The length is checked before anything descends into the
+		// elements. An array's length is work the tool then does per
+		// element — a child task inserted inside the transaction holding
+		// the project row, an id fetched and pasted into an LLM prompt —
+		// so it is the argument that costs, and a caller sending ten
+		// thousand of them has to be refused for the count rather than
+		// after ten thousand element validations. The bounds apply
+		// whether or not an item schema is declared, for the same reason:
+		// what is being bounded is the number of elements, not their
+		// shape.
+		if minItems, ok := schemaInt(schema, "minItems"); ok && len(arr) < minItems {
+			return argumentsInvalid(path, "must have at least %d items", minItems)
+		}
+		if maxItems, ok := schemaInt(schema, "maxItems"); ok && len(arr) > maxItems {
+			return argumentsInvalid(path, "must have at most %d items", maxItems)
 		}
 		items, _ := schema["items"].(map[string]any)
 		if items == nil {
