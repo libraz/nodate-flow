@@ -371,6 +371,12 @@ jobs:
       - name: Build
         run: make build-go
 
+      # Reads Go sources, compose.yml and the scrape configuration
+      # together, so it belongs to the job that has a Go toolchain rather
+      # than to the script guards in the web job.
+      - name: Metrics wiring
+        run: make check-metrics-wiring
+
       # -short is deliberately absent: the integration guards skip on it as
       # well as on NF_TEST_INTEGRATION, so passing it would silence the
       # suites this job just opted into.

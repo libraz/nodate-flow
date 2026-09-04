@@ -275,8 +275,8 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-goroutine-failnow check-calendar-write-acl
-check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-goroutine-failnow check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + goroutine FailNow guard + calendar write-ACL guard
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-goroutine-failnow check-calendar-write-acl check-metrics-wiring
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-goroutine-failnow check-calendar-write-acl check-metrics-wiring ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + goroutine FailNow guard + calendar write-ACL guard + metrics wiring guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -338,6 +338,13 @@ check-schema-collisions: ## Fail when one component schema is the response of tw
 
 check-reachability: ## Fail when a guard, generator, or suite exists that no gate runs
 	node scripts/check-reachability.mjs
+
+# The census this prints on a passing run is the point: each line is a
+# dashboard panel that renders empty or an alert that cannot fire, and
+# `make` shows a passing recipe's output, so the residue stays visible
+# instead of appearing only on the run that already failed.
+check-metrics-wiring: ## Fail when Prometheus scrapes an address no service binds for /metrics
+	go -C scripts run check-metrics-wiring.go
 
 # --strict also rejects a reference to an undefined token that carries a
 # fallback. Such a reference still renders, which is why it was advisory
