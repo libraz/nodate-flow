@@ -57,6 +57,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -64,6 +65,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // agentCommentPrefix marks a comment row authored on behalf of the
@@ -566,13 +568,9 @@ func truncateTitleRunes(s string, maxRunes int) string {
 	if maxRunes < 1 {
 		return ""
 	}
-	r := []rune(s)
-	if len(r) <= maxRunes {
+	if utf8.RuneCountInString(s) <= maxRunes {
 		return s
 	}
 	// Reserve one rune for the ellipsis.
-	if maxRunes == 1 {
-		return "…"
-	}
-	return string(r[:maxRunes-1]) + "…"
+	return stringutil.TruncateRunes(s, maxRunes-1) + "…"
 }

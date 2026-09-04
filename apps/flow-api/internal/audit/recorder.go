@@ -11,22 +11,16 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // userAgentMaxLen matches the audit_logs.user_agent column width. The
 // value is clipped before storage so an oversized header cannot be used
 // as a write-amplification vector.
 const userAgentMaxLen = 512
-
-// truncateUserAgent clips an oversized User-Agent to the column width.
-func truncateUserAgent(ua string) string {
-	if len(ua) > userAgentMaxLen {
-		return ua[:userAgentMaxLen]
-	}
-	return ua
-}
 
 // Recorder appends audit log entries to the audit_logs table.
 // A nil *Recorder is safe to use; all methods become no-ops so callers
@@ -111,7 +105,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 	}
 	uaValue := sql.NullString{}
 	if userAgent != "" {
-		uaValue = sql.NullString{String: truncateUserAgent(userAgent), Valid: true}
+		uaValue = sql.NullString{String: stringutil.TruncateBytes(userAgent, userAgentMaxLen), Valid: true}
 	}
 
 	now := time.Now()
@@ -132,7 +126,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 			OccurredAt:             now,
 		})
 		if err != nil {
-			slog.WarnContext(ctx, "audit: failed to append instance log", slog.String("action", e.Action), slog.String("err", err.Error()))
+			recordLoss(ctx, obs.AuditTableInstance, e.Action, err)
 		}
 		return
 	}
@@ -150,6 +144,22 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 		OccurredAt:       now,
 	})
 	if err != nil {
-		slog.WarnContext(ctx, "audit: failed to append log", slog.String("action", e.Action), slog.String("err", err.Error()))
+		recordLoss(ctx, obs.AuditTableWorkspace, e.Action, err)
 	}
+}
+
+// recordLoss reports an audit row that was built but never stored.
+//
+// The caller is not failed: an audit backend problem must not turn into
+// a service outage. That decision is what makes the loss silent, so it
+// is logged at error level and counted, because the request it belongs
+// to has already been answered 2xx and nothing else will ever mention
+// it. The counter is the part an alert can watch; the log line is the
+// part that says which action went missing.
+func recordLoss(ctx context.Context, table, action string, err error) {
+	obs.IncAuditWriteFailure(table)
+	slog.ErrorContext(ctx, "audit: entry lost, write failed",
+		slog.String("table", table),
+		slog.String("action", action),
+		slog.String("err", err.Error()))
 }

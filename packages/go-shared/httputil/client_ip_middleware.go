@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // ClientIPMaxLen caps the stored IP string to avoid unbounded
@@ -29,16 +30,15 @@ func ClientIPMiddleware() func(http.Handler) http.Handler {
 func ClientIPMiddlewareWithTrustedProxyHops(trustedProxyHops int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := ExtractClientIPWithTrustedProxyHops(r, trustedProxyHops)
-			if len(ip) > ClientIPMaxLen {
-				ip = ip[:ClientIPMaxLen]
-			}
+			// Both values reach utf8mb4 columns further down, and both
+			// can carry arbitrary bytes: net/http accepts obs-text in a
+			// header value, so a User-Agent is not ASCII by contract and
+			// neither is a forwarding header. The caps therefore cut on a
+			// rune boundary rather than a byte index.
+			ip := stringutil.TruncateBytes(ExtractClientIPWithTrustedProxyHops(r, trustedProxyHops), ClientIPMaxLen)
 			ctx := authn.WithClientIP(r.Context(), ip)
 			if ua := r.UserAgent(); ua != "" {
-				if len(ua) > UserAgentMaxLen {
-					ua = ua[:UserAgentMaxLen]
-				}
-				ctx = authn.WithUserAgent(ctx, ua)
+				ctx = authn.WithUserAgent(ctx, stringutil.TruncateBytes(ua, UserAgentMaxLen))
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

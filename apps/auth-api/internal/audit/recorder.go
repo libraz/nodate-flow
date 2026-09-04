@@ -13,20 +13,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // userAgentMaxLen matches the audit_logs.user_agent column width. The
 // value is clipped before storage so an oversized header cannot be used
 // as a write-amplification vector.
 const userAgentMaxLen = 512
-
-// truncateUserAgent clips an oversized User-Agent to the column width.
-func truncateUserAgent(ua string) string {
-	if len(ua) > userAgentMaxLen {
-		return ua[:userAgentMaxLen]
-	}
-	return ua
-}
 
 // Sink is the minimal contract used by handlers to append audit
 // entries. The production implementation is *Recorder; tests inject
@@ -125,7 +118,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 	}
 	uaValue := sql.NullString{}
 	if userAgent != "" {
-		uaValue = sql.NullString{String: truncateUserAgent(userAgent), Valid: true}
+		uaValue = sql.NullString{String: stringutil.TruncateBytes(userAgent, userAgentMaxLen), Valid: true}
 	}
 
 	now := time.Now()
@@ -146,7 +139,7 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 			OccurredAt:             now,
 		})
 		if err != nil {
-			slog.WarnContext(ctx, "audit: failed to append instance log", slog.String("action", e.Action), slog.String("err", err.Error()))
+			recordLoss(ctx, auditTableInstance, e.Action, err)
 		}
 		return
 	}
@@ -164,6 +157,30 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 		OccurredAt:       now,
 	})
 	if err != nil {
-		slog.WarnContext(ctx, "audit: failed to append log", slog.String("action", e.Action), slog.String("err", err.Error()))
+		recordLoss(ctx, auditTableWorkspace, e.Action, err)
 	}
+}
+
+// Audit destination table labels, shared by the log lines below and by
+// whatever counts them.
+const (
+	auditTableWorkspace = "audit_logs"
+	auditTableInstance  = "instance_audit_logs"
+)
+
+// recordLoss reports an audit row that was built but never stored.
+//
+// The caller is not failed: an audit backend problem must not turn into
+// a service outage. That decision is what makes the loss silent, so it
+// is logged at error level, because the request it belongs to has
+// already been answered 2xx and nothing else will ever mention it.
+//
+// This service exposes no metrics endpoint, so the log line is the only
+// signal; the flow-api recorder counts the same event on
+// nf_audit_write_failures_total.
+func recordLoss(ctx context.Context, table, action string, err error) {
+	slog.ErrorContext(ctx, "audit: entry lost, write failed",
+		slog.String("table", table),
+		slog.String("action", action),
+		slog.String("err", err.Error()))
 }

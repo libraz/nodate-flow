@@ -30,6 +30,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // countLinkedEvents returns how many enabled calendar_events are
@@ -2628,6 +2629,25 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": pub.String()}, nil
 }
 
+// generatedPageTitleMaxLen caps the page title this tool produces,
+// whether it came from the caller's description or from the model. The
+// pages.title column is wider; this is the tool's own bound, and it
+// matches the maxLength the create_page and update_page tools declare on
+// a caller-supplied title.
+const generatedPageTitleMaxLen = 200
+
+// generatedPageTitle builds the fallback page title from the caller's
+// context description.
+//
+// The cut lands on a rune boundary: the description arrives over MCP and
+// is free-form, so a byte-indexed cut can sever a multi-byte character
+// and hand the utf8mb4 column a fragment it rejects under
+// STRICT_TRANS_TABLES — the page then fails to create with nothing in
+// the request to explain why.
+func generatedPageTitle(contextDescription string) string {
+	return stringutil.TruncateBytes("Generated: "+contextDescription, generatedPageTitleMaxLen)
+}
+
 // runGeneratePage generates a wiki page using AI. When no AI provider
 // is configured, it creates a page with the context description as body
 // and marks is_ai_generated=false.
@@ -2675,10 +2695,7 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	}
 
 	// Attempt AI generation.
-	title := "Generated: " + in.ContextDescription
-	if len(title) > 200 {
-		title = title[:200]
-	}
+	title := generatedPageTitle(in.ContextDescription)
 	body := in.ContextDescription
 	isAI := false
 
@@ -2692,7 +2709,13 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 			// Use the first proposed task's title and description as page
 			// content. ProposeTasksFrom is reused as the general-purpose
 			// LLM call; the response is repurposed here.
-			title = proposed[0].Title
+			//
+			// The model's title gets the same bound as the fallback one.
+			// Nothing constrains what a model returns, so an overlong title
+			// reached pages.title unclipped and the insert failed, losing
+			// the body the call had already paid for. The cut is rune-aware
+			// for the same reason as in generatedPageTitle.
+			title = stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleMaxLen)
 			body = proposed[0].Description
 			isAI = true
 		}
@@ -2735,6 +2758,11 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		"isAiGenerated": isAI,
 	}, nil
 }
+
+// taskTitleMaxLen is the width of tasks.title. Model-produced titles are
+// cut to it in bytes, which is conservative for a utf8mb4 column counted
+// in characters.
+const taskTitleMaxLen = 255
 
 // runSmartCreateTask creates a parent task and AI-suggested subtasks with
 // assignee recommendations. It delegates to the AI orchestrator's
@@ -2780,6 +2808,18 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	)
 	if err != nil {
 		return nil, mapAiError(err)
+	}
+
+	// Bound every title the model produced before any of them reaches a
+	// column. Nothing constrains what a model returns, and tasks.title is
+	// finite, so an overlong subtask title failed the insert and took the
+	// whole batch — parent included — down with it. The caller's own title
+	// is bounded by the tool's input schema; this is the same bound applied
+	// to the half of the payload no schema covers. The cut is rune-aware:
+	// a byte-indexed cut can sever a multi-byte character and hand the
+	// utf8mb4 column a fragment it rejects under STRICT_TRANS_TABLES.
+	for i := range proposal.Subtasks {
+		proposal.Subtasks[i].Title = stringutil.TruncateBytes(proposal.Subtasks[i].Title, taskTitleMaxLen)
 	}
 
 	// Create the parent and every proposed subtask in one transaction, so a

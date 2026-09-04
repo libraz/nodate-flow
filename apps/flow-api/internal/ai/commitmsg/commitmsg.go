@@ -15,6 +15,10 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // Status describes the file-level change type in the source control
@@ -29,6 +33,12 @@ const (
 	StatusDeleted  Status = "deleted"
 	StatusRenamed  Status = "renamed"
 )
+
+// subjectMaxLen is the Conventional Commits subject width, in bytes.
+// The limit describes a terminal line, so it counts storage rather than
+// characters; a wide-character summary is clipped earlier in characters
+// than an ASCII one, which is what a fixed line width means.
+const subjectMaxLen = 72
 
 // Change is one file in a candidate commit.
 type Change struct {
@@ -174,13 +184,18 @@ func inferSubject(changes []Change, summary string) string {
 	s := strings.TrimSpace(summary)
 	if s != "" {
 		s = strings.TrimRight(s, ".")
-		// Lowercase the first rune so it reads imperative.
-		if len(s) > 0 {
-			s = strings.ToLower(s[:1]) + s[1:]
+		// Lowercase the first character so it reads imperative. The
+		// summary is caller-supplied free text, so the first character
+		// is not necessarily one byte: decoding it is what makes this
+		// "lowercase the first character" rather than "lowercase the
+		// first byte and replace the rest of that character with U+FFFD".
+		// A character with no lowercase form is left as it is.
+		if r, size := utf8.DecodeRuneInString(s); size > 0 && r != utf8.RuneError {
+			s = string(unicode.ToLower(r)) + s[size:]
 		}
-		if len(s) > 72 {
-			s = s[:72]
-		}
+		// Clip to the conventional subject width, cutting at a rune
+		// boundary so a multi-byte summary stays valid UTF-8.
+		s = stringutil.TruncateBytes(s, subjectMaxLen)
 		return s
 	}
 	// Fallback: list up to 3 file basenames.

@@ -38,6 +38,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/presence-discord/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // SignalKind is the wire-level signal kind emitted for every
@@ -56,6 +57,14 @@ const SignalSource = string(signalwire.SourceDiscord)
 // row is subject_type='user' with subject_id = the resolved flow user
 // public id (UUID v7).
 const SignalSubjectType = "user"
+
+// maxLookupBodyLen caps how much of the by-discord lookup response is
+// read into memory. The client has a timeout, so an endless body is
+// bounded in time already, but a fast one is not bounded in size: the
+// decoder would keep allocating for as long as bytes arrive. The two
+// fields below are a few dozen bytes; 1 MiB leaves room for an error
+// envelope and nothing else.
+const maxLookupBodyLen = 1 << 20
 
 // resolverResponse is the JSON shape returned by the by-discord lookup
 // endpoint. Mirrored field-for-field on the flow-api side; any
@@ -220,7 +229,7 @@ func (e *Emitter) resolveUser(ctx context.Context, snowflake string) (resolverRe
 	}
 
 	var out resolverResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxLookupBodyLen)).Decode(&out); err != nil {
 		e.logger.WarnContext(ctx, "presence-discord: lookup decode failed",
 			slog.Any("err", err),
 		)
@@ -305,12 +314,16 @@ func buildLookupURL(baseURL, snowflake string) (string, error) {
 // lines stay bounded even when flow-api returns a long error envelope.
 // Reading inside the defer-Close above is safe because the next read
 // after truncation closes the underlying connection.
+//
+// The clip lands on a rune boundary: an error envelope carries the
+// offending values, which are workspace content and need not be ASCII,
+// and a byte cut would put U+FFFD at the end of the log line.
 func truncatedBody(r io.Reader) string {
 	const max = 512
 	buf := make([]byte, max+1)
 	n, _ := io.ReadFull(r, buf)
 	if n > max {
-		return string(buf[:max]) + "...(truncated)"
+		return stringutil.TruncateBytes(string(buf[:n]), max) + "...(truncated)"
 	}
 	return string(buf[:n])
 }

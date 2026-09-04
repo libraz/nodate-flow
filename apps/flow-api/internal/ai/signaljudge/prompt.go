@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // systemPrompt is the production signal_judge system prompt. It is
@@ -409,7 +411,7 @@ func capTasks(in []TaskSummary, n int) []TaskSummary {
 	out := make([]TaskSummary, n)
 	for i := 0; i < n; i++ {
 		t := in[i]
-		t.Title = truncateRunes(t.Title, MaxTaskTitleLen)
+		t.Title = stringutil.TruncateBytes(t.Title, MaxTaskTitleLen)
 		out[i] = t
 	}
 	return out
@@ -420,35 +422,7 @@ func capTasks(in []TaskSummary, n int) []TaskSummary {
 // no ellipsis is appended (the LLM tolerates abrupt cutoff fine and
 // an ellipsis costs tokens we would rather spend on context).
 func capJudgeInstructions(s string) string {
-	if len(s) <= MaxJudgeInstructionsLen {
-		return s
-	}
-	return truncateBytes(s, MaxJudgeInstructionsLen)
-}
-
-// truncateRunes returns s shortened to at most maxBytes bytes,
-// cutting at a rune boundary so the result is valid UTF-8.
-func truncateRunes(s string, maxBytes int) string {
-	if len(s) <= maxBytes {
-		return s
-	}
-	return truncateBytes(s, maxBytes)
-}
-
-// truncateBytes cuts s at the last rune boundary <= maxBytes. Pulled
-// out as a tiny helper so the cap call sites stay readable.
-func truncateBytes(s string, maxBytes int) string {
-	if maxBytes <= 0 {
-		return ""
-	}
-	if len(s) <= maxBytes {
-		return s
-	}
-	cut := maxBytes
-	for cut > 0 && (s[cut]&0xC0) == 0x80 {
-		cut--
-	}
-	return s[:cut]
+	return stringutil.TruncateBytes(s, MaxJudgeInstructionsLen)
 }
 
 // RenderUserPrompt turns a [PromptContext] into the markdown-flavoured

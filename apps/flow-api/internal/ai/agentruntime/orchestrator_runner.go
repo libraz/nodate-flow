@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"time"
-	"unicode/utf8"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -14,6 +13,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // ExecutionResult is the optional rich return value an [AgentExecutor]
@@ -515,7 +515,7 @@ func (r *OrchestratorRunner) recordSuccessMemo(ctx context.Context, workspaceID,
 		// actual agent_memo write site: redact again as a persistence
 		// guard so a future executor that forgets cannot leak a
 		// secret-prefixed token into storage. Redact is idempotent.
-		patch["last_thought"] = logutil.Redact(truncate(result.LastThought, 500))
+		patch["last_thought"] = logutil.Redact(stringutil.TruncateBytes(result.LastThought, 500))
 	}
 	prior := r.readMemo(ctx, workspaceID, taskID)
 	if prior.HandoffStatus != "" {
@@ -666,26 +666,4 @@ func (r *OrchestratorRunner) pauseAgent(ctx context.Context, agentID uint32) {
 		slog.ErrorContext(ctx, "agentruntime: pause agent failed",
 			slog.Uint64("agent_id", uint64(agentID)), slog.Any("err", err))
 	}
-}
-
-// truncate shortens s to at most n bytes, cutting at a rune boundary so
-// the result is valid UTF-8.
-//
-// The cut used to land on a byte index, which severs the last rune of any
-// non-ASCII summary and leaves a fragment that renders as U+FFFD. The one
-// call site writes agent_memo.last_thought, so the damage is stored: the
-// replacement character is what the inbox shows from then on, and the
-// bytes that would have completed the rune are gone.
-func truncate(s string, n int) string {
-	if n <= 0 {
-		return ""
-	}
-	if len(s) <= n {
-		return s
-	}
-	cut := n
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut]
 }

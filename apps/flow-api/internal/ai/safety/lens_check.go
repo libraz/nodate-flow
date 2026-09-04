@@ -6,8 +6,10 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // Finding describes a single PII or secret match found during a scan.
@@ -128,6 +130,12 @@ func scanFields(taskID, title, description string) []Finding {
 // redactSnippet extracts a short window around the match and partially
 // redacts the matched text, keeping only the first 3 and last 2
 // characters visible.
+//
+// loc is a byte range and the surrounding text is free-form user content,
+// so both window edges are snapped to rune boundaries. A fixed byte
+// offset either side of the match otherwise opens or closes the window
+// inside a multi-byte character, and the snippet reaches the reviewer
+// with U+FFFD where the context should be.
 func redactSnippet(text string, loc []int) string {
 	const windowBefore = 20
 	const windowAfter = 20
@@ -136,22 +144,23 @@ func redactSnippet(text string, loc []int) string {
 	if start < 0 {
 		start = 0
 	}
-	end := loc[1] + windowAfter
-	if end > len(text) {
-		end = len(text)
+	// Snap forward: opening the window later never exceeds the budget.
+	for start < loc[0] && !utf8.RuneStart(text[start]) {
+		start++
 	}
 
-	matched := text[loc[0]:loc[1]]
-	redacted := redactMatch(matched)
+	before := text[start:loc[0]]
+	after := stringutil.TruncateBytes(text[loc[1]:], windowAfter)
+	redacted := redactMatch(text[loc[0]:loc[1]])
 
 	var b strings.Builder
 	if start > 0 {
 		b.WriteString("...")
 	}
-	b.WriteString(text[start:loc[0]])
+	b.WriteString(before)
 	b.WriteString(redacted)
-	b.WriteString(text[loc[1]:end])
-	if end < len(text) {
+	b.WriteString(after)
+	if loc[1]+len(after) < len(text) {
 		b.WriteString("...")
 	}
 	return b.String()
@@ -159,6 +168,10 @@ func redactSnippet(text string, loc []int) string {
 
 // redactMatch keeps the first 3 and last 2 characters of a matched
 // string, replacing the middle with asterisks.
+//
+// The byte slices are safe: s is what one of the heuristics above
+// matched, and every one of them is built from ASCII-only character
+// classes, so each byte of s is one character.
 func redactMatch(s string) string {
 	if len(s) <= 5 {
 		return strings.Repeat("*", len(s))
