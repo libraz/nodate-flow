@@ -21,14 +21,29 @@
 //
 //	DELETE            zero rows means nothing matched the predicate.
 //	soft delete       UPDATE ... SET enabled = FALSE ... WHERE ... enabled
-//	                  counts zero when no live row matched. The reads in
-//	                  this repository filter on enabled = TRUE, so "already
-//	                  disabled" and "never existed" are the same answer to
-//	                  the caller: the resource is not there.
+//	                  counts zero when no live row matched. The reads that
+//	                  answer a caller asking for a resource filter on
+//	                  enabled = TRUE, so "already disabled" and "never
+//	                  existed" are the same answer to that caller: the
+//	                  resource is not there.
+//
+// The premise is scoped to those reads, and deliberately so. Other reads
+// see past the marker because seeing past it is their job — detecting the
+// replay of a credential that was revoked, showing an operator what was
+// removed, sweeping tombstoned rows before their storage goes. None of
+// them answers a request for the resource, so none of them makes a
+// disabled row visible to the caller a zero count concerns.
 //
 // For those statements a zero count is exactly the 404 the caller is owed,
 // so dropping it turns a request that changed nothing into a success —
 // together with the audit entry and the timeline event that say it did.
+//
+// The soft-delete shape is one shape written in several columns: the
+// enabled flag, and the tombstone timestamps whose absence the reads take
+// as the live state. Which columns those are is the vocabulary in
+// liveness.go, and it is asserted against the schema rather than assumed —
+// a convention nobody classified fails the check instead of quietly
+// carrying statements out of it.
 //
 // The scope is derived rather than listed. A removal statement added
 // tomorrow is checked without anyone remembering it exists, and a statement
@@ -69,8 +84,8 @@ const (
 	NotRemoval RemovalKind = ""
 	// HardDelete is a DELETE.
 	HardDelete RemovalKind = "DELETE"
-	// SoftDelete is an UPDATE that clears the liveness flag the reads
-	// filter on, guarded on that same flag.
+	// SoftDelete is an UPDATE that writes a removal marker the reads
+	// filter on, guarded on that same marker.
 	SoftDelete RemovalKind = "soft delete"
 )
 
@@ -112,9 +127,18 @@ func (s Statement) RemovalKind() RemovalKind {
 	case "delete":
 		return HardDelete
 	case "update":
+		table := updateTarget(s.SQL)
 		set, where := updateClauses(s.SQL)
-		if disablesLiveness.MatchString(set) && mentionsLiveness.MatchString(where) {
-			return SoftDelete
+		for _, marker := range removalMarkers {
+			// The same column removes a row on one table and merely
+			// shelves it on another, so the table the statement writes
+			// decides which it is doing here.
+			if role, _ := RoleFor(table, marker.column); role != RemovalMarker {
+				continue
+			}
+			if marker.written(set) && marker.guarded(where) {
+				return SoftDelete
+			}
 		}
 		return NotRemoval
 	default:
@@ -143,11 +167,55 @@ func (s Statement) CountIsReachable() bool {
 	return s.Annotation == "execrows" || s.Annotation == "execresult"
 }
 
-var (
-	disablesLiveness = regexp.MustCompile(`\benabled\s*=\s*false\b`)
-	mentionsLiveness = regexp.MustCompile(`\benabled\b`)
-	headerPattern    = regexp.MustCompile(`^--\s*name:\s*(\S+)\s+:(\S+)`)
-)
+var headerPattern = regexp.MustCompile(`^--\s*name:\s*(\S+)\s+:(\S+)`)
+
+// marker matches one removal-marker column inside a normalized clause.
+type marker struct {
+	column     string
+	assignment *regexp.Regexp
+	mention    *regexp.Regexp
+}
+
+// removalMarkers is the vocabulary the removal shape is read in: every
+// column classified as a removal marker on any table. Whether it is one on
+// the table a given statement writes is settled per statement, because the
+// classification is keyed by table and column together.
+var removalMarkers = compileMarkers(RemovalMarkerColumns())
+
+func compileMarkers(columns []string) []marker {
+	out := make([]marker, 0, len(columns))
+	for _, column := range columns {
+		out = append(out, marker{
+			column:     column,
+			assignment: regexp.MustCompile(`\b` + column + `\s*=\s*([^\s,]+)`),
+			mention:    regexp.MustCompile(`\b` + column + `\b`),
+		})
+	}
+	return out
+}
+
+// isLiveValue reports whether an assigned value leaves the row in the read
+// set: the marker's live value, or a parameter, which says nothing about
+// which direction the statement moves the row in.
+func isLiveValue(value string) bool {
+	return value == "true" || value == "null" || value == "?" ||
+		strings.HasPrefix(value, "sqlc.")
+}
+
+// written reports whether a SET clause moves the marker to its removed
+// value. `SET enabled = TRUE` and `SET deleted_at = NULL` are the same
+// statement running backwards, and neither is a removal.
+func (m marker) written(set string) bool {
+	found := m.assignment.FindStringSubmatch(set)
+	return found != nil && !isLiveValue(found[1])
+}
+
+// guarded reports whether a predicate restricts on the marker, which is
+// what makes a zero count mean "no live row matched" rather than "the row
+// already held this value".
+func (m marker) guarded(where string) bool {
+	return m.mention.MatchString(where)
+}
 
 // RepoRoot returns the repository root, found by walking up from the
 // caller's working directory to the go.work that defines the workspace.
@@ -280,6 +348,16 @@ func head(sql string) string {
 		return ""
 	}
 	return fields[0]
+}
+
+// updateTarget returns the table a normalized UPDATE writes. The name may
+// be followed by an alias, which is not part of it.
+func updateTarget(sql string) string {
+	fields := strings.Fields(sql)
+	if len(fields) < 2 || fields[0] != "update" {
+		return ""
+	}
+	return fields[1]
 }
 
 // updateClauses splits a normalized UPDATE into its assignments and its

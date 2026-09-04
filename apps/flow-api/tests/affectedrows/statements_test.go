@@ -99,6 +99,31 @@ SET archived_at = NOW()
 WHERE public_id = ?
   AND archived_at IS NULL;
 
+-- name: TombstoneRow :execrows
+UPDATE t
+SET enabled = FALSE,
+    deleted_at = CURRENT_TIMESTAMP(3)
+WHERE public_id = ?
+  AND deleted_at IS NULL;
+
+-- name: RestoreRow :execrows
+UPDATE t
+SET deleted_at = NULL
+WHERE public_id = ?
+  AND deleted_at IS NOT NULL;
+
+-- name: RevokeRow :execrows
+UPDATE t
+SET revoked_at = NOW()
+WHERE public_id = ?
+  AND revoked_at IS NULL;
+
+-- name: UnarchiveRow :execrows
+UPDATE t
+SET archived_at = NULL
+WHERE public_id = ?
+  AND archived_at IS NOT NULL;
+
 -- name: AddRow :execlastid
 INSERT INTO t (public_id) VALUES (?);
 `
@@ -116,7 +141,25 @@ INSERT INTO t (public_id) VALUES (?);
 		{"ReviveRow", "execrows", 13, NotRemoval, false},
 		{"RenameRow", "exec", 19, NotRemoval, false},
 		{"ArchiveRow", "exec", 24, NotRemoval, false},
-		{"AddRow", "execlastid", 30, NotRemoval, false},
+		// The removal shape is read in more than one column: a tombstone
+		// timestamp guarded on its own absence removes the row from the
+		// reads exactly as the flag does. ArchiveRow above is the
+		// counterexample that has to stay outside it — archiving is a
+		// state the row comes back out of, so a zero count there says the
+		// row was already archived, not that it was never there.
+		{"TombstoneRow", "execrows", 30, SoftDelete, false},
+		// Writing the same column back is the statement running
+		// backwards, and reading the SET clause is what tells them apart.
+		{"RestoreRow", "execrows", 37, NotRemoval, false},
+		{"RevokeRow", "execrows", 43, SoftDelete, false},
+		// ArchiveRow and UnarchiveRow are the pair that has to stay
+		// outside the shape. RevokeRow above is written identically to
+		// ArchiveRow, so the SET clause is not what separates them: a
+		// statement clears archived_at and none clears revoked_at, which
+		// is the discriminator TestRemovalMarkersAreNeverWrittenBack
+		// holds against the committed SQL.
+		{"UnarchiveRow", "execrows", 49, NotRemoval, false},
+		{"AddRow", "execlastid", 55, NotRemoval, false},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("parsed %d statements, want %d", len(got), len(want))
