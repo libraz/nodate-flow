@@ -11,6 +11,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
@@ -162,10 +163,12 @@ func (r *Recorder) Record(ctx context.Context, e Entry) {
 }
 
 // Audit destination table labels, shared by the log lines below and by
-// whatever counts them.
+// the counter that records them. They alias the obs constants so the
+// label a dashboard queries and the value a log line carries cannot
+// drift apart.
 const (
-	auditTableWorkspace = "audit_logs"
-	auditTableInstance  = "instance_audit_logs"
+	auditTableWorkspace = obs.AuditTableWorkspace
+	auditTableInstance  = obs.AuditTableInstance
 )
 
 // recordLoss reports an audit row that was built but never stored.
@@ -175,10 +178,11 @@ const (
 // is logged at error level, because the request it belongs to has
 // already been answered 2xx and nothing else will ever mention it.
 //
-// This service exposes no metrics endpoint, so the log line is the only
-// signal; the flow-api recorder counts the same event on
-// nf_audit_write_failures_total.
+// The log line names the row; nf_audit_write_failures_total is what
+// makes the loss alertable, since a log line alone is only found by
+// someone already looking.
 func recordLoss(ctx context.Context, table, action string, err error) {
+	obs.IncAuditWriteFailure(table)
 	slog.ErrorContext(ctx, "audit: entry lost, write failed",
 		slog.String("table", table),
 		slog.String("action", action),

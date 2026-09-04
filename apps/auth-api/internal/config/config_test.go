@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // baseProdConfig returns a config that passes production Validate, so each
 // test can flip a single field to assert that guard.
@@ -108,6 +111,56 @@ func TestNormalizeAllowlist(t *testing.T) {
 			t.Fatalf("got %v", got)
 		}
 	})
+}
+
+// TestValidateEnumsPorts holds that both listening ports are refused
+// before the process binds anything.
+//
+// A port that is not a number, or is outside the range the OS accepts,
+// only surfaces at listen time — after the rest of startup has already
+// run — and the metrics listener is the easier one to get wrong because
+// nothing else in the service depends on it. Each message must name the
+// variable it rejected, since that string is all an operator gets.
+func TestValidateEnumsPorts(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		port    string
+		metrics string
+		wantVar string
+	}{
+		{"both valid", "8082", "9092", ""},
+		{"boundary values accepted", "1", "65535", ""},
+		{"service port not a number", "http", "9092", "NF_AUTH_PORT"},
+		{"service port above range", "65536", "9092", "NF_AUTH_PORT"},
+		{"service port zero", "0", "9092", "NF_AUTH_PORT"},
+		{"metrics port not a number", "8082", "metrics", "NF_AUTH_METRICS_PORT"},
+		{"metrics port above range", "8082", "65536", "NF_AUTH_METRICS_PORT"},
+		{"metrics port zero", "8082", "0", "NF_AUTH_METRICS_PORT"},
+		{"metrics port empty", "8082", "", "NF_AUTH_METRICS_PORT"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateEnums(&Config{
+				Port:         tt.port,
+				MetricsPort:  tt.metrics,
+				SessionStore: "mysql",
+			})
+			if tt.wantVar == "" {
+				if err != nil {
+					t.Fatalf("validateEnums() error = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("validateEnums() accepted port=%q metrics=%q, want rejection naming %s", tt.port, tt.metrics, tt.wantVar)
+			}
+			if !strings.Contains(err.Error(), tt.wantVar) {
+				t.Fatalf("validateEnums() error = %q, does not name %s", err, tt.wantVar)
+			}
+		})
+	}
 }
 
 func TestValidateDevModeSkipsGuards(t *testing.T) {

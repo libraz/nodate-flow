@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 // errDBTX fails every write, which is the shape of an audit backend
@@ -37,25 +39,31 @@ func captureLogs(t *testing.T) *bytes.Buffer {
 	return &buf
 }
 
-// TestRecord_LostEntryIsLoggedAtError holds the visibility of an audit
-// write that fails.
+// TestRecord_LostEntryIsCountedAndLoggedAtError holds the visibility of
+// an audit write that fails.
 //
 // The recorder deliberately does not fail its caller — an audit backend
 // problem must not become a service outage — so the request is answered
-// 2xx and the entry is simply gone. This service exposes no metrics
-// endpoint, so the error-level log line is the only evidence the action
-// ever happened; a warning nobody reads is what makes the loss silent.
-func TestRecord_LostEntryIsLoggedAtError(t *testing.T) {
+// 2xx and the entry is simply gone. That makes the counter and the
+// error-level log the only evidence the action ever happened. A warning
+// nobody reads, and no counter at all, is what makes the loss silent.
+//
+// The two destination tables are asserted separately: this service owns
+// identity, so a lost login (instance-scoped) and a lost role change
+// (workspace-scoped) must stay distinguishable on the dashboard that
+// queries the label.
+func TestRecord_LostEntryIsCountedAndLoggedAtError(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		workspaceID uint32
 		table       string
 	}{
-		{name: "workspace scoped", workspaceID: 9, table: auditTableWorkspace},
-		{name: "instance scoped", workspaceID: 0, table: auditTableInstance},
+		{name: "workspace scoped", workspaceID: 9, table: obs.AuditTableWorkspace},
+		{name: "instance scoped", workspaceID: 0, table: obs.AuditTableInstance},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := captureLogs(t)
+			before := testutil.ToFloat64(obs.AuditWriteFailuresCounter(tc.table))
 
 			rec := New(generated.New(errDBTX{err: errors.New("audit backend unreachable")}))
 			rec.Record(context.Background(), Entry{
@@ -64,6 +72,10 @@ func TestRecord_LostEntryIsLoggedAtError(t *testing.T) {
 				WorkspaceID:  tc.workspaceID,
 				ResourceType: "user",
 			})
+
+			if got := testutil.ToFloat64(obs.AuditWriteFailuresCounter(tc.table)); got != before+1 {
+				t.Fatalf("nf_audit_write_failures_total{table=%q} = %v, want %v", tc.table, got, before+1)
+			}
 
 			line := logs.String()
 			if !strings.Contains(line, "level=ERROR") {

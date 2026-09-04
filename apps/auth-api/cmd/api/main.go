@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/router"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/integrations"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
@@ -247,8 +248,26 @@ func main() {
 	}
 
 	outer := chi.NewRouter()
+	outer.Use(obs.MetricsMiddleware())
 	outer.Use(httputil.BuildCORS(cfg.CorsAllowedOrigins, cfg.CorsDevLocalhost))
 	outer.Mount("/", inner)
+
+	// Prometheus metrics are served on a separate internal-only listener
+	// so they are never reachable through the public API port.
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", obs.MetricsHandler())
+	metricsAddr := ":" + cfg.MetricsPort
+	metricsSrv := &http.Server{
+		Addr:              metricsAddr,
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		logger.Info("metrics server listening", "addr", metricsAddr)
+		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("metrics server exited", "err", err)
+		}
+	}()
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{
@@ -281,6 +300,9 @@ func main() {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer shutdownCancel()
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("metrics server shutdown failed", "err", err)
+	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)

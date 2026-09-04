@@ -15,6 +15,11 @@ type Config struct {
 	Port     string `env:"NF_AUTH_PORT" envDefault:"8082"`
 	LogLevel string `env:"NF_AUTH_LOG_LEVEL" envDefault:"info"`
 
+	// MetricsPort is the port for the internal-only Prometheus metrics
+	// HTTP server. Metrics are served on a separate listener so they are
+	// never exposed through the public-facing API port.
+	MetricsPort string `env:"NF_AUTH_METRICS_PORT" envDefault:"9092"`
+
 	// Env selects the runtime environment. "development"/"dev" enables
 	// developer conveniences (ephemeral JWT key fallback, permissive CORS).
 	// Any other value (e.g. "production") is treated as production by
@@ -312,6 +317,10 @@ func validateEnums(cfg *Config) error {
 	port, err := strconv.Atoi(cfg.Port)
 	if err != nil || port < 1 || port > 65535 {
 		return fmt.Errorf("config: NF_AUTH_PORT must be an integer between 1 and 65535, got %q", cfg.Port)
+	}
+	metricsPort, err := strconv.Atoi(cfg.MetricsPort)
+	if err != nil || metricsPort < 1 || metricsPort > 65535 {
+		return fmt.Errorf("config: NF_AUTH_METRICS_PORT must be an integer between 1 and 65535, got %q", cfg.MetricsPort)
 	}
 	switch cfg.SessionStore {
 	case "mysql", "redis":
