@@ -53,7 +53,10 @@ func TestNoProviderCallGoesUnrecorded(t *testing.T) {
 // is not into a provider, a helper forwarding the error it was handed,
 // and a nil check on something that is not an error. It pins the
 // collapse too: the call that records on neither path is one finding,
-// because two would read as a contradiction about the same line.
+// because two would read as a contradiction about the same line. And it
+// pins the forward search with its limit — a latency bound between the
+// call and the check is not a finding, an error overwritten before the
+// check is.
 func TestScanSeesAProviderCallThatRecordsOnOnePath(t *testing.T) {
 	t.Parallel()
 
@@ -155,6 +158,35 @@ func (s *service) completeRecordsNeither(ctx context.Context, req request) (stri
 	return out, nil
 }
 
+// completeMeasuresElapsed binds the latency between the call and the
+// check, which leaves the outcome exactly where it was.
+func (s *service) completeMeasuresElapsed(ctx context.Context, req request) (string, error) {
+	start := time.Now()
+	out, err := s.provider.Complete(ctx, req)
+	elapsed := time.Since(start)
+	s.observe(elapsed)
+	if err != nil {
+		s.hooks.OnInvocation(ctx, req.Model, err)
+		return "", err
+	}
+	s.hooks.OnInvocation(ctx, req.Model, nil)
+	return out, nil
+}
+
+// completeReassignsError overwrites the provider's error before anything
+// checks it, so the branch below decides on a later call's outcome and
+// the provider's own is never told apart.
+func (s *service) completeReassignsError(ctx context.Context, req request) (string, error) {
+	out, err := s.provider.Complete(ctx, req) // want: reassigned
+	out, err = s.postProcess(out)
+	if err != nil {
+		s.hooks.OnInvocation(ctx, req.Model, err)
+		return "", err
+	}
+	s.hooks.OnInvocation(ctx, req.Model, nil)
+	return out, nil
+}
+
 // embedMislabelsFailure counts both paths and calls both of them a
 // success.
 func (s *service) embedMislabelsFailure(ctx context.Context, req request) ([]float32, error) {
@@ -198,7 +230,7 @@ func (s *service) loadCached(ctx context.Context, req request) (string, error) {
 	if _, ok := reach[funcKey{dir: "sample", name: "buildRequest"}]; ok {
 		t.Error("buildRequest reaches no hook, so it must stay out of the set")
 	}
-	if got, want := callsByDir["sample"], 8; got != want {
+	if got, want := callsByDir["sample"], 10; got != want {
 		t.Errorf("counted %d provider calls in the sample, want %d", got, want)
 	}
 
@@ -210,6 +242,7 @@ func (s *service) loadCached(ctx context.Context, req request) (string, error) {
 		fmt.Sprintf("sample.go:%d: %s", lineOf(t, src, "// want: omission"), KindFailureUnrecorded),
 		fmt.Sprintf("sample.go:%d: %s", lineOf(t, src, "// want: inverted omission"), KindFailureUnrecorded),
 		fmt.Sprintf("sample.go:%d: %s", lineOf(t, src, "// want: neither"), KindNeitherRecorded),
+		fmt.Sprintf("sample.go:%d: %s", lineOf(t, src, "// want: reassigned"), KindUnchecked),
 		fmt.Sprintf("sample.go:%d: %s", lineOf(t, src, "// want: mislabel"), KindMislabel),
 	}
 	if !slices.Equal(flagged, want) {

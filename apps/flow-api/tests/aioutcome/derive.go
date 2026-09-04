@@ -503,22 +503,21 @@ func (c *walkContext) omissions(body *ast.BlockStmt) []Finding {
 				out = append(out, at(KindUnchecked, nil))
 				continue
 			}
-			check, _ := stmtAt(list, i+1).(*ast.IfStmt)
+			check, checkAt := findErrorCheck(list, i+1, errIdent)
 			if check == nil {
 				out = append(out, at(KindUnchecked, nil))
 				continue
 			}
 			sense := errorCheckSense(check.Cond, errIdent)
-			if sense == senseNone {
-				out = append(out, at(KindUnchecked, nil))
-				continue
-			}
 
 			inBody := c.firstReaching(check.Body)
 			// The other branch is whatever runs when the if-body does
 			// not: an else when the code is written that way round, and
-			// otherwise the statements the check falls through to.
-			other := c.firstReachingIn(list[i+2:])
+			// otherwise the statements the check falls through to. What
+			// ran before the check is neither branch — it ran whatever
+			// the outcome was, so a hook call there records nothing
+			// about which one it was.
+			other := c.firstReachingIn(list[checkAt+1:])
 			if other == nil && check.Else != nil {
 				other = c.firstReaching(check.Else)
 			}
@@ -935,12 +934,60 @@ func isIdent(expr ast.Expr, name string) bool {
 	return ok && ident.Name == name
 }
 
-// stmtAt returns the statement at an index, or nil past the end.
-func stmtAt(list []ast.Stmt, i int) ast.Stmt {
-	if i < 0 || i >= len(list) {
-		return nil
+// findErrorCheck scans forward from a provider call for the statement
+// that checks the error it bound, and returns where in the block it sits
+// so the branch that follows the check can be told from the run that
+// precedes it.
+//
+// The check does not have to be the next statement. Binding the elapsed
+// time or naming part of the response in between changes nothing about
+// the outcome, and a rule that insists on adjacency is one that gets
+// code written around it rather than one that catches more: the code
+// bends to the scanner, the scanner learns nothing, and the next value
+// bound there is reported as a defect it is not.
+//
+// The search stops at the first statement that transfers control or can
+// skip the check, and at any statement that reassigns the error itself.
+// Past either of those, a check further down is not this call's — over
+// a reassignment it is deciding on another call's outcome, which is the
+// defect this rule exists for rather than an exemption from it.
+func findErrorCheck(list []ast.Stmt, from int, errIdent string) (*ast.IfStmt, int) {
+	for i := from; i < len(list); i++ {
+		switch stmt := list[i].(type) {
+		case *ast.IfStmt:
+			// An init that rebinds the error makes the condition below
+			// a different call's check, whatever it is spelled like.
+			if init, isAssign := stmt.Init.(*ast.AssignStmt); isAssign && assignsTo(init, errIdent) {
+				return nil, -1
+			}
+			if errorCheckSense(stmt.Cond, errIdent) == senseNone {
+				return nil, -1
+			}
+			return stmt, i
+		case *ast.AssignStmt:
+			if assignsTo(stmt, errIdent) {
+				return nil, -1
+			}
+		case *ast.ExprStmt, *ast.DeclStmt:
+			// Naming a value and calling something for its effect both
+			// leave the outcome where it was. A hook call among these is
+			// not the check and does not stand in for it: it ran however
+			// the call went, so it records nothing about which way.
+		default:
+			return nil, -1
+		}
 	}
-	return list[i]
+	return nil, -1
+}
+
+// assignsTo reports whether an assignment writes the named identifier.
+func assignsTo(assign *ast.AssignStmt, name string) bool {
+	for _, lhs := range assign.Lhs {
+		if isIdent(lhs, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // firstChain returns whichever of two routes was found, so a finding

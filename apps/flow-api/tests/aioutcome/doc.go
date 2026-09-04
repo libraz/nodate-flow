@@ -36,6 +36,15 @@
 //	           recording it: the error rate reads as zero rather than as
 //	           low.
 //
+// The check is looked for forward through the block rather than
+// required to be the next statement: measuring the elapsed time or
+// naming part of the response in between leaves the outcome where it
+// was. The search stops at the first statement that transfers control
+// or can skip the check, and at any statement that reassigns the error,
+// because past either of those the check below belongs to a different
+// call. What ran before the check is neither branch — it ran whatever
+// the outcome was — so a hook call there does not stand in for one.
+//
 // The branch the failure takes is read off the check rather than
 // assumed. A condition may compare the error against nil either way
 // round and may carry further operands — a retry that insists on a
