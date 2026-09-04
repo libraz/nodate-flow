@@ -116,6 +116,42 @@ func TestUnresolvedBoundsAreVisible(t *testing.T) {
 	fmt.Print(report.String())
 }
 
+// TestStoredFieldsDeclareABound refuses a string field that lands in a
+// column of bounded width and states no length of its own.
+//
+// This is the same gap the overflow half names, approached from the other
+// side. There the contract draws a line past the column's width, so the
+// values between the two are promised and then refused; here it draws no
+// line at all, so every value past the width is promised and then refused,
+// and the caller has nothing to read that would tell them where the width
+// is. The error they get names nothing either way.
+//
+// The failure carries the column and its width, because that is the number
+// whoever fixes the field has to declare, and a fix that goes looking for it
+// somewhere else is how a wrong number gets written down.
+//
+// The counts are printed whether or not anything is refused. The second of
+// them is the size of the gap this derivation does not reach — the fields
+// that state no length and resolve to no column, which nothing here can
+// speak for — and it is on the passing run that it matters, because that is
+// the run where an unseen gap looks like coverage.
+func TestStoredFieldsDeclareABound(t *testing.T) {
+	t.Parallel()
+
+	tree := readTree(t)
+	placed, unplaced := Placed(tree.unstated)
+	for _, r := range Absent(placed) {
+		t.Errorf("%s: %s states no maxLength, and %s holds %d %s. "+
+			"Every value past that width validates and is then refused by storage, and the "+
+			"contract draws no line the caller could have read, because there is none to read. "+
+			"Declare the bound the column holds",
+			r.Location(), r.Describe(), r.Column.Qualified(), r.Column.Capacity, r.Column.Units)
+	}
+
+	fmt.Printf("%d string fields state no length: %d land in a column of bounded width, "+
+		"%d reach no column\n", len(tree.unstated), len(placed), len(unplaced))
+}
+
 // TestDerivationStillMatches is the positive control, and it runs on every
 // invocation because it reads sources stated here rather than the tree.
 //
@@ -133,6 +169,8 @@ CREATE TABLE widgets (
   title VARCHAR(255) NOT NULL COMMENT 'Widget title (255, note the -- and (parens) a comment may carry)',
   icon_url VARCHAR(2048) NULL COMMENT 'Icon image URL',
   body TEXT NULL COMMENT 'Free text',
+  slug VARCHAR(64) NOT NULL COMMENT 'Widget slug',
+  kind VARCHAR(16) NOT NULL COMMENT 'Widget kind, a value set held as a string rather than an ENUM',
   state ENUM('open','done') NOT NULL DEFAULT 'open' COMMENT 'Lifecycle',
   UNIQUE KEY uniq_widgets_id (id)
 ) ENGINE=InnoDB;
@@ -163,13 +201,18 @@ CREATE TABLE comments (
 	const handlerSrc = `package probe
 
 // The pair the overflow half exists for: a create bound wider than the
-// column, and a fitting bound beside it.
+// column, and a fitting bound beside it. Its slug is what the absence half
+// exists for — a column of bounded width with nothing said about it — and
+// its kind names the values it takes, which fixes its longest value without
+// stating a length.
 type CreateWidgetInput struct {
 	WsID string ` + "`" + `path:"wsId" maxLength:"36"` + "`" + `
 	Body struct {
 		Title   string ` + "`" + `json:"title" minLength:"1" maxLength:"500"` + "`" + `
 		IconURL string ` + "`" + `json:"iconUrl,omitempty" maxLength:"2048"` + "`" + `
 		Body    string ` + "`" + `json:"body,omitempty" maxLength:"50000"` + "`" + `
+		Slug    string ` + "`" + `json:"slug"` + "`" + `
+		Kind    string ` + "`" + `json:"kind" enum:"panel,dial"` + "`" + `
 		Tags    []string ` + "`" + `json:"tags,omitempty" maxLength:"40"` + "`" + `
 		Nested  struct {
 			Title string ` + "`" + `json:"title" maxLength:"9999"` + "`" + `
@@ -246,6 +289,7 @@ func PresignPart(deps Deps) func(context.Context, *PresignPartInput) (*PresignPa
 type LookupWidgetInput struct {
 	Body struct {
 		Title string ` + "`" + `json:"title" maxLength:"4000"` + "`" + `
+		Slug  string ` + "`" + `json:"slug"` + "`" + `
 	}
 }
 
@@ -264,12 +308,18 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"title":   stringSchema("Widget title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
 			"iconUrl": stringSchema("Icon URL.", Constraints{MaxLength: intPtr(2048)}),
-			"parts": map[string]any{
-				"type":  "array",
-				"items": objectSchema(map[string]any{
-					"title": stringSchema("Part title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"body":    stringSchema("Widget body.", Constraints{}),
+			"slug":    stringSchema("Widget slug.", Constraints{Enum: []string{"left", "right"}}),
+			"parts": arraySchema("Parts to create.",
+				objectSchema(map[string]any{
+					"title":  stringSchema("Part title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+					"weight": intSchema("Part weight.", Constraints{Min: intPtr(0)}),
 				}, []string{"title"}),
-			},
+				Constraints{MaxItems: intPtr(10)}),
+			"labels": arraySchema("Free-form labels.",
+				stringSchema("One label.", Constraints{MaxLength: intPtr(9999)}),
+				Constraints{MaxItems: intPtr(5)}),
+			"visible": boolSchema("Whether the widget is listed."),
 		}, []string{"title"}),
 	})
 	h.register(auth.FloorProjectEditor, tool{
@@ -321,12 +371,60 @@ func registerTools(h *Handler) {
 		t.Error("a bound on a string slice was read as a field's length; it does not land in " +
 			"one column, so placing it would compare a width against something else")
 	}
+	if !has(handler, "CreateWidgetInput", "body", "slug") {
+		t.Fatal("a field stating no length was not read at all; the absence half sees only what " +
+			"the reader collects, so it would have nothing to report and would say so quietly")
+	}
+	if has(handler, "CreateWidgetInput", "body", "kind") {
+		t.Error("a field naming the values it accepts was read as one that forgot to state a " +
+			"length; the set already fixes its longest value, and asking for a bound on top " +
+			"would be asking for a number that changes nothing")
+	}
+	if has(tools, "create_widget", "body", "slug") {
+		t.Error("a tool property naming the values it accepts was read as one stating no length")
+	}
 	if !has(tools, "create_widget", "body", "iconUrl") {
 		t.Fatal("the tool schema properties were not read; the tool half of every comparison " +
 			"would be empty")
 	}
 	if !has(tools, "create_widget", "body", "parts.title") {
-		t.Error("a property nested under an array's items was not read")
+		t.Error("a property nested under an array's element schema was not read; an array is " +
+			"how a tool takes a repeated body, and every field inside one would go uncompared")
+	}
+	if has(tools, "create_widget", "body", "labels") {
+		t.Error("a bound on an array of strings was read as a field's length; the array holds " +
+			"many of them and they do not land in one column, which is the same reading a " +
+			"slice of strings gets on the handler side")
+	}
+
+	// A helper nobody has taught this walk about. It is written exactly the
+	// way the ones it knows are, which is the point: the day somebody adds
+	// the next constructor, the properties under it stop being read, and a
+	// walk that stepped over what it did not recognise would go on passing
+	// while it saw less. Refusing costs one line here; not refusing costs a
+	// gap with nothing pointing at it.
+	const unknownHelperSrc = `package probe
+
+func registerTools(h *Handler) {
+	h.register(auth.FloorProjectEditor, tool{
+		name:        "create_widget",
+		inputSchema: objectSchema(map[string]any{
+			"title": stringSchema("Widget title.", Constraints{MaxLength: intPtr(500)}),
+			"spec":  unionSchema("Either shape.", map[string]any{
+				"note": stringSchema("A note.", Constraints{MaxLength: intPtr(80)}),
+			}),
+		}, []string{"title"}),
+	})
+}
+`
+	switch _, uerr := ParseTools("probe/tools.go", unknownHelperSrc); {
+	case uerr == nil:
+		t.Error("a schema constructor this walk does not know was stepped over in silence; " +
+			"every property under it goes unread, and the scan covers less than it did with " +
+			"nothing saying so")
+	case !strings.Contains(uerr.Error(), "unionSchema"):
+		t.Errorf("the refusal was %v, which does not name the constructor; the fix is one line "+
+			"in the dispatch and whoever reads this has to be told which name to write", uerr)
 	}
 
 	const probeScope = "apps/probe-api/internal/http/handlers/widgets"
@@ -496,11 +594,48 @@ func registerTools(h *Handler) {
 		t.Fatal("fewer than two fields were compared across surfaces, so the agreeing ones " +
 			"prove nothing about the pairing still matching")
 	}
+
+	// The absence half: a column of bounded width with nothing said about
+	// it, on each surface, and nothing else.
+	absent := map[string]bool{}
+	for _, r := range Absent(resolutions) {
+		absent[r.Describe()+" -> "+r.Column.Qualified()] = true
+	}
+	for _, want := range []string{
+		"REST CreateWidgetInput body.slug -> widgets.slug",
+		"MCP create_widget body.body -> widgets.body",
+	} {
+		if !absent[want] {
+			t.Errorf("did not flag %q: a field landing in a column of bounded width while "+
+				"stating no length is the state the third half exists to catch", want)
+		}
+		delete(absent, want)
+	}
+	for extra := range absent {
+		t.Errorf("flagged %q, which either states a length or is bounded by the values it names", extra)
+	}
+	if !unplacedHas(unplaced, "LookupWidgetInput", "slug") {
+		t.Error("a field stating no length was placed on a column by an operation that writes " +
+			"nothing; being unresolved is what keeps it out, and a field the derivation cannot " +
+			"place is reported rather than refused")
+	}
+	for _, p := range Pairs(resolutions) {
+		if !p.A.Bounded || !p.B.Bounded {
+			t.Errorf("%s and %s were compared for agreement while one of them states no length; "+
+				"a missing bound reads as zero, which disagrees with every number there is",
+				p.A.Describe(), p.B.Describe())
+		}
+	}
 }
 
 // tree is the derivation run over the repository, read once per test.
 type tree struct {
+	// resolutions are the fields that state a bound: the set the overflow
+	// and agreement halves read.
 	resolutions []Resolution
+	// unstated are the string fields that state none: the set the absence
+	// half reads.
+	unstated []Resolution
 }
 
 // readTree runs the derivation over the committed sources and proves every
@@ -600,12 +735,22 @@ func readTree(t *testing.T) tree {
 	}
 	decls = append(decls, tools...)
 
-	resolutions := ResolveAll(decls, Evidence{
+	all := ResolveAll(decls, Evidence{
 		Schema:          schema,
 		WriteSets:       writeSets,
 		Calls:           calls,
 		StatementWrites: statements,
 	})
+	resolutions, unstated := Stated(all)
+	if len(resolutions) == 0 {
+		t.Fatal("no input field was read as stating a bound; the tags or the tool schemas are " +
+			"written some other way now, and the overflow and agreement halves compare nothing")
+	}
+	if len(unstated) == 0 {
+		t.Fatal("no input field was read as stating no bound; every string field in both trees " +
+			"declaring a length would be news, so the reader stopped collecting the silent ones " +
+			"rather than the silence having gone away")
+	}
 	if placed, _ := Placed(resolutions); len(placed) == 0 {
 		t.Fatal("no declared bound resolved to a column, so the overflow half compared " +
 			"nothing; the resolution rule has stopped matching this repository's naming")
@@ -628,7 +773,7 @@ func readTree(t *testing.T) tree {
 			"tool/REST pairs having gone away")
 	}
 
-	return tree{resolutions: resolutions}
+	return tree{resolutions: resolutions, unstated: unstated}
 }
 
 // has reports whether the derivation produced one named field of one owner.

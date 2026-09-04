@@ -10,7 +10,7 @@
 // and the error names nothing they can act on, because as far as the
 // contract goes their input was fine.
 //
-// Two things are derived here, and they answer different questions:
+// Three things are derived here, and they answer different questions:
 //
 //	overflow      a declared bound larger than the column it resolves to.
 //	              This needs the mapping from a wire field to a column, and
@@ -19,6 +19,21 @@
 //	              needs no column: whichever of the two is the column's
 //	              width, the other is not, so one of them is wrong. It holds
 //	              everywhere the field is declared twice.
+//	absent        a string field that resolves to a column of bounded width
+//	              and states no bound at all. It needs the same mapping the
+//	              overflow half needs, and names the same gap with the wire
+//	              side left open instead of set too wide: everything past
+//	              the column's width validates and is refused by storage,
+//	              and the caller is told nothing about where the line is,
+//	              because the contract draws none. Neither of the other two
+//	              sees it — an undeclared bound is wider than nothing, and
+//	              two surfaces declaring nothing agree perfectly.
+//
+// All three refuse. A field the mapping reaches has a width behind it, and
+// a field that has one and does not say so is as wrong as one that says the
+// wrong number; the only reason to treat it differently would be that there
+// were many of them, which is a fact about a moment rather than about any
+// field.
 //
 // The mapping is derived rather than listed, and there are two derivations
 // because there are two independent kinds of evidence. One reads what an
@@ -34,15 +49,20 @@
 // stronger evidence and goes first.
 //
 // Between them they do not reach every field, and they are not meant to:
-// most bounded inputs are not stored under the name they arrive as, and
-// requiring each of those to carry an exemption would put a marker on the
-// majority of them, which teaches people to write markers rather than to
-// look. So an unresolved field is not a failure. It is counted and printed,
-// so the size of the gap is visible rather than assumed.
+// most inputs are not stored under the name they arrive as, and requiring
+// each of those to carry an exemption would put a marker on the majority of
+// them, which teaches people to write markers rather than to look. So an
+// unresolved field is not a failure, whether it states a bound or states
+// none. It is counted and printed, so the size of the gap is visible rather
+// than assumed.
 //
-//	scope        every wire field of a body reachable from a type named
-//	             *Input under the handler trees, and every property of an
-//	             MCP tool's input schema, that states a maxLength.
+//	scope        every string wire field of a body reachable from a type
+//	             named *Input under the handler trees, and every string
+//	             property of an MCP tool's input schema, whether or not it
+//	             states a maxLength. A field of some other type is outside
+//	             this: an integer, a boolean and a date are not constrained
+//	             by a length, and a field naming the values it accepts is
+//	             bounded by that set, which already fixes its longest value.
 //	resolution   the owner names a write verb and a resource, a table this
 //	             surface writes is that resource pluralised, and the wire
 //	             name in the schema's spelling is a column of it; or, for

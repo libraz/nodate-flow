@@ -252,7 +252,17 @@ type Resolution struct {
 // Overflows reports whether the declared bound is larger than the column
 // can hold, which is the state where the API accepts a value storage then
 // refuses.
-func (r Resolution) Overflows() bool { return r.Placed && r.Max > r.Column.Capacity }
+func (r Resolution) Overflows() bool { return r.Placed && r.Bounded && r.Max > r.Column.Capacity }
+
+// Absent reports whether the field states no length and lands in a column
+// that has one.
+//
+// Placed already carries the second half: a resolution is placed on a
+// column of a length-bounded type, because those are the only ones a lookup
+// can answer with. So a placed field that states nothing is one the API
+// accepts any length of and storage accepts up to a width — the same gap
+// Overflows names, with the wire side left open rather than set too wide.
+func (r Resolution) Absent() bool { return r.Placed && !r.Bounded }
 
 // Resolve places a declaration on the column it writes.
 //
@@ -438,6 +448,38 @@ func Overflows(all []Resolution) []Resolution {
 	return out
 }
 
+// Absent narrows a resolution set down to the fields that state no length
+// and land in a column that has one.
+func Absent(all []Resolution) []Resolution {
+	var out []Resolution
+	for _, r := range all {
+		if r.Absent() {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// Stated splits a resolution set into the fields that state a length and the
+// ones that state none.
+//
+// The two derivations that compare a declared number read the first; the one
+// that reads the absence of a number reads the second. Keeping them apart is
+// what stops a field with nothing to say from being read as a field saying
+// zero: a declaration with no bound has a Max of zero, which is smaller than
+// every width and different from every other surface's number, so it would
+// otherwise overflow nothing while disagreeing with everything.
+func Stated(all []Resolution) (stated, unstated []Resolution) {
+	for _, r := range all {
+		if r.Bounded {
+			stated = append(stated, r)
+			continue
+		}
+		unstated = append(unstated, r)
+	}
+	return stated, unstated
+}
+
 // Pair is two declarations of the same field on surfaces that have to agree.
 type Pair struct{ A, B Resolution }
 
@@ -469,7 +511,11 @@ func (p Pair) Disagrees() bool { return p.A.Max != p.B.Max }
 // naming convention that shifts — and then it passes because it compared
 // nothing. The caller asserts on this set for that reason.
 func Pairs(all []Resolution) []Pair {
-	ordered := append([]Resolution(nil), all...)
+	// Only the fields that state a length are compared. Two surfaces
+	// stating nothing agree about nothing, and one stating nothing against
+	// one stating a number is the absence derivation's question rather than
+	// this one's.
+	ordered, _ := Stated(all)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		if ordered[i].Path != ordered[j].Path {
 			return ordered[i].Path < ordered[j].Path
