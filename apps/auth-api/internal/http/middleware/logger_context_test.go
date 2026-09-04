@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -27,8 +28,12 @@ func TestLoggerContext_AttachesAttrs(t *testing.T) {
 
 	wsPub := uuid.New()
 	sessionPub := dbtype.FromUUID(uuid.New())
-	const wsID = uint32(42)
-	const userID = uint32(7)
+	// Sentinel row ids. They stay small enough to read as internal
+	// sequence values, but distinctive enough that no incidental attr a
+	// log line may grow later — a status code, a count, a duration —
+	// equals one of them.
+	const wsID = uint32(4242)
+	const userID = uint32(7007)
 	const requestID = "rid-test"
 
 	final := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,9 +86,52 @@ func TestLoggerContext_AttachesAttrs(t *testing.T) {
 			t.Fatalf("%s must not be on the request-scoped logger: %v", key, rec1)
 		}
 	}
-	if raw := buf.String(); strings.Contains(raw, ":42") || strings.Contains(raw, ":7") {
-		t.Fatalf("an internal id reached the log line: %s", raw)
+	// The absence loop above covers the keys the middleware is known to
+	// have written. The record must also be free of the internal ids
+	// under a key nobody named, so walk every decoded value instead.
+	if path := sentinelPath(rec1, "", wsID, userID); path != "" {
+		t.Fatalf("an internal id reached the log line at %s: %v", path, rec1)
 	}
+}
+
+// sentinelPath reports the location of the first value equal to one of
+// the sentinel ids, at any depth, or "" when none is present. It reads
+// the decoded record rather than the serialised line because the line
+// also carries the handler's timestamp, whose digits say nothing about
+// what the middleware logged.
+//
+// A leaked id can surface either as a JSON number, which decodes to
+// float64, or as a string, so both forms count. The comparison is by
+// whole value: a value is a leak when it is the id, not when it merely
+// contains the id's digits.
+func sentinelPath(v any, path string, sentinels ...uint32) string {
+	switch t := v.(type) {
+	case map[string]any:
+		for key, elem := range t {
+			if hit := sentinelPath(elem, path+"."+key, sentinels...); hit != "" {
+				return hit
+			}
+		}
+	case []any:
+		for i, elem := range t {
+			if hit := sentinelPath(elem, fmt.Sprintf("%s[%d]", path, i), sentinels...); hit != "" {
+				return hit
+			}
+		}
+	case float64:
+		for _, s := range sentinels {
+			if t == float64(s) {
+				return path
+			}
+		}
+	case string:
+		for _, s := range sentinels {
+			if t == strconv.FormatUint(uint64(s), 10) {
+				return path
+			}
+		}
+	}
+	return ""
 }
 
 // TestLoggerContext_OmitsEmpty verifies that when neither actor nor
