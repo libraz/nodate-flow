@@ -48,28 +48,71 @@ const (
 	OutcomePause
 )
 
-// Decision is the Decide result. Reason is always human-readable and
-// stable enough to surface in audit logs / UI.
+// Cause names which rule produced a non-allow Decision. Outcome says
+// what the caller must do; Cause says why, which is what a caller
+// answering a client has to put in the answer — a paused agent and an
+// exhausted budget are both a pause and are not the same thing to say.
+type Cause int
+
+const (
+	// CauseNone: no rule fired; the decision is an allow.
+	CauseNone Cause = iota
+	// CauseDisabled: the agent is not enabled.
+	CauseDisabled
+	// CausePaused: the agent is already paused.
+	CausePaused
+	// CauseScopeNotAllowed: the required scope is not in the agent's
+	// allow list.
+	CauseScopeNotAllowed
+	// CauseCostCapExhausted: month-to-date spend has already reached
+	// the effective monthly cost cap.
+	CauseCostCapExhausted
+	// CauseCostCapWouldExceed: the call's estimated cost would carry
+	// month-to-date spend past the effective monthly cost cap.
+	CauseCostCapWouldExceed
+)
+
+// Decision is the Decide result. Outcome is what the caller must do,
+// Cause is which rule produced it. Reason is always human-readable and
+// stable enough to surface in audit logs / UI; Cause is the enumerated
+// form callers should branch on.
 type Decision struct {
 	Outcome Outcome
+	Cause   Cause
 	Reason  string
+}
+
+// DecideAccess evaluates the access half of the guard — enabled,
+// paused, allowed scopes — and returns the same Decision shape. It
+// answers "may this agent act at all", which is the whole question for
+// a caller that grants the agent no billable work: a cost cap governs
+// money, and there is nothing for it to bound where nothing is spent.
+// Decide is this plus the cost rules, so a caller cannot pick up the
+// kill switch and miss a rule added to it.
+func DecideAccess(agent Agent, requiredScope string) Decision {
+	if !agent.Enabled {
+		return Decision{Outcome: OutcomePause, Cause: CauseDisabled, Reason: "agent is disabled"}
+	}
+	if agent.Paused {
+		return Decision{Outcome: OutcomePause, Cause: CausePaused, Reason: "agent is paused"}
+	}
+	if len(agent.AllowedScopes) > 0 && requiredScope != "" && !contains(agent.AllowedScopes, requiredScope) {
+		return Decision{
+			Outcome: OutcomeDeny,
+			Cause:   CauseScopeNotAllowed,
+			Reason:  "scope " + requiredScope + " is not in the agent's allow list",
+		}
+	}
+	return Decision{Outcome: OutcomeAllow, Cause: CauseNone, Reason: "within policy"}
 }
 
 // Decide evaluates the guard rules against agent + req and returns a
 // Decision. Order of checks: disabled → already paused → scope check
-// → cap exhausted → would-exceed cap → allow.
+// (all three in DecideAccess) → cap exhausted → would-exceed cap →
+// allow.
 func Decide(agent Agent, req Request) Decision {
-	if !agent.Enabled {
-		return Decision{Outcome: OutcomePause, Reason: "agent is disabled"}
-	}
-	if agent.Paused {
-		return Decision{Outcome: OutcomePause, Reason: "agent is paused"}
-	}
-	if len(agent.AllowedScopes) > 0 && req.RequiredScope != "" && !contains(agent.AllowedScopes, req.RequiredScope) {
-		return Decision{
-			Outcome: OutcomeDeny,
-			Reason:  "scope " + req.RequiredScope + " is not in the agent's allow list",
-		}
+	if access := DecideAccess(agent, req.RequiredScope); access.Outcome != OutcomeAllow {
+		return access
 	}
 	if costCap := agent.MonthlyCostCapCents; costCap != nil {
 		// Apply a 95% safety margin to the effective cap. Concurrent
@@ -83,17 +126,19 @@ func Decide(agent Agent, req Request) Decision {
 		if req.SpentCentsMonth >= effectiveCap {
 			return Decision{
 				Outcome: OutcomePause,
+				Cause:   CauseCostCapExhausted,
 				Reason:  "monthly cost cap exhausted",
 			}
 		}
 		if req.SpentCentsMonth+req.EstimatedCents > effectiveCap {
 			return Decision{
 				Outcome: OutcomePause,
+				Cause:   CauseCostCapWouldExceed,
 				Reason:  "call would exceed monthly cost cap",
 			}
 		}
 	}
-	return Decision{Outcome: OutcomeAllow, Reason: "within policy"}
+	return Decision{Outcome: OutcomeAllow, Cause: CauseNone, Reason: "within policy"}
 }
 
 func contains(xs []string, s string) bool {
