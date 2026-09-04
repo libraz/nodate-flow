@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 )
 
 // Transition names accepted by [NextState] / [ApplyTransitionTx]. The
@@ -251,6 +252,14 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	}); err != nil {
 		return ApplyResult{}, apierrors.InternalUnexpected, err
 	}
+
+	// Counted here because this is the only path that can move
+	// derived_state: the trigger above rejects every other writer. The
+	// helper ignores a pair whose states are equal, and records the
+	// completion counter itself when the target state is done. The caller
+	// still owns the commit, so a transaction that rolls back after this
+	// point leaves the counter ahead of the table by that one transition.
+	obs.IncTaskTransition(string(locked.DerivedState), string(next))
 
 	return ApplyResult{FromState: locked.DerivedState, ToState: next}, nil, nil
 }

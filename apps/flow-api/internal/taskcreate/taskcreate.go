@@ -33,6 +33,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
 )
 
@@ -124,6 +125,11 @@ func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("taskcreate: insert task: %w", err)
 	}
+	// Every transport reaches the tasks table through this one call, so
+	// the counter needs no other instrumentation point. The caller owns
+	// the commit, so a transaction that rolls back after this point
+	// leaves the counter ahead of the table by that one row.
+	obs.IncTaskCreated()
 	return Result{ID: id, PublicID: pub, TaskNumber: taskNumber}, nil
 }
 
