@@ -54,18 +54,19 @@ export function createSlugField(opts: SlugFieldOptions): z.ZodString {
 /**
  * @brief Derive a slug-safe string from a display name.
  *
- * Lowercase, spaces and punctuation collapse to a single '-', leading
- * and trailing dashes are dropped, and the result is truncated to
- * {@link DNS_LABEL_MAX_LENGTH}. Used to prefill the slug field while the
- * user types a name, so its output must always be accepted by
- * {@link createSlugField}.
+ * Lowercase, spaces and punctuation collapse to a single '-', the result
+ * is truncated to {@link DNS_LABEL_MAX_LENGTH}, and only then are edge
+ * dashes dropped: truncating first can cut just after an interior
+ * hyphen, and the API allows hyphens only between alphanumerics. Used to
+ * prefill the slug field while the user types a name, so its output has
+ * to be a value the API will accept.
  */
 export function slugify(input: string): string {
   return input
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, DNS_LABEL_MAX_LENGTH);
+    .slice(0, DNS_LABEL_MAX_LENGTH)
+    .replace(/^-+|-+$/g, '');
 }
 
 /**
