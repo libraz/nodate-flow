@@ -80,15 +80,54 @@ groups:
             AI error rate is {{ $value | humanizePercentage }} over the last 5 minutes
             (threshold: 10%).
 
+  - name: nodate-audit
+    rules:
+      # AuditWriteLoss: audit rows the recorder built but could not store.
+      # An audit write never fails the request that triggered it, so this
+      # counter is the only sign that a service answered 2xx for an action
+      # that left no trace. The loss is unrecoverable — nothing retries the
+      # row — which is why any increase alerts rather than a rate threshold.
+      - alert: AuditWriteLoss
+        expr: |
+          sum by (job, table) (increase(nf_audit_write_failures_total[15m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Audit trail incomplete on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} failed to store {{ $value | printf "%.0f" }}
+            {{ $labels.table }} row(s) in the last 15 minutes. Those actions
+            succeeded and were answered 2xx, but no audit record exists for
+            them and none will be written retroactively; correlate with
+            nf_db_queries_total{status="error"} to confirm the cause.
+
   - name: nodate-flow-infra
     rules:
-      # ServiceDown: API target has been unreachable for 1 minute.
+      # ServiceDown: a service metrics target answered at some point in the
+      # last hour and has now been unreachable for 1 minute. The second
+      # condition is what separates "down" from "not deployed": a target
+      # that has never been reachable is a service this instance does not
+      # run, and alerting on it would leave the rule permanently red. The
+      # job matcher covers every nodate-* service and excludes the
+      # otel-collector target, which is infrastructure rather than a
+      # service.
+      #
+      # The window is the price of having no deployment inventory to check
+      # against. One hour means a service stopped deliberately goes quiet
+      # within the hour instead of staying red, and in exchange an outage
+      # lasting longer than an hour resolves itself here — by which point
+      # it has been paging for an hour and is no longer news.
       - alert: ServiceDown
-        expr: up{job="nodate-flow-api"} == 0
+        expr: |
+          up{job=~"nodate-.*"} == 0
+          and
+          max_over_time(up{job=~"nodate-.*"}[1h]) == 1
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "nodate-flow API is down"
+          summary: "{{ $labels.job }} is down"
           description: >-
-            The API server has been unreachable for more than 1 minute.
+            The metrics target {{ $labels.instance }} for job
+            {{ $labels.job }} has been unreachable for more than 1 minute.

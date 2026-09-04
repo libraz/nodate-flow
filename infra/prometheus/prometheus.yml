@@ -5,17 +5,35 @@ global:
 rule_files:
   - alerts.yml
 
+# Every service serves /metrics on a separate internal-only listener, never
+# on its public API port, so each target below is the metrics port and not
+# the port the service answers requests on.
 scrape_configs:
   - job_name: nodate-flow-api
     static_configs:
       - targets:
-          - api:8080
+          - api:9090
     metrics_path: /metrics
 
   - job_name: nodate-auth-api
     static_configs:
       - targets:
-          - auth-api:8082
+          - auth-api:9092
+    metrics_path: /metrics
+
+  # The worker binaries carry their own metrics listener and are scraped on
+  # the same terms as the APIs, so whichever ones an instance runs are
+  # observed without a config change here.
+  - job_name: nodate-flow-worker
+    static_configs:
+      - targets:
+          - flow-worker:9091
+    metrics_path: /metrics
+
+  - job_name: nodate-presence-discord
+    static_configs:
+      - targets:
+          - presence-discord:9094
     metrics_path: /metrics
 
   # Scrape OTLP metrics exported by the OTel Collector.

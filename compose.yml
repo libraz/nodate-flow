@@ -157,6 +157,10 @@ services:
         condition: service_healthy
     environment:
       NF_FLOW_PORT: "8080"
+      # Internal-only Prometheus /metrics port. Set explicitly so the value
+      # here and the scrape target in infra/prometheus/prometheus.yml can be
+      # checked against each other rather than both relying on the default.
+      NF_FLOW_METRICS_PORT: "9090"
       NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
@@ -195,6 +199,11 @@ services:
       NF_VERSION: ${NF_VERSION:-dev}
     ports:
       - "${NF_API_PORT:-8080}:8080"
+    # Metrics are not published to the host. The listener is separate from
+    # the API port precisely so /metrics stays off the public surface;
+    # Prometheus reaches :9090 over the docker network.
+    expose:
+      - "9090"
     healthcheck:
       test: ["CMD", "/healthcheck"]
       interval: 5s
@@ -218,6 +227,10 @@ services:
         condition: service_healthy
     environment:
       NF_AUTH_PORT: "8082"
+      # Internal-only Prometheus /metrics port. Set explicitly so the value
+      # here and the scrape target in infra/prometheus/prometheus.yml can be
+      # checked against each other rather than both relying on the default.
+      NF_AUTH_METRICS_PORT: "9092"
       NF_AUTH_LOG_LEVEL: ${NF_AUTH_LOG_LEVEL:-info}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
@@ -249,6 +262,11 @@ services:
       NF_AUTH_SMTP_FROM: ${NF_AUTH_SMTP_FROM:-noreply@nodate-flow.local}
     ports:
       - "${NF_AUTH_PORT:-8082}:8082"
+    # Metrics are not published to the host. The listener is separate from
+    # the API port precisely so /metrics stays off the public surface;
+    # Prometheus reaches :9092 over the docker network.
+    expose:
+      - "9092"
     healthcheck:
       test: ["CMD", "/healthcheck"]
       interval: 5s
