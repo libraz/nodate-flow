@@ -150,6 +150,8 @@ func DoJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []by
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
+	// outbound-deadline: not-applicable — the peer is the test server in this process, and a
+	// request that hangs is bounded by the test timeout rather than holding somebody's request.
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

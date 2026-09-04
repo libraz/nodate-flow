@@ -5,12 +5,16 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/microsoft"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
+
+// microsoftIssuer is the discovery root for multi-tenant Microsoft apps.
+const microsoftIssuer = "https://login.microsoftonline.com/common/v2.0"
 
 // MicrosoftOIDCConfig configures a Microsoft Entra ID OIDC client.
 type MicrosoftOIDCConfig struct {
@@ -46,13 +50,20 @@ type MicrosoftClaims struct {
 // MicrosoftOIDCClient wraps the standard OIDC discovery flow for
 // Microsoft Entra ID (Azure AD) using the "common" tenant so that
 // any Microsoft account can sign in.
+//
+// authn.Discovery carries the deadline, the single-flight and the retry
+// behaviour of the discovery call; this type only says what to build once
+// the provider is in hand.
 type MicrosoftOIDCClient struct {
 	cfg MicrosoftOIDCConfig
 
-	once     sync.Once
-	verifier *oidc.IDTokenVerifier
-	oauth    *oauth2.Config
-	initErr  error
+	// issuer is the discovery root. Empty means [microsoftIssuer]; tests
+	// point it at a local server.
+	issuer string
+
+	discovery authn.Discovery
+	verifier  *oidc.IDTokenVerifier
+	oauth     *oauth2.Config
 }
 
 // NewMicrosoftOIDC builds a MicrosoftOIDCClient. The provider discovery
@@ -62,14 +73,15 @@ func NewMicrosoftOIDC(cfg MicrosoftOIDCConfig) *MicrosoftOIDCClient {
 	return &MicrosoftOIDCClient{cfg: cfg}
 }
 
+func (c *MicrosoftOIDCClient) issuerURL() string {
+	if c.issuer != "" {
+		return c.issuer
+	}
+	return microsoftIssuer
+}
+
 func (c *MicrosoftOIDCClient) ensure(ctx context.Context) error {
-	c.once.Do(func() {
-		// Microsoft uses the "common" tenant for multi-tenant apps.
-		p, err := oidc.NewProvider(ctx, "https://login.microsoftonline.com/common/v2.0")
-		if err != nil {
-			c.initErr = fmt.Errorf("microsoft: oidc provider: %w", err)
-			return
-		}
+	return c.discovery.Do(ctx, c.issuerURL(), func(p *oidc.Provider) {
 		// Skip issuer check because "common" returns a tenant-specific
 		// issuer in the id_token that differs from the discovery URL.
 		c.verifier = p.Verifier(&oidc.Config{
@@ -84,7 +96,6 @@ func (c *MicrosoftOIDCClient) ensure(ctx context.Context) error {
 			Scopes:       []string{oidc.ScopeOpenID, "email", "profile"},
 		}
 	})
-	return c.initErr
 }
 
 // AuthCodeURL returns the redirect URL the user should be sent to.
@@ -101,6 +112,7 @@ func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce 
 	if err := c.ensure(ctx); err != nil {
 		return nil, err
 	}
+	ctx = authn.WithOutboundHTTPClient(ctx)
 	tok, err := c.oauth.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("microsoft: oidc exchange: %w", err)

@@ -156,6 +156,8 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 	if tt.RefreshToken != "" {
 		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: tt.RefreshToken}) //#nosec G124 -- test cookie
 	}
+	// outbound-deadline: not-applicable — the peer is the test server in this process, and a
+	// cleanup that hangs is bounded by the test timeout rather than holding somebody's sign-in.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Logf("logout request failed: %v", err)
@@ -170,6 +172,8 @@ func CleanupTenant(t *testing.T, tt *TestTenant) {
 func doJSON(t *testing.T, method, url, bearer string, body any, out any) {
 	t.Helper()
 	req := newJSONRequest(t, method, url, bearer, body)
+	// outbound-deadline: not-applicable — the peer is the test server in this process, and a
+	// request that hangs is bounded by the test timeout rather than holding somebody's request.
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "%s %s", method, url)
 	defer func() { _ = resp.Body.Close() }()
@@ -218,6 +222,8 @@ func doJSONCapturingRefreshCookie(t *testing.T, method, url, bearer, refreshCook
 	if refreshCookie != "" {
 		req.AddCookie(&http.Cookie{Name: "nd_rt", Value: refreshCookie}) //#nosec G124 -- test cookie
 	}
+	// outbound-deadline: not-applicable — the peer is the test server in this process, and a
+	// request that hangs is bounded by the test timeout rather than holding somebody's request.
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "%s %s", method, url)
 	defer func() { _ = resp.Body.Close() }()

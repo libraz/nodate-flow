@@ -14,7 +14,23 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
+
+// githubHTTPClient is the client the /user and /user/emails calls go
+// through. It exists so those calls carry a deadline: the alternative the
+// net/http package offers by default has none, and an endpoint that
+// accepts the connection and then stops answering would hold the sign-in
+// goroutine for as long as it keeps the socket open.
+var githubHTTPClient = &http.Client{Timeout: authn.OutboundTimeout}
+
+// maxGithubResponseBytes bounds how much of a GitHub response this client
+// holds in memory. Both responses read here are small JSON envelopes — a
+// user profile and a list of that user's addresses — but their length is
+// picked by the process on the other end of the socket, so it is bounded
+// here rather than trusted.
+const maxGithubResponseBytes = 1 << 20 // 1 MiB
 
 // ErrGithubEmailNotVerified is returned by the GitHub OAuth client when
 // the authenticated user has no primary verified email available. The
@@ -84,7 +100,7 @@ func (c *GithubOAuthClient) AuthCodeURL(state string) string {
 // id_token to bind it to, so the value is currently unused on the
 // wire but reserved for the day GitHub ships true OIDC.
 func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*GithubClaims, error) {
-	tok, err := c.oauth.Exchange(ctx, code)
+	tok, err := c.oauth.Exchange(authn.WithOutboundHTTPClient(ctx), code)
 	if err != nil {
 		return nil, fmt.Errorf("github: oauth exchange: %w", err)
 	}
@@ -95,7 +111,7 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := githubHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("github: user request: %w", err)
 	}
@@ -103,7 +119,7 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("github: user request returned %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxGithubResponseBytes))
 	if err != nil {
 		return nil, fmt.Errorf("github: read body: %w", err)
 	}
@@ -148,7 +164,7 @@ func (c *GithubOAuthClient) fetchGithubPrimaryVerifiedEmail(ctx context.Context,
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := githubHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("github: emails request: %w", err)
 	}
@@ -156,12 +172,16 @@ func (c *GithubOAuthClient) fetchGithubPrimaryVerifiedEmail(ctx context.Context,
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("github: emails request returned %d", resp.StatusCode)
 	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxGithubResponseBytes))
+	if err != nil {
+		return "", fmt.Errorf("github: read emails body: %w", err)
+	}
 	var emails []struct {
 		Email    string `json:"email"`
 		Primary  bool   `json:"primary"`
 		Verified bool   `json:"verified"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+	if err := json.Unmarshal(body, &emails); err != nil {
 		return "", fmt.Errorf("github: decode emails: %w", err)
 	}
 	for _, e := range emails {

@@ -67,7 +67,7 @@ func TestVerifyTotpStep_ReplayDetectableAcrossSkew(t *testing.T) {
 	// Emulate the handler's last-step guard: with the step already
 	// consumed, the replay must be rejected.
 	lastStep := step1
-	if !(step2 <= lastStep) {
+	if step2 > lastStep {
 		t.Fatalf("replayed step %d not <= stored last step %d; replay would be accepted", step2, lastStep)
 	}
 }

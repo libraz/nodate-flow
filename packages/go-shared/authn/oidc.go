@@ -3,12 +3,14 @@ package authn
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
+
+// googleIssuer is the discovery root for Google sign-in.
+const googleIssuer = "https://accounts.google.com"
 
 // OIDCConfig configures a Google OIDC client.
 type OIDCConfig struct {
@@ -17,16 +19,21 @@ type OIDCConfig struct {
 	RedirectURL  string
 }
 
-// OIDCClient lazily constructs an oidc.Provider on first use so that
-// process startup never fails when the upstream issuer is unreachable.
+// OIDCClient lazily discovers the issuer on first use so that process
+// startup never fails when it is unreachable. [Discovery] carries the
+// retry and single-flight behaviour; this type only says what to build
+// once the provider is in hand.
 type OIDCClient struct {
 	cfg OIDCConfig
 
-	once     sync.Once
-	provider *oidc.Provider
-	verifier *oidc.IDTokenVerifier
-	oauth    *oauth2.Config
-	initErr  error
+	// issuer is the discovery root. Empty means [googleIssuer]; tests
+	// point it at a local server.
+	issuer string
+
+	discovery Discovery
+	provider  *oidc.Provider
+	verifier  *oidc.IDTokenVerifier
+	oauth     *oauth2.Config
 }
 
 // NewOIDCClient builds an unconfigured OIDCClient. The provider is
@@ -35,13 +42,15 @@ func NewOIDCClient(cfg OIDCConfig) *OIDCClient {
 	return &OIDCClient{cfg: cfg}
 }
 
+func (c *OIDCClient) issuerURL() string {
+	if c.issuer != "" {
+		return c.issuer
+	}
+	return googleIssuer
+}
+
 func (c *OIDCClient) ensure(ctx context.Context) error {
-	c.once.Do(func() {
-		p, err := oidc.NewProvider(ctx, "https://accounts.google.com")
-		if err != nil {
-			c.initErr = fmt.Errorf("authn: oidc provider: %w", err)
-			return
-		}
+	return c.discovery.Do(ctx, c.issuerURL(), func(p *oidc.Provider) {
 		c.provider = p
 		c.verifier = p.Verifier(&oidc.Config{ClientID: c.cfg.ClientID})
 		c.oauth = &oauth2.Config{
@@ -52,7 +61,6 @@ func (c *OIDCClient) ensure(ctx context.Context) error {
 			Scopes:       []string{oidc.ScopeOpenID, "email", "profile"},
 		}
 	})
-	return c.initErr
 }
 
 // AuthCodeURL returns the redirect URL the user should be sent to.
@@ -70,6 +78,7 @@ func (c *OIDCClient) Exchange(ctx context.Context, code, expectedNonce string) (
 	if err := c.ensure(ctx); err != nil {
 		return nil, err
 	}
+	ctx = WithOutboundHTTPClient(ctx)
 	tok, err := c.oauth.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("authn: oidc exchange: %w", err)
