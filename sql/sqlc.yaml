@@ -558,6 +558,37 @@ sql:
           - column: "*.triggered_by_signal_id"
             go_struct_tag: 'json:"-"'
           # See note in flow-api block above.
+  # --- flow-worker (the business gauge counts only) ---
+  # The worker cannot import apps/flow-api/internal/db/generated (Go's
+  # internal rule stops at the flow-api module), so its queries need their
+  # own output package. omit_unused_structs keeps that package to the two
+  # result rows and the state enum instead of a second copy of every model
+  # in the schema — which is what made the earlier worker queries
+  # hand-written database/sql in the first place. No override list is
+  # needed for the same reason: these queries select counts and an enum,
+  # never an id column.
+  - engine: "mysql"
+    queries:
+      - "queries/worker-metrics"
+    schema:
+      - "core/tables"
+      - "flow/tables"
+      - "flow/constraints"
+      - "flow/views"
+    gen:
+      go:
+        package: "generated"
+        out: "../apps/flow-worker/internal/db/generated"
+        sql_package: "database/sql"
+        emit_interface: true
+        emit_json_tags: true
+        json_tags_case_style: "camel"
+        emit_pointers_for_null_types: true
+        emit_db_tags: false
+        emit_prepared_queries: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        omit_unused_structs: true
   # --- auth-api (auth + audit + workspace queries only) ---
   - engine: "mysql"
     queries:

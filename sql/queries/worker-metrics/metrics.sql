@@ -1,0 +1,48 @@
+-- name: CountTasksByDerivedState :many
+-- Instance-wide task count grouped by state, for nf_tasks_total (the sum
+-- of the rows) and nf_tasks_by_state (one row per state). One aggregate
+-- rather than two queries, so the total can never disagree with its parts.
+--
+-- Filters match what an ordinary product read sees: soft-deleted tasks
+-- (enabled = FALSE) and tasks under a disabled workspace are excluded, the
+-- second being the same join v_task_list applies. Archived tasks ARE
+-- counted — archiving shelves a task, it does not remove it, and the
+-- product still lists archived tasks on request.
+SELECT t.derived_state, COUNT(*) AS total
+FROM tasks t
+INNER JOIN workspaces w
+        ON w.id = t.workspace_id
+       AND w.enabled = TRUE
+WHERE t.enabled = TRUE
+GROUP BY t.derived_state;
+
+-- name: CountWorkspacesWithRecentActivity :one
+-- Number of enabled workspaces that have at least one event appended with
+-- occurred_at at or after `since`, for nf_active_workspaces. "Active"
+-- means exactly that: the workspace produced an event in the window. The
+-- event log is the one table every state transition passes through, so
+-- this counts real work rather than HTTP traffic.
+--
+-- Written as a correlated aggregate rather than the EXISTS it reads as,
+-- because the two plan differently. EXISTS is flattened into a semi-join
+-- that drives from events, and no index leads with occurred_at, so it
+-- scans the entire append-only log on every refresh. A scalar subquery
+-- cannot be flattened: the plan drives from the enabled workspaces and
+-- probes idx_events_workspace_id_occurred_at (workspace_id, occurred_at)
+-- once per workspace, index-only, reading just that workspace's slice of
+-- the window. The cost is then bounded by the workspace count.
+--
+-- Staying index-only is also why enabled is not filtered here, unlike the
+-- timeline read: enabled lives outside the index, so testing it turns
+-- every probe into a row lookup. The log is append-only and nothing
+-- disables a row in it, and a workspace that emitted a disabled event
+-- still emitted one.
+SELECT COUNT(*) AS total
+FROM workspaces w
+WHERE w.enabled = TRUE
+  AND (
+    SELECT MAX(e.occurred_at)
+    FROM events e
+    WHERE e.workspace_id = w.id
+      AND e.occurred_at >= sqlc.arg(since)
+  ) IS NOT NULL;

@@ -28,6 +28,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/config"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtz"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -167,7 +168,7 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 		opts.Register(runner, db)
 	}
 
-	reportRunnerHealth(logger, runner.Registered())
+	ReportRunnerHealth(logger, runner.Names())
 	if opts.MetricsReady != nil {
 		close(opts.MetricsReady)
 	}
@@ -214,26 +215,78 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	return runErr
 }
 
-// reportRunnerHealth publishes what the boot produced: how many jobs
-// the runner was given, and whether this process is therefore up.
+// expectedJobs names the jobs a complete flow-worker runs. A deployment
+// missing one is misconfigured, and the up gauge says so.
+//
+// The list is written out rather than derived because the configuration
+// offers nothing honest to derive it from: what decides whether the
+// calendar job registers is the presence of NF_FLOW_API_SIGNAL_TOKEN, and
+// reading the expectation off that same value would make the gauge agree
+// with any configuration at all — an unset token would mean "no calendar
+// job wanted" instead of "the calendar job cannot run", which is the
+// failure this metric exists to report.
+//
+// Only conditionally-registered jobs belong here. business_metrics is
+// deliberately absent: it registers unconditionally, so its presence is a
+// property of the binary rather than of the deployment, and letting it
+// satisfy the gauge is what would make a misconfigured worker look
+// complete. Adding a job whose registration depends on configuration
+// means adding its name here — this is the one place the expectation is
+// written down.
+//
+//nolint:gochecknoglobals // the binary's fixed job expectation, read once at boot.
+var expectedJobs = []string{calendar_event_day.JobName}
+
+// ReportRunnerHealth publishes what the boot produced: how many jobs the
+// runner was given, and whether this process is therefore up. registered
+// is the runner's job names (Runner.Names).
 //
 // The up gauge flips on once MySQL is reachable, the metrics endpoint is
-// bound, and there is at least one job to run. A worker that registered
-// nothing — which is what an unset NF_FLOW_API_SIGNAL_TOKEN produces —
-// reports 0. It still boots and stays up, so the binary can be rolled
-// out ahead of its configuration, but it does not claim to be working:
-// the failure it used to produce was a permanently silent event feed
-// with a green process standing in front of it, and the only trace was
-// a tick counter that never appeared.
-func reportRunnerHealth(logger *slog.Logger, registered int) {
-	obs.JobsRegisteredGauge.Set(float64(registered))
-	if registered == 0 {
+// bound, and every job in expectedJobs is registered. A worker missing one
+// — which is what an unset NF_FLOW_API_SIGNAL_TOKEN produces — reports 0.
+// It still boots and stays up, so the binary can be rolled out ahead of
+// its configuration, but it does not claim to be working: the failure it
+// used to produce was a permanently silent event feed with a green
+// process standing in front of it, and the only trace was a tick counter
+// that never appeared.
+//
+// Exported because the chain it closes — configuration decides what is
+// registered, registration decides the gauge — runs across this package
+// and cmd/worker, and is pinned from there.
+func ReportRunnerHealth(logger *slog.Logger, registered []string) {
+	obs.JobsRegisteredGauge.Set(float64(len(registered)))
+
+	if len(registered) == 0 {
 		obs.UpGauge.Set(0)
 		logger.Error("flow-worker: no jobs registered; the process is running but will do nothing")
 		return
 	}
+	if missing := missingJobs(registered, expectedJobs); len(missing) > 0 {
+		obs.UpGauge.Set(0)
+		logger.Error("flow-worker: a job this configuration calls for is not registered; "+
+			"the process is running but part of what it was deployed to do will never happen",
+			"missing", missing,
+			"registered", registered,
+		)
+		return
+	}
 	obs.UpGauge.Set(1)
-	logger.Info("flow-worker: jobs registered", "count", registered)
+	logger.Info("flow-worker: jobs registered", "count", len(registered), "jobs", registered)
+}
+
+// missingJobs returns the expected names absent from registered.
+func missingJobs(registered, expected []string) []string {
+	have := make(map[string]struct{}, len(registered))
+	for _, name := range registered {
+		have[name] = struct{}{}
+	}
+	var missing []string
+	for _, name := range expected {
+		if _, ok := have[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 // openAndPingDB opens the MySQL pool described by cfg and verifies the

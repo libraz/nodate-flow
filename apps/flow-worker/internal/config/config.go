@@ -55,6 +55,14 @@ type Config struct {
 	// as the default cadence unless they declare their own.
 	JobTickInterval time.Duration `env:"NF_FLOW_WORKER_TICK_INTERVAL" envDefault:"60s"`
 
+	// BusinessMetricsInterval is the minimum time between two refreshes of
+	// the instance-wide task and workspace gauges. The runner ticks every
+	// job on JobTickInterval; this job throttles itself to this value on
+	// top of that, so it can be relaxed on a large instance without
+	// slowing the other jobs down. Values below JobTickInterval have no
+	// effect — the runner is the floor.
+	BusinessMetricsInterval time.Duration `env:"NF_FLOW_WORKER_BUSINESS_METRICS_INTERVAL" envDefault:"60s"`
+
 	// JobShutdownTimeout caps how long the runner waits for an in-flight
 	// tick to drain after the shutdown signal arrives. Mirrors flow-api's
 	// 20s graceful HTTP drain but uses 30s to account for longer jobs.
@@ -98,6 +106,9 @@ func (c *Config) Validate() error {
 
 	if c.JobTickInterval <= 0 {
 		return fmt.Errorf("config: NF_FLOW_WORKER_TICK_INTERVAL must be positive, got %s", c.JobTickInterval)
+	}
+	if c.BusinessMetricsInterval <= 0 {
+		return fmt.Errorf("config: NF_FLOW_WORKER_BUSINESS_METRICS_INTERVAL must be positive, got %s", c.BusinessMetricsInterval)
 	}
 	if c.JobShutdownTimeout <= 0 {
 		return fmt.Errorf("config: NF_FLOW_WORKER_SHUTDOWN_TIMEOUT must be positive, got %s", c.JobShutdownTimeout)

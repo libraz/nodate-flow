@@ -23,6 +23,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/config"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/business_metrics"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/lifecycle"
 )
@@ -39,8 +40,14 @@ import (
 // roll out the worker binary before flipping the token on flow-api.
 func registerProductionJobs(cfg *config.Config, logger *slog.Logger) func(*jobs.Runner, *sql.DB) {
 	return func(runner *jobs.Runner, db *sql.DB) {
+		registerBusinessMetrics(cfg, logger, runner, db)
+
 		if strings.TrimSpace(cfg.ServiceToken) == "" {
-			logger.Warn("flow-worker: calendar_event_day disabled (NF_FLOW_API_SIGNAL_TOKEN unset)")
+			// Error, not warn: this deployment will never emit a single
+			// calendar.event_day_arrived, and nothing else in the system
+			// reports that absence. lifecycle.ReportRunnerHealth says the
+			// same thing on the up gauge.
+			logger.Error("flow-worker: calendar_event_day disabled (NF_FLOW_API_SIGNAL_TOKEN unset)")
 			return
 		}
 		userAgent := "flow-worker/" + lifecycle.ResolveVersion()
@@ -66,6 +73,23 @@ func registerProductionJobs(cfg *config.Config, logger *slog.Logger) func(*jobs.
 			"tick_interval", cfg.JobTickInterval,
 		)
 	}
+}
+
+// registerBusinessMetrics wires the gauge-refresh job. It reads the
+// database directly and needs no flow-api credential, so it is registered
+// before the service-token check above: a deploy waiting on the token
+// still reports how many tasks the instance holds.
+func registerBusinessMetrics(cfg *config.Config, logger *slog.Logger, runner *jobs.Runner, db *sql.DB) {
+	job, err := business_metrics.New(db, logger)
+	if err != nil {
+		logger.Error("flow-worker: business_metrics construction failed", "err", err)
+		return
+	}
+	job.RefreshInterval = cfg.BusinessMetricsInterval
+	runner.Register(job)
+	logger.Info("flow-worker: business_metrics registered",
+		"refresh_interval", cfg.BusinessMetricsInterval,
+	)
 }
 
 func main() {

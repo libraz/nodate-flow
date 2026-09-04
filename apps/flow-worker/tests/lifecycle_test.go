@@ -182,9 +182,12 @@ func baseConfig(t *testing.T, dsnStr, port string) *config.Config {
 		OTelInsecure:       true,
 		JobTickInterval:    50 * time.Millisecond,
 		JobShutdownTimeout: 500 * time.Millisecond,
-		DBMaxOpenConns:     4,
-		DBMaxIdleConns:     2,
-		DBConnMaxLifetime:  30 * time.Minute,
+		// Validate requires it positive. The value is irrelevant here:
+		// these tests register their own jobs, not business_metrics.
+		BusinessMetricsInterval: time.Minute,
+		DBMaxOpenConns:          4,
+		DBMaxIdleConns:          2,
+		DBConnMaxLifetime:       30 * time.Minute,
 	}
 	require.NoError(t, cfg.Validate())
 	return cfg
@@ -385,9 +388,12 @@ func TestWorkerDBConnectionFailureLogsAndExits(t *testing.T) {
 		OTelInsecure:       true,
 		JobTickInterval:    50 * time.Millisecond,
 		JobShutdownTimeout: 500 * time.Millisecond,
-		DBMaxOpenConns:     4,
-		DBMaxIdleConns:     2,
-		DBConnMaxLifetime:  30 * time.Minute,
+		// Validate requires it positive. The value is irrelevant here:
+		// these tests register their own jobs, not business_metrics.
+		BusinessMetricsInterval: time.Minute,
+		DBMaxOpenConns:          4,
+		DBMaxIdleConns:          2,
+		DBConnMaxLifetime:       30 * time.Minute,
 	}
 	require.NoError(t, cfg.Validate())
 

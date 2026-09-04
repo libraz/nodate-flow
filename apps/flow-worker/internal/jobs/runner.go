@@ -73,6 +73,20 @@ func (r *Runner) Registered() int {
 	return len(r.jobs)
 }
 
+// Names returns the name of every registered job, in registration order.
+// Registered() answers how many, which stops being enough once more than
+// one job can be disabled by configuration: "one job registered" no longer
+// says which one is missing.
+func (r *Runner) Names() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]string, 0, len(r.jobs))
+	for _, j := range r.jobs {
+		out = append(out, j.Name())
+	}
+	return out
+}
+
 // Start launches the tick loop in its own goroutine and returns. The loop
 // exits when ctx is cancelled; callers MUST then call Stop to wait for
 // any in-flight tick to drain.
