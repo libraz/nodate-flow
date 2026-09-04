@@ -275,8 +275,8 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-calendar-write-acl
-check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + calendar write-ACL guard
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + calendar write-ACL guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -298,6 +298,9 @@ check-outbound-deadline: ## Fail when a request can leave the repository with no
 
 check-enum-parity: ## Fail when one operation states a field's accepted values and a sibling operation leaves the same field open
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/enumparity/
+
+check-column-bounds: ## Fail when a declared input bound is wider than the column behind it, or two surfaces bound the same column differently
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/columnbounds/
 
 check-calendar-write-acl: ## Fail when a tool writes a calendar's contents without the rule the REST handlers apply to the same write
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/precondition/
