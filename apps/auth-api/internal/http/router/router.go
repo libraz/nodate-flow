@@ -16,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth/sessadapter"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/errormodel"
 	adminhandlers "github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/admin"
 	authhandlers "github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/auth"
 	inthandlers "github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/integrations"
@@ -143,6 +144,12 @@ func newAPIConfig(authenticated bool) huma.Config {
 // BuildResult mounts every auth-api route onto a fresh chi router and
 // returns the handler together with the list of huma.API instances used.
 func BuildResult(deps Deps) Result {
+	// Before any operation is registered: Huma's stock validation
+	// envelope echoes the rejected value back to the caller, which for a
+	// password, a one-time code or a TOTP secret means answering a
+	// refusal with the credential. See internal/http/errormodel.
+	errormodel.Install()
+
 	r := chi.NewRouter()
 	r.Use(middleware.ClientIP(deps.TrustedProxyHops))
 	r.Use(middleware.SecurityHeaders())
@@ -713,6 +720,10 @@ func BuildResult(deps Deps) Result {
 			Description: "Removes the named user_integrations row and best-effort revokes the provider token. Idempotent: returns 200 even if the integration was already removed.",
 		}, inthandlers.Disconnect(integrationsDeps))
 	})
+
+	// Every operation is registered by now, so the schema registries are
+	// populated and the write-only members can be read off them.
+	errormodel.LearnWriteOnlyFields(apis)
 
 	return Result{Handler: r, APIs: apis}
 }

@@ -60,6 +60,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	activityhandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/activity"
 	aihandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/ai"
 	audithandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/audit"
@@ -386,6 +387,12 @@ func Build(deps Deps) http.Handler {
 // used. It mirrors cmd/api/main.go so that the integration test harness
 // can exercise the full API surface without duplicating the wiring.
 func BuildResult(deps Deps) Result {
+	// Before any operation is registered: Huma's stock validation
+	// envelope echoes the rejected value back to the caller, which for a
+	// credential-bearing field means answering a refusal with the
+	// credential. See internal/http/errormodel.
+	errormodel.Install()
+
 	r := chi.NewRouter()
 	// Outermost layer: extract and stash the client IP so auth
 	// handlers can record it on new sessions without re-parsing
@@ -457,6 +464,10 @@ func BuildResult(deps Deps) Result {
 	for _, g := range authGroups {
 		apis = append(apis, g.api)
 	}
+
+	// Every operation is registered by now, so the schema registries are
+	// populated and the write-only members can be read off them.
+	errormodel.LearnWriteOnlyFields(apis)
 
 	// OpenAPI spec and Scalar API reference UI — public, no auth.
 	specJSON := buildOpenAPIJSON(apis)
