@@ -125,14 +125,22 @@ type GetEventOutput struct {
 }
 
 // PatchEventInput is the input for the patch event endpoint.
+//
+// The enum-backed fields carry the same value sets as CreateEventInput.
+// They are the column's own sets, and stating them here is what refuses an
+// unrecognised value with a validation error naming the field. Without the
+// constraint the only thing left refusing it is the ENUM itself, which
+// answers as a write failure the caller cannot act on — and every reader
+// downstream has to treat a value it does not know as the safest one it
+// can, because it arrived through a route that never checked.
 type PatchEventInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
 	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
-		Kind                 *string          `json:"kind,omitempty" required:"false" doc:"Event kind"`
-		Visibility           *string          `json:"visibility,omitempty" required:"false" doc:"Visibility"`
-		ShowAs               *string          `json:"showAs,omitempty" required:"false" doc:"Show-as status"`
+		Kind                 *string          `json:"kind,omitempty" required:"false" enum:"event,block,free,milestone" doc:"Event kind"`
+		Visibility           *string          `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
+		ShowAs               *string          `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
 		Flexibility          *string          `json:"flexibility,omitempty" required:"false" enum:"fixed,negotiable,conditional" doc:"Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken"`
 		Title                *string          `json:"title,omitempty" required:"false" doc:"Event title"`
 		AllDay               *bool            `json:"allDay,omitempty" required:"false" doc:"All-day flag"`

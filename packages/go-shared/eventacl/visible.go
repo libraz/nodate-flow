@@ -69,21 +69,35 @@ type Event struct {
 	CalendarDefault Visibility
 }
 
-// effective resolves 'default' against the calendar's setting.
+// effective resolves 'default' against the calendar's setting, and reads
+// anything it does not recognise as confidential.
 //
 // The setting cannot name confidential, so 'default' never hides a row —
 // which is what lets the SQL row filter stay free of a join on calendars.
-// An unrecognised or absent setting reads as public, matching the column
-// default rather than inventing a stricter answer the operator did not
-// choose.
+// An absent setting reads as public, matching the column default rather
+// than inventing a stricter answer the operator did not choose; the zero
+// CalendarDefault is a documented "public" that callers leave unset, so it
+// is a value here rather than an unrecognised one.
+//
+// A visibility outside the four constants is different: nobody chose it,
+// and the two predicates below are written as "everything except the one
+// restrictive value", so passing it through would make it the most
+// permissive answer the type can give. Confidential is the most
+// restrictive — the row is not disclosed and neither are its fields — and
+// matching roleRank's fail-closed direction is what keeps a value added to
+// the column but not to this package from being published on the way in.
 func (e Event) effective() Visibility {
-	if e.Visibility != VisibilityDefault && e.Visibility != "" {
+	switch e.Visibility {
+	case VisibilityPublic, VisibilityPrivate, VisibilityConfidential:
 		return e.Visibility
+	case VisibilityDefault, "":
+		if e.CalendarDefault == VisibilityPrivate {
+			return VisibilityPrivate
+		}
+		return VisibilityPublic
+	default:
+		return VisibilityConfidential
 	}
-	if e.CalendarDefault == VisibilityPrivate {
-		return VisibilityPrivate
-	}
-	return VisibilityPublic
 }
 
 // Actor is the requesting user's context. IsAttendee is true when the

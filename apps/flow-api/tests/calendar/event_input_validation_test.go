@@ -137,6 +137,141 @@ func TestPatchEventRejectsUnresolvableTimezone(t *testing.T) {
 	assert.Equal(t, "UTC", after.Timezone)
 }
 
+// problemFieldLocations reads the RFC 9457 `errors` member, which names
+// the request member each validation failure is about. A refusal that
+// comes back without one is a refusal the caller cannot act on.
+func problemFieldLocations(t *testing.T, raw []byte) []string {
+	t.Helper()
+	var p struct {
+		Errors []struct {
+			Location string `json:"location"`
+		} `json:"errors"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &p), "decode problem body: %s", string(raw))
+	out := make([]string, 0, len(p.Errors))
+	for _, e := range p.Errors {
+		out = append(out, e.Location)
+	}
+	return out
+}
+
+// TestPatchEventRejectsUnknownEnumValues pins where an unrecognised enum
+// value is refused, not merely that it is.
+//
+// The column is an ENUM and the connection runs in strict mode, so an
+// unknown value never reached storage. What it did reach was the write:
+// the refusal arrived as a failed INSERT reported as
+// CALENDAR.EVENT.STORE_WRITE_INTERRUPTED, a 500 that tells the caller
+// their input was fine and the server is broken, and it left the API
+// contract silent about which values the field takes. Asserting the class
+// is the whole test — a check for "not 2xx" passes on the database doing
+// the refusing.
+//
+// visibility is the one with a consequence beyond the status code: the
+// readers downstream branch on it, and a value none of them classifies
+// decides how far the event is published.
+func TestPatchEventRejectsUnknownEnumValues(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	calID := createCalendar(t, tt)
+	start := time.Date(2026, 5, 11, 10, 0, 0, 0, time.UTC)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost,
+		tt.WsPath("calendars", calID, "events"), tt.AccessToken, map[string]any{
+			"kind":       "event",
+			"visibility": "private",
+			"showAs":     "busy",
+			"title":      "Patch enum",
+			"startAt":    start.Unix(),
+			"endAt":      start.Add(time.Hour).Unix(),
+			"timezone":   "UTC",
+		}, &created)
+	require.NotEmpty(t, created.ID)
+
+	for _, c := range []struct {
+		field string
+		value string
+	}{
+		{"visibility", "internal"},
+		{"kind", "appointment"},
+		{"showAs", "away"},
+	} {
+		t.Run(c.field, func(t *testing.T) {
+			status, raw := helpers.DoJSONStatus(t, http.MethodPatch,
+				tt.WsPath("calendars", calID, "events", created.ID), tt.AccessToken, map[string]any{
+					c.field: c.value,
+				})
+			assert.Equalf(t, http.StatusUnprocessableEntity, status,
+				"%s=%q is bad input, not a storage failure: got %d body=%s",
+				c.field, c.value, status, string(raw))
+			assert.Containsf(t, problemFieldLocations(t, raw), "body."+c.field,
+				"the refusal has to name the field the caller sent: body=%s", string(raw))
+		})
+	}
+
+	// The stored row must be the one that was there before the refused
+	// patches, which is what says none of them reached the write.
+	var after struct {
+		Kind       string `json:"kind"`
+		Visibility string `json:"visibility"`
+		ShowAs     string `json:"showAs"`
+	}
+	helpers.DoJSON(t, http.MethodGet,
+		tt.WsPath("calendars", calID, "events", created.ID), tt.AccessToken, nil, &after)
+	assert.Equal(t, "event", after.Kind)
+	assert.Equal(t, "private", after.Visibility)
+	assert.Equal(t, "busy", after.ShowAs)
+}
+
+// TestPatchEventAcceptsEveryEnumValue is the other half: a constraint
+// implemented by refusing everything would pass the test above, and would
+// take the four visibilities the product is built on with it.
+func TestPatchEventAcceptsEveryEnumValue(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	calID := createCalendar(t, tt)
+	start := time.Date(2026, 5, 12, 10, 0, 0, 0, time.UTC)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost,
+		tt.WsPath("calendars", calID, "events"), tt.AccessToken, map[string]any{
+			"kind":     "event",
+			"title":    "Patch enum accepted",
+			"startAt":  start.Unix(),
+			"endAt":    start.Add(time.Hour).Unix(),
+			"timezone": "UTC",
+		}, &created)
+	require.NotEmpty(t, created.ID)
+
+	for _, c := range []struct {
+		field  string
+		values []string
+	}{
+		{"visibility", []string{"default", "public", "private", "confidential"}},
+		{"kind", []string{"event", "block", "free", "milestone"}},
+		{"showAs", []string{"busy", "free", "tentative", "oof"}},
+	} {
+		for _, value := range c.values {
+			var patched map[string]any
+			helpers.DoJSON(t, http.MethodPatch,
+				tt.WsPath("calendars", calID, "events", created.ID), tt.AccessToken, map[string]any{
+					c.field: value,
+				}, &patched)
+			assert.Equalf(t, value, patched[c.field],
+				"%s=%q is a value of the column and must round-trip", c.field, value)
+		}
+	}
+}
+
 // TestCreateEventRejectsEndBeforeStart pins the status class as much as
 // the refusal. The ordering is a database CHECK, so an unchecked
 // request was already refused — as a 500 saying the event could not be

@@ -56,6 +56,11 @@ func TestCanSee(t *testing.T) {
 			Actor{UserID: 0},
 			false,
 		},
+		{"an unrecognised visibility hides the row from a co-member",
+			Event{Visibility: Visibility("internal"), OwnerUserID: 99},
+			Actor{UserID: 7},
+			false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -104,6 +109,11 @@ func TestCanSeeDetails(t *testing.T) {
 			Actor{UserID: 42},
 			true,
 		},
+		{"an unrecognised visibility withholds the details from an attendee",
+			Event{Visibility: Visibility("internal"), OwnerUserID: 99},
+			Actor{UserID: 7, IsAttendee: true},
+			false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -114,12 +124,51 @@ func TestCanSeeDetails(t *testing.T) {
 	}
 }
 
+// TestEffectiveResolution drives effective directly, which is the only
+// way to reach the unrecognised case: the column is an ENUM and the API
+// states the same four values, so no request path can deliver a fifth. The
+// point of pinning it anyway is that both predicates are written as
+// "everything except one value", so whatever effective returns for a value
+// nobody classified decides how far it is published — and the test that
+// would catch the permissive answer cannot go through a route that refuses
+// to produce it.
+//
+// The four values and the two default cases are pinned alongside it, so
+// this cannot pass on an implementation that answers confidential to
+// everything.
+func TestEffectiveResolution(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		evt  Event
+		want Visibility
+	}{
+		{"public stays public", Event{Visibility: VisibilityPublic}, VisibilityPublic},
+		{"private stays private", Event{Visibility: VisibilityPrivate}, VisibilityPrivate},
+		{"confidential stays confidential", Event{Visibility: VisibilityConfidential}, VisibilityConfidential},
+		{"default follows a public calendar", Event{Visibility: VisibilityDefault, CalendarDefault: VisibilityPublic}, VisibilityPublic},
+		{"default follows a private calendar", Event{Visibility: VisibilityDefault, CalendarDefault: VisibilityPrivate}, VisibilityPrivate},
+		{"default with no calendar setting reads as public", Event{Visibility: VisibilityDefault}, VisibilityPublic},
+		{"an unset visibility follows the calendar", Event{Visibility: "", CalendarDefault: VisibilityPrivate}, VisibilityPrivate},
+		{"an unrecognised visibility reads as confidential", Event{Visibility: Visibility("internal")}, VisibilityConfidential},
+		{"an unrecognised visibility does not fall back to the calendar setting",
+			Event{Visibility: Visibility("internal"), CalendarDefault: VisibilityPublic}, VisibilityConfidential},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.evt.effective(); got != c.want {
+				t.Fatalf("effective(%+v) = %q, want %q", c.evt, got, c.want)
+			}
+		})
+	}
+}
+
 // TestDetailsNeverExceedRowVisibility states the relationship between
 // the two predicates as a property rather than a list: there is no
 // combination in which the details are readable but the row is not.
 func TestDetailsNeverExceedRowVisibility(t *testing.T) {
 	t.Parallel()
-	visibilities := []Visibility{VisibilityPublic, VisibilityDefault, VisibilityPrivate, VisibilityConfidential, ""}
+	visibilities := []Visibility{VisibilityPublic, VisibilityDefault, VisibilityPrivate, VisibilityConfidential, "", Visibility("internal")}
 	owners := []uint32{0, 42, 99}
 	actors := []uint32{0, 42, 7}
 	for _, v := range visibilities {
