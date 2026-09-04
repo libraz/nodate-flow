@@ -131,9 +131,16 @@ func RevokeAdmin(deps Deps) func(context.Context, *RevokeAdminInput) (*RevokeAdm
 			return nil, httpErr(apierrors.InstanceAdminLastAdmin)
 		}
 
-		err = deps.Queries.AdminRevokeInstanceAdmin(ctx, targetID)
+		affected, err := deps.Queries.AdminRevokeInstanceAdmin(ctx, targetID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		// Another path may have revoked the grant since the check above, in
+		// which case this statement matched nothing. Answer as if the grant
+		// were never there and record no audit entry, so the trail never
+		// claims a revocation that did not happen.
+		if affected == 0 {
+			return nil, httpErr(apierrors.InstanceAdminNotFound)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

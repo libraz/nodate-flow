@@ -198,14 +198,22 @@ func (q *Queries) AdminListInstanceAdmins(ctx context.Context, arg AdminListInst
 	return items, nil
 }
 
-const adminRevokeInstanceAdmin = `-- name: AdminRevokeInstanceAdmin :exec
+const adminRevokeInstanceAdmin = `-- name: AdminRevokeInstanceAdmin :execrows
 UPDATE instance_admins
 SET revoked_at = NOW()
 WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL
 `
 
 // Revoke an instance admin grant by setting revoked_at.
-func (q *Queries) AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error {
-	_, err := q.db.ExecContext(ctx, adminRevokeInstanceAdmin, userID)
-	return err
+// The WHERE clause re-checks that the grant is still active, so a grant
+// revoked by another path between the caller's existence check and this
+// write matches nothing. Callers MUST inspect RowsAffected and treat 0 as
+// "not an active admin" rather than reporting a revocation that never
+// happened.
+func (q *Queries) AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) (int64, error) {
+	result, err := q.db.ExecContext(ctx, adminRevokeInstanceAdmin, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

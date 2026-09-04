@@ -39,8 +39,13 @@ WHERE NOT EXISTS (
   SELECT 1 FROM instance_admins WHERE enabled = TRUE AND revoked_at IS NULL
 );
 
--- name: AdminRevokeInstanceAdmin :exec
+-- name: AdminRevokeInstanceAdmin :execrows
 -- Revoke an instance admin grant by setting revoked_at.
+-- The WHERE clause re-checks that the grant is still active, so a grant
+-- revoked by another path between the caller's existence check and this
+-- write matches nothing. Callers MUST inspect RowsAffected and treat 0 as
+-- "not an active admin" rather than reporting a revocation that never
+-- happened.
 UPDATE instance_admins
 SET revoked_at = NOW()
 WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL;

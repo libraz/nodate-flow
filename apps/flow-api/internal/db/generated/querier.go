@@ -103,7 +103,12 @@ type Querier interface {
 	// filter_enabled: pass NULL to skip, otherwise filters by enabled flag.
 	AdminListWorkspaces(ctx context.Context, arg AdminListWorkspacesParams) ([]AdminListWorkspacesRow, error)
 	// Revoke an instance admin grant by setting revoked_at.
-	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) error
+	// The WHERE clause re-checks that the grant is still active, so a grant
+	// revoked by another path between the caller's existence check and this
+	// write matches nothing. Callers MUST inspect RowsAffected and treat 0 as
+	// "not an active admin" rather than reporting a revocation that never
+	// happened.
+	AdminRevokeInstanceAdmin(ctx context.Context, userID uint32) (int64, error)
 	// Revoke any session by its public_id (admin override, no user scoping).
 	AdminRevokeSession(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a user account (soft-delete).
