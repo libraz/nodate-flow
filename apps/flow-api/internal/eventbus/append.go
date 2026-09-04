@@ -81,11 +81,33 @@ func isDuplicateEntry(err error) bool {
 	return errors.As(err, &me) && me.Number == mysqlDuplicateEntry
 }
 
-// globalSeq is a monotonically increasing counter that assigns a
-// sequence number to every event notification. SSE subscribers include
-// the sequence in their payload so clients can detect gaps and reorder
+// workspaceSeq holds one monotonically increasing counter per
+// workspace. [fireNotifyHooks] stamps each notification with the next
+// value for the workspace the event belongs to, and SSE subscribers
+// carry it in their payload so clients can detect gaps and reorder
 // events that arrive out of order from concurrent goroutines.
-var globalSeq atomic.Int64
+//
+// The counter is per workspace because a subscriber only ever sees one
+// workspace's events. A single process-wide counter would show every
+// other tenant's traffic as a gap — which both makes gap detection
+// meaningless in a multi-tenant deployment and lets a client read the
+// rest of the instance's activity rate off its own stream. Each
+// workspace instead sees a dense 1, 2, 3... of its own events.
+//
+// A sync.Map keeps the dispatch path off a process-wide lock: counters
+// are looked up far more often than they are created, and the keyspace
+// is bounded by the number of workspaces this process has served.
+var workspaceSeq sync.Map // map[uint32]*atomic.Int64
+
+// nextSeq returns the next sequence number for workspaceInternalID,
+// starting at 1 for a workspace this process has not seen before.
+func nextSeq(workspaceInternalID uint32) int64 {
+	counter, ok := workspaceSeq.Load(workspaceInternalID)
+	if !ok {
+		counter, _ = workspaceSeq.LoadOrStore(workspaceInternalID, &atomic.Int64{})
+	}
+	return counter.(*atomic.Int64).Add(1)
+}
 
 // Event is the high-level shape callers pass to [Append]. The optional
 // TaskID and ActorUserID accept *int64 so callers can express NULL by
@@ -226,8 +248,8 @@ func WithSeq(ctx context.Context, seq int64) context.Context {
 	return context.WithValue(ctx, seqCtxKey{}, seq)
 }
 
-// SeqFromContext returns the event sequence number set by Append,
-// or zero if the context was not tagged.
+// SeqFromContext returns the event sequence number set by
+// [fireNotifyHooks], or zero if the context was not tagged.
 func SeqFromContext(ctx context.Context) int64 {
 	if ctx == nil {
 		return 0
@@ -263,7 +285,16 @@ func ActorAgentIDFromContext(ctx context.Context) uint32 {
 	return v
 }
 
+// fireNotifyHooks dispatches one event to every registered subscriber,
+// stamping the context with the event's sequence number on the way.
+//
+// The stamp lives here because this is the one point both appenders
+// reach: [Append] calls it directly and the eventlog bridge forwards
+// into it (see bridge.go). Numbering at either appender leaves the
+// other's events unnumbered, and numbering at both leaves the two
+// sequences disagreeing about what comes next.
 func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64) {
+	ctx = WithSeq(ctx, nextSeq(workspaceInternalID))
 	notifyMu.RLock()
 	hooks := make([]NotifyHook, 0, len(notifyHooks))
 	for _, h := range notifyHooks {
@@ -636,8 +667,6 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 	// LastInsertId is a positive int64 produced by AUTO_INCREMENT, and
 	// events.id is BIGINT UNSIGNED, so uint64 carries it without loss.
 	eventInternalID := uint64(lastID) //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative
-	seq := globalSeq.Add(1)
-	seqCtx := WithSeq(ctx, seq)
 	// Fan-out (SSE tap, notification goroutines, on_event triggers) must
 	// observe a committed row, and must not run while this call's
 	// enclosing transaction still holds locks on the just-inserted rows
@@ -654,7 +683,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 	// branch for that case because [dbretry.CommitBoundary] leaves no way
 	// to reach it.
 	db.AfterCommit(func() {
-		fireNotifyHooks(seqCtx, evt.WorkspaceID, string(evt.Type), eventInternalID)
+		fireNotifyHooks(ctx, evt.WorkspaceID, string(evt.Type), eventInternalID)
 	})
 	return ReverseAppendResult{PublicID: pubID, OccurredAt: now}, nil
 }

@@ -341,8 +341,10 @@ func writeSSEComment(w http.ResponseWriter, f http.Flusher, text string) error {
 
 // buildEventNotification constructs a JSON-RPC 2.0 notification
 // payload for a workspace event. Notifications have no id per the
-// JSON-RPC 2.0 spec. The seq field is a monotonically increasing
-// counter that clients can use to detect gaps and reorder events.
+// JSON-RPC 2.0 spec. The seq field counts the events of one workspace:
+// it is dense within the stream a client subscribes to and says nothing
+// about any other workspace, so a gap means the client missed one of
+// its own events rather than that another tenant was busy.
 func buildEventNotification(eventType string, seq int64) string {
 	payload := map[string]any{
 		"jsonrpc": "2.0",
