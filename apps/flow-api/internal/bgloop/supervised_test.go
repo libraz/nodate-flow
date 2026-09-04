@@ -36,7 +36,9 @@ var unsupervisedInMain = map[string]string{
 // Two shapes are checked, matching how a resident loop actually gets
 // started in this codebase:
 //
-//   - `go <anything>` in cmd/api/main.go, where the wiring lives;
+//   - `go <anything>` in cmd/api/main.go, where the wiring lives. There
+//     a loop goes through [Start] rather than `go Run`, so its cancel
+//     and its stop cannot drift apart;
 //   - `go x.loop(...)` / `go x.Loop(...)` anywhere under internal/,
 //     which is how a component starts its own loop from Start.
 func TestEveryResidentLoopIsSupervised(t *testing.T) {
@@ -55,8 +57,14 @@ func TestEveryResidentLoopIsSupervised(t *testing.T) {
 	}
 }
 
-// unsupervisedGoStmtsInMain reports `go` statements in main.go that
-// neither call Run nor appear in the allowlist.
+// unsupervisedGoStmtsInMain reports `go` statements in main.go that do
+// not appear in the allowlist.
+//
+// `go Run(...)` counts as an offender here, unlike under internal/: it
+// leaves the loop's cancel as a second thing the shutdown path has to
+// remember, and a shutdown that stops the loop without it restarts what
+// it stopped. In main, [Start] is the way in — it hands back one
+// stopper that is both.
 func unsupervisedGoStmtsInMain(t *testing.T, root string) []string {
 	t.Helper()
 	path := filepath.Join(root, "cmd", "api", "main.go")
@@ -72,11 +80,15 @@ func unsupervisedGoStmtsInMain(t *testing.T, root string) []string {
 		if !ok {
 			return true
 		}
-		if callsRun(goStmt.Call) || startsAllowedListener(goStmt.Call) {
-			return true
+		line := fset.Position(goStmt.Pos()).Line
+		switch {
+		case callsRun(goStmt.Call):
+			out = append(out, fmt.Sprintf("cmd/api/main.go:%d supervises a loop with `go bgloop.Run`, "+
+				"which leaves its cancel separate from its stop; use bgloop.Start", line))
+		case startsAllowedListener(goStmt.Call):
+		default:
+			out = append(out, fmt.Sprintf("cmd/api/main.go:%d starts a goroutine outside bgloop.Run", line))
 		}
-		out = append(out, fmt.Sprintf("cmd/api/main.go:%d starts a goroutine outside bgloop.Run",
-			fset.Position(goStmt.Pos()).Line))
 		return true
 	})
 	return out

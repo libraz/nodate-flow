@@ -231,8 +231,11 @@ func main() {
 	var tap *stream.EventbusTap
 	var streamRemember stream.RememberWorkspaceFunc
 	var aiInvocationPublisher func(context.Context, uint32)
-	streamTailCancel := func() {}
-	defer func() { streamTailCancel() }()
+	// Every resident loop below hands back one stopper, called in the
+	// shutdown sequence at the bottom of main. A no-op stands in while
+	// the feature that owns the loop is disabled, so the shutdown path
+	// does not have to know which loops were started.
+	stopStreamTail := func() {}
 	if cfg.StreamEnabled {
 		// Prefer a Redis-backed notifier when the env asks for it and
 		// the binary was compiled with -tags redis; otherwise fall
@@ -262,9 +265,7 @@ func main() {
 		if cfg.StreamTail {
 			tailer := stream.NewTailer(db, notifier, tap)
 			tailer.SetInterval(cfg.StreamTailInterval)
-			var tailCtx context.Context
-			tailCtx, streamTailCancel = context.WithCancel(context.Background())
-			go bgloop.Run(tailCtx, "stream.tailer", logger, func(ctx context.Context) {
+			stopStreamTail = bgloop.Start(context.Background(), "stream.tailer", logger, func(ctx context.Context) {
 				if err := tailer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					logger.Warn("event tail stopped", "err", err)
 				}
@@ -555,26 +556,23 @@ func main() {
 	}
 	scheduler.Queue = agentQueue
 	var agentWorkers []*agentruntime.Worker
-	var workerCancel context.CancelFunc
+	var stopAgentWorkers []func()
 	var agentPurger *agentruntime.Purger
 	workerCount := cfg.AgentWorkerCount
 	if workerCount <= 0 {
 		workerCount = 1
 	}
-	{
-		var wctx context.Context
-		wctx, workerCancel = context.WithCancel(context.Background())
-		for i := 0; i < workerCount; i++ {
-			name := fmt.Sprintf("agent.worker.%d", i)
-			w := &agentruntime.Worker{Queue: agentQueue, Runner: runner, Name: name, Logger: logger}
-			agentWorkers = append(agentWorkers, w)
-			// Supervised: the loop already survives claim failures, and
-			// bgloop covers what it cannot — a panic inside an agent run
-			// would otherwise take the whole process down with it.
-			go bgloop.Run(wctx, name, logger, w.Loop)
-		}
-		logger.Info("agent workers started", "count", workerCount, "backend", cfg.AgentQueueBackend)
+	for i := 0; i < workerCount; i++ {
+		name := fmt.Sprintf("agent.worker.%d", i)
+		w := &agentruntime.Worker{Queue: agentQueue, Runner: runner, Name: name, Logger: logger}
+		agentWorkers = append(agentWorkers, w)
+		// Supervised: the loop already survives claim failures, and
+		// bgloop covers what it cannot — a panic inside an agent run
+		// would otherwise take the whole process down with it.
+		stopAgentWorkers = append(stopAgentWorkers,
+			bgloop.Start(context.Background(), name, logger, w.Loop))
 	}
+	logger.Info("agent workers started", "count", workerCount, "backend", cfg.AgentQueueBackend)
 	if cfg.AgentQueueBackend == "mysql" && cfg.AgentRunsPurgeInterval > 0 {
 		agentPurger = &agentruntime.Purger{
 			Queries:   queries,
@@ -631,22 +629,26 @@ func main() {
 		HandoffLoopLimit: cfg.AgentHandoffLoopLimit,
 		Logger:           logger,
 	}
-	autoActionCtx, autoActionCancel := context.WithCancel(context.Background())
-	defer autoActionCancel()
+	stopAutoAction := func() {}
 	if cfg.AutoActionInterval > 0 {
 		// Only supervised when it is actually enabled: Start returns at
 		// once when the interval is zero, and the supervisor would read
 		// that as a loop dying and restart it forever. A disabled
 		// feature must not look like a broken one.
-		go bgloop.Run(autoActionCtx, "autoactions.executor", logger, autoActionExec.Start)
+		//
+		// The stopper is the whole stop: it cancels the supervisor's
+		// context, which is the one signal the executor's loop observes
+		// and the one the supervisor reads as deliberate rather than as
+		// a loop that died and needs bringing back mid-shutdown.
+		stopAutoAction = bgloop.Start(context.Background(), "autoactions.executor", logger, autoActionExec.Start)
 	} else {
-		autoActionExec.Start(autoActionCtx)
+		autoActionExec.Start(context.Background())
 	}
 
 	// Item-consistency reconciler: scans tasks and calendar_events for
 	// drift (date mismatch, orphan role, enabled-flag mismatch) and
 	// self-heals via UPDATE. 0 disables.
-	var reconcilerCancel context.CancelFunc
+	stopReconciler := func() {}
 	if cfg.ItemReconcilerInterval > 0 {
 		rec := &reconciler.Reconciler{
 			DB:       db,
@@ -654,9 +656,7 @@ func main() {
 			Metrics:  obs.ReconcilerMetrics{},
 			Interval: cfg.ItemReconcilerInterval,
 		}
-		var rctx context.Context
-		rctx, reconcilerCancel = context.WithCancel(context.Background())
-		go bgloop.Run(rctx, "item.reconciler", logger, rec.Start)
+		stopReconciler = bgloop.Start(context.Background(), "item.reconciler", logger, rec.Start)
 		logger.Info("item reconciler started", "interval", cfg.ItemReconcilerInterval)
 	}
 
@@ -677,9 +677,11 @@ func main() {
 	// 0007). Scans calendar_events on a 1-minute interval, dispatches
 	// reminders through the shared notification fan-out so each
 	// attendee receives an in-app notification row, and marks
-	// notified_at to prevent duplicates. Exits when stopCtx is
-	// cancelled by the shutdown signal handler.
-	go bgloop.Run(stopCtx, "calendar.reminder_scheduler", logger, func(ctx context.Context) {
+	// notified_at to prevent duplicates. Its context descends from
+	// stopCtx, so a signal ends it; the stopper covers the other way out
+	// of the select below, where the listener returned on its own and no
+	// signal ever arrived.
+	stopCalendarReminders := bgloop.Start(stopCtx, "calendar.reminder_scheduler", logger, func(ctx context.Context) {
 		calendarnotifs.StartNotificationScheduler(ctx, db, notifFanout, time.Minute)
 	})
 
@@ -702,19 +704,23 @@ func main() {
 		logger.Info("shutdown signal received")
 	}
 
+	// Every resident loop stops here rather than on return from main: a
+	// supervised loop whose context outlives its stop is restarted by
+	// its supervisor and spends the drain window ticking against a
+	// database pool that the rest of this sequence is closing.
 	scheduler.Stop()
-	autoActionExec.Stop()
+	stopAutoAction()
 	webhookWorker.Stop()
 	importWorker.Stop()
 	if storageSweeper != nil {
 		storageSweeper.Stop()
 	}
 	schedulerCancel()
-	if reconcilerCancel != nil {
-		reconcilerCancel()
-	}
-	if workerCancel != nil {
-		workerCancel()
+	stopReconciler()
+	stopCalendarReminders()
+	stopStreamTail()
+	for _, stop := range stopAgentWorkers {
+		stop()
 	}
 	if agentPurger != nil {
 		agentPurger.Stop()

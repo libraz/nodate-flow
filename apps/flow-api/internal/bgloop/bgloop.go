@@ -151,6 +151,30 @@ func Run(ctx context.Context, name string, log *slog.Logger, fn func(ctx context
 	}
 }
 
+// Start supervises fn under name in its own goroutine and hands back the
+// single function that ends it.
+//
+// The loop runs under a context derived from ctx, and stop cancels that
+// context. Cancelling is the only clean way to end a supervised loop: a
+// loop ended through any other signal — a component's own Stop, a close
+// on a quit channel — returns while its context is still live, which is
+// exactly the fault [Run] restarts. It would come back up, in the middle
+// of a shutdown, against a database pool being torn down around it.
+//
+// Handing back one stopper is why this exists. "Stop the loop" and
+// "stop its supervisor" are otherwise two things every shutdown path has
+// to keep together, and one of them drifting is invisible until a
+// shutdown restarts what it just stopped.
+//
+// stop does not wait for fn to return: a loop that ignores its context
+// would hold the shutdown open past its deadline, and the drain budget
+// belongs to in-flight requests. Calling stop more than once is safe.
+func Start(ctx context.Context, name string, log *slog.Logger, fn func(ctx context.Context)) (stop func()) {
+	loopCtx, cancel := context.WithCancel(ctx)
+	go Run(loopCtx, name, log, fn)
+	return cancel
+}
+
 // runOnce calls fn and reports whether it panicked. The recover lives in
 // its own frame so a panic unwinds only fn, leaving the supervisor loop
 // intact.

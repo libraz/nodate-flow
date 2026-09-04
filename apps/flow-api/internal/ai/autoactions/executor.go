@@ -109,9 +109,6 @@ type Executor struct {
 	// tick in every replica regardless.
 	lastRunMu sync.Mutex
 	lastRun   map[uint32]time.Time
-
-	stopOnce sync.Once
-	stopCh   chan struct{}
 }
 
 // now returns the executor's clock.
@@ -122,15 +119,26 @@ func (e *Executor) now() time.Time {
 	return time.Now()
 }
 
+// startedMessage is logged once per run, at the point the loop begins.
+// It is a constant so that "a run is under way" has one spelling
+// shared by the loop and by anything watching for it.
+const startedMessage = "auto-action executor started"
+
 // Start launches the background loop. It blocks until ctx is
 // cancelled. Safe to call from a goroutine.
+//
+// Cancelling ctx is the only way to end a run, and it is the way the
+// supervisor understands: a loop that returns while its context is
+// still live is indistinguishable from one that died, and gets
+// restarted. Every point the loop can block on — the ticker wait and
+// each database call a pass makes — takes ctx, so the cancel is
+// observed wherever the run happens to be.
 func (e *Executor) Start(ctx context.Context) {
 	if e.Config.Interval <= 0 {
 		e.Logger.Info("auto-action executor disabled (interval=0)")
 		return
 	}
-	e.stopCh = make(chan struct{})
-	e.Logger.Info("auto-action executor started",
+	e.Logger.Info(startedMessage,
 		"interval", e.Config.Interval,
 		"threshold", e.Config.ConfidenceThreshold,
 		"dry_run", e.Config.DryRun,
@@ -143,8 +151,6 @@ func (e *Executor) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-e.stopCh:
-			return
 		case <-ticker.C:
 			if err := e.tick(ctx); err != nil {
 				e.Logger.Error("auto-action executor: pass incomplete", "err", err)
@@ -153,20 +159,11 @@ func (e *Executor) Start(ctx context.Context) {
 	}
 }
 
-// Stop signals the loop to exit.
-func (e *Executor) Stop() {
-	e.stopOnce.Do(func() {
-		if e.stopCh != nil {
-			close(e.stopCh)
-		}
-	})
-}
-
 // RunOnce performs a single evaluation pass synchronously, mirroring
 // what the background loop does on every ticker tick. It exists for
 // integration tests that need deterministic execution without waiting
 // on the interval, and for one-shot CLI invocations. Production code
-// uses [Start] / [Stop].
+// uses [Start].
 //
 // The error reports that the pass did not reach every workspace, not
 // that a particular workspace failed: per-workspace problems are logged
