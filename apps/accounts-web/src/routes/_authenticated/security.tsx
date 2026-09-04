@@ -229,8 +229,14 @@ export function SecurityPage(): ReactElement {
         'Failed to revoke the session',
       );
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    } catch {
-      toaster.show({ message: t('security.session_revoke_failed'), tone: 'danger' });
+    } catch (err) {
+      const code = refusalCode(err);
+      toaster.show({
+        message: code
+          ? `${t('security.session_revoke_failed')} (${code})`
+          : t('security.session_revoke_failed'),
+        tone: 'danger',
+      });
     } finally {
       setRevokingId(null);
     }
@@ -814,6 +820,8 @@ export function RecoveryCodesView({
       await navigator.clipboard.writeText(codes.join('\n'));
       toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') });
     } catch {
+      // error-toast-exempt: the clipboard write never reached the API, so the
+      // rejection carries a browser permission state and no refusal to show.
       toaster.show({ tone: 'danger', message: t('security.totp.recovery.copy_failed') });
     }
   };

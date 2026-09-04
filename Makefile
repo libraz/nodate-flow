@@ -230,8 +230,8 @@ lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 
 # ---------- lint / format / typecheck ----------
 
-.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary
-check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate
+.PHONY: check lint format typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts
+check: lint typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts ## Lint + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -287,6 +287,9 @@ check-strings: ## Fail when a JSX attribute carries a literal UI string instead 
 
 check-breakpoints: ## Fail when a media query does not match the declared breakpoint scale
 	node scripts/check-breakpoints.mjs
+
+check-error-toasts: ## Fail when an error-path toast is built from a fixed sentence instead of the caught error
+	node scripts/check-error-toasts.mjs
 
 check-css-var-parens: ## Fail when a var(--nf-...) token reference has a stray extra closing paren
 	bash scripts/check-css-var-parens.sh
