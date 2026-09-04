@@ -1,0 +1,385 @@
+{
+  "uid": "nf-worker-background",
+  "title": "Worker & Background Jobs",
+  "tags": ["nodate-flow", "worker", "background"],
+  "timezone": "browser",
+  "editable": true,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "flow-worker Complete",
+      "description": "Whether flow-worker came up doing the work its configuration calls for: 1 when every job that configuration implies is registered, 0 when one is missing, when nothing is registered, and during shutdown. This is not process liveness — a worker reporting 0 here is still running and still answering scrapes.",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "nf_flow_worker_up",
+          "legendFormat": "flow-worker complete"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": 0, "color": "red" }, { "value": 1, "color": "green" }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "title": "flow-worker Jobs Registered",
+      "description": "How many jobs the flow-worker runner was given at boot. Read alongside the completeness gauge: it distinguishes a worker that registered nothing from one that is shutting down.",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "nf_flow_worker_jobs_registered",
+          "legendFormat": "jobs registered"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [{ "value": 0, "color": "blue" }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Discord Gateway Connected",
+      "description": "Whether the presence-discord gateway WebSocket is connected and identified with Discord. 0 covers both a dropped link and shutdown; the process itself stays up and scrapeable either way, so no other signal turns red while presence stops arriving.",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "nf_presence_discord_gateway_up",
+          "legendFormat": "gateway connected"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "value": 0, "color": "red" }, { "value": 1, "color": "green" }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Calendar Event-Day Ticks by Outcome",
+      "description": "Rate of calendar event-day job ticks, split by outcome. A skipped tick is one that found nothing to do rather than a failure. An errored tick leaves the workspace cursor where it was, so the days it did not materialise are retried on the next tick.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(nf_flow_worker_calendar_event_day_ticks_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Calendar Event-Day Tick Duration p95",
+      "description": "Wall-clock duration of one calendar event-day tick, aggregated across the whole job. Compare against the 60 second tick cadence — a p95 approaching it means ticks are about to overlap. The histogram uses the Prometheus default buckets, so anything slower than 10 seconds is only visible as overflow.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nf_flow_worker_calendar_event_day_tick_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Item Reconciler Passes",
+      "description": "Rate of item-consistency reconciler passes, one per tick. A rate falling to zero means the reconciler has stopped running, which nothing else reports: the process stays up and requests are served regardless.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(nf_item_reconciler_runs_total[5m]))",
+          "legendFormat": "passes/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Item Reconciler Errors",
+      "description": "Rate of query or heal failures raised inside reconciler passes. These indicate a database-side problem rather than drift, and for as long as they last item drift is going undetected.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(nf_item_reconciler_errors_total[5m]))",
+          "legendFormat": "errors/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Item Drift Detected",
+      "description": "Drift rows the reconciler found, broken down by the kind of drift. Any of these means a writer bypassed the shared item path. Deliberately has no alert of its own — drift the reconciler goes on to heal is the reconciler doing its job, so it is watched here instead.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(nf_item_inconsistency_total[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Item Drift Healed",
+      "description": "Drift rows the reconciler successfully repaired, broken down by the kind of drift. Stays at or below the detected rate because some kinds are only ever logged and never healed.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(nf_item_reconciler_heal_total[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Notification Fan-out Deduplication",
+      "description": "Rate of notification rows dropped by the fan-out uniqueness key, by why they were dropped. A steady non-zero rate is normal under at-least-once delivery; a sudden spike usually means a hook is firing more often than expected.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(nf_notification_fanout_dedup_total[5m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Notification Preference Fetch Errors",
+      "description": "Rate of failures to load a recipient's channel preferences during fan-out, split by error class so a database failure is separable from a timeout. Every failure drops that recipient to the in-app-only default, so a channel they configured is skipped while the fan-out still reports success.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (type) (rate(nf_notification_fanout_preference_fetch_errors_total[5m]))",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "Discord Gateway Events",
+      "description": "Rate of gateway events presence-discord processed, by kind: presence updates received, signal posts that succeeded or failed, and presence belonging to a Discord user with no linked account. Carries no user or guild dimension by design.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (kind) (rate(nf_presence_discord_events_total[5m]))",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Discord Presence Debounce Drops",
+      "description": "Rate of pending trailing presence updates that a newer event replaced before they could emit. A non-zero rate is expected and healthy: it is the per-user debounce window suppressing a storm, and the final trailing update still emits.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 38 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum(rate(nf_presence_discord_debounce_dropped_total[5m]))",
+          "legendFormat": "dropped/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Background Loop Restarts",
+      "description": "Rate of supervised background loop restarts, by which loop and why it stopped. A supervised loop is meant to run for the lifetime of the process, so any restart means its work stopped for at least the backoff while the process stayed up and kept serving requests.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "sum by (loop, reason) (rate(nf_background_loop_restarts_total[5m]))",
+          "legendFormat": "{{loop}} ({{reason}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "schemaVersion": 39,
+  "version": 1
+}

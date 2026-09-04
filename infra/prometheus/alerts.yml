@@ -102,6 +102,159 @@ groups:
             them and none will be written retroactively; correlate with
             nf_db_queries_total{status="error"} to confirm the cause.
 
+  - name: nodate-flow-worker
+    rules:
+      # FlowWorkerDegraded: the worker is running but incomplete.
+      #
+      # This is not ServiceDown. The process is up and its metrics
+      # endpoint is being scraped successfully — the gauge is only
+      # readable because both are true. It reports 0 because a job the
+      # worker's configuration calls for was never registered: an unset
+      # NF_FLOW_API_SIGNAL_TOKEN leaves the calendar job out, and the
+      # deployment then looks entirely healthy while emitting no
+      # calendar signals at all. Nothing else in the stack can say that;
+      # only the process knows which jobs its own configuration implied.
+      #
+      # The gauge is also 0 during graceful shutdown, which is what the
+      # 10 minute wait absorbs so an ordinary restart does not page.
+      - alert: FlowWorkerDegraded
+        expr: |
+          nf_flow_worker_up == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "flow-worker on {{ $labels.job }} is running without a job it was configured for"
+          description: >-
+            {{ $labels.job }} has reported an incomplete job set for more than
+            10 minutes. The process is up and being scraped, so nothing else
+            will turn red; check nf_flow_worker_jobs_registered and confirm
+            NF_FLOW_API_SIGNAL_TOKEN is set, without which the calendar job is
+            never registered and no calendar signals are emitted.
+
+      # CalendarEventDayTickFailing: the calendar job has been failing
+      # long enough to be about to lose days.
+      #
+      # An errored tick leaves that workspace's cursor where it was, so
+      # the days it did not materialise are retried on the next tick
+      # rather than lost. Days are only actually lost once the failure
+      # outlives the job's catch-up lookback of 26 hours, past which the
+      # widened window no longer reaches back to them. So the rule waits
+      # for sustained failure instead of firing on a blip, and at 30
+      # minutes still leaves most of a day of margin before anything is
+      # unrecoverable.
+      - alert: CalendarEventDayTickFailing
+        expr: |
+          sum by (job) (rate(nf_flow_worker_calendar_event_day_ticks_total{status="error"}[15m])) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Calendar event-day ticks failing on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} has been failing calendar event-day ticks
+            continuously for 30 minutes. The cursor has not advanced, so the
+            unmaterialised days are still being retried; they are lost once the
+            failure outlives the 26 hour catch-up lookback.
+
+  - name: nodate-flow-background
+    rules:
+      # BackgroundLoopRestarting: a supervised loop stopped and had to be
+      # started again.
+      #
+      # A supervised loop is meant to run for the lifetime of the
+      # process, so any restart means its work stopped for at least the
+      # backoff. Nothing else surfaces it: the process stays up, health
+      # passes and requests are served normally while the loop's work
+      # simply stops happening — which is why any increase alerts rather
+      # than a rate threshold. The reason label separates a panic from a
+      # loop that returned on its own.
+      - alert: BackgroundLoopRestarting
+        expr: |
+          sum by (job, loop, reason) (increase(nf_background_loop_restarts_total[1h])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Background loop {{ $labels.loop }} restarting on {{ $labels.job }}"
+          description: >-
+            The {{ $labels.loop }} loop on {{ $labels.job }} restarted
+            {{ $value | printf "%.0f" }} time(s) in the last hour
+            (reason: {{ $labels.reason }}). The process stayed up and served
+            requests throughout; the work that loop does stopped for at least
+            the restart backoff each time.
+
+      # ItemReconcilerFailing: the drift detector itself is erroring.
+      #
+      # The reconciler is what detects writers that skipped the shared
+      # item path. While it is erroring, drift accumulates with nothing
+      # reporting it — so this rule is about having lost the detector,
+      # not about the drift.
+      #
+      # nf_item_inconsistency_total deliberately has no rule of its own:
+      # drift the reconciler finds and heals is the reconciler working,
+      # and paging on it would page on a self-healing system. It is on
+      # the dashboard instead.
+      - alert: ItemReconcilerFailing
+        expr: |
+          sum by (job) (increase(nf_item_reconciler_errors_total[1h])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Item-consistency reconciler failing on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} raised {{ $value | printf "%.0f" }} reconciler
+            error(s) in the last hour. Item drift is going undetected for as
+            long as this lasts; correlate with
+            nf_db_queries_total{status="error"} to confirm the cause.
+
+      # NotificationPreferenceFetchFailing: deliveries are silently
+      # falling back to the default channel.
+      #
+      # When the preference fetch fails, the recipient falls through to
+      # the in-app-only default, so a delivery the user configured
+      # simply does not happen — while the fan-out itself reports
+      # success and nothing downstream registers a failure. The type
+      # label separates a database failure from a timeout.
+      - alert: NotificationPreferenceFetchFailing
+        expr: |
+          sum by (job, type) (rate(nf_notification_fanout_preference_fetch_errors_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notification preferences unreadable on {{ $labels.job }}"
+          description: >-
+            {{ $labels.job }} has been failing notification preference fetches
+            ({{ $labels.type }}) for 15 minutes. Affected recipients are
+            falling back to the in-app-only default, so channels they
+            configured are being skipped while fan-out reports success.
+
+  - name: nodate-presence-discord
+    rules:
+      # PresenceDiscordGatewayDown: the Discord gateway link is not up.
+      #
+      # Distinct from ServiceDown for the same reason as
+      # FlowWorkerDegraded: the process is up and being scraped, so the
+      # target is healthy and every other signal source looks fine. What
+      # is down is the gateway socket — not connected and identified —
+      # so presence signals stop arriving with nothing else to point at.
+      # The 10 minute wait covers an ordinary reconnect.
+      - alert: PresenceDiscordGatewayDown
+        expr: |
+          nf_presence_discord_gateway_up == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Discord gateway disconnected on {{ $labels.job }}"
+          description: >-
+            The Discord gateway WebSocket on {{ $labels.job }} has been
+            disconnected for more than 10 minutes. The process itself is up and
+            being scraped; presence signals are not arriving for as long as
+            this lasts.
+
   - name: nodate-flow-infra
     rules:
       # ServiceDown: a service metrics target answered at some point in the
