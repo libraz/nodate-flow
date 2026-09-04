@@ -35,6 +35,14 @@
 // port, and a check carrying more exemptions than findings stops being
 // read at all. So the wiring fails and the census speaks.
 //
+// One property of the declarations themselves is failed rather than
+// reported, because it is not a difference of opinion between two files
+// but a value the client library refuses: a fully-qualified metric name
+// declared by more than one collector. The default registry admits one
+// collector per name, so the second registration panics at init and
+// takes the whole binary with it before anything it was linked into can
+// run.
+//
 // Usage: go run scripts/check-metrics-wiring.go [repository-root]
 //
 // Exit codes:
@@ -48,6 +56,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -198,24 +207,37 @@ func run(args []string) error {
 	fmt.Printf("check-metrics-wiring: %d service(s) serving /metrics, %d compose service(s) built from apps/, %d scrape target(s) (%d outside apps/, not this check's business)\n",
 		len(listeners), len(appBacked), len(targets), skipped)
 
+	declared, err := declaredMetrics(root)
+	if err != nil {
+		return err
+	}
+
 	// The census runs whether or not the wiring holds: the counts are
 	// the reason this target shows its output, and suppressing them on
 	// the run that fails would hide them exactly when somebody is
 	// reading.
-	if err := census(root); err != nil {
+	if err := census(root, declared); err != nil {
 		return err
 	}
 
+	// Both verdicts are reported together. They are independent
+	// problems — one is a name declared twice, the other an address
+	// scraped at the wrong port — and stopping at the first would hide
+	// the second behind a fix for something unrelated.
+	var problems []error
+	if err := duplicateDeclarations(declared); err != nil {
+		problems = append(problems, err)
+	}
 	if len(failures) > 0 {
 		sort.Strings(failures)
-		return fmt.Errorf("check-metrics-wiring: %d metrics wiring problem(s):\n\n  %s\n\n"+
+		problems = append(problems, fmt.Errorf("check-metrics-wiring: %d metrics wiring problem(s):\n\n  %s\n\n"+
 			"A scrape target that is not the port the service binds collects nothing, and collects\n"+
 			"it silently: the target is simply down, every series behind it is absent, and every\n"+
 			"alert and panel built on those series stays quiet forever. Point the target at the\n"+
 			"metrics listener, or change what the service binds — the two are one decision.",
-			len(failures), strings.Join(failures, "\n  "))
+			len(failures), strings.Join(failures, "\n  ")))
 	}
-	return nil
+	return errors.Join(problems...)
 }
 
 // ----- stage one: what the Go sources bind -----
@@ -740,25 +762,100 @@ var ambientLabels = map[string]bool{"le": true, "job": true, "instance": true}
 // name. A query naming one of these is querying the declared metric.
 var seriesSuffixes = []string{"_bucket", "_sum", "_count"}
 
+// declaration is one prometheus.New* call: where it is written, and the
+// labels it hands the collector.
+type declaration struct {
+	where  string   // file:line of the constructor call
+	labels []string // sorted, empty for a collector that takes no label list
+}
+
+// labelSet renders a declaration's labels for display and for deciding
+// whether two declarations of one name differ in shape.
+func (d declaration) labelSet() string {
+	return "{" + strings.Join(d.labels, ",") + "}"
+}
+
 // declaredMetric is one metric as the Go sources declare it: the Name of
 // a prometheus options literal and, for the vector constructors, the
 // labels the constructor is given.
 //
-// Two services declare the same HTTP metrics, so declarations are merged
-// by name and labels are unioned. The union is the forgiving direction:
-// it can only remove a label finding, never invent one.
+// A name is expected to be declared once and is carried as a list of
+// declarations anyway, because a second one is the finding. For the
+// census the labels are unioned across them, which is the forgiving
+// direction: it can only remove a label finding, never invent one.
 type declaredMetric struct {
 	name     string
 	labels   map[string]bool
 	suffixed bool // histogram or summary, publishes _bucket / _sum / _count
-	where    []string
+	decls    []declaration
 }
 
-func census(root string) error {
-	declared, err := declaredMetrics(root)
-	if err != nil {
-		return err
+// where lists the places this metric is declared, in walk order.
+func (m *declaredMetric) where() []string {
+	var out []string
+	for _, d := range m.decls {
+		out = append(out, d.where)
 	}
+	return out
+}
+
+// duplicateDeclarations refuses a fully-qualified metric name that more
+// than one collector declares.
+//
+// This is a failure and not a census line because it is not a gap
+// between what is instrumented and what is queried: the client library
+// admits one collector per name in the default registry, so the second
+// registration panics at init and every binary that links both
+// declarations dies there — including any binary that links two
+// services' packages together, whether or not either service would ever
+// have collided in production.
+//
+// Sharing the name across services is the intended design. Each service
+// is scraped as its own job and the job label separates the series, so
+// one query spans the deployment. The fix is therefore to declare the
+// collector once in a package both services call into, never to give
+// each service its own spelling of the name.
+func duplicateDeclarations(declared map[string]*declaredMetric) error {
+	var names []string
+	for name, metric := range declared {
+		if len(metric.decls) > 1 {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	sort.Strings(names)
+
+	var findings []string
+	for _, name := range names {
+		metric := declared[name]
+		shapes := map[string]bool{}
+		var lines []string
+		for _, d := range metric.decls {
+			shapes[d.labelSet()] = true
+			lines = append(lines, fmt.Sprintf("      %s  %s", d.where, d.labelSet()))
+		}
+		shape := "with the same label set, which is one collector duplicated"
+		if len(shapes) > 1 {
+			shape = "with differing label sets, which is one name given two incompatible collectors — a query written for either shape reads only the series of the one that registered"
+		}
+		findings = append(findings, fmt.Sprintf("%s is declared %d times, %s:\n%s",
+			name, len(metric.decls), shape, strings.Join(lines, "\n")))
+	}
+
+	return fmt.Errorf("check-metrics-wiring: %d metric name(s) declared more than once:\n\n  %s\n\n"+
+		"Two declarations of one name are two collectors. The default registry admits one\n"+
+		"collector per fully-qualified name, so any binary that links both declarations panics\n"+
+		"at init the moment the second registers — before any of its own code runs.\n"+
+		"Sharing the name between services is correct and intended: each service is scraped as\n"+
+		"its own job and the job label separates them, so one query covers the deployment.\n"+
+		"Declare the collector once in a shared package and have each service call into it.\n"+
+		"Do not resolve this by renaming the metric per service.",
+		len(findings), strings.Join(findings, "\n  "))
+}
+
+func census(root string, declared map[string]*declaredMetric) error {
 	queries, err := readQueries(root)
 	if err != nil {
 		return err
@@ -834,7 +931,7 @@ func census(root string) error {
 			continue
 		}
 		unused[name] = map[string]bool{}
-		for _, where := range metric.where {
+		for _, where := range metric.where() {
 			unused[name][where] = true
 		}
 	}
@@ -991,64 +1088,101 @@ func labelsFor(expr, name string, group map[string]bool) map[string]bool {
 	return out
 }
 
+// declarationRoots are the directories a metric declaration can live in.
+//
+// A collector exported by more than one service is declared once in a
+// shared package rather than once per service, so the declarations are
+// not all under apps/. A root left out here is not read as empty, it is
+// read as nothing at all: its metrics would be reported as queried by an
+// alert and declared by nobody, and its labels would be unknown, so
+// every label finding against them would silently disappear.
+var declarationRoots = []string{"apps", "packages"}
+
 // declaredMetrics reads every metric the Go sources declare: the Name
 // field of a prometheus options literal, and the label slice the vector
 // constructors take alongside it.
+//
+// The result is keyed by fully-qualified name across the whole
+// repository, with no attempt to attribute a declaration to the services
+// that link it. Which binaries a shared package reaches is an import
+// question this does not ask; what the census needs, and what the
+// duplicate rule needs, is which names exist and where each is written.
 func declaredMetrics(root string) (map[string]*declaredMetric, error) {
-	appsDir := filepath.Join(root, "apps")
-	entries, err := os.ReadDir(appsDir)
-	if err != nil {
-		return nil, fmt.Errorf("check-metrics-wiring: %w", err)
-	}
 	out := map[string]*declaredMetric{}
 	fset := token.NewFileSet()
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		files, err := goFiles(filepath.Join(appsDir, entry.Name()))
+	for _, name := range declarationRoots {
+		dir := filepath.Join(root, name)
+		found, err := declaredMetricsIn(root, dir, fset, out)
 		if err != nil {
 			return nil, err
 		}
-		for _, file := range files {
-			parsed, err := parser.ParseFile(fset, file, nil, 0)
-			if err != nil {
-				return nil, fmt.Errorf("check-metrics-wiring: %s: %w", relPath(root, file), err)
-			}
-			where := relPath(root, file)
-			ast.Inspect(parsed, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				sel, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok || !strings.HasPrefix(sel.Sel.Name, "New") {
-					return true
-				}
-				name, kind, ok := optsName(call.Args)
-				if !ok {
-					return true
-				}
-				metric := out[name]
-				if metric == nil {
-					metric = &declaredMetric{name: name, labels: map[string]bool{}}
-					out[name] = metric
-				}
-				metric.suffixed = metric.suffixed || kind == "Histogram" || kind == "Summary"
-				metric.where = append(metric.where, where)
-				// Only the vector constructors take labels, and only
-				// their second argument is that list: a []string
-				// literal anywhere else in the call is data.
-				if strings.HasSuffix(sel.Sel.Name, "Vec") && len(call.Args) > 1 {
-					for _, label := range stringSlice(call.Args[1]) {
-						metric.labels[label] = true
-					}
-				}
-				return true
-			})
+		// Non-emptiness proof, per root. A root that matches nothing
+		// answers exactly like a root with nothing wrong: with no
+		// declarations the census knows no namespace, so every query
+		// against them is attributed to some outside exporter, no label
+		// can disagree with anything, and no name can be declared twice.
+		// The whole report reads clean.
+		if found == 0 {
+			return nil, fmt.Errorf("check-metrics-wiring: no metric declaration was found under %s in %s, so nothing declared there was compared against anything queried.\n"+
+				"Either the declarations moved, or they no longer have the shape this reads: a prometheus.New… call taking a prometheus.…Opts literal with a Name field.", name, root)
 		}
 	}
 	return out, nil
+}
+
+// declaredMetricsIn adds the declarations under one directory to out and
+// returns how many constructor calls it found there.
+func declaredMetricsIn(root, dir string, fset *token.FileSet, out map[string]*declaredMetric) (int, error) {
+	files, err := goFiles(dir)
+	if err != nil {
+		return 0, err
+	}
+	found := 0
+	for _, file := range files {
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			return 0, fmt.Errorf("check-metrics-wiring: %s: %w", relPath(root, file), err)
+		}
+		where := relPath(root, file)
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || !strings.HasPrefix(sel.Sel.Name, "New") {
+				return true
+			}
+			name, kind, ok := optsName(call.Args)
+			if !ok {
+				return true
+			}
+			found++
+			metric := out[name]
+			if metric == nil {
+				metric = &declaredMetric{name: name, labels: map[string]bool{}}
+				out[name] = metric
+			}
+			metric.suffixed = metric.suffixed || kind == "Histogram" || kind == "Summary"
+			// Only the vector constructors take labels, and only
+			// their second argument is that list: a []string
+			// literal anywhere else in the call is data.
+			var labels []string
+			if strings.HasSuffix(sel.Sel.Name, "Vec") && len(call.Args) > 1 {
+				labels = stringSlice(call.Args[1])
+				sort.Strings(labels)
+				for _, label := range labels {
+					metric.labels[label] = true
+				}
+			}
+			metric.decls = append(metric.decls, declaration{
+				where:  fmt.Sprintf("%s:%d", where, fset.Position(call.Pos()).Line),
+				labels: labels,
+			})
+			return true
+		})
+	}
+	return found, nil
 }
 
 // optsName reads the Name field of a prometheus.*Opts literal among a
