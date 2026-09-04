@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
@@ -68,20 +69,24 @@ func TestEmbedTask_MeteringSuccess(t *testing.T) {
 	var metrics []struct {
 		provider string
 		model    string
-		ws       string
+		inTok    int
+		outTok   int
 		cost     int64
+		elapsed  time.Duration
 	}
 
 	client := New(provider, store).WithMetering(
 		guard,
 		func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
-		func(provider, model, workspaceID string, costCents int64, _ error) {
+		func(provider, model string, inTok, outTok int, costCents int64, elapsed time.Duration, _ error) {
 			metrics = append(metrics, struct {
 				provider string
 				model    string
-				ws       string
+				inTok    int
+				outTok   int
 				cost     int64
-			}{provider: provider, model: model, ws: workspaceID, cost: costCents})
+				elapsed  time.Duration
+			}{provider: provider, model: model, inTok: inTok, outTok: outTok, cost: costCents, elapsed: elapsed})
 		},
 		func(s string) string { return "redacted:" + s },
 	)
@@ -115,8 +120,16 @@ func TestEmbedTask_MeteringSuccess(t *testing.T) {
 	if rec.TokensInput == 0 {
 		t.Fatal("tokens_input must be estimated for embedding cost accounting")
 	}
-	if len(metrics) != 1 || metrics[0].provider != "fake-embed" || metrics[0].model != "text-embedding-3-small" || metrics[0].ws != "7" {
+	if len(metrics) != 1 || metrics[0].provider != "fake-embed" || metrics[0].model != "text-embedding-3-small" {
 		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+	// The metric and the row are read side by side when spend is
+	// questioned, so they must be counted from the same estimate.
+	if metrics[0].inTok != rec.TokensInput {
+		t.Errorf("metric input tokens = %d, want the logged row's %d", metrics[0].inTok, rec.TokensInput)
+	}
+	if metrics[0].outTok != 0 {
+		t.Errorf("an embedding produces no completion, got %d output tokens", metrics[0].outTok)
 	}
 }
 
@@ -168,7 +181,9 @@ func TestEmbedQuery_RecordsTheInvocation(t *testing.T) {
 			client := New(provider, &fakeStore{}).WithMetering(
 				guard,
 				func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
-				func(_, _, _ string, _ int64, err error) { hookErrs = append(hookErrs, err) },
+				func(_, _ string, _, _ int, _ int64, _ time.Duration, err error) {
+					hookErrs = append(hookErrs, err)
+				},
 				func(s string) string { return "redacted:" + s },
 			)
 

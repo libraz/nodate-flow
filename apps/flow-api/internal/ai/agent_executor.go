@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
@@ -115,11 +115,11 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		// manual triggers will populate Prompt in a later pass.
 		Prompt: "",
 	})
-	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
+	start := time.Now()
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
 		if e.OnInvocation != nil {
-			e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, 0, err)
+			e.OnInvocation(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
 		}
 		if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 			o.logFailure(ctx, workspaceID, "agent_tick", req, err)
@@ -127,7 +127,7 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		return result, fmt.Errorf("ai: agent provider call failed: %w", err)
 	}
 	if e.OnInvocation != nil {
-		e.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros(), nil)
+		e.OnInvocation(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
 	}
 	if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
 		o.logSuccess(ctx, workspaceID, "agent_tick", req, resp)

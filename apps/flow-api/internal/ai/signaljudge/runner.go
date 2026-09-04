@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
@@ -63,9 +63,11 @@ type InvocationRecord struct {
 
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as [ai.InvocationMetricsHook] so the obs package's
-// RecordAIInvocation can be reused without an adapter. err is nil on a
-// successful call and carries the provider's error on a failed one.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
+// RecordAIInvocation can be reused without an adapter. elapsed measures
+// the provider call alone; the token counts come from the response that
+// attempt produced and are 0 on a failure. err is nil on a successful call
+// and carries the provider's error on a failed one.
+type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
 
 // AgentLookup is the narrow surface the runner needs to read an
 // agent's system prompt + kind by internal id. The production wiring
@@ -255,15 +257,19 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		System: systemPrompt,
 		Prompt: userPrompt,
 	})
-	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	// Pre-compose the combined prompt for redaction so both branches
 	// (success / failure) below see the same shape and any registered
 	// SecretPrefixes are scrubbed before the ai_invocations write.
 	combinedPrompt := logutil.Redact(strings.TrimSpace(req.System + "\n" + req.Prompt))
+	// time.Since is taken inside each branch rather than bound to a local
+	// here: the latency this reports must cover the provider call and
+	// nothing else, and the error check has to stay adjacent to the call
+	// it checks.
+	start := time.Now()
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
 		if r.OnInvocation != nil {
-			r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, 0, err)
+			r.OnInvocation(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
 		}
 		r.logInvocation(ctx, InvocationRecord{
 			WorkspaceID:    workspaceID,
@@ -278,7 +284,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	}
 
 	if r.OnInvocation != nil {
-		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros(), nil)
+		r.OnInvocation(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
 	}
 	model := resp.Model
 	if model == "" {
@@ -318,10 +324,11 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		// temperature exactly as the first attempt did, or the second
 		// answer is not comparable to the first.
 		retryReq := airequest.WithPrompt(req, userPrompt+"\n\n"+retryReminder)
+		retryStart := time.Now()
 		retryResp, retryErr := prov.Complete(ctx, retryReq)
 		if retryErr == nil && retryResp != nil {
 			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.EstimatedCostMicros(), nil)
+				r.OnInvocation(string(prov.Kind()), retryReq.Model, retryResp.InputTokens, retryResp.OutputTokens, retryResp.EstimatedCostMicros(), time.Since(retryStart), nil)
 			}
 			retryModel := retryResp.Model
 			if retryModel == "" {
@@ -357,7 +364,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 				failure = errRetryNoResponse
 			}
 			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, 0, failure)
+				r.OnInvocation(string(prov.Kind()), retryReq.Model, 0, 0, 0, time.Since(retryStart), failure)
 			}
 			r.logInvocation(ctx, InvocationRecord{
 				WorkspaceID:    workspaceID,

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
@@ -54,9 +54,10 @@ type InvocationRecord struct {
 
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as ai.InvocationMetricsHook so obs.RecordAIInvocation is reused
-// without an adapter. err is nil on a successful call and carries the
-// provider's error on a failed one.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
+// without an adapter. elapsed measures the provider call alone; the token
+// counts come from the response and are 0 on a failure. err is nil on a
+// successful call and carries the provider's error on a failed one.
+type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
 
 // resolveCommandSystem is the system prompt sent to the LLM when
 // resolving natural-language commands into MCP tool invocations. The
@@ -144,9 +145,9 @@ func (w *WorkspaceProvider) WithMetering(guard CostGuard, log InvocationLogger, 
 
 // logSuccess records the redacted invocation + cost metric after a
 // successful provider call.
-func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, wsIDStr, prompt string, resp *providers.Response, kind string) {
+func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, prompt string, resp *providers.Response, kind string, elapsed time.Duration) {
 	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, wsIDStr, resp.EstimatedCostMicros(), nil)
+		w.OnInvocation(kind, model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), elapsed, nil)
 	}
 	if w.LogInvoke != nil {
 		loggedModel := resp.Model
@@ -170,9 +171,9 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 
 // logFailure records the redacted invocation + zero-cost metric after a
 // failed provider call.
-func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, wsIDStr, prompt string, callErr error, kind string) {
+func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, prompt string, callErr error, kind string, elapsed time.Duration) {
 	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, wsIDStr, 0, callErr)
+		w.OnInvocation(kind, model, 0, 0, 0, elapsed, callErr)
 	}
 	if w.LogInvoke != nil {
 		w.LogInvoke(ctx, InvocationRecord{
@@ -229,14 +230,18 @@ func (w *WorkspaceProvider) ResolveCommand(ctx context.Context, prompt string, t
 		Prompt:    prompt,
 		MaxTokens: 1024,
 	})
-	wsIDStr := strconv.FormatUint(uint64(wsID), 10)
 	promptRedacted := logutil.Redact(strings.TrimSpace(req.System + "\n" + req.Prompt))
+	// time.Since is taken inside each branch rather than bound to a local
+	// here: the latency this reports must cover the provider call and
+	// nothing else, and the error check has to stay adjacent to the call
+	// it checks.
+	start := time.Now()
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
-		w.logFailure(ctx, wsID, req.Model, wsIDStr, promptRedacted, err, string(prov.Kind()))
+		w.logFailure(ctx, wsID, req.Model, promptRedacted, err, string(prov.Kind()), time.Since(start))
 		return nil, fmt.Errorf("nlcommand: provider call failed: %w", err)
 	}
-	w.logSuccess(ctx, wsID, req.Model, wsIDStr, promptRedacted, resp, string(prov.Kind()))
+	w.logSuccess(ctx, wsID, req.Model, promptRedacted, resp, string(prov.Kind()), time.Since(start))
 
 	text := strings.TrimSpace(resp.Text)
 	if text == "" {

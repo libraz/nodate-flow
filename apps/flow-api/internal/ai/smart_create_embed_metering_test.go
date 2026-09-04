@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
@@ -58,8 +59,8 @@ func meteredEmbedClient(prov *stubEmbedProvider, logged *[]embed.InvocationRecor
 	return embed.New(prov, stubEmbedStore{}).WithMetering(
 		nil,
 		func(_ context.Context, rec embed.InvocationRecord) { *logged = append(*logged, rec) },
-		func(provider, model, ws string, cost int64, err error) {
-			*samples = append(*samples, sample{provider, model, ws, cost, err})
+		func(provider, model string, inTok, outTok int, cost int64, elapsed time.Duration, err error) {
+			*samples = append(*samples, sample{provider, model, inTok, outTok, cost, elapsed, err})
 		},
 		nil,
 	)
@@ -134,14 +135,18 @@ func TestProposalEmbeddingsAreMetered(t *testing.T) {
 			if samples[0].err != nil {
 				t.Errorf("a successful embedding reported err = %v", samples[0].err)
 			}
-			if samples[0].ws != "42" {
-				t.Errorf("workspace label = %q, want %q: the spend is unattributable", samples[0].ws, "42")
-			}
 			if len(logged) != 1 {
 				t.Fatalf("ai_invocations rows = %d, want 1: the spend leaves no trace", len(logged))
 			}
 			if logged[0].WorkspaceID != workspaceID || logged[0].Purpose != "embed_query" {
 				t.Errorf("unexpected invocation record: %+v", logged[0])
+			}
+			// The workspace this spend belongs to is carried by the
+			// ai_invocations row above; what the metric has to carry is the
+			// size of the call, counted the same way the row counts it.
+			if samples[0].inTok != logged[0].TokensInput {
+				t.Errorf("metric input tokens = %d, want the logged row's %d",
+					samples[0].inTok, logged[0].TokensInput)
 			}
 		})
 	}

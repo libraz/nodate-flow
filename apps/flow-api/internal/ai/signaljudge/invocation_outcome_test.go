@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
@@ -14,9 +15,12 @@ const validVerdict = `{"action":"noop","confidence":0.1,"reasoning_excerpt":"not
 
 // metricSample is one call the runner made to its metrics hook.
 type metricSample struct {
-	model string
-	cost  int64
-	err   error
+	model   string
+	inTok   int
+	outTok  int
+	cost    int64
+	elapsed time.Duration
+	err     error
 }
 
 // newOutcomeRunner wires a runner around prov that records every metrics
@@ -27,8 +31,15 @@ func newOutcomeRunner(prov providers.Provider, samples *[]metricSample, logged *
 		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
 		Resolver: &fakeResolver{provider: prov},
 		Log:      func(_ context.Context, rec InvocationRecord) { *logged = append(*logged, rec) },
-		OnInvocation: func(_, model, _ string, cost int64, err error) {
-			*samples = append(*samples, metricSample{model: model, cost: cost, err: err})
+		OnInvocation: func(_, model string, inTok, outTok int, cost int64, elapsed time.Duration, err error) {
+			*samples = append(*samples, metricSample{
+				model:   model,
+				inTok:   inTok,
+				outTok:  outTok,
+				cost:    cost,
+				elapsed: elapsed,
+				err:     err,
+			})
 		},
 	}
 }
@@ -44,7 +55,7 @@ func TestExecuteJudgeMetricsCarryTheOutcome(t *testing.T) {
 		t.Parallel()
 		prov := &recordingProvider{
 			kind: providers.Kind("mock"),
-			resp: &providers.Response{Text: validVerdict},
+			resp: &providers.Response{Text: validVerdict, InputTokens: 311, OutputTokens: 29},
 		}
 		var samples []metricSample
 		var logged []InvocationRecord
@@ -58,6 +69,9 @@ func TestExecuteJudgeMetricsCarryTheOutcome(t *testing.T) {
 		}
 		if samples[0].err != nil {
 			t.Errorf("a successful call reported err = %v; the metric would label it an error", samples[0].err)
+		}
+		if samples[0].inTok != 311 || samples[0].outTok != 29 {
+			t.Errorf("token counts = (%d, %d), want the response's (311, 29)", samples[0].inTok, samples[0].outTok)
 		}
 	})
 
@@ -94,7 +108,7 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 		kind: providers.Kind("mock"),
 		script: []providerAnswer{
 			// Not a valid verdict, so the runner's single retry fires.
-			{resp: &providers.Response{Text: "sorry, I cannot comply"}},
+			{resp: &providers.Response{Text: "sorry, I cannot comply", InputTokens: 200, OutputTokens: 5}},
 			{err: retryFailure},
 		},
 	}
@@ -122,6 +136,14 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 	}
 	if samples[1].cost != 0 {
 		t.Errorf("a failed retry has no known cost, got %d", samples[1].cost)
+	}
+	if samples[0].inTok != 200 || samples[0].outTok != 5 {
+		t.Errorf("first-attempt token counts = (%d, %d), want its own response's (200, 5)",
+			samples[0].inTok, samples[0].outTok)
+	}
+	if samples[1].inTok != 0 || samples[1].outTok != 0 {
+		t.Errorf("a failed retry has no response to count tokens from, got (%d, %d)",
+			samples[1].inTok, samples[1].outTok)
 	}
 	if len(logged) != 2 {
 		t.Fatalf("expected one ai_invocations record per provider call, got %d: %+v", len(logged), logged)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -282,11 +283,13 @@ func TestExecuteJudgeSendsTheAgentsConfiguredSettings(t *testing.T) {
 	var logged []InvocationRecord
 	var metricModels []string
 	r := &Runner{
-		Agents:       &fakeAgentLookup{snap: AgentSnapshot{AgentID: 4, WorkspaceID: 6, Settings: settings}},
-		Signals:      &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
-		Resolver:     &fakeResolver{provider: prov},
-		Log:          func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
-		OnInvocation: func(_, model, _ string, _ int64, _ error) { metricModels = append(metricModels, model) },
+		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 4, WorkspaceID: 6, Settings: settings}},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
+		Resolver: &fakeResolver{provider: prov},
+		Log:      func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+		OnInvocation: func(_, model string, _, _ int, _ int64, _ time.Duration, _ error) {
+			metricModels = append(metricModels, model)
+		},
 	}
 
 	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
@@ -49,8 +50,8 @@ func TestInvocationMetricsCarryTheOutcome(t *testing.T) {
 				Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
 					return tc.prov, nil
 				}),
-				OnInvocation: func(provider, model, ws string, cost int64, err error) {
-					got = append(got, sample{provider, model, ws, cost, err})
+				OnInvocation: func(provider, model string, inTok, outTok int, cost int64, elapsed time.Duration, err error) {
+					got = append(got, sample{provider, model, inTok, outTok, cost, elapsed, err})
 				},
 			}
 			_, callErr := o.ProposeTasksFrom(context.Background(), 42, "ship the thing")

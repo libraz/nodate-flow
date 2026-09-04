@@ -20,6 +20,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -57,10 +58,12 @@ type CostGuard interface {
 	Check(ctx context.Context, workspaceID uint32) error
 }
 
-// InvocationMetricsHook is called after each embedding provider call. err
-// is nil when the call produced a usable vector and carries the failure
-// otherwise.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
+// InvocationMetricsHook is called after each embedding provider call.
+// elapsed measures the provider call alone. An embedding call produces no
+// completion, so outputTokens is always 0 and inputTokens is the same
+// estimate the ai_invocations row is written with. err is nil when the call
+// produced a usable vector and carries the failure otherwise.
+type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
 
 // InvocationLogger persists a redacted embedding invocation record.
 type InvocationLogger func(ctx context.Context, rec InvocationRecord)
@@ -200,33 +203,42 @@ func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, 
 		}
 	}
 
+	// The success path binds the duration before normalizing so the
+	// measurement covers the provider call and nothing this package does
+	// with the vector afterwards.
+	start := time.Now()
 	raw, err := c.Provider.Embed(ctx, text)
 	if err != nil {
-		c.recordMetrics(workspaceID, 0, err)
+		c.recordMetrics(0, 0, time.Since(start), err)
 		c.logFailure(ctx, workspaceID, purpose, text, err)
 		return nil, fmt.Errorf("provider embed: %w", err)
 	}
 	if len(raw) == 0 {
 		err := errors.New("embed: provider returned empty vector")
-		c.recordMetrics(workspaceID, 0, err)
+		c.recordMetrics(0, 0, time.Since(start), err)
 		c.logFailure(ctx, workspaceID, purpose, text, err)
 		return nil, err
 	}
+	elapsed := time.Since(start)
 	Normalize(raw)
 
 	costMicros := estimateCostMicros(c.Model(), text)
-	c.recordMetrics(workspaceID, costMicros, nil)
+	c.recordMetrics(estimateTokens(text), costMicros, elapsed, nil)
 	c.logSuccess(ctx, workspaceID, purpose, text, costMicros)
 	return raw, nil
 }
 
 // recordMetrics calls the OnInvocation hook if set. err is nil on a
-// successful embedding call and the failure on an unsuccessful one.
-func (c *Client) recordMetrics(workspaceID uint32, costMicros int64, err error) {
+// successful embedding call and the failure on an unsuccessful one;
+// elapsed measures the provider call alone. inputTokens is the same
+// estimate logSuccess writes to ai_invocations, so the metric and the row
+// cannot disagree; there is no completion, so no output tokens are
+// reported.
+func (c *Client) recordMetrics(inputTokens int, costMicros int64, elapsed time.Duration, err error) {
 	if c.OnInvocation == nil {
 		return
 	}
-	c.OnInvocation(providerName(c.Provider), c.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros, err)
+	c.OnInvocation(providerName(c.Provider), c.Model(), inputTokens, 0, costMicros, elapsed, err)
 }
 
 func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, purpose, text string, costMicros int64) {

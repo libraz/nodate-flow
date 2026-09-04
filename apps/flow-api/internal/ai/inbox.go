@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -87,14 +87,14 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 		System: proposeInboxTriageSystem,
 		Prompt: prompt,
 	})
-	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
+	start := time.Now()
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0, err)
+		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
 		o.logFailure(ctx, workspaceID, "propose_inbox_triage", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros(), nil)
+	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
 	o.logSuccess(ctx, workspaceID, "propose_inbox_triage", req, resp)
 
 	suggestions, parseErr := parseInboxTriageSuggestions(resp.Text)

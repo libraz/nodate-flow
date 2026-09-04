@@ -6,17 +6,21 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 )
 
 // labelProvider records the request it was handed and answers with a
 // canned response. Its Model is what a resolved workspace provider would
-// report before any call is made.
+// report before any call is made. delay makes the call take an observable
+// amount of time so the latency the metrics hook reports can be asserted
+// against a known lower bound.
 type labelProvider struct {
 	model string
 	resp  *providers.Response
 	err   error
+	delay time.Duration
 	req   providers.Request
 }
 
@@ -25,6 +29,9 @@ func (p *labelProvider) Kind() providers.Kind { return providers.Kind("labelkind
 func (p *labelProvider) Model() string        { return p.model }
 func (p *labelProvider) Complete(_ context.Context, req providers.Request) (*providers.Response, error) {
 	p.req = req
+	if p.delay > 0 {
+		time.Sleep(p.delay)
+	}
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -34,8 +41,10 @@ func (p *labelProvider) Complete(_ context.Context, req providers.Request) (*pro
 type sample struct {
 	provider string
 	model    string
-	ws       string
+	inTok    int
+	outTok   int
 	cost     int64
+	elapsed  time.Duration
 	err      error
 }
 
@@ -64,14 +73,14 @@ func TestInvocationMetricsCarryAModelLabel(t *testing.T) {
 			Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
 				return prov, nil
 			}),
-			OnInvocation: func(provider, model, ws string, cost int64, err error) {
-				got = append(got, sample{provider, model, ws, cost, err})
+			OnInvocation: func(provider, model string, inTok, outTok int, cost int64, elapsed time.Duration, err error) {
+				got = append(got, sample{provider, model, inTok, outTok, cost, elapsed, err})
 			},
 		}
 		if _, err := o.ProposeTasksFrom(context.Background(), 42, "ship the thing"); err != nil {
 			t.Fatalf("ProposeTasksFrom: %v", err)
 		}
-		requireOneLabelledSample(t, got, wantModel, "42")
+		requireOneLabelledSample(t, got, wantModel)
 		if prov.req.Model != wantModel {
 			t.Errorf("the request itself must name the model too, got %q", prov.req.Model)
 		}
@@ -85,18 +94,18 @@ func TestInvocationMetricsCarryAModelLabel(t *testing.T) {
 			Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
 				return prov, nil
 			}),
-			OnInvocation: func(provider, model, ws string, cost int64, err error) {
-				got = append(got, sample{provider, model, ws, cost, err})
+			OnInvocation: func(provider, model string, inTok, outTok int, cost int64, elapsed time.Duration, err error) {
+				got = append(got, sample{provider, model, inTok, outTok, cost, elapsed, err})
 			},
 		}
 		if _, err := o.ProposeTasksFrom(context.Background(), 42, "ship the thing"); err == nil {
 			t.Fatal("expected the provider error to surface")
 		}
-		requireOneLabelledSample(t, got, wantModel, "42")
+		requireOneLabelledSample(t, got, wantModel)
 	})
 }
 
-func requireOneLabelledSample(t *testing.T, got []sample, wantModel, wantWS string) {
+func requireOneLabelledSample(t *testing.T, got []sample, wantModel string) {
 	t.Helper()
 	if len(got) != 1 {
 		t.Fatalf("expected exactly one metrics sample, got %d: %+v", len(got), got)
@@ -110,9 +119,6 @@ func requireOneLabelledSample(t *testing.T, got []sample, wantModel, wantWS stri
 	}
 	if s.provider == "" {
 		t.Error("the provider label is empty")
-	}
-	if s.ws != wantWS {
-		t.Errorf("workspace label = %q, want %q", s.ws, wantWS)
 	}
 }
 
