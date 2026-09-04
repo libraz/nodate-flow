@@ -56,18 +56,14 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 	}, Disable(deps))
 }
 
-// RegisterTaskScoped wires every task-scoped label route on one chi group.
-// Preserved for callers that want uniform middleware; the production router
-// calls the split variants ([RegisterTaskScopedReads] /
-// [RegisterTaskScopedWrites]) so a read-only project role cannot attach or
-// remove labels. The caller must attach RequireTaskAccess.
-func RegisterTaskScoped(api huma.API, deps Deps) {
-	RegisterTaskScopedReads(api, deps)
-	RegisterTaskScopedWrites(api, deps)
-}
-
 // RegisterTaskScopedReads wires the read-only task-scoped label route under
-// /tasks/{id}/labels. Gated only by RequireTaskAccess.
+// /tasks/{id}/labels. Gated only by RequireTaskAccess, so any role that can
+// see the task may call it.
+//
+// The read belongs on its own chi group, separate from
+// [RegisterTaskScopedWrites]: attaching and removing labels takes a project
+// editor role, and mounting both on one group with uniform middleware would
+// let a read-only project role reshape a task's labels.
 func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-labels-list",

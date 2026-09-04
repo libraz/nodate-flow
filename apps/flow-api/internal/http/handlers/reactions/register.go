@@ -6,18 +6,14 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// RegisterTaskScoped wires every task-scoped reaction route on one chi group.
-// Preserved for callers that want uniform middleware; the production router
-// calls the split variants ([RegisterTaskScopedReads] /
-// [RegisterTaskScopedWrites]) so a project viewer cannot leave reactions. The
-// caller must attach RequireTaskAccess.
-func RegisterTaskScoped(api huma.API, deps Deps) {
-	RegisterTaskScopedReads(api, deps)
-	RegisterTaskScopedWrites(api, deps)
-}
-
 // RegisterTaskScopedReads wires the read-only reaction listing under
-// /tasks/{id}/reactions. Gated only by RequireTaskAccess.
+// /tasks/{id}/reactions. Gated only by RequireTaskAccess, so any role that
+// can see the task may call it.
+//
+// The read belongs on its own chi group, separate from
+// [RegisterTaskScopedWrites]: leaving or withdrawing a reaction takes a
+// project commenter role, and mounting both on one group with uniform
+// middleware would let a project viewer react.
 func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-reactions-list",

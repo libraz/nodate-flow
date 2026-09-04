@@ -58,25 +58,18 @@ func RegisterCollection(api huma.API, deps Deps) {
 	}, ListMyTasksWithDates(deps))
 }
 
-// RegisterTaskScoped wires the per-task routes that operate on a single
-// {id}. It is the historical single entry point and is preserved for any
-// caller that wants every task-scoped route on one chi group with uniform
-// middleware. The production router instead calls the split variants
-// ([RegisterTaskScopedReads], [RegisterTaskScopedCommenterWrites],
-// [RegisterTaskScopedEditorWrites]) so a project read-only role cannot
-// reach the mutating routes (see apps/flow-api/internal/http/router).
+// RegisterTaskScopedReads wires the read-only per-task routes. The caller
+// must attach RequireTaskAccess to the underlying chi router so the task /
+// project / workspace contexts are populated; that is the only gate these
+// routes carry (Layer-4 visibility), so any role that can see the task —
+// including a project viewer — may call them.
 //
-// The caller must attach RequireTaskAccess to the underlying chi router so
-// the task / project / workspace contexts are populated.
-func RegisterTaskScoped(api huma.API, deps Deps) {
-	RegisterTaskScopedReads(api, deps)
-	RegisterTaskScopedCommenterWrites(api, deps)
-	RegisterTaskScopedEditorWrites(api, deps)
-}
-
-// RegisterTaskScopedReads wires the read-only per-task routes. These are
-// gated only by RequireTaskAccess (Layer-4 visibility): any role that can
-// see the task — including a project viewer — may call them.
+// The reads belong on their own chi group, separate from
+// [RegisterTaskScopedCommenterWrites] and [RegisterTaskScopedEditorWrites],
+// each of which adds its own project-role floor on top of RequireTaskAccess.
+// Mounting the per-task surface on one group with uniform middleware would
+// put every mutating route behind the read floor, which a project read-only
+// role clears.
 func RegisterTaskScopedReads(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tasks-get",
