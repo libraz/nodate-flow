@@ -16,7 +16,7 @@
     {
       "id": 1,
       "title": "AI Invocations (req/s)",
-      "description": "Rate of AI provider calls. Metric nf_ai_invocations_total is expected with labels: provider, model, workspace_id.",
+      "description": "Rate of AI provider calls, in total and split by provider. nf_ai_invocations_total is a counter with labels: provider, model, outcome.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -44,7 +44,7 @@
     {
       "id": 2,
       "title": "AI Request Duration p50 / p95 / p99",
-      "description": "Latency of AI provider calls. Metric nf_ai_request_duration_seconds is expected as a histogram.",
+      "description": "Latency of AI provider calls, aggregated across every provider and model. nf_ai_request_duration_seconds is a histogram with labels: provider, model. Its buckets run to two minutes rather than stopping at the Prometheus default of ten seconds, because an LLM completion routinely runs longer than that.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -76,7 +76,7 @@
     {
       "id": 3,
       "title": "Token Usage (tokens/s)",
-      "description": "Total token consumption rate. Metric nf_ai_tokens_total is expected with labels: type (prompt/completion), model.",
+      "description": "Token consumption rate split by direction. nf_ai_tokens_total is a counter with labels: type (prompt, completion), model.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -101,18 +101,14 @@
     {
       "id": 4,
       "title": "Estimated Cost (USD/h)",
-      "description": "Estimated hourly AI cost. Metric nf_ai_cost_dollars_total is expected as a counter with labels: provider, model, workspace_id.",
+      "description": "Estimated hourly AI cost across every provider and model. nf_ai_cost_dollars_total is a counter with labels: provider, model.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
           "expr": "sum(rate(nf_ai_cost_dollars_total[1h])) * 3600",
-          "legendFormat": "total $/h"
-        },
-        {
-          "expr": "sum by (workspace_id) (rate(nf_ai_cost_dollars_total[1h])) * 3600",
-          "legendFormat": "ws:{{workspace_id}}"
+          "legendFormat": "all providers and models $/h"
         }
       ],
       "fieldConfig": {
