@@ -147,18 +147,18 @@
     {
       "id": 6,
       "title": "AI Error Rate",
-      "description": "Rate of failed AI provider calls. Uses nf_ai_errors_total with labels: provider, error_type.",
+      "description": "Rate of failed AI provider calls. Uses nf_ai_invocations_total{outcome=\"error\"}, broken down by the provider label.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "sum(rate(nf_ai_errors_total[5m]))",
+          "expr": "sum(rate(nf_ai_invocations_total{outcome=\"error\"}[5m]))",
           "legendFormat": "total errors"
         },
         {
-          "expr": "sum by (error_type) (rate(nf_ai_errors_total[5m]))",
-          "legendFormat": "{{error_type}}"
+          "expr": "sum by (provider) (rate(nf_ai_invocations_total{outcome=\"error\"}[5m]))",
+          "legendFormat": "{{provider}}"
         }
       ],
       "fieldConfig": {

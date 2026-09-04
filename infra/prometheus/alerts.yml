@@ -67,7 +67,7 @@ groups:
       - alert: HighAIErrorRate
         expr: |
           (
-            sum(rate(nf_ai_invocations_total{status=~"5.."}[5m]))
+            sum(rate(nf_ai_invocations_total{outcome="error"}[5m]))
             /
             sum(rate(nf_ai_invocations_total[5m]))
           ) > 0.1
