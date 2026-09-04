@@ -11,8 +11,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -90,14 +92,15 @@ func main() {
 	// output in memory, compare against what is committed, write nothing,
 	// exit 1 on any disagreement.
 	if len(os.Args) > 1 && os.Args[1] == "--check" {
-		if err := run(true); err != nil {
+		res, err := run(true)
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stdout, "gen-errors: generated files match errors/*.yaml")
+		fmt.Fprintln(os.Stdout, "gen-errors: generated files match errors/*.yaml "+res.summary())
 		return
 	}
-	if err := run(false); err != nil {
+	if _, err := run(false); err != nil {
 		fmt.Fprintln(os.Stderr, "gen-errors:", err)
 		os.Exit(1)
 	}
@@ -106,18 +109,19 @@ func main() {
 
 // run builds every output from the YAML catalog. With check set it
 // compares the results against what is committed and writes nothing.
-func run(check bool) error {
+func run(check bool) (checkResult, error) {
+	var none checkResult
 	root, err := repoRoot()
 	if err != nil {
-		return err
+		return none, err
 	}
 	errorsDir := filepath.Join(root, "errors")
 	matches, err := filepath.Glob(filepath.Join(errorsDir, "*.yaml"))
 	if err != nil {
-		return err
+		return none, err
 	}
 	if len(matches) == 0 {
-		return fmt.Errorf("no YAML files found in %s", errorsDir)
+		return none, fmt.Errorf("no YAML files found in %s", errorsDir)
 	}
 	sort.Strings(matches)
 
@@ -128,24 +132,24 @@ func run(check bool) error {
 	for _, path := range matches {
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return none, err
 		}
 		var df domainFile
 		if err := yaml.Unmarshal(raw, &df); err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			return none, fmt.Errorf("%s: %w", path, err)
 		}
 		base := strings.TrimSuffix(filepath.Base(path), ".yaml")
 		if df.Domain == "" {
-			return fmt.Errorf("%s: missing 'domain'", path)
+			return none, fmt.Errorf("%s: missing 'domain'", path)
 		}
 		var recs []record
 		for resKey, res := range df.Resources {
 			for errKey, e := range res.Errors {
 				if err := validateEntry(path, e); err != nil {
-					return err
+					return none, err
 				}
 				if prev, ok := seen[e.Code]; ok {
-					return fmt.Errorf("duplicate code %q in %s and %s", e.Code, prev, path)
+					return none, fmt.Errorf("duplicate code %q in %s and %s", e.Code, prev, path)
 				}
 				seen[e.Code] = path
 				bc := res.Breadcrumb
@@ -262,14 +266,15 @@ func run(check bool) error {
 	}
 	obsolete, err := obsoleteDocs(docsRoot, outputs)
 	if err != nil {
-		return err
+		return none, err
 	}
 
 	if check {
-		if err := compareOutputs(root, outputs, obsolete); err != nil {
-			return err
+		res, err := compareOutputs(root, outputs, obsolete)
+		if err != nil {
+			return none, err
 		}
-		return checkI18nKeys(root, all, localeApps)
+		return res, checkI18nKeys(root, all, localeApps)
 	}
 
 	paths := make([]string, 0, len(outputs))
@@ -279,12 +284,12 @@ func run(check bool) error {
 	sort.Strings(paths)
 	for _, path := range paths {
 		if err := writeFile(path, outputs[path]); err != nil {
-			return err
+			return none, err
 		}
 	}
 	for _, path := range obsolete {
 		if err := os.Remove(path); err != nil {
-			return err
+			return none, err
 		}
 		fmt.Printf("gen-errors: removed stale doc %s\n", path)
 	}
@@ -298,7 +303,7 @@ func run(check bool) error {
 	}
 	domains, err := os.ReadDir(docsRoot)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return none, err
 	}
 	for _, d := range domains {
 		if !d.IsDir() || live[d.Name()] {
@@ -307,12 +312,12 @@ func run(check bool) error {
 		dir := filepath.Join(docsRoot, d.Name())
 		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
 			if err := os.Remove(dir); err != nil {
-				return err
+				return none, err
 			}
 		}
 	}
 
-	return checkI18nKeys(root, all, localeApps)
+	return none, checkI18nKeys(root, all, localeApps)
 }
 
 // obsoleteDocs lists the generated error pages under docsRoot that the
@@ -357,43 +362,138 @@ func obsoleteDocs(docsRoot string, outputs map[string][]byte) ([]string, error) 
 	return stale, nil
 }
 
+// checkResult counts what a --check pass was able to weigh: the outputs the
+// repository carries, and the ones it does not and so cannot disagree with.
+//
+// Kept identical to the type of the same name in
+// scripts/gen-signal-kinds.go.
+type checkResult struct {
+	compared int
+	outside  int
+}
+
+// summary renders the counts for the success line, so a passing run states
+// what it covered instead of only that it passed. The second clause is
+// dropped when there is nothing outside the repository, rather than
+// reporting a zero.
+func (r checkResult) summary() string {
+	if r.outside == 0 {
+		return fmt.Sprintf("(%d in the repository)", r.compared)
+	}
+	return fmt.Sprintf("(%d in the repository; %d documentation pages are outside it and were not compared)",
+		r.compared, r.outside)
+}
+
+// outsideRepo reports which of paths the repository does not carry.
+//
+// The question is put to git rather than answered from a path prefix here,
+// so the rule follows the repository's own configuration instead of a
+// second copy of it that can drift apart from it. git echoes back the paths
+// that are outside; exit status 1 means none of them are, which is an
+// answer and not a failure.
+//
+// Kept identical to the function of the same name in
+// scripts/gen-signal-kinds.go.
+func outsideRepo(root string, paths []string) (map[string]bool, error) {
+	outside := make(map[string]bool, len(paths))
+	if len(paths) == 0 {
+		return outside, nil
+	}
+	cmd := exec.Command("git", "-C", root, "check-ignore", "--stdin")
+	cmd.Stdin = strings.NewReader(strings.Join(paths, "\n") + "\n")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 1) {
+		// Without this answer the check cannot tell an output the
+		// repository is missing from one it was never meant to hold, and
+		// guessing either way turns the guard into noise or a rubber
+		// stamp. So it stops instead.
+		return nil, fmt.Errorf("cannot ask the repository which of its outputs it carries "+
+			"(git -C %s check-ignore): %w%s", root, err, stderrDetail(stderr.String()))
+	}
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		if line != "" {
+			outside[line] = true
+		}
+	}
+	return outside, nil
+}
+
+// stderrDetail appends a command's diagnostic output when it produced any.
+func stderrDetail(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	return ": " + s
+}
+
 // compareOutputs reports the committed files that differ from what the
 // generator produces now, and the generated files it no longer produces.
 // Nothing is written.
+//
+// Only the outputs the repository carries are compared. The rest are
+// written locally on a real run but live outside the repository, and a path
+// the repository cannot hold can never be out of sync with it; comparing it
+// would fail every checkout that has not run the generator. Comparing
+// nothing at all is a failure in turn: a guard that weighed no file has
+// reached no verdict.
 //
 // Kept identical to the function of the same name in
 // scripts/gen-signal-kinds.go: the two generators answer the drift
 // question the same way, in the same message shape, with the same exit
 // status, so neither can quietly become the weaker one.
-func compareOutputs(root string, outputs map[string][]byte, obsolete []string) error {
-	paths := make([]string, 0, len(outputs))
+func compareOutputs(root string, outputs map[string][]byte, obsolete []string) (checkResult, error) {
+	var res checkResult
+
+	paths := make([]string, 0, len(outputs)+len(obsolete))
 	for path := range outputs {
 		paths = append(paths, path)
 	}
+	paths = append(paths, obsolete...)
 	sort.Strings(paths)
+
+	outside, err := outsideRepo(root, paths)
+	if err != nil {
+		return res, fmt.Errorf("gen-errors: %w", err)
+	}
 
 	var stale []string
 	for _, path := range paths {
+		if outside[path] {
+			res.outside++
+			continue
+		}
+		res.compared++
+		content, produced := outputs[path]
+		if !produced {
+			stale = append(stale, relPath(root, path)+"\n    no longer produced by the generator; it is stale")
+			continue
+		}
 		committed, err := os.ReadFile(path)
 		switch {
 		case os.IsNotExist(err):
 			stale = append(stale, relPath(root, path)+"\n    the generator produces this file, but it is not committed")
 		case err != nil:
-			return fmt.Errorf("gen-errors: cannot read %s: %w", relPath(root, path), err)
-		case !bytes.Equal(committed, outputs[path]):
-			stale = append(stale, relPath(root, path)+"\n"+firstDifference(committed, outputs[path]))
+			return res, fmt.Errorf("gen-errors: cannot read %s: %w", relPath(root, path), err)
+		case !bytes.Equal(committed, content):
+			stale = append(stale, relPath(root, path)+"\n"+firstDifference(committed, content))
 		}
 	}
-	for _, path := range obsolete {
-		stale = append(stale, relPath(root, path)+"\n    no longer produced by the generator; it is stale")
-	}
 	if len(stale) > 0 {
-		return fmt.Errorf("gen-errors: these files are not what errors/*.yaml generates:\n\n  %s\n\n"+
+		return res, fmt.Errorf("gen-errors: these files are not what errors/*.yaml generates:\n\n  %s\n\n"+
 			"Run 'make gen-errors' and commit the result. Editing a generated file by hand does not "+
 			"survive the next run — put the change in errors/*.yaml instead",
 			strings.Join(stale, "\n\n  "))
 	}
-	return nil
+	if res.compared == 0 {
+		return res, fmt.Errorf("gen-errors: none of the %d generated paths are carried by the repository, "+
+			"so this check compared nothing and reached no verdict", len(paths))
+	}
+	return res, nil
 }
 
 // relPath renders a path relative to the repository root, falling back to
