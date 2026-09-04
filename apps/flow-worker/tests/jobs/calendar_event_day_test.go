@@ -765,6 +765,15 @@ func TestMalformedRecurrenceDoesNotBlockWorkspaceScan(t *testing.T) {
 // catch-up tick reaches back over two missed local days of a daily rule and
 // emits one signal per occurrence-day; re-ticking collapses via INSERT IGNORE
 // and a later mid-day tick adds nothing.
+//
+// This is the one recurring test that asserts on the event's whole row set
+// rather than filtering with signalsForOccurrenceDay, so it is sensitive to
+// what any other test writes into its workspace. A tick scans every enabled
+// workspace, not just the caller's, so a fixture that still yields occurrences
+// on the real current day gets written into by any test that ticks on the live
+// clock. This fixture therefore sits in a settled past window and carries a
+// recurrence bound, leaving it unreachable by a live-clock tick's catch-up
+// lookback.
 func TestRecurringFireOnceAndIdempotentAcrossCatchUp(t *testing.T) {
 	t.Parallel()
 	h := getHarness(t)
@@ -773,36 +782,40 @@ func TestRecurringFireOnceAndIdempotentAcrossCatchUp(t *testing.T) {
 	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
 	calID := createCalendarViaAPI(t, tt)
 
-	base := time.Date(2026, time.September, 1, 9, 0, 0, 0, time.UTC)
+	base := time.Date(2026, time.June, 1, 9, 0, 0, 0, time.UTC)
 	endAt := base.Add(time.Hour)
 	eventPublicID := createEventViaAPI(t, tt, calID, base, endAt, "UTC", "Daily Standup")
 	eventInternalID := resolveEventInternalID(t, h.db, eventPublicID)
-	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", nil)
+	recurrenceEnd := time.Date(2026, time.June, 4, 23, 0, 0, 0, time.UTC)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", &recurrenceEnd)
 
-	// Worker returns at 2026-09-04 01:00Z after sleeping through the 09-03
-	// and 09-04 local-day boundaries. A ~26h catch-up window backfills both
-	// missed occurrence-days (the 09-04 midnight just crossed, and 09-03 is
+	// Worker returns at 2026-06-04 01:00Z after sleeping through the 06-03
+	// and 06-04 local-day boundaries. A ~26h catch-up window backfills both
+	// missed occurrence-days (the 06-04 midnight just crossed, and 06-03 is
 	// inside the lookback).
 	job := newJob(t, h.db, h.srv.BaseURL)
-	recoveryTick := time.Date(2026, time.September, 4, 1, 0, 0, 0, time.UTC)
+	recoveryTick := time.Date(2026, time.June, 4, 1, 0, 0, 0, time.UTC)
 	require.NoError(t, job.Tick(context.Background(), recoveryTick), "recovery tick should succeed")
 
 	signals := loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
-	require.Equalf(t, []string{"2026-09-03", "2026-09-04"}, externalIDDaySuffixes(signals),
+	require.Equalf(t, []string{"2026-06-03", "2026-06-04"}, externalIDDaySuffixes(signals),
 		"catch-up must backfill each missed occurrence-day exactly once, got %v",
 		externalIDDaySuffixes(signals))
 
-	// Re-tick the same instant: INSERT IGNORE on the day-scoped external_id
-	// must collapse every re-emit, so the row set is unchanged.
-	require.NoError(t, job.Tick(context.Background(), recoveryTick), "second recovery tick should succeed")
+	// Re-tick the same instant through a second job, whose fresh in-process
+	// cursor re-materialises both days so the POSTs genuinely reach the dedupe
+	// key: INSERT IGNORE on the day-scoped external_id must collapse every
+	// re-emit, so the row set is unchanged.
+	rerunJob := newJob(t, h.db, h.srv.BaseURL)
+	require.NoError(t, rerunJob.Tick(context.Background(), recoveryTick), "second recovery tick should succeed")
 	signals = loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
-	require.Equalf(t, []string{"2026-09-03", "2026-09-04"}, externalIDDaySuffixes(signals),
+	require.Equalf(t, []string{"2026-06-03", "2026-06-04"}, externalIDDaySuffixes(signals),
 		"re-ticking must stay idempotent, got %v", externalIDDaySuffixes(signals))
 
 	// A later mid-day tick crosses no new boundary in its fire-once window,
 	// so it must add nothing — proving no per-tick spam.
-	job.CatchUpWindow = time.Nanosecond
-	require.NoError(t, job.Tick(context.Background(), recoveryTick.Add(8*time.Hour)), "mid-day tick should succeed")
+	rerunJob.CatchUpWindow = time.Nanosecond
+	require.NoError(t, rerunJob.Tick(context.Background(), recoveryTick.Add(8*time.Hour)), "mid-day tick should succeed")
 	signals = loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID)
 	require.Lenf(t, signals, 2,
 		"a mid-day tick must not add a new occurrence-day signal, got %d", len(signals))
