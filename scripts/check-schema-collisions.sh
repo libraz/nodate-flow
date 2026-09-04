@@ -23,6 +23,8 @@
 # Exit codes:
 #   0 — no collisions
 #   1 — at least one schema name carries divergent shapes
+#   2 — the check could not be performed (no spec, no jq, or a spec whose
+#       shape the queries below no longer reach into)
 
 set -euo pipefail
 
@@ -70,6 +72,49 @@ fi
 # handlers/notifications returns from both the list and the update.
 ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|IntegrationMapping|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|PreferencesOutputBody|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
+# The whole verdict rests on one jq traversal of a generated document.
+# Every way that traversal can stop reaching the spec — a path layout the
+# `.paths[][]` walk no longer matches, response bodies moving out from
+# under `content["application/json"].schema.$ref`, a truncated
+# regeneration — ends in an empty suspect list, which is exactly what a
+# clean spec produces. So the inputs to the traversal are counted first
+# and each is required to be non-empty in its own right.
+if ! counts="$(jq -r '
+  ([.paths[]? | .[]? | select(type == "object") | select(.operationId)]) as $ops
+  | ([$ops[]
+      | (([.responses["200"]?, .responses["201"]?, .responses["202"]?]
+          | map(.content["application/json"].schema."$ref"? // empty))
+         + [.requestBody?.content["application/json"].schema."$ref"? // empty])
+      | .[]]) as $refs
+  | "\($ops | length)\t\($refs | length)\t\((.components.schemas? // {}) | length)"
+' "$SPEC")"; then
+  echo "check-schema-collisions: $SPEC could not be read as JSON (jq's error is above), so no schema name was compared." >&2
+  exit 2
+fi
+
+op_count="$(cut -f1 <<<"$counts")"
+ref_count="$(cut -f2 <<<"$counts")"
+schema_count="$(cut -f3 <<<"$counts")"
+
+if [[ "$op_count" -eq 0 ]]; then
+  echo "check-schema-collisions: no operation was found in $SPEC, so no schema name was compared." >&2
+  echo "  The spec is empty, or operations no longer live under .paths[][] with an operationId." >&2
+  exit 2
+fi
+
+if [[ "$schema_count" -eq 0 ]]; then
+  echo "check-schema-collisions: components.schemas is empty in $SPEC, so there is no name left to collide." >&2
+  echo "  Regenerate the merged spec ('make gen-openapi'); this one carries no schemas at all." >&2
+  exit 2
+fi
+
+if [[ "$ref_count" -eq 0 ]]; then
+  echo "check-schema-collisions: $op_count operation(s) were walked and not one request or response \$ref was collected, so nothing was compared." >&2
+  echo "  Request and response bodies no longer sit under content[\"application/json\"].schema.\$ref," >&2
+  echo "  so the query below can never see a shared name however many there are." >&2
+  exit 2
+fi
+
 mapfile -t suspects < <(
   jq -r '
     [.paths[][]
@@ -105,7 +150,7 @@ for line in "${suspects[@]}"; do
 done
 
 if [[ ${#violations[@]} -eq 0 ]]; then
-  echo "check-schema-collisions: ok ($SPEC)"
+  echo "check-schema-collisions: ok — $ref_count body reference(s) across $op_count operation(s), $schema_count schema(s) ($SPEC)"
   exit 0
 fi
 

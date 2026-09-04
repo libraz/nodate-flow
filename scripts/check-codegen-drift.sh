@@ -150,7 +150,8 @@ sqlc generate -f "$SCRATCH_CONFIG" >/dev/null
 # .gitattributes), so the comparison is limited to what sqlc actually emits:
 # every file it wrote into the scratch tree, plus any file left in the
 # repository that carries a generated name but is no longer produced.
-if ! python3 - "$ROOT_DIR" "$SCRATCH" <<PY
+compare_status=0
+python3 - "$ROOT_DIR" "$SCRATCH" <<PY || compare_status=$?
 import difflib, os, sys
 
 root, scratch = sys.argv[1], sys.argv[2]
@@ -165,6 +166,19 @@ def is_generated_name(name):
 
 problems = []
 checked = set()
+# Files compared per output directory. A comparison that opened nothing
+# reports no drift, which is what an up-to-date tree reports too, so each
+# output directory has to be shown to have produced something. Per
+# directory rather than in total: with one of several redirected wrongly,
+# a total stays satisfied by the others while that one stops being
+# compared at all.
+compared_per_out = {}
+
+if not outs:
+    print("No output directory reached the comparison, so no generated file was compared at all.")
+    print("")
+    print("The out: entries are read from sql/sqlc.yaml by the step above; this one received none.")
+    sys.exit(2)
 
 for rel in outs:
     produced = set()
@@ -195,6 +209,19 @@ for rel in outs:
                 checked.add(key)
                 problems.append((key, ["  no longer produced by the generator; it is stale"]))
 
+    compared_per_out[rel] = len(produced)
+
+empty = [rel for rel, n in compared_per_out.items() if n == 0]
+if empty:
+    print("The generator wrote no file into these output directories, so nothing under them was compared:")
+    print("")
+    for rel in empty:
+        print(f"  {rel}")
+    print("")
+    print("An empty comparison reports no drift for the same reason an up-to-date one does.")
+    print("Check that the out: entries in sql/sqlc.yaml still name directories sqlc emits into.")
+    sys.exit(2)
+
 if problems:
     print("The generated data layer no longer matches the schema it comes from.")
     print("")
@@ -203,7 +230,12 @@ if problems:
         print("\n".join(lines))
     sys.exit(1)
 PY
-then
+
+if [[ $compare_status -eq 2 ]]; then
+  exit 2
+fi
+
+if [[ $compare_status -ne 0 ]]; then
   echo ""
   echo "Run the generator and commit its output alongside the schema change:"
   echo "  make gen-sqlc"

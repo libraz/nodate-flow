@@ -30,6 +30,12 @@
 # remembering a flag, and a caller that forgot it reported success on a
 # tree full of violations. Arguments are rejected rather than ignored so
 # a stale `--ci` is visible instead of merely harmless.
+#
+# Exit codes:
+#   0 — every scan root was read and holds no malformed reference
+#   1 — at least one malformed reference
+#   2 — the scan could not be performed (bad arguments, or a scan root
+#       that no longer holds any file this check can read)
 
 set -euo pipefail
 
@@ -51,25 +57,52 @@ EXCLUDES=(
   --exclude-dir=dist
 )
 
+INCLUDES=(
+  --include='*.css'
+  --include='*.module.css'
+  --include='*.tsx'
+  --include='*.ts'
+)
+
 # Token shape: `var(--nf-<token>))`. The token name cannot contain parens,
 # so the trailing `))` is always a var close plus one extra close paren.
 PATTERN='var\(--nf-[A-Za-z0-9_-]+\)\)'
+
+# A scan root that has been renamed away reads exactly like a clean one:
+# grep is handed nothing, finds nothing, and the guard reports success
+# over a tree it never opened. Each root is therefore proved to hold at
+# least one readable file before anything is scanned, and proved
+# individually — a total would stay satisfied by the roots that survived
+# while the renamed one silently stopped being checked.
+for dir in "${SCAN_DIRS[@]}"; do
+  rel="${dir#"$ROOT"/}"
+  if [[ ! -d "$dir" ]]; then
+    echo "check-css-var-parens: scan root $rel does not exist, so nothing under it was checked." >&2
+    echo "  Point SCAN_DIRS at the directory it moved to." >&2
+    exit 2
+  fi
+  # An empty pattern matches every line, so this lists every file the
+  # scan below is able to read under this root. `|| true` is what makes
+  # the empty case reportable: grep exits 1 when it matches nothing, and
+  # under `set -e` with pipefail that status would end the script here,
+  # with no message and nothing to read it from.
+  scanned="$(grep -rl -e '' "$dir" "${EXCLUDES[@]}" "${INCLUDES[@]}" 2>/dev/null | wc -l | tr -d ' ' || true)"
+  if [[ "$scanned" -eq 0 ]]; then
+    echo "check-css-var-parens: scan root $rel holds no .css/.ts/.tsx file, so nothing under it was checked." >&2
+    echo "  Either the sources moved or the --include filters no longer name the extensions they are written in." >&2
+    exit 2
+  fi
+done
 
 count=0
 found_lines=""
 
 for dir in "${SCAN_DIRS[@]}"; do
-  [[ -d "$dir" ]] || continue
-
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
     count=$((count + 1))
     found_lines="$found_lines\n$line"
-  done < <(grep -rnE "$PATTERN" "$dir" "${EXCLUDES[@]}" \
-    --include='*.css' \
-    --include='*.module.css' \
-    --include='*.tsx' \
-    --include='*.ts' \
+  done < <(grep -rnE "$PATTERN" "$dir" "${EXCLUDES[@]}" "${INCLUDES[@]}" \
     2>/dev/null \
     | awk '
         {

@@ -544,6 +544,15 @@ export interface ScanResult {
    * marker, "exempts no spacing literal" cannot be read as "wrong".
    */
   dangling: DanglingOverride[];
+  /**
+   * Files collected under each entry of `scanDirs`, in the order given.
+   *
+   * `collectFiles` swallows a directory it cannot read, so a scan root
+   * that has been renamed contributes no file, no offense, and a clean
+   * result — the same result a correct tree produces. The caller checks
+   * these counts before treating an empty offense list as good news.
+   */
+  filesByRoot: Map<string, number>;
 }
 
 /**
@@ -558,8 +567,11 @@ export interface ScanResult {
  */
 export function scanFiles(options: ScanOptions): ScanResult {
   const files: string[] = [];
+  const filesByRoot = new Map<string, number>();
   for (const rel of options.scanDirs) {
+    const before = files.length;
     collectFiles(resolve(options.root, rel), options.excludeFragments, files);
+    filesByRoot.set(rel, files.length - before);
   }
   const offenses: SpacingOffense[] = [];
   const dangling: DanglingOverride[] = [];
@@ -588,7 +600,7 @@ export function scanFiles(options: ScanOptions): ScanResult {
       dangling.push({ file, line, context: (rows[line - 1] ?? '').trim() });
     }
   }
-  return { offenses, dangling };
+  return { offenses, dangling, filesByRoot };
 }
 
 /**
@@ -670,11 +682,35 @@ function parseFlags(argv: ReadonlyArray<string>): CliFlags {
 
 function main(): void {
   const flags = parseFlags(process.argv.slice(2));
-  const { offenses, dangling } = scanFiles({
+  const { offenses, dangling, filesByRoot } = scanFiles({
     root: flags.root,
     scanDirs: DEFAULT_SCAN_DIRS,
     excludeFragments: DEFAULT_EXCLUDE_FRAGMENTS,
   });
+
+  // Each scan root is required to have yielded a file, one root at a
+  // time. A total would stay satisfied by the roots that still exist
+  // while a renamed one quietly stopped being scanned, and the run would
+  // report a clean tree it never opened.
+  const emptyRoots = [...filesByRoot].filter(([, n]) => n === 0).map(([rel]) => rel);
+  if (emptyRoots.length > 0) {
+    console.error(
+      `check-inline-spacing: ${emptyRoots.length} of ${DEFAULT_SCAN_DIRS.length} scan root(s) hold no file, so nothing under them was checked:`,
+    );
+    for (const rel of emptyRoots) console.error(`  ${rel}`);
+    console.error('');
+    // The roots are resolved against a root derived from this file's own
+    // location, so moving the script empties every one of them at once.
+    // Printing what they were resolved against is what separates that
+    // cause from a single directory having been renamed.
+    console.error(`  resolved against: ${flags.root}`);
+    console.error('');
+    console.error(
+      'Either the sources moved, or an exclude fragment now excludes the whole root. Point',
+    );
+    console.error('DEFAULT_SCAN_DIRS at where they live now.');
+    process.exit(2);
+  }
 
   if (flags.json) {
     process.stdout.write(JSON.stringify({ offenses, dangling }, null, 2));

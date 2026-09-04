@@ -69,8 +69,40 @@ function walk(dir, out) {
   return out;
 }
 
+/**
+ * Refuse to report success over a set nothing was read into.
+ *
+ * A scan root that has been renamed produces no files, no references and
+ * no findings, which is indistinguishable from a clean tree. Every set
+ * this check reasons over is proved non-empty before its verdict is
+ * allowed to mean anything, and the roots are proved one at a time: a
+ * total stays satisfied by the roots that still exist while the renamed
+ * one quietly stops being checked.
+ */
+function vacuous(lines) {
+  for (const line of lines) console.error(line);
+  process.exit(2);
+}
+
 const files = [];
-for (const root of SOURCE_ROOTS) walk(join(repo, root), files);
+/** Root -> files walked, so an empty root can be named rather than summed away. */
+const filesByRoot = new Map();
+for (const root of SOURCE_ROOTS) {
+  const before = files.length;
+  walk(join(repo, root), files);
+  filesByRoot.set(root, files.length - before);
+}
+
+const emptyRoots = [...filesByRoot].filter(([, n]) => n === 0).map(([root]) => root);
+if (emptyRoots.length > 0) {
+  vacuous([
+    `check-undefined-tokens: ${emptyRoots.length} of ${SOURCE_ROOTS.length} scan root(s) hold no source file, so nothing under them was checked:`,
+    ...emptyRoots.map((root) => `  ${root}`),
+    '',
+    'Either the sources moved, or the extension filter no longer names what they are written in.',
+    'Point SOURCE_ROOTS at where they live now.',
+  ]);
+}
 
 const defined = new Set();
 /** token -> tokens its own value references, for cycle detection. */
@@ -101,6 +133,19 @@ for (const file of files) {
   }
 }
 
+// The definitions are the second set with a vacuous mode of its own. An
+// empty one does not hide undefined references — with nothing defined,
+// every reference is reported and the check fails loudly — but the cycle
+// pass reads only this map, so with no definitions collected there is
+// nothing to walk and no cycle can be found however many exist.
+if (defined.size === 0) {
+  vacuous([
+    `check-undefined-tokens: ${files.length} file(s) were read and not one token definition was found.`,
+    'No definition means no dependency graph, so the cycle pass walked nothing and proves nothing.',
+    'The definition pattern no longer matches how tokens are declared in this tree.',
+  ]);
+}
+
 /** Tokens that reach themselves through their own definitions. */
 function findCycles() {
   const cycles = [];
@@ -126,6 +171,8 @@ const cycles = findCycles();
 
 /** @type {Map<string, {withFallback: number, bare: Array<{file: string, line: number}>}>} */
 const undefinedRefs = new Map();
+/** References examined, including the ones that resolve. */
+let referenceCount = 0;
 
 for (const file of files) {
   const text = readFileSync(file, 'utf8');
@@ -134,13 +181,25 @@ for (const file of files) {
   for (let i = 0; i < lines.length; i++) {
     for (const m of (lines[i] ?? '').matchAll(REFERENCE_RE)) {
       const name = m[1];
-      if (name === undefined || defined.has(name)) continue;
+      if (name === undefined) continue;
+      referenceCount += 1;
+      if (defined.has(name)) continue;
       const entry = undefinedRefs.get(name) ?? { withFallback: 0, bare: [] };
       if (m[2]) entry.withFallback += 1;
       else entry.bare.push({ file: relative(repo, file), line: i + 1 });
       undefinedRefs.set(name, entry);
     }
   }
+}
+
+// With no reference collected there is nothing to resolve, and "all
+// references resolve" is a statement about the empty set.
+if (referenceCount === 0) {
+  vacuous([
+    `check-undefined-tokens: ${files.length} file(s) were read and not one var(--nf-*) reference was found.`,
+    'Nothing was resolved against the defined tokens, so the check confirmed nothing.',
+    'The reference pattern no longer matches how tokens are spent in this tree.',
+  ]);
 }
 
 const bareNames = [...undefinedRefs].filter(([, v]) => v.bare.length > 0).sort();
@@ -184,4 +243,6 @@ if (bareNames.length > 0 || cycles.length > 0 || (strict && fallbackOnly.length 
   process.exit(1);
 }
 
-console.info(`check-undefined-tokens: ${defined.size} tokens defined, all references resolve`);
+console.info(
+  `check-undefined-tokens: ${defined.size} tokens defined, ${referenceCount} references across ${files.length} files, all resolve`,
+);

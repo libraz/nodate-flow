@@ -62,7 +62,13 @@ const DECLARATION = 'packages/ui/src/tokens/breakpoints.ts';
 
 /** Read the breakpoint scale from its single declaration. */
 function readBreakpoints() {
-  const src = readFileSync(join(repo, DECLARATION), 'utf8');
+  let src;
+  try {
+    src = readFileSync(join(repo, DECLARATION), 'utf8');
+  } catch {
+    // Reported by the caller, which can say what the empty scale costs.
+    return new Map();
+  }
   const body = src.slice(src.indexOf('export const BP'), src.indexOf('} as const'));
   const out = new Map();
   for (const m of body.matchAll(/(\w+)\s*:\s*(\d+)\s*,/g)) {
@@ -94,7 +100,30 @@ function walk(dir, out) {
   return out;
 }
 
+/**
+ * Refuse to report success over a set nothing was read into.
+ *
+ * The walk swallows a missing directory, so a renamed source root
+ * contributes no file, no query, and no finding — the same output as a
+ * tree that is entirely correct.
+ */
+function vacuous(lines) {
+  for (const line of lines) console.error(line);
+  process.exit(2);
+}
+
 const bp = readBreakpoints();
+// The scale is the set every verdict here is measured against. It is
+// recovered from the declaration by looking for two literal markers, so a
+// refactor of that file can leave it empty; an empty scale cannot
+// validate a single query.
+if (bp.size === 0) {
+  vacuous([
+    `check-breakpoints: no breakpoint could be read from ${DECLARATION}, so no query had anything to be measured against.`,
+    'The parse reads the entries between `export const BP` and `} as const`; that file is missing or no longer has that shape.',
+  ]);
+}
+
 const byMaxWidth = new Map(); // breakpoint - 1 -> name
 const byMinWidth = new Map(); // breakpoint     -> name
 for (const [name, px] of bp) {
@@ -123,10 +152,17 @@ function annotationLines(lines) {
   return out;
 }
 
-/** Every query on one line that does not match the scale. Exemption-blind. */
+/**
+ * Every query on one line that does not match the scale. Exemption-blind.
+ *
+ * Also tallies the queries it examined. A run that examined none reports
+ * the same "every media query matches" as a run over a correct tree, so
+ * the tally is what tells those apart.
+ */
 function violationsOn(line, where) {
   const out = [];
   for (const m of line.matchAll(CONDITION)) {
+    conditionCount += 1;
     const kind = m[1];
     const raw = m[2] ?? '';
     const px = /^(\d+(?:\.\d+)?)px$/.test(raw)
@@ -165,9 +201,15 @@ function violationsOn(line, where) {
 }
 
 const dangling = [];
+/** Root -> files walked, so an empty root can be named rather than summed away. */
+const filesByRoot = new Map();
+/** Queries examined, including the ones that match the scale. */
+let conditionCount = 0;
 
 for (const root of SOURCE_ROOTS) {
-  for (const file of walk(join(repo, root), [])) {
+  const rootFiles = walk(join(repo, root), []);
+  filesByRoot.set(root, rootFiles.length);
+  for (const file of rootFiles) {
     const text = readFileSync(file, 'utf8');
     if (!text.includes('-width:')) continue;
     const lines = text.split('\n');
@@ -214,6 +256,27 @@ for (const root of SOURCE_ROOTS) {
   }
 }
 
+// Proved per root, not in total: a total stays satisfied by the roots
+// that still exist while a renamed one quietly stops being walked.
+const emptyRoots = [...filesByRoot].filter(([, n]) => n === 0).map(([root]) => root);
+if (emptyRoots.length > 0) {
+  vacuous([
+    `check-breakpoints: ${emptyRoots.length} of ${SOURCE_ROOTS.length} source root(s) hold no file, so no query under them was checked:`,
+    ...emptyRoots.map((root) => `  ${root}`),
+    '',
+    'Either the sources moved, or the extension filter no longer names what they are written in.',
+    'Point SOURCE_ROOTS at where they live now.',
+  ]);
+}
+
+if (conditionCount === 0) {
+  vacuous([
+    'check-breakpoints: not one media or container query was examined across the source roots.',
+    'Every verdict below would be about the empty set, so the scale is not being enforced anywhere.',
+    'The condition pattern no longer matches how these queries are written in this tree.',
+  ]);
+}
+
 const scale = [...bp].map(([n, v]) => `${n} ${v}`).join(', ');
 
 if (findings.length > 0) {
@@ -250,4 +313,6 @@ if (dangling.length > 0) {
 
 if (findings.length > 0 || dangling.length > 0) process.exit(1);
 
-console.info(`check-breakpoints: every media query matches the declared scale (${scale})`);
+console.info(
+  `check-breakpoints: ${conditionCount} media/container queries all match the declared scale (${scale})`,
+);

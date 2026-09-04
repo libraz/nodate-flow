@@ -36,7 +36,18 @@ const override = overrideRule('nf-color-override');
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
 
-const SCAN_DIRS = ['apps/flow-web/src', 'apps/accounts-web/src', 'packages/ui/src/primitives'];
+const SCAN_DIRS = [
+  'apps/flow-web/src',
+  'apps/accounts-web/src',
+  'packages/ui/src/primitives',
+  'packages/ui/src/calendar',
+];
+/**
+ * Where the fill tokens the text check names are declared. These are
+ * excluded from the scan itself — they are the files colour values belong
+ * in — but they are read here to confirm the tokens still exist.
+ */
+const TOKEN_SOURCES = ['packages/ui/src/themes', 'packages/ui/src/tokens'];
 const EXCLUDE_FRAGMENTS = [
   '/node_modules/',
   '/dist/',
@@ -58,7 +69,7 @@ const EXCLUDE_FRAGMENTS = [
  */
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch)\s*\(/;
 
-function walk(dir, out) {
+function walk(dir, out, exclude = EXCLUDE_FRAGMENTS) {
   let entries;
   try {
     entries = readdirSync(dir);
@@ -67,17 +78,30 @@ function walk(dir, out) {
   }
   for (const entry of entries) {
     const full = join(dir, entry);
-    if (EXCLUDE_FRAGMENTS.some((frag) => `${full}/`.includes(frag))) continue;
+    if (exclude.some((frag) => `${full}/`.includes(frag))) continue;
     let s;
     try {
       s = statSync(full);
     } catch {
       continue;
     }
-    if (s.isDirectory()) walk(full, out);
+    if (s.isDirectory()) walk(full, out, exclude);
     else if (/\.(css|tsx?)$/.test(entry) && !entry.endsWith('.d.ts')) out.push(full);
   }
   return out;
+}
+
+/**
+ * Refuse to report success over a set nothing was read into.
+ *
+ * The walk swallows a missing directory, so a renamed scan root yields no
+ * files, no findings, and a clean bill of health for a tree that was
+ * never opened. Every set this check reasons over is proved non-empty
+ * first.
+ */
+function vacuous(lines) {
+  for (const line of lines) console.error(line);
+  process.exit(2);
 }
 
 /**
@@ -118,10 +142,50 @@ const FILLS = FILL_TOKENS.map((t) => t.replace('--', '')).join('|');
 const STATUS_AS_TEXT = new RegExp(String.raw`(?<![-\w])color:\s*['"]?var\(--(${FILLS})\)`);
 const STATUS_AS_FG_ALIAS = new RegExp(String.raw`--[\w-]*-fg:\s*var\(--(${FILLS})\)`);
 
+// The fill tokens are the second set with a vacuous mode. Both text
+// patterns above are built by interpolating these names, so a token that
+// has been renamed away leaves a pattern that cannot match anything: the
+// text check keeps running and keeps finding nothing, on a tree where
+// every status label may well be painted with a fill. The names are
+// checked against the files that declare them rather than assumed.
+{
+  const declared = new Set();
+  const sources = [];
+  for (const root of TOKEN_SOURCES) {
+    const before = sources.length;
+    walk(join(repo, root), sources, ['/node_modules/', '/dist/']);
+    if (sources.length === before) {
+      vacuous([
+        `check-hardcoded-colors: token source ${root} holds no file, so the fill tokens the text check names could not be confirmed to exist.`,
+        'Point TOKEN_SOURCES at where the theme and token declarations live now.',
+      ]);
+    }
+  }
+  for (const file of sources) {
+    for (const m of readFileSync(file, 'utf8').matchAll(/(--[\w-]+)\s*:/g)) {
+      if (m[1] !== undefined) declared.add(m[1]);
+    }
+  }
+  const missing = FILL_TOKENS.filter((t) => !declared.has(t));
+  if (missing.length > 0) {
+    vacuous([
+      `check-hardcoded-colors: ${missing.length} of ${FILL_TOKENS.length} fill token(s) named by the fill-as-text patterns are not declared anywhere in ${TOKEN_SOURCES.join(' or ')}:`,
+      ...missing.map((t) => `  ${t}`),
+      '',
+      'A pattern built from a token nothing declares matches nothing, so that colour is no longer',
+      'checked for being used as text. Update FILL_TOKENS to the names these tokens now carry.',
+    ]);
+  }
+}
+
 const findings = [];
 const textFindings = [];
+/** Root -> files scanned, so an empty root can be named rather than summed away. */
+const filesByRoot = new Map();
 for (const root of SCAN_DIRS) {
-  for (const file of walk(join(repo, root), [])) {
+  const rootFiles = walk(join(repo, root), []);
+  filesByRoot.set(root, rootFiles.length);
+  for (const file of rootFiles) {
     const text = readFileSync(file, 'utf8');
     const hasColor = COLOR.test(text);
     const hasStatusText = STATUS_AS_TEXT.test(text) || STATUS_AS_FG_ALIAS.test(text);
@@ -148,6 +212,19 @@ for (const root of SCAN_DIRS) {
       findings.push({ where: `${relative(repo, file)}:${i + 1}`, text: line.trim() });
     }
   }
+}
+
+// Proved per root, not in total: a total stays satisfied by the roots
+// that still exist while a renamed one quietly stops being scanned.
+const emptyRoots = [...filesByRoot].filter(([, n]) => n === 0).map(([root]) => root);
+if (emptyRoots.length > 0) {
+  vacuous([
+    `check-hardcoded-colors: ${emptyRoots.length} of ${SCAN_DIRS.length} scan root(s) hold no file, so nothing under them was checked:`,
+    ...emptyRoots.map((root) => `  ${root}`),
+    '',
+    'Either the sources moved, or EXCLUDE_FRAGMENTS now excludes the whole root.',
+    'Point SCAN_DIRS at where they live now.',
+  ]);
 }
 
 if (findings.length > 0) {
