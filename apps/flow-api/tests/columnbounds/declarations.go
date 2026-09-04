@@ -51,6 +51,30 @@ type Declaration struct {
 	Line int
 }
 
+// RESTDeclaration builds a declaration for one wire field of a handler
+// input, deriving the resource from the owner's name the way the bounded
+// fields do.
+//
+// It is exported for the check that reads which values a field accepts.
+// That check scopes itself differently — a field states a value set whether
+// or not it states a length — so it collects its own fields, and this lets
+// it hand them to this package's resolution instead of carrying a second
+// copy of the naming rule. Max is left zero: nothing about a length is
+// claimed by building one of these.
+func RESTDeclaration(scope, owner, section, name, path string, line int) Declaration {
+	resource, _ := resourceOf(owner)
+	return Declaration{
+		Surface:  REST,
+		Scope:    scope,
+		Owner:    owner,
+		Resource: resource,
+		Section:  section,
+		Name:     name,
+		Path:     path,
+		Line:     line,
+	}
+}
+
 // Location renders the declaration's position for a failure message.
 func (d Declaration) Location() string { return fmt.Sprintf("%s:%d", d.Path, d.Line) }
 

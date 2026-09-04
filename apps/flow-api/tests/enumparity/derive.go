@@ -1,6 +1,22 @@
-// Package enumparity derives, from the committed handler sources, the
-// request fields whose accepted value set is stated on one operation and
-// left open on another.
+// Package enumparity derives, from the committed sources, the request
+// fields whose accepted value set nothing above storage stands behind.
+//
+// It owns which values a field accepts, the way the columnbounds package
+// beside it owns how long a value may be, and it asks that question from
+// two directions.
+//
+// The first compares operations against each other: a field one operation
+// constrains and a sibling leaves open. It knows nothing about columns, and
+// holds wherever a field is written twice.
+//
+// The second compares a declaration against the ENUM column it writes,
+// which is the half that reaches a field no sibling operation describes.
+// Where it lands is not derived again here — the placement is columnbounds'
+// resolution, run over the schema's ENUM columns instead of its
+// length-bounded ones, so there is one reading of which column a field
+// writes rather than two that can drift apart. See columns.go.
+//
+// What follows describes the first.
 //
 // A Huma input struct is the only place the API says which values a field
 // takes. When the create operation states them and the update operation
@@ -79,6 +95,11 @@ type Field struct {
 	Name string
 	// Enum is the enum tag's value, empty when the field carries none.
 	Enum string
+	// Repeated reports whether the field carries many strings rather than
+	// one. A repeated field is still paired against its siblings — they
+	// have the same reason to agree — but it lands in rows of some other
+	// table rather than in one column, so no column speaks for it.
+	Repeated bool
 	// Path and Line locate the declaration.
 	Path string
 	Line int
@@ -306,13 +327,14 @@ func (w *walker) walk(st *ast.StructType, prefix string, visiting map[string]boo
 		}
 		tag := reflect.StructTag(strings.Trim(field.Tag.Value, "`"))
 		w.found = append(w.found, Field{
-			Package: w.pkg,
-			Owner:   w.owner,
-			Section: section,
-			Name:    prefix + name,
-			Enum:    tag.Get("enum"),
-			Path:    w.fset.Position(field.Pos()).Filename,
-			Line:    w.fset.Position(field.Pos()).Line,
+			Package:  w.pkg,
+			Owner:    w.owner,
+			Section:  section,
+			Name:     prefix + name,
+			Enum:     tag.Get("enum"),
+			Repeated: isRepeated(field.Type),
+			Path:     w.fset.Position(field.Pos()).Filename,
+			Line:     w.fset.Position(field.Pos()).Line,
 		})
 	}
 }
@@ -367,6 +389,20 @@ func isStringShaped(expr ast.Expr) bool {
 		return isStringShaped(t.X)
 	case *ast.ArrayType:
 		return t.Len == nil && isStringShaped(t.Elt)
+	default:
+		return false
+	}
+}
+
+// isRepeated reports whether the field carries many strings rather than
+// one, which is the difference between a value a column holds and a set of
+// values held somewhere else.
+func isRepeated(expr ast.Expr) bool {
+	switch t := expr.(type) {
+	case *ast.StarExpr:
+		return isRepeated(t.X)
+	case *ast.ArrayType:
+		return t.Len == nil
 	default:
 		return false
 	}

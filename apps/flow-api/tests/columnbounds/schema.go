@@ -21,16 +21,39 @@ type Column struct {
 	// character count from above, so a declared bound above it cannot fit
 	// under any encoding — which is the only thing this compares.
 	Units string
+	// Members are the values an ENUM column accepts, in the order it
+	// declares them, and empty for every other type. A length says nothing
+	// about them, so they are carried for the check that reads value sets
+	// rather than used here.
+	Members []string
 }
 
 // Qualified renders the column the way a failure names it.
 func (c Column) Qualified() string { return c.Table + "." + c.Name }
 
-// Schema is every string-holding column, keyed by table and column name,
-// alongside the set of tables that exist at all.
+// Schema is every column a value can be written into as a string, split by
+// what constrains it, alongside the set of tables that exist at all.
 type Schema struct {
+	// Columns are the ones bounded by a length, keyed by table and column
+	// name. They are what a declared maxLength is compared against.
 	Columns map[string]map[string]Column
-	Tables  map[string]bool
+	// Enums are the ones bounded by a value set, keyed the same way. They
+	// are kept apart from Columns because a length comparison against one
+	// would report something no bound could fix.
+	Enums  map[string]map[string]Column
+	Tables map[string]bool
+}
+
+// EnumsOnly returns this schema with the ENUM columns standing where the
+// length-bounded ones do.
+//
+// It exists so a check on which values a field accepts runs over the same
+// resolution as the check on how long a value may be, rather than through a
+// second copy of it. Resolution asks a schema which of a table's columns a
+// wire name matches; swapping which columns it can answer with is the whole
+// difference between the two questions.
+func (s Schema) EnumsOnly() Schema {
+	return Schema{Columns: s.Enums, Tables: s.Tables}
 }
 
 // Column returns one table's column and whether the schema declares it as a
@@ -42,6 +65,27 @@ func (s Schema) Column(table, column string) (Column, bool) {
 	}
 	c, ok := byName[column]
 	return c, ok
+}
+
+// EnumColumn returns one table's column and whether the schema declares it
+// as an ENUM.
+func (s Schema) EnumColumn(table, column string) (Column, bool) {
+	byName, ok := s.Enums[table]
+	if !ok {
+		return Column{}, false
+	}
+	c, ok := byName[column]
+	return c, ok
+}
+
+// EnumCount returns how many ENUM columns the schema declares, which is
+// what a caller asserts before trusting anything derived from them.
+func (s Schema) EnumCount() int {
+	n := 0
+	for _, byName := range s.Enums {
+		n += len(byName)
+	}
+	return n
 }
 
 // Count returns how many string-holding columns the schema declares, which
@@ -73,19 +117,41 @@ var blobText = map[string]int{
 	"LONGTEXT":   4294967295,
 }
 
-// ParseSchema reads every string-holding column out of a schema dump.
+// ParseSchema reads every column a string can be written into out of a
+// schema dump, split by what constrains the string.
 //
-// Only the types whose capacity is stated by the definition are collected.
-// VARCHAR and CHAR carry a character count, which is the same unit a wire
-// bound is written in, so the comparison against them is exact. The text
-// types carry a byte count, which bounds their character count from above.
-// An ENUM is left out: what it accepts is a value set rather than a length,
-// and a bound on one is a different question than the one asked here.
+// Only the types whose constraint is stated by the definition are
+// collected. VARCHAR and CHAR carry a character count, which is the same
+// unit a wire bound is written in, so the comparison against them is exact.
+// The text types carry a byte count, which bounds their character count
+// from above. An ENUM carries neither: it names the values it takes, so it
+// is kept under Enums, where the check that reads value sets finds it and a
+// length comparison does not.
 func ParseSchema(dump string) Schema {
-	out := Schema{Columns: map[string]map[string]Column{}, Tables: map[string]bool{}}
+	out := Schema{
+		Columns: map[string]map[string]Column{},
+		Enums:   map[string]map[string]Column{},
+		Tables:  map[string]bool{},
+	}
 	for _, table := range parseCreateTables(dump) {
 		out.Tables[table.name] = true
 		for _, column := range table.columns {
+			if members, ok := enumMembers(column.definition); ok {
+				if _, seen := out.Enums[table.name]; !seen {
+					out.Enums[table.name] = map[string]Column{}
+				}
+				out.Enums[table.name][column.name] = Column{
+					Table: table.name,
+					Name:  column.name,
+					// The longest member is the longest string the column
+					// can hold, so a length question about an ENUM has the
+					// same answer shape as one about a VARCHAR.
+					Capacity: longestRuneCount(members),
+					Units:    "characters",
+					Members:  members,
+				}
+				continue
+			}
 			capacity, units, ok := stringCapacity(column.definition)
 			if !ok {
 				continue
@@ -102,6 +168,55 @@ func ParseSchema(dump string) Schema {
 		}
 	}
 	return out
+}
+
+// enumMembers reads the values an ENUM column accepts, in the order the
+// definition declares them, and reports false for every other type.
+func enumMembers(definition string) ([]string, bool) {
+	trimmed := strings.TrimSpace(definition)
+	if !strings.HasPrefix(strings.ToUpper(trimmed), "ENUM(") {
+		return nil, false
+	}
+	open := strings.IndexByte(trimmed, '(')
+	end := matchingParen(trimmed, open+1)
+	if end < 0 {
+		return nil, false
+	}
+
+	var out []string
+	inside := trimmed[open+1 : end]
+	for i := 0; i < len(inside); {
+		if inside[i] != '\'' {
+			i++
+			continue
+		}
+		next := skipString(inside, i)
+		out = append(out, unquote(inside[i:next]))
+		i = next
+	}
+	if len(out) == 0 {
+		return nil, false
+	}
+	return out, true
+}
+
+// unquote turns one SQL string literal into the value it holds, undoing the
+// ways a quote is written inside one.
+func unquote(literal string) string {
+	inner := strings.TrimSuffix(strings.TrimPrefix(literal, "'"), "'")
+	return strings.NewReplacer(`\\`, `\`, `\'`, `'`, `''`, `'`).Replace(inner)
+}
+
+// longestRuneCount returns the character count of the longest value in a
+// set.
+func longestRuneCount(values []string) int {
+	longest := 0
+	for _, v := range values {
+		if n := len([]rune(v)); n > longest {
+			longest = n
+		}
+	}
+	return longest
 }
 
 // stringCapacity reads the largest string a column definition accepts.
@@ -260,8 +375,13 @@ func skipUntil(text string, i int, terminator string) int {
 }
 
 // splitTopLevel splits a table body on the commas separating its
-// definitions, dropping comments and the text of string literals and
-// ignoring commas nested inside parentheses.
+// definitions, dropping comments and ignoring commas nested inside
+// parentheses.
+//
+// A string literal is stepped over whole and kept whole: the values an ENUM
+// declares are literals, so dropping their text would leave the column
+// saying it accepts nothing, while reading inside them would let a comma or
+// a parenthesis in a column comment split the definition it belongs to.
 func splitTopLevel(body string) []string {
 	var items []string
 	var current strings.Builder
@@ -269,7 +389,9 @@ func splitTopLevel(body string) []string {
 	for i := 0; i < len(body); {
 		switch {
 		case body[i] == '\'':
-			i = skipString(body, i)
+			end := skipString(body, i)
+			current.WriteString(body[i:end])
+			i = end
 		case strings.HasPrefix(body[i:], "/*"):
 			i = skipUntil(body, i+2, "*/")
 		case strings.HasPrefix(body[i:], "--"):

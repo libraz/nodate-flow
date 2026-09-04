@@ -296,13 +296,14 @@ check-commit-boundary: ## Fail when an event append against a handle with no obs
 check-outbound-deadline: ## Fail when a request can leave the repository with no deadline, including through a context nothing installed a client into
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/outbounddeadline/
 
-check-enum-parity: ## Fail when one operation states a field's accepted values and a sibling operation leaves the same field open
-	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/enumparity/
+# -v is load-bearing here and on the target below, unlike the guards above:
+# these packages report what they could not place on a column, and the
+# subsets they see and do not refuse, while `go test` discards a passing
+# package's stdout. Without the flag the report is visible only on the
+# failing run, which is not the run where an unseen gap matters.
+check-enum-parity: ## Fail when one operation states a field's accepted values and a sibling operation leaves the same field open, or when a field writing an ENUM column states values it cannot store
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 -v ./tests/enumparity/
 
-# -v is load-bearing here, unlike the guards above: this package reports the
-# declarations it could not place on a column, and `go test` discards a
-# passing package's stdout. Without the flag the report is visible only on
-# the failing run, which is not the run where an unseen gap matters.
 check-column-bounds: ## Fail when a declared input bound is wider than the column behind it, or two surfaces bound the same column differently
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 -v ./tests/columnbounds/
 

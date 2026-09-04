@@ -53,4 +53,9 @@
 //	             capacity of the text types, which bounds a character count
 //	             from above. An ENUM states a value set rather than a
 //	             length and is left to the check that reads value sets.
+//
+// That other check lives beside this one and shares this resolution rather
+// than repeating it: the ENUM columns are read here, and reaching them is a
+// matter of which columns a lookup may answer with. Schema.EnumsOnly and
+// RESTDeclaration are exported for it, and for nothing else.
 package columnbounds
