@@ -100,19 +100,17 @@ func rowToLensFromGet(r generated.GetLensByPublicIDRow) SavedLens {
 }
 
 // rowToPublicLens maps a FindLensByPublicTokenHashRow to the PublicLens DTO.
-// Only exposes the lens definition; all workspace/creator metadata is
-// omitted. The Tasks slice is initialised to a non-nil empty slice so the
-// JSON encoder emits `[]` rather than `null`; the caller fills it in by
-// running the resolver.
+// Only exposes what the share page renders: the lens heading and, once
+// the caller has run the resolver, the tasks. Workspace and creator
+// metadata are omitted, and so is the stored lens definition — see
+// PublicLens for why the reader of an unauthenticated link is not shown
+// the query. The Tasks slice is initialised to a non-nil empty slice so
+// the JSON encoder emits `[]` rather than `null`.
 func rowToPublicLens(r generated.FindLensByPublicTokenHashRow) PublicLens {
-	filter, sort, groupBy := parseLensJSON(r.LensJson)
 	return PublicLens{
 		ID:          r.PublicID.String(),
 		Name:        r.Name,
 		Description: nullString(r.Description),
-		Filter:      filter,
-		Sort:        sort,
-		GroupBy:     groupBy,
 		Tasks:       []PublicLensTask{},
 	}
 }

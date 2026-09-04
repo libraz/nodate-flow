@@ -25,6 +25,13 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			return nil, httpErr(apierrors.WsMemberRoleDenied)
 		}
 
+		// A lens can be published to an unauthenticated URL, so a filter
+		// the resolver cannot render in full is refused here rather than
+		// stored and defended against on every read.
+		if err := validateLensFilter(in.Body.Filter); err != nil {
+			return nil, err
+		}
+
 		// Resolve optional project public_id → internal id.
 		var projectID sql.NullInt32
 		if in.Body.ProjectID != nil && *in.Body.ProjectID != "" {
@@ -167,9 +174,21 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
 		lid, err := types.Parse(in.LensID)
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
+		}
+
+		// A patch that replaces the filter is checked on the way in for
+		// the same reason a create is: the lens may already be published.
+		if in.Body.Filter != nil {
+			if err := validateLensFilter(*in.Body.Filter); err != nil {
+				return nil, err
+			}
 		}
 
 		// Fetch existing to merge partial updates.
@@ -179,6 +198,9 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
+		}
+		if err := requireLensOwner(ctx, deps, ws, actorID, existing.CreatorPublicID); err != nil {
+			return nil, err
 		}
 
 		// Parse existing lens_json for merge.
@@ -232,15 +254,13 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "lens.update",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "lens",
-				ResourceID:   existing.PublicID.String(),
-			})
-		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "lens.update",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "lens",
+			ResourceID:   existing.PublicID.String(),
+		})
 
 		return &UpdateLensOutput{Body: SavedLens{
 			ID:                 existing.PublicID.String(),
@@ -269,10 +289,28 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsMemberRoleDenied)
+		}
 		lid, err := types.Parse(in.LensID)
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
+
+		// Read before deleting: the creator is what the ownership rule is
+		// decided on, and the delete statement does not return it.
+		existing, err := deps.Queries.GetLensByPublicID(ctx, generated.GetLensByPublicIDParams{
+			WorkspaceID: ws.ID,
+			PublicID:    lid,
+		})
+		if err != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
+		}
+		if err := requireLensOwner(ctx, deps, ws, actorID, existing.CreatorPublicID); err != nil {
+			return nil, err
+		}
+
 		// Scoped to the workspace and to live views, so a zero count means
 		// the caller named a view that is not theirs to delete.
 		rows, err := deps.Queries.DeleteLens(ctx, generated.DeleteLensParams{
@@ -286,15 +324,13 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 			return nil, httpErr(apierrors.WsLensNotFound)
 		}
 
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "lens.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "lens",
-				ResourceID:   lid.String(),
-			})
-		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "lens.delete",
+			ActorID:      actorID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "lens",
+			ResourceID:   lid.String(),
+		})
 
 		out := &DeleteLensOutput{}
 		out.Body.Ok = true

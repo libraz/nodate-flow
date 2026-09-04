@@ -35,7 +35,7 @@ func TestLensVisibleToAllWorkspaceMembers(t *testing.T) {
 	doJSON(t, http.MethodPost, wsURL+"/lenses", owner.AccessToken,
 		map[string]any{
 			"name":      "Shared Lens",
-			"filter":    map[string]any{"state": "open"},
+			"filter":    map[string]any{"status": map[string]any{"values": []string{"open"}}},
 			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
 			"isDefault": false,
 		}, &lens)
@@ -77,7 +77,7 @@ func TestLensCrossTenantNotVisible(t *testing.T) {
 	doJSON(t, http.MethodPost, wsURL+"/lenses", tenant1.AccessToken,
 		map[string]any{
 			"name":      "T1 Lens",
-			"filter":    map[string]any{"state": "open"},
+			"filter":    map[string]any{"status": map[string]any{"values": []string{"open"}}},
 			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
 			"isDefault": false,
 		}, &lens)

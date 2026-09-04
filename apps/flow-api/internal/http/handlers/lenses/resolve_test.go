@@ -93,12 +93,112 @@ func TestParseLensFilterFailsClosedOnUnmatchableValues(t *testing.T) {
 	}
 }
 
-func TestParseLensFilterIgnoresUnknownKeys(t *testing.T) {
-	f := parseLensFilter(json.RawMessage(`{"colour":{"value":"blue"}}`))
-	if f.Impossible {
-		t.Fatal("a key outside the grammar is not a contradiction")
+// A filter this reader cannot render in full selects nothing. Rendering
+// only the part it understands drops predicates, and a dropped predicate
+// on an unauthenticated page publishes tasks the lens never named.
+func TestParseLensFilterFailsClosedOnAnythingItCannotRender(t *testing.T) {
+	for name, raw := range map[string]string{
+		"unreadable blob":                                 `{"status":"open"}`,
+		"not an object at all":                            `["status"]`,
+		"key outside the grammar":                         `{"colour":{"value":"blue"}}`,
+		"grammar key this reader does not implement":      `{"labels":{"in":["urgent"]}}`,
+		"grammar operator this reader does not implement": `{"status":{"neq":"done"}}`,
+		"key carrying no operator":                        `{"status":{}}`,
+		"empty status set":                                `{"status":{"values":[]}}`,
+		"empty priority set":                              `{"priority":{"in":[]}}`,
+		"priority set mixed with a comparison":            `{"priority":{"values":[1,2],"gte":4}}`,
+		"priority bounded twice from below":               `{"priority":{"gt":1,"gte":3}}`,
+		"due date that is not a date":                     `{"due_on":{"gte":"next tuesday"}}`,
+		"assignee naming nobody":                          `{"assignee":{"value":""}}`,
+	} {
+		f := parseLensFilter(json.RawMessage(raw))
+		if !f.Impossible {
+			t.Fatalf("%s: filter must select nothing, got %+v", name, f)
+		}
+		where, _ := f.fragments()
+		if strings.Join(where, " AND ") != "1 = 0" {
+			t.Fatalf("%s: predicate must exclude everything; got %v", name, where)
+		}
 	}
-	if where, _ := f.fragments(); len(where) != 0 {
-		t.Fatalf("an unreadable key must add no predicate; got %v", where)
+}
+
+// The counterweight to the cases above: a filter this reader does render
+// still narrows rather than excluding, and an empty filter still means
+// "everything in the lens's own scope".
+func TestParseLensFilterStillReadsWhatItImplements(t *testing.T) {
+	for name, raw := range map[string]string{
+		"status set":            `{"status":{"values":["open","done"]}}`,
+		"status eq":             `{"status":{"eq":"open"}}`,
+		"priority set":          `{"priority":{"in":[1,4]}}`,
+		"priority range":        `{"priority":{"gte":1,"lte":3}}`,
+		"due date bracket":      `{"due_on":{"gte":"2026-01-01","lte":"2026-12-31"}}`,
+		"due date pinned":       `{"due_on":{"eq":"2026-01-01"}}`,
+		"status plus search":    `{"status":{"in":["open"]},"search":{"value":"quarterly"}}`,
+		"unknown state dropped": `{"status":{"values":["open","shipped"]}}`,
+	} {
+		f := parseLensFilter(json.RawMessage(raw))
+		if f.Impossible {
+			t.Fatalf("%s: a filter this reader implements must not be impossible", name)
+		}
+		if where, _ := f.fragments(); len(where) == 0 {
+			t.Fatalf("%s: filter must reach SQL as a predicate", name)
+		}
+	}
+
+	empty := parseLensFilter(json.RawMessage(`{}`))
+	if empty.Impossible {
+		t.Fatal("a lens with no filter names its whole scope, not nothing")
+	}
+	if where, _ := empty.fragments(); len(where) != 0 {
+		t.Fatalf("an empty filter must add no predicate; got %v", where)
+	}
+}
+
+// The write-time refusal and the read-time fail-closed are the same
+// reading, so what the reader cannot render is exactly what a lens may
+// not be written in, and the refusal can name where it stopped.
+func TestReadLensFilterNamesWhatStoppedIt(t *testing.T) {
+	for raw, want := range map[string]string{
+		`{"state":"open"}`:                  "filter",
+		`{"labels":{"in":["urgent"]}}`:      "filter.labels",
+		`{"status":{"neq":"done"}}`:         "filter.status.neq",
+		`{"status":{"values":["shipped"]}}`: "filter.status",
+		`{"priority":{"in":[]}}`:            "filter.priority",
+		`{"due_on":{"gte":"soon"}}`:         "filter.due_on",
+		`{"status":{"values":["open"]}}`:    "",
+		`{}`:                                "",
+	} {
+		f, unread := readLensFilter(json.RawMessage(raw))
+		if unread != want {
+			t.Fatalf("%s: expected the reading to stop at %q; got %q", raw, want, unread)
+		}
+		if unread != "" && !parseLensFilter(json.RawMessage(raw)).Impossible {
+			t.Fatalf("%s: a reading that stopped must select nothing", raw)
+		}
+		if unread == "" && f.Impossible {
+			t.Fatalf("%s: a complete reading must not be impossible", raw)
+		}
+	}
+}
+
+// publicLensFilter reads the stored envelope, so a lens_json that cannot
+// be decoded at all must reach the resolver as the excluding predicate
+// rather than as no filter.
+func TestPublicLensFilterFailsClosedOnUnreadableLensJSON(t *testing.T) {
+	for name, raw := range map[string]string{
+		"truncated blob": `{"filter":`,
+		"not an object":  `42`,
+		"filter of wrong shape": `{"filter":{"state":"open"},` +
+			`"sort":[],"groupBy":null}`,
+	} {
+		f := publicLensFilter(json.RawMessage(raw))
+		if !f.Impossible {
+			t.Fatalf("%s: an unreadable lens must select nothing, got %+v", name, f)
+		}
+	}
+
+	f := publicLensFilter(json.RawMessage(`{"filter":{"status":{"values":["open"]}},"sort":[],"groupBy":null}`))
+	if f.Impossible || len(f.States) != 1 || f.States[0] != "open" {
+		t.Fatalf("a readable lens must still resolve its filter; got %+v", f)
 	}
 }

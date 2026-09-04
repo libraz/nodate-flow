@@ -65,13 +65,20 @@ type PublicLensTask struct {
 // embedded so the share page can render in a single round-trip; the
 // list is hard-capped (see resolve.go) and not paginated because public
 // shares are not meant to be unbounded data dumps.
+//
+// The lens definition itself — filter, sort, group-by — stays on the
+// authenticated side. The share page renders the resolved tasks, not
+// the query that selected them, and the definition names things the
+// link holder was never given: user public ids under the assignee key
+// and whatever free text the author saved under the search key. A
+// definition that is absent from this DTO cannot leak through it,
+// which is why it is omitted rather than sanitised. The resolver reads
+// the stored blob directly (see resolve.go), so the shared page still
+// answers the question the lens asks.
 type PublicLens struct {
 	ID          string           `json:"id" doc:"Lens public id (UUID v7)"`
 	Name        string           `json:"name"`
 	Description *string          `json:"description,omitempty" doc:"Optional public-facing description shown on the share page"`
-	Filter      json.RawMessage  `json:"filter"`
-	Sort        json.RawMessage  `json:"sort"`
-	GroupBy     *string          `json:"groupBy"`
 	Tasks       []PublicLensTask `json:"tasks" doc:"Tasks matching the lens filter, capped at 200 rows"`
 }
 

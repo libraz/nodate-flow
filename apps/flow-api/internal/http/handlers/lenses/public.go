@@ -53,8 +53,11 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
-		if err := requireLensShareOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
+		if err := requireLensOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
 			return nil, err
+		}
+		if lensRow.IsPublic {
+			return nil, httpErr(apierrors.WsLensAlreadyPublic)
 		}
 
 		// Mint through the shared token package so lens shares stay in
@@ -65,21 +68,21 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// SetLensPublic is a no-op when is_public = TRUE (WHERE guard).
-		// The already-public case is answered from lensRow just below, which
-		// distinguishes it from a missing view; the count cannot, because it
-		// is zero for both.
-		if _, err := deps.Queries.SetLensPublic(ctx, generated.SetLensPublicParams{
+		// SetLensPublic only matches a lens that is still private (WHERE
+		// is_public = FALSE guard), so a zero count means the state moved
+		// between the read above and this write. The freshly minted hash was
+		// never stored, and answering ok would hand the caller a token that
+		// unlocks nothing — plus an event and an audit record for a write
+		// that changed no row.
+		published, err := deps.Queries.SetLensPublic(ctx, generated.SetLensPublicParams{
 			PublicTokenHash: sql.NullString{String: tokenHash, Valid: true},
 			WorkspaceID:     ws.ID,
 			PublicID:        lid,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		// If the lens was already public the UPDATE matched zero rows.
-		// Detect by checking the existing row's state.
-		if lensRow.IsPublic {
+		if published == 0 {
 			return nil, httpErr(apierrors.WsLensAlreadyPublic)
 		}
 
@@ -134,22 +137,25 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLensNotFound, apierrors.InternalUnexpected))
 		}
-		if err := requireLensShareOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
+		if err := requireLensOwner(ctx, deps, ws, actorID, lensRow.CreatorPublicID); err != nil {
 			return nil, err
 		}
-
-		// SetLensPrivate is a no-op when is_public = FALSE (WHERE guard).
-		// See Publish: the already-private case is answered from lensRow,
-		// which the count cannot distinguish from a missing view.
-		if _, err := deps.Queries.SetLensPrivate(ctx, generated.SetLensPrivateParams{
-			WorkspaceID: ws.ID,
-			PublicID:    lid,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if !lensRow.IsPublic {
+			return nil, httpErr(apierrors.WsLensAlreadyPrivate)
 		}
 
-		// If the lens was already private the UPDATE matched zero rows.
-		if !lensRow.IsPublic {
+		// SetLensPrivate only matches a lens that is still public (WHERE
+		// is_public = TRUE guard). See Publish: a zero count means another
+		// call revoked the share first, so this one took nothing down and
+		// must not record that it did.
+		revoked, err := deps.Queries.SetLensPrivate(ctx, generated.SetLensPrivateParams{
+			WorkspaceID: ws.ID,
+			PublicID:    lid,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if revoked == 0 {
 			return nil, httpErr(apierrors.WsLensAlreadyPrivate)
 		}
 
@@ -177,8 +183,8 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 	}
 }
 
-// requireLensShareOwner gates publishing and unpublishing a lens to its
-// creator and to workspace admins / owners.
+// requireLensOwner gates every write to a lens — publish, unpublish,
+// update and delete — to its creator and to workspace admins / owners.
 //
 // Publishing puts a projection of the workspace's tasks on an
 // unauthenticated URL, so "any workspace member who can see the lens" is
@@ -186,7 +192,15 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 // this narrows the remaining members to the people who own the view or
 // administer the workspace. It mirrors the calendar public-share rule
 // (resolveWorkspaceNonGuest / resolveWorkspaceAdmin).
-func requireLensShareOwner(
+//
+// Editing carries the same authority as publishing and is gated the same
+// way: replacing a published lens's filter changes what the anonymous
+// page serves, so a gate on publishing alone would be worth nothing. The
+// rule holds for private lenses too, because whether a lens is published
+// can change between the check and the write, and because a saved view
+// belongs to whoever built it — members who want their own can create or
+// duplicate one.
+func requireLensOwner(
 	ctx context.Context,
 	deps Deps,
 	ws middleware.WorkspaceContext,
