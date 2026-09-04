@@ -19,6 +19,22 @@
 //               target reached through another target, or a script
 //               invoked by an already-reachable script, counts.
 //
+// Reachable means invoked, not mentioned. The corpus a candidate is
+// looked for in is made of other people's source: Makefile recipes,
+// workflow steps, the hook, and the body of every script already known to
+// run. A plain substring search over that text counts a filename written
+// in a comment — a `#` line in the Makefile, a sentence in another
+// script's header explaining what this one does — as evidence that
+// something runs it, which is the one direction in which this check
+// cannot fail loudly: it reports fewer orphans, and reporting no orphans
+// is what a healthy tree looks like. So comments are removed from every
+// unit before it enters the corpus, and the surviving text has to look
+// like a call: the name preceded by a path separator, or by a runner.
+//
+// A script invoked in a way that shape cannot see — through a shell
+// variable, a loop over a glob — should be exempted with the marker
+// below rather than answered by widening the match back to a substring.
+//
 // A candidate that no gate reaches is reported. The way out is to wire
 // it or to delete it; a script that is deliberately neither — a manual
 // instrument, a one-off seeding helper — declares that in its own body:
@@ -56,6 +72,118 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', 'locales'
 
 /** package.json script names that are gates rather than utilities. */
 const isGateScript = (name) => name === 'test' || name.startsWith('check');
+
+/**
+ * Strip `#` comments from shell, YAML and Makefile recipe text.
+ *
+ * A `#` only opens a comment at the start of a word and outside quotes.
+ * `${var#prefix}` and `${#list[@]}` are parameter expansions, and a `#`
+ * inside a quoted string is data — cutting at either would truncate the
+ * line and could throw away a real invocation sitting after it.
+ */
+function stripHashComments(text) {
+  const out = [];
+  for (const line of text.split('\n')) {
+    let quote = null;
+    let cut = -1;
+    for (let i = 0; i < line.length; i += 1) {
+      const c = line[i];
+      if (quote !== null) {
+        if (c === '\\' && quote === '"') {
+          i += 1;
+          continue;
+        }
+        if (c === quote) quote = null;
+        continue;
+      }
+      if (c === "'" || c === '"') {
+        quote = c;
+        continue;
+      }
+      if (c === '#' && (i === 0 || /\s/.test(line[i - 1] ?? ''))) {
+        cut = i;
+        break;
+      }
+    }
+    out.push(cut === -1 ? line : line.slice(0, cut));
+  }
+  return out.join('\n');
+}
+
+/**
+ * Strip `//` and block comments from JS, TS and Go source.
+ *
+ * String and template literals are tracked, so a `//` inside a URL or a
+ * quoted path is left alone. This is deliberately not applied to shell
+ * or YAML, where `//` is an ordinary part of a path.
+ */
+function stripSlashComments(text) {
+  let out = '';
+  let quote = null;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (quote !== null) {
+      out += c;
+      if (c === '\\') {
+        out += next ?? '';
+        i += 2;
+        continue;
+      }
+      if (c === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      quote = c;
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      continue;
+    }
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+}
+
+/** Comment syntax follows the file's language, not the other way round. */
+function stripComments(text, path) {
+  return /\.(mjs|js|ts|go)$/.test(path) ? stripSlashComments(text) : stripHashComments(text);
+}
+
+/**
+ * Tokens that run the file named after them, for the invocations that do
+ * not spell out a directory: `node foo.mjs`, `go -C scripts run bar.go`.
+ * `run` is included on its own because that is the token both `go run`
+ * and `bun run` put directly in front of the name.
+ */
+const RUNNERS = ['node', 'bun', 'bunx', 'tsx', 'bash', 'sh', 'zsh', 'run', 'python3', 'python'];
+
+/**
+ * Does `corpus` call `basename`, as opposed to naming it?
+ *
+ * Two shapes count: preceded by a path separator (`scripts/x.sh`,
+ * `./x.sh`, `"$DIR/x.sh"`), or preceded by a runner token. The trailing
+ * boundary keeps `x.sh` from matching inside `x.sh.bak`.
+ */
+function invokes(corpus, basename) {
+  const escaped = basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const shape = new RegExp(
+    String.raw`(?:/|(?:^|[\s;|&("'\`])(?:${RUNNERS.join('|')})\s+)${escaped}(?![\w.-])`,
+  );
+  return shape.test(corpus);
+}
 
 function walk(dir, out) {
   let entries;
@@ -106,15 +234,41 @@ function listDirs(parent) {
 // Candidates
 // ---------------------------------------------------------------------
 
-/** @type {Array<{id: string, body: string, basename: string}>} */
+/**
+ * Refuse to report success over a set nothing was read into.
+ *
+ * This check reports the scripts a gate does not reach, so an empty
+ * candidate list is its happiest possible output: nothing unreachable,
+ * because nothing was looked at. The walk swallows a missing directory,
+ * which is precisely how that happens.
+ */
+function vacuous(lines) {
+  for (const line of lines) console.error(line);
+  process.exit(2);
+}
+
+/** @type {Array<{id: string, body: string, code: string, basename: string}>} */
 const scriptCandidates = [];
 {
   const roots = [...SCRIPT_ROOTS];
   for (const parent of WORKSPACE_PARENTS) {
-    for (const ws of listDirs(parent)) roots.push(join(ws, 'scripts'));
+    const workspaces = listDirs(parent);
+    // A workspace parent that lists nothing takes every per-package
+    // scripts/ directory and every workspace package.json out of the
+    // inventory at once, and the run still ends in "all reachable".
+    if (workspaces.length === 0) {
+      vacuous([
+        `check-reachability: the workspace parent ${parent}/ holds no directory, so no workspace script or package.json under it entered the inventory.`,
+        'Either the workspaces moved, or WORKSPACE_PARENTS names a directory that no longer exists.',
+      ]);
+    }
+    for (const ws of workspaces) roots.push(join(ws, 'scripts'));
   }
+  /** Root -> candidates found, so an empty root can be named individually. */
+  const countByRoot = new Map();
   const seen = new Set();
   for (const root of roots) {
+    const before = scriptCandidates.length;
     for (const file of walk(join(repo, root), [])) {
       const id = relative(repo, file);
       if (seen.has(id)) continue;
@@ -125,8 +279,30 @@ const scriptCandidates = [];
       } catch {
         body = '';
       }
-      scriptCandidates.push({ id, body, basename: id.slice(id.lastIndexOf('/') + 1) });
+      // Both forms are kept: the marker is a comment, so it is read from
+      // the raw body, while only the code contributes to the corpus.
+      scriptCandidates.push({
+        id,
+        body,
+        code: stripComments(body, id),
+        basename: id.slice(id.lastIndexOf('/') + 1),
+      });
     }
+    countByRoot.set(root, scriptCandidates.length - before);
+  }
+  // Only the fixed roots are required to hold candidates. A workspace
+  // that has no scripts/ directory of its own is ordinary; `scripts/` and
+  // `sql/` going empty is the inventory losing a whole class of guard.
+  // Checked one root at a time, because the other root still holding
+  // scripts would satisfy any total.
+  const emptyRoots = SCRIPT_ROOTS.filter((root) => (countByRoot.get(root) ?? 0) === 0);
+  if (emptyRoots.length > 0) {
+    vacuous([
+      `check-reachability: ${emptyRoots.length} of ${SCRIPT_ROOTS.length} script root(s) yielded no candidate, so nothing under them was tested for being reachable:`,
+      ...emptyRoots.map((root) => `  ${root}/`),
+      '',
+      'Either the scripts moved, or SCRIPT_EXTENSIONS no longer names what they are written in.',
+    ]);
   }
 }
 
@@ -151,6 +327,14 @@ const packageCandidates = [];
         command: String(command),
       });
     }
+  }
+  // The other half of the inventory. Every workspace manifest could fail
+  // to parse and the run would still end in "all reachable".
+  if (packageCandidates.length === 0) {
+    vacuous([
+      'check-reachability: no package.json test or check* script entered the inventory, so that half of the inventory was not tested for being reachable.',
+      'Either no manifest could be read, or the scripts are named something isGateScript no longer recognises.',
+    ]);
   }
 }
 
@@ -214,9 +398,13 @@ function parseMakefile(text) {
 
 const targets = parseMakefile(readFileSync(join(repo, 'Makefile'), 'utf8'));
 
-/** One recipe command per unit; continuations were joined during parsing. */
+/**
+ * One recipe command per unit; continuations were joined during parsing.
+ * Comments are removed here rather than in the parser, which needs the
+ * raw text to find the targets themselves.
+ */
 function recipeUnits(name) {
-  return targets.get(name)?.recipe ?? [];
+  return (targets.get(name)?.recipe ?? []).map(stripHashComments);
 }
 
 const closure = new Set();
@@ -225,8 +413,20 @@ function addTarget(name) {
   closure.add(name);
   for (const prereq of targets.get(name)?.prereqs ?? []) addTarget(prereq);
 }
-addTarget('check');
-addTarget('test');
+// The gates are the other set that has to be non-empty, and they fail
+// the opposite way: a gate that goes missing makes everything look
+// unreachable rather than everything look fine. Naming the missing gate
+// is still worth more than a list of every script in the tree, which is
+// what the report would otherwise be.
+for (const gate of ['check', 'test']) {
+  if (!targets.has(gate)) {
+    vacuous([
+      `check-reachability: the Makefile has no \`${gate}\` target, so the reachability closure was never seeded from it.`,
+      'Every script that only that gate runs would be reported as reachable by nothing.',
+    ]);
+  }
+  addTarget(gate);
+}
 
 /** Every make target named in a chunk of text, filtered against real targets. */
 function makeTargetsIn(text) {
@@ -264,22 +464,36 @@ const workflowUnits = [];
     let chunk = [];
     for (const line of text.split('\n')) {
       if (/^\s*-\s/.test(line) && chunk.length > 0) {
-        workflowUnits.push(chunk.join('\n'));
+        workflowUnits.push(stripHashComments(chunk.join('\n')));
         chunk = [];
       }
       chunk.push(line);
     }
-    if (chunk.length > 0) workflowUnits.push(chunk.join('\n'));
+    if (chunk.length > 0) workflowUnits.push(stripHashComments(chunk.join('\n')));
   }
+}
+
+if (workflowUnits.length === 0) {
+  vacuous([
+    'check-reachability: .github/workflows holds no workflow file, so CI contributed nothing to the set of gates.',
+    'A script that only CI runs would be reported as reachable by nothing.',
+  ]);
 }
 
 const hookText = (() => {
   try {
-    return readFileSync(join(repo, '.githooks/pre-commit'), 'utf8');
+    return stripHashComments(readFileSync(join(repo, '.githooks/pre-commit'), 'utf8'));
   } catch {
     return '';
   }
 })();
+
+if (hookText === '') {
+  vacuous([
+    'check-reachability: .githooks/pre-commit could not be read, so the hook contributed nothing to the set of gates.',
+    'A script that only the pre-commit hook runs would be reported as reachable by nothing.',
+  ]);
+}
 
 // ---------------------------------------------------------------------
 // Fixpoint: a gate reaches a script, whose body reaches the next one
@@ -304,11 +518,11 @@ for (let pass = 0; pass < 32; pass += 1) {
   for (const name of closure) units.push(...recipeUnits(name));
   for (const id of reachableScripts) {
     const found = scriptCandidates.find((c) => c.id === id);
-    if (found !== undefined) units.push(...found.body.split('\n'));
+    if (found !== undefined) units.push(...found.code.split('\n'));
   }
   for (const id of reachablePackages) {
     const found = packageCandidates.find((c) => c.id === id);
-    if (found !== undefined) units.push(`${found.dir} ${found.command}`);
+    if (found !== undefined) units.push(stripHashComments(`${found.dir} ${found.command}`));
   }
   const corpus = units.join('\n');
 
@@ -321,7 +535,7 @@ for (let pass = 0; pass < 32; pass += 1) {
   }
   for (const candidate of scriptCandidates) {
     if (reachableScripts.has(candidate.id)) continue;
-    if (!corpus.includes(candidate.basename)) continue;
+    if (!invokes(corpus, candidate.basename)) continue;
     reachableScripts.add(candidate.id);
     changed = true;
   }
