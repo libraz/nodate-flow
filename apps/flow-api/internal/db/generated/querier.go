@@ -948,6 +948,9 @@ type Querier interface {
 	// Fetch the minimal fields the agent guard needs to make an allow/deny
 	// decision. Returns enabled, paused, allowed_scopes_json, and the
 	// monthly cost cap. Used by the MCP dispatch guard.
+	// allowed_scopes_json coalesces to an empty JSON array: a NULL column is
+	// the documented "inherit from the token" case, which carries no scope
+	// restriction, and it has to reach the guard as a scannable JSON value.
 	GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error)
 	// ============================================================================
 	// ai_settings queries (ADR 0003)

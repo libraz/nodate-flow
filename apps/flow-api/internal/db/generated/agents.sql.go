@@ -120,7 +120,7 @@ const getAgentGuardSnapshot = `-- name: GetAgentGuardSnapshot :one
 SELECT
   enabled,
   paused,
-  allowed_scopes_json,
+  COALESCE(allowed_scopes_json, CAST('[]' AS JSON)) AS allowed_scopes_json,
   monthly_cost_cap_cents
 FROM ai_agents
 WHERE id = ?
@@ -137,6 +137,9 @@ type GetAgentGuardSnapshotRow struct {
 // Fetch the minimal fields the agent guard needs to make an allow/deny
 // decision. Returns enabled, paused, allowed_scopes_json, and the
 // monthly cost cap. Used by the MCP dispatch guard.
+// allowed_scopes_json coalesces to an empty JSON array: a NULL column is
+// the documented "inherit from the token" case, which carries no scope
+// restriction, and it has to reach the guard as a scannable JSON value.
 func (q *Queries) GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error) {
 	row := q.db.QueryRowContext(ctx, getAgentGuardSnapshot, id)
 	var i GetAgentGuardSnapshotRow
