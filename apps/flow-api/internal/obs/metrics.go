@@ -6,36 +6,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
 
-// httpRequestsTotal counts completed HTTP requests partitioned by method,
-// route pattern, and response status code.
-var httpRequestsTotal = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "nf_http_requests_total",
-		Help: "Total number of HTTP requests handled, partitioned by method, path, and status.",
-	},
-	[]string{"method", "path", "status"},
+	sharedobs "github.com/libraz/nodate-flow/packages/go-shared/obs"
 )
-
-// httpRequestDuration observes request latency in seconds partitioned by
-// method and route pattern. The default histogram buckets cover the range
-// from 5 ms to 10 s which is suitable for most API workloads.
-var httpRequestDuration = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "nf_http_request_duration_seconds",
-		Help:    "Histogram of HTTP request latencies in seconds, partitioned by method and path.",
-		Buckets: prometheus.DefBuckets,
-	},
-	[]string{"method", "path"},
-)
-
-func init() {
-	prometheus.MustRegister(httpRequestsTotal)
-	prometheus.MustRegister(httpRequestDuration)
-}
 
 // MetricsHandler returns an http.Handler that serves Prometheus metrics at
 // /metrics. It delegates to promhttp.Handler which writes the standard
@@ -70,12 +44,7 @@ func MetricsMiddleware() func(http.Handler) http.Handler {
 				}
 			}
 
-			elapsed := time.Since(start).Seconds()
-			method := r.Method
-			status := strconv.Itoa(rec.status)
-
-			httpRequestsTotal.WithLabelValues(method, routePattern, status).Inc()
-			httpRequestDuration.WithLabelValues(method, routePattern).Observe(elapsed)
+			sharedobs.ObserveHTTPRequest(r.Method, routePattern, strconv.Itoa(rec.status), time.Since(start))
 		})
 	}
 }
