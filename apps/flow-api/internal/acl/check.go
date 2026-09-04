@@ -459,12 +459,24 @@ func CheckTaskVisibility(
 // membership, looks up optional project membership, and enforces task
 // visibility. It is the shared Layer 3/4 decision used by REST task
 // middleware and MCP task resolvers.
-func AuthorizeTaskAccess(ctx context.Context, db DB, pub uuid.UUID, userID uint32) (TaskAccess, error) {
+//
+// The task is resolved workspace-blind, so the caller chooses what an
+// actor outside the task's workspace is told through nonMemberSpec. The
+// choice exists because the two transports hold different disclosure
+// postures: REST answers a resolvable foreign task as a denial
+// (WS.TASK.ACCESS_DENIED), while MCP answers it exactly as an id that
+// exists nowhere (WS.TASK.NOT_FOUND) so a tool cannot probe for task ids
+// outside its own tenant. Naming the posture at every call site is what
+// keeps a new caller from inheriting the wrong one silently.
+//
+// A visibility denial *within* the workspace is always WS.TASK.NOT_FOUND,
+// whatever nonMemberSpec says — see [CheckTaskVisibility].
+func AuthorizeTaskAccess(ctx context.Context, db DB, pub uuid.UUID, userID uint32, nonMemberSpec *apierrors.Spec) (TaskAccess, error) {
 	rec, err := ResolveTaskByPublicID(ctx, db, pub)
 	if err != nil {
 		return TaskAccess{}, err
 	}
-	wsRole, err := CheckWorkspaceMember(ctx, db, rec.WorkspaceID, userID, apierrors.WsTaskAccessDenied)
+	wsRole, err := CheckWorkspaceMember(ctx, db, rec.WorkspaceID, userID, nonMemberSpec)
 	if err != nil {
 		return TaskAccess{}, err
 	}

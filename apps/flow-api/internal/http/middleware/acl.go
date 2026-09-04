@@ -569,7 +569,7 @@ func RequireTaskAccess(db ACLDB) func(http.Handler) http.Handler {
 				writeSpecError(w, apierrors.WsTaskNotFound)
 				return
 			}
-			access, err := acl.AuthorizeTaskAccess(r.Context(), db, pub, userID)
+			access, err := acl.AuthorizeTaskAccess(r.Context(), db, pub, userID, apierrors.WsTaskAccessDenied)
 			if err != nil {
 				writeAPIError(w, err)
 				return

@@ -133,7 +133,7 @@ func ensureFavoriteTargetExists(
 		_, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: workspaceID, PublicID: targetPublicID})
 		return err
 	case generated.UserFavoritesTargetTypeTask:
-		access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, targetPublicID.UUID(), actorID)
+		access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, targetPublicID.UUID(), actorID, apierrors.WsTaskAccessDenied)
 		if err != nil {
 			return err
 		}

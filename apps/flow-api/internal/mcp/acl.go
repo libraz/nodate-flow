@@ -258,8 +258,11 @@ func requireWorkspaceMember(ctx context.Context, deps Deps, s *session) (acl.Wor
 // caller's project role. Anything that writes inside the project must use
 // [resolveProjectForWrite] instead.
 //
-// Delegates to [acl.ResolveProjectByPublicID] for the lookup and
-// applies the workspace-binding check that is specific to MCP tokens.
+// Delegates to [acl.ResolveProjectByPublicID] for the lookup and applies the
+// workspace-binding check that is specific to MCP tokens. A public id that
+// belongs to another workspace is answered exactly as one that exists
+// nowhere — both are WS.PROJECT.NOT_FOUND — so a tool cannot be used to probe
+// for project ids outside its own tenant.
 func resolveProject(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
@@ -270,7 +273,7 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 		return 0, err
 	}
 	if prj.WorkspaceID != s.workspaceID {
-		return 0, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+		return 0, apierrors.New(apierrors.WsProjectNotFound)
 	}
 	return prj.ID, nil
 }
@@ -334,17 +337,25 @@ func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID
 // authorizeTask runs the shared Layer-3/4 task ACL and the MCP-specific
 // workspace binding, returning the full access result so callers can apply a
 // role floor on top. Every MCP task resolver funnels through here.
+//
+// A public id that belongs to another workspace is answered exactly as one
+// that exists nowhere — both are WS.TASK.NOT_FOUND — so a tool cannot be used
+// to probe for task ids outside its own tenant.
 func authorizeTask(ctx context.Context, deps Deps, s *session, publicID string) (acl.TaskAccess, types.PublicID, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
 		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
-	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, pub.UUID(), s.userID)
+	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, pub.UUID(), s.userID, apierrors.WsTaskNotFound)
 	if err != nil {
 		return acl.TaskAccess{}, types.PublicID{}, err
 	}
+	// Defence in depth: the shared ACL above is the primary gate and
+	// already refuses a task outside the session workspace as absent.
+	// This second comparison holds the tenant binding even if that
+	// function's workspace handling changes underneath MCP.
 	if access.Task.WorkspaceID != s.workspaceID {
-		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+		return acl.TaskAccess{}, types.PublicID{}, apierrors.New(apierrors.WsTaskNotFound)
 	}
 	// Every task-touching tool passes through here, which is what makes
 	// this the one place that can attribute an MCP call to its task
@@ -402,9 +413,9 @@ func loadTaskRow(ctx context.Context, q *generated.Queries, workspaceID uint32, 
 // resolveTaskRow authorizes access to a task through the shared
 // task-visibility ACL (resolveTask) and then loads its full row. Tools
 // that need task fields must use this instead of loading the row directly,
-// so a caller can never read task data it is not permitted to see. Missing
-// and access-denied both surface as WS.TASK.NOT_FOUND, so the tool is not
-// an existence oracle.
+// so a caller can never read task data it is not permitted to see. Missing,
+// belonging to another workspace and access-denied all surface as
+// WS.TASK.NOT_FOUND, so the tool is not an existence oracle.
 func resolveTaskRow(ctx context.Context, deps Deps, s *session, publicID string) (uint32, generated.FindTaskByPublicIdRow, error) {
 	internalID, pub, err := resolveTask(ctx, deps, s, publicID)
 	if err != nil {

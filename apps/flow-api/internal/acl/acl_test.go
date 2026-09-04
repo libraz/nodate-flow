@@ -529,20 +529,20 @@ func TestACLLayered(t *testing.T) {
 	})
 
 	t.Run("task/authorize/shared_matrix", func(t *testing.T) {
-		access, err := acl.AuthorizeTaskAccess(ctx, db, fx.taskPublicPub, fx.creatorUserID)
+		access, err := acl.AuthorizeTaskAccess(ctx, db, fx.taskPublicPub, fx.creatorUserID, apierrors.WsTaskAccessDenied)
 		require.NoError(t, err)
 		require.Equal(t, fx.taskPublicID, access.Task.ID)
 		require.False(t, access.IsProjectMember)
 
-		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.creatorUserID)
+		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.creatorUserID, apierrors.WsTaskAccessDenied)
 		requireSpec(t, err, apierrors.WsTaskNotFound)
 
-		access, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.memberUserID)
+		access, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskProject), fx.memberUserID, apierrors.WsTaskAccessDenied)
 		require.NoError(t, err)
 		require.True(t, access.IsProjectMember)
 
 		nonActorUserID := insertWorkspaceOnlyUser(t, db, fx.wsID)
-		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskPrivate), nonActorUserID)
+		_, err = acl.AuthorizeTaskAccess(ctx, db, uuidFromTaskID(t, db, fx.taskPrivate), nonActorUserID, apierrors.WsTaskAccessDenied)
 		requireSpec(t, err, apierrors.WsTaskNotFound)
 	})
 }

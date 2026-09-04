@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
@@ -78,21 +79,24 @@ func TestMCPTokenExpired(t *testing.T) {
 		"expired token must surface MCP.TOKEN.EXPIRED, body=%s", string(body))
 }
 
-// TestMCPTokenWorkspaceMismatch verifies that an MCP token bound to
-// workspace A cannot operate on a project that belongs to workspace B.
-// The cross-workspace fence lives in resolveProject (apps/flow-api/
-// internal/mcp/acl.go) which compares the resolved project's
-// workspace_id against the session's workspace_id and emits
-// MCP.TOKEN.WORKSPACE_MISMATCH on divergence.
+// TestMCPCrossWorkspaceProjectAnsweredAsMissing pins the project half of
+// the existence-concealment property: a project public id that belongs to
+// another workspace is answered exactly as one that exists nowhere, so a
+// tool cannot be used to probe for project ids outside its own tenant.
 //
-// We pick create_task because runGetTask scopes its FindTaskByPublicId
-// query by session workspace and surfaces WS.TASK.NOT_FOUND for cross-
-// workspace ids; only resolveProject emits the dedicated mismatch code.
+// The fence lives in resolveProject (apps/flow-api/internal/mcp/acl.go),
+// which compares the resolved project's workspace_id against the session's
+// and answers WS.PROJECT.NOT_FOUND on divergence — the same code the lookup
+// itself raises when no row matches at all.
+//
+// Both halves are asserted together and required to be equal. Either one
+// alone is satisfied by an implementation that refuses every call with that
+// code; the equality is the property.
 //
 // Application-layer rejection: auth + frame parse have already
 // succeeded, so writeRPCAppError returns HTTP 200 with the JSON-RPC
-// envelope carrying error.data.code = "MCP.TOKEN.WORKSPACE_MISMATCH".
-func TestMCPTokenWorkspaceMismatch(t *testing.T) {
+// envelope carrying the stable code in error.data.code.
+func TestMCPCrossWorkspaceProjectAnsweredAsMissing(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -100,19 +104,97 @@ func TestMCPTokenWorkspaceMismatch(t *testing.T) {
 	tt2 := newTenant(t)
 
 	tok := mintMCPToken(t, tt1.AccessToken, tt1.WorkspacePublicID,
-		"mismatch-token", []string{"read:workspace", "write:workspace"})
+		"cross-tenant-project-token", []string{"read:workspace", "write:workspace"})
 
-	status, body := mcpCallRaw(t, tok, "tools/call", map[string]any{
-		"name": "create_task",
-		"arguments": map[string]any{
-			"projectId": tt2.ProjectPublicID,
-			"title":     "cross-tenant create attempt",
-		},
-	})
-	require.Equal(t, http.StatusOK, status,
-		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(body))
-	require.Equal(t, "MCP.TOKEN.WORKSPACE_MISMATCH", mcpErrorCode(t, body),
-		"cross-workspace projectId must surface MCP.TOKEN.WORKSPACE_MISMATCH, body=%s", string(body))
+	createTask := func(projectID string) (int, []byte) {
+		t.Helper()
+		return mcpCallRaw(t, tok, "tools/call", map[string]any{
+			"name": "create_task",
+			"arguments": map[string]any{
+				"projectId": projectID,
+				"title":     "cross-tenant create attempt",
+			},
+		})
+	}
+
+	foreignStatus, foreignBody := createTask(tt2.ProjectPublicID)
+	require.Equal(t, http.StatusOK, foreignStatus,
+		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(foreignBody))
+	foreignCode := mcpErrorCode(t, foreignBody)
+	require.Equal(t, "WS.PROJECT.NOT_FOUND", foreignCode,
+		"another tenant's projectId must surface WS.PROJECT.NOT_FOUND, body=%s", string(foreignBody))
+
+	// A well-formed id that no projects row carries, so the only difference
+	// from the call above is whether the project exists somewhere else.
+	missingStatus, missingBody := createTask(uuid.Must(uuid.NewV7()).String())
+	require.Equal(t, http.StatusOK, missingStatus,
+		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(missingBody))
+	missingCode := mcpErrorCode(t, missingBody)
+	require.Equal(t, "WS.PROJECT.NOT_FOUND", missingCode,
+		"an id belonging to no project must surface WS.PROJECT.NOT_FOUND, body=%s", string(missingBody))
+
+	require.Equal(t, missingCode, foreignCode,
+		"another tenant's projectId must be answered identically to one that exists nowhere;"+
+			" foreign=%s missing=%s", string(foreignBody), string(missingBody))
+}
+
+// TestMCPCrossWorkspaceTaskAnsweredAsMissing pins the same property on the
+// task path. authorizeTask (apps/flow-api/internal/mcp/acl.go) is the funnel
+// every task-touching tool goes through, so the answer it gives a task id
+// from another workspace is the answer the whole task surface gives: the
+// WS.TASK.NOT_FOUND an id belonging to no task gets.
+//
+// As on the project path, the equality of the two answers is the property —
+// asserting only that a cross-tenant id is refused would also pass on an
+// implementation that refuses everything.
+func TestMCPCrossWorkspaceTaskAnsweredAsMissing(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt1 := newTenant(t)
+	tt2 := newTenant(t)
+
+	tok := mintMCPToken(t, tt1.AccessToken, tt1.WorkspacePublicID,
+		"cross-tenant-task-token", []string{"read:workspace", "write:workspace"})
+
+	// A real task in the other tenant, created through the REST API so the
+	// row is built by the same codepath a production task is.
+	var foreignTask struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks", tt2.AccessToken, map[string]any{
+		"projectId": tt2.ProjectPublicID,
+		"title":     "task in another tenant",
+	}, &foreignTask)
+	require.NotEmpty(t, foreignTask.ID)
+
+	getTask := func(taskID string) (int, []byte) {
+		t.Helper()
+		return mcpCallRaw(t, tok, "tools/call", map[string]any{
+			"name":      "get_task",
+			"arguments": map[string]any{"taskId": taskID},
+		})
+	}
+
+	foreignStatus, foreignBody := getTask(foreignTask.ID)
+	require.Equal(t, http.StatusOK, foreignStatus,
+		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(foreignBody))
+	foreignCode := mcpErrorCode(t, foreignBody)
+	require.Equal(t, "WS.TASK.NOT_FOUND", foreignCode,
+		"another tenant's taskId must surface WS.TASK.NOT_FOUND, body=%s", string(foreignBody))
+
+	// A well-formed id that no tasks row carries, so the only difference
+	// from the call above is whether the task exists somewhere else.
+	missingStatus, missingBody := getTask(uuid.Must(uuid.NewV7()).String())
+	require.Equal(t, http.StatusOK, missingStatus,
+		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(missingBody))
+	missingCode := mcpErrorCode(t, missingBody)
+	require.Equal(t, "WS.TASK.NOT_FOUND", missingCode,
+		"an id belonging to no task must surface WS.TASK.NOT_FOUND, body=%s", string(missingBody))
+
+	require.Equal(t, missingCode, foreignCode,
+		"another tenant's taskId must be answered identically to one that exists nowhere;"+
+			" foreign=%s missing=%s", string(foreignBody), string(missingBody))
 }
 
 // TestMCPScopeInsufficient mints a read-only MCP token and exercises a

@@ -276,7 +276,7 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 		return httpErr(apierrors.InternalUnexpected)
 	}
 
-	if _, err := acl.AuthorizeTaskAccess(ctx, db, taskPub.UUID(), actorInternal); err != nil {
+	if _, err := acl.AuthorizeTaskAccess(ctx, db, taskPub.UUID(), actorInternal, apierrors.WsTaskAccessDenied); err != nil {
 		var apiErr *apierr.APIError
 		if stderrors.As(err, &apiErr) {
 			return httpErr(apierrors.AiReverseTargetNotFound)

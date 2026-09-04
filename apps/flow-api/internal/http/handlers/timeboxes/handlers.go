@@ -508,7 +508,7 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 		// so it takes the same right as reading it. Without this a task
 		// the actor cannot see could be pulled into a timebox they can,
 		// which is a read of someone else's task through a write.
-		if _, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID); err != nil {
+		if _, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID, apierrors.WsTaskAccessDenied); err != nil {
 			return nil, err
 		}
 

@@ -392,7 +392,7 @@ func resolveDismiss(
 // Errors from the ACL layer already carry the canonical spec, so they
 // travel back unchanged rather than being flattened into a 500.
 func authorizeEndpoint(ctx context.Context, deps Deps, taskPub types.PublicID, actorID uint32) (acl.TaskAccess, error) {
-	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID)
+	access, err := acl.AuthorizeTaskAccess(ctx, deps.DB, taskPub.UUID(), actorID, apierrors.WsTaskAccessDenied)
 	if err != nil {
 		return acl.TaskAccess{}, err
 	}
