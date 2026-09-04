@@ -78,11 +78,8 @@ SELECT
   v.title,
   v.derived_state,
   v.priority,
-  v.due_on,
-  u.display_name AS assignee_display_name
+  v.due_on
 FROM v_task_list v
-LEFT JOIN users u
-  ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
 WHERE v.workspace_id = ?
   AND v.visibility = 'public'
   AND (? IS NULL OR v.project_id = ?)
@@ -107,19 +104,19 @@ type ListPublicLensTasksParams struct {
 }
 
 type ListPublicLensTasksRow struct {
-	PublicID            types.PublicID    `json:"publicId"`
-	Title               string            `json:"title"`
-	DerivedState        TasksDerivedState `json:"derivedState"`
-	Priority            int32             `json:"priority"`
-	DueOn               sql.NullTime      `json:"dueOn"`
-	AssigneeDisplayName sql.NullString    `json:"assigneeDisplayName"`
+	PublicID     types.PublicID    `json:"publicId"`
+	Title        string            `json:"title"`
+	DerivedState TasksDerivedState `json:"derivedState"`
+	Priority     int32             `json:"priority"`
+	DueOn        sql.NullTime      `json:"dueOn"`
 }
 
 // Resolve a publicly shared lens's task projection.
 //
-// Returns a minimal, public-safe row set: title, status, priority, due_on,
-// and the primary assignee's display name. Internal ids and workspace
-// metadata are intentionally excluded so this query can back the
+// Returns a minimal, public-safe row set: title, status, priority and
+// due_on. The projection names no person: an unauthenticated reader is
+// never told who a task is assigned to. Internal ids and workspace
+// metadata are likewise excluded so this query can back the
 // unauthenticated GET /public/lenses/{token} endpoint.
 //
 // The hard cap of 200 rows is enforced by the caller (see
@@ -171,7 +168,6 @@ func (q *Queries) ListPublicLensTasks(ctx context.Context, arg ListPublicLensTas
 			&i.DerivedState,
 			&i.Priority,
 			&i.DueOn,
-			&i.AssigneeDisplayName,
 		); err != nil {
 			return nil, err
 		}

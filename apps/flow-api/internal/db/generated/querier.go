@@ -1574,9 +1574,10 @@ type Querier interface {
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
 	// Resolve a publicly shared lens's task projection.
 	//
-	// Returns a minimal, public-safe row set: title, status, priority, due_on,
-	// and the primary assignee's display name. Internal ids and workspace
-	// metadata are intentionally excluded so this query can back the
+	// Returns a minimal, public-safe row set: title, status, priority and
+	// due_on. The projection names no person: an unauthenticated reader is
+	// never told who a task is assigned to. Internal ids and workspace
+	// metadata are likewise excluded so this query can back the
 	// unauthenticated GET /public/lenses/{token} endpoint.
 	//
 	// The hard cap of 200 rows is enforced by the caller (see

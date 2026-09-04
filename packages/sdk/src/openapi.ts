@@ -8969,8 +8969,6 @@ export interface components {
             tasks: components["schemas"]["PublicLensTask"][] | null;
         };
         PublicLensTask: {
-            /** @description Display name of the primary assignee, if any */
-            assigneeDisplayName?: string;
             /** @description Due date as YYYY-MM-DD */
             dueOn?: string;
             /** @description Task public id (UUID v7) */

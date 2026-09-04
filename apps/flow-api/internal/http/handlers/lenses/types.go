@@ -47,16 +47,18 @@ type SavedLens struct {
 }
 
 // PublicLensTask is the minimal task projection embedded in PublicLens.
-// All fields are public-safe: no internal ids, no descriptions, no
-// creator information, no embedding scores, no relations. Matches the
-// columns rendered by the public share page table.
+// It carries the task's own presentation fields and names no person:
+// the holder of an unauthenticated link has no identity, so there is
+// nobody the projection can be trusted to name. Assignees, creators and
+// anyone else who touched the task therefore stay on the authenticated
+// side. Internal ids, descriptions, embedding scores and relations are
+// omitted for the same reason.
 type PublicLensTask struct {
-	ID                  string  `json:"id" doc:"Task public id (UUID v7)"`
-	Title               string  `json:"title"`
-	Status              string  `json:"status" doc:"Task derived state"`
-	Priority            int32   `json:"priority"`
-	DueOn               *string `json:"dueOn,omitempty" doc:"Due date as YYYY-MM-DD"`
-	AssigneeDisplayName *string `json:"assigneeDisplayName,omitempty" doc:"Display name of the primary assignee, if any"`
+	ID       string  `json:"id" doc:"Task public id (UUID v7)"`
+	Title    string  `json:"title"`
+	Status   string  `json:"status" doc:"Task derived state"`
+	Priority int32   `json:"priority"`
+	DueOn    *string `json:"dueOn,omitempty" doc:"Due date as YYYY-MM-DD"`
 }
 
 // PublicLens is the read-only DTO returned by the unauthenticated

@@ -8773,10 +8773,6 @@
       "PublicLensTask": {
         "additionalProperties": false,
         "properties": {
-          "assigneeDisplayName": {
-            "description": "Display name of the primary assignee, if any",
-            "type": "string"
-          },
           "dueOn": {
             "description": "Due date as YYYY-MM-DD",
             "type": "string"

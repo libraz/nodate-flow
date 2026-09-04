@@ -117,15 +117,14 @@ func rowToPublicLens(r generated.FindLensByPublicTokenHashRow) PublicLens {
 
 // rowToPublicLensTask maps a ListPublicLensTasksRow to the PublicLensTask
 // DTO. due_on is rendered as a YYYY-MM-DD string per the API time
-// convention; the assignee display name is nullable.
+// convention. No person is carried across — see PublicLensTask.
 func rowToPublicLensTask(r generated.ListPublicLensTasksRow) PublicLensTask {
 	return PublicLensTask{
-		ID:                  r.PublicID.String(),
-		Title:               r.Title,
-		Status:              string(r.DerivedState),
-		Priority:            r.Priority,
-		DueOn:               nullDateString(r.DueOn),
-		AssigneeDisplayName: nullString(r.AssigneeDisplayName),
+		ID:       r.PublicID.String(),
+		Title:    r.Title,
+		Status:   string(r.DerivedState),
+		Priority: r.Priority,
+		DueOn:    nullDateString(r.DueOn),
 	}
 }
 

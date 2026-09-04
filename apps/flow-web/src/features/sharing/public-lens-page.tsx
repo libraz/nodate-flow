@@ -4,6 +4,9 @@
  * Accessible at /public/lenses/{token} without authentication. Displays
  * the lens name, description, and a simple task table. No sidebar or
  * navigation — this is a standalone shareable page.
+ *
+ * Anyone holding the link is an anonymous reader, so the projection names no
+ * person: the table carries title, status, priority and due date only.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
@@ -101,7 +104,6 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
                 <th>{t('public_page.col_status')}</th>
                 <th>{t('public_page.col_priority')}</th>
                 <th>{t('public_page.col_due')}</th>
-                <th>{t('public_page.col_assignee')}</th>
               </tr>
             </thead>
             <tbody>
@@ -118,7 +120,6 @@ export default function PublicLensPage({ token }: PublicLensPageProps): ReactEle
                     <td>{stateKey ? tCommon(stateKey) : task.status}</td>
                     <td>{priorityKey ? tCommon(priorityKey) : String(task.priority)}</td>
                     <td>{task.dueOn ? formatDueDate(task.dueOn, locale) : '—'}</td>
-                    <td>{task.assigneeDisplayName ?? '—'}</td>
                   </tr>
                 );
               })}

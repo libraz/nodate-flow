@@ -9,6 +9,10 @@
  * because the defect was that the values never entered the i18n path at all —
  * a test against `tasks.status.waiting` would pass on the broken version if
  * it stubbed the label maps.
+ *
+ * The reader is anonymous, so the page must also name no person. That is
+ * pinned here by feeding the component a payload that carries a display name
+ * anyway and asserting it never reaches the DOM.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -31,7 +35,6 @@ const queryMock = vi.hoisted(() => ({
         status: 'waiting',
         priority: 3,
         dueOn: '2026-04-28',
-        assigneeDisplayName: 'Aoi',
       },
       {
         id: '01920000-0000-7000-8000-000000000002',
@@ -110,11 +113,38 @@ describe('PublicLensPage localization', () => {
     expect(cells[3]).toBe('Apr 28, 2026');
   });
 
-  it('leaves a placeholder for a task with no due date or assignee', () => {
+  it('leaves a placeholder for a task with no due date', () => {
     renderIn('ja');
     const cells = rowCells('Draft the release note');
     expect(cells[3]).toBe('—');
-    expect(cells[4]).toBe('—');
+  });
+
+  it('never renders a person even when the payload carries one', () => {
+    const previous = queryMock.data;
+    queryMock.data = {
+      name: 'Roadmap',
+      tasks: [
+        {
+          id: '01920000-0000-7000-8000-000000000004',
+          title: 'Ship the importer',
+          status: 'waiting',
+          priority: 3,
+          dueOn: '2026-04-28',
+          // Not part of the DTO. A link holder has no account, so a name that
+          // arrives anyway must stop at the boundary rather than be rendered.
+          assigneeDisplayName: 'Imaginary Person',
+        },
+      ],
+    };
+    try {
+      renderIn('en');
+      expect(document.body.textContent).not.toContain('Imaginary Person');
+      const headers = screen.getAllByRole('columnheader').map((th) => th.textContent);
+      expect(headers).toEqual(['Title', 'Status', 'Priority', 'Due']);
+      expect(rowCells('Ship the importer')).toHaveLength(4);
+    } finally {
+      queryMock.data = previous;
+    }
   });
 
   it('falls back to the raw value for a state the label map does not know', () => {

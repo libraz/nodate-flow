@@ -490,13 +490,14 @@ func publicLensFilter(lensJSON json.RawMessage) lensFilter {
 
 // publicLensTaskColumns is the public-safe projection the share page
 // renders: no internal ids, no description, no creator, no workspace
-// metadata.
+// metadata, and no person. A share URL carries no reader identity, so
+// naming the assignee would hand a real person's display name to whoever
+// holds the link.
 const publicLensTaskColumns = `v.public_id,
   v.title,
   v.derived_state,
   v.priority,
-  v.due_on,
-  u.display_name AS assignee_display_name`
+  v.due_on`
 
 // resolvePublicLensTasks runs the public-safe task projection for a
 // shared lens. The lens row carries the workspace_id and (optional)
@@ -529,8 +530,6 @@ func resolvePublicLensTasks(
 	q := fmt.Sprintf(`SELECT
   %s
 FROM v_task_list v
-LEFT JOIN users u
-  ON u.public_id = v.primary_assignee_public_id AND u.enabled = TRUE
 WHERE %s
 ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ?`, publicLensTaskColumns, strings.Join(where, " AND "))
@@ -553,7 +552,6 @@ LIMIT ?`, publicLensTaskColumns, strings.Join(where, " AND "))
 			&r.DerivedState,
 			&r.Priority,
 			&r.DueOn,
-			&r.AssigneeDisplayName,
 		); err != nil {
 			return nil, err
 		}
