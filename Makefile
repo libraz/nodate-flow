@@ -214,8 +214,8 @@ test-e2e: ## Playwright E2E
 test-contract: ## Schemathesis contract tests (requires running API)
 	./scripts/contract-test.sh
 
-test-openapi-diff: ## Fail if the committed OpenAPI specs drift from the live Go sources
-	./scripts/openapi-diff.sh
+test-openapi-diff: ## Fail if the committed API document or the SDK types drift from the Go sources
+	bash scripts/check-openapi-drift.sh
 
 test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
 	./scripts/schema-diff.sh
