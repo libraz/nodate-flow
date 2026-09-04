@@ -6236,8 +6236,8 @@ export interface components {
             /** Format: int64 */
             positionY: number;
             title: string;
-            /** @description Widget type enum value */
-            widgetType: string;
+            /** @enum {string} */
+            widgetType: "task_summary" | "burndown" | "signals_feed" | "ai_suggestions" | "overdue_tasks" | "notification_feed";
             /** Format: int64 */
             width: number;
         };
@@ -10481,8 +10481,8 @@ export interface components {
              * @example https://example.com/schemas/UpdateTimeboxStatusBody.json
              */
             readonly $schema?: string;
-            /** @description Target status: planned, active, completed, cancelled */
-            status: string;
+            /** @enum {string} */
+            status: "planned" | "active" | "completed" | "cancelled";
         };
         UpdateWidgetBody: {
             /**

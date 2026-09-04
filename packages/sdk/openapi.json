@@ -2540,6 +2540,7 @@
           "slug": {
             "maxLength": 63,
             "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
             "type": "string"
           }
         },
@@ -2821,9 +2822,14 @@
             "type": "string"
           },
           "widgetType": {
-            "description": "Widget type enum value",
-            "maxLength": 50,
-            "minLength": 1,
+            "enum": [
+              "task_summary",
+              "burndown",
+              "signals_feed",
+              "ai_suggestions",
+              "overdue_tasks",
+              "notification_feed"
+            ],
             "type": "string"
           },
           "width": {
@@ -2865,6 +2871,7 @@
           "slug": {
             "maxLength": 63,
             "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
             "type": "string"
           },
           "timezone": {
@@ -7944,6 +7951,7 @@
           "slug": {
             "maxLength": 63,
             "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
             "type": "string"
           }
         },
@@ -12041,7 +12049,7 @@
             "type": "string"
           },
           "status": {
-            "description": "Target status: planned, active, completed, cancelled",
+            "enum": ["planned", "active", "completed", "cancelled"],
             "type": "string"
           }
         },
@@ -12722,6 +12730,7 @@
           "slug": {
             "maxLength": 63,
             "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
             "type": "string"
           },
           "timezone": {
