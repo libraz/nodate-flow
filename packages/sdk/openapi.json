@@ -2553,10 +2553,12 @@
             "type": "string"
           },
           "apiKey": {
-            "description": "Plaintext provider API key (write-only)",
-            "maxLength": 512,
+            "description": "Plaintext provider API key (write-only). Printable ASCII, no spaces.",
+            "maxLength": 484,
             "minLength": 8,
-            "type": "string"
+            "pattern": "^[\\x21-\\x7E]+$",
+            "type": "string",
+            "writeOnly": true
           },
           "baseUrl": {
             "maxLength": 255,
@@ -2564,6 +2566,7 @@
           },
           "defaultModel": {
             "maxLength": 100,
+            "pattern": "^$|^[\\x21-\\x7E]+$",
             "type": "string"
           },
           "kind": {
@@ -7534,6 +7537,7 @@
             "type": "string"
           },
           "signalKind": {
+            "maxLength": 64,
             "type": "string"
           }
         },
@@ -7705,6 +7709,7 @@
           },
           "kind": {
             "description": "Event kind",
+            "enum": ["event", "block", "free", "milestone"],
             "type": "string"
           },
           "location": {
@@ -7733,6 +7738,7 @@
           },
           "showAs": {
             "description": "Show-as status",
+            "enum": ["busy", "free", "tentative", "oof"],
             "type": "string"
           },
           "startAt": {
@@ -7754,6 +7760,7 @@
           },
           "visibility": {
             "description": "Visibility",
+            "enum": ["default", "public", "private", "confidential"],
             "type": "string"
           }
         },
@@ -7943,10 +7950,12 @@
             "type": "string"
           },
           "apiKey": {
-            "description": "New plaintext provider API key (write-only)",
-            "maxLength": 512,
+            "description": "New plaintext provider API key (write-only). Printable ASCII, no spaces.",
+            "maxLength": 484,
             "minLength": 8,
-            "type": "string"
+            "pattern": "^[\\x21-\\x7E]+$",
+            "type": "string",
+            "writeOnly": true
           }
         },
         "required": ["apiKey"],
@@ -8743,10 +8752,6 @@
             "description": "Optional public-facing description shown on the share page",
             "type": "string"
           },
-          "filter": {},
-          "groupBy": {
-            "type": ["string", "null"]
-          },
           "id": {
             "description": "Lens public id (UUID v7)",
             "type": "string"
@@ -8754,7 +8759,6 @@
           "name": {
             "type": "string"
           },
-          "sort": {},
           "tasks": {
             "description": "Tasks matching the lens filter, capped at 200 rows",
             "items": {
@@ -8763,7 +8767,7 @@
             "type": ["array", "null"]
           }
         },
-        "required": ["id", "name", "filter", "sort", "groupBy", "tasks"],
+        "required": ["id", "name", "tasks"],
         "type": "object"
       },
       "PublicLensTask": {

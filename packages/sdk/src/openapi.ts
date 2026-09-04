@@ -6107,7 +6107,7 @@ export interface components {
              * @example https://example.com/schemas/CreateProviderInputBody.json
              */
             readonly $schema?: string;
-            /** @description Plaintext provider API key (write-only) */
+            /** @description Plaintext provider API key (write-only). Printable ASCII, no spaces. */
             apiKey: string;
             baseUrl?: string;
             defaultModel?: string;
@@ -8455,8 +8455,11 @@ export interface components {
              * @enum {string}
              */
             flexibility?: "fixed" | "negotiable" | "conditional";
-            /** @description Event kind */
-            kind?: string;
+            /**
+             * @description Event kind
+             * @enum {string}
+             */
+            kind?: "event" | "block" | "free" | "milestone";
             /** @description Location */
             location?: string;
             /** @description Memo */
@@ -8475,8 +8478,11 @@ export interface components {
             recurrenceExceptions?: unknown;
             /** @description Recurrence rule */
             recurrenceRule?: unknown;
-            /** @description Show-as status */
-            showAs?: string;
+            /**
+             * @description Show-as status
+             * @enum {string}
+             */
+            showAs?: "busy" | "free" | "tentative" | "oof";
             /**
              * Format: int64
              * @description Start time as unix seconds (UTC)
@@ -8488,8 +8494,11 @@ export interface components {
             title?: string;
             /** @description Related URL */
             url?: string;
-            /** @description Visibility */
-            visibility?: string;
+            /**
+             * @description Visibility
+             * @enum {string}
+             */
+            visibility?: "default" | "public" | "private" | "confidential";
         };
         PatchLabelBody: {
             /**
@@ -8576,7 +8585,7 @@ export interface components {
              * @example https://example.com/schemas/PatchProviderInputBody.json
              */
             readonly $schema?: string;
-            /** @description New plaintext provider API key (write-only) */
+            /** @description New plaintext provider API key (write-only). Printable ASCII, no spaces. */
             apiKey: string;
         };
         PatchProviderOutputBody: {
@@ -8953,12 +8962,9 @@ export interface components {
             readonly $schema?: string;
             /** @description Optional public-facing description shown on the share page */
             description?: string;
-            filter: unknown;
-            groupBy: string | null;
             /** @description Lens public id (UUID v7) */
             id: string;
             name: string;
-            sort: unknown;
             /** @description Tasks matching the lens filter, capped at 200 rows */
             tasks: components["schemas"]["PublicLensTask"][] | null;
         };
