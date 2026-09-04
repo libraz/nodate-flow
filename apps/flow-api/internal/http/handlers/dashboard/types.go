@@ -43,7 +43,10 @@ type WidgetDTO struct {
 
 // CreateWidgetBody is the request body for POST /workspaces/{wsId}/dashboard/widgets.
 type CreateWidgetBody struct {
-	WidgetType string          `json:"widgetType" minLength:"1" maxLength:"50" doc:"Widget type enum value"`
+	// WidgetType names a variant the column stores. The handler casts it
+	// straight to the column's type, so a value stated here and nowhere
+	// else would reach storage and be refused there.
+	WidgetType string          `json:"widgetType" enum:"task_summary,burndown,signals_feed,ai_suggestions,overdue_tasks,notification_feed"`
 	Title      string          `json:"title" minLength:"1" maxLength:"200"`
 	Config     json.RawMessage `json:"config,omitempty" doc:"Arbitrary JSON configuration blob"`
 	PositionX  int             `json:"positionX" minimum:"0"`

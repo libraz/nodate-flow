@@ -145,7 +145,10 @@ type UpdateTimeboxOutput struct {
 
 // UpdateTimeboxStatusBody is the request body for POST /workspaces/{wsId}/timeboxes/{timeboxId}/status.
 type UpdateTimeboxStatusBody struct {
-	Status string `json:"status" doc:"Target status: planned, active, completed, cancelled"`
+	// Status is one of the values the column stores. Naming them in the
+	// tag rather than in prose is what puts them in the API document and
+	// refuses the rest before the write.
+	Status string `json:"status" enum:"planned,active,completed,cancelled"`
 }
 
 // UpdateTimeboxStatusInput is the input for POST /workspaces/{wsId}/timeboxes/{timeboxId}/status.
