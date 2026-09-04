@@ -275,8 +275,8 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl
-check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + calendar write-ACL guard
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-calendar-write-acl ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + calendar write-ACL guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -314,6 +314,13 @@ check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of 
 
 check-public-router: ## Fail when the auth-free router registers a route that is not allowlisted
 	$(PKG_RUN) scripts/check-public-router.ts
+
+# The unresolved declarations this prints on a passing run are the point:
+# a field the API document cannot place is unchecked, and `make` shows a
+# passing recipe's output, so the residue stays visible instead of
+# appearing only on the run that already failed.
+check-web-bounds: ## Fail when a web form accepts a longer value than the API document allows
+	$(PKG_RUN) scripts/check-web-bounds.ts
 
 check-region-parity: ## Fail when the Go and TS country allowlists disagree
 	node scripts/check-region-parity.mjs

@@ -68,6 +68,16 @@ jobs:
       - name: Public router surface
         run: make check-public-router
 
+      # A form field's maximum length is written twice: once in the Go
+      # input struct, which reaches the OpenAPI document as `maxLength`,
+      # and once in the Zod schema the form validates with. A frontend
+      # bound wider than the document's lets a value through the form that
+      # the server then refuses — a 422 where an inline field error
+      # belongs. It reads the committed spec plus the web sources, so it
+      # needs no Go toolchain either.
+      - name: Web input bounds
+        run: make check-web-bounds
+
       # The country allowlist is written twice and nothing generates one
       # side from the other. A code only the form knows fails on save with
       # an error naming a field nobody touched; a code only the API knows
