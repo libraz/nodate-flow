@@ -81,8 +81,13 @@ type CreateWorkspaceInput struct {
 
 // CreateWorkspaceInputBody is the JSON body for POST /workspaces.
 type CreateWorkspaceInputBody struct {
-	// Slug is a DNS label, so it is capped at the 63-octet label limit of RFC 1035.
-	Slug        string `json:"slug" minLength:"1" maxLength:"63"`
+	// Slug reaches URLs verbatim and is a DNS label: lowercase letters and
+	// digits, hyphens only between them, capped at the 63-octet limit of
+	// RFC 1035 that the column encodes. A leading digit is allowed, per
+	// the RFC 1123 relaxation. The value is stored exactly as sent: an
+	// uppercase or padded slug is refused here rather than folded into a
+	// different one further in.
+	Slug        string `json:"slug" minLength:"1" maxLength:"63" pattern:"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"`
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
 	IconURL     string `json:"iconUrl,omitempty" maxLength:"500"`
@@ -133,8 +138,9 @@ type PatchWorkspaceInput struct {
 
 // WorkspacePatchWorkspaceInputBody is the JSON body for PATCH /workspaces/{wsId}.
 type WorkspacePatchWorkspaceInputBody struct {
-	// Slug is a DNS label, so it is capped at the 63-octet label limit of RFC 1035.
-	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63"`
+	// Slug carries the same DNS label rule and 63-octet bound as on
+	// create, and is stored exactly as sent.
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63" pattern:"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"`
 	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
 	Description *string `json:"description,omitempty" maxLength:"500"`
 	IconURL     *string `json:"iconUrl,omitempty" maxLength:"500"`

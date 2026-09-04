@@ -24,10 +24,11 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		slug := strings.ToLower(strings.TrimSpace(in.Body.Slug))
-		if slug == "" {
-			return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
-		}
+		// The slug is used as sent. Its character set and length are
+		// settled by the request schema, so there is nothing left here to
+		// fold or trim, and folding would mean an uppercase slug landed on
+		// a row the caller never named.
+		slug := in.Body.Slug
 
 		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}

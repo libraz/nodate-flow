@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
@@ -36,7 +35,10 @@ func Patch(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspa
 			params.Name = sql.NullString{String: *in.Body.Name, Valid: true}
 		}
 		if in.Body.Slug != nil && *in.Body.Slug != "" {
-			candidate := strings.ToLower(strings.TrimSpace(*in.Body.Slug))
+			// Used as sent: the request schema has already settled the
+			// character set and length, so create and patch cannot
+			// disagree about what a slug is.
+			candidate := *in.Body.Slug
 			if candidate != current.Slug {
 				if _, err := deps.Queries.FindWorkspaceBySlug(ctx, candidate); err == nil {
 					return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)

@@ -60,8 +60,14 @@ type ProjectMember struct {
 // that validates is a body the row can hold. Slug is a DNS label, whose
 // 63-octet limit (RFC 1035) the column encodes; color holds a hex value
 // such as #1abc9c.
+//
+// Slug reaches URLs verbatim and is a DNS label: lowercase letters and
+// digits, hyphens only between them, with a leading digit allowed per
+// the RFC 1123 relaxation. It is stored exactly as sent: an uppercase or
+// padded slug is refused here rather than folded into a different one
+// further in.
 type CreateProjectBody struct {
-	Slug        string `json:"slug" minLength:"1" maxLength:"63"`
+	Slug        string `json:"slug" minLength:"1" maxLength:"63" pattern:"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"`
 	Identifier  string `json:"identifier,omitempty" maxLength:"5" doc:"Human-readable project key (e.g. NF)"`
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
@@ -110,9 +116,10 @@ type GetProjectOutput struct {
 
 // PatchProjectBody is the request body for PATCH /projects/{prjId}.
 //
-// Slug carries the same RFC 1035 label bound the column enforces on create.
+// Slug carries the same DNS label rule and RFC 1035 bound as on create,
+// and is stored exactly as sent.
 type PatchProjectBody struct {
-	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63"`
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63" pattern:"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"`
 	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
 	Description *string `json:"description,omitempty" maxLength:"500"`
 }

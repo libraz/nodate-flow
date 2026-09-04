@@ -35,7 +35,10 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 		}
 		newSlug := current.Slug
 		if in.Body.Slug != nil && *in.Body.Slug != "" {
-			newSlug = strings.ToLower(strings.TrimSpace(*in.Body.Slug))
+			// Used as sent: the request schema has already settled the
+			// character set and length, so create and patch cannot
+			// disagree about what a slug is.
+			newSlug = *in.Body.Slug
 		}
 		newDesc := current.Description
 		if in.Body.Description != nil {

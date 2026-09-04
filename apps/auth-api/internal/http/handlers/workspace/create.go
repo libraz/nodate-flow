@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
@@ -25,10 +24,11 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		if !ok {
 			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
-		slug := strings.ToLower(strings.TrimSpace(in.Body.Slug))
-		if slug == "" {
-			return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)
-		}
+		// The slug is used as sent. Its character set and length are
+		// settled by the request schema, so there is nothing left here to
+		// fold or trim, and folding would mean an uppercase slug landed on
+		// a row the caller never named.
+		slug := in.Body.Slug
 		// Conflict check.
 		if _, err := deps.Queries.FindWorkspaceBySlug(ctx, slug); err == nil {
 			return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)
