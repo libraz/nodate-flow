@@ -20,10 +20,20 @@
 //	              width, the other is not, so one of them is wrong. It holds
 //	              everywhere the field is declared twice.
 //
-// The mapping is derived rather than listed, from the two kinds of evidence
-// the repository already carries — the resource an input type or a tool
-// names, and the tables that surface's own statements write. Resolve
-// states the rule. It does not reach every field, and it is not meant to:
+// The mapping is derived rather than listed, and there are two derivations
+// because there are two independent kinds of evidence. One reads what an
+// operation is called: a name carrying a write verb states the resource, and
+// the tables its own statements write say which of them that is. The other
+// reads what an operation does: the statements the function taking the input
+// calls, and the tables those statements write. Neither is a vocabulary
+// anybody maintains, and the second exists because the first cannot see an
+// operation whose name states no verb — presigning an upload, proposing a
+// plan, applying a recurrence all store something, and the next name nobody
+// thought of would be outside any list of verbs written today. Resolve and
+// ResolveByCalls state the two rules, in that order: the name is the
+// stronger evidence and goes first.
+//
+// Between them they do not reach every field, and they are not meant to:
 // most bounded inputs are not stored under the name they arrive as, and
 // requiring each of those to carry an exemption would put a marker on the
 // majority of them, which teaches people to write markers rather than to
@@ -33,10 +43,12 @@
 //	scope        every wire field of a body reachable from a type named
 //	             *Input under the handler trees, and every property of an
 //	             MCP tool's input schema, that states a maxLength.
-//	resolution   the owner names a write verb and a resource; a table this
-//	             surface writes is that resource pluralised; the wire name
-//	             in the schema's spelling is a column of it. One candidate
-//	             or none — two is no answer.
+//	resolution   the owner names a write verb and a resource, a table this
+//	             surface writes is that resource pluralised, and the wire
+//	             name in the schema's spelling is a column of it; or, for
+//	             what that leaves over, the handler taking the input calls a
+//	             statement, and one table that statement writes carries the
+//	             column. Either way one candidate or none — two is no answer.
 //	comparison   the character width of VARCHAR and CHAR, and the byte
 //	             capacity of the text types, which bounds a character count
 //	             from above. An ENUM states a value set rather than a

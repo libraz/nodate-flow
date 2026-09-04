@@ -138,12 +138,32 @@ func RepoRoot() (string, error) {
 
 // HandlerDeclarations reads every bound declared on an input field under
 // one handler tree.
-//
-// Files are grouped by directory before they are read: half the inputs name
-// their body as a separate type in the same package, so a file read on its
-// own would see the marker field and none of the fields the request
-// actually carries.
 func HandlerDeclarations(root, rel string) ([]Declaration, error) {
+	packages, order, err := readPackages(root, rel)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []Declaration
+	for _, pkg := range order {
+		decls, perr := ParseHandlerPackage(pkg, packages[pkg])
+		if perr != nil {
+			return nil, perr
+		}
+		out = append(out, decls...)
+	}
+	return out, nil
+}
+
+// readPackages reads one handler tree's sources, grouped by directory and
+// keyed by repository-relative path.
+//
+// The grouping is what both derivations need. Half the inputs name their
+// body as a separate type in the same package, so a file read on its own
+// would see the marker field and none of the fields the request actually
+// carries; and a handler lives in a different file from the input it takes
+// as often as not.
+func readPackages(root, rel string) (map[string]map[string]string, []string, error) {
 	packages := map[string]map[string]string{}
 	var order []string
 
@@ -177,19 +197,10 @@ func HandlerDeclarations(root, rel string) ([]Declaration, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sort.Strings(order)
-
-	var out []Declaration
-	for _, pkg := range order {
-		decls, perr := ParseHandlerPackage(pkg, packages[pkg])
-		if perr != nil {
-			return nil, perr
-		}
-		out = append(out, decls...)
-	}
-	return out, nil
+	return packages, order, nil
 }
 
 // ParseHandlerPackage reads the declared bounds out of one handler package,

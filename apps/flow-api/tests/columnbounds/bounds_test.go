@@ -58,30 +58,54 @@ func TestDeclaredBoundsAgreeAcrossSurfaces(t *testing.T) {
 	}
 }
 
-// TestUnresolvedBoundsAreVisible prints the bounds no column was found for.
+// TestUnresolvedBoundsAreVisible prints the bounds no column was found for,
+// and the ones a column was found for by the weaker of the two rules.
 //
-// They are not failures. A search term, a bearer token, a free-form
-// instruction and a password are all declared like a field and none is
-// stored under the name it arrives as, so requiring an exemption on each
-// would mark the majority of the bounds in this repository — and a marker
-// the majority carries is one nobody reads. The gap is printed instead, so
-// the reach of the overflow check is something someone can look at rather
-// than assume.
+// The unresolved ones are not failures. A search term, a bearer token, a
+// free-form instruction and a password are all declared like a field and
+// none is stored under the name it arrives as, so requiring an exemption on
+// each would mark the majority of the bounds in this repository — and a
+// marker the majority carries is one nobody reads. The gap is printed
+// instead, so the reach of the overflow check is something someone can look
+// at rather than assume.
 //
-// The run this has to be readable on is the one where everything passes,
-// because that is the run where an unnoticed gap looks like coverage. A
-// passing package's output is shown only under -v, so the target that runs
-// this guard passes -v, and nothing else here writes at that volume.
+// The call-rule placements are printed for the opposite reason. A placement
+// from the owner's name can be checked by reading the name, and one from the
+// statements a handler calls cannot: it is right only if the handler really
+// stores that field there. Printing each with its column is what lets a
+// wrong placement be seen, rather than trusted because it is derived.
+//
+// The run both of these have to be readable on is the one where everything
+// passes, because that is the run where an unnoticed gap looks like
+// coverage. A passing package's output is shown only under -v, so the target
+// that runs this guard passes -v, and nothing else here writes at that
+// volume.
 func TestUnresolvedBoundsAreVisible(t *testing.T) {
 	t.Parallel()
 
 	tree := readTree(t)
 	placed, unplaced := Placed(tree.resolutions)
+	byName, byCalls := 0, 0
+	var viaCalls []string
+	for _, r := range placed {
+		if r.Rule == ByName {
+			byName++
+			continue
+		}
+		byCalls++
+		viaCalls = append(viaCalls, fmt.Sprintf("  %s maxLength=%d -> %s (%d %s) at %s",
+			r.Describe(), r.Max, r.Column.Qualified(), r.Column.Capacity, r.Column.Units, r.Location()))
+	}
 
 	var report strings.Builder
-	fmt.Fprintf(&report, "%d declared bounds: %d placed on a column, %d unresolved; "+
-		"%d pairs compared across surfaces\n",
-		len(tree.resolutions), len(placed), len(unplaced), len(Pairs(tree.resolutions)))
+	fmt.Fprintf(&report, "%d declared bounds: %d placed on a column (%d from the owner's name, "+
+		"%d from the statements its handler calls), %d unresolved; %d pairs compared across surfaces\n",
+		len(tree.resolutions), len(placed), byName, byCalls, len(unplaced), len(Pairs(tree.resolutions)))
+
+	fmt.Fprintf(&report, "placed by the statements the handler calls (the derivation to check by eye):\n")
+	sort.Strings(viaCalls)
+	fmt.Fprintln(&report, strings.Join(viaCalls, "\n"))
+
 	fmt.Fprintf(&report, "unresolved (no column found; the overflow check does not reach these):\n")
 	lines := make([]string, 0, len(unplaced))
 	for _, r := range unplaced {
@@ -115,7 +139,8 @@ CREATE TABLE widgets (
 
 CREATE TABLE widget_notes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(80) NOT NULL COMMENT 'Note title'
+  title VARCHAR(80) NOT NULL COMMENT 'Note title',
+  label VARCHAR(200) NOT NULL COMMENT 'Note label, a column only this table carries'
 ) ENGINE=InnoDB;
 
 CREATE TABLE gadgets (
@@ -182,6 +207,47 @@ type CreateGadgetInput struct {
 type CreateCommentInput struct {
 	Body struct {
 		Body string ` + "`" + `json:"body" minLength:"1" maxLength:"2000"` + "`" + `
+	}
+}
+
+// An operation whose name states nothing — no verb any list would hold —
+// and which stores what it takes all the same.
+type PresignPartInput struct {
+	ID   string ` + "`" + `path:"id"` + "`" + `
+	Body struct {
+		Label string ` + "`" + `json:"label" maxLength:"300"` + "`" + `
+		Title string ` + "`" + `json:"title" maxLength:"70"` + "`" + `
+	}
+}
+
+// The handler is a closure returned by a factory, which is how half of them
+// are written here: the input is a parameter of the closure and of nothing
+// else, and its statements are called from inside a transaction on a second
+// receiver bound to the tx.
+func PresignPart(deps Deps) func(context.Context, *PresignPartInput) (*PresignPartOutput, error) {
+	return func(ctx context.Context, in *PresignPartInput) (*PresignPartOutput, error) {
+		qtx := deps.Queries.WithTx(tx)
+		if err := qtx.InsertWidgetNote(ctx, in.Body.Label); err != nil {
+			return nil, err
+		}
+		if _, err := deps.Queries.InsertWidget(ctx, in.Body.Title); err != nil {
+			return nil, err
+		}
+		return &PresignPartOutput{}, nil
+	}
+}
+
+// An operation that only reads. Its field is spelled like a column and there
+// is a table of that name, and nothing it calls writes one.
+type LookupWidgetInput struct {
+	Body struct {
+		Title string ` + "`" + `json:"title" maxLength:"4000"` + "`" + `
+	}
+}
+
+func LookupWidget(deps Deps) func(context.Context, *LookupWidgetInput) (*LookupWidgetOutput, error) {
+	return func(ctx context.Context, in *LookupWidgetInput) (*LookupWidgetOutput, error) {
+		return deps.Queries.FindWidget(ctx, in.Body.Title)
 	}
 }
 `
@@ -259,16 +325,54 @@ func registerTools(h *Handler) {
 		t.Error("a property nested under an array's items was not read")
 	}
 
-	decls := append(append([]Declaration(nil), handler...), tools...)
-	writeSets := map[string]map[string]bool{
-		"widgets":  {"widgets": true, "widget_notes": true, "widget_comments": true},
-		"gadgets":  {"gadgets": true},
-		"comments": {"comments": true},
+	const probeScope = "apps/probe-api/internal/http/handlers/widgets"
+	calls, err := ParseHandlerCalls(probeScope, map[string]string{"probe.go": handlerSrc})
+	if err != nil {
+		t.Fatalf("read the control handler's calls: %v", err)
 	}
-	resolutions := ResolveAll(decls, schema, writeSets)
+	if len(calls) == 0 {
+		t.Fatal("no handler was read as taking an input; the call rule places nothing, and " +
+			"every field only it reaches goes unchecked on a green run")
+	}
+	if !calls.Methods(probeScope, "PresignPartInput")["InsertWidget"] {
+		t.Fatal("a statement the handler calls was not read; the call rule rests on reaching " +
+			"them, so it would place nothing")
+	}
+	if !calls.Methods(probeScope, "PresignPartInput")["InsertWidgetNote"] {
+		t.Fatal("a statement called on a receiver bound to the transaction was not read; " +
+			"every write in this repository is issued that way, so the rule would see only " +
+			"the reads")
+	}
+
+	decls := append(append([]Declaration(nil), handler...), tools...)
+	evidence := Evidence{
+		Schema: schema,
+		WriteSets: map[string]map[string]bool{
+			"widgets":  {"widgets": true, "widget_notes": true, "widget_comments": true},
+			"gadgets":  {"gadgets": true},
+			"comments": {"comments": true},
+		},
+		Calls: calls,
+		StatementWrites: map[string]map[string]bool{
+			"InsertWidget":     {"widgets": true},
+			"InsertWidgetNote": {"widget_notes": true},
+			"FindWidget":       {},
+		},
+	}
+	resolutions := ResolveAll(decls, evidence)
 	placed, unplaced := Placed(resolutions)
 	if len(placed) == 0 {
 		t.Fatal("nothing resolved to a column, so the overflow half compared nothing")
+	}
+	byRule := map[Rule]int{}
+	for _, r := range placed {
+		byRule[r.Rule]++
+	}
+	for _, rule := range []Rule{ByName, ByCalls} {
+		if byRule[rule] == 0 {
+			t.Fatalf("the %s rule placed nothing here, so it proves nothing about the tree: "+
+				"a rule that has stopped matching reads exactly like one with nothing to say", rule)
+		}
 	}
 
 	// The overflow half: one bound over its column, and nothing else.
@@ -279,6 +383,7 @@ func registerTools(h *Handler) {
 	for _, want := range []string{
 		"REST CreateWidgetInput body.title -> widgets.title",
 		"MCP create_widget body.title -> widgets.title",
+		"REST PresignPartInput body.label -> widget_notes.label",
 	} {
 		if !overflowing[want] {
 			t.Errorf("did not flag %q: a bound wider than its column is the state this exists "+
@@ -310,6 +415,10 @@ func registerTools(h *Handler) {
 			"search_widgets", "query"},
 		{"a comment on a widget is not the comment a tool of that name writes",
 			"CreateCommentInput", "body"},
+		{"a field whose name is a column of two tables the handler writes could land in " +
+			"either, which is not an answer", "PresignPartInput", "title"},
+		{"an operation that only reads stores nothing, whatever its fields are called",
+			"LookupWidgetInput", "title"},
 	} {
 		for _, r := range Overflows(resolutions) {
 			if r.Owner == neighbour.owner && r.Name == neighbour.name {
@@ -326,6 +435,24 @@ func registerTools(h *Handler) {
 	}
 	if !unplacedHas(unplaced, "SearchWidgetsInput", "q") {
 		t.Error("a read operation's term resolved to a column")
+	}
+	if !unplacedHas(unplaced, "PresignPartInput", "title") {
+		t.Error("a field carried by two of the tables its handler writes resolved to one of " +
+			"them; two candidates is no answer, and picking between them would place a bound " +
+			"against a width nobody chose")
+	}
+	if !unplacedHas(unplaced, "LookupWidgetInput", "title") {
+		t.Error("a field of an operation that only reads resolved to a column; the statements " +
+			"it calls write nothing, so there is no column it lands in")
+	}
+	// The call rule is what places this one, and it is the shape the name
+	// rule cannot see: nothing in PresignPartInput spells a resource.
+	for _, r := range placed {
+		if r.Owner == "PresignPartInput" && r.Name == "label" && r.Rule != ByCalls {
+			t.Errorf("PresignPartInput.label was placed by the %s rule; its name states no "+
+				"resource, so a placement from it means the name rule is matching something "+
+				"it cannot know", r.Rule)
+		}
 	}
 
 	// The disagreement half, which needs no column of its own.
@@ -387,10 +514,25 @@ func readTree(t *testing.T) tree {
 		written += len(tables)
 	}
 	if written == 0 {
-		t.Fatal("no statement under sql/queries was read as writing a table; the resolution " +
+		t.Fatal("no statement under sql/queries was read as writing a table; the name " +
 			"rule's second half has nothing to confirm against, so nothing can resolve")
 	}
 
+	statements, err := StatementWrites(root)
+	if err != nil {
+		t.Fatalf("read the statements under sql/queries: %v", err)
+	}
+	writing := 0
+	for _, tables := range statements {
+		writing += len(tables)
+	}
+	if writing == 0 {
+		t.Fatal("no named statement under sql/queries was read as writing a table; either " +
+			"the annotation naming a statement changed shape or the file split stopped " +
+			"matching, and the call rule can place nothing")
+	}
+
+	calls := CallIndex{}
 	var decls []Declaration
 	for _, rel := range HandlerRoots {
 		found, ferr := HandlerDeclarations(root, rel)
@@ -407,6 +549,23 @@ func readTree(t *testing.T) tree {
 			}
 		}
 		decls = append(decls, found...)
+
+		made, cerr := HandlerCallIndex(root, rel)
+		if cerr != nil {
+			t.Fatalf("read the handler calls under %s: %v", rel, cerr)
+		}
+		if len(made) == 0 {
+			t.Fatalf("no handler under %s was read as taking an input; the handlers are "+
+				"written some other way now, and the call rule places nothing", rel)
+		}
+		for ref, methods := range made {
+			if _, seen := calls[ref]; !seen {
+				calls[ref] = map[string]bool{}
+			}
+			for name := range methods {
+				calls[ref][name] = true
+			}
+		}
 	}
 
 	tools, err := ToolDeclarations(root)
@@ -419,10 +578,27 @@ func readTree(t *testing.T) tree {
 	}
 	decls = append(decls, tools...)
 
-	resolutions := ResolveAll(decls, schema, writeSets)
+	resolutions := ResolveAll(decls, Evidence{
+		Schema:          schema,
+		WriteSets:       writeSets,
+		Calls:           calls,
+		StatementWrites: statements,
+	})
 	if placed, _ := Placed(resolutions); len(placed) == 0 {
 		t.Fatal("no declared bound resolved to a column, so the overflow half compared " +
 			"nothing; the resolution rule has stopped matching this repository's naming")
+	}
+	byRule := map[Rule]int{}
+	for _, r := range resolutions {
+		if r.Placed {
+			byRule[r.Rule]++
+		}
+	}
+	for _, rule := range []Rule{ByName, ByCalls} {
+		if byRule[rule] == 0 {
+			t.Fatalf("the %s rule placed nothing; it has stopped matching this repository, "+
+				"and every field only it reaches is now unchecked while the run stays green", rule)
+		}
 	}
 	if len(Pairs(resolutions)) == 0 {
 		t.Fatal("no field is declared on two surfaces, so nothing was compared for " +

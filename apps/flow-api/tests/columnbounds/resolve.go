@@ -46,6 +46,79 @@ func WriteSets(root string) (map[string]map[string]bool, error) {
 	return out, nil
 }
 
+// StatementWrites returns, for each named statement under sql/queries, the
+// tables that one statement writes.
+//
+// This is the same reading as WriteSets at a finer grain, and the grain is
+// what makes it usable from the other direction. A query file holds the
+// reads beside the writes, so asking a file which tables it writes answers
+// for the whole file; asking a statement answers for the method a handler
+// calls, which is the thing that says where that handler's values land.
+//
+// Names are taken to be unique across the tree, which they are because sqlc
+// generates a method per name. Should two files ever share one, the tables
+// of both are returned together — the candidate set widens, which can only
+// turn an answer into no answer, never into a wrong one.
+func StatementWrites(root string) (map[string]map[string]bool, error) {
+	base := filepath.Join(root, "sql", "queries")
+	out := map[string]map[string]bool{}
+	err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			return nil
+		}
+		raw, readErr := os.ReadFile(path) //#nosec G304,G122 -- repository path walked at test time
+		if readErr != nil {
+			return readErr
+		}
+		for name, body := range splitStatements(string(raw)) {
+			if _, seen := out[name]; !seen {
+				out[name] = map[string]bool{}
+			}
+			for _, table := range writtenTables(body) {
+				out[name][table] = true
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// statementMarker is the annotation sqlc names a statement with, and which
+// becomes the generated method's name.
+var statementMarker = regexp.MustCompile(`^\s*--\s*name:\s*([A-Za-z_][A-Za-z0-9_]*)`)
+
+// splitStatements cuts a query file into its named statements. Text before
+// the first name belongs to no statement — it is the file's own header — and
+// is dropped.
+func splitStatements(text string) map[string]string {
+	out := map[string]string{}
+	name := ""
+	var body strings.Builder
+	flush := func() {
+		if name != "" {
+			out[name] += body.String()
+		}
+		body.Reset()
+	}
+	for _, line := range strings.Split(text, "\n") {
+		if found := statementMarker.FindStringSubmatch(line); found != nil {
+			flush()
+			name = found[1]
+			continue
+		}
+		body.WriteString(line)
+		body.WriteString("\n")
+	}
+	flush()
+	return out
+}
+
 var writeTarget = regexp.MustCompile(`(?:insert\s+(?:ignore\s+)?into|replace\s+into|update)\s+` + "`?" + `([a-z_][a-z0-9_]*)`)
 
 // writtenTables reads the tables a query file writes.
@@ -134,6 +207,33 @@ func isVowel(c byte) bool {
 	return strings.IndexByte("aeiou", c) >= 0
 }
 
+// Rule names the derivation that placed a declaration.
+type Rule string
+
+const (
+	// ByName placed it from the resource the owner's name spells.
+	ByName Rule = "name"
+	// ByCalls placed it from the statements the handler taking it calls.
+	ByCalls Rule = "calls"
+)
+
+// Evidence is everything a resolution reads outside the declaration itself.
+// Each field is derived from committed sources, and a resolution uses two of
+// them at once so that neither the naming nor the call graph can place a
+// field on its own.
+type Evidence struct {
+	Schema Schema
+	// WriteSets are the tables each query directory's statements write,
+	// which is the second half of the name rule.
+	WriteSets map[string]map[string]bool
+	// Calls are the methods each input type's handler calls, which is the
+	// first half of the call rule.
+	Calls CallIndex
+	// StatementWrites are the tables each named statement writes, which is
+	// its second half.
+	StatementWrites map[string]map[string]bool
+}
+
 // Resolution is one declaration together with the column it was placed on,
 // or the record that no column was found for it.
 type Resolution struct {
@@ -142,6 +242,11 @@ type Resolution struct {
 	// Placed reports whether a column was found. An unplaced declaration
 	// is still compared against other surfaces, which needs no column.
 	Placed bool
+	// Rule is which derivation placed it, empty when none did. It is
+	// reported rather than kept internal because the two are not equally
+	// easy to check by eye: a placement from the name can be confirmed by
+	// reading the type's name, and one from the calls cannot.
+	Rule Rule
 }
 
 // Overflows reports whether the declared bound is larger than the column
@@ -212,14 +317,74 @@ func Resolve(d Declaration, schema Schema, scope map[string]bool) (Column, bool)
 	return found[0], true
 }
 
+// ResolveByCalls places a declaration on the column the handler that takes
+// it writes, and is the answer for the operations whose name states nothing.
+//
+// It runs on what the name rule leaves over, and it asks for two agreeing
+// pieces of evidence of its own:
+//
+//	the calls  the function taking this input calls a named statement.
+//	the write  that statement writes a table carrying a column named as
+//	           the field. A statement that writes nothing, or writes
+//	           somewhere without that column, places nothing.
+//
+// Neither half is a list anybody maintains. An operation reaches storage by
+// calling the statement that does the storing, whatever the operation is
+// called, and the statement says which table it writes in its own text.
+//
+// The same discipline as the name rule settles ambiguity: a handler that
+// writes two tables both carrying the column has told us the field could
+// land in either, which is not an answer, so it stays unresolved.
+func ResolveByCalls(d Declaration, ev Evidence) (Column, bool) {
+	if d.Surface != REST || d.Section != "body" || strings.Contains(d.Name, ".") {
+		return Column{}, false
+	}
+	methods := ev.Calls.Methods(d.Scope, d.Owner)
+	if len(methods) == 0 {
+		return Column{}, false
+	}
+
+	written := map[string]bool{}
+	for method := range methods {
+		for table := range ev.StatementWrites[method] {
+			written[table] = true
+		}
+	}
+
+	column := snake(d.Name)
+	var found []Column
+	for table := range written {
+		if c, ok := ev.Schema.Column(table, column); ok {
+			found = append(found, c)
+		}
+	}
+	if len(found) != 1 {
+		return Column{}, false
+	}
+	return found[0], true
+}
+
 // ResolveAll places every declaration it can, returning the whole set:
 // the ones a column was found for carry it, and the rest record that none
 // was.
-func ResolveAll(decls []Declaration, schema Schema, writeSets map[string]map[string]bool) []Resolution {
+//
+// The name rule goes first and the call rule sees only what it did not
+// place. They agree where both apply — a create handler calls the create
+// statement for the resource it is named after — and keeping the order fixed
+// means the weaker evidence never overrides the stronger one on a handler
+// that happens to touch two tables.
+func ResolveAll(decls []Declaration, ev Evidence) []Resolution {
 	out := make([]Resolution, 0, len(decls))
 	for _, d := range decls {
-		column, ok := Resolve(d, schema, ScopeFor(d, writeSets))
-		out = append(out, Resolution{Declaration: d, Column: column, Placed: ok})
+		if column, ok := Resolve(d, ev.Schema, ScopeFor(d, ev.WriteSets)); ok {
+			out = append(out, Resolution{Declaration: d, Column: column, Placed: true, Rule: ByName})
+			continue
+		}
+		if column, ok := ResolveByCalls(d, ev); ok {
+			out = append(out, Resolution{Declaration: d, Column: column, Placed: true, Rule: ByCalls})
+			continue
+		}
+		out = append(out, Resolution{Declaration: d})
 	}
 	return out
 }
@@ -264,14 +429,16 @@ func (p Pair) Disagrees() bool { return p.A.Max != p.B.Max }
 // no resolution reaches.
 //
 // What the schema is used for is deciding they are the same field. Where
-// both sides were placed, they pair only if they were placed on the same
-// column — two surfaces can name a comment and mean an event's and a task's.
-// Where either side reaches no column, the names carry the pairing on their
-// own: two REST operations pair only inside one handler package, because a
-// noun as ordinary as member names a different table in each package that
-// uses it, while a tool pairs with any REST operation on its resource
-// because it belongs to no package and its name spells the resource in
-// full.
+// both sides were placed, the column settles it and nothing else is asked:
+// they pair if they were placed on the same one — two surfaces can name a
+// comment and mean an event's and a task's — and they pair across packages,
+// because two operations demonstrably writing one column are writing one
+// column whatever trees they live in. Where either side reaches no column,
+// the names carry the pairing on their own: two REST operations pair only
+// inside one handler package, because a noun as ordinary as member names a
+// different table in each package that uses it, while a tool pairs with any
+// REST operation on its resource because it belongs to no package and its
+// name spells the resource in full.
 //
 // It is separate from Disagreements because the failure mode of a derived
 // check is that the derivation stops matching — a renamed suffix, a tool
@@ -299,13 +466,14 @@ func Pairs(all []Resolution) []Pair {
 
 // describeSameField reports whether two declarations describe one field.
 func describeSameField(a, b Resolution) bool {
-	if a.Resource == "" || a.Resource != b.Resource {
-		return false
-	}
 	if a.Section != b.Section || a.Name != b.Name {
 		return false
 	}
-	if a.Placed && b.Placed && a.Column.Qualified() != b.Column.Qualified() {
+	if a.Placed && b.Placed {
+		return a.Column.Qualified() == b.Column.Qualified() &&
+			(a.Surface != b.Surface || a.Owner != b.Owner)
+	}
+	if a.Resource == "" || a.Resource != b.Resource {
 		return false
 	}
 	if a.Surface != b.Surface {
