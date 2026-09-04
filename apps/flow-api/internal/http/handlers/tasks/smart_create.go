@@ -113,7 +113,7 @@ func ProposeSmart(deps SmartCreateDeps) func(context.Context, *ProposeSmartInput
 		proposal, err := deps.AI.ProposeSmartCreate(
 			ctx, ws.ID,
 			in.Body.Title, in.Body.Description,
-			deps.Embedder.Provider, deps.Queries,
+			deps.Embedder, deps.Queries,
 			vis,
 		)
 		if err != nil {

@@ -54,6 +54,16 @@ type recordingProvider struct {
 	// well as the first.
 	req  providers.Request
 	reqs []providers.Request
+	// script, when non-empty, answers the Nth call with its Nth entry so
+	// a test can make the first attempt succeed and the retry fail.
+	// Calls past its end fall back to resp / err.
+	script []providerAnswer
+}
+
+// providerAnswer is one scripted reply from recordingProvider.
+type providerAnswer struct {
+	resp *providers.Response
+	err  error
 }
 
 func (p *recordingProvider) Name() string         { return "recording" }
@@ -68,6 +78,9 @@ func (p *recordingProvider) Model() string {
 func (p *recordingProvider) Complete(_ context.Context, req providers.Request) (*providers.Response, error) {
 	p.req = req
 	p.reqs = append(p.reqs, req)
+	if n := len(p.reqs) - 1; n < len(p.script) {
+		return p.script[n].resp, p.script[n].err
+	}
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -273,7 +286,7 @@ func TestExecuteJudgeSendsTheAgentsConfiguredSettings(t *testing.T) {
 		Signals:      &fakeSignalLookup{snap: SignalSnapshot{SignalID: 2, WorkspaceID: 6, Kind: "manual"}},
 		Resolver:     &fakeResolver{provider: prov},
 		Log:          func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
-		OnInvocation: func(_, model, _ string, _ int64) { metricModels = append(metricModels, model) },
+		OnInvocation: func(_, model, _ string, _ int64, _ error) { metricModels = append(metricModels, model) },
 	}
 
 	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {

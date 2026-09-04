@@ -75,7 +75,7 @@ func TestEmbedTask_MeteringSuccess(t *testing.T) {
 	client := New(provider, store).WithMetering(
 		guard,
 		func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
-		func(provider, model, workspaceID string, costCents int64) {
+		func(provider, model, workspaceID string, costCents int64, _ error) {
 			metrics = append(metrics, struct {
 				provider string
 				model    string
@@ -137,6 +137,121 @@ func TestEmbedTask_BudgetBlockSkipsProvider(t *testing.T) {
 	}
 	if store.upserts != 0 {
 		t.Fatalf("upserts = %d, want 0", store.upserts)
+	}
+}
+
+// TestEmbedQuery_RecordsTheInvocation pins the accounting for the query
+// side of similarity search. The vector is thrown away after the search,
+// so the ai_invocations row is the only trace the call left, and without
+// it the workspace is billed for spend nothing can attribute.
+func TestEmbedQuery_RecordsTheInvocation(t *testing.T) {
+	t.Parallel()
+
+	upstream := errors.New("embedding endpoint refused the request")
+
+	cases := []struct {
+		name        string
+		providerErr error
+		wantStatus  string
+	}{
+		{name: "success", wantStatus: "ok"},
+		{name: "failure", providerErr: upstream, wantStatus: "error"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			provider := &fakeProvider{err: tc.providerErr}
+			guard := &fakeGuard{}
+			var logged []InvocationRecord
+			var hookErrs []error
+			client := New(provider, &fakeStore{}).WithMetering(
+				guard,
+				func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+				func(_, _, _ string, _ int64, err error) { hookErrs = append(hookErrs, err) },
+				func(s string) string { return "redacted:" + s },
+			)
+
+			vec, err := client.EmbedQuery(context.Background(), 7, "find me something similar")
+			switch {
+			case tc.providerErr == nil && err != nil:
+				t.Fatalf("EmbedQuery returned error: %v", err)
+			case tc.providerErr != nil && !errors.Is(err, upstream):
+				t.Fatalf("EmbedQuery error = %v, want %v", err, upstream)
+			}
+			if tc.providerErr == nil && len(vec) == 0 {
+				t.Fatal("EmbedQuery returned no vector on the success path")
+			}
+			if guard.calls != 1 {
+				t.Fatalf("guard calls = %d, want 1", guard.calls)
+			}
+			if provider.calls != 1 {
+				t.Fatalf("provider calls = %d, want 1", provider.calls)
+			}
+			if len(hookErrs) != 1 {
+				t.Fatalf("metrics samples = %d, want 1", len(hookErrs))
+			}
+			if tc.providerErr == nil && hookErrs[0] != nil {
+				t.Errorf("a successful call reported err = %v; the metric would label it an error", hookErrs[0])
+			}
+			if tc.providerErr != nil && !errors.Is(hookErrs[0], upstream) {
+				t.Errorf("hook err = %v, want the provider error", hookErrs[0])
+			}
+			if len(logged) != 1 {
+				t.Fatalf("logged records = %d, want 1", len(logged))
+			}
+			rec := logged[0]
+			if rec.WorkspaceID != 7 || rec.Purpose != "embed_query" || rec.Status != tc.wantStatus {
+				t.Fatalf("unexpected invocation record: %+v", rec)
+			}
+			if rec.PromptRedacted != "redacted:find me something similar" {
+				t.Errorf("prompt was not redacted: %q", rec.PromptRedacted)
+			}
+		})
+	}
+}
+
+// TestEmbedQuery_StoresNothing pins that a query embedding leaves no
+// task_embeddings row. It belongs to no task, so a row for it would key
+// off an id it does not have.
+func TestEmbedQuery_StoresNothing(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{}
+	client := New(&fakeProvider{}, store)
+
+	if _, err := client.EmbedQuery(context.Background(), 7, "query text"); err != nil {
+		t.Fatalf("EmbedQuery returned error: %v", err)
+	}
+	if store.upserts != 0 {
+		t.Fatalf("upserts = %d, want 0", store.upserts)
+	}
+}
+
+// TestEmbedQuery_BudgetBlockSkipsProvider is the budget hole itself: a
+// workspace past its daily cap must be refused before the tokens are
+// spent, not after.
+func TestEmbedQuery_BudgetBlockSkipsProvider(t *testing.T) {
+	t.Parallel()
+	blocked := errors.New("budget blocked")
+	provider := &fakeProvider{}
+	guard := &fakeGuard{err: blocked}
+	var logged []InvocationRecord
+	client := New(provider, &fakeStore{}).WithMetering(
+		guard,
+		func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+		nil,
+		nil,
+	)
+
+	_, err := client.EmbedQuery(context.Background(), 7, "query text")
+	if !errors.Is(err, blocked) {
+		t.Fatalf("EmbedQuery error = %v, want %v", err, blocked)
+	}
+	if provider.calls != 0 {
+		t.Fatalf("provider calls = %d, want 0: the guard must refuse before the call is made", provider.calls)
+	}
+	if len(logged) != 0 {
+		t.Fatalf("logged records = %d, want 0: no call was made to record", len(logged))
 	}
 }
 

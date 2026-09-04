@@ -63,8 +63,9 @@ type InvocationRecord struct {
 
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as [ai.InvocationMetricsHook] so the obs package's
-// RecordAIInvocation can be reused without an adapter.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
+// RecordAIInvocation can be reused without an adapter. err is nil on a
+// successful call and carries the provider's error on a failed one.
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
 
 // AgentLookup is the narrow surface the runner needs to read an
 // agent's system prompt + kind by internal id. The production wiring
@@ -184,6 +185,12 @@ var ErrAgentPaused = errors.New("signaljudge: agent is paused")
 // failure.
 var ErrSignalMissing = errors.New("signaljudge: signal not found")
 
+// errRetryNoResponse stands in for the failure of a parse retry that
+// returned neither an error nor a response. It never leaves the runner —
+// it exists so that case is metered and audited as the failure it is
+// rather than as a zero-cost success.
+var errRetryNoResponse = errors.New("signaljudge: retry returned no response")
+
 // ExecuteJudge runs one judge tick for the given (agent, signal)
 // pair. It loads the agent + signal snapshots, enforces the cost
 // guard, resolves the workspace's default LLM provider, builds the
@@ -256,7 +263,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
 		if r.OnInvocation != nil {
-			r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, 0)
+			r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, 0, err)
 		}
 		r.logInvocation(ctx, InvocationRecord{
 			WorkspaceID:    workspaceID,
@@ -271,7 +278,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	}
 
 	if r.OnInvocation != nil {
-		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
+		r.OnInvocation(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros(), nil)
 	}
 	model := resp.Model
 	if model == "" {
@@ -314,7 +321,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		retryResp, retryErr := prov.Complete(ctx, retryReq)
 		if retryErr == nil && retryResp != nil {
 			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.EstimatedCostMicros())
+				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, retryResp.EstimatedCostMicros(), nil)
 			}
 			retryModel := retryResp.Model
 			if retryModel == "" {
@@ -337,6 +344,30 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 			result.CostCents = result.CostMicros / 10_000
 			result.LastThought = logutil.Redact(retryResp.Text)
 			verdictText = retryResp.Text
+		} else {
+			// The retry is a provider call that happened, so it is
+			// metered and audited like any other — a second attempt
+			// that fails must not be invisible to the metric or to
+			// ai_invocations just because its answer is unusable. A
+			// nil error with a nil response is a failure too, and is
+			// reported under an error of its own rather than as a
+			// zero-cost success.
+			failure := retryErr
+			if failure == nil {
+				failure = errRetryNoResponse
+			}
+			if r.OnInvocation != nil {
+				r.OnInvocation(string(prov.Kind()), retryReq.Model, wsIDStr, 0, failure)
+			}
+			r.logInvocation(ctx, InvocationRecord{
+				WorkspaceID:    workspaceID,
+				AgentID:        agentID,
+				Purpose:        "signal_judge",
+				Model:          retryReq.Model,
+				PromptRedacted: logutil.Redact(strings.TrimSpace(retryReq.System + "\n" + retryReq.Prompt)),
+				Status:         "error",
+				ErrorCode:      logutil.Redact(failure.Error()),
+			})
 		}
 		// A retry that also errors is treated like an unparseable
 		// response: the synthesised noop verdict below routes

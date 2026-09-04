@@ -28,6 +28,14 @@ import (
 // Dim is the default embedding dimensionality (see ADR 0003).
 const Dim = 768
 
+// Purposes written to ai_invocations.purpose. Every embedding purpose
+// shares the "embed_" prefix, which is what the invocation queries split
+// embedding spend from completion spend by.
+const (
+	purposeEmbedTask  = "embed_task"
+	purposeEmbedQuery = "embed_query"
+)
+
 // Provider produces a raw embedding for a piece of text. Implementations
 // need not normalize; the Client applies L2 normalization before store.
 type Provider interface {
@@ -49,8 +57,10 @@ type CostGuard interface {
 	Check(ctx context.Context, workspaceID uint32) error
 }
 
-// InvocationMetricsHook is called after each embedding provider call.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
+// InvocationMetricsHook is called after each embedding provider call. err
+// is nil when the call produced a usable vector and carries the failure
+// otherwise.
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
 
 // InvocationLogger persists a redacted embedding invocation record.
 type InvocationLogger func(ctx context.Context, rec InvocationRecord)
@@ -148,56 +158,84 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 	if err == nil && existing.ContentHash == hash {
 		return nil
 	}
-	if c.Guard != nil {
-		if err := c.Guard.Check(ctx, workspaceID); err != nil {
-			return err
-		}
-	}
-
-	raw, err := c.Provider.Embed(ctx, text)
+	raw, err := c.meteredEmbed(ctx, workspaceID, purposeEmbedTask, text)
 	if err != nil {
-		c.recordMetrics(workspaceID, 0)
-		c.logFailure(ctx, workspaceID, text, err)
-		return fmt.Errorf("provider embed: %w", err)
-	}
-	if len(raw) == 0 {
-		err := errors.New("embed: provider returned empty vector")
-		c.recordMetrics(workspaceID, 0)
-		c.logFailure(ctx, workspaceID, text, err)
 		return err
 	}
-	Normalize(raw)
 
-	if err := c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
+	return c.Queries.UpsertTaskEmbedding(ctx, generated.UpsertTaskEmbeddingParams{
 		TaskID:         taskID,
 		WorkspaceID:    workspaceID,
 		Model:          model,
 		Dim:            uint16(len(raw)), //#nosec G115 -- embedding dimensions cap at the upstream model's MaxDim (~3072 today), well below uint16
 		StringToVector: Encode(raw),
 		ContentHash:    hash,
-	}); err != nil {
-		return err
-	}
-	costMicros := estimateCostMicros(model, text)
-	c.recordMetrics(workspaceID, costMicros)
-	c.logSuccess(ctx, workspaceID, text, costMicros)
-	return nil
+	})
 }
 
-func (c *Client) recordMetrics(workspaceID uint32, costMicros int64) {
+// EmbedQuery returns a normalized vector for text without storing it.
+// Callers that search task_embeddings by similarity need only the query
+// side of the comparison: there is no task to key a row on, and the
+// vector is not reusable, so nothing is written.
+//
+// The call still spends the provider's tokens, so workspaceID is
+// required: it scopes the budget the guard enforces and the
+// ai_invocations row the call is accounted for in.
+func (c *Client) EmbedQuery(ctx context.Context, workspaceID uint32, text string) ([]float32, error) {
+	return c.meteredEmbed(ctx, workspaceID, purposeEmbedQuery, text)
+}
+
+// meteredEmbed is the only place the provider is called. Every embedding
+// call is billable, so the budget guard runs before it and both of its
+// outcomes reach the metrics hook and the invocation log; purpose names
+// which caller the spend belongs to. Routing every caller through here is
+// what keeps a new one from spending unaccounted.
+//
+// The returned vector is normalized to unit length, which is what makes
+// Cosine a plain dot product.
+func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, text string) ([]float32, error) {
+	if c.Guard != nil {
+		if err := c.Guard.Check(ctx, workspaceID); err != nil {
+			return nil, err
+		}
+	}
+
+	raw, err := c.Provider.Embed(ctx, text)
+	if err != nil {
+		c.recordMetrics(workspaceID, 0, err)
+		c.logFailure(ctx, workspaceID, purpose, text, err)
+		return nil, fmt.Errorf("provider embed: %w", err)
+	}
+	if len(raw) == 0 {
+		err := errors.New("embed: provider returned empty vector")
+		c.recordMetrics(workspaceID, 0, err)
+		c.logFailure(ctx, workspaceID, purpose, text, err)
+		return nil, err
+	}
+	Normalize(raw)
+
+	costMicros := estimateCostMicros(c.Model(), text)
+	c.recordMetrics(workspaceID, costMicros, nil)
+	c.logSuccess(ctx, workspaceID, purpose, text, costMicros)
+	return raw, nil
+}
+
+// recordMetrics calls the OnInvocation hook if set. err is nil on a
+// successful embedding call and the failure on an unsuccessful one.
+func (c *Client) recordMetrics(workspaceID uint32, costMicros int64, err error) {
 	if c.OnInvocation == nil {
 		return
 	}
-	c.OnInvocation(providerName(c.Provider), c.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros)
+	c.OnInvocation(providerName(c.Provider), c.Model(), strconv.FormatUint(uint64(workspaceID), 10), costMicros, err)
 }
 
-func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, text string, costMicros int64) {
+func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, purpose, text string, costMicros int64) {
 	if c.LogInvoke == nil {
 		return
 	}
 	c.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
-		Purpose:          "embed_task",
+		Purpose:          purpose,
 		Model:            c.Model(),
 		PromptRedacted:   c.redact(text),
 		ResponseRedacted: "embedding vector omitted",
@@ -208,13 +246,13 @@ func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, text string
 	})
 }
 
-func (c *Client) logFailure(ctx context.Context, workspaceID uint32, text string, err error) {
+func (c *Client) logFailure(ctx context.Context, workspaceID uint32, purpose, text string, err error) {
 	if c.LogInvoke == nil {
 		return
 	}
 	c.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:    workspaceID,
-		Purpose:        "embed_task",
+		Purpose:        purpose,
 		Model:          c.Model(),
 		PromptRedacted: c.redact(text),
 		Status:         "error",

@@ -2811,12 +2811,12 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
 
-	// Call the smart create orchestrator. The embed provider satisfies
+	// Call the smart create orchestrator. The embed client satisfies
 	// ai.EmbedClient and *generated.Queries satisfies SmartCreateReader.
 	proposal, err := deps.AI.ProposeSmartCreate(
 		ctx, s.workspaceID,
 		in.Title, in.Description,
-		deps.Embedder.Provider, deps.Queries,
+		deps.Embedder, deps.Queries,
 		vis,
 	)
 	if err != nil {

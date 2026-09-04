@@ -53,8 +53,9 @@ type InvocationRecord struct {
 
 // InvocationMetricsHook is called after each LLM provider call. Same
 // shape as ai.InvocationMetricsHook so obs.RecordAIInvocation is reused
-// without an adapter.
-type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64)
+// without an adapter. err is nil on a successful call and carries the
+// provider's error on a failed one.
+type InvocationMetricsHook func(provider, model, workspaceID string, costMicros int64, err error)
 
 // compileConstraintSystem is the system prompt sent to the LLM when
 // compiling natural-language prose into a constraint DSL expression.
@@ -140,7 +141,7 @@ func (w *WorkspaceProvider) WithMetering(guard CostGuard, log InvocationLogger, 
 // successful provider call.
 func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, wsIDStr, prompt string, resp *providers.Response, kind string) {
 	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, wsIDStr, resp.EstimatedCostMicros())
+		w.OnInvocation(kind, model, wsIDStr, resp.EstimatedCostMicros(), nil)
 	}
 	if w.LogInvoke != nil {
 		loggedModel := resp.Model
@@ -166,7 +167,7 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 // failed provider call.
 func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, wsIDStr, prompt string, callErr error, kind string) {
 	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, wsIDStr, 0)
+		w.OnInvocation(kind, model, wsIDStr, 0, callErr)
 	}
 	if w.LogInvoke != nil {
 		w.LogInvoke(ctx, InvocationRecord{

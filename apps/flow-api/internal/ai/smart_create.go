@@ -22,9 +22,16 @@ import (
 // EmbedClient is the narrow contract ProposeSmartCreate uses to produce
 // an embedding vector for the new task's text and to obtain the model
 // name for querying existing embeddings.
+//
+// It is satisfied by *embed.Client rather than by an embedding provider:
+// the workspace's daily budget is enforced, and the invocation recorded,
+// around the provider call, so a caller holding the provider itself would
+// spend the workspace's tokens without any of it being counted. That is
+// why the workspace id is part of the contract.
 type EmbedClient interface {
-	// Embed returns a normalized vector for the given text.
-	Embed(ctx context.Context, text string) ([]float32, error)
+	// EmbedQuery returns a normalized vector for the given text, metered
+	// against the workspace's budget.
+	EmbedQuery(ctx context.Context, workspaceID uint32, text string) ([]float32, error)
 	// Model returns the model key stored in task_embeddings.model.
 	Model() string
 }
@@ -180,11 +187,10 @@ func (o *Orchestrator) ProposeSmartCreate(
 
 	// ---- embed the new task text ----
 	taskText := composeText(title, description)
-	queryVec, err := embedClient.Embed(ctx, taskText)
+	queryVec, err := embedClient.EmbedQuery(ctx, workspaceID, taskText)
 	if err != nil {
 		return nil, fmt.Errorf("ai: smart create embed failed: %w", err)
 	}
-	embed.Normalize(queryVec)
 
 	// ---- retrieve candidate embeddings ----
 	candidates, err := scReader.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
@@ -254,11 +260,11 @@ func (o *Orchestrator) ProposeSmartCreate(
 	wsIDStr := strconv.FormatUint(uint64(workspaceID), 10)
 	resp, err := prov.Complete(ctx, req)
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0)
+		o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, 0, err)
 		o.logFailure(ctx, workspaceID, "propose_smart_create", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros())
+	o.recordMetrics(string(prov.Kind()), req.Model, wsIDStr, resp.EstimatedCostMicros(), nil)
 	o.logSuccess(ctx, workspaceID, "propose_smart_create", req, resp)
 
 	// ---- parse response ----

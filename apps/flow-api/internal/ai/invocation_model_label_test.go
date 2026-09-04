@@ -36,6 +36,7 @@ type sample struct {
 	model    string
 	ws       string
 	cost     int64
+	err      error
 }
 
 // TestInvocationMetricsCarryAModelLabel covers the metrics half of the
@@ -63,8 +64,8 @@ func TestInvocationMetricsCarryAModelLabel(t *testing.T) {
 			Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
 				return prov, nil
 			}),
-			OnInvocation: func(provider, model, ws string, cost int64) {
-				got = append(got, sample{provider, model, ws, cost})
+			OnInvocation: func(provider, model, ws string, cost int64, err error) {
+				got = append(got, sample{provider, model, ws, cost, err})
 			},
 		}
 		if _, err := o.ProposeTasksFrom(context.Background(), 42, "ship the thing"); err != nil {
@@ -84,8 +85,8 @@ func TestInvocationMetricsCarryAModelLabel(t *testing.T) {
 			Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
 				return prov, nil
 			}),
-			OnInvocation: func(provider, model, ws string, cost int64) {
-				got = append(got, sample{provider, model, ws, cost})
+			OnInvocation: func(provider, model, ws string, cost int64, err error) {
+				got = append(got, sample{provider, model, ws, cost, err})
 			},
 		}
 		if _, err := o.ProposeTasksFrom(context.Background(), 42, "ship the thing"); err == nil {

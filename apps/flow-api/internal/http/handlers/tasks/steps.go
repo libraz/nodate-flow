@@ -167,11 +167,14 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			}
 		}
 
-		// Resolve optional embed client for similar-task context.
-		var embedProvider ai.EmbedClient
+		// Resolve optional embed client for similar-task context. The
+		// interface stays unset when no embedder is configured: a nil
+		// *embed.Client held in it would be non-nil as an interface and
+		// the orchestrator's nil check would let it through.
+		var embedClient ai.EmbedClient
 		var reader ai.SmartCreateReader
 		if deps.Embedder != nil {
-			embedProvider = deps.Embedder.Provider
+			embedClient = deps.Embedder
 			reader = deps.Queries
 		}
 
@@ -184,7 +187,7 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			ctx, ws.ID,
 			row.Title, desc,
 			granularity, children,
-			embedProvider, reader,
+			embedClient, reader,
 			vis,
 		)
 		if err != nil {
