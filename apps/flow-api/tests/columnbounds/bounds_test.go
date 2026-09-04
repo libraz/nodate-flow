@@ -215,8 +215,12 @@ type CreateCommentInput struct {
 type PresignPartInput struct {
 	ID   string ` + "`" + `path:"id"` + "`" + `
 	Body struct {
-		Label string ` + "`" + `json:"label" maxLength:"300"` + "`" + `
-		Title string ` + "`" + `json:"title" maxLength:"70"` + "`" + `
+		Label  string ` + "`" + `json:"label" maxLength:"300"` + "`" + `
+		Title  string ` + "`" + `json:"title" maxLength:"70"` + "`" + `
+		Nested struct {
+			Label   string ` + "`" + `json:"label" maxLength:"9999"` + "`" + `
+			Caption string ` + "`" + `json:"caption" maxLength:"9999"` + "`" + `
+		} ` + "`" + `json:"nested"` + "`" + `
 	}
 }
 
@@ -384,6 +388,7 @@ func registerTools(h *Handler) {
 		"REST CreateWidgetInput body.title -> widgets.title",
 		"MCP create_widget body.title -> widgets.title",
 		"REST PresignPartInput body.label -> widget_notes.label",
+		"REST PresignPartInput body.nested.label -> widget_notes.label",
 	} {
 		if !overflowing[want] {
 			t.Errorf("did not flag %q: a bound wider than its column is the state this exists "+
@@ -406,6 +411,8 @@ func registerTools(h *Handler) {
 		{"a bound under a text column's byte capacity fits it", "CreateWidgetInput", "body"},
 		{"a member of a nested object is not a column of the resource the input is named after",
 			"CreateWidgetInput", "nested.title"},
+		{"a member no table the handler writes carries lands nowhere the statements name",
+			"PresignPartInput", "nested.caption"},
 		{"a query parameter selects rows rather than supplying a value stored in one",
 			"PatchWidgetInput", "q"},
 		{"a read operation's term is not stored under the name it arrives as",
@@ -426,12 +433,22 @@ func registerTools(h *Handler) {
 			}
 		}
 	}
-	// The nested title has no column of its own to be placed on; being
-	// unresolved is what keeps it out, so say that rather than only that it
-	// was not flagged.
+	// The nested members have no column of their own to be placed on; being
+	// unresolved is what keeps them out, so say that rather than only that
+	// they were not flagged. Nothing states which table the widget's nested
+	// title lives in — its input reaches no statement, and the resource its
+	// name spells says nothing about a member of another object — while the
+	// nested caption reaches statements that write two tables, neither of
+	// which carries a column of that name.
 	if !unplacedHas(unplaced, "CreateWidgetInput", "nested.title") {
-		t.Error("a member of a nested object resolved to a column; the resource the input " +
-			"names says nothing about which table that member lives in")
+		t.Error("a member of a nested object resolved to a column with no evidence of where " +
+			"it lands; the resource the input names says nothing about which table that " +
+			"member lives in, and its handler calls no statement that would")
+	}
+	if !unplacedHas(unplaced, "PresignPartInput", "nested.caption") {
+		t.Error("a member none of the tables its handler writes carries resolved to a column; " +
+			"the statements are the whole evidence for a nested field, and they name no " +
+			"column it could land in")
 	}
 	if !unplacedHas(unplaced, "SearchWidgetsInput", "q") {
 		t.Error("a read operation's term resolved to a column")
@@ -445,13 +462,18 @@ func registerTools(h *Handler) {
 		t.Error("a field of an operation that only reads resolved to a column; the statements " +
 			"it calls write nothing, so there is no column it lands in")
 	}
-	// The call rule is what places this one, and it is the shape the name
-	// rule cannot see: nothing in PresignPartInput spells a resource.
+	// The call rule is what places these, and they are the shapes the name
+	// rule cannot see: nothing in PresignPartInput spells a resource, and a
+	// member of a nested object is outside what a resource name can answer
+	// for even where one is spelled.
 	for _, r := range placed {
-		if r.Owner == "PresignPartInput" && r.Name == "label" && r.Rule != ByCalls {
-			t.Errorf("PresignPartInput.label was placed by the %s rule; its name states no "+
+		if r.Owner != "PresignPartInput" || r.Rule == ByCalls {
+			continue
+		}
+		if r.Name == "label" || r.Name == "nested.label" {
+			t.Errorf("PresignPartInput.%s was placed by the %s rule; its name states no "+
 				"resource, so a placement from it means the name rule is matching something "+
-				"it cannot know", r.Rule)
+				"it cannot know", r.Name, r.Rule)
 		}
 	}
 

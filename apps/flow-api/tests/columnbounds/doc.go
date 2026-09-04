@@ -49,6 +49,11 @@
 //	             what that leaves over, the handler taking the input calls a
 //	             statement, and one table that statement writes carries the
 //	             column. Either way one candidate or none — two is no answer.
+//	             A field nested under an object is reached by the second rule
+//	             only, under the name of its last segment: the resource an
+//	             input is named after says nothing about a member of some
+//	             other object, while the statements a handler calls answer
+//	             for that member as readily as for the body's own fields.
 //	comparison   the character width of VARCHAR and CHAR, and the byte
 //	             capacity of the text types, which bounds a character count
 //	             from above. An ENUM states a value set rather than a

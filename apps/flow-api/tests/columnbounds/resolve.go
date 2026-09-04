@@ -268,10 +268,12 @@ func (r Resolution) Overflows() bool { return r.Placed && r.Max > r.Column.Capac
 //	            whatever it is called.
 //
 // The column is the wire name in the schema's spelling. A field nested
-// under an object is not resolved: it describes a member of something else,
-// and the resource the input is named after says nothing about which table
-// that member lives in. A query parameter is not resolved either: it
-// selects rows rather than supplying a value to store in one.
+// under an object is not placed by this rule: it describes a member of
+// something else, and the resource the input is named after says nothing
+// about which table that member lives in — the call rule answers those,
+// from the statements rather than from the name. A query parameter is not
+// resolved at all: it selects rows rather than supplying a value to store
+// in one.
 //
 // More than one candidate table carrying the column is no answer at all,
 // and is reported as unresolved rather than picked between.
@@ -332,11 +334,23 @@ func Resolve(d Declaration, schema Schema, scope map[string]bool) (Column, bool)
 // calling the statement that does the storing, whatever the operation is
 // called, and the statement says which table it writes in its own text.
 //
+// A field nested under an object is resolved here, and only here. The name
+// rule cannot place a member of another object, because the resource the
+// input is named after says nothing about which table that member lives in;
+// this rule never asks the name. It asks which statements the handler calls
+// and which tables those write, and that question is as well posed for the
+// title of a step as for a field of the body itself, so the column is the
+// last segment of the field's path in the schema's spelling.
+//
 // The same discipline as the name rule settles ambiguity: a handler that
 // writes two tables both carrying the column has told us the field could
-// land in either, which is not an answer, so it stays unresolved.
+// land in either, which is not an answer, so it stays unresolved. That is
+// also what keeps a nested placement honest, and it is not a proof: a member
+// whose name happens to match a column of a table the handler writes for
+// some other reason is placed all the same, which is why every placement
+// from this rule is printed to be checked by eye.
 func ResolveByCalls(d Declaration, ev Evidence) (Column, bool) {
-	if d.Surface != REST || d.Section != "body" || strings.Contains(d.Name, ".") {
+	if d.Surface != REST || d.Section != "body" {
 		return Column{}, false
 	}
 	methods := ev.Calls.Methods(d.Scope, d.Owner)
@@ -351,7 +365,7 @@ func ResolveByCalls(d Declaration, ev Evidence) (Column, bool) {
 		}
 	}
 
-	column := snake(d.Name)
+	column := snake(memberName(d.Name))
 	var found []Column
 	for table := range written {
 		if c, ok := ev.Schema.Column(table, column); ok {
@@ -362,6 +376,16 @@ func ResolveByCalls(d Declaration, ev Evidence) (Column, bool) {
 		return Column{}, false
 	}
 	return found[0], true
+}
+
+// memberName returns the field a wire path names, which is its last segment:
+// the objects it is nested under say where the value sits in the request,
+// and the column it lands in is named after the member itself.
+func memberName(path string) string {
+	if at := strings.LastIndex(path, "."); at >= 0 {
+		return path[at+1:]
+	}
+	return path
 }
 
 // ResolveAll places every declaration it can, returning the whole set:
