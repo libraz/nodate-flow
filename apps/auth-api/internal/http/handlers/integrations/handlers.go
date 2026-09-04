@@ -358,32 +358,18 @@ func revokeAtProvider(ctx context.Context, deps Deps, uid uint32, pubID types.Pu
 		slog.WarnContext(ctx, "integrations: revoke skipped: cipher unavailable", "provider", providerName, "connection", pubID.String())
 		return
 	}
-	tokRow, err := deps.Queries.FindUserIntegrationByUserProvider(ctx, generated.FindUserIntegrationByUserProviderParams{
-		UserID:   uid,
-		Provider: provider,
-	})
-	if err != nil {
-		slog.WarnContext(ctx, "integrations: revoke token lookup failed", "provider", providerName, "connection", pubID.String(), "error", err)
-		return
-	}
-	var tokens integrationspkg.TokenSet
-	if len(tokRow.AccessTokenCiphertext) > 0 {
-		plain, err := deps.Cipher.Decrypt(tokRow.AccessTokenCiphertext)
-		if err != nil {
-			slog.WarnContext(ctx, "integrations: revoke access-token decrypt failed", "provider", providerName, "connection", pubID.String(), "error", err)
-			return
-		}
-		tokens.AccessToken = string(plain)
-	}
-	if tokRow.RefreshTokenCiphertext.Valid && len(tokRow.RefreshTokenCiphertext.String) > 0 {
-		plain, err := deps.Cipher.Decrypt([]byte(tokRow.RefreshTokenCiphertext.String))
-		if err != nil {
-			slog.WarnContext(ctx, "integrations: revoke refresh-token decrypt failed", "provider", providerName, "connection", pubID.String(), "error", err)
-			return
-		}
-		tokens.RefreshToken = string(plain)
-	}
-	if err := p.Revoke(ctx, tokens); err != nil {
+	// The callback bounds the plaintext's lifetime: WithStoredTokens
+	// wipes both tokens as it returns, which holding them in a struct
+	// here could not do.
+	err = integrationspkg.WithStoredTokens(ctx, deps.Queries, deps.Cipher, uid, providerName,
+		func(ctx context.Context, tokens integrationspkg.Tokens) error {
+			return p.Revoke(ctx, tokens)
+		})
+	switch {
+	case err == nil:
+	case errors.Is(err, integrationspkg.ErrNotConnected):
+		// Nothing stored for this provider, so nothing to revoke.
+	default:
 		slog.WarnContext(ctx, "integrations: provider revoke failed", "provider", providerName, "connection", pubID.String(), "error", err)
 	}
 }

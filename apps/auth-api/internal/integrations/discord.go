@@ -185,15 +185,23 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code, redirectURI string
 // Refresh implements [Provider]. Discord issues refresh tokens and
 // accepts grant_type=refresh_token at the same token endpoint. The
 // response shape mirrors Exchange so the parsing path is shared.
-func (p *DiscordProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
-	if refreshToken == "" {
+//
+// Discord usually rotates the refresh token. A response that omits one
+// is reported as an empty RefreshToken, which callers read as "not
+// rotated, keep the stored one" — echoing the borrowed plaintext back
+// would only copy a secret no caller reads into a string that cannot
+// be wiped.
+func (p *DiscordProvider) Refresh(ctx context.Context, refreshToken []byte) (*TokenSet, error) {
+	if len(refreshToken) == 0 {
 		return nil, ErrRefreshNotSupported
 	}
 	form := url.Values{}
 	form.Set("client_id", p.clientID)
 	form.Set("client_secret", p.clientSecret)
 	form.Set("grant_type", "refresh_token")
-	form.Set("refresh_token", refreshToken)
+	// net/url encodes strings, so the borrowed plaintext is copied into
+	// an unwipeable one here — as late as the request body allows.
+	form.Set("refresh_token", string(refreshToken))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, discordTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -228,20 +236,13 @@ func (p *DiscordProvider) Refresh(ctx context.Context, refreshToken string) (*To
 	if tok.AccessToken == "" {
 		return nil, wrapExchange(fmt.Errorf("discord: %s", tok.Error))
 	}
-	rt := tok.RefreshToken
-	if rt == "" {
-		// Discord usually rotates the refresh token; preserve the
-		// existing one only if the response omits it so the stored
-		// row never loses its refresh capability.
-		rt = refreshToken
-	}
 	var expiresAt time.Time
 	if tok.ExpiresIn > 0 {
 		expiresAt = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second)
 	}
 	return &TokenSet{
 		AccessToken:  tok.AccessToken,
-		RefreshToken: rt,
+		RefreshToken: tok.RefreshToken,
 		ExpiresAt:    expiresAt,
 		Scopes:       strings.Fields(tok.Scope),
 	}, nil
@@ -251,16 +252,18 @@ func (p *DiscordProvider) Refresh(ctx context.Context, refreshToken string) (*To
 // the token + client credentials as a form post and answers 200 on
 // success. Best-effort: a non-2xx response is logged and swallowed
 // so the local row deletion always proceeds.
-func (p *DiscordProvider) Revoke(ctx context.Context, tokens TokenSet) error {
+func (p *DiscordProvider) Revoke(ctx context.Context, tokens Tokens) error {
 	token := tokens.RefreshToken
-	if token == "" {
+	if len(token) == 0 {
 		token = tokens.AccessToken
 	}
-	if token == "" {
+	if len(token) == 0 {
 		return nil
 	}
 	form := url.Values{}
-	form.Set("token", token)
+	// See Refresh: the form body is built from strings, so this copy of
+	// the borrowed plaintext cannot be wiped.
+	form.Set("token", string(token))
 	form.Set("client_id", p.clientID)
 	form.Set("client_secret", p.clientSecret)
 

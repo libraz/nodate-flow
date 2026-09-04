@@ -118,22 +118,25 @@ func (p *SlackProvider) Exchange(ctx context.Context, code, redirectURI string) 
 // Refresh implements [Provider]. Slack user tokens (xoxp-) do not
 // expire by default; token rotation is opt-in per-app and we do
 // not enable it, so there is nothing to refresh.
-func (p *SlackProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
+func (p *SlackProvider) Refresh(_ context.Context, _ []byte) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
 
 // Revoke implements [Provider]. Calls auth.revoke with the user
 // token as bearer. Slack responds 200 even on failure and signals
 // success through the JSON body.
-func (p *SlackProvider) Revoke(ctx context.Context, tokens TokenSet) error {
-	if tokens.AccessToken == "" {
+func (p *SlackProvider) Revoke(ctx context.Context, tokens Tokens) error {
+	if len(tokens.AccessToken) == 0 {
 		return nil
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://slack.com/api/auth.revoke", nil)
 	if err != nil {
 		return fmt.Errorf("integrations/slack: revoke: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
+	// http.Header holds strings, so the borrowed plaintext is copied
+	// into one here and that copy cannot be wiped. It is made at the
+	// last step before the request for that reason.
+	req.Header.Set("Authorization", "Bearer "+string(tokens.AccessToken))
 	resp, err := p.hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("integrations/slack: revoke: %w", err)

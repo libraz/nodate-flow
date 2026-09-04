@@ -20,6 +20,12 @@ import (
 
 // TokenSet is the normalised result of a token exchange or refresh.
 // Providers that do not return an expiry leave ExpiresAt zero.
+//
+// Its fields are strings because they are parsed straight out of the
+// provider's JSON response, and a Go string cannot be wiped. It is
+// therefore the response side of the boundary only: stored plaintext
+// travelling the other way — into Refresh and Revoke — is carried as
+// [Tokens] so it stays wipeable.
 type TokenSet struct {
 	AccessToken  string
 	RefreshToken string
@@ -61,11 +67,17 @@ type Provider interface {
 	// token. Providers that do not issue refresh tokens (GitHub OAuth
 	// Apps) or whose user tokens are long-lived (Slack) return
 	// ErrRefreshNotSupported and the refresher skips them.
-	Refresh(ctx context.Context, refreshToken string) (*TokenSet, error)
+	//
+	// refreshToken is a borrowed plaintext: the caller wipes it once
+	// Refresh returns, so an implementation must not retain the slice
+	// or hand it to anything that outlives the call.
+	Refresh(ctx context.Context, refreshToken []byte) (*TokenSet, error)
 	// Revoke asks the provider to invalidate the given tokens. It is
 	// best-effort: "already gone" responses are treated as success.
 	// Called on user-initiated disconnect.
-	Revoke(ctx context.Context, tokens TokenSet) error
+	//
+	// tokens carries borrowed plaintext under the same rule as Refresh.
+	Revoke(ctx context.Context, tokens Tokens) error
 }
 
 // ErrNotConfigured is returned by a Provider constructor when the

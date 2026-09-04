@@ -53,16 +53,45 @@ type Provider struct {
 }
 
 // CreateProviderInput is the body for POST /workspaces/{wsId}/ai/providers.
+//
+// The API key and the model identifier are constrained to printable ASCII
+// (U+0021..U+007E, no spaces or control characters), which is what makes
+// their storage correct by construction rather than by luck. A key's
+// derived prefix and suffix land in ai_providers.api_key_prefix /
+// api_key_suffix, and a model identifier lands in
+// ai_providers.default_model and ai_models.name; all four columns are
+// latin1. Without the constraint a value carrying CJK or an emoji passes
+// validation and is then rejected by the insert, so the caller sees an
+// unexplained server error instead of a refusal naming the field.
+//
+// Every supported provider issues printable-ASCII credentials (base64,
+// base64url, hex, prefixed tokens) and printable-ASCII model identifiers,
+// so nothing legitimate is turned away.
 type CreateProviderInput struct {
 	WsID string `path:"wsId"`
 	Body struct {
-		Kind         string `json:"kind" enum:"anthropic,openai,google,ollama,openai_compat"`
-		Name         string `json:"name" minLength:"1" maxLength:"100"`
-		BaseURL      string `json:"baseUrl,omitempty" maxLength:"255"`
-		DefaultModel string `json:"defaultModel,omitempty" maxLength:"100"`
+		Kind    string `json:"kind" enum:"anthropic,openai,google,ollama,openai_compat"`
+		Name    string `json:"name" minLength:"1" maxLength:"100"`
+		BaseURL string `json:"baseUrl,omitempty" maxLength:"255"`
+		// DefaultModel is a provider model identifier. The empty
+		// alternative in the pattern keeps an explicit "" equivalent to
+		// omitting the field.
+		DefaultModel string `json:"defaultModel,omitempty" maxLength:"100" pattern:"^$|^[\\x21-\\x7E]+$"`
 		// APIKey is the plaintext provider API key. It is write-only and
 		// is dropped from memory as soon as it is sealed by the cipher.
-		APIKey string `json:"apiKey" minLength:"8" maxLength:"512" doc:"Plaintext provider API key (write-only)"`
+		//
+		// The writeOnly tag is the declaration that carries that: it says
+		// the member is accepted in a request and never returned in a
+		// response, and internal/http/errormodel reads it off the schema
+		// so a refused key is not echoed back in the validation error
+		// either.
+		//
+		// The 484-character cap is what fits api_key_ciphertext
+		// (VARBINARY(512)): Encrypt prepends a 12-byte nonce and appends a
+		// 16-byte GCM tag, so the stored blob is the plaintext plus 28
+		// bytes. Under the pattern one character is one byte, so the cap
+		// is exact.
+		APIKey string `json:"apiKey" writeOnly:"true" minLength:"8" maxLength:"484" pattern:"^[\\x21-\\x7E]+$" doc:"Plaintext provider API key (write-only). Printable ASCII, no spaces."`
 	}
 }
 
@@ -93,7 +122,10 @@ type PatchProviderInput struct {
 	Body       struct {
 		// APIKey is the new plaintext provider API key. The old key is
 		// overwritten in place; the previous ciphertext is unrecoverable.
-		APIKey string `json:"apiKey" minLength:"8" maxLength:"512" doc:"New plaintext provider API key (write-only)"`
+		// Bounded and marked write-only exactly as on create — see
+		// [CreateProviderInput] for why the value has to be printable
+		// ASCII, at most 484 characters, and never reflected.
+		APIKey string `json:"apiKey" writeOnly:"true" minLength:"8" maxLength:"484" pattern:"^[\\x21-\\x7E]+$" doc:"New plaintext provider API key (write-only). Printable ASCII, no spaces."`
 	}
 }
 

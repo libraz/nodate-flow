@@ -47,8 +47,8 @@ func TestRefreshOnce_RefreshesExpiringToken(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
-				assert.Equal(t, "stored-refresh", rt)
+			refreshFn: func(_ context.Context, rt []byte) (*TokenSet, error) {
+				assert.Equal(t, "stored-refresh", string(rt))
 				return &TokenSet{
 					AccessToken: "refreshed-access",
 					ExpiresAt:   newExpiry,
@@ -81,13 +81,96 @@ func TestRefreshOnce_RefreshesExpiringToken(t *testing.T) {
 		"must persist the new access token encrypted")
 }
 
+// TestRefreshOnce_WipesThePlaintextHandedToRefresh is why Provider.Refresh
+// takes a []byte: the slice it receives is the decrypted refresh token, and
+// the refresher wipes it as refreshRow returns. A string parameter could
+// not hold this — nothing can overwrite an immutable copy.
+func TestRefreshOnce_WipesThePlaintextHandedToRefresh(t *testing.T) {
+	t.Parallel()
+	c := newRefresherCipher(t)
+	refreshCT, _ := c.Encrypt([]byte("stored-refresh"))
+
+	// Held deliberately, which is what the doc tells providers not to do.
+	// It is the only way to look at the buffer after the wipe.
+	var held []byte
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(_ context.Context, rt []byte) (*TokenSet, error) {
+				require.Equal(t, "stored-refresh", string(rt),
+					"the provider must see the plaintext while it runs")
+				held = rt
+				return &TokenSet{
+					AccessToken: "refreshed-access",
+					ExpiresAt:   time.Now().Add(time.Hour),
+				}, nil
+			},
+		}, nil
+	})
+	q := &fakeRefresherQuerier{
+		rows: []generated.ListConnectionsExpiringBeforeRow{{
+			ID:                     42,
+			UserID:                 1,
+			Provider:               "google_calendar",
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(5 * time.Minute), Valid: true},
+		}},
+	}
+	r := &Refresher{Queries: q, Cipher: c, Registry: reg, LeadTime: 15 * time.Minute}
+	require.NoError(t, r.RefreshOnce(context.Background()))
+
+	require.NotEmpty(t, held, "the provider must have been handed a token to hold")
+	assert.Equal(t, make([]byte, len(held)), held,
+		"the refresh token plaintext is still readable after the refresh returned")
+}
+
+// TestRefreshOnce_WipesThePlaintextWhenRefreshFails holds the same
+// property on the error path, which is the one where a plaintext is most
+// likely to be forgotten.
+func TestRefreshOnce_WipesThePlaintextWhenRefreshFails(t *testing.T) {
+	t.Parallel()
+	c := newRefresherCipher(t)
+	refreshCT, _ := c.Encrypt([]byte("stored-refresh"))
+
+	var held []byte
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(_ context.Context, rt []byte) (*TokenSet, error) {
+				held = rt
+				return nil, errors.New("provider down")
+			},
+		}, nil
+	})
+	q := &fakeRefresherQuerier{
+		rows: []generated.ListConnectionsExpiringBeforeRow{{
+			ID:                     42,
+			UserID:                 1,
+			Provider:               "google_calendar",
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(5 * time.Minute), Valid: true},
+		}},
+		updateFn: func(generated.UpdateConnectionTokensParams) error {
+			t.Fatal("a failed refresh must not write tokens back")
+			return nil
+		},
+	}
+	r := &Refresher{Queries: q, Cipher: c, Registry: reg, LeadTime: 15 * time.Minute}
+	require.NoError(t, r.RefreshOnce(context.Background()),
+		"one failing connection must not fail the pass")
+
+	require.NotEmpty(t, held)
+	assert.Equal(t, make([]byte, len(held)), held,
+		"the plaintext survived a provider refresh that returned an error")
+}
+
 func TestRefreshOnce_SkipsRowWithoutRefreshToken(t *testing.T) {
 	t.Parallel()
 	c := newRefresherCipher(t)
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				t.Fatal("must not call Refresh for row without refresh token")
 				return nil, nil
 			},
@@ -113,7 +196,7 @@ func TestRefreshOnce_SkipsProviderReturningErrRefreshNotSupported(t *testing.T) 
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return nil, ErrRefreshNotSupported
 			},
 		}, nil
@@ -146,9 +229,9 @@ func TestRefreshOnce_OneRowFailure_DoesNotBlockOthers(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, rt []byte) (*TokenSet, error) {
 				return &TokenSet{
-					AccessToken: "new-" + rt,
+					AccessToken: "new-" + string(rt),
 					ExpiresAt:   time.Now().Add(time.Hour),
 				}, nil
 			},
@@ -213,7 +296,7 @@ func TestRefreshOnce_PreservesRefreshTokenWhenNotRotated(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken: "new-access",
 					// RefreshToken empty or same as input → no rotation.
@@ -251,7 +334,7 @@ func TestRefreshOnce_RotatesRefreshTokenWhenProviderReturnsNew(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken:  "new-access",
 					RefreshToken: "rotated-rt",
@@ -333,7 +416,7 @@ func TestRefreshOnce_EmptyRefreshResult_SkipsUpdate(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return &TokenSet{AccessToken: ""}, nil // empty result
 			},
 		}, nil

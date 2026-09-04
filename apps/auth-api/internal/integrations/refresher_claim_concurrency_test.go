@@ -56,13 +56,13 @@ type rotatingProvider struct {
 
 var errGrantRevoked = errors.New("integrations: refresh token reuse detected, grant revoked")
 
-func (p *rotatingProvider) Refresh(_ context.Context, refreshToken string) (*TokenSet, error) {
+func (p *rotatingProvider) Refresh(_ context.Context, refreshToken []byte) (*TokenSet, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.revoked {
 		return nil, errGrantRevoked
 	}
-	if refreshToken != p.current {
+	if string(refreshToken) != p.current {
 		// A token this provider already rotated away. Real providers
 		// respond by killing the whole grant.
 		p.revoked = true
@@ -228,7 +228,7 @@ func TestRefresher_ConcurrentReplicas_DoNotRevokeTheGrant(t *testing.T) {
 	require.True(t, stored.RefreshTokenCiphertext.Valid, "the connection lost its refresh token")
 	plain, err := cipher.Decrypt([]byte(stored.RefreshTokenCiphertext.String))
 	require.NoError(t, err)
-	_, err = provider.Refresh(ctx, string(plain))
+	_, err = provider.Refresh(ctx, plain)
 	require.NoError(t, err, "the stored refresh token is no longer the one the provider will accept")
 }
 

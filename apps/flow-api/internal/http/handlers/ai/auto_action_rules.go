@@ -72,8 +72,12 @@ type PatchAutoActionRulesInput struct {
 // levels. A clear-to-NULL flow (e.g. ClearAutonomyLevel companion
 // bool) is a follow-up if needed.
 type PatchAutoActionRuleItem struct {
-	Kind          string   `json:"kind" enum:"escalate_overdue,assign_owner,nudge_assignee,close_stale_review"`
-	SignalKind    *string  `json:"signalKind,omitempty"`
+	Kind string `json:"kind" enum:"escalate_overdue,assign_owner,nudge_assignee,close_stale_review"`
+	// SignalKind is bounded to the width of auto_action_rules.signal_kind.
+	// The value is written through unchanged, so an unbounded field turns a
+	// too-long scope into a failed insert reported as a server error rather
+	// than a validation error naming the field.
+	SignalKind    *string  `json:"signalKind,omitempty" maxLength:"64"`
 	Enabled       *bool    `json:"enabled,omitempty"`
 	Confidence    *float64 `json:"confidence,omitempty" minimum:"0" maximum:"1"`
 	IdleHours     *int     `json:"idleHours,omitempty" minimum:"0" maximum:"8760"`

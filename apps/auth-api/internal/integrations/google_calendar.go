@@ -148,16 +148,21 @@ func (p *GoogleCalendarProvider) Exchange(ctx context.Context, code, redirectURI
 
 // Refresh implements [Provider]. Google's refresh endpoint reuses
 // the same token URL; the refresh_token is NOT rotated in the
-// response unless it was revoked, so we preserve the stored value
-// when the response omits it.
-func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
-	if refreshToken == "" {
+// response unless it was revoked. An omitted refresh_token is
+// reported as an empty RefreshToken, which callers read as "not
+// rotated, keep the stored one" — echoing the borrowed plaintext back
+// would only copy a secret no caller reads into a string that cannot
+// be wiped.
+func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken []byte) (*TokenSet, error) {
+	if len(refreshToken) == 0 {
 		return nil, ErrRefreshNotSupported
 	}
 	form := url.Values{}
 	form.Set("client_id", p.clientID)
 	form.Set("client_secret", p.clientSecret)
-	form.Set("refresh_token", refreshToken)
+	// net/url encodes strings, so the borrowed plaintext is copied into
+	// an unwipeable one here — as late as the request body allows.
+	form.Set("refresh_token", string(refreshToken))
 	form.Set("grant_type", "refresh_token")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, googleTokenURL, strings.NewReader(form.Encode()))
@@ -190,13 +195,9 @@ func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken strin
 	if tok.AccessToken == "" {
 		return nil, wrapExchange(fmt.Errorf("google: %s", tok.Error))
 	}
-	rt := tok.RefreshToken
-	if rt == "" {
-		rt = refreshToken
-	}
 	return &TokenSet{
 		AccessToken:  tok.AccessToken,
-		RefreshToken: rt,
+		RefreshToken: tok.RefreshToken,
 		ExpiresAt:    time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second),
 		Scopes:       strings.Split(tok.Scope, " "),
 	}, nil
@@ -204,16 +205,18 @@ func (p *GoogleCalendarProvider) Refresh(ctx context.Context, refreshToken strin
 
 // Revoke implements [Provider]. Prefers the refresh token since
 // revoking it also invalidates any derived access tokens.
-func (p *GoogleCalendarProvider) Revoke(ctx context.Context, tokens TokenSet) error {
+func (p *GoogleCalendarProvider) Revoke(ctx context.Context, tokens Tokens) error {
 	token := tokens.RefreshToken
-	if token == "" {
+	if len(token) == 0 {
 		token = tokens.AccessToken
 	}
-	if token == "" {
+	if len(token) == 0 {
 		return nil
 	}
 	form := url.Values{}
-	form.Set("token", token)
+	// See Refresh: the form body is built from strings, so this copy of
+	// the borrowed plaintext cannot be wiped.
+	form.Set("token", string(token))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/revoke", strings.NewReader(form.Encode()))
 	if err != nil {
 		return fmt.Errorf("integrations/google: revoke: %w", err)

@@ -266,6 +266,117 @@ func TestDisconnect_RevokeFailure_DoesNotBlockDeletion(t *testing.T) {
 		"local row must be deleted regardless of revoke outcome")
 }
 
+// TestDisconnect_WipesThePlaintextAfterRevoke pins the borrow contract on
+// the revoke path: the tokens the provider was handed are zeroed once the
+// disconnect returns. Holding them in a struct — which a string field
+// would force — leaves the OAuth plaintext in the heap for the life of
+// the process.
+func TestDisconnect_WipesThePlaintextAfterRevoke(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	pub := types.New()
+	accessCT, _ := c.Encrypt([]byte("access-tok"))
+	refreshCT, _ := c.Encrypt([]byte("refresh-tok"))
+
+	prov := &stubRevokeProvider{stubProvider: stubProvider{name: "github"}}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) { return prov, nil },
+	)
+	q := &fakeQueries{
+		findByPubRow: generated.FindUserIntegrationByPublicIdRow{
+			ID: 10, PublicID: pub, Provider: "github",
+		},
+		findByProvRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     10,
+			PublicID:               pub,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+		},
+	}
+	deps := Deps{Queries: q, Registry: reg, Cipher: c}
+	resp := serve(t, deps, "disconnect", http.MethodDelete, "/me/integrations/"+pub.String(), 1, "")
+	require.Equal(t, http.StatusOK, resp.Code, "body=%s", resp.Body.String())
+
+	seen := prov.borrowed()
+	require.NotEmpty(t, seen.AccessToken, "the provider must have been handed the access token")
+	require.NotEmpty(t, seen.RefreshToken, "the provider must have been handed the refresh token")
+	assert.Equal(t, make([]byte, len(seen.AccessToken)), seen.AccessToken,
+		"the access token plaintext is still readable after the revoke returned")
+	assert.Equal(t, make([]byte, len(seen.RefreshToken)), seen.RefreshToken,
+		"the refresh token plaintext is still readable after the revoke returned")
+}
+
+// TestDisconnect_WipesThePlaintextWhenRevokeFails holds the same property
+// on the path where the provider rejects the revoke — the case where a
+// plaintext is most likely to be forgotten.
+func TestDisconnect_WipesThePlaintextWhenRevokeFails(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	pub := types.New()
+	accessCT, _ := c.Encrypt([]byte("access-tok"))
+
+	prov := &stubRevokeProvider{
+		stubProvider: stubProvider{name: "github"},
+		revokeErr:    errors.New("provider down"),
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) { return prov, nil },
+	)
+	q := &fakeQueries{
+		findByPubRow: generated.FindUserIntegrationByPublicIdRow{
+			ID: 11, PublicID: pub, Provider: "github",
+		},
+		findByProvRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                    11,
+			PublicID:              pub,
+			AccessTokenCiphertext: accessCT,
+		},
+	}
+	deps := Deps{Queries: q, Registry: reg, Cipher: c}
+	resp := serve(t, deps, "disconnect", http.MethodDelete, "/me/integrations/"+pub.String(), 1, "")
+	require.Equal(t, http.StatusOK, resp.Code)
+
+	seen := prov.borrowed()
+	require.NotEmpty(t, seen.AccessToken)
+	assert.Equal(t, make([]byte, len(seen.AccessToken)), seen.AccessToken,
+		"the plaintext survived a provider revoke that returned an error")
+}
+
+// TestDisconnect_ExpiredAccessToken_StillRevokes pins that expiry does not
+// gate revocation: the stored refresh token outlives the access token it
+// mints, so a connection whose access token lapsed is exactly the one
+// whose grant still has to be invalidated at the provider.
+func TestDisconnect_ExpiredAccessToken_StillRevokes(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	pub := types.New()
+	accessCT, _ := c.Encrypt([]byte("expired-access"))
+	refreshCT, _ := c.Encrypt([]byte("live-refresh"))
+
+	prov := &stubRevokeProvider{stubProvider: stubProvider{name: "google_calendar"}}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) { return prov, nil },
+	)
+	q := &fakeQueries{
+		findByPubRow: generated.FindUserIntegrationByPublicIdRow{
+			ID: 12, PublicID: pub, Provider: "google_calendar",
+		},
+		findByProvRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     12,
+			PublicID:               pub,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true},
+		},
+	}
+	deps := Deps{Queries: q, Registry: reg, Cipher: c}
+	resp := serve(t, deps, "disconnect", http.MethodDelete, "/me/integrations/"+pub.String(), 1, "")
+	require.Equal(t, http.StatusOK, resp.Code)
+
+	require.NotEmpty(t, prov.borrowed().RefreshToken,
+		"an expired access token must not stop the grant being revoked at the provider")
+}
+
 func TestDisconnect_NoCipher_StillDeletes(t *testing.T) {
 	t.Parallel()
 	pub := types.New()
@@ -1004,20 +1115,37 @@ func (s *stubProvider) AuthURL(state, redirectURI string) string {
 func (s *stubProvider) Exchange(_ context.Context, _, _ string) (*integrationspkg.TokenSet, *integrationspkg.Account, error) {
 	return &integrationspkg.TokenSet{AccessToken: "tok"}, &integrationspkg.Account{ExternalID: "1", Label: "test"}, nil
 }
-func (s *stubProvider) Refresh(_ context.Context, _ string) (*integrationspkg.TokenSet, error) {
+func (s *stubProvider) Refresh(_ context.Context, _ []byte) (*integrationspkg.TokenSet, error) {
 	return nil, integrationspkg.ErrRefreshNotSupported
 }
-func (s *stubProvider) Revoke(_ context.Context, _ integrationspkg.TokenSet) error {
+func (s *stubProvider) Revoke(_ context.Context, _ integrationspkg.Tokens) error {
 	return nil
 }
 
 type stubRevokeProvider struct {
 	stubProvider
 	revokeErr error
+
+	// seen records the plaintext the provider was handed, by reference,
+	// so a test can look at the buffer after Revoke returned. Holding a
+	// borrowed token is what the doc tells real callers not to do; it is
+	// the only way to observe the wipe.
+	mu   sync.Mutex
+	seen integrationspkg.Tokens
 }
 
-func (s *stubRevokeProvider) Revoke(_ context.Context, _ integrationspkg.TokenSet) error {
+func (s *stubRevokeProvider) Revoke(_ context.Context, tokens integrationspkg.Tokens) error {
+	s.mu.Lock()
+	s.seen = tokens
+	s.mu.Unlock()
 	return s.revokeErr
+}
+
+// borrowed returns the slices Revoke was handed.
+func (s *stubRevokeProvider) borrowed() integrationspkg.Tokens {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.seen
 }
 
 type stubExchangeProvider struct {

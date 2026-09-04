@@ -3,7 +3,9 @@ package crypto
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func newTestCipher(t *testing.T) *Cipher {
@@ -155,5 +157,43 @@ func TestAPIKeyPrefixSuffix(t *testing.T) {
 	}
 	if got := APIKeySuffix("abc"); got != "abc" {
 		t.Errorf("short suffix: got %q", got)
+	}
+}
+
+// TestAPIKeyMaskStaysValidUTF8 sweeps a key whose multi-byte characters
+// straddle both mask widths.
+//
+// The key is not generated here: it is a third-party credential a
+// workspace admin pastes in, bounded only by a length check, so nothing
+// makes it ASCII. A byte-indexed mask severs the character on the
+// boundary and stores a fragment that is not valid UTF-8.
+func TestAPIKeyMaskStaysValidUTF8(t *testing.T) {
+	for pad := 0; pad < 6; pad++ {
+		key := strings.Repeat("x", pad) + strings.Repeat("鍵設計方針", 6) + strings.Repeat("y", pad)
+
+		for name, got := range map[string]string{
+			"prefix": APIKeyPrefix(key),
+			"suffix": APIKeySuffix(key),
+		} {
+			if !utf8.ValidString(got) {
+				t.Fatalf("pad=%d %s = %q, which is not valid UTF-8", pad, name, got)
+			}
+			if strings.ContainsRune(got, utf8.RuneError) {
+				t.Fatalf("pad=%d %s = %q, which carries U+FFFD", pad, name, got)
+			}
+		}
+
+		if n := len(APIKeyPrefix(key)); n > apiKeyPrefixLen {
+			t.Fatalf("pad=%d prefix is %d bytes, over the %d column width", pad, n, apiKeyPrefixLen)
+		}
+		if n := len(APIKeySuffix(key)); n > apiKeySuffixLen {
+			t.Fatalf("pad=%d suffix is %d bytes, over the %d column width", pad, n, apiKeySuffixLen)
+		}
+		if !strings.HasPrefix(key, APIKeyPrefix(key)) {
+			t.Fatalf("pad=%d prefix is not a prefix of the key", pad)
+		}
+		if !strings.HasSuffix(key, APIKeySuffix(key)) {
+			t.Fatalf("pad=%d suffix is not a suffix of the key", pad)
+		}
 	}
 }

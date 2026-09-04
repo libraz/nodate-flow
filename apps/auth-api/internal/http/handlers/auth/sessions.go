@@ -13,20 +13,15 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
-// userAgentMaxLen caps the stored User-Agent string. The sessions
-// table column is sized for this upper bound.
+// userAgentMaxLen caps the User-Agent stored on a session row so a
+// malicious client cannot use the header as a write-amplification
+// vector. It sits below the sessions.user_agent column, which is
+// VARCHAR(512): the column is the ceiling, this is the budget, and only
+// the column width can be read as permission to store more.
 const userAgentMaxLen = 255
-
-// truncateUserAgent clips an oversized User-Agent header to the column
-// width so a malicious client cannot use it as a write-amp vector.
-func truncateUserAgent(ua string) string {
-	if len(ua) > userAgentMaxLen {
-		return ua[:userAgentMaxLen]
-	}
-	return ua
-}
 
 // IssueTokens signs an access JWT and creates a new session row. It
 // returns the JSON-body AuthTokens envelope plus the freshly-minted
@@ -47,7 +42,7 @@ func IssueTokens(ctx context.Context, deps Deps, userID uint32, userPub types.Pu
 		PublicID:    sessPub,
 		UserID:      userID,
 		RefreshHash: refreshHash,
-		UserAgent:   truncateUserAgent(userAgent),
+		UserAgent:   stringutil.TruncateBytes(userAgent, userAgentMaxLen),
 		IPAddress:   ipAddress,
 		ExpiresAt:   time.Now().Add(refreshCookieTTL),
 	}); err != nil {

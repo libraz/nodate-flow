@@ -177,29 +177,38 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 		// It stays -1 on the recovery-code branch (no step to advance).
 		acceptedStep := int64(-1)
 		if hasCode {
-			secret, derr := deps.Cipher.Decrypt([]byte(ident.MfaSecretCiphertext.String))
-			if derr != nil {
-				recordCipherDecryptFailure(ctx, deps, uint32(uid), "login_totp", derr)
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			step, okCode := auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
-			// RFC 6238 5.2 one-time-use: a syntactically valid code whose
-			// step was already consumed is a replay. Treat it exactly like
-			// a mismatch (same audit + lockout accounting) so an attacker
-			// replaying a captured code cannot distinguish replay from a
-			// wrong code and cannot reuse it inside the skew window.
-			replayed := okCode && ident.MfaLastStep.Valid && step <= ident.MfaLastStep.Int64
-			if !okCode || replayed {
-				bumpFailedByID(ctx, deps, ident.ID)
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "auth.login_totp_failed",
-					ActorID:      uint32(uid),
-					ResourceType: "user",
+			var step int64
+			verifyErr := withTotpSecret(deps.Cipher, ident.MfaSecretCiphertext.String,
+				func(secret []byte) error {
+					var okCode bool
+					step, okCode = auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
+					// RFC 6238 5.2 one-time-use: a syntactically valid code
+					// whose step was already consumed is a replay. Treat it
+					// exactly like a mismatch (same audit + lockout
+					// accounting) so an attacker replaying a captured code
+					// cannot distinguish replay from a wrong code and cannot
+					// reuse it inside the skew window.
+					replayed := okCode && ident.MfaLastStep.Valid && step <= ident.MfaLastStep.Int64
+					if !okCode || replayed {
+						bumpFailedByID(ctx, deps, ident.ID)
+						deps.Audit.Record(ctx, audit.Entry{
+							Action:       "auth.login_totp_failed",
+							ActorID:      uint32(uid),
+							ResourceType: "user",
+						})
+						if ident.FailedAttempts+1 >= maxFailedBeforeLock {
+							return httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
+						}
+						return httpErr(apierrors.AuthTotpCodeMismatch)
+					}
+					return nil
 				})
-				if ident.FailedAttempts+1 >= maxFailedBeforeLock {
-					return nil, httpErr(apierrors.AuthLoginRateLimitedAfterRetries)
-				}
-				return nil, httpErr(apierrors.AuthTotpCodeMismatch)
+			switch {
+			case errors.Is(verifyErr, errTotpSecretUnreadable):
+				recordCipherDecryptFailure(ctx, deps, uint32(uid), "login_totp", verifyErr)
+				return nil, httpErr(apierrors.InternalUnexpected)
+			case verifyErr != nil:
+				return nil, verifyErr
 			}
 			acceptedStep = step
 		} else {

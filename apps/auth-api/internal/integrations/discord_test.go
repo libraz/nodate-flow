@@ -215,7 +215,7 @@ func TestDiscord_Exchange_RejectsMissingAccessToken(t *testing.T) {
 func TestDiscord_Refresh_EmptyTokenReturnsErrRefreshNotSupported(t *testing.T) {
 	t.Parallel()
 	p, _ := NewDiscord("id", "secret", "https://x/cb")
-	_, err := p.Refresh(context.Background(), "")
+	_, err := p.Refresh(context.Background(), nil)
 	require.ErrorIs(t, err, ErrRefreshNotSupported,
 		"empty refresh token must be treated as unsupported, not a transport error")
 }
@@ -240,14 +240,14 @@ func TestDiscord_Refresh_RotatedTokenIsAdopted(t *testing.T) {
 		clientID: "id", clientSecret: "secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	tok, err := p.Refresh(context.Background(), "old-rt")
+	tok, err := p.Refresh(context.Background(), []byte("old-rt"))
 	require.NoError(t, err)
 	assert.Equal(t, "new-access", tok.AccessToken)
 	assert.Equal(t, "rotated-rt", tok.RefreshToken,
 		"Discord rotates refresh tokens — caller must adopt the new value")
 }
 
-func TestDiscord_Refresh_PreservesOriginalWhenResponseOmitsRefresh(t *testing.T) {
+func TestDiscord_Refresh_ReportsNoRotationWhenResponseOmitsRefresh(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -263,10 +263,12 @@ func TestDiscord_Refresh_PreservesOriginalWhenResponseOmitsRefresh(t *testing.T)
 		clientID: "id", clientSecret: "secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	tok, err := p.Refresh(context.Background(), "old-rt")
+	tok, err := p.Refresh(context.Background(), []byte("old-rt"))
 	require.NoError(t, err)
-	assert.Equal(t, "old-rt", tok.RefreshToken,
-		"when Discord omits refresh_token, preserve the stored one so the row keeps its refresh capability")
+	assert.Empty(t, tok.RefreshToken,
+		"when Discord omits refresh_token the provider must report no rotation rather than echo the "+
+			"borrowed plaintext back into a string that cannot be wiped. The stored token stays in "+
+			"force through the caller, which is pinned in the refresher tests")
 }
 
 // --- Revoke ---
@@ -274,7 +276,7 @@ func TestDiscord_Refresh_PreservesOriginalWhenResponseOmitsRefresh(t *testing.T)
 func TestDiscord_Revoke_EmptyTokenIsNoop(t *testing.T) {
 	t.Parallel()
 	p, _ := NewDiscord("id", "secret", "https://x/cb")
-	err := p.Revoke(context.Background(), TokenSet{})
+	err := p.Revoke(context.Background(), Tokens{})
 	require.NoError(t, err, "revoking empty tokens must succeed silently")
 }
 
@@ -294,9 +296,9 @@ func TestDiscord_Revoke_PrefersRefreshTokenAndPostsClientCreds(t *testing.T) {
 		clientID: "my-id", clientSecret: "my-secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	err := p.Revoke(context.Background(), TokenSet{
-		AccessToken:  "at-value",
-		RefreshToken: "rt-value",
+	err := p.Revoke(context.Background(), Tokens{
+		AccessToken:  []byte("at-value"),
+		RefreshToken: []byte("rt-value"),
 	})
 	require.NoError(t, err, "HTTP 200 from Discord means token was revoked successfully")
 }
@@ -315,7 +317,7 @@ func TestDiscord_Revoke_FallsBackToAccessTokenWhenNoRefresh(t *testing.T) {
 		clientID: "id", clientSecret: "secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "access-only"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("access-only")})
 	require.NoError(t, err)
 }
 
@@ -332,7 +334,7 @@ func TestDiscord_Revoke_InvalidTokenIsSuccess(t *testing.T) {
 		clientID: "id", clientSecret: "secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	err := p.Revoke(context.Background(), TokenSet{RefreshToken: "already-gone"})
+	err := p.Revoke(context.Background(), Tokens{RefreshToken: []byte("already-gone")})
 	require.NoError(t, err,
 		"Discord 400 + invalid_token means token is already revoked — must be treated as success")
 }
@@ -349,7 +351,7 @@ func TestDiscord_Revoke_ServerErrorPropagates(t *testing.T) {
 		clientID: "id", clientSecret: "secret", redirectURI: "https://x/cb",
 		hc: rewriteClient(srv.URL, map[string]string{"https://discord.com": ""}),
 	}
-	err := p.Revoke(context.Background(), TokenSet{RefreshToken: "rt"})
+	err := p.Revoke(context.Background(), Tokens{RefreshToken: []byte("rt")})
 	require.Error(t, err, "non-success non-invalid_token responses must propagate so the caller can log them")
 }
 

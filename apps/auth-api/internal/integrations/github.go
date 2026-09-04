@@ -135,17 +135,21 @@ func (p *GithubProvider) Exchange(ctx context.Context, code, redirectURI string)
 
 // Refresh implements [Provider]. GitHub OAuth Apps do not issue
 // refresh tokens; access tokens are long-lived until revoked.
-func (p *GithubProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
+func (p *GithubProvider) Refresh(_ context.Context, _ []byte) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
 
 // Revoke implements [Provider]. Uses the OAuth App token revocation
 // endpoint which requires HTTP Basic auth with client credentials.
-func (p *GithubProvider) Revoke(ctx context.Context, tokens TokenSet) error {
-	if tokens.AccessToken == "" {
+func (p *GithubProvider) Revoke(ctx context.Context, tokens Tokens) error {
+	if len(tokens.AccessToken) == 0 {
 		return nil
 	}
-	payload, err := json.Marshal(map[string]string{"access_token": tokens.AccessToken})
+	// encoding/json has no []byte-as-text form, so the token becomes a
+	// string to be marshalled and that copy cannot be wiped. Making it
+	// here, one step before the request, is the narrowest the borrowed
+	// plaintext's exposure gets.
+	payload, err := json.Marshal(map[string]string{"access_token": string(tokens.AccessToken)})
 	if err != nil {
 		return fmt.Errorf("integrations/github: revoke marshal: %w", err)
 	}

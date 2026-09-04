@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -166,7 +167,8 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 			"provider", row.Provider, "connection_id", row.PublicID.String(), "err", err)
 		return
 	}
-	tok, err := provider.Refresh(ctx, string(refreshPlain))
+	defer crypto.Zero(refreshPlain)
+	tok, err := provider.Refresh(ctx, refreshPlain)
 	if err != nil {
 		if errors.Is(err, ErrRefreshNotSupported) {
 			return
@@ -189,7 +191,7 @@ func (r *Refresher) refreshRow(ctx context.Context, row generated.ListConnection
 	// Preserve existing refresh token if the provider did not
 	// rotate one (Google's common case).
 	newRefresh := row.RefreshTokenCiphertext
-	if tok.RefreshToken != "" && tok.RefreshToken != string(refreshPlain) {
+	if tok.RefreshToken != "" && !bytes.Equal(refreshPlain, []byte(tok.RefreshToken)) {
 		enc, encErr := r.Cipher.Encrypt([]byte(tok.RefreshToken))
 		if encErr != nil {
 			log.Warn("integrations refresher: encrypt refresh token failed",

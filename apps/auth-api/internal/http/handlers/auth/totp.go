@@ -23,6 +23,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base32"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
@@ -31,6 +33,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
 // TotpStatus handles GET /me/totp.
@@ -137,16 +140,24 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
 			return nil, err
 		}
-		secret, err := deps.Cipher.Decrypt([]byte(row.MfaSecretCiphertext.String))
-		if err != nil {
+		var step int64
+		verifyErr := withTotpSecret(deps.Cipher, row.MfaSecretCiphertext.String,
+			func(secret []byte) error {
+				var okCode bool
+				step, okCode = auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
+				// A pending enrollment has mfa_last_step = NULL, but guard
+				// against a replay of the confirmation code anyway in case
+				// enrollment was rotated without clearing the step.
+				if !okCode || (row.MfaLastStep.Valid && step <= row.MfaLastStep.Int64) {
+					return httpErr(apierrors.AuthTotpCodeMismatch)
+				}
+				return nil
+			})
+		switch {
+		case errors.Is(verifyErr, errTotpSecretUnreadable):
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		step, okCode := auth.VerifyTotpStep(secret, in.Body.Code, time.Now())
-		// A pending enrollment has mfa_last_step = NULL, but guard against
-		// a replay of the confirmation code anyway in case enrollment was
-		// rotated without clearing the step.
-		if !okCode || (row.MfaLastStep.Valid && step <= row.MfaLastStep.Int64) {
-			return nil, httpErr(apierrors.AuthTotpCodeMismatch)
+		case verifyErr != nil:
+			return nil, verifyErr
 		}
 		if err := deps.Queries.ConfirmIdentityMfa(ctx, row.ID); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -262,6 +273,31 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 		out.Body.Ok = true
 		return out, nil
 	}
+}
+
+// errTotpSecretUnreadable marks a stored TOTP secret that would not
+// decrypt, so a caller can tell a broken cipher — which is a 500 and an
+// audit entry — from a code that simply did not match.
+var errTotpSecretUnreadable = errors.New("auth: totp secret unreadable")
+
+// withTotpSecret decrypts the stored TOTP secret, hands it to verify,
+// and wipes it before returning. The error from verify is returned
+// unchanged; a decrypt failure is wrapped in errTotpSecretUnreadable.
+//
+// The callback shape is what bounds the plaintext's lifetime. A TOTP
+// secret is a long-lived credential — one leaked copy mints valid codes
+// until the user re-enrolls — so it is verified on the spot and wiped on
+// every path out, including the mismatch the callback reports. Returning
+// it instead would leave it live in the caller's frame for as long as
+// that frame runs, which is what [crypto.Cipher.Decrypt] tells callers
+// not to do, and nothing would know when the caller was finished with it.
+func withTotpSecret(cipher *crypto.Cipher, ciphertext string, verify func(secret []byte) error) error {
+	plain, err := cipher.Decrypt([]byte(ciphertext))
+	if err != nil {
+		return fmt.Errorf("%w: %w", errTotpSecretUnreadable, err)
+	}
+	defer crypto.Zero(plain)
+	return verify(plain)
 }
 
 // loadLocalIdentity is a small helper that maps sql.ErrNoRows to

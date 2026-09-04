@@ -163,7 +163,7 @@ func TestGoogle_AuthURL_RequestsOfflineAccessWithConsent(t *testing.T) {
 func TestGithub_Refresh_ReturnsErrRefreshNotSupported(t *testing.T) {
 	t.Parallel()
 	p, _ := NewGithub("id", "secret")
-	_, err := p.Refresh(context.Background(), "any-token")
+	_, err := p.Refresh(context.Background(), []byte("any-token"))
 	require.ErrorIs(t, err, ErrRefreshNotSupported,
 		"GitHub OAuth Apps do not issue refresh tokens")
 }
@@ -171,7 +171,7 @@ func TestGithub_Refresh_ReturnsErrRefreshNotSupported(t *testing.T) {
 func TestSlack_Refresh_ReturnsErrRefreshNotSupported(t *testing.T) {
 	t.Parallel()
 	p, _ := NewSlack("id", "secret")
-	_, err := p.Refresh(context.Background(), "any-token")
+	_, err := p.Refresh(context.Background(), []byte("any-token"))
 	require.ErrorIs(t, err, ErrRefreshNotSupported,
 		"Slack user tokens do not expire and have no refresh flow")
 }
@@ -179,7 +179,7 @@ func TestSlack_Refresh_ReturnsErrRefreshNotSupported(t *testing.T) {
 func TestGoogle_Refresh_EmptyTokenReturnsErrRefreshNotSupported(t *testing.T) {
 	t.Parallel()
 	p, _ := NewGoogleCalendar("id", "secret")
-	_, err := p.Refresh(context.Background(), "")
+	_, err := p.Refresh(context.Background(), nil)
 	require.ErrorIs(t, err, ErrRefreshNotSupported,
 		"empty refresh token must be treated as unsupported")
 }
@@ -189,21 +189,21 @@ func TestGoogle_Refresh_EmptyTokenReturnsErrRefreshNotSupported(t *testing.T) {
 func TestGithub_Revoke_EmptyTokenIsNoop(t *testing.T) {
 	t.Parallel()
 	p, _ := NewGithub("id", "secret")
-	err := p.Revoke(context.Background(), TokenSet{})
+	err := p.Revoke(context.Background(), Tokens{})
 	require.NoError(t, err, "revoking empty tokens must succeed silently")
 }
 
 func TestSlack_Revoke_EmptyTokenIsNoop(t *testing.T) {
 	t.Parallel()
 	p, _ := NewSlack("id", "secret")
-	err := p.Revoke(context.Background(), TokenSet{})
+	err := p.Revoke(context.Background(), Tokens{})
 	require.NoError(t, err)
 }
 
 func TestGoogle_Revoke_EmptyTokenIsNoop(t *testing.T) {
 	t.Parallel()
 	p, _ := NewGoogleCalendar("id", "secret")
-	err := p.Revoke(context.Background(), TokenSet{})
+	err := p.Revoke(context.Background(), Tokens{})
 	require.NoError(t, err)
 }
 
@@ -363,8 +363,10 @@ func TestGoogle_Refresh_HappyPath(t *testing.T) {
 	tok, err := googleRefreshViaTestServer(t, p, srv.URL, "old-rt")
 	require.NoError(t, err)
 	assert.Equal(t, "ya29.new", tok.AccessToken)
-	assert.Equal(t, "old-rt", tok.RefreshToken,
-		"when provider does not rotate, must preserve the original refresh token")
+	assert.Empty(t, tok.RefreshToken,
+		"a response without refresh_token means no rotation; the provider must report that "+
+			"rather than echo the borrowed plaintext back into a string that cannot be wiped. "+
+			"Preserving the stored token is the caller's job and is pinned in the refresher tests")
 	assert.False(t, tok.ExpiresAt.IsZero())
 }
 
@@ -406,7 +408,7 @@ func TestGithub_Revoke_204IsSuccess(t *testing.T) {
 
 	p := &GithubProvider{clientID: "my-id", clientSecret: "my-secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("gho_tok")})
 	require.NoError(t, err, "HTTP 204 means token was revoked successfully")
 }
 
@@ -419,7 +421,7 @@ func TestGithub_Revoke_404IsSuccess(t *testing.T) {
 
 	p := &GithubProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("gho_tok")})
 	require.NoError(t, err,
 		"HTTP 404 means token is already gone — must be treated as success")
 }
@@ -434,7 +436,7 @@ func TestGithub_Revoke_500IsError(t *testing.T) {
 
 	p := &GithubProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://api.github.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "gho_tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("gho_tok")})
 	require.Error(t, err, "server error must propagate so caller can log it")
 }
 
@@ -450,7 +452,7 @@ func TestSlack_Revoke_OkTrueIsSuccess(t *testing.T) {
 
 	p := &SlackProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("xoxp-tok")})
 	require.NoError(t, err)
 }
 
@@ -464,7 +466,7 @@ func TestSlack_Revoke_NotAuthedIsSuccess(t *testing.T) {
 
 	p := &SlackProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("xoxp-tok")})
 	require.NoError(t, err,
 		"not_authed means token is already invalid — treat as success")
 }
@@ -479,7 +481,7 @@ func TestSlack_Revoke_TokenRevokedIsSuccess(t *testing.T) {
 
 	p := &SlackProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("xoxp-tok")})
 	require.NoError(t, err,
 		"token_revoked means already revoked — treat as success")
 }
@@ -494,7 +496,7 @@ func TestSlack_Revoke_InvalidAuthIsSuccess(t *testing.T) {
 
 	p := &SlackProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("xoxp-tok")})
 	require.NoError(t, err,
 		"invalid_auth means token is already unusable — treat as success")
 }
@@ -509,7 +511,7 @@ func TestSlack_Revoke_UnknownErrorIsError(t *testing.T) {
 
 	p := &SlackProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://slack.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "xoxp-tok"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("xoxp-tok")})
 	require.Error(t, err, "unknown Slack error must propagate")
 	assert.Contains(t, err.Error(), "internal_error")
 }
@@ -526,8 +528,8 @@ func TestGoogle_Revoke_200IsSuccess(t *testing.T) {
 
 	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{
-		AccessToken: "access", RefreshToken: "my-refresh",
+	err := p.Revoke(context.Background(), Tokens{
+		AccessToken: []byte("access"), RefreshToken: []byte("my-refresh"),
 	})
 	require.NoError(t, err)
 }
@@ -544,7 +546,7 @@ func TestGoogle_Revoke_FallsBackToAccessToken(t *testing.T) {
 
 	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "access-only"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("access-only")})
 	require.NoError(t, err)
 }
 
@@ -559,7 +561,7 @@ func TestGoogle_Revoke_InvalidTokenIsSuccess(t *testing.T) {
 
 	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{AccessToken: "already-gone"})
+	err := p.Revoke(context.Background(), Tokens{AccessToken: []byte("already-gone")})
 	require.NoError(t, err,
 		"Google 400 + invalid_token means token is already revoked — treat as success")
 }
@@ -574,7 +576,7 @@ func TestGoogle_Revoke_OtherErrorIsError(t *testing.T) {
 
 	p := &GoogleCalendarProvider{clientID: "id", clientSecret: "secret",
 		hc: rewriteClient(srv.URL, map[string]string{"https://oauth2.googleapis.com": ""})}
-	err := p.Revoke(context.Background(), TokenSet{RefreshToken: "rt"})
+	err := p.Revoke(context.Background(), Tokens{RefreshToken: []byte("rt")})
 	require.Error(t, err, "non-success/non-invalid_token responses must propagate")
 }
 
@@ -598,10 +600,10 @@ func (s *stubProvider) AuthURL(_, _ string) string { return "" }
 func (s *stubProvider) Exchange(_ context.Context, _, _ string) (*TokenSet, *Account, error) {
 	return nil, nil, nil
 }
-func (s *stubProvider) Refresh(_ context.Context, _ string) (*TokenSet, error) {
+func (s *stubProvider) Refresh(_ context.Context, _ []byte) (*TokenSet, error) {
 	return nil, ErrRefreshNotSupported
 }
-func (s *stubProvider) Revoke(_ context.Context, _ TokenSet) error { return nil }
+func (s *stubProvider) Revoke(_ context.Context, _ Tokens) error { return nil }
 
 // exchangeViaTestServer calls the GithubProvider Exchange method by
 // temporarily pointing its http.Client at the test server. Because
@@ -641,7 +643,7 @@ func googleRefreshViaTestServer(t *testing.T, p *GoogleCalendarProvider, baseURL
 	p.hc = rewriteClient(baseURL, map[string]string{
 		"https://oauth2.googleapis.com": "",
 	})
-	return p.Refresh(context.Background(), refreshToken)
+	return p.Refresh(context.Background(), []byte(refreshToken))
 }
 
 // rewriteClient returns an *http.Client whose Transport rewrites

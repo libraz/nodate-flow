@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -25,17 +26,46 @@ func newTestCipher(t *testing.T) *crypto.Cipher {
 	return c
 }
 
-// --- LoadUserTokenSet ---
+// captured records what the callback saw, as strings, so assertions do
+// not hold the borrowed slices past the call.
+type captured struct {
+	calls   int
+	access  string
+	refresh string
+	expires time.Time
+}
 
-func TestLoadUserTokenSet_NotConnected_NoRow(t *testing.T) {
+// capture returns a callback that records the tokens it was handed.
+func capture(got *captured) func(context.Context, Tokens) error {
+	return func(_ context.Context, tk Tokens) error {
+		got.calls++
+		got.access = string(tk.AccessToken)
+		got.refresh = string(tk.RefreshToken)
+		got.expires = tk.ExpiresAt
+		return nil
+	}
+}
+
+// mustNotRun is a callback that fails the test if the loader reaches it.
+func mustNotRun(t *testing.T) func(context.Context, Tokens) error {
+	t.Helper()
+	return func(context.Context, Tokens) error {
+		t.Fatal("the callback must not run on a path that returns an error")
+		return nil
+	}
+}
+
+// --- WithUserTokens ---
+
+func TestWithUserTokens_NotConnected_NoRow(t *testing.T) {
 	t.Parallel()
 	q := &fakeLoaderQuerier{findErr: sql.ErrNoRows}
-	_, err := LoadUserTokenSet(context.Background(), q, newTestCipher(t), nil, 1, "github")
+	err := WithUserTokens(context.Background(), q, newTestCipher(t), nil, 1, "github", mustNotRun(t))
 	require.ErrorIs(t, err, ErrNotConnected,
 		"missing DB row must surface as ErrNotConnected, not a raw DB error")
 }
 
-func TestLoadUserTokenSet_NotConnected_EmptyCiphertext(t *testing.T) {
+func TestWithUserTokens_NotConnected_EmptyCiphertext(t *testing.T) {
 	t.Parallel()
 	q := &fakeLoaderQuerier{
 		findRow: generated.FindUserIntegrationByUserProviderRow{
@@ -43,12 +73,12 @@ func TestLoadUserTokenSet_NotConnected_EmptyCiphertext(t *testing.T) {
 			AccessTokenCiphertext: nil, // empty
 		},
 	}
-	_, err := LoadUserTokenSet(context.Background(), q, newTestCipher(t), nil, 1, "github")
+	err := WithUserTokens(context.Background(), q, newTestCipher(t), nil, 1, "github", mustNotRun(t))
 	require.ErrorIs(t, err, ErrNotConnected,
 		"empty access_token_ciphertext must be treated as not connected")
 }
 
-func TestLoadUserTokenSet_DecryptsValidToken(t *testing.T) {
+func TestWithUserTokens_DecryptsValidToken(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, err := c.Encrypt([]byte("my-access-token"))
@@ -65,15 +95,83 @@ func TestLoadUserTokenSet_DecryptsValidToken(t *testing.T) {
 			// No expiry → non-expiring token (GitHub/Slack pattern).
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, nil, 42, "github")
-	require.NoError(t, err)
-	assert.Equal(t, "my-access-token", ts.AccessToken)
-	assert.Equal(t, "my-refresh-token", ts.RefreshToken)
-	assert.True(t, ts.ExpiresAt.IsZero(),
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, nil, 42, "github", capture(&got)))
+	assert.Equal(t, 1, got.calls)
+	assert.Equal(t, "my-access-token", got.access)
+	assert.Equal(t, "my-refresh-token", got.refresh)
+	assert.True(t, got.expires.IsZero(),
 		"non-expiring token must have zero ExpiresAt")
 }
 
-func TestLoadUserTokenSet_NonExpiringToken_SkipsRefresh(t *testing.T) {
+// TestWithUserTokens_WipesThePlaintextAfterTheCallback is the property
+// the callback shape exists for: once the work that needed the tokens is
+// done, neither plaintext is still in the buffer the loader decrypted
+// into. A helper that returned the tokens instead could not hold this —
+// nothing would know when the caller was finished with them.
+func TestWithUserTokens_WipesThePlaintextAfterTheCallback(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, err := c.Encrypt([]byte("my-access-token"))
+	require.NoError(t, err)
+	refreshCT, err := c.Encrypt([]byte("my-refresh-token"))
+	require.NoError(t, err)
+
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+		},
+	}
+	// Held deliberately, which is what the doc tells callers not to do.
+	// It is the only way to look at the buffer after the wipe.
+	var heldAccess, heldRefresh []byte
+	require.NoError(t, WithUserTokens(context.Background(), q, c, nil, 1, "github",
+		func(_ context.Context, tk Tokens) error {
+			require.Equal(t, "my-access-token", string(tk.AccessToken),
+				"the callback must see the plaintext while it runs")
+			require.Equal(t, "my-refresh-token", string(tk.RefreshToken))
+			heldAccess = tk.AccessToken
+			heldRefresh = tk.RefreshToken
+			return nil
+		}))
+
+	require.NotEmpty(t, heldAccess, "the callback must have been handed a token to hold")
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldAccess)), heldAccess,
+		"the access token plaintext is still readable after the callback returned")
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldRefresh)), heldRefresh,
+		"the refresh token plaintext is still readable after the callback returned")
+}
+
+// TestWithUserTokens_WipesThePlaintextWhenTheCallbackFails holds the
+// same property on the error path: a callback that returns an error is
+// the case where the plaintext is most likely to be forgotten.
+func TestWithUserTokens_WipesThePlaintextWhenTheCallbackFails(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, err := c.Encrypt([]byte("my-access-token"))
+	require.NoError(t, err)
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                    1,
+			AccessTokenCiphertext: accessCT,
+		},
+	}
+	useErr := errors.New("provider call failed")
+	var held []byte
+	err = WithUserTokens(context.Background(), q, c, nil, 1, "github",
+		func(_ context.Context, tk Tokens) error {
+			held = tk.AccessToken
+			return useErr
+		})
+	require.ErrorIs(t, err, useErr, "the callback's error must reach the caller unchanged")
+	require.NotEmpty(t, held)
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(held)), held,
+		"the plaintext survived a callback that returned an error")
+}
+
+func TestWithUserTokens_NonExpiringToken_SkipsRefresh(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	ct, _ := c.Encrypt([]byte("token"))
@@ -88,18 +186,18 @@ func TestLoadUserTokenSet_NonExpiringToken_SkipsRefresh(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				t.Fatal("Refresh must not be called for non-expiring tokens")
 				return nil, nil
 			},
 		}, nil
 	})
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "github")
-	require.NoError(t, err)
-	assert.Equal(t, "token", ts.AccessToken)
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "github", capture(&got)))
+	assert.Equal(t, "token", got.access)
 }
 
-func TestLoadUserTokenSet_ValidToken_NotExpired(t *testing.T) {
+func TestWithUserTokens_ValidToken_NotExpired(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	ct, _ := c.Encrypt([]byte("valid-token"))
@@ -110,12 +208,12 @@ func TestLoadUserTokenSet_ValidToken_NotExpired(t *testing.T) {
 			AccessTokenExpiresAt:  sql.NullTime{Time: time.Now().Add(time.Hour), Valid: true},
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, nil, 1, "google_calendar")
-	require.NoError(t, err)
-	assert.Equal(t, "valid-token", ts.AccessToken)
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, nil, 1, "google_calendar", capture(&got)))
+	assert.Equal(t, "valid-token", got.access)
 }
 
-func TestLoadUserTokenSet_Expired_NoRegistry_ReturnsErrTokenExpired(t *testing.T) {
+func TestWithUserTokens_Expired_NoRegistry_ReturnsErrTokenExpired(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	ct, _ := c.Encrypt([]byte("stale"))
@@ -126,12 +224,12 @@ func TestLoadUserTokenSet_Expired_NoRegistry_ReturnsErrTokenExpired(t *testing.T
 			AccessTokenExpiresAt:  sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true},
 		},
 	}
-	_, err := LoadUserTokenSet(context.Background(), q, c, nil, 1, "google_calendar")
+	err := WithUserTokens(context.Background(), q, c, nil, 1, "google_calendar", mustNotRun(t))
 	require.ErrorIs(t, err, ErrTokenExpired,
 		"expired token without registry must return ErrTokenExpired")
 }
 
-func TestLoadUserTokenSet_Expired_NoRefreshToken_ReturnsErrTokenExpired(t *testing.T) {
+func TestWithUserTokens_Expired_NoRefreshToken_ReturnsErrTokenExpired(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	ct, _ := c.Encrypt([]byte("stale"))
@@ -148,12 +246,12 @@ func TestLoadUserTokenSet_Expired_NoRefreshToken_ReturnsErrTokenExpired(t *testi
 			// RefreshTokenCiphertext is empty.
 		},
 	}
-	_, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
+	err := WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", mustNotRun(t))
 	require.ErrorIs(t, err, ErrTokenExpired,
 		"expired token without refresh token must return ErrTokenExpired")
 }
 
-func TestLoadUserTokenSet_Expired_RefreshNotSupported_ReturnsErrTokenExpired(t *testing.T) {
+func TestWithUserTokens_Expired_RefreshNotSupported_ReturnsErrTokenExpired(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("stale"))
@@ -161,7 +259,7 @@ func TestLoadUserTokenSet_Expired_RefreshNotSupported_ReturnsErrTokenExpired(t *
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "github"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return nil, ErrRefreshNotSupported
 			},
 		}, nil
@@ -174,11 +272,11 @@ func TestLoadUserTokenSet_Expired_RefreshNotSupported_ReturnsErrTokenExpired(t *
 			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true},
 		},
 	}
-	_, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "github")
+	err := WithUserTokens(context.Background(), q, c, reg, 1, "github", mustNotRun(t))
 	require.ErrorIs(t, err, ErrTokenExpired)
 }
 
-func TestLoadUserTokenSet_Expired_JITRefreshSucceeds(t *testing.T) {
+func TestWithUserTokens_Expired_JITRefreshSucceeds(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("old-access"))
@@ -189,13 +287,14 @@ func TestLoadUserTokenSet_Expired_JITRefreshSucceeds(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, rt string) (*TokenSet, error) {
-				assert.Equal(t, "my-refresh", rt,
+			refreshFn: func(_ context.Context, rt []byte) (*TokenSet, error) {
+				assert.Equal(t, "my-refresh", string(rt),
 					"Refresh must receive the decrypted refresh token")
 				return &TokenSet{
-					AccessToken:  "fresh-access",
-					RefreshToken: "my-refresh", // not rotated
-					ExpiresAt:    newExpiry,
+					AccessToken: "fresh-access",
+					// Empty RefreshToken is how a provider reports
+					// "not rotated"; the stored one stays in force.
+					ExpiresAt: newExpiry,
 				}, nil
 			},
 		}, nil
@@ -212,12 +311,12 @@ func TestLoadUserTokenSet_Expired_JITRefreshSucceeds(t *testing.T) {
 			return nil
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
-	require.NoError(t, err)
-	assert.Equal(t, "fresh-access", ts.AccessToken,
-		"must return the refreshed access token")
-	assert.Equal(t, "my-refresh", ts.RefreshToken,
-		"must preserve existing refresh token when not rotated")
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", capture(&got)))
+	assert.Equal(t, "fresh-access", got.access,
+		"must hand over the refreshed access token")
+	assert.Equal(t, "my-refresh", got.refresh,
+		"a provider that did not rotate must leave the stored refresh token in force")
 
 	// Verify the persisted row received encrypted new tokens.
 	assert.Equal(t, uint32(7), updatedParams.ID,
@@ -230,7 +329,49 @@ func TestLoadUserTokenSet_Expired_JITRefreshSucceeds(t *testing.T) {
 	assert.Equal(t, "fresh-access", string(decrypted))
 }
 
-func TestLoadUserTokenSet_Expired_JITRefreshFails_ReturnsStaleFallback(t *testing.T) {
+// TestWithUserTokens_WipesTheRefreshedPlaintext holds the wipe on the
+// JIT-refresh path, where the plaintext handed to the callback is the
+// one that came back from the provider rather than the one decrypted
+// from the row.
+func TestWithUserTokens_WipesTheRefreshedPlaintext(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, _ := c.Encrypt([]byte("old-access"))
+	refreshCT, _ := c.Encrypt([]byte("old-refresh"))
+	reg := NewRegistry(func() (Provider, error) {
+		return &stubRefreshProvider{
+			stubProvider: stubProvider{name: "google_calendar"},
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
+				return &TokenSet{
+					AccessToken:  "fresh-access",
+					RefreshToken: "rotated-refresh",
+					ExpiresAt:    time.Now().Add(time.Hour),
+				}, nil
+			},
+		}, nil
+	})
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
+		},
+	}
+	var heldAccess, heldRefresh []byte
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar",
+		func(_ context.Context, tk Tokens) error {
+			heldAccess = tk.AccessToken
+			heldRefresh = tk.RefreshToken
+			return nil
+		}))
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldAccess)), heldAccess,
+		"the refreshed access token is still readable after the callback returned")
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldRefresh)), heldRefresh,
+		"the rotated refresh token is still readable after the callback returned")
+}
+
+func TestWithUserTokens_Expired_JITRefreshFails_ReturnsStaleFallback(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("stale-access"))
@@ -238,7 +379,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshFails_ReturnsStaleFallback(t *testin
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return nil, errors.New("provider unavailable")
 			},
 		}, nil
@@ -251,13 +392,13 @@ func TestLoadUserTokenSet_Expired_JITRefreshFails_ReturnsStaleFallback(t *testin
 			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
-	require.NoError(t, err,
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", capture(&got)),
 		"transient refresh failure must not be fatal — caller gets the stale token to try")
-	assert.Equal(t, "stale-access", ts.AccessToken)
+	assert.Equal(t, "stale-access", got.access)
 }
 
-func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
+func TestWithUserTokens_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("old-access"))
@@ -267,7 +408,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken:  "new-access",
 					RefreshToken: "rotated-refresh", // different from stored
@@ -288,11 +429,11 @@ func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
 			return nil
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
-	require.NoError(t, err)
-	assert.Equal(t, "new-access", ts.AccessToken)
-	assert.Equal(t, "rotated-refresh", ts.RefreshToken,
-		"caller must receive the rotated refresh token")
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", capture(&got)))
+	assert.Equal(t, "new-access", got.access)
+	assert.Equal(t, "rotated-refresh", got.refresh,
+		"the callback must receive the rotated refresh token")
 
 	// Persisted refresh token must be the new one, encrypted.
 	require.True(t, updatedParams.RefreshTokenCiphertext.Valid,
@@ -303,7 +444,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshRotatesRefreshToken(t *testing.T) {
 		"persisted ciphertext must decrypt to the rotated token")
 }
 
-func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *testing.T) {
+func TestWithUserTokens_Expired_JITRefreshPersistFails_StillReturnsFresh(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("old-access"))
@@ -311,7 +452,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *te
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return &TokenSet{
 					AccessToken: "fresh",
 					ExpiresAt:   time.Now().Add(time.Hour),
@@ -330,14 +471,14 @@ func TestLoadUserTokenSet_Expired_JITRefreshPersistFails_StillReturnsFresh(t *te
 			return errors.New("db write failed")
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
-	require.NoError(t, err,
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", capture(&got)),
 		"DB persist failure must be non-fatal — the background refresher will catch up")
-	assert.Equal(t, "fresh", ts.AccessToken,
-		"caller must receive the fresh token regardless of persistence outcome")
+	assert.Equal(t, "fresh", got.access,
+		"the callback must receive the fresh token regardless of persistence outcome")
 }
 
-func TestLoadUserTokenSet_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
+func TestWithUserTokens_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
 	t.Parallel()
 	c := newTestCipher(t)
 	accessCT, _ := c.Encrypt([]byte("stale"))
@@ -345,7 +486,7 @@ func TestLoadUserTokenSet_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
 	reg := NewRegistry(func() (Provider, error) {
 		return &stubRefreshProvider{
 			stubProvider: stubProvider{name: "google_calendar"},
-			refreshFn: func(_ context.Context, _ string) (*TokenSet, error) {
+			refreshFn: func(_ context.Context, _ []byte) (*TokenSet, error) {
 				return nil, nil // nil result, nil error
 			},
 		}, nil
@@ -358,19 +499,117 @@ func TestLoadUserTokenSet_Expired_JITRefreshReturnsNil_FallsBack(t *testing.T) {
 			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 	}
-	ts, err := LoadUserTokenSet(context.Background(), q, c, reg, 1, "google_calendar")
-	require.NoError(t, err)
-	assert.Equal(t, "stale", ts.AccessToken,
+	var got captured
+	require.NoError(t, WithUserTokens(context.Background(), q, c, reg, 1, "google_calendar", capture(&got)))
+	assert.Equal(t, "stale", got.access,
 		"nil refresh result must fall back to the stale token")
 }
 
-func TestLoadUserTokenSet_DBError_PropagatesUnwrapped(t *testing.T) {
+func TestWithUserTokens_DBError_PropagatesUnwrapped(t *testing.T) {
 	t.Parallel()
 	dbErr := errors.New("connection refused")
 	q := &fakeLoaderQuerier{findErr: dbErr}
-	_, err := LoadUserTokenSet(context.Background(), q, newTestCipher(t), nil, 1, "github")
+	err := WithUserTokens(context.Background(), q, newTestCipher(t), nil, 1, "github", mustNotRun(t))
 	require.ErrorIs(t, err, dbErr,
 		"non-ErrNoRows DB errors must propagate directly, not masked as ErrNotConnected")
+}
+
+// --- WithStoredTokens ---
+
+// TestWithStoredTokens_WipesThePlaintextAfterTheCallback holds the borrow
+// contract for the expiry-free entry point, which revocation uses.
+func TestWithStoredTokens_WipesThePlaintextAfterTheCallback(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, err := c.Encrypt([]byte("my-access-token"))
+	require.NoError(t, err)
+	refreshCT, err := c.Encrypt([]byte("my-refresh-token"))
+	require.NoError(t, err)
+
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+		},
+	}
+	// Held deliberately, which is what the doc tells callers not to do.
+	// It is the only way to look at the buffer after the wipe.
+	var heldAccess, heldRefresh []byte
+	require.NoError(t, WithStoredTokens(context.Background(), q, c, 1, "google_calendar",
+		func(_ context.Context, tk Tokens) error {
+			require.Equal(t, "my-access-token", string(tk.AccessToken),
+				"the callback must see the plaintext while it runs")
+			require.Equal(t, "my-refresh-token", string(tk.RefreshToken))
+			heldAccess = tk.AccessToken
+			heldRefresh = tk.RefreshToken
+			return nil
+		}))
+
+	require.NotEmpty(t, heldAccess, "the callback must have been handed a token to hold")
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldAccess)), heldAccess,
+		"the access token plaintext is still readable after the callback returned")
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(heldRefresh)), heldRefresh,
+		"the refresh token plaintext is still readable after the callback returned")
+}
+
+// TestWithStoredTokens_WipesThePlaintextWhenTheCallbackFails holds the
+// same property on the error path — a provider revoke that fails is the
+// case where the plaintext is most likely to be forgotten.
+func TestWithStoredTokens_WipesThePlaintextWhenTheCallbackFails(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, err := c.Encrypt([]byte("my-access-token"))
+	require.NoError(t, err)
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                    1,
+			AccessTokenCiphertext: accessCT,
+		},
+	}
+	useErr := errors.New("provider call failed")
+	var held []byte
+	err = WithStoredTokens(context.Background(), q, c, 1, "github",
+		func(_ context.Context, tk Tokens) error {
+			held = tk.AccessToken
+			return useErr
+		})
+	require.ErrorIs(t, err, useErr, "the callback's error must reach the caller unchanged")
+	require.NotEmpty(t, held)
+	assert.Equal(t, bytes.Repeat([]byte{0}, len(held)), held,
+		"the plaintext survived a callback that returned an error")
+}
+
+// TestWithStoredTokens_ExpiredAccessToken_StillHandsOverTokens is the
+// reason this entry point exists alongside WithUserTokens. A grant whose
+// access token has expired still has to be revocable: the refresh token
+// outlives the access tokens it mints, and skipping it would leave the
+// grant live at the provider after the user disconnected.
+func TestWithStoredTokens_ExpiredAccessToken_StillHandsOverTokens(t *testing.T) {
+	t.Parallel()
+	c := newTestCipher(t)
+	accessCT, _ := c.Encrypt([]byte("expired-access"))
+	refreshCT, _ := c.Encrypt([]byte("still-valid-refresh"))
+	q := &fakeLoaderQuerier{
+		findRow: generated.FindUserIntegrationByUserProviderRow{
+			ID:                     1,
+			AccessTokenCiphertext:  accessCT,
+			RefreshTokenCiphertext: sql.NullString{String: string(refreshCT), Valid: true},
+			AccessTokenExpiresAt:   sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true},
+		},
+	}
+	var got captured
+	require.NoError(t, WithStoredTokens(context.Background(), q, c, 1, "google_calendar", capture(&got)))
+	assert.Equal(t, 1, got.calls, "an expired access token must not skip the callback")
+	assert.Equal(t, "still-valid-refresh", got.refresh)
+}
+
+func TestWithStoredTokens_NotConnected_NoRow(t *testing.T) {
+	t.Parallel()
+	q := &fakeLoaderQuerier{findErr: sql.ErrNoRows}
+	err := WithStoredTokens(context.Background(), q, newTestCipher(t), 1, "github", mustNotRun(t))
+	require.ErrorIs(t, err, ErrNotConnected,
+		"missing DB row must surface as ErrNotConnected, not a raw DB error")
 }
 
 // --- test doubles ---
@@ -400,10 +639,10 @@ func (f *fakeLoaderQuerier) UpdateConnectionTokens(
 // stubRefreshProvider extends stubProvider with a customisable Refresh.
 type stubRefreshProvider struct {
 	stubProvider
-	refreshFn func(ctx context.Context, refreshToken string) (*TokenSet, error)
+	refreshFn func(ctx context.Context, refreshToken []byte) (*TokenSet, error)
 }
 
-func (s *stubRefreshProvider) Refresh(ctx context.Context, refreshToken string) (*TokenSet, error) {
+func (s *stubRefreshProvider) Refresh(ctx context.Context, refreshToken []byte) (*TokenSet, error) {
 	if s.refreshFn != nil {
 		return s.refreshFn(ctx, refreshToken)
 	}

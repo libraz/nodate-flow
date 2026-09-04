@@ -3,11 +3,18 @@
 //
 // # SECURITY POLICY
 //
-// Decrypt MUST NOT be called from anywhere outside this package and the
-// internal/ai/providers/* package family. The depguard linter in each app's
-// .golangci.yml enforces that. The plaintext returned by Decrypt must be
-// passed straight to the upstream provider's Authorization header and never
-// stored in long-lived structs, logs, errors, or responses.
+// Reaching a sealed secret means importing this package, and the set of
+// packages allowed to import it is the boundary. Each app names its own set
+// in the depguard `crypto-internal` rule in its .golangci.yml — flow-api
+// admits the AI stack that opens provider keys, auth-api the MFA and
+// integration-token paths that open their own secrets — so the rule there,
+// not this comment, is the list. Anything outside it is refused at lint
+// time, and widening the boundary is an edit to that rule.
+//
+// Within an admitted package the plaintext returned by Decrypt is
+// short-lived: pass it straight to the call that needs it (an upstream
+// Authorization header, a TOTP verification) and never put it in a
+// long-lived struct field, a log, an error, or a response.
 package crypto
 
 import (
@@ -21,8 +28,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
 // EnvVar is the name of the environment variable that holds the master key.
@@ -102,9 +112,11 @@ func (c *Cipher) Encrypt(plaintext []byte) ([]byte, error) {
 
 // Decrypt opens a blob produced by Encrypt and returns the plaintext.
 //
-// IMPORTANT: callers must drop the returned plaintext as soon as possible.
-// Do not place it in struct fields, do not log it, and do not return it
-// to API clients.
+// The caller owns the plaintext's lifetime and must keep it short: use it
+// on the spot and [Zero] it. Do not place it in a struct field that
+// outlives the call, do not log it, and do not return it to API clients.
+// A process that keeps decrypted secrets in live memory hands every one of
+// them to whoever reads a heap dump or a core file.
 func (c *Cipher) Decrypt(blob []byte) ([]byte, error) {
 	if len(blob) < nonceSize+16 {
 		return nil, errors.New("crypto: ciphertext too short")
@@ -131,13 +143,13 @@ func Reencrypt(oldCipher, newCipher *Cipher, blob []byte) ([]byte, error) {
 	plain, err := oldCipher.Decrypt(blob)
 	if err != nil {
 		if p, newErr := newCipher.Decrypt(blob); newErr == nil {
-			zeroBytes(p)
+			Zero(p)
 			return nil, ErrAlreadyRotated
 		}
 		return nil, err
 	}
 	sealed, sealErr := newCipher.Encrypt(plain)
-	zeroBytes(plain)
+	Zero(plain)
 	return sealed, sealErr
 }
 
@@ -149,34 +161,59 @@ func (c *Cipher) CanDecrypt(blob []byte) bool {
 	if err != nil {
 		return false
 	}
-	zeroBytes(plain)
+	Zero(plain)
 	return true
 }
 
-// zeroBytes overwrites b to shorten the lifetime of plaintext secrets in
-// process memory. Best-effort: the runtime may retain copies in GC'd frames.
-func zeroBytes(b []byte) {
+// Zero overwrites b to shorten the lifetime of a plaintext secret in
+// process memory. It is what an admitted caller uses to discharge the
+// obligation Decrypt hands it: wipe the plaintext once the work that
+// needed it is done, so a heap dump taken later does not carry it.
+//
+// Best-effort in two ways. The runtime may retain copies in GC'd frames,
+// and a plaintext converted to a string cannot be wiped at all — Go
+// strings are immutable, so keep a secret in a []byte for as long as it
+// is a secret.
+func Zero(b []byte) {
 	for i := range b {
 		b[i] = 0
 	}
 }
 
-// APIKeyPrefix returns the first 8 characters of an LLM provider API key
-// for masked display (e.g. "sk-ant-A"). Shorter keys return what they have.
+// API key mask widths, in bytes. They match the api_key_prefix CHAR(8)
+// and api_key_suffix CHAR(4) display columns.
+const (
+	apiKeyPrefixLen = 8
+	apiKeySuffixLen = 4
+)
+
+// APIKeyPrefix returns the leading bytes of an LLM provider API key for
+// masked display (e.g. "sk-ant-A"). Shorter keys return what they have.
+//
+// The key is not generated here — it is a third-party credential the
+// workspace admin pastes in, bounded only by a length check — so it
+// cannot be assumed ASCII, and the cut lands on a rune boundary. For an
+// ASCII key, which is what every provider issues in practice, this is
+// exactly the first 8 characters.
 func APIKeyPrefix(plaintext string) string {
-	if len(plaintext) <= 8 {
-		return plaintext
-	}
-	return plaintext[:8]
+	return stringutil.TruncateBytes(plaintext, apiKeyPrefixLen)
 }
 
-// APIKeySuffix returns the last 4 characters of an LLM provider API key
-// for masked display (e.g. "AbCd"). Shorter keys return what they have.
+// APIKeySuffix returns the trailing bytes of an LLM provider API key for
+// masked display (e.g. "AbCd"). Shorter keys return what they have.
+// See [APIKeyPrefix] for why the cut is rune-aware.
 func APIKeySuffix(plaintext string) string {
-	if len(plaintext) <= 4 {
+	if len(plaintext) <= apiKeySuffixLen {
 		return plaintext
 	}
-	return plaintext[len(plaintext)-4:]
+	// Open the window later rather than earlier: a cut inside a
+	// multi-byte character would leave a fragment that is not valid
+	// UTF-8, and the mask is display-only so a shorter one is fine.
+	start := len(plaintext) - apiKeySuffixLen
+	for start < len(plaintext) && !utf8.RuneStart(plaintext[start]) {
+		start++
+	}
+	return plaintext[start:]
 }
 
 func decodeMasterKey(raw string) ([]byte, error) {
