@@ -15,6 +15,11 @@
       "title": "Fixture subtask three",
       "description": "Third step, kept distinct so per-child assertions can tell them apart.",
       "priority": "low"
+    },
+    {
+      "title": "Overlong AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA設設設設設設設設設設設設設設設設設設設設",
+      "description": "Fourth step, its title longer than tasks.title in characters and ending in multi-byte characters so a byte-indexed cut would land mid-rune.",
+      "priority": "low"
     }
   ]
 }
