@@ -3911,7 +3911,7 @@ type Task struct {
 	CreatedByUserID sql.NullInt32 `json:"-"`
 	// Last modifier user.id (audit field; NULL for system writers)
 	UpdatedByUserID sql.NullInt32 `json:"-"`
-	// Task title
+	// Task title; length matches the API and MCP input limit
 	Title string `json:"title"`
 	// Markdown body
 	Description sql.NullString `json:"description"`

@@ -2055,6 +2055,7 @@
           },
           "blockLabel": {
             "description": "Block label",
+            "maxLength": 100,
             "type": "string"
           },
           "endAt": {
@@ -2074,6 +2075,7 @@
           },
           "location": {
             "description": "Location",
+            "maxLength": 500,
             "type": "string"
           },
           "memo": {
@@ -2109,6 +2111,7 @@
           },
           "timezone": {
             "description": "IANA timezone",
+            "maxLength": 64,
             "type": "string"
           },
           "title": {
@@ -2119,6 +2122,7 @@
           },
           "url": {
             "description": "Related URL",
+            "maxLength": 2048,
             "type": "string"
           },
           "visibility": {
@@ -2516,7 +2520,7 @@
             "type": "string"
           },
           "color": {
-            "maxLength": 32,
+            "maxLength": 16,
             "type": "string"
           },
           "description": {
@@ -2534,7 +2538,7 @@
             "type": "string"
           },
           "slug": {
-            "maxLength": 64,
+            "maxLength": 63,
             "minLength": 1,
             "type": "string"
           }
@@ -2859,7 +2863,7 @@
             "type": "string"
           },
           "slug": {
-            "maxLength": 64,
+            "maxLength": 63,
             "minLength": 1,
             "type": "string"
           },
@@ -7678,6 +7682,7 @@
           },
           "blockLabel": {
             "description": "Block label",
+            "maxLength": 100,
             "type": "string"
           },
           "clear": {
@@ -7714,6 +7719,7 @@
           },
           "location": {
             "description": "Location",
+            "maxLength": 500,
             "type": "string"
           },
           "memo": {
@@ -7748,14 +7754,18 @@
           },
           "timezone": {
             "description": "IANA timezone",
+            "maxLength": 64,
             "type": "string"
           },
           "title": {
             "description": "Event title",
+            "maxLength": 500,
+            "minLength": 1,
             "type": "string"
           },
           "url": {
             "description": "Related URL",
+            "maxLength": 2048,
             "type": "string"
           },
           "visibility": {
@@ -7932,7 +7942,7 @@
             "type": "string"
           },
           "slug": {
-            "maxLength": 64,
+            "maxLength": 63,
             "minLength": 1,
             "type": "string"
           }
@@ -8236,7 +8246,7 @@
           },
           "contentType": {
             "description": "MIME type",
-            "maxLength": 255,
+            "maxLength": 127,
             "minLength": 1,
             "type": "string"
           },
@@ -8312,7 +8322,7 @@
           },
           "contentType": {
             "description": "MIME type",
-            "maxLength": 255,
+            "maxLength": 127,
             "minLength": 1,
             "type": "string"
           },
@@ -12710,7 +12720,7 @@
             "type": "string"
           },
           "slug": {
-            "maxLength": 64,
+            "maxLength": 63,
             "minLength": 1,
             "type": "string"
           },

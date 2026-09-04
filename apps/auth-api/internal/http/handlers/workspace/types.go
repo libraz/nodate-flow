@@ -81,7 +81,8 @@ type CreateWorkspaceInput struct {
 
 // CreateWorkspaceInputBody is the JSON body for POST /workspaces.
 type CreateWorkspaceInputBody struct {
-	Slug        string `json:"slug" minLength:"1" maxLength:"64"`
+	// Slug is a DNS label, so it is capped at the 63-octet label limit of RFC 1035.
+	Slug        string `json:"slug" minLength:"1" maxLength:"63"`
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
 	IconURL     string `json:"iconUrl,omitempty" maxLength:"500"`
@@ -132,7 +133,8 @@ type PatchWorkspaceInput struct {
 
 // WorkspacePatchWorkspaceInputBody is the JSON body for PATCH /workspaces/{wsId}.
 type WorkspacePatchWorkspaceInputBody struct {
-	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
+	// Slug is a DNS label, so it is capped at the 63-octet label limit of RFC 1035.
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63"`
 	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
 	Description *string `json:"description,omitempty" maxLength:"500"`
 	IconURL     *string `json:"iconUrl,omitempty" maxLength:"500"`

@@ -900,9 +900,12 @@ type DeleteTaskAttachmentOutput struct {
 // needed) and the response carries Deduplicated=true with empty
 // UploadURL. On a miss the server allocates a new storage_objects row
 // and returns a presigned PUT URL the client streams the bytes to.
+//
+// ContentType stops at the width of the storage_objects column that
+// records it, so a type this body accepts is a type the row can hold.
 type PresignUploadBody struct {
 	Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
-	ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
+	ContentType string `json:"contentType" minLength:"1" maxLength:"127" doc:"MIME type"`
 	ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE."`
 	Sha256      string `json:"sha256" minLength:"64" maxLength:"64" pattern:"^[0-9a-f]{64}$" doc:"Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup."`
 }

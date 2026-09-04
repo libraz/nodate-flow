@@ -55,12 +55,17 @@ type ProjectMember struct {
 }
 
 // CreateProjectBody is the request body for POST /workspaces/{wsId}/projects.
+//
+// Each bound is the width of the column that stores the value, so a body
+// that validates is a body the row can hold. Slug is a DNS label, whose
+// 63-octet limit (RFC 1035) the column encodes; color holds a hex value
+// such as #1abc9c.
 type CreateProjectBody struct {
-	Slug        string `json:"slug" minLength:"1" maxLength:"64"`
+	Slug        string `json:"slug" minLength:"1" maxLength:"63"`
 	Identifier  string `json:"identifier,omitempty" maxLength:"5" doc:"Human-readable project key (e.g. NF)"`
 	Name        string `json:"name" minLength:"1" maxLength:"100"`
 	Description string `json:"description,omitempty" maxLength:"500"`
-	Color       string `json:"color,omitempty" maxLength:"32"`
+	Color       string `json:"color,omitempty" maxLength:"16"`
 }
 
 // CreateProjectInput is the input for POST /workspaces/{wsId}/projects.
@@ -104,8 +109,10 @@ type GetProjectOutput struct {
 }
 
 // PatchProjectBody is the request body for PATCH /projects/{prjId}.
+//
+// Slug carries the same RFC 1035 label bound the column enforces on create.
 type PatchProjectBody struct {
-	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"64"`
+	Slug        *string `json:"slug,omitempty" minLength:"1" maxLength:"63"`
 	Name        *string `json:"name,omitempty" minLength:"1" maxLength:"100"`
 	Description *string `json:"description,omitempty" maxLength:"500"`
 }

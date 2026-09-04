@@ -152,7 +152,7 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"description": stringSchema("Optional description."),
+			"description": stringSchema("Optional description.", Constraints{MaxLength: intPtr(50000)}),
 			"priority":    intSchema("Priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"startOn":     stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -166,7 +166,7 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"taskId":      stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"description": stringSchema("New description."),
+			"description": stringSchema("New description.", Constraints{MaxLength: intPtr(50000)}),
 			"priority":    intSchema("New priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"startOn":     stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -180,7 +180,7 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"taskId":     stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"transition": stringSchema("Transition name: start | block | unblock | submit | complete | reopen | cancel.", Constraints{Pattern: `^(start|block|unblock|submit|complete|reopen|cancel)$`}),
-			"reason":     stringSchema("Optional reason for the transition."),
+			"reason":     stringSchema("Optional reason for the transition.", Constraints{MaxLength: intPtr(2000)}),
 		}, []string{"taskId", "transition"}),
 		run: runTransitionTask,
 	})
@@ -189,8 +189,11 @@ func registerTools(h *Handler) {
 		description:   "Append a comment to a task.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
+			// The body bound is what the REST comment input declares. The column
+			// is MEDIUMTEXT and would take more, but a comment one surface
+			// accepts has to be one the other accepts too.
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"body":   stringSchema("Comment body.", Constraints{MinLength: intPtr(1)}),
+			"body":   stringSchema("Comment body.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(50000)}),
 		}, []string{"taskId", "body"}),
 		run: runAddComment,
 	})
@@ -243,7 +246,7 @@ func registerTools(h *Handler) {
 				"description": "Step definitions to create as child tasks.",
 				"items": objectSchema(map[string]any{
 					"title":       stringSchema("Step title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-					"description": stringSchema("Step description (optional)."),
+					"description": stringSchema("Step description (optional).", Constraints{MaxLength: intPtr(50000)}),
 					"priority":    intSchema("Step priority 0..4 (optional).", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 				}, []string{"title"}),
 			},
@@ -286,7 +289,7 @@ func registerTools(h *Handler) {
 			"name":        stringSchema("Timebox name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(200)}),
 			"startsOn":    stringSchema("Start date YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"endsOn":      stringSchema("End date YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"description": stringSchema("Optional description."),
+			"description": stringSchema("Optional description.", Constraints{MaxLength: intPtr(4000)}),
 			"projectId":   stringSchema("Optional project public id (UUID v7) to scope the timebox.", Constraints{Pattern: publicIDPattern}),
 		}, []string{"name", "startsOn", "endsOn"}),
 		run: runCreateTimebox,
@@ -344,8 +347,11 @@ func registerTools(h *Handler) {
 		description:   "Create a new wiki page.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"title":        stringSchema("Page title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(200)}),
-			"body":         stringSchema("Optional page body content."),
+			// The title bound is the width of pages.title, which is also what
+			// the REST page inputs declare. A narrower bound here would refuse
+			// a title the same column accepts from the other surface.
+			"title":        stringSchema("Page title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"body":         stringSchema("Optional page body content.", Constraints{MaxLength: intPtr(100000)}),
 			"parentPageId": stringSchema("Optional parent page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"projectId":    stringSchema("Optional project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"title"}),
@@ -357,8 +363,8 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"pageId": stringSchema("Page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":  stringSchema("New title (optional).", Constraints{MaxLength: intPtr(200)}),
-			"body":   stringSchema("New body content (optional)."),
+			"title":  stringSchema("New title (optional).", Constraints{MaxLength: intPtr(500)}),
+			"body":   stringSchema("New body content (optional).", Constraints{MaxLength: intPtr(100000)}),
 		}, []string{"pageId"}),
 		run: runUpdatePage,
 	})
@@ -384,7 +390,7 @@ func registerTools(h *Handler) {
 		inputSchema: objectSchema(map[string]any{
 			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
-			"description": stringSchema("Optional task description for better AI analysis."),
+			"description": stringSchema("Optional task description for better AI analysis.", Constraints{MaxLength: intPtr(50000)}),
 		}, []string{"projectId", "title"}),
 		run: runSmartCreateTask,
 	})
@@ -426,9 +432,13 @@ func registerTools(h *Handler) {
 			"visibility":  stringSchema("Who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
 			"ownerUserId": stringSchema("Owner user public id (UUID v7). Defaults to caller.", Constraints{Pattern: publicIDPattern}),
 			"allDay":      boolSchema("Whether this is an all-day event."),
-			"location":    stringSchema("Event location."),
-			"memo":        stringSchema("Event memo/notes."),
-			"blockLabel":  stringSchema("Label for block-type events."),
+			// location and blockLabel are bounded by the widths of
+			// calendar_events.location and calendar_events.block_label. Both are
+			// narrow columns, so a value past them is refused by the driver
+			// rather than by the schema unless the bound is advertised here.
+			"location":   stringSchema("Event location.", Constraints{MaxLength: intPtr(500)}),
+			"memo":       stringSchema("Event memo/notes."),
+			"blockLabel": stringSchema("Label for block-type events.", Constraints{MaxLength: intPtr(100)}),
 		}, []string{"calendarId", "title"}),
 		run: runCreateCalendarEvent,
 	})
@@ -447,9 +457,9 @@ func registerTools(h *Handler) {
 			"showAs":      stringSchema("New reading of the time to others.", Constraints{Enum: calendarEventShowAs}),
 			"flexibility": stringSchema("New answer to whether the commitment can be moved. Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),
 			"visibility":  stringSchema("New answer to who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
-			"location":    stringSchema("New location."),
+			"location":    stringSchema("New location.", Constraints{MaxLength: intPtr(500)}),
 			"memo":        stringSchema("New memo/notes."),
-			"blockLabel":  stringSchema("New block label."),
+			"blockLabel":  stringSchema("New block label.", Constraints{MaxLength: intPtr(100)}),
 		}, []string{"eventId"}),
 		run: runUpdateCalendarEvent,
 	})
@@ -521,9 +531,12 @@ func registerTools(h *Handler) {
 		description:   "Create a new label in the workspace.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"name":        stringSchema("Label name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(100)}),
+			// The name bound is the width of labels.name, which is also what the
+			// REST label inputs declare. A wider bound here would accept a name
+			// the column cannot store and fail in the driver instead.
+			"name":        stringSchema("Label name.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(64)}),
 			"color":       stringSchema("Hex color (e.g. #ef4444). Optional.", Constraints{Pattern: `^#[0-9a-fA-F]{6}$`}),
-			"description": stringSchema("Optional description."),
+			"description": stringSchema("Optional description.", Constraints{MaxLength: intPtr(255)}),
 		}, []string{"name"}),
 		run: runCreateLabel,
 	})

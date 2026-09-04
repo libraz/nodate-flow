@@ -2749,7 +2749,7 @@ CREATE TABLE tasks (
   created_by_user_id INT UNSIGNED NULL COMMENT 'Creator user.id',
   updated_by_user_id INT UNSIGNED NULL COMMENT 'Last modifier user.id (audit field; NULL for system writers)',
 
-  title VARCHAR(255) NOT NULL COMMENT 'Task title',
+  title VARCHAR(500) NOT NULL COMMENT 'Task title; length matches the API and MCP input limit',
   description MEDIUMTEXT NULL COMMENT 'Markdown body',
   derived_state ENUM('open','waiting','review','done','cancelled') NOT NULL DEFAULT 'open' COMMENT 'Computed from constraints + events; do NOT update directly',
   agent_memo JSON NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"',

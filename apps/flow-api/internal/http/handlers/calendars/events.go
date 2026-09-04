@@ -83,6 +83,14 @@ type ListEventsOutput struct {
 }
 
 // CreateEventInput is the input for the create event endpoint.
+//
+// The maxLength on each textual field is the width of the column behind
+// it (calendar_events.title / location / url / timezone / block_label).
+// Stating it here is what refuses an over-long value as a validation
+// error naming the field; without it the only thing left refusing it is
+// the driver, which answers as a write failure for input this API
+// described as acceptable. Memo is absent from that list on purpose: it
+// is MEDIUMTEXT, so the request body limit is its only real bound.
 type CreateEventInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
@@ -95,12 +103,12 @@ type CreateEventInput struct {
 		AllDay             bool             `json:"allDay" required:"false" doc:"All-day event flag"`
 		StartAt            *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC); omit for a planning-stage (undated) event"`
 		EndAt              *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC); omit for a planning-stage (undated) event"`
-		Timezone           string           `json:"timezone" doc:"IANA timezone"`
-		Location           *string          `json:"location,omitempty" required:"false" doc:"Location"`
+		Timezone           string           `json:"timezone" maxLength:"64" doc:"IANA timezone"`
+		Location           *string          `json:"location,omitempty" required:"false" maxLength:"500" doc:"Location"`
 		Memo               *string          `json:"memo,omitempty" required:"false" doc:"Memo / notes"`
-		URL                *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
+		URL                *string          `json:"url,omitempty" required:"false" maxLength:"2048" doc:"Related URL"`
 		OwnerUserID        *string          `json:"ownerUserId,omitempty" required:"false" doc:"Owner user public ID (defaults to actor)"`
-		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
+		BlockLabel         *string          `json:"blockLabel,omitempty" required:"false" maxLength:"100" doc:"Block label"`
 		RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"RFC 5545 recurrence rule as JSON"`
 		RecurrenceEnd      *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		NotificationOffset *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset in minutes"`
@@ -133,6 +141,15 @@ type GetEventOutput struct {
 // answers as a write failure the caller cannot act on — and every reader
 // downstream has to treat a value it does not know as the safest one it
 // can, because it arrived through a route that never checked.
+//
+// The textual fields carry the same maxLength values as CreateEventInput,
+// for the same reason: a bound that only one of the two write routes
+// states is not a bound on the column.
+//
+// Title also carries minLength, because an omitted field is already how
+// this route says "leave it alone" — so an explicit "" is a value, and
+// without the constraint it is written to a NOT NULL column that create
+// refuses to leave empty, leaving an event nothing can name.
 type PatchEventInput struct {
 	WsID  string `path:"wsId" doc:"Workspace public ID"`
 	CalID string `path:"calId" doc:"Calendar public ID"`
@@ -142,15 +159,15 @@ type PatchEventInput struct {
 		Visibility           *string          `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
 		ShowAs               *string          `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
 		Flexibility          *string          `json:"flexibility,omitempty" required:"false" enum:"fixed,negotiable,conditional" doc:"Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken"`
-		Title                *string          `json:"title,omitempty" required:"false" doc:"Event title"`
+		Title                *string          `json:"title,omitempty" required:"false" minLength:"1" maxLength:"500" doc:"Event title"`
 		AllDay               *bool            `json:"allDay,omitempty" required:"false" doc:"All-day flag"`
 		StartAt              *int64           `json:"startAt,omitempty" required:"false" doc:"Start time as unix seconds (UTC)"`
 		EndAt                *int64           `json:"endAt,omitempty" required:"false" doc:"End time as unix seconds (UTC)"`
-		Timezone             *string          `json:"timezone,omitempty" required:"false" doc:"IANA timezone"`
-		Location             *string          `json:"location,omitempty" required:"false" doc:"Location"`
+		Timezone             *string          `json:"timezone,omitempty" required:"false" maxLength:"64" doc:"IANA timezone"`
+		Location             *string          `json:"location,omitempty" required:"false" maxLength:"500" doc:"Location"`
 		Memo                 *string          `json:"memo,omitempty" required:"false" doc:"Memo"`
-		URL                  *string          `json:"url,omitempty" required:"false" doc:"Related URL"`
-		BlockLabel           *string          `json:"blockLabel,omitempty" required:"false" doc:"Block label"`
+		URL                  *string          `json:"url,omitempty" required:"false" maxLength:"2048" doc:"Related URL"`
+		BlockLabel           *string          `json:"blockLabel,omitempty" required:"false" maxLength:"100" doc:"Block label"`
 		RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"Recurrence rule"`
 		RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty" required:"false" doc:"Array of ISO 8601 dates/times to exclude from recurrence"`

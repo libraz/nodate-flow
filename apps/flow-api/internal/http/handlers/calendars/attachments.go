@@ -78,7 +78,7 @@ type PresignAttachmentInput struct {
 	EvtID string `path:"evtId" doc:"Event public ID"`
 	Body  struct {
 		Filename    string `json:"filename" minLength:"1" maxLength:"512" doc:"Original filename"`
-		ContentType string `json:"contentType" minLength:"1" maxLength:"255" doc:"MIME type"`
+		ContentType string `json:"contentType" minLength:"1" maxLength:"127" doc:"MIME type"`
 		ByteSize    uint64 `json:"byteSize" minimum:"1" doc:"File size in bytes. Max 100 MB; over that the handler answers 413 VALIDATION.FILE.TOO_LARGE."`
 		Sha256      string `json:"sha256" minLength:"64" maxLength:"64" pattern:"^[0-9a-f]{64}$" doc:"Lowercase hex SHA-256 digest of the file body (64 chars). Drives content-addressed dedup."`
 	}
