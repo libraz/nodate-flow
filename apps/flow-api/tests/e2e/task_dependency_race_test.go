@@ -61,7 +61,7 @@ func TestConcurrentReverseDependencyPostsKeepGraphAcyclic(t *testing.T) {
 			go func(from, to string) {
 				defer wg.Done()
 				<-start
-				status, body, err := postJSONForConcurrency(t,
+				status, body, err := sendJSONStatus(http.MethodPost,
 					testServerURL+"/tasks/"+from+"/dependencies", tt.AccessToken,
 					map[string]any{"toTaskId": to, "kind": "blocks"})
 				results <- depRaceResult{status: status, body: body, err: err}

@@ -26,17 +26,23 @@ const streamReadBudget = 30 * time.Second
 // streamPostResult carries the outcome of the create the writer
 // goroutine performs. It distinguishes a create that ran from one that
 // never started, because a status of 0 is not an answer the server
-// gave and must never be asserted against as if it were.
+// gave and must never be asserted against as if it were. A create that
+// started but could not be sent is a third outcome again: the request
+// failed in transport, so no status exists and the event pipeline was
+// never reached.
 type streamPostResult struct {
 	attempted bool
 	status    int
 	body      []byte
 	blockedBy error // why the create never started
+	sendErr   error // why the create could not be sent
 }
 
 // describe renders the create's outcome for a failure message.
 func (r streamPostResult) describe() string {
 	switch {
+	case r.sendErr != nil:
+		return fmt.Sprintf("POST /tasks could not be sent: %v", r.sendErr)
 	case r.attempted:
 		return fmt.Sprintf("POST /tasks -> %d body=%s", r.status, string(r.body))
 	case r.blockedBy != nil:
@@ -121,7 +127,8 @@ func TestWorkspaceStream(t *testing.T) {
 	// outcome on a channel and assert it on the main goroutine after the
 	// read loop instead of calling require.* here — a require failure in
 	// a goroutine that outlives the test panics with "Fail in goroutine
-	// after test has completed".
+	// after test has completed". That includes the transport error,
+	// which travels back as data rather than as an assertion.
 	writerDone := make(chan streamPostResult, 1)
 	resyncSeen := make(chan struct{})
 	go func() {
@@ -134,11 +141,15 @@ func TestWorkspaceStream(t *testing.T) {
 			writerDone <- streamPostResult{blockedBy: context.Cause(ctx)}
 			return
 		}
-		status, body := doJSONStatus(t, http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+		status, body, err := sendJSONStatus(http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
 			"projectId": tt.ProjectPublicID,
 			"title":     "stream-triggering task",
 			"priority":  1,
 		})
+		if err != nil {
+			writerDone <- streamPostResult{sendErr: err}
+			return
+		}
 		writerDone <- streamPostResult{attempted: true, status: status, body: body}
 	}()
 
@@ -253,6 +264,10 @@ func TestWorkspaceStream(t *testing.T) {
 	if !postReported {
 		post = <-writerDone
 	}
+	// A create that could not be sent says nothing about the event
+	// pipeline, so it fails in its own words rather than as a missing
+	// frame or a bogus status.
+	require.NoErrorf(t, post.sendErr, "%s", post.describe())
 	require.Truef(t, post.attempted, "%s", post.describe())
 	require.GreaterOrEqualf(t, post.status, 200, "%s", post.describe())
 	require.Lessf(t, post.status, 300, "%s", post.describe())

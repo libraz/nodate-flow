@@ -137,19 +137,29 @@ func requireAIMock(t *testing.T) {
 
 // ---- Shared HTTP helpers ----------------------------------------------------
 
-// doJSONStatus sends a JSON request and returns the status code plus
-// raw response body. Unlike doJSON this does not assert 2xx and is
-// therefore the tool of choice for negative-path tests (401, 409, ...).
-func doJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []byte) {
-	t.Helper()
+// sendJSONStatus sends a JSON request and returns the status code, the
+// raw response body, and any transport error.
+//
+// It takes no *testing.T on purpose. testing.T.FailNow — and therefore
+// every require.* — may only run on the goroutine executing the test:
+// elsewhere it calls runtime.Goexit on the wrong goroutine, and once the
+// test has returned it panics and takes the whole test binary with it.
+// A caller running off the test goroutine consequently has no legal way
+// to fail the test, so it is handed the error to carry back instead.
+// Callers on the test goroutine want doJSONStatus.
+func sendJSONStatus(method, url, bearer string, body any) (int, []byte, error) {
 	var rdr io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
-		require.NoError(t, err)
+		if err != nil {
+			return 0, nil, err
+		}
 		rdr = bytes.NewReader(buf)
 	}
 	req, err := http.NewRequest(method, url, rdr)
-	require.NoError(t, err)
+	if err != nil {
+		return 0, nil, err
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -158,11 +168,25 @@ func doJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []by
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
 	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
+	if err != nil {
+		return 0, nil, err
+	}
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, err
+	}
+	return resp.StatusCode, raw, nil
+}
+
+// doJSONStatus sends a JSON request and returns the status code plus
+// raw response body. Unlike doJSON this does not assert 2xx and is
+// therefore the tool of choice for negative-path tests (401, 409, ...).
+func doJSONStatus(t *testing.T, method, url, bearer string, body any) (int, []byte) {
+	t.Helper()
+	status, raw, err := sendJSONStatus(method, url, bearer, body)
 	require.NoError(t, err)
-	return resp.StatusCode, raw
+	return status, raw
 }
 
 // requireDenied asserts that a refusal landed on exactly the status and

@@ -52,17 +52,25 @@ func TestMarkMagicLinkUsed_ConcurrentRaceOnlyOneWins(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
+	// Each goroutine carries its error back rather than requiring on it:
+	// require calls FailNow, which is only legal on the goroutine running
+	// the test, and panics once the test has returned.
 	results := make([]int64, goroutines)
+	errs := make([]error, goroutines)
 	for i := 0; i < goroutines; i++ {
 		idx := i
 		go func() {
 			defer wg.Done()
 			affected, err := q.MarkMagicLinkUsed(context.Background(), 42)
-			require.NoError(t, err)
+			errs[idx] = err
 			results[idx] = affected
 		}()
 	}
 	wg.Wait()
+
+	for i, err := range errs {
+		require.NoErrorf(t, err, "goroutine %d failed to execute the UPDATE", i)
+	}
 
 	winners := 0
 	for _, r := range results {

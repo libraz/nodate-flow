@@ -89,7 +89,7 @@ func TestConcurrentCrossProjectEdgesCannotCloseCycle(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				<-start
-				status, body, err := postJSONForConcurrency(t,
+				status, body, err := sendJSONStatus(http.MethodPost,
 					testServerURL+"/tasks/"+closing[i][0]+"/dependencies", tt.AccessToken,
 					map[string]any{"toTaskId": closing[i][1], "kind": "blocks"})
 				if err != nil {

@@ -1,43 +1,13 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func postJSONForConcurrency(t *testing.T, url, bearer string, body any) (int, []byte, error) {
-	t.Helper()
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, err
-	}
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(raw))
-	if err != nil {
-		return 0, nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, nil, err
-	}
-	return resp.StatusCode, respBody, nil
-}
 
 func TestConcurrentTaskCreatesAllocateDistinctTaskNumbers(t *testing.T) {
 	bootstrap(t)
@@ -53,7 +23,7 @@ func TestConcurrentTaskCreatesAllocateDistinctTaskNumbers(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			status, body, err := postJSONForConcurrency(t, testServerURL+"/tasks", tt.AccessToken, map[string]any{
+			status, body, err := sendJSONStatus(http.MethodPost, testServerURL+"/tasks", tt.AccessToken, map[string]any{
 				"projectId": tt.ProjectPublicID,
 				"title":     fmt.Sprintf("Concurrent task %02d", i),
 			})
@@ -109,7 +79,7 @@ func TestConcurrentCalendarInviteCreateConvergesToSingleActiveInvite(t *testing.
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			status, body, err := postJSONForConcurrency(t, url, host.AccessToken, map[string]any{})
+			status, body, err := sendJSONStatus(http.MethodPost, url, host.AccessToken, map[string]any{})
 			if err != nil {
 				errs <- err
 				return

@@ -457,6 +457,7 @@ func TestPresignConcurrentRace(t *testing.T) {
 	type result struct {
 		status int
 		raw    []byte
+		err    error
 		res    presignResponse
 	}
 	results := make([]result, racers)
@@ -467,14 +468,21 @@ func TestPresignConcurrentRace(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			<-start // release all racers as close to simultaneously as possible
-			status, raw := doJSONStatus(t, http.MethodPost,
+			status, raw, err := sendJSONStatus(http.MethodPost,
 				fmt.Sprintf("%s/tasks/%s/attachments/presign", testServerURL, taskID),
 				tt.AccessToken, body)
-			results[idx] = result{status: status, raw: raw}
+			results[idx] = result{status: status, raw: raw, err: err}
 		}(i)
 	}
 	close(start)
 	wg.Wait()
+
+	// A racer whose request never reached the server has no status to
+	// judge, so take the transport error first — here on the test
+	// goroutine, where failing the test is legal.
+	for i, r := range results {
+		require.NoErrorf(t, r.err, "racer %d could not send its presign request", i)
+	}
 
 	// First assertion: NO racer saw a 5xx. The handler's
 	// duplicate-entry retry path is the only thing that can keep that
