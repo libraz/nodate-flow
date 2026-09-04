@@ -338,18 +338,37 @@ export function useMarkNotificationRead(): UseMutationResult<void, ApiError, str
   });
 }
 
+/**
+ * The archive endpoint only matches a notification the caller owns that is
+ * still unarchived, so it answers this code whenever it archived nothing:
+ * the row is already archived, belongs to someone else, or never existed.
+ * In every one of those cases the notification is not in the caller's list,
+ * which is precisely the state the archive action asks for — so we treat it
+ * as success rather than rolling the optimistic removal back and reporting a
+ * failure for something the user already got.
+ *
+ * Narrow on purpose: only this code, only on this endpoint. Any other
+ * refusal is a real failure and still rolls back and surfaces.
+ */
+const ARCHIVE_ALREADY_GONE_CODE = 'WS.NOTIFICATION.NOT_FOUND';
+
 /** POST /notifications/{id}/archive — optimistic removal. */
 export function useArchiveNotification(): UseMutationResult<void, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      await apiRequest(
-        (client) =>
-          client.POST('/notifications/{notifId}/archive', {
-            params: { path: { notifId: id } },
-          }),
-        'Failed to archive notification',
-      );
+      try {
+        await apiRequest(
+          (client) =>
+            client.POST('/notifications/{notifId}/archive', {
+              params: { path: { notifId: id } },
+            }),
+          'Failed to archive notification',
+        );
+      } catch (err) {
+        if (err instanceof ApiError && err.code === ARCHIVE_ALREADY_GONE_CODE) return;
+        throw err;
+      }
     },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: [...notificationKeys.all, 'list'] });
