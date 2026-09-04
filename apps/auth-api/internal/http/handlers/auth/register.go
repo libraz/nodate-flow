@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -96,6 +97,13 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			slog.ErrorContext(ctx, "register: create identity failed", "error", err)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		// The account is whole here and both rows are committed: whoever
+		// holds this address can sign in from now on, whether or not the
+		// session below is issued. Counting any earlier would count the
+		// loser of either uniqueness race, who was told the address is
+		// taken and registered nothing.
+		obs.IncUsersRegistered()
 
 		tokens, refresh, err := IssueTokens(ctx, deps, uint32(uid), userPub, in.UserAgent, authn.ClientIPFromContext(ctx)) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		if err != nil {

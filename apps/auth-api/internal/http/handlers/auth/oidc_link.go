@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -135,6 +136,10 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 	if cerr := d.createOIDCIdentity(ctx, userID, p.Provider, p.Subject); cerr != nil {
 		return 0, types.PublicID{}, cerr
 	}
+	// Only this branch registers anyone. The two above resolve a user
+	// that already exists — an identity that logs in, or an account the
+	// provider is linked onto — and inserted no users row.
+	obs.IncUsersRegistered()
 	return userID, userPub, nil
 }
 
