@@ -74,7 +74,12 @@ type Worker struct {
 	db      *sql.DB
 	queries *generated.Queries
 	client  *http.Client
-	done    chan struct{}
+	// doneOnce guards the close of done. Shutdown reaches Stop from
+	// more than one direction — a signal handler and an explicit call
+	// on the same worker — and closing a closed channel would panic the
+	// process in the middle of its own teardown.
+	doneOnce sync.Once
+	done     chan struct{}
 	// cancel stops the supervised delivery loop. Set by Start, called
 	// by Stop.
 	cancel context.CancelFunc
@@ -347,7 +352,8 @@ func (w *Worker) Start(ctx context.Context) {
 	slog.Info("webhook worker started", slog.Duration("interval", pollInterval))
 }
 
-// Stop signals the delivery loop to exit.
+// Stop signals the delivery loop to exit. It is safe to call more than
+// once.
 //
 // Cancelling the loop's context is what makes the stop clean: the
 // supervisor restarts a loop that returns on its own, so signalling
@@ -357,9 +363,15 @@ func (w *Worker) Stop() {
 	if w.cancel != nil {
 		w.cancel()
 	}
-	close(w.done)
+	w.doneOnce.Do(w.closeDone)
 	slog.Info("webhook worker stopped")
 }
+
+// closeDone closes the loop's done channel. Stop passes it to doneOnce
+// as a method value rather than wrapping it in a closure the way the
+// sibling workers do: a func literal in Stop makes the gosec
+// cancel-func check stop seeing the w.cancel() call above it.
+func (w *Worker) closeDone() { close(w.done) }
 
 // loop is the main ticker that periodically processes pending deliveries.
 func (w *Worker) loop(ctx context.Context) {

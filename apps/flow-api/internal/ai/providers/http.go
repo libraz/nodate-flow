@@ -231,23 +231,38 @@ func OutboundSnapshot() map[string]outbound.LimiterStats {
 // maxRetries is the number of additional attempts after the first 429.
 const maxRetries = 3
 
-// doLimited runs req through sharedClient after waiting on both the
-// per-workspace limiter (if a workspace ID is on the context) and the
-// global per-destination outbound limiter. The workspace limiter is
-// checked first so a single tenant cannot exhaust the global quota.
-// On HTTP 429, it retries with exponential backoff up to maxRetries
-// times, honoring the Retry-After header when present.
-func doLimited(ctx context.Context, destination string, req *http.Request) (*http.Response, error) {
-	// Per-workspace egress cap (checked first).
+// waitEgress consumes one token from every cap that applies to this
+// call: the per-workspace bucket when the context carries a workspace
+// ID, then the global per-destination bucket. The workspace bucket is
+// taken first so a single tenant cannot exhaust the global quota.
+//
+// Both are token buckets that hold their own mutex only long enough to
+// credit and decrement it, so nothing is held across the wait and the
+// two can be taken in sequence on every attempt.
+func waitEgress(ctx context.Context, destination string) error {
 	if wsID := WorkspaceIDFromContext(ctx); wsID != 0 {
 		if wl := getOrCreateWSLimiter(wsID); wl != nil {
 			if err := wl.Wait(ctx); err != nil {
-				return nil, fmt.Errorf("workspace rate limit: %w", err)
+				return fmt.Errorf("workspace rate limit: %w", err)
 			}
 		}
 	}
-	// Global per-destination cap.
-	if err := outboundRegistry.Wait(ctx, destination); err != nil {
+	return outboundRegistry.Wait(ctx, destination)
+}
+
+// doLimited runs req through sharedClient after waiting on both the
+// per-workspace limiter (if a workspace ID is on the context) and the
+// global per-destination outbound limiter. On HTTP 429, it retries with
+// exponential backoff up to maxRetries times, honoring the Retry-After
+// header when present.
+//
+// Every attempt pays both caps, because every attempt is another request
+// on the wire. Charging the workspace only for the first one would let a
+// tenant in a sustained 429 loop issue maxRetries+1 upstream calls per
+// token it holds — spending the most quota exactly when the upstream is
+// asking for less traffic.
+func doLimited(ctx context.Context, destination string, req *http.Request) (*http.Response, error) {
+	if err := waitEgress(ctx, destination); err != nil {
 		return nil, err
 	}
 
@@ -270,8 +285,8 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 		case <-time.After(wait):
 		}
 
-		// Re-wait on rate limiter before retrying.
-		if err := outboundRegistry.Wait(ctx, destination); err != nil {
+		// Re-pay both caps before retrying.
+		if err := waitEgress(ctx, destination); err != nil {
 			return nil, err
 		}
 

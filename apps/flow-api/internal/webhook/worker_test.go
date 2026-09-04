@@ -83,3 +83,31 @@ func TestHookRecoversPanic(t *testing.T) {
 		t.Fatal("hook goroutine did not run")
 	}
 }
+
+// TestStopIsIdempotent asserts that Stop can be reached twice — a
+// signal handler and an explicit call on the same worker — without
+// panicking, and that a single Stop still ends the delivery loop.
+//
+// Both halves matter: a Stop that closed nothing would never panic and
+// would also never stop anything, so the loop is observed here through
+// w.done alone, with cancel left unset.
+func TestStopIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	w := NewWorker(nil, nil)
+
+	looped := make(chan struct{})
+	go func() {
+		defer close(looped)
+		w.loop(context.Background())
+	}()
+
+	w.Stop()
+	w.Stop()
+
+	select {
+	case <-looped:
+	case <-time.After(time.Second):
+		t.Fatal("delivery loop did not exit after Stop")
+	}
+}

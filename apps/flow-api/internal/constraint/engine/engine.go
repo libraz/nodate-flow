@@ -59,10 +59,11 @@ type Engine struct {
 	Now func() time.Time
 }
 
-// EvaluateTask loads a task's constraints, evaluates each against
-// the task facts, and updates the stored satisfied/failed markers
-// for every row whose outcome actually changed. The returned slice
-// mirrors the stored order so callers can surface per-constraint
+// EvaluateTask loads a task's constraints, evaluates each against the
+// task facts, and writes the resulting satisfied/failed marker for
+// every row it evaluated — the write is unconditional, so a row whose
+// outcome is unchanged is written the same values again. The returned
+// slice mirrors the stored order so callers can surface per-constraint
 // feedback in the UI.
 func (e *Engine) EvaluateTask(ctx context.Context, taskID uint32) ([]Outcome, error) {
 	if e.Store == nil {
