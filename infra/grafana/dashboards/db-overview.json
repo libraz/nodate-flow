@@ -1,6 +1,6 @@
 {
   "uid": "nf-db-overview",
-  "title": "MySQL Database Overview",
+  "title": "Database Overview",
   "tags": ["nodate-flow", "mysql", "database"],
   "timezone": "browser",
   "editable": true,
@@ -12,18 +12,19 @@
   "panels": [
     {
       "id": 1,
-      "title": "Threads Connected",
+      "title": "Connection Pool",
+      "description": "Size of the flow-api database connection pool. nf_db_connections_open and nf_db_connections_idle are gauges without labels, sampled from sql.DBStats every 15 seconds.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "mysql_global_status_threads_connected",
-          "legendFormat": "connected"
+          "expr": "nf_db_connections_open",
+          "legendFormat": "open"
         },
         {
-          "expr": "mysql_global_variables_max_connections",
-          "legendFormat": "max_connections"
+          "expr": "nf_db_connections_idle",
+          "legendFormat": "idle"
         }
       ],
       "fieldConfig": {
@@ -36,10 +37,10 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "max_connections" },
+            "matcher": { "id": "byName", "options": "idle" },
             "properties": [
               { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+              { "id": "custom.fillOpacity", "value": 0 }
             ]
           }
         ]
@@ -47,14 +48,15 @@
     },
     {
       "id": 2,
-      "title": "Threads Running",
+      "title": "Connections In Use",
+      "description": "Pooled connections checked out to a query, derived as nf_db_connections_open minus nf_db_connections_idle.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "mysql_global_status_threads_running",
-          "legendFormat": "running"
+          "expr": "nf_db_connections_open - nf_db_connections_idle",
+          "legendFormat": "in use"
         }
       ],
       "fieldConfig": {
@@ -70,14 +72,19 @@
     },
     {
       "id": 3,
-      "title": "Questions Rate (queries/s)",
+      "title": "Query Rate (queries/s)",
+      "description": "Completed queries per second, in total and for the five busiest operations. nf_db_queries_total is a counter with labels: query (the sqlc operation name), status.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "rate(mysql_global_status_questions[5m])",
-          "legendFormat": "queries/s"
+          "expr": "sum(rate(nf_db_queries_total[5m]))",
+          "legendFormat": "total"
+        },
+        {
+          "expr": "topk(5, sum by (query) (rate(nf_db_queries_total[5m])))",
+          "legendFormat": "{{query}}"
         }
       ],
       "fieldConfig": {
@@ -93,23 +100,31 @@
     },
     {
       "id": 4,
-      "title": "Slow Queries Rate",
+      "title": "Query Duration p50 / p95 / p99",
+      "description": "Query latency across every operation. nf_db_query_duration_seconds is a histogram with a single label, query; its buckets end at 10 seconds, so anything slower is only bounded from below.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "rate(mysql_global_status_slow_queries[5m])",
-          "legendFormat": "slow queries/s"
+          "expr": "histogram_quantile(0.50, sum(rate(nf_db_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nf_db_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(nf_db_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
-          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10
+            "fillOpacity": 5
           }
         },
         "overrides": []
@@ -117,14 +132,15 @@
     },
     {
       "id": 5,
-      "title": "InnoDB Buffer Pool Usage",
+      "title": "Query Error Ratio",
+      "description": "Share of completed queries that returned an error, from the status label on nf_db_queries_total.",
       "type": "gauge",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "mysql_global_status_innodb_buffer_pool_pages_data / mysql_global_status_innodb_buffer_pool_pages_total",
-          "legendFormat": "usage"
+          "expr": "sum(rate(nf_db_queries_total{status=\"error\"}[5m])) / sum(rate(nf_db_queries_total[5m]))",
+          "legendFormat": "error ratio"
         }
       ],
       "fieldConfig": {
@@ -135,8 +151,8 @@
           "thresholds": {
             "steps": [
               { "value": 0, "color": "green" },
-              { "value": 0.8, "color": "yellow" },
-              { "value": 0.95, "color": "red" }
+              { "value": 0.01, "color": "yellow" },
+              { "value": 0.05, "color": "red" }
             ]
           }
         },
@@ -145,23 +161,25 @@
     },
     {
       "id": 6,
-      "title": "Aborted Connections Rate",
+      "title": "Query Error Rate",
+      "description": "Failing queries per second, in total and by operation.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "rate(mysql_global_status_aborted_connects[5m])",
-          "legendFormat": "aborted connects/s"
+          "expr": "sum(rate(nf_db_queries_total{status=\"error\"}[5m]))",
+          "legendFormat": "total errors"
         },
         {
-          "expr": "rate(mysql_global_status_aborted_clients[5m])",
-          "legendFormat": "aborted clients/s"
+          "expr": "sum by (query) (rate(nf_db_queries_total{status=\"error\"}[5m]))",
+          "legendFormat": "{{query}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "color": { "mode": "fixed", "fixedColor": "red" },
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10
@@ -172,23 +190,23 @@
     },
     {
       "id": 7,
-      "title": "Table Locks Waited Rate",
+      "title": "Slowest Operations (p95)",
+      "description": "The five operations with the highest p95 latency, from nf_db_query_duration_seconds grouped by the query label.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "rate(mysql_global_status_table_locks_waited[5m])",
-          "legendFormat": "locks waited/s"
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, query) (rate(nf_db_query_duration_seconds_bucket[5m]))))",
+          "legendFormat": "{{query}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops",
-          "color": { "mode": "fixed", "fixedColor": "red" },
+          "unit": "s",
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10
+            "fillOpacity": 5
           }
         },
         "overrides": []
