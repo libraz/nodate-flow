@@ -318,6 +318,15 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 	// run agentguard.Decide to enforce enabled / paused /
 	// allowed-scopes and the monthly cost cap.
 	//
+	// The guard answers two different questions here: whether the agent
+	// may act at all (enabled / paused / allowed scopes) and whether it
+	// may spend (the monthly cost cap). Both refuse with the same
+	// Outcome, so the refusal is named from decision.Cause instead: an
+	// operator who flips the kill switch must not see the agent's client
+	// report a budget failure and go looking at spending limits for it.
+	// AI.AGENT.PAUSED is what the SSE stream returns for the same two
+	// rules, so both transports name the kill switch identically.
+	//
 	// Monthly cost-cap enforcement is a deliberate SOFT cap with
 	// post-hoc + 95%-margin semantics, not a hard pre-call reserve:
 	//   - spend is real: loadAgentMonthSpendCents sums
@@ -361,9 +370,22 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			EstimatedCents: 0,
 		})
 		if decision.Outcome != agentguard.OutcomeAllow {
-			spec := apierrors.McpScopeInsufficient
-			if decision.Outcome == agentguard.OutcomePause {
+			var spec *apierrors.Spec
+			switch decision.Cause {
+			case agentguard.CauseDisabled, agentguard.CausePaused:
+				spec = apierrors.AiAgentPaused
+			case agentguard.CauseCostCapExhausted, agentguard.CauseCostCapWouldExceed:
 				spec = apierrors.AiCostGuardExceeded
+			case agentguard.CauseScopeNotAllowed:
+				spec = apierrors.McpScopeInsufficient
+			case agentguard.CauseNone:
+				// CauseNone belongs to an allow, so it cannot reach here;
+				// the branch keeps the switch total so a cause added to
+				// agentguard still refuses the call rather than falling
+				// through to a nil spec.
+				spec = apierrors.McpScopeInsufficient
+			default:
+				spec = apierrors.McpScopeInsufficient
 			}
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusDenied, spec.Code, 0)

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentguard"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
@@ -131,6 +132,12 @@ var (
 // no declared minimum to hold it to. Reading the workspace's events is
 // what any member may do, which is the rule the two checks below state in
 // full: hold read:workspace, and still be in the workspace.
+//
+// A session backed by an AI agent is held to the agent's own state as
+// well. Disabling or pausing an agent stops its tool calls on the POST
+// path; without the same check here the stream is the one place the kill
+// switch does not reach, and a paused agent keeps receiving every event
+// in the workspace for as long as it stays connected.
 func (h *Handler) authorizeStream(ctx context.Context, sess *session) error {
 	if !sess.hasScope(ScopeReadWorkspace) {
 		return apierrors.New(apierrors.McpScopeInsufficient)
@@ -138,8 +145,35 @@ func (h *Handler) authorizeStream(ctx context.Context, sess *session) error {
 	if _, err := requireWorkspaceMembership(ctx, h.deps, sess); err != nil {
 		return err
 	}
+	if sess.agentID != 0 {
+		agent, err := h.loadAgentGuardSnapshot(ctx, sess.agentID)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errStreamGuardUnavailable, err)
+		}
+		// Only the access half of the guard applies. A stream delivers
+		// events and spends no provider money, so a monthly spend cap has
+		// nothing to bound here; evaluating it would mean summing
+		// ai_invocations once per revalidation tick per connection to
+		// enforce a limit against zero spend. Every billable call an
+		// over-budget agent makes is already refused on the POST path.
+		decision := agentguard.DecideAccess(agent, ScopeReadWorkspace)
+		switch decision.Outcome {
+		case agentguard.OutcomePause:
+			return apierrors.New(apierrors.AiAgentPaused)
+		case agentguard.OutcomeDeny:
+			return apierrors.New(apierrors.McpScopeInsufficient)
+		case agentguard.OutcomeAllow:
+		}
+	}
 	return nil
 }
+
+// errStreamGuardUnavailable marks a failure to load the agent guard
+// snapshot, as opposed to a decision the guard reached. It is
+// deliberately not an *apierrors.APIError: the two callers of
+// authorizeStream tell the two apart by that type, and only one of them
+// closes the stream over it.
+var errStreamGuardUnavailable = stderrors.New("agent guard unavailable")
 
 // revalidateStream re-answers "may this connection still be here?"
 // against the database rather than against the decision made when it
@@ -172,9 +206,18 @@ func (h *Handler) revalidateStream(ctx context.Context, tok string, sess *sessio
 	if row.WorkspaceID != sess.workspaceID {
 		return apierrors.New(apierrors.McpTokenWorkspaceMismatch)
 	}
+	var agentID uint32
+	if row.AgentID.Valid {
+		agentID = uint32(row.AgentID.Int32) //#nosec G115 -- agent_id is agents.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	}
+	// The agent id is carried across because authorizeStream holds an
+	// agent-backed session to the agent's state. Rebuilding the session
+	// without it would leave the guard looking at a zero id and passing
+	// every tick, which is the same as not running it at all.
 	current := &session{
 		userID:      row.UserID,
 		workspaceID: row.WorkspaceID,
+		agentID:     agentID,
 		scopes:      parseScopes(row.ScopesJson),
 	}
 	if aerr := h.authorizeStream(ctx, current); aerr != nil {
@@ -183,6 +226,11 @@ func (h *Handler) revalidateStream(ctx context.Context, tok string, sess *sessio
 			return aerr
 		}
 		// Not a decision, an infrastructure failure — same trade as above.
+		// A guard snapshot that could not be loaded is one of them, and it
+		// is why the two callers of authorizeStream differ: at open, one
+		// client is refused and retries, while here the same database
+		// outage would disconnect every connected client at once and they
+		// would all reconnect into it.
 		return nil
 	}
 	return nil
@@ -239,10 +287,22 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Scope and membership are checked before the stream is registered,
-	// not only when a tool is called: the stream itself is a read of the
-	// workspace.
+	// Scope, membership and the agent kill switch are checked before the
+	// stream is registered, not only when a tool is called: the stream
+	// itself is a read of the workspace.
 	if aerr := h.authorizeStream(r.Context(), sess); aerr != nil {
+		// The sentinel is tested for before the general error shape, so a
+		// guard failure that ever comes to wrap an API error is still
+		// named as the guard failure it is rather than as whatever it
+		// carries.
+		if stderrors.Is(aerr, errStreamGuardUnavailable) {
+			// Opening a stream whose guard could not be read would hand out
+			// an unbounded read on an unchecked credential, so this one
+			// client is refused and reconnects. The POST path names the
+			// same failure the same way.
+			writeRPCTransportError(w, nil, apierrors.McpToolGuardUnavailable, "agent guard check failed")
+			return
+		}
 		var ae *apierrors.APIError
 		if stderrors.As(aerr, &ae) {
 			writeRPCTransportError(w, nil, ae.Spec, ae.Spec.Message)
