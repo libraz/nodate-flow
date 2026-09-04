@@ -43,9 +43,10 @@ export interface ConnectRequest {
   provider: IntegrationProviderName;
   redirectTo?: string;
 }
-export interface ConnectResponse {
-  authorizeUrl: string;
-}
+export type ConnectResponse = Pick<
+  components['schemas']['ConnectIntegrationOutputBody'],
+  'authorizeUrl'
+>;
 
 /** POST /me/integrations/{provider}/connect — returns the authorize URL. */
 export function useConnectIntegration(): UseMutationResult<

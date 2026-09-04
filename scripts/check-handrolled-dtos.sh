@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-handrolled-dtos.sh -- detect hand-rolled response DTO interfaces
+# check-handrolled-dtos.sh -- detect hand-rolled response DTO declarations
 # in route / feature code that should reuse the generated SDK schemas.
 #
 # Background:
@@ -12,24 +12,39 @@
 #   `{ workspaces: ... }` while the route declared `{ items: ... }`.
 #
 # What this checks:
-#   Bans `interface <Foo>Body`, `interface <Foo>OutputBody`,
-#   `interface <Foo>ResponseBody`, and `interface <Foo>Response` declared
-#   inside `apps/accounts-web/src/` or `apps/flow-web/src/`. Use one of:
+#   Bans a response shape spelled out by hand under
+#   `apps/accounts-web/src/` or `apps/flow-web/src/`, in either form a
+#   declaration can take:
+#
+#     interface <Foo>Body / <Foo>OutputBody / <Foo>ResponseBody / <Foo>Response
+#     type <Foo>Response = { ... }        (right-hand side an object literal)
+#
+#   Both describe the shape rather than derive it, so `type` is not an
+#   escape hatch from the `interface` ban. Use one of:
 #
 #     type Foo = components['schemas']['Foo'];
 #     type Foo = components['schemas']['FooOutputBody'];
 #     type Foo = Pick<components['schemas']['Foo'], 'a' | 'b'>;
 #
-#   from `@nodate-flow/sdk` instead. If a local interface is genuinely a
-#   normalised view-model (not a 1:1 mirror of the API), give it a name
-#   that does not end in Body / OutputBody / ResponseBody / Response (e.g.
-#   `NormalisedShareRender`, `UnreadCountResult`).
+#   from `@nodate-flow/sdk` instead. An alias whose right-hand side is a
+#   `components[...]` lookup, a `Pick` / `Omit` over one, or another type
+#   is derived rather than hand-rolled and is not flagged.
+#
+#   If a local type is genuinely a normalised view-model (not a 1:1 mirror
+#   of the API), give it a name that does not end in Body / OutputBody /
+#   ResponseBody / Response (e.g. `NormalisedShareRender`,
+#   `UnreadCountResult`) -- and still derive its members from the schema
+#   where it mirrors one, so a field rename upstream fails the build.
 #
 # Excluded:
 #   - test / spec / fixture files (`*.test.*`, `*.spec.*`, `__tests__/`,
 #     `e2e/`)
 #   - `node_modules`, `.git`, `dist`
 #   - generated route tree (`routeTree.gen.ts`)
+#
+# Every scan root must reach at least one file. A root that matches
+# nothing is reported as a failure rather than as a pass, because a scan
+# over zero files is indistinguishable from a clean scan.
 #
 # Usage:
 #   ./scripts/check-handrolled-dtos.sh        # exit 1 on any hit
@@ -41,11 +56,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Matches: `interface FooBody {`, `interface FooOutputBody {`,
-#          `interface FooResponseBody {`, `interface FooResponse {`
-# Anchored to the start of the line so we don't trip over JSDoc / comments
-# that mention the suffix in prose.
-PATTERN='^interface +[A-Z][A-Za-z0-9]*(Body|OutputBody|ResponseBody|Response)[[:space:]]*(extends|<|\{)'
+# Both patterns are anchored to the start of the line so we don't trip over
+# JSDoc / comments that mention a suffix in prose: a declaration starts at
+# column 0, while prose inside a block comment is indented behind a `*`.
+SUFFIXED_NAME='[A-Z][A-Za-z0-9]*(Body|OutputBody|ResponseBody|Response)'
+
+# `interface FooBody {`, `interface FooResponse extends`, and so on,
+# optionally prefixed with `export ` or `export default `.
+INTERFACE_PATTERN="^(export +(default +)?)?interface +${SUFFIXED_NAME}[[:space:]]*(extends|<|\{)"
+
+# `type FooResponse = {`, i.e. an alias whose right-hand side opens an
+# object type literal on the same line. A derived alias is left alone: it
+# either names its source (`= components[...]`, `= Pick<...>`) or wraps to
+# the next line, and neither puts a `{` after the `=`.
+ALIAS_PATTERN="^(export +)?type +${SUFFIXED_NAME}[[:space:]]*(<[^=]*>)?[[:space:]]*=[[:space:]]*\{"
 
 SCAN_DIRS=(
   "$ROOT/apps/accounts-web/src"
@@ -64,23 +88,36 @@ EXCLUDES=(
   --exclude='routeTree.gen.ts'
 )
 
+INCLUDES=(
+  --include='*.ts'
+  --include='*.tsx'
+)
+
 hits=""
 count=0
 
 for dir in "${SCAN_DIRS[@]}"; do
-  [[ -d "$dir" ]] || continue
+  # `grep -c ''` reports a count for every file it opens, empty ones
+  # included, so this is the file set the scan below actually sees.
+  scanned=$({ grep -rc '' "$dir" "${EXCLUDES[@]}" "${INCLUDES[@]}" 2>/dev/null || true; } | wc -l | tr -d ' ')
+  if [[ "$scanned" -eq 0 ]]; then
+    echo "check-handrolled-dtos: scan root reached 0 files: $dir" >&2
+    echo "The scan cannot report a violation it never read. Fix the path" >&2
+    echo "or the include/exclude filters before trusting this check." >&2
+    exit 2
+  fi
+
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     hits="${hits}${line}"$'\n'
     count=$((count + 1))
-  done < <(grep -rnE "$PATTERN" "$dir" "${EXCLUDES[@]}" \
-    --include='*.ts' \
-    --include='*.tsx' \
+  done < <(grep -rnE -e "$INTERFACE_PATTERN" -e "$ALIAS_PATTERN" \
+    "$dir" "${EXCLUDES[@]}" "${INCLUDES[@]}" \
     2>/dev/null || true)
 done
 
 if [[ $count -gt 0 ]]; then
-  echo "Found $count hand-rolled response DTO interface(s):"
+  echo "Found $count hand-rolled response DTO declaration(s):"
   printf '%s' "$hits" | sort
   echo ""
   echo "Replace each with a generated SDK type, e.g.:"
@@ -96,4 +133,4 @@ if [[ $count -gt 0 ]]; then
   exit 1
 fi
 
-echo "No hand-rolled response DTO interfaces found."
+echo "No hand-rolled response DTO declarations found."

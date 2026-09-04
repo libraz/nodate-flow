@@ -136,10 +136,10 @@ export function useTotpStatusQuery(): UseSuspenseQueryResult<TotpStatus> {
   });
 }
 
-export interface TotpEnrollResponse {
-  otpauthUrl: string;
-  secret: string;
-}
+export type TotpEnrollResponse = Pick<
+  components['schemas']['TotpEnrollOutputBody'],
+  'otpauthUrl' | 'secret'
+>;
 
 export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, ApiError, string> {
   const qc = useQueryClient();
@@ -158,7 +158,13 @@ export function useTotpEnroll(): UseMutationResult<TotpEnrollResponse, ApiError,
   });
 }
 
-export interface TotpConfirmResponse {
+/**
+ * Recovery codes as the panel consumes them. Not a mirror of one API
+ * schema: `/me/totp/confirm` and `/me/totp/recovery-codes` each return
+ * `recoveryCodes` as nullable, and both hooks below normalise the null
+ * away so callers can render the list without a second empty-state.
+ */
+export interface RecoveryCodesResult {
   recoveryCodes: string[];
 }
 
@@ -168,14 +174,14 @@ export interface TotpConfirmRequest {
 }
 
 export function useTotpConfirm(): UseMutationResult<
-  TotpConfirmResponse,
+  RecoveryCodesResult,
   ApiError,
   TotpConfirmRequest
 > {
   const qc = useQueryClient();
-  return useMutation<TotpConfirmResponse, ApiError, TotpConfirmRequest>({
+  return useMutation<RecoveryCodesResult, ApiError, TotpConfirmRequest>({
     throwOnError: false,
-    mutationFn: async ({ code, password }: TotpConfirmRequest): Promise<TotpConfirmResponse> => {
+    mutationFn: async ({ code, password }: TotpConfirmRequest): Promise<RecoveryCodesResult> => {
       const data = await authApiRequest(
         (client) => client.POST('/me/totp/confirm', { body: { code, password } }),
         'Failed to confirm 2FA code',
@@ -203,14 +209,14 @@ export function useRecoveryCodesStatusQuery(): UseSuspenseQueryResult<number> {
 }
 
 export function useRegenerateRecoveryCodes(): UseMutationResult<
-  TotpConfirmResponse,
+  RecoveryCodesResult,
   ApiError,
   string
 > {
   const qc = useQueryClient();
-  return useMutation<TotpConfirmResponse, ApiError, string>({
+  return useMutation<RecoveryCodesResult, ApiError, string>({
     throwOnError: false,
-    mutationFn: async (password: string): Promise<TotpConfirmResponse> => {
+    mutationFn: async (password: string): Promise<RecoveryCodesResult> => {
       const data = await authApiRequest(
         (client) => client.POST('/me/totp/recovery-codes', { body: { password } }),
         'Failed to regenerate recovery codes',
@@ -244,9 +250,10 @@ export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
 }
-export interface ChangePasswordResponse {
-  otherSessionsRevoked: number;
-}
+export type ChangePasswordResponse = Pick<
+  components['schemas']['ChangePasswordOutputBody'],
+  'otherSessionsRevoked'
+>;
 export function useChangePassword(): UseMutationResult<
   ChangePasswordResponse,
   ApiError,

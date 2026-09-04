@@ -24,6 +24,10 @@
 #     equality assertions)
 #   - node_modules, dist, .git
 #   - generated SDK output
+#
+# Every scan root must reach at least one file. A root that matches
+# nothing is reported as a failure rather than as a pass, because a scan
+# over zero files is indistinguishable from a clean scan.
 
 set -euo pipefail
 
@@ -35,9 +39,10 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Detects: attr="Word ...", attr='Word ...' where the value contains at
-# least one alphabetic run of length >= 4. Bound the inner pattern so we
-# don't match expression-bound attrs like attr={t('x')}.
-ATTR_PATTERN='(placeholder|aria-label|aria-description|title|alt)="[^"{}<>][^"{}<>]*[A-Za-z]{4,}[^"{}<>]*"'
+# least one alphabetic run of length >= 4. Both quote forms are matched,
+# each against a value that may not contain its own delimiter. Bound the
+# inner pattern so we don't match expression-bound attrs like attr={t('x')}.
+ATTR_PATTERN="(placeholder|aria-label|aria-description|title|alt)=(\"[^\"{}<>][^\"{}<>]*[A-Za-z]{4,}[^\"{}<>]*\"|'[^'{}<>][^'{}<>]*[A-Za-z]{4,}[^'{}<>]*')"
 
 SCAN_DIRS=(
   "$ROOT/apps/flow-web/src"
@@ -58,7 +63,15 @@ count=0
 found_files=""
 
 for dir in "${SCAN_DIRS[@]}"; do
-  [[ -d "$dir" ]] || continue
+  # `grep -c ''` reports a count for every file it opens, empty ones
+  # included, so this is the file set the scan below actually sees.
+  scanned=$({ grep -rc '' "$dir" "${EXCLUDES[@]}" --include='*.tsx' 2>/dev/null || true; } | wc -l | tr -d ' ')
+  if [[ "$scanned" -eq 0 ]]; then
+    echo "check-hardcoded-strings: scan root reached 0 .tsx files: $dir" >&2
+    echo "The scan cannot report a violation it never read. Fix the path" >&2
+    echo "or the include/exclude filters before trusting this check." >&2
+    exit 2
+  fi
 
   while IFS= read -r line; do
     count=$((count + 1))

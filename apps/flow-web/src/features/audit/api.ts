@@ -7,9 +7,19 @@ import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-q
 import { apiRequest } from '../../lib/api';
 
 export type AuditLogEntry = components['schemas']['LogEntryDTO'];
-export type AuditLogListResponse = {
-  entries: AuditLogEntry[];
-  total: number;
+
+type ListAuditLogsBody = components['schemas']['ListAuditLogsBody'];
+
+/**
+ * The list response as the table consumes it. Not a mirror of the API
+ * schema: `entries` arrives nullable and the query below normalises the
+ * null to an empty array so callers render one empty state, not two.
+ * Both members stay tied to the schema, so a field renamed upstream
+ * fails the build here rather than at runtime.
+ */
+export type AuditLogList = {
+  entries: NonNullable<ListAuditLogsBody['entries']>;
+  total: ListAuditLogsBody['total'];
 };
 
 export interface AuditLogFilters {
@@ -36,10 +46,10 @@ export const auditLogKeys = {
 export function useAuditLogsQuery(
   workspaceId: string,
   filters: AuditLogFilters = {},
-): UseSuspenseQueryResult<AuditLogListResponse> {
+): UseSuspenseQueryResult<AuditLogList> {
   return useSuspenseQuery({
     queryKey: auditLogKeys.list(workspaceId, filters),
-    queryFn: async (): Promise<AuditLogListResponse> => {
+    queryFn: async (): Promise<AuditLogList> => {
       const queryParams: AuditLogFilters = {
         limit: filters.limit ?? 50,
         offset: filters.offset ?? 0,
