@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -103,7 +104,9 @@ func TestNotificationMarkReadAndArchive(t *testing.T) {
 	notifID := list.Notifications[0].ID
 	require.NotEmpty(t, notifID)
 
-	// Mark as read.
+	// Mark as read. The audit entry carries no workspace, so it lands in
+	// instance_audit_logs.
+	memberInternalID := lookupUserInternalID(ctx, t, testDB, member.UserPublicID)
 	var ok struct {
 		Ok bool `json:"ok"`
 	}
@@ -111,10 +114,92 @@ func TestNotificationMarkReadAndArchive(t *testing.T) {
 		testServerURL+"/notifications/"+notifID+"/read",
 		member.AccessToken, nil, &ok)
 	require.True(t, ok.Ok)
+	require.Equal(t, 1,
+		countInstanceAuditLogs(t, testDB, "notification.read", memberInternalID, notifID),
+		"the live read must record exactly one entry")
+
+	// Marking read again moves no row. No list read filters on read_at, so
+	// the notification is still in the member's inbox and the call stays ok
+	// -- but nothing was read, so nothing may be recorded.
+	doJSON(t, http.MethodPost,
+		testServerURL+"/notifications/"+notifID+"/read",
+		member.AccessToken, nil, &ok)
+	require.True(t, ok.Ok, "marking an already read notification must stay ok")
+	require.Equal(t, 1,
+		countInstanceAuditLogs(t, testDB, "notification.read", memberInternalID, notifID),
+		"the repeat must not record a second read")
+
+	// The owner is in the same workspace but is not the recipient, so the
+	// statement's recipient predicate excludes the row. The answer stays ok
+	// -- refusing would confirm the notification exists -- and nothing may
+	// be recorded against the owner.
+	doJSON(t, http.MethodPost,
+		testServerURL+"/notifications/"+notifID+"/read",
+		owner.AccessToken, nil, &ok)
+	require.True(t, ok.Ok, "marking another user's notification read must stay ok")
+	require.Equal(t, 0,
+		countInstanceAuditLogs(t, testDB, "notification.read", ownerInternalID, notifID),
+		"a non-recipient must not record a read")
 
 	// Archive.
+	require.Equal(t, 0,
+		countInstanceAuditLogs(t, testDB, "notification.archive", memberInternalID, notifID),
+		"no archive should be recorded before the call")
+
 	doJSON(t, http.MethodPost,
 		testServerURL+"/notifications/"+notifID+"/archive",
 		member.AccessToken, nil, &ok)
 	require.True(t, ok.Ok)
+	require.Equal(t, 1,
+		countInstanceAuditLogs(t, testDB, "notification.archive", memberInternalID, notifID),
+		"the live archive must record exactly one entry")
+
+	// Archiving again matches nothing: every list read filters
+	// archived_at IS NULL, so the notification is already out of the
+	// member's view. It must refuse, and it must not record a second
+	// archive of a notification that was archived once.
+	status, raw := doJSONStatus(t, http.MethodPost,
+		testServerURL+"/notifications/"+notifID+"/archive",
+		member.AccessToken, nil)
+	requireDenied(t, status, raw, http.StatusNotFound, "WS.NOTIFICATION.NOT_FOUND",
+		"re-archiving an already archived notification")
+	require.Equal(t, 1,
+		countInstanceAuditLogs(t, testDB, "notification.archive", memberInternalID, notifID),
+		"the refused repeat must not record a second archive")
+
+	// The owner is in the same workspace but is not the recipient, so the
+	// statement's recipient predicate excludes the row. The refusal must
+	// not confirm the notification exists, and nothing may be recorded
+	// against the owner.
+	status, raw = doJSONStatus(t, http.MethodPost,
+		testServerURL+"/notifications/"+notifID+"/archive",
+		owner.AccessToken, nil)
+	requireDenied(t, status, raw, http.StatusNotFound, "WS.NOTIFICATION.NOT_FOUND",
+		"archiving another user's notification")
+	require.Equal(t, 0,
+		countInstanceAuditLogs(t, testDB, "notification.archive", ownerInternalID, notifID),
+		"a non-recipient must not record an archive")
+}
+
+// TestNotificationArchiveUnknownIDRefuses pins the archive of a
+// well-formed id that names no notification at all. The recipient
+// predicate and the archived_at guard both miss, so the count is zero for
+// a row that never existed, and nothing may be recorded for it.
+func TestNotificationArchiveUnknownIDRefuses(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	ctx := context.Background()
+	actorInternalID := lookupUserInternalID(ctx, t, testDB, tenant.UserPublicID)
+
+	unknownID := uuid.Must(uuid.NewV7()).String()
+	status, raw := doJSONStatus(t, http.MethodPost,
+		testServerURL+"/notifications/"+unknownID+"/archive",
+		tenant.AccessToken, nil)
+	requireDenied(t, status, raw, http.StatusNotFound, "WS.NOTIFICATION.NOT_FOUND",
+		"archiving a notification that does not exist")
+	require.Equal(t, 0,
+		countInstanceAuditLogs(t, testDB, "notification.archive", actorInternalID, unknownID),
+		"a miss must not record an archive")
 }

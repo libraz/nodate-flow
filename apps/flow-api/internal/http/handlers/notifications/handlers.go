@@ -194,19 +194,28 @@ func MarkRead(deps Deps) func(context.Context, *MarkReadInput) (*MarkReadOutput,
 		}
 		// Reading a notification is idempotent -- the statement skips rows
 		// already read -- so a zero count is the normal answer to marking one
-		// twice and must not become a 404.
-		if _, err := deps.Queries.MarkNotificationRead(ctx, generated.MarkNotificationReadParams{
+		// twice and must not become a 404: no list read filters on read_at, so
+		// an already-read notification is still sitting in the caller's inbox
+		// and refusing it would be wrong. The audit trail is the other half.
+		// A zero count cannot tell "already read" apart from a notification
+		// that belongs to someone else or never existed, and none of the three
+		// is a read that happened, so the entry is written only when a row
+		// actually moved.
+		rows, err := deps.Queries.MarkNotificationRead(ctx, generated.MarkNotificationReadParams{
 			PublicID:        pub,
 			RecipientUserID: actorID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "notification.read",
-			ActorID:      actorID,
-			ResourceType: "notification",
-			ResourceID:   in.NotifID,
-		})
+		if rows > 0 {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "notification.read",
+				ActorID:      actorID,
+				ResourceType: "notification",
+				ResourceID:   in.NotifID,
+			})
+		}
 		out := &MarkReadOutput{}
 		out.Body.Ok = true
 		return out, nil
@@ -253,13 +262,22 @@ func Archive(deps Deps) func(context.Context, *ArchiveInput) (*ArchiveOutput, er
 		if err != nil {
 			return nil, httpErr(apierrors.WsNotificationNotFound)
 		}
-		// Archiving is idempotent for the same reason as MarkRead: the
-		// statement skips rows already archived.
-		if _, err := deps.Queries.ArchiveNotification(ctx, generated.ArchiveNotificationParams{
+		// Only matches a notification the caller owns that is still
+		// unarchived, so a zero count means nothing was archived. Unlike
+		// marking read, that cannot answer ok: every list read filters
+		// archived_at IS NULL, so an archived notification is already gone
+		// from the caller's view and a second call is naming something the
+		// caller cannot see. Answering ok would also record an archive of a
+		// notification that does not exist, or belongs to someone else.
+		rows, err := deps.Queries.ArchiveNotification(ctx, generated.ArchiveNotificationParams{
 			PublicID:        pub,
 			RecipientUserID: actorID,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			return nil, httpErr(apierrors.WsNotificationNotFound)
 		}
 		deps.Audit.Record(ctx, audit.Entry{
 			Action:       "notification.archive",
