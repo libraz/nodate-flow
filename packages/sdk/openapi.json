@@ -10089,7 +10089,7 @@
           },
           "kind": {
             "description": "Signal kind from signal_kinds/*.yaml registry (e.g. discord.presence, manual). Unknown kinds are rejected with WS.SIGNAL.KIND_UNKNOWN.",
-            "maxLength": 255,
+            "maxLength": 64,
             "minLength": 1,
             "type": "string"
           },
