@@ -28,9 +28,15 @@ export interface IdentifierFieldOptions {
  * Lowercase letters, digits, and hyphens only. The translator key for
  * each rule is supplied by the caller because the surrounding namespace
  * differs (workspaces vs projects).
+ *
+ * The default maximum is 63 because a slug has to survive as a single
+ * DNS label, which RFC 1035 caps at 63 octets. Both the workspace and
+ * project slug columns are sized to that limit and the API rejects
+ * anything longer, so the form has to stop at the same point to keep
+ * the error inline instead of coming back as a 422.
  */
 export function createSlugField(opts: SlugFieldOptions): z.ZodString {
-  const max = opts.maxLength ?? 64;
+  const max = opts.maxLength ?? 63;
   return z
     .string()
     .min(1, opts.requiredKey)
