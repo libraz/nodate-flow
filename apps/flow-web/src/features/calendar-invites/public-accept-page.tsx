@@ -116,6 +116,11 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
   const isNotFound = error instanceof ApiError && error.code === 'CALENDAR.INVITE.NOT_FOUND';
   const network = isNetworkError(error);
 
+  const submit = (rsvp: RsvpChoice): void => {
+    // error-toast-exempt: the alert panel below renders mutation.error through formatApiError
+    mutation.mutate(rsvp);
+  };
+
   return (
     <PublicPageLayout measure="narrow" alignMain="center" mainLabel={t('invites.accept.title')}>
       <Card>
@@ -168,7 +173,9 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="primary"
               disabled={mutation.isPending}
-              onClick={() => mutation.mutate('accepted')}
+              onClick={() => {
+                submit('accepted');
+              }}
             >
               {t('invites.accept.action_accept')}
             </Button>
@@ -176,7 +183,9 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="default"
               disabled={mutation.isPending}
-              onClick={() => mutation.mutate('tentative')}
+              onClick={() => {
+                submit('tentative');
+              }}
             >
               {t('invites.accept.action_tentative')}
             </Button>
@@ -184,7 +193,9 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="ghost"
               disabled={mutation.isPending}
-              onClick={() => mutation.mutate('declined')}
+              onClick={() => {
+                submit('declined');
+              }}
             >
               {t('invites.accept.action_decline')}
             </Button>

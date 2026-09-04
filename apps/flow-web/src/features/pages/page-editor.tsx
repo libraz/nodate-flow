@@ -8,10 +8,12 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Sparkles } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import MarkdownEditor from '../tasks/markdown-editor';
 import {
   type CreatePageInput,
@@ -82,6 +84,9 @@ export default function PageEditor({
           onSuccess: () => {
             onDone(existingPage.id);
           },
+          onError: (err) => {
+            toaster.show({ tone: 'danger', message: formatApiError(err, t, 'errors.save_failed') });
+          },
         },
       );
     } else {
@@ -94,6 +99,12 @@ export default function PageEditor({
         {
           onSuccess: (created) => {
             onDone(created.id);
+          },
+          onError: (err) => {
+            toaster.show({
+              tone: 'danger',
+              message: formatApiError(err, t, 'errors.create_failed'),
+            });
           },
         },
       );

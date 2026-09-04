@@ -144,15 +144,45 @@ export default function AttendeesSection({
   }));
 
   const handleRsvpChange = (next: Rsvp): void => {
-    updateOwnRsvp.mutate({ ...scope, rsvp: next });
+    updateOwnRsvp.mutate(
+      { ...scope, rsvp: next },
+      {
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'event.attendees.errors.rsvp_failed'),
+          });
+        },
+      },
+    );
   };
 
   const handleToggleCanEdit = (userId: string, next: boolean): void => {
-    toggleCanEdit.mutate({ ...scope, userId, canEdit: next });
+    toggleCanEdit.mutate(
+      { ...scope, userId, canEdit: next },
+      {
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'event.attendees.errors.can_edit_failed'),
+          });
+        },
+      },
+    );
   };
 
   const handleRemove = (userId: string): void => {
-    removeAttendee.mutate({ ...scope, userId });
+    removeAttendee.mutate(
+      { ...scope, userId },
+      {
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'event.attendees.errors.remove_failed'),
+          });
+        },
+      },
+    );
   };
 
   const handleInvite = async (attendeeId: string): Promise<void> => {

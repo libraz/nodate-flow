@@ -101,6 +101,7 @@ export default function InboxList(): ReactElement {
 
   const recordApply = (inboxItemId: string): void => {
     if (!triageWorkspaceId) return;
+    // error-toast-exempt: bookkeeping after the acted-on mutation already reported its outcome
     applySuggestion.mutate(inboxItemId);
   };
 
@@ -147,6 +148,7 @@ export default function InboxList(): ReactElement {
   const handleDismissSuggestion = (suggestion: Suggestion): void => {
     suggestionsStore.getState().dismissSuggestion(suggestion.inboxItemId);
     if (triageWorkspaceId) {
+      // error-toast-exempt: bookkeeping only; the suggestion is already gone from the local store
       dismissSuggestion.mutate(suggestion.inboxItemId);
     }
   };

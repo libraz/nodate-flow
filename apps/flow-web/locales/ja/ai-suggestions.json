@@ -84,7 +84,11 @@
     "title": "AI 提案",
     "empty": "保留中の提案はありません",
     "expand": "提案パネルを展開",
-    "collapse": "提案パネルを折りたたむ"
+    "collapse": "提案パネルを折りたたむ",
+    "errors": {
+      "apply_failed": "提案を適用できませんでした",
+      "dismiss_failed": "提案を却下できませんでした"
+    }
   },
   "state_suggestions": {
     "title": "次の推奨アクション"

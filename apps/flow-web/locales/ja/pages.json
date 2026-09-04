@@ -36,5 +36,10 @@
     "root": "ルートページ",
     "expand": "展開",
     "collapse": "折りたたむ"
+  },
+  "errors": {
+    "save_failed": "ページを保存できませんでした",
+    "create_failed": "ページを作成できませんでした",
+    "delete_failed": "ページを削除できませんでした"
   }
 }

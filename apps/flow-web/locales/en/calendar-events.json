@@ -164,7 +164,10 @@
       "your_response": "Your response",
       "errors": {
         "add_failed": "Could not add the attendee",
-        "invite_failed": "Could not create the invite link"
+        "invite_failed": "Could not create the invite link",
+        "rsvp_failed": "Could not save your response",
+        "can_edit_failed": "Could not change the edit permission",
+        "remove_failed": "Could not remove the attendee"
       }
     },
     "creator": {

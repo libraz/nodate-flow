@@ -164,7 +164,10 @@
       "your_response": "你的回应",
       "errors": {
         "add_failed": "无法添加参与者",
-        "invite_failed": "无法生成邀请链接"
+        "invite_failed": "无法生成邀请链接",
+        "rsvp_failed": "无法保存你的回应",
+        "can_edit_failed": "无法更改编辑权限",
+        "remove_failed": "无法移除参与者"
       }
     },
     "creator": {

@@ -50,6 +50,7 @@ import type { Project } from '../../features/projects/api';
 import type { TaskListItem } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { apiRequest } from '../../lib/api';
+import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import css from './command-palette.module.css';
 
@@ -144,6 +145,7 @@ function CommandModeBody({
     lastSubmittedRef.current = prompt;
     setResult(null);
     setOutcome(null);
+    // error-toast-exempt: the assertive alert below renders resolveCommand.error inline
     resolveCommand.mutate(prompt, {
       onSuccess: (data) => setResult(data),
     });
@@ -204,7 +206,7 @@ function CommandModeBody({
           }}
           aria-live="assertive"
         >
-          {t('dock.command_palette.error')}
+          {formatApiError(resolveCommand.error, t, 'dock.command_palette.error')}
         </p>
       )}
 

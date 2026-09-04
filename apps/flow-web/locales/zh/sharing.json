@@ -21,6 +21,8 @@
   },
   "badge": "公开",
   "badge_private": "私有",
+  "cancel": "取消",
+  "close": "关闭",
   "error": {
     "publish_failed": "发布视图失败",
     "unpublish_failed": "取消发布视图失败"

@@ -339,6 +339,10 @@
       "subscribed_toast": "{name} を購読しました",
       "load_error": "メンバーのカレンダーを読み込めませんでした。もう一度お試しください。",
       "subscribe_error": "購読できませんでした。もう一度お試しください。"
+    },
+    "errors": {
+      "visibility_failed": "カレンダーの表示を切り替えられませんでした",
+      "leave_failed": "カレンダーから退出できませんでした"
     }
   },
   "not_found": {

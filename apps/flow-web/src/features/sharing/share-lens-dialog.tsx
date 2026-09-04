@@ -5,6 +5,12 @@
  * When the lens is private, shows a publish button with a confirmation
  * message. When public, shows the shareable URL with a copy button and
  * an unpublish option.
+ *
+ * Publishing and unpublishing are gated by the API to the lens creator and
+ * to workspace admins / owners; `canManage` says whether this viewer is one
+ * of them. Without it the dialog is read-only: it still reports whether a
+ * share URL is live and lets the viewer copy it, because that link is
+ * already public, but it offers no control that would be refused.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -23,6 +29,12 @@ export interface ShareLensDialogProps {
   lensId: string;
   /** Current public token, if the lens is already published. */
   publicToken: string | null;
+  /**
+   * Whether the viewer may publish or unpublish this lens: its creator, or
+   * a workspace admin / owner. When false the dialog shows the current
+   * state without offering either action.
+   */
+  canManage: boolean;
   open: boolean;
   onClose: () => void;
   /** Called after publish/unpublish so the parent can refresh lens state. */
@@ -37,12 +49,12 @@ export default function ShareLensDialog({
   workspaceId,
   lensId,
   publicToken,
+  canManage,
   open,
   onClose,
   onTokenChange,
 }: ShareLensDialogProps): ReactElement {
   const { t } = useTranslation('sharing');
-  const { t: tc } = useTranslation('common');
   const publishMutation = usePublishLens(workspaceId);
   const unpublishMutation = useUnpublishLens(workspaceId);
   const linkRef = useRef<HTMLInputElement>(null);
@@ -130,30 +142,40 @@ export default function ShareLensDialog({
             </div>
 
             {/* Unpublish */}
-            <p className={styles.confirmText}>{t('confirm_unpublish')}</p>
-            <div className={styles.actions}>
-              <Button type="button" variant="ghost" onClick={handleClose} disabled={isPending}>
-                {tc('actions.cancel')}
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() => {
-                  void handleUnpublish();
-                }}
-                disabled={isPending}
-              >
-                {t('unpublish')}
-              </Button>
-            </div>
+            {canManage ? (
+              <>
+                <p className={styles.confirmText}>{t('confirm_unpublish')}</p>
+                <div className={styles.actions}>
+                  <Button type="button" variant="ghost" onClick={handleClose} disabled={isPending}>
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => {
+                      void handleUnpublish();
+                    }}
+                    disabled={isPending}
+                  >
+                    {t('unpublish')}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className={styles.actions}>
+                <Button type="button" variant="ghost" onClick={handleClose}>
+                  {t('close')}
+                </Button>
+              </div>
+            )}
           </>
-        ) : (
+        ) : canManage ? (
           <>
             {/* Publish confirmation */}
             <p className={styles.confirmText}>{t('confirm_publish')}</p>
             <div className={styles.actions}>
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isPending}>
-                {tc('actions.cancel')}
+                {t('cancel')}
               </Button>
               <Button
                 type="button"
@@ -167,6 +189,12 @@ export default function ShareLensDialog({
               </Button>
             </div>
           </>
+        ) : (
+          <div className={styles.actions}>
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              {t('close')}
+            </Button>
+          </div>
         )}
       </div>
     </Dialog>

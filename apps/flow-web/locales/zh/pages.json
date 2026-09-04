@@ -36,5 +36,10 @@
     "root": "根页面",
     "expand": "展开",
     "collapse": "折叠"
+  },
+  "errors": {
+    "save_failed": "无法保存页面",
+    "create_failed": "无法创建页面",
+    "delete_failed": "无法删除页面"
   }
 }

@@ -12,6 +12,7 @@ import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
 import Icon from '@nodate-flow/ui/icon';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Day, type Zone } from '@nodate-flow/ui/time';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
@@ -19,6 +20,7 @@ import { Sparkles, X } from 'lucide-react';
 import { type ReactElement, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 
@@ -607,12 +609,26 @@ function GlassDockImpl(): ReactElement {
 
   const handleApply = (inboxItemId: string): void => {
     if (!workspaceId) return;
-    applyMutation.mutate(inboxItemId);
+    applyMutation.mutate(inboxItemId, {
+      onError: (err) => {
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(err, t, 'glass_dock.errors.apply_failed'),
+        });
+      },
+    });
   };
 
   const handleDismiss = (inboxItemId: string): void => {
     if (!workspaceId) return;
-    dismissMutation.mutate(inboxItemId);
+    dismissMutation.mutate(inboxItemId, {
+      onError: (err) => {
+        toaster.show({
+          tone: 'danger',
+          message: formatApiError(err, t, 'glass_dock.errors.dismiss_failed'),
+        });
+      },
+    });
   };
 
   if (!open) {

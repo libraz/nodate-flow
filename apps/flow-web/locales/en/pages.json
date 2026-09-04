@@ -36,5 +36,10 @@
     "root": "Root pages",
     "expand": "Expand",
     "collapse": "Collapse"
+  },
+  "errors": {
+    "save_failed": "Could not save the page",
+    "create_failed": "Could not create the page",
+    "delete_failed": "Could not delete the page"
   }
 }

@@ -84,7 +84,11 @@
     "title": "AI 建议",
     "empty": "暂无待处理建议",
     "expand": "展开建议面板",
-    "collapse": "折叠建议面板"
+    "collapse": "折叠建议面板",
+    "errors": {
+      "apply_failed": "无法应用该建议",
+      "dismiss_failed": "无法忽略该建议"
+    }
   },
   "state_suggestions": {
     "title": "下一步建议"

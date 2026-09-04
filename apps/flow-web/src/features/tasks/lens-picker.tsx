@@ -8,12 +8,19 @@
  *
  * `aria-selected` is a real comparison between the current task filters and each lens's stored
  * filter map.
+ *
+ * Deleting a lens is offered only to the people the API lets do it — its
+ * creator and workspace admins / owners. See {@link canManageLens}.
  */
 
 import Popover from '@nodate-flow/ui/primitives/popover';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
+import { selectUser, useAuth } from '../auth/auth-store';
+import { useWorkspaceQuery } from '../workspaces/api';
 import type { TaskDerivedState, TaskFilters, TaskPriority } from './api';
 import type { LensDto } from './lens-api';
 import { useCreateLens, useDeleteLens, useLensesQuery } from './lens-api';
@@ -118,9 +125,34 @@ function isLensActive(
   );
 }
 
+/**
+ * Whether the signed-in user may write to this lens, mirroring the API rule:
+ * the lens creator, or a workspace admin / owner. Anyone else gets
+ * `WS.MEMBER.ROLE_DENIED` from update, delete, publish and unpublish, so the
+ * affordance is not offered.
+ *
+ * A refusal can still arrive — the role can change, or another tab can act
+ * first — and the mutation handlers surface it.
+ *
+ * `workspaceRole` is the caller's own role as the workspace endpoint reports
+ * it, not a row looked up in the member list: that list is paginated, so an
+ * admin sitting past the first page would be denied a control the API would
+ * have allowed.
+ */
+function canManageLens(
+  lens: LensDto,
+  currentUserId: string | undefined,
+  workspaceRole: string | undefined,
+): boolean {
+  if (workspaceRole === 'admin' || workspaceRole === 'owner') return true;
+  return currentUserId !== undefined && lens.creatorId === currentUserId;
+}
+
 export default function LensPicker({ workspaceId, projectId }: LensPickerProps): ReactElement {
   const { t } = useTranslation('common');
   const { data: lenses } = useLensesQuery(workspaceId, projectId);
+  const { data: workspace } = useWorkspaceQuery(workspaceId);
+  const currentUser = useAuth(selectUser);
   const currentFilters = useTaskFilters(projectId);
   const createLens = useCreateLens();
   const deleteLens = useDeleteLens();
@@ -136,33 +168,42 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
     setOpen(false);
   };
 
-  const handleDelete = (lens: LensDto): void => {
-    deleteLens.mutate({ workspaceId, lensId: lens.id, projectId });
+  const handleDelete = async (lens: LensDto): Promise<void> => {
+    try {
+      await deleteLens.mutateAsync({ workspaceId, lensId: lens.id, projectId });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.lens.delete_failed'),
+      });
+    }
   };
 
-  const handleSave = (): void => {
+  const handleSave = async (): Promise<void> => {
     const trimmed = nameInput.trim();
     if (trimmed.length === 0) return;
     const trimmedDescription = descriptionInput.trim();
     const captured = getTaskFilters(projectId);
     const filter = taskFiltersToLensFilter(captured);
     setSaving(true);
-    createLens.mutate(
-      {
+    try {
+      await createLens.mutateAsync({
         workspaceId,
         name: trimmed,
         ...(trimmedDescription.length > 0 ? { description: trimmedDescription } : {}),
         projectId,
         filter,
-      },
-      {
-        onSettled: () => {
-          setSaving(false);
-          setNameInput('');
-          setDescriptionInput('');
-        },
-      },
-    );
+      });
+      setNameInput('');
+      setDescriptionInput('');
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'tasks.lens.save_failed'),
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const panel = (
@@ -192,16 +233,18 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
                     <span className={styles.defaultBadge}>{t('tasks.lens.default_badge')}</span>
                   ) : null}
                 </button>
-                <button
-                  type="button"
-                  aria-label={t('tasks.lens.delete')}
-                  className={styles.optionDelete}
-                  onClick={() => {
-                    handleDelete(lens);
-                  }}
-                >
-                  &times;
-                </button>
+                {canManageLens(lens, currentUser?.id, workspace.role) ? (
+                  <button
+                    type="button"
+                    aria-label={t('tasks.lens.delete')}
+                    className={styles.optionDelete}
+                    onClick={() => {
+                      void handleDelete(lens);
+                    }}
+                  >
+                    &times;
+                  </button>
+                ) : null}
               </li>
             );
           })}
@@ -219,13 +262,15 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
           aria-label={t('tasks.lens.name_placeholder')}
           className={styles.saveInput}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Enter') void handleSave();
           }}
         />
         <button
           type="button"
           disabled={saving || nameInput.trim().length === 0}
-          onClick={handleSave}
+          onClick={() => {
+            void handleSave();
+          }}
           className={styles.saveButton}
         >
           {saving ? t('tasks.lens.creating') : t('tasks.lens.create')}

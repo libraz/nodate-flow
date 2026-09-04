@@ -30,12 +30,14 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
 import Popover from '@nodate-flow/ui/primitives/popover';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../lib/api';
+import { formatApiError } from '../../lib/api-error';
 import CalendarMemosPanel from '../calendar-memos/calendar-memos-panel';
 import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
@@ -223,16 +225,36 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
   const Icon = calendar.visible ? Eye : EyeOff;
 
   const handleToggleVisibility = (): void => {
-    patchSub.mutate({
-      wsId: workspaceId,
-      calId: calendar.id,
-      body: { visible: !calendar.visible },
-    });
+    patchSub.mutate(
+      {
+        wsId: workspaceId,
+        calId: calendar.id,
+        body: { visible: !calendar.visible },
+      },
+      {
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'calendars_rail.errors.visibility_failed'),
+          });
+        },
+      },
+    );
   };
 
   const handleLeave = (): void => {
     setMenuOpen(false);
-    leaveCal.mutate({ wsId: workspaceId, calId: calendar.id, userId: selfUserId });
+    leaveCal.mutate(
+      { wsId: workspaceId, calId: calendar.id, userId: selfUserId },
+      {
+        onError: (err) => {
+          toaster.show({
+            tone: 'danger',
+            message: formatApiError(err, t, 'calendars_rail.errors.leave_failed'),
+          });
+        },
+      },
+    );
   };
 
   const menuContent = (

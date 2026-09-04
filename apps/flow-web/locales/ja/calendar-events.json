@@ -164,7 +164,10 @@
       "your_response": "あなたの返事",
       "errors": {
         "add_failed": "参加者を追加できませんでした",
-        "invite_failed": "招待リンクを発行できませんでした"
+        "invite_failed": "招待リンクを発行できませんでした",
+        "rsvp_failed": "返事を保存できませんでした",
+        "can_edit_failed": "編集権限を変更できませんでした",
+        "remove_failed": "参加者を除外できませんでした"
       }
     },
     "creator": {

@@ -13,10 +13,12 @@ import {
 } from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type PageItem, useChildPagesQuery, useDeletePage, usePageQuery } from './api';
 import styles from './pages.module.css';
@@ -98,8 +100,15 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
       tone: 'danger',
     });
     if (!confirmed) return;
+    // Navigating first would report a delete the API may still refuse, leaving
+    // the page in the list behind a screen that says it is gone.
+    try {
+      await deleteMutation.mutateAsync(pageId);
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'errors.delete_failed') });
+      return;
+    }
     void navigate({ to: '/pages' });
-    deleteMutation.mutate(pageId);
   };
 
   const updatedLabel = t('updated_at', {

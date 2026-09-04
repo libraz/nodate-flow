@@ -23,7 +23,10 @@
     "marked_read": "Marked as read",
     "all_marked_read": "All notifications marked as read",
     "archived": "Notification archived",
-    "error": "Action failed"
+    "error": "Action failed",
+    "mark_read_failed": "Could not mark the notification as read",
+    "archive_failed": "Could not archive the notification",
+    "mark_all_read_failed": "Could not mark all notifications as read"
   },
   "event": {
     "task_created": "A new task was created",

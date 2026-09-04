@@ -84,7 +84,11 @@
     "title": "AI suggestions",
     "empty": "No pending suggestions",
     "expand": "Expand suggestions panel",
-    "collapse": "Collapse suggestions panel"
+    "collapse": "Collapse suggestions panel",
+    "errors": {
+      "apply_failed": "Could not apply the suggestion",
+      "dismiss_failed": "Could not dismiss the suggestion"
+    }
   },
   "state_suggestions": {
     "title": "Suggested next steps"

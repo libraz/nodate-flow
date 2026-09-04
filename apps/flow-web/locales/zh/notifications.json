@@ -23,7 +23,10 @@
     "marked_read": "已标为已读",
     "all_marked_read": "已将所有通知标为已读",
     "archived": "已归档通知",
-    "error": "操作失败"
+    "error": "操作失败",
+    "mark_read_failed": "无法将通知标为已读",
+    "archive_failed": "无法归档通知",
+    "mark_all_read_failed": "无法将所有通知标为已读"
   },
   "event": {
     "task_created": "创建了新任务",

@@ -21,6 +21,8 @@
   },
   "badge": "Public",
   "badge_private": "Private",
+  "cancel": "Cancel",
+  "close": "Close",
   "error": {
     "publish_failed": "Failed to publish view",
     "unpublish_failed": "Failed to unpublish view"

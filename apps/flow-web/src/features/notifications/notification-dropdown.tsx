@@ -6,11 +6,13 @@
 
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
 import { Archive, Check } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import {
   type NotificationItem,
@@ -86,18 +88,41 @@ function NotificationRow({
   const isUnread = item.readAt === null;
   const href = resourceHref(item.resourceType, item.resourceId);
 
-  const handleMarkRead = (e: React.MouseEvent): void => {
-    e.stopPropagation();
-    if (isUnread) markRead.mutate(item.id);
+  /**
+   * The mutation rolls the unread dot back on failure, which alone leaves the
+   * reader guessing whether the click registered. The toast says what the API
+   * refused.
+   */
+  const runMarkRead = async (): Promise<void> => {
+    try {
+      await markRead.mutateAsync(item.id);
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'toast.mark_read_failed'),
+      });
+    }
   };
 
-  const handleArchive = (e: React.MouseEvent): void => {
+  const handleMarkRead = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    archive.mutate(item.id);
+    if (isUnread) void runMarkRead();
+  };
+
+  const handleArchive = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    try {
+      await archive.mutateAsync(item.id);
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'toast.archive_failed'),
+      });
+    }
   };
 
   const handleRowClick = (): void => {
-    if (isUnread) markRead.mutate(item.id);
+    if (isUnread) void runMarkRead();
     if (href) onNavigate(href);
   };
 
@@ -138,7 +163,9 @@ function NotificationRow({
         <button
           type="button"
           className={cx(styles.actionButton, 'nf-focus-ring')}
-          onClick={handleArchive}
+          onClick={(e) => {
+            void handleArchive(e);
+          }}
           aria-label={t('action.archive')}
         >
           <Icon icon={Archive} decorative />
@@ -169,8 +196,15 @@ export default function NotificationDropdown({
 
   const hasUnread = items.some((item) => item.readAt === null);
 
-  const handleMarkAll = (): void => {
-    markAll.mutate();
+  const handleMarkAll = async (): Promise<void> => {
+    try {
+      await markAll.mutateAsync();
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'toast.mark_all_read_failed'),
+      });
+    }
   };
 
   const handleLoadMore = (): void => {
@@ -188,7 +222,9 @@ export default function NotificationDropdown({
           <button
             type="button"
             className={cx(styles.markAllButton, 'nf-focus-ring')}
-            onClick={handleMarkAll}
+            onClick={() => {
+              void handleMarkAll();
+            }}
             disabled={!hasUnread || !wsId}
           >
             {t('view.mark_all_read')}

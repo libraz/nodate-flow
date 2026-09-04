@@ -339,6 +339,10 @@
       "subscribed_toast": "Subscribed to {name}",
       "load_error": "Could not load teammate calendars. Please try again.",
       "subscribe_error": "Could not subscribe. Please try again."
+    },
+    "errors": {
+      "visibility_failed": "Could not change the calendar visibility",
+      "leave_failed": "Could not leave the calendar"
     }
   },
   "not_found": {

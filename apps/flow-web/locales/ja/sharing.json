@@ -21,6 +21,8 @@
   },
   "badge": "公開",
   "badge_private": "非公開",
+  "cancel": "キャンセル",
+  "close": "閉じる",
   "error": {
     "publish_failed": "ビューの公開に失敗しました",
     "unpublish_failed": "ビューの非公開化に失敗しました"

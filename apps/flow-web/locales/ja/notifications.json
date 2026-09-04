@@ -23,7 +23,10 @@
     "marked_read": "既読にしました",
     "all_marked_read": "すべての通知を既読にしました",
     "archived": "通知をアーカイブしました",
-    "error": "操作に失敗しました"
+    "error": "操作に失敗しました",
+    "mark_read_failed": "通知を既読にできませんでした",
+    "archive_failed": "通知をアーカイブできませんでした",
+    "mark_all_read_failed": "すべての通知を既読にできませんでした"
   },
   "event": {
     "task_created": "新しいタスクが作成されました",
