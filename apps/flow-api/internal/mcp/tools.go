@@ -3347,6 +3347,13 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		ownerUserID = resolved
 	}
 
+	// The stored zone is the one the event's day is read in, so it is
+	// resolved for the workspace rather than assumed — a row stamped UTC
+	// is a day only at offset zero, and on an Asia/Tokyo grid it lands
+	// nine hours from where the agent put it. The chain and the actor are
+	// the ones REST resolves against: the caller, not the owner named.
+	zone := resolveUserTimezone(ctx, deps, s.workspaceID, s.userID)
+
 	pub := newPublicID()
 	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:           pub,
@@ -3360,7 +3367,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		AllDay:             allDay,
 		StartAt:            sql.NullTime{Time: startAt, Valid: true},
 		EndAt:              sql.NullTime{Time: endAt, Valid: true},
-		Timezone:           "UTC",
+		Timezone:           zone.Name(),
 		Location:           sql.NullString{String: in.Location, Valid: in.Location != ""},
 		Memo:               sql.NullString{String: in.Memo, Valid: in.Memo != ""},
 		Url:                sql.NullString{},
@@ -3968,6 +3975,11 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, rangeErr
 	}
 
+	// The projected event is read on the same grid as one created
+	// directly, so its zone is resolved for the workspace rather than
+	// assumed: a day built in UTC is a day only at offset zero.
+	zone := resolveUserTimezone(ctx, deps, s.workspaceID, s.userID)
+
 	pub := newPublicID()
 	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 		PublicID:           pub,
@@ -3981,7 +3993,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		AllDay:             false,
 		StartAt:            sql.NullTime{Time: startAt, Valid: true},
 		EndAt:              sql.NullTime{Time: endAt, Valid: true},
-		Timezone:           "UTC",
+		Timezone:           zone.Name(),
 		Location:           sql.NullString{},
 		Memo:               sql.NullString{},
 		Url:                sql.NullString{},
