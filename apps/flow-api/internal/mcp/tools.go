@@ -1408,7 +1408,7 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	taskID64 := int64(taskInternal)
 	// The comment row is committed; a retry would post it twice.
 	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.CommentAddedLegacy,
+		EventType:    eventbus.TaskCommentAdded,
 		AuditAction:  "comment.create",
 		ResourceType: "comment",
 		ResourceID:   cpub.String(),
