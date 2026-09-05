@@ -322,7 +322,7 @@ func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, 
 		return err
 	}
 	return dbretry.InTx(ctx, w.DB, "importer.createTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+		created, err := taskcreate.New(ctx, tx, taskcreate.Unattributed(), taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   projectID,
 			Title:       title,

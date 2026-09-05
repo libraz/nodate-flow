@@ -1154,10 +1154,9 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		taskID int64
 	)
 	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+		created, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
-			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Title:       title,
 			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
 			Priority:    in.Priority,
@@ -1970,11 +1969,10 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		created = created[:0]
 		childIDs = childIDs[:0]
 		for i, st := range in.Steps {
-			child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			child, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 				WorkspaceID:  s.workspaceID,
 				ProjectID:    parentProjectID,
 				ParentTaskID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				Title:        stepTitles[i],
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 				Priority:     st.Priority,
@@ -3006,10 +3004,9 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	)
 	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.smart_create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		children = children[:0]
-		parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
+		parent, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
-			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Title:       parentTitle,
 			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
 		})
@@ -3028,11 +3025,10 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			if terr != nil {
 				continue
 			}
-			child, cerr := taskcreate.New(ctx, tx, taskcreate.Args{
+			child, cerr := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 				WorkspaceID:  s.workspaceID,
 				ProjectID:    prjID,
 				ParentTaskID: sql.NullInt32{Int32: int32(parent.ID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},  //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				Title:        childTitle,
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 				Priority:     smartCreatePriorityToInt(st.Priority),

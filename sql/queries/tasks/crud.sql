@@ -874,7 +874,26 @@ FOR UPDATE;
 
 -- name: AssignTaskNumber :one
 -- Allocate the next task number for a project. Must be called inside a
--- transaction after LockProjectForTaskNumber.
+-- transaction after LockProjectForTaskNumber, and must be that transaction's
+-- first ordinary read.
+-- The ordering requirement is not stylistic. This is a non-locking read, so it
+-- resolves against the transaction's snapshot, and under REPEATABLE READ that
+-- snapshot is fixed by the first ordinary read -- a locking read does not
+-- create one. Reaching here first therefore pins the snapshot after the
+-- project lock was granted, where the count includes everything the previous
+-- holder committed. A transaction that reads anything before creating pins it
+-- earlier and allocates a number the project already uses, which the insert
+-- rejects on uniq_tasks_project_id_task_number. taskcreate.LockProject exists
+-- for callers that must read first.
+-- A locking read here would remove that ordering requirement but is not
+-- available: FOR UPDATE on the aggregate locks every task row of the project
+-- until commit, and the narrow form -- ORDER BY task_number DESC LIMIT 1 FOR
+-- UPDATE on uniq_tasks_project_id_task_number -- takes a next-key lock whose
+-- gap reaches past the project's highest number into the first record of the
+-- adjacent project, so two creators in neighbouring projects deadlock. Making
+-- the number come from a counter on projects, rather than from the tasks
+-- table, is the shape that would work; it changes what a task number means
+-- when the highest task is deleted and is not a drop-in.
 -- workspace_id is included so the index (workspace_id, project_id) is used and
 -- the query is bounded to the caller's workspace as a defence-in-depth check.
 SELECT COALESCE(MAX(task_number), 0) + 1 AS next_number

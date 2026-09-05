@@ -367,10 +367,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 
 			// An intake item is a workspace-level inbox entry with no audience of
 			// its own, so the converted task takes the workspace default.
-			created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			created, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(actorID), taskcreate.Args{
 				WorkspaceID: ws.ID,
 				ProjectID:   prj.ID,
-				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Title:       title,
 				Description: sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid},
 			})

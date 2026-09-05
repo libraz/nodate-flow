@@ -278,11 +278,10 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			created = created[:0]
 			childIDs = childIDs[:0]
 			for i, st := range in.Body.Steps {
-				child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				child, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(actorID), taskcreate.Args{
 					WorkspaceID:  ws.ID,
 					ProjectID:    parentProjectID,
 					ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-					ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 					Title:        stepTitles[i],
 					Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 					Priority:     st.Priority,

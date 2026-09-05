@@ -359,7 +359,7 @@ SELECT COALESCE(
 //  1. SELECT the source task's workspace, project_id, title, and
 //     first enabled human assignee user_id (best-effort).
 //  2. BEGIN TX.
-//  3. AssignTaskNumber + CreateTask + (optional) AddActor +
+//  3. taskcreate.New, carrying the optional inherited assignee, plus
 //     AddDependency(kind='retro_of'). Every write goes through the
 //     sqlc-generated queries bound to the open transaction so the
 //     existing prepared-statement cache and instrumentation are
@@ -439,12 +439,22 @@ func (m *SQLTaskMutator) DraftRetroTask(
 	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.DraftRetroTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		qtx := m.Queries.WithTx(tx.RawTx())
 
-		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+		// The retro records no creator: attribution for an agent-drafted
+		// row lives on events.actor_agent_id, not on the task.
+		attr := taskcreate.Unattributed()
+		// Best-effort assignee inheritance. When the source had a
+		// human assignee, attach them to the retro draft so the
+		// queue surfaces on their /me/tasks feed.
+		if src.AssigneeUserID.Valid {
+			attr = attr.WithActors(taskcreate.Actor{
+				UserID: uint32(src.AssigneeUserID.Int32), //#nosec G115 -- users.id (INT UNSIGNED), fits uint32
+				Role:   generated.TaskActorsRoleAssignee,
+			})
+		}
+
+		created, err := taskcreate.New(ctx, tx, attr, taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   src.ProjectID,
-			// ActorUserID stays invalid: attribution for an agent-drafted
-			// retro lives on events.actor_agent_id, not on the task row.
-			ActorUserID: sql.NullInt32{},
 			Title:       retroTitle,
 			Description: sql.NullString{String: description, Valid: true},
 		})
@@ -454,22 +464,6 @@ func (m *SQLTaskMutator) DraftRetroTask(
 		taskID := created.ID
 		newPub = created.PublicID
 		newTaskID = taskID
-
-		// Best-effort assignee inheritance. When the source had a
-		// human assignee, attach them to the retro draft so the
-		// queue surfaces on their /me/tasks feed.
-		if src.AssigneeUserID.Valid {
-			actorPub := types.New()
-			if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
-				PublicID:    actorPub,
-				WorkspaceID: workspaceID,
-				TaskID:      uint32(taskID), //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				UserID:      src.AssigneeUserID,
-				Role:        generated.TaskActorsRoleAssignee,
-			}); aerr != nil {
-				return fmt.Errorf("AddActor: %w", aerr)
-			}
-		}
 
 		// retro_of edge. from = the new retro task, to = the
 		// original task that prompted the retrospective. The schema

@@ -199,11 +199,31 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			answered = nil
 			qtx := deps.Queries.WithTx(tx.RawTx())
 
+			// Resolving reads, and the first read of a transaction is what
+			// fixes its snapshot, so the project lock has to come before it
+			// or the task number is allocated from a stale view of the
+			// project.
+			if lerr := taskcreate.LockProject(ctx, tx, ws.ID, prj.ID); lerr != nil {
+				return lerr
+			}
+
+			// The proposal names the assignees; the caller who applied it is
+			// the creator. Resolution runs in this transaction so a user
+			// that stops being a member mid-apply cannot slip through.
+			parentActors := make([]taskcreate.Actor, 0, len(in.Body.AssigneeUserIDs))
+			for _, uid := range in.Body.AssigneeUserIDs {
+				resolved, rerr := resolveAssignee(ctx, qtx, ws.ID, uid)
+				if rerr != nil {
+					answered = rerr
+					return rerr
+				}
+				parentActors = append(parentActors, taskcreate.Actor{UserID: resolved, Role: generated.TaskActorsRoleAssignee})
+			}
+
 			// Create parent task.
-			parent, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			parent, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(actorID).WithActors(parentActors...), taskcreate.Args{
 				WorkspaceID: ws.ID,
 				ProjectID:   prj.ID,
-				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Title:       parentTitle,
 				Description: sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
 				Priority:    in.Body.Priority,
@@ -214,36 +234,28 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			parentID = parent.ID
 			parentPub = parent.PublicID
 
-			// Attach assignees to parent task.
-			for _, uid := range in.Body.AssigneeUserIDs {
-				if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(parentID), uid); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-					answered = err
-					return err
-				}
-			}
-
 			// Create subtasks.
 			subtasks = make([]createdSubtask, 0, len(in.Body.Subtasks))
 			for i, sub := range in.Body.Subtasks {
-				child, err := taskcreate.New(ctx, tx, taskcreate.Args{
+				attr := taskcreate.AuthoredBy(actorID)
+				if sub.AssigneeUserID != "" {
+					resolved, rerr := resolveAssignee(ctx, qtx, ws.ID, sub.AssigneeUserID)
+					if rerr != nil {
+						answered = rerr
+						return rerr
+					}
+					attr = attr.WithActors(taskcreate.Actor{UserID: resolved, Role: generated.TaskActorsRoleAssignee})
+				}
+				child, err := taskcreate.New(ctx, tx, attr, taskcreate.Args{
 					WorkspaceID:  ws.ID,
 					ProjectID:    prj.ID,
 					ParentTaskID: sql.NullInt32{Int32: int32(parentID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-					ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true},  //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 					Title:        subtaskTitles[i],
 					Description:  sql.NullString{String: sub.Description, Valid: sub.Description != ""},
 					Priority:     sub.Priority,
 				})
 				if err != nil {
 					return err
-				}
-
-				// Attach subtask assignee if provided.
-				if sub.AssigneeUserID != "" {
-					if err := addActorByPublicID(ctx, qtx, ws.ID, uint32(child.ID), sub.AssigneeUserID); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-						answered = err
-						return err
-					}
 				}
 				subtasks = append(subtasks, createdSubtask{ID: child.ID, PublicID: child.PublicID})
 			}
@@ -343,13 +355,14 @@ func RegisterSmartCreate(api huma.API, deps SmartCreateDeps) {
 
 // ---- helpers ---------------------------------------------------------------
 
-// addActorByPublicID resolves a user public ID to an internal ID and adds
-// them as an assignee on the given task. It returns an httpErr-wrapped
-// error on failure.
-func addActorByPublicID(ctx context.Context, qtx *generated.Queries, wsID, taskID uint32, userPublicID string) error {
+// resolveAssignee maps a user public ID onto the internal ID an actor row
+// takes. It returns an httpErr-wrapped error on failure, so the caller can
+// answer a rejected assignee as a response rather than as a transaction
+// failure.
+func resolveAssignee(ctx context.Context, qtx *generated.Queries, wsID uint32, userPublicID string) (uint32, error) {
 	userPub, err := types.Parse(userPublicID)
 	if err != nil {
-		return httpErr(apierrors.WsMemberNotFound)
+		return 0, httpErr(apierrors.WsMemberNotFound)
 	}
 	// Resolve the target user scoped to this workspace so an AI proposal
 	// cannot attach a user from another tenant as an assignee.
@@ -358,22 +371,12 @@ func addActorByPublicID(ctx context.Context, qtx *generated.Queries, wsID, taskI
 		PublicID:    userPub,
 	})
 	if err != nil {
-		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 	}
 	if uid > math.MaxInt32 {
-		return httpErr(apierrors.InternalUnexpected)
+		return 0, httpErr(apierrors.InternalUnexpected)
 	}
-	pub := types.New()
-	if _, err := qtx.AddActor(ctx, generated.AddActorParams{
-		PublicID:    pub,
-		WorkspaceID: wsID,
-		TaskID:      taskID,
-		UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
-		Role:        generated.TaskActorsRoleAssignee,
-	}); err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-	return nil
+	return uid, nil
 }
 
 // emitCreatedEvent appends a TaskCreated event for a newly created task.

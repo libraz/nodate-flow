@@ -225,10 +225,9 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		// An intake item is a workspace-level inbox entry with no audience of
 		// its own, so the converted task takes the workspace default, exactly
 		// as REST intake.Convert does.
-		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+		created, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
-			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			Title:       title,
 			Description: item.Body,
 		})

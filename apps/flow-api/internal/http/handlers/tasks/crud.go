@@ -407,10 +407,58 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			validationFn = nil
 			qtx := deps.Queries.WithTx(tx.RawTx())
 
-			created, err := taskcreate.New(ctx, tx, taskcreate.Args{
+			// When the caller passed no explicit actor list we auto-attach
+			// them as the sole `assignee` so the task shows up on their
+			// /me/tasks feeds. An explicit non-empty list is treated as
+			// authoritative, and the creator is recorded without being
+			// attached.
+			attr := taskcreate.SelfAssigned(actorID)
+			if len(in.Body.Actors) > 0 {
+				// Resolving reads, and the first read of a transaction is
+				// what fixes its snapshot, so the project lock has to come
+				// before it or the task number is allocated from a stale
+				// view of the project.
+				if lerr := taskcreate.LockProject(ctx, tx, prj.WorkspaceID, prj.ID); lerr != nil {
+					return lerr
+				}
+				actors := make([]taskcreate.Actor, 0, len(in.Body.Actors))
+				for _, a := range in.Body.Actors {
+					userPub, perr := types.Parse(a.UserID)
+					if perr != nil {
+						validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
+						return errCreateValidation
+					}
+					// Resolve scoped to the task's workspace so an explicit actor
+					// list cannot attach a user from another tenant.
+					uid, lerr := qtx.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+						WorkspaceID: prj.WorkspaceID,
+						PublicID:    userPub,
+					})
+					if lerr != nil {
+						if errors.Is(lerr, sql.ErrNoRows) {
+							validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
+							return errCreateValidation
+						}
+						return lerr
+					}
+					role := generated.TaskActorsRoleAssignee
+					if a.Role != "" {
+						parsed, perr := parseActorRole(a.Role)
+						if perr != nil {
+							capturedErr := perr
+							validationFn = func() error { return translateActorRoleError(capturedErr) }
+							return errCreateValidation
+						}
+						role = parsed
+					}
+					actors = append(actors, taskcreate.Actor{UserID: uid, Role: role})
+				}
+				attr = taskcreate.AuthoredBy(actorID).WithActors(actors...)
+			}
+
+			created, err := taskcreate.New(ctx, tx, attr, taskcreate.Args{
 				WorkspaceID: prj.WorkspaceID,
 				ProjectID:   prj.ID,
-				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
 				Title:       title,
 				Description: desc,
 				Priority:    in.Body.Priority,
@@ -433,62 +481,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			pub = created.PublicID
 			taskID = tID
 
-			// Attach actors. When the caller passed no explicit actor
-			// list we auto-attach them as the sole `assignee` so the
-			// task shows up on their /me/tasks feeds. An explicit
-			// non-empty list is treated as authoritative.
-			if len(in.Body.Actors) == 0 {
-				actorPub := types.New()
-				if _, err := qtx.AddActor(ctx, generated.AddActorParams{
-					PublicID:    actorPub,
-					WorkspaceID: prj.WorkspaceID,
-					TaskID:      uint32(tID),                                       //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-					UserID:      sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-					Role:        generated.TaskActorsRoleAssignee,
-				}); err != nil {
-					return err
-				}
-			}
-			for _, a := range in.Body.Actors {
-				userPub, perr := types.Parse(a.UserID)
-				if perr != nil {
-					validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
-					return errCreateValidation
-				}
-				// Resolve scoped to the task's workspace so an explicit actor
-				// list cannot attach a user from another tenant.
-				uid, lerr := qtx.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
-					WorkspaceID: prj.WorkspaceID,
-					PublicID:    userPub,
-				})
-				if lerr != nil {
-					if errors.Is(lerr, sql.ErrNoRows) {
-						validationFn = func() error { return httpErr(apierrors.WsMemberNotFound) }
-						return errCreateValidation
-					}
-					return lerr
-				}
-				role := generated.TaskActorsRoleAssignee
-				if a.Role != "" {
-					parsed, perr := parseActorRole(a.Role)
-					if perr != nil {
-						capturedErr := perr
-						validationFn = func() error { return translateActorRoleError(capturedErr) }
-						return errCreateValidation
-					}
-					role = parsed
-				}
-				actorPub := types.New()
-				if _, aerr := qtx.AddActor(ctx, generated.AddActorParams{
-					PublicID:    actorPub,
-					WorkspaceID: prj.WorkspaceID,
-					TaskID:      uint32(tID),                                   //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-					UserID:      sql.NullInt32{Int32: int32(uid), Valid: true}, //#nosec G115 -- user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-					Role:        role,
-				}); aerr != nil {
-					return aerr
-				}
-			}
 			// Append the lifecycle event inside the same tx so a crash
 			// between commit and a post-commit append cannot lose the
 			// timeline/audit row. On a deadlock retry the whole tx
