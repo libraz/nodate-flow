@@ -2906,9 +2906,9 @@ const taskTitleMaxLen = 255
 // runSmartCreateTask creates a parent task and AI-suggested subtasks with
 // assignee recommendations. It delegates to the AI orchestrator's
 // ProposeSmartCreate method to get a structured proposal, then persists
-// the parent task and each subtask as child tasks. When the proposal
-// includes assignee suggestions, the tool adds task actors for valid
-// workspace members.
+// the parent task and each subtask as child tasks. Suggested assignees are
+// returned for the caller to confirm and no task actor is added for them, so
+// a name the model proposed never becomes an assignment on its own.
 func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		ProjectID   string `json:"projectId"`
