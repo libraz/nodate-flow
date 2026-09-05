@@ -163,6 +163,19 @@ var Rules = []Rule{
 			"changes a task's text without refreshing its embedding leaves " +
 			"the task findable only under text it no longer has",
 	},
+	{
+		Name:    "description-history",
+		Table:   "tasks",
+		Columns: []string{"description"},
+		Enforcers: []string{
+			modulePath + "/internal/taskdesc.Snapshot",
+		},
+		Marker: "task-precondition",
+		Why: "the version history is the only copy of a body the task no " +
+			"longer carries, so a path that overwrites the description " +
+			"without appending it destroys the one thing a restore could " +
+			"have returned to",
+	},
 }
 
 // Statement is one named statement in sql/queries, normalised.
