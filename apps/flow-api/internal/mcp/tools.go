@@ -25,6 +25,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
@@ -1285,11 +1286,20 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 					TaskID:      taskInternal,
 					NewTitle:    title,
 				}); err != nil {
-					answered = translateItemkitMCPError(err)
+					answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
 					return err
 				}
 			}
 			if dueOnChanged {
+				// The snap badges come from the actor's working week and
+				// holiday set, resolved from the same workspace and actor
+				// REST resolves them from. Left unresolved the reschedule
+				// would store no snap at all, so the same move made through
+				// a tool and through REST would leave two different rows.
+				snap, err := itemkit.ResolveSnapConfig(ctx, tx, s.workspaceID, s.userID)
+				if err != nil {
+					return err
+				}
 				var t time.Time
 				if due.Valid {
 					t = due.Time
@@ -1300,8 +1310,9 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 					ActorUserID: s.userID,
 					SetDueOn:    true,
 					DueOn:       t,
+					Snap:        snap,
 				}); err != nil {
-					answered = translateItemkitMCPError(err)
+					answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
 					return err
 				}
 			}
@@ -1333,16 +1344,34 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": current.PublicID.String()}, nil
 }
 
-// translateItemkitMCPError maps an itemkit invariant into a stable MCP
-// error code so the tool response is 422-style for recoverable cases
-// and generic for the rest.
-func translateItemkitMCPError(err error) error {
+// translateItemkitMCPError maps an itemkit failure onto the error a
+// tool answers with, using the same classifier the REST handlers use so
+// the two surfaces cannot disagree about what an itemkit error means.
+//
+// notFound is the caller's own 404 spec, because itemkit is shared
+// between the task and calendar tools and only the caller knows which
+// resource went missing. The distinction matters to the caller as well
+// as to a reader: an agent retries a server error and does not retry a
+// 404, so collapsing a missing row into a tool-execution failure buys a
+// retry loop that cannot succeed.
+func translateItemkitMCPError(err error, notFound *apierrors.Spec) error {
 	if err == nil {
 		return nil
 	}
-	if strings.Contains(err.Error(), "itemkit invariant") {
+	switch handlerutil.ClassifyItemkitError(err) {
+	case handlerutil.ItemkitErrorNone:
+		return nil
+	case handlerutil.ItemkitErrorNotFound:
+		return apierrors.New(notFound)
+	case handlerutil.ItemkitErrorRecurrenceWithLink:
+		return apierrors.New(apierrors.ItemItemkitRecurrenceWithTaskLink)
+	case handlerutil.ItemkitErrorInvariant:
 		return apierrors.New(apierrors.ItemItemkitInvariantViolation)
+	case handlerutil.ItemkitErrorOther:
+		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// Totality only: a kind added to the classifier and not handled above
+	// answers as a server error rather than as a plausible wrong one.
 	return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 }
 
@@ -2126,7 +2155,7 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if err != nil {
 		return nil, err
 	}
-	visibility := mcpExportVisibilityParams(s.userID, wsRole)
+	visibility := acl.ListVisibilityArgs(s.userID, wsRole)
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 200
 	}
@@ -2150,10 +2179,10 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
 			WorkspaceID:   s.workspaceID,
 			ProjectID:     prjID,
-			IsElevated:    visibility.isElevated,
-			ActorUserID:   visibility.actorUserID,
-			ActorUserID_2: visibility.actorUserID,
-			ActorUserID_3: visibility.actorUserID,
+			IsElevated:    visibility.IsElevated,
+			ActorUserID:   visibility.ActorUserID,
+			ActorUserID_2: visibility.ActorUserID,
+			ActorUserID_3: visibility.ActorUserID,
 			Limit:         in.Limit,
 		})
 		if err != nil {
@@ -2175,10 +2204,10 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	} else {
 		dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
 			WorkspaceID:   s.workspaceID,
-			IsElevated:    visibility.isElevated,
-			ActorUserID:   visibility.actorUserID,
-			ActorUserID_2: visibility.actorUserID,
-			ActorUserID_3: visibility.actorUserID,
+			IsElevated:    visibility.IsElevated,
+			ActorUserID:   visibility.ActorUserID,
+			ActorUserID_2: visibility.ActorUserID,
+			ActorUserID_3: visibility.ActorUserID,
 			Limit:         in.Limit,
 		})
 		if err != nil {
@@ -2235,22 +2264,6 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		CallSite: "mcp.export_tasks",
 	})
 	return map[string]any{"tasks": items}, nil
-}
-
-type mcpExportVisibility struct {
-	isElevated  int64
-	actorUserID int64
-}
-
-func mcpExportVisibilityParams(actorID uint32, wsRole acl.WorkspaceRole) mcpExportVisibility {
-	var elevated int64
-	if wsRole.AtLeast(acl.WorkspaceRoleAdmin) {
-		elevated = 1
-	}
-	return mcpExportVisibility{
-		isElevated:  elevated,
-		actorUserID: int64(actorID),
-	}
 }
 
 // runProposeRelations finds related or duplicate tasks for a given task
@@ -3438,6 +3451,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	calID64 := int64(calID)
 	// The event row is committed; a retry would create a second entry on
 	// somebody's calendar.
 	recordMutation(ctx, deps, s, mutation{
@@ -3445,6 +3459,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		AuditAction:  "calendar.event.create",
 		ResourceType: "calendar.event",
 		ResourceID:   pub.String(),
+		CalendarID:   &calID64,
 		Payload: map[string]any{
 			"eventId":    pub.String(),
 			"calendarId": in.CalendarID,
@@ -3510,7 +3525,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
+			return nil, apierrors.New(apierrors.CalendarEventNotFound)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -3527,9 +3542,16 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if err := requireCalendarWritable(ctx, deps, s, owner.CalendarID); err != nil {
 		return nil, err
 	}
+	// A failed lookup is not a decision about the caller's authority, so
+	// it answers as the server failure it is; only a completed check that
+	// says no is a refusal. REST refuses the same event with the same
+	// spec, so the two transports disclose the same thing.
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
-	if err != nil || !ok {
-		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot edit event")
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apierrors.New(apierrors.CalendarEventEditPermissionRequired)
 	}
 
 	params := calendar.PatchCalendarEventParams{
@@ -3650,6 +3672,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		if _, err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
+		calID64 := int64(owner.CalendarID)
 		// This branch never reaches itemkit, so nothing else appends the
 		// event. That is why an agent editing a standalone event used to
 		// leave no trace at all: the linked-event path borrowed itemkit's
@@ -3659,6 +3682,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			AuditAction:  "calendar.event.update",
 			ResourceType: "calendar.event",
 			ResourceID:   eventPub.String(),
+			CalendarID:   &calID64,
 			Payload: map[string]any{
 				"eventId": eventPub.String(),
 				"via":     "mcp",
@@ -3703,7 +3727,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 				EventID:     evt.ID,
 				NewTitle:    *in.Title,
 			}); err != nil {
-				answered = translateItemkitMCPError(err)
+				answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
 				return err
 			}
 		}
@@ -3715,7 +3739,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 				StartAt:     newStartAt,
 				EndAt:       newEndAt,
 			}); err != nil {
-				answered = translateItemkitMCPError(err)
+				answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
 				return err
 			}
 		}
@@ -3771,7 +3795,7 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "event not found")
+			return nil, apierrors.New(apierrors.CalendarEventNotFound)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -3788,15 +3812,18 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		return nil, err
 	}
 	ok, err := canEditCalendarEvent(ctx, deps, s, owner.OwnerUserID, evt.ID, owner.CalendarID)
-	if err != nil || !ok {
-		return nil, apierrors.Newf(apierrors.McpToolExecutionFailed, "permission denied: cannot delete event")
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, apierrors.New(apierrors.CalendarEventEditPermissionRequired)
 	}
 
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.delete_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
 		if err := itemkit.DeleteEvent(ctx, tx, s.workspaceID, evt.ID, s.userID); err != nil {
-			answered = translateItemkitMCPError(err)
+			answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
 			return err
 		}
 		return nil
@@ -3988,9 +4015,13 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 // runCreateEventFromTask projects a task onto a calendar as a timed
 // event.
 //
-// calendar-precondition: all-day-bounds not-applicable — the row is
-// written with all_day false and the tool takes no date arguments, so
-// there is no calendar square to pin to UTC midnight
+// The write goes through itemkit.ScheduleTask, the projection engine,
+// because a calendar event carrying a task link is a projection row:
+// calendar_events reserves task_id, task_role, title, start_at, end_at
+// and enabled on such a row for the engine, and a trigger refuses any
+// direct insert that sets task_id. The engine owns the columns the
+// calendar write preconditions govern, so they are answered where it
+// writes rather than here.
 func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID     string `json:"taskId"`
@@ -4036,43 +4067,52 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	// assumed: a day built in UTC is a day only at offset zero.
 	zone := resolveUserTimezone(ctx, deps, s.workspaceID, s.userID)
 
-	pub := newPublicID()
-	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
-		PublicID:           pub,
-		WorkspaceID:        s.workspaceID,
-		CalendarID:         calID,
-		Kind:               calendar.CalendarEventsKindEvent,
-		Visibility:         calendar.CalendarEventsVisibilityDefault,
-		ShowAs:             calendar.CalendarEventsShowAsBusy,
-		Flexibility:        calendar.CalendarEventsFlexibilityFixed,
-		Title:              task.Title,
-		AllDay:             false,
-		StartAt:            sql.NullTime{Time: startAt, Valid: true},
-		EndAt:              sql.NullTime{Time: endAt, Valid: true},
-		Timezone:           zone.Name(),
-		Location:           sql.NullString{},
-		Memo:               sql.NullString{},
-		Url:                sql.NullString{},
-		OwnerUserID:        s.userID,
-		CreatedByUserID:    s.userID,
-		BlockLabel:         sql.NullString{},
-		RecurrenceRule:     nil,
-		RecurrenceEnd:      sql.NullTime{},
-		NotificationOffset: sql.NullInt32{},
-		TaskID:             sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	// RoleDue is the only role a task-projected event may hold, and the
+	// call is idempotent in it: a task already projected onto a calendar
+	// is moved rather than doubled, which is what the REST counterpart
+	// does too. Snap is left at its zero value, as there: this path
+	// resolves no working-day configuration, so no badge is applied and
+	// the window the caller chose is the window written.
+	var eventPub types.PublicID
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_event_from_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		pub, _, err := itemkit.ScheduleTask(ctx, tx, itemkit.ScheduleTaskArgs{
+			WorkspaceID: s.workspaceID,
+			TaskID:      taskInternal,
+			CalendarID:  calID,
+			ActorUserID: s.userID,
+			Role:        itemkit.RoleDue,
+			Title:       task.Title,
+			StartAt:     startAt,
+			EndAt:       endAt,
+			Timezone:    zone.Name(),
+		})
+		if err != nil {
+			answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
+			return err
+		}
+		eventPub = pub
+		return nil
 	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if answered != nil {
+		return nil, answered
 	}
-	taskID64 := int64(taskInternal)
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.CalEventCreated,
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
+	}
+
+	// itemkit appended item.scheduled and its legacy calendar.event.created
+	// inside the transaction that just committed, so only the audit half is
+	// left. No calendar id is named: the engine files through an event type
+	// that carries none, so there is nothing here that a per-calendar feed
+	// could be pointed at.
+	recordTxMutationAudit(ctx, deps, s, mutation{
 		AuditAction:  "calendar.event.create",
 		ResourceType: "calendar.event",
-		ResourceID:   pub.String(),
-		TaskID:       &taskID64,
+		ResourceID:   eventPub.String(),
 		Payload: map[string]any{
-			"eventId":    pub.String(),
+			"eventId":    eventPub.String(),
 			"calendarId": in.CalendarID,
 			"taskId":     task.PublicID.String(),
 			"title":      task.Title,
@@ -4083,7 +4123,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 		CallSite: "mcp.create_event_from_task",
 	})
 	return map[string]any{
-		"id":      pub.String(),
+		"id":      eventPub.String(),
 		"title":   task.Title,
 		"startAt": startAt.Unix(),
 		"endAt":   endAt.Unix(),
@@ -4160,6 +4200,7 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	calID64 := int64(calID)
 	// Same kind and action the REST memo patch uses, so a shared memo
 	// ticked off by an agent reads the same on the timeline as one ticked
 	// off in the web app.
@@ -4168,6 +4209,7 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		AuditAction:  "calendar.memo.update",
 		ResourceType: "calendar.memo",
 		ResourceID:   in.MemoID,
+		CalendarID:   &calID64,
 		Payload: map[string]any{
 			"memoId":     in.MemoID,
 			"calendarId": in.CalendarID,

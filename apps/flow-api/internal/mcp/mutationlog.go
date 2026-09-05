@@ -59,6 +59,13 @@ type mutation struct {
 	// TaskID is the internal task id when the change targets a task, so
 	// events.task_id carries the link the timeline reads.
 	TaskID *int64
+	// CalendarID is the internal calendar id when the change happened
+	// inside a calendar, so events.calendar_id carries the link a
+	// per-calendar activity feed reads. Same field the REST calendar
+	// handlers fill; without it a calendar.* mutation says what happened
+	// but not where, and that feed cannot see it at all. Nil for changes
+	// with no calendar subject.
+	CalendarID *int64
 	// Payload is the event payload and doubles as the audit metadata. It
 	// must already be free of secrets and internal sequential ids.
 	Payload map[string]any
@@ -143,6 +150,7 @@ func mutationEvent(s *session, m mutation) eventbus.Event {
 		WorkspaceID: s.workspaceID,
 		ActorUserID: &actor,
 		TaskID:      m.TaskID,
+		CalendarID:  m.CalendarID,
 		Payload:     m.Payload,
 	}
 }
