@@ -990,9 +990,12 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			ResourceType: "task",
 			ResourceID:   task.PublicID.String(),
 		})
-		// Only the request body says whether the embedded text changed at
-		// all, so the decision to refresh stays here.
-		if in.Body.Title != nil || in.Body.Description != nil {
+		// Against the stored values, not the presence of the fields: a
+		// client that round-trips the whole task re-sends text it never
+		// edited, and a refresh costs a provider call the workspace pays
+		// for. Only text that actually moved invalidates the vector.
+		textChanged := titleChanged || (in.Body.Description != nil && newDesc != current.Description)
+		if textChanged {
 			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, newTitle.String(), nullStr(newDesc))
 		}
 
