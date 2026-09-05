@@ -31,8 +31,8 @@ func TestCalendarWritesReachTheirPreconditions(t *testing.T) {
 			}
 		}
 		if len(Sinks(statements, rule)) == 0 {
-			t.Fatalf("no statement in sql/queries writes any of %s on calendar_events, so rule %q is held against nothing; the SQL derivation has stopped matching rather than the writes having gone away",
-				strings.Join(rule.Columns, " / "), rule.Name)
+			t.Fatalf("no statement in sql/queries writes any of %s on %s, so rule %q is held against nothing; the SQL derivation has stopped matching rather than the writes having gone away",
+				strings.Join(rule.Columns, " / "), rule.Table, rule.Name)
 		}
 	}
 
@@ -46,7 +46,7 @@ func TestCalendarWritesReachTheirPreconditions(t *testing.T) {
 				"  Route the write through the shared rule, or say at the entry why this one cannot carry the input: %s",
 				f.Entry.Surface, f.Entry.Name, f.Entry.Symbol, f.Entry.Pos,
 				strings.Join(rule.Columns, " / "), f.Via.Name, f.Via.Location(),
-				strings.Join(rule.Enforcers, " / "), rule.Why, MarkerForm)
+				strings.Join(rule.Enforcers, " / "), rule.Why, rule.MarkerForm())
 		case StaleMarker:
 			t.Errorf("%s %s (%s) carries a %q exemption that covers nothing — it either writes none of %s or applies the rule anyway. It exempts nothing and reads as though something was reasoned about; drop it",
 				f.Entry.Surface, f.Entry.Name, f.Entry.Symbol, f.Rule, strings.Join(rule.Columns, " / "))

@@ -21,8 +21,10 @@ import (
 // the control keeps working when the real rules change.
 var controlRule = Rule{
 	Name:      "chronology",
+	Table:     "calendar_events",
 	Columns:   []string{"start_at"},
 	Enforcers: []string{modulePath + "/internal/calendarrules.RequireEventChronology"},
+	Marker:    "calendar-precondition",
 	Why:       "the fixture rule",
 }
 

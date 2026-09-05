@@ -1,7 +1,6 @@
 // Package precondition derives, from the committed SQL and the committed
-// Go, which request paths write a calendar_events column that carries an
-// input rule — and proves each of them reaches the one function that
-// applies it.
+// Go, which request paths write a column that carries an input rule — and
+// proves each of them reaches the one function that applies it.
 //
 // Sharing a precondition helper is not the fix on its own. The chronology
 // rule already existed, correctly, in the REST handlers; what was missing
@@ -14,7 +13,7 @@
 // So the scope is derived rather than listed:
 //
 //	sink        a statement in sql/queries that INSERTs into or UPDATEs
-//	            calendar_events and writes one of a rule's columns. The
+//	            the rule's table and writes one of the rule's columns. The
 //	            SQL is the shared source both transports reach the row
 //	            through, so a new write statement is in scope the moment
 //	            it is committed.
@@ -31,7 +30,7 @@
 //
 // An entry that legitimately writes the columns without the rule says so
 // at the entry, in a marker a machine reads, rather than in a sentence
-// somewhere else — see [MarkerForm]. The reason is mandatory: an
+// somewhere else — see [Rule.MarkerForm]. The reason is mandatory: an
 // exemption with nothing after the marker is not an exemption.
 //
 // Call edges are literal. A call through an imported package name is an
@@ -59,41 +58,53 @@ import (
 // resolves is rooted at.
 const modulePath = "github.com/libraz/nodate-flow/apps/flow-api"
 
-// MarkerForm is the machine-readable exemption, written in the doc
-// comment or the body of the entry it exempts.
-//
-// The rule name is part of the marker: an entry exempt from one rule is
-// not exempt from the others, and a single blanket marker would hide the
-// next rule added rather than the one somebody reasoned about.
-const MarkerForm = "calendar-precondition: <rule> not-applicable — <why this write cannot carry the input>"
-
-// markerPattern builds the pattern that matches [MarkerForm] for one
-// rule. Requiring the reason to start and end with a letter is what stops
-// a mention of the marker from acting as one, which is the rule the
-// direct-SQL gate and the affected-rows gate use for their own
-// exemptions.
-func markerPattern(rule string) *regexp.Regexp {
-	return regexp.MustCompile(
-		`calendar-precondition:[ \t]*` + regexp.QuoteMeta(rule) +
-			`[ \t]*not-applicable[ \t]*—[ \t]*[A-Za-z][^\n]*[A-Za-z]`)
-}
-
-// Rule is one input precondition on a calendar_events write.
+// Rule is one input precondition on a table's write.
 type Rule struct {
 	// Name is what a marker names and what a failure reports.
 	Name string
-	// Columns are the calendar_events columns whose write puts a
-	// statement in scope. A rule about a start/end window is not a rule
-	// about a title, so a statement that writes neither column is not
-	// held to it.
+	// Table is the table whose write puts a statement in scope. A rule
+	// about an event window says nothing about a task, so a statement
+	// against another table is not held to it however its columns are
+	// spelled.
+	Table string
+	// Columns are the table's columns whose write puts a statement in
+	// scope. A rule about a start/end window is not a rule about a title,
+	// so a statement that writes neither column is not held to it.
 	Columns []string
 	// Enforcers are the package-qualified functions that apply the rule.
 	// Reaching any one of them satisfies it: the shared entry point and
 	// the wrappers around it are the same decision.
 	Enforcers []string
+	// Marker is the domain prefix of this rule's exemption marker. It is
+	// per-rule because a prefix that names one domain reads as noise in
+	// another: an exemption on a task write should not have to claim to
+	// be about calendars for a machine to read it.
+	Marker string
 	// Why is the one-line reason the rule exists, quoted in the failure
 	// so a reader does not have to find this file to understand it.
 	Why string
+}
+
+// MarkerForm renders the machine-readable exemption for this rule,
+// written in the doc comment or the body of the entry it exempts.
+//
+// The rule name is part of the marker: an entry exempt from one rule is
+// not exempt from the others, and a single blanket marker would hide the
+// next rule added rather than the one somebody reasoned about.
+func (r Rule) MarkerForm() string {
+	return r.Marker + ": " + r.Name +
+		" not-applicable — <why this write cannot carry the input>"
+}
+
+// markerPattern builds the pattern that matches [Rule.MarkerForm] for one
+// rule. Requiring the reason to start and end with a letter is what stops
+// a mention of the marker from acting as one, which is the rule the
+// direct-SQL gate and the affected-rows gate use for their own
+// exemptions.
+func markerPattern(rule Rule) *regexp.Regexp {
+	return regexp.MustCompile(
+		regexp.QuoteMeta(rule.Marker) + `:[ \t]*` + regexp.QuoteMeta(rule.Name) +
+			`[ \t]*not-applicable[ \t]*—[ \t]*[A-Za-z][^\n]*[A-Za-z]`)
 }
 
 // Rules are the preconditions held across both transports.
@@ -105,20 +116,24 @@ type Rule struct {
 var Rules = []Rule{
 	{
 		Name:    "chronology",
+		Table:   "calendar_events",
 		Columns: []string{"start_at", "end_at"},
 		Enforcers: []string{
 			modulePath + "/internal/calendarrules.RequireEventChronology",
 		},
+		Marker: "calendar-precondition",
 		Why: "an inverted window reaches chk_calendar_events_chronology, " +
 			"which the transport cannot attribute and reports as a server error " +
 			"instead of the 422 that says which way round the window goes",
 	},
 	{
 		Name:    "all-day-bounds",
+		Table:   "calendar_events",
 		Columns: []string{"all_day"},
 		Enforcers: []string{
 			modulePath + "/internal/calendarrules.NormalizeAllDayBounds",
 		},
+		Marker: "calendar-precondition",
 		Why: "an all-day row is a date, stored as UTC midnight; a transport " +
 			"that writes the instant it was handed puts the same event on a " +
 			"different square for readers in another zone",
@@ -144,15 +159,15 @@ func (s Statement) Location() string {
 }
 
 // WritesColumn reports whether the statement writes the named column of
-// calendar_events.
+// the named table.
 //
 // Only a write counts. A SELECT that filters on start_at reads the
 // window; it cannot store an inverted one, and holding it to the rule
 // would put every list endpoint in scope of a check about input.
-func (s Statement) WritesColumn(column string) bool {
+func (s Statement) WritesColumn(table, column string) bool {
 	switch head(s.SQL) {
 	case "insert":
-		cols, ok := insertColumns(s.SQL)
+		cols, ok := insertColumns(s.SQL, table)
 		if !ok {
 			return false
 		}
@@ -163,21 +178,23 @@ func (s Statement) WritesColumn(column string) bool {
 		}
 		return false
 	case "update":
-		if !strings.HasPrefix(s.SQL, "update calendar_events") {
+		set, ok := setClause(s.SQL, table)
+		if !ok {
 			return false
 		}
-		return assignsColumn(setClause(s.SQL), column)
+		return assignsColumn(set, column)
 	default:
 		return false
 	}
 }
 
-// Sinks returns the statements that write any of the rule's columns.
+// Sinks returns the statements that write any of the rule's columns on
+// the rule's table.
 func Sinks(statements []Statement, rule Rule) map[string]Statement {
 	out := map[string]Statement{}
 	for _, s := range statements {
 		for _, col := range rule.Columns {
-			if s.WritesColumn(col) {
+			if s.WritesColumn(rule.Table, col) {
 				out[s.Name] = s
 				break
 			}
@@ -289,13 +306,13 @@ func head(sql string) string {
 	return fields[0]
 }
 
-// insertColumns returns the column list of an INSERT INTO calendar_events.
-func insertColumns(sql string) ([]string, bool) {
-	const target = "insert into calendar_events"
-	if !strings.HasPrefix(sql, target) {
+// insertColumns returns the column list of an INSERT INTO the named
+// table.
+func insertColumns(sql, table string) ([]string, bool) {
+	rest, ok := afterTable(sql, "insert into", table)
+	if !ok {
 		return nil, false
 	}
-	rest := sql[len(target):]
 	open := strings.Index(rest, "(")
 	if open < 0 {
 		return nil, false
@@ -315,19 +332,47 @@ func insertColumns(sql string) ([]string, bool) {
 	return nil, false
 }
 
-// setClause returns the assignments of a normalised UPDATE, cut before
-// the predicate. Reading the whole statement instead would let a WHERE
-// on the same column read as a write to it.
-func setClause(sql string) string {
-	at := setKeyword.FindStringIndex(sql)
+// setClause returns the assignments of a normalised UPDATE of the named
+// table, cut before the predicate. Reading the whole statement instead
+// would let a WHERE on the same column read as a write to it.
+func setClause(sql, table string) (string, bool) {
+	rest, ok := afterTable(sql, "update", table)
+	if !ok {
+		return "", false
+	}
+	at := setKeyword.FindStringIndex(rest)
 	if at == nil {
-		return ""
+		return "", false
 	}
-	rest := sql[at[1]:]
+	rest = rest[at[1]:]
 	if end := whereKeyword.FindStringIndex(rest); end != nil {
-		return rest[:end[0]]
+		return rest[:end[0]], true
 	}
-	return rest
+	return rest, true
+}
+
+// afterTable returns what follows "<verb> <table>" in a normalised
+// statement, and whether the statement addresses that table at all.
+//
+// The name has to end where the table's name ends: calendar_events and
+// calendar_event_attendees share a prefix, and a rule about one holding
+// writes to the other would report a column the statement never wrote.
+func afterTable(sql, verb, table string) (string, bool) {
+	target := verb + " " + table
+	if !strings.HasPrefix(sql, target) {
+		return "", false
+	}
+	rest := sql[len(target):]
+	if rest != "" && isIdentifierByte(rest[0]) {
+		return "", false
+	}
+	return rest, true
+}
+
+// isIdentifierByte reports whether the byte can continue a normalised SQL
+// identifier.
+func isIdentifierByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
 }
 
 // assignsColumn reports whether the SET clause assigns to the column,
@@ -645,7 +690,7 @@ func (s *Source) Declares(symbol string) bool {
 
 // Marked reports whether the entry carries a marker for the rule, in its
 // doc comment or anywhere in its body.
-func (s *Source) Marked(symbol, rule string) bool {
+func (s *Source) Marked(symbol string, rule Rule) bool {
 	fn := s.funcs[symbol]
 	if fn == nil {
 		return false
@@ -715,7 +760,7 @@ func Check(src *Source, statements []Statement, rules []Rule) ([]Finding, InScop
 		for _, entry := range src.Entries {
 			qualified, called := src.Reach(entry.Symbol)
 			via, writes := firstSink(called, sinks)
-			marked := src.Marked(entry.Symbol, rule.Name)
+			marked := src.Marked(entry.Symbol, rule)
 
 			if !writes {
 				if marked {
