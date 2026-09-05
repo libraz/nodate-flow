@@ -138,6 +138,31 @@ var Rules = []Rule{
 			"that writes the instant it was handed puts the same event on a " +
 			"different square for readers in another zone",
 	},
+	{
+		Name:    "date-order",
+		Table:   "tasks",
+		Columns: []string{"due_on", "started_on"},
+		Enforcers: []string{
+			modulePath + "/internal/taskrules.DateOrder",
+		},
+		Marker: "task-precondition",
+		Why: "a due date earlier than the start date is a task nobody can " +
+			"act on, and nothing in the database refuses the pair — the rule " +
+			"is a plain function call, so a write path that does not make it " +
+			"stores the inversion",
+	},
+	{
+		Name:    "write-time-embedding",
+		Table:   "tasks",
+		Columns: []string{"title", "description"},
+		Enforcers: []string{
+			modulePath + "/internal/ai/embed.RefreshTaskAfterCommit",
+		},
+		Marker: "task-precondition",
+		Why: "search is served from stored embeddings, so a path that " +
+			"changes a task's text without refreshing its embedding leaves " +
+			"the task findable only under text it no longer has",
+	},
 }
 
 // Statement is one named statement in sql/queries, normalised.
