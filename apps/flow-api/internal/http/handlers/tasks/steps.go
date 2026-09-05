@@ -20,6 +20,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -244,6 +245,19 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 
+		// Every step title is checked before the transaction opens, so a
+		// blank one in the middle of the list is refused as a validation
+		// error rather than aborting a batch that has already inserted
+		// its predecessors.
+		stepTitles := make([]taskrules.Title, 0, len(in.Body.Steps))
+		for _, st := range in.Body.Steps {
+			title, err := taskrules.NewTitle(st.Title)
+			if err != nil {
+				return nil, translateTaskRuleError(err)
+			}
+			stepTitles = append(stepTitles, title)
+		}
+
 		// Resolve parent's project_id.
 		var parentProjectID uint32
 		if err := deps.DB.QueryRowContext(ctx,
@@ -263,13 +277,13 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			created = created[:0]
 			childIDs = childIDs[:0]
-			for _, st := range in.Body.Steps {
+			for i, st := range in.Body.Steps {
 				child, err := taskcreate.New(ctx, tx, taskcreate.Args{
 					WorkspaceID:  ws.ID,
 					ProjectID:    parentProjectID,
 					ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 					ActorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-					Title:        st.Title,
+					Title:        stepTitles[i],
 					Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 					Priority:     st.Priority,
 				})
@@ -285,9 +299,12 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// Emit events after commit so they reference committed rows.
+		// Emit events after commit so they reference committed rows. The
+		// title an event carries is the title the child row carries:
+		// recording the submitted one instead would describe the step as
+		// having a name it was never stored under.
 		parentPubStr := task.PublicID.String()
-		for i, st := range in.Body.Steps {
+		for i := range in.Body.Steps {
 			actor := int64(actorID)
 			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
 				Type:        eventbus.TaskCreated,
@@ -296,7 +313,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 				TaskID:      &childIDs[i],
 				Payload: map[string]any{
 					"taskId":       created[i],
-					"title":        st.Title,
+					"title":        stepTitles[i].String(),
 					"parentTaskId": parentPubStr,
 					"via":          "api:apply_steps",
 				},

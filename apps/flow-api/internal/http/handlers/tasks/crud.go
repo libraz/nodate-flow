@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -19,6 +20,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
@@ -46,6 +48,22 @@ const maxTaskPriority = 4
 // captured validation closure to translate the failure into the right
 // problem+json envelope.
 var errCreateValidation = errors.New("tasks.Create: validation failed")
+
+// translateTaskRuleError renders a [taskrules] refusal as the
+// problem+json envelope the REST contract answers for it. The rules
+// package states what was violated and stops there, because MCP answers
+// the same violations differently; this is the REST half of that split.
+func translateTaskRuleError(err error) error {
+	switch taskrules.Classify(err) {
+	case taskrules.ViolationNone:
+		return nil
+	case taskrules.ViolationTitleEmpty:
+		return httpErr(apierrors.ValidationBodyFieldInvalid)
+	case taskrules.ViolationDueBeforeStart:
+		return httpErr(apierrors.ValidationBodyDueBeforeStart)
+	}
+	return httpErr(apierrors.InternalUnexpected)
+}
 
 // translateActorRoleError converts an apierror returned by
 // [parseActorRole] into the canonical problem+json envelope so the
@@ -337,9 +355,12 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		title := strings.TrimSpace(in.Body.Title)
-		if title == "" {
-			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		// Checked before the project lookup: a blank title with an
+		// unknown project id is answered as a validation error, and
+		// moving the check past the lookup would answer not-found.
+		title, err := taskrules.NewTitle(in.Body.Title)
+		if err != nil {
+			return nil, translateTaskRuleError(err)
 		}
 		prjPub, err := types.Parse(in.Body.ProjectID)
 		if err != nil {
@@ -363,11 +384,8 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 		}
-		// Cross-field invariant: when both dueOn and startedOn are
-		// provided, dueOn must not be earlier than startedOn. Same-day
-		// (equal) is allowed; NULL on either side means "unconstrained".
-		if due.Valid && start.Valid && due.Time.Before(start.Time) {
-			return nil, httpErr(apierrors.ValidationBodyDueBeforeStart)
+		if err := taskrules.DateOrder(due, start); err != nil {
+			return nil, translateTaskRuleError(err)
 		}
 
 		var pub types.PublicID
@@ -483,7 +501,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 				Payload: map[string]any{
 					"taskId":    pub.String(),
 					"projectId": prjPub.String(),
-					"title":     title,
+					"title":     title.String(),
 				},
 			}); err != nil {
 				return err
@@ -502,14 +520,9 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			WorkspaceID:  prj.WorkspaceID,
 			ResourceType: "task",
 			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"title": title, "projectId": in.Body.ProjectID},
+			Metadata:     map[string]any{"title": title.String(), "projectId": in.Body.ProjectID},
 		})
-		if deps.Embedder != nil {
-			// Write-time embedding upsert (ADR 0003). Failures are swallowed
-			// so the task write still succeeds; the weekly reindex cron
-			// picks up any rows that missed.
-			_ = deps.Embedder.EmbedTask(ctx, prj.WorkspaceID, uint32(taskID), title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		}
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, prj.WorkspaceID, uint32(taskID), title.String(), in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: prj.WorkspaceID,
@@ -816,13 +829,9 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 
-		newTitle := current.Title
-		if in.Body.Title != nil {
-			trimmedTitle := strings.TrimSpace(*in.Body.Title)
-			if trimmedTitle == "" {
-				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
-			}
-			newTitle = trimmedTitle
+		newTitle, err := taskrules.PatchTitle(current.Title, in.Body.Title)
+		if err != nil {
+			return nil, translateTaskRuleError(err)
 		}
 		newDesc := current.Description
 		if in.Body.Description != nil {
@@ -848,15 +857,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			newStart = parsed
 		}
-		// Cross-field invariant: after applying the patch, dueOn must not
-		// be earlier than startedOn. Same-day (equal) is allowed. We only
-		// run the check when BOTH values would be present after the patch;
-		// NULL on either side means "unconstrained" and is always valid.
-		// The inputs merge the request body with the existing persisted
-		// task, so the check also catches a body that touches only one
-		// side but inverts the pair against the other side's stored value.
-		if newDue.Valid && newStart.Valid && newDue.Time.Before(newStart.Time) {
-			return nil, httpErr(apierrors.ValidationBodyDueBeforeStart)
+		// The merged pair, not the body: a patch that moves only one
+		// side still has to face the other side's stored value.
+		if err := taskrules.DateOrder(newDue, newStart); err != nil {
+			return nil, translateTaskRuleError(err)
 		}
 		newSortWeight := current.SortWeight
 		if in.Body.SortWeight != nil {
@@ -867,7 +871,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			newVisibility = generated.TasksVisibility(*in.Body.Visibility)
 		}
 
-		titleChanged := in.Body.Title != nil && *in.Body.Title != "" && newTitle != current.Title
+		titleChanged := in.Body.Title != nil && newTitle.String() != current.Title
 		dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
 
 		needsItemkit := false
@@ -882,7 +886,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 
 		updateParams := generated.UpdateTaskParams{
-			Title:           newTitle,
+			Title:           newTitle.String(),
 			Description:     newDesc,
 			Priority:        newPriority,
 			DueOn:           newDue,
@@ -986,8 +990,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			ResourceType: "task",
 			ResourceID:   task.PublicID.String(),
 		})
-		if deps.Embedder != nil && (in.Body.Title != nil || in.Body.Description != nil) {
-			_ = deps.Embedder.EmbedTask(ctx, ws.ID, task.ID, newTitle, nullStr(newDesc))
+		// Only the request body says whether the embedded text changed at
+		// all, so the decision to refresh stays here.
+		if in.Body.Title != nil || in.Body.Description != nil {
+			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, newTitle.String(), nullStr(newDesc))
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{

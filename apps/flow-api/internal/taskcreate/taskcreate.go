@@ -35,6 +35,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 // ErrVisibilityInvalid is returned when [Args.Visibility] is non-empty
@@ -62,7 +63,10 @@ type Args struct {
 	// agent-authored rows, where attribution lives on
 	// events.actor_agent_id rather than on the task.
 	ActorUserID sql.NullInt32
-	Title       string
+	// Title carries the title rule with it: the only way to hold one is
+	// taskrules.NewTitle, so no call site can reach this insert with a
+	// title nobody checked.
+	Title       taskrules.Title
 	Description sql.NullString
 	Priority    int32
 	DueOn       sql.NullTime
@@ -94,6 +98,13 @@ type Result struct {
 // allocation reads MAX(task_number) within the transaction, so each
 // successive call sees the rows the previous ones inserted.
 func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
+	// The zero Title is the one value the type cannot rule out: a caller
+	// that omits the field entirely still compiles. Refusing it here
+	// keeps "every stored title passed the rule" true rather than nearly
+	// true.
+	if args.Title.String() == "" {
+		return Result{}, taskrules.ErrTitleEmpty
+	}
 	visibility, err := resolveVisibility(args.Visibility)
 	if err != nil {
 		return Result{}, err
@@ -115,7 +126,7 @@ func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 		CreatedByUserID: args.ActorUserID,
 		UpdatedByUserID: args.ActorUserID,
 		TaskNumber:      taskNumber,
-		Title:           args.Title,
+		Title:           args.Title.String(),
 		Description:     args.Description,
 		Priority:        args.Priority,
 		DueOn:           args.DueOn,

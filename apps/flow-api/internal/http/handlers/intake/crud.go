@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -323,6 +324,14 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			return nil, httpErr(apierrors.WsIntakeAlreadyConverted)
 		}
 
+		// The converted task takes the item's title, so it faces the rule
+		// every other task title faces. An item whose title is blank has
+		// nothing to convert into.
+		title, err := taskrules.NewTitle(item.Title)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+
 		// Resolve project.
 		prjPub, err := types.Parse(in.Body.ProjectID)
 		if err != nil {
@@ -361,7 +370,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				WorkspaceID: ws.ID,
 				ProjectID:   prj.ID,
 				ActorUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				Title:       item.Title,
+				Title:       title,
 				Description: sql.NullString{String: nullStr(item.Body), Valid: item.Body.Valid},
 			})
 			if err != nil {
@@ -401,10 +410,13 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			WorkspaceID: ws.ID,
 			ActorUserID: actorPtr(ctx),
 			TaskID:      &taskID,
+			// The task's title, not the item's: the conversion trims what
+			// the item carried, so recording the item's string would name
+			// the task by something it was never stored under.
 			Payload: map[string]any{
 				"taskId":    taskPub.String(),
 				"projectId": prjPub.String(),
-				"title":     item.Title,
+				"title":     title.String(),
 				"source":    "intake_convert",
 			},
 		}, "intake.Convert")
@@ -425,7 +437,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				ResourceType: "task",
 				ResourceID:   taskPub.String(),
 				Metadata: map[string]any{
-					"title":     item.Title,
+					"title":     title.String(),
 					"projectId": in.Body.ProjectID,
 					"source":    "intake_convert",
 				},

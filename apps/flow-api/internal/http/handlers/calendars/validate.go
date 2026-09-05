@@ -2,7 +2,10 @@ package calendars
 
 import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 // The rules these wrappers apply live in
@@ -18,6 +21,21 @@ func requireValidTimezone(field, tz string) error {
 		return handlerutil.HTTPErrFromAPIError(err)
 	}
 	return nil
+}
+
+// requireLinkedTitle prepares the title a linked event's rename carries
+// into tasks.title.
+//
+// A linked event and its task share one title, so the rule that governs
+// a task title governs this edit too — the rename writes the task row.
+// An unlinked event's title never reaches tasks and is not checked here.
+func requireLinkedTitle(field, raw string) (taskrules.Title, error) {
+	title, err := taskrules.NewTitle(raw)
+	if err != nil {
+		return taskrules.Title{}, handlerutil.HTTPErrFromAPIError(
+			apierr.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", field))
+	}
+	return title, nil
 }
 
 // requireEventChronology rejects an event whose end precedes its start.

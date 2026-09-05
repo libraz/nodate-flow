@@ -31,6 +31,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 // Defaults for the worker's cadence and limits.
@@ -313,11 +314,18 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 // so an imported task is indistinguishable from one made through the
 // API: same task-number allocation, same defaults, same created event.
 func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, row Row) error {
+	// The parser already refuses a row whose title column is blank, so
+	// this restates the rule at the sink rather than adding one: an
+	// imported task passes the same check as a task made through the API.
+	title, err := taskrules.NewTitle(row.Title)
+	if err != nil {
+		return err
+	}
 	return dbretry.InTx(ctx, w.DB, "importer.createTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		created, err := taskcreate.New(ctx, tx, taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   projectID,
-			Title:       row.Title,
+			Title:       title,
 			Description: row.Description,
 			Priority:    row.Priority,
 			DueOn:       row.DueOn,
@@ -331,9 +339,12 @@ func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, 
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: workspaceID,
 			TaskID:      &taskID,
+			// The stored title, not the parsed cell: the two differ when a
+			// cell arrives with a formula guard, and an event naming a task
+			// by a title the row does not carry cannot be corrected.
 			Payload: map[string]any{
 				"taskId": created.PublicID.String(),
-				"title":  row.Title,
+				"title":  title.String(),
 				"source": "import",
 			},
 		})

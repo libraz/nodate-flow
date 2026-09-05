@@ -64,6 +64,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
@@ -414,6 +415,12 @@ func (m *SQLTaskMutator) DraftRetroTask(
 		newTitle = retroTitlePrefix + src.Title
 	}
 	newTitle = truncateTitleRunes(newTitle, retroTitleMaxLen)
+	// Checked after the truncation, which is the last thing that can turn
+	// a title into whitespace.
+	retroTitle, err := taskrules.NewTitle(newTitle)
+	if err != nil {
+		return 0, "", fmt.Errorf("signaljudge: retro title: %w", err)
+	}
 
 	// Description text — see [retroDescriptionTemplate].
 	now := m.now().UTC()
@@ -438,7 +445,7 @@ func (m *SQLTaskMutator) DraftRetroTask(
 			// ActorUserID stays invalid: attribution for an agent-drafted
 			// retro lives on events.actor_agent_id, not on the task row.
 			ActorUserID: sql.NullInt32{},
-			Title:       newTitle,
+			Title:       retroTitle,
 			Description: sql.NullString{String: description, Valid: true},
 		})
 		if err != nil {

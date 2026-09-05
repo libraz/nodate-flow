@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
@@ -669,6 +670,18 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		titleChanged := input.Body.Title != nil && *input.Body.Title != evt.Title
 		timeChanged := input.Body.StartAt != nil // pair invariant guarantees EndAt also set
 
+		// Resolved before the transaction so a refusal is answered as a
+		// validation error rather than surfacing from inside a retryable
+		// unit of work.
+		var renameTitle taskrules.Title
+		if isLinked && titleChanged {
+			var terr error
+			renameTitle, terr = requireLinkedTitle("title", *input.Body.Title)
+			if terr != nil {
+				return nil, terr
+			}
+		}
+
 		// itemkit owns the propagation of a linked event's title and
 		// times to the task, so those fields drop out of the direct PATCH
 		// rather than being written twice. They are decided here rather
@@ -822,7 +835,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
 					WorkspaceID: wsID,
 					ActorUserID: actorID,
-					NewTitle:    *input.Body.Title,
+					NewTitle:    renameTitle,
 					EventID:     evt.ID,
 				}); err != nil {
 					answered = translateItemkitError(ctx, "itemkit.RenameItem", err)

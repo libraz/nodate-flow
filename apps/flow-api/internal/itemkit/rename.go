@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
@@ -15,7 +16,12 @@ import (
 type RenameItemArgs struct {
 	WorkspaceID uint32
 	ActorUserID uint32
-	NewTitle    string
+	// NewTitle lands in tasks.title on both origins — an event rename
+	// propagates to the linked task — so it carries the task title rule
+	// even when the edit started on the calendar side. The writes below
+	// are raw ExecContext, invisible to anything that derives its write
+	// sinks from the generated queries; the type is what reaches them.
+	NewTitle taskrules.Title
 
 	// Exactly one of these is non-zero.
 	TaskID  uint32
@@ -29,7 +35,10 @@ type RenameItemArgs struct {
 // "linked-origin title" shadow column can be introduced without
 // altering this API.
 func RenameItem(ctx context.Context, tx TX, args RenameItemArgs) error {
-	if args.NewTitle == "" {
+	// The zero Title is the one value the type cannot rule out, so the
+	// invariant stays: a caller that omits the field entirely still
+	// compiles.
+	if args.NewTitle.String() == "" {
 		return wrapInvariant("title_required", "new title is empty")
 	}
 	if (args.TaskID == 0) == (args.EventID == 0) {
@@ -56,18 +65,18 @@ func renameFromTask(ctx context.Context, tx TX, args RenameItemArgs) error {
 		}
 		return fmt.Errorf("itemkit: read task: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, args.NewTitle, task.id); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, args.NewTitle.String(), task.id); err != nil {
 		return fmt.Errorf("itemkit: update task title: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE calendar_events SET title = ? WHERE task_id = ? AND enabled = TRUE`,
-		args.NewTitle, task.id); err != nil {
+		args.NewTitle.String(), task.id); err != nil {
 		return fmt.Errorf("itemkit: update linked event titles: %w", err)
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, &args.ActorUserID, &task.id,
 		map[string]any{
 			"taskPublicId": task.publicID.String(),
-			"newTitle":     args.NewTitle,
+			"newTitle":     args.NewTitle.String(),
 			"origin":       "task",
 		})
 }
@@ -80,26 +89,26 @@ func renameFromEvent(ctx context.Context, tx TX, args RenameItemArgs) error {
 		}
 		return fmt.Errorf("itemkit: read event: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE calendar_events SET title = ? WHERE id = ?`, args.NewTitle, evt.id); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE calendar_events SET title = ? WHERE id = ?`, args.NewTitle.String(), evt.id); err != nil {
 		return fmt.Errorf("itemkit: update event title: %w", err)
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid {
 		tid := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		taskPtr = &tid
-		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, args.NewTitle, tid); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET title = ? WHERE id = ?`, args.NewTitle.String(), tid); err != nil {
 			return fmt.Errorf("itemkit: propagate event rename to task: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE calendar_events SET title = ? WHERE task_id = ? AND enabled = TRUE AND id <> ?`,
-			args.NewTitle, tid, evt.id); err != nil {
+			args.NewTitle.String(), tid, evt.id); err != nil {
 			return fmt.Errorf("itemkit: fan-out event rename to siblings: %w", err)
 		}
 	}
 	return appendItemEvents(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, &args.ActorUserID, taskPtr,
 		map[string]any{
 			"eventPublicId": evt.publicID.String(),
-			"newTitle":      args.NewTitle,
+			"newTitle":      args.NewTitle.String(),
 			"origin":        "event",
 		})
 }

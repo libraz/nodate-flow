@@ -65,6 +65,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 //go:embed locales/*.json
@@ -505,11 +506,15 @@ func ensureTasks(ctx context.Context, db *sql.DB, _ *generated.Queries, wsID, pr
 		createdBy := sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- user id sourced from seed flow, fits int32
 		if err := dbretry.InTx(ctx, db, "seed.ensureTasks", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			for _, s := range l.Tasks {
+				title, terr := taskrules.NewTitle(s.Title)
+				if terr != nil {
+					return fmt.Errorf("create seed task: %w", terr)
+				}
 				if _, err := taskcreate.New(ctx, tx, taskcreate.Args{
 					WorkspaceID: wsID,
 					ProjectID:   projID,
 					ActorUserID: createdBy,
-					Title:       s.Title,
+					Title:       title,
 					Priority:    s.Priority,
 				}); err != nil {
 					return fmt.Errorf("create seed task: %w", err)

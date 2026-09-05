@@ -11,6 +11,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 // itemkit tests use a shared MySQL testcontainer, so every entry point
@@ -335,9 +337,13 @@ func TestRenameFromTaskPropagatesToEvent(t *testing.T) {
 		}
 	})
 
+	newTitle, err := taskrules.NewTitle("New")
+	if err != nil {
+		t.Fatalf("NewTitle: %v", err)
+	}
 	withTx(t, db, func(tx TX) {
 		if err := RenameItem(context.Background(), tx, RenameItemArgs{
-			WorkspaceID: fx.wsID, ActorUserID: fx.userID, TaskID: fx.taskID, NewTitle: "New",
+			WorkspaceID: fx.wsID, ActorUserID: fx.userID, TaskID: fx.taskID, NewTitle: newTitle,
 		}); err != nil {
 			t.Fatalf("RenameItem: %v", err)
 		}

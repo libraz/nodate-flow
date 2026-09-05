@@ -17,6 +17,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 func runListIntakeItems(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -207,6 +208,14 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		return nil, err
 	}
 
+	// The converted task takes the item's title, so it faces the rule
+	// every other task title faces. An item whose title is blank has
+	// nothing to convert into.
+	title, err := taskrules.NewTitle(item.Title)
+	if err != nil {
+		return nil, translateTaskRuleError(err)
+	}
+
 	var (
 		taskPub types.PublicID
 		taskID  int64
@@ -219,7 +228,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
 			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Title:       item.Title,
+			Title:       title,
 			Description: item.Body,
 		})
 		if err != nil {
@@ -259,7 +268,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		ResourceType: "task",
 		ResourceID:   taskPub.String(),
 		TaskID:       &taskID,
-		Payload:      map[string]any{"taskId": taskPub.String(), "title": item.Title, "source": "intake_convert_mcp"},
+		Payload:      map[string]any{"taskId": taskPub.String(), "title": title.String(), "source": "intake_convert_mcp"},
 		CallSite:     "mcp.convert_intake_to_task",
 	})
 

@@ -28,6 +28,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
@@ -1125,8 +1126,9 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if in.Title == "" {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	title, err := taskrules.NewTitle(in.Title)
+	if err != nil {
+		return nil, translateTaskRuleError(err)
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
@@ -1143,6 +1145,9 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
+	if err := taskrules.DateOrder(due, start); err != nil {
+		return nil, translateTaskRuleError(err)
+	}
 	var (
 		pub    types.PublicID
 		taskID int64
@@ -1152,7 +1157,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
 			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Title:       in.Title,
+			Title:       title,
 			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
 			Priority:    in.Priority,
 			DueOn:       due,
@@ -1178,7 +1183,7 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		TaskID:       &taskID,
 		Payload: map[string]any{
 			"taskId": pub.String(),
-			"title":  in.Title,
+			"title":  title.String(),
 			"via":    "mcp",
 		},
 		CallSite: "mcp.create_task",
@@ -1205,9 +1210,9 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	title := current.Title
-	if in.Title != nil && *in.Title != "" {
-		title = *in.Title
+	title, err := taskrules.PatchTitle(current.Title, in.Title)
+	if err != nil {
+		return nil, translateTaskRuleError(err)
 	}
 	desc := current.Description
 	if in.Description != nil {
@@ -1233,8 +1238,14 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		}
 		start = p
 	}
+	// The merged pair, not the arguments: a call that moves only one side
+	// still has to face the other side's stored value. Answered before any
+	// of the writes below, so a refusal leaves the task as it was.
+	if err := taskrules.DateOrder(due, start); err != nil {
+		return nil, translateTaskRuleError(err)
+	}
 
-	titleChanged := in.Title != nil && *in.Title != "" && title != current.Title
+	titleChanged := in.Title != nil && title.String() != current.Title
 	dueOnChanged := in.DueOn != nil && due != current.DueOn
 
 	needsItemkit := false
@@ -1247,7 +1258,7 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	updateParams := generated.UpdateTaskParams{
-		Title:           title,
+		Title:           title.String(),
 		Description:     desc,
 		Priority:        prio,
 		DueOn:           due,
@@ -1354,6 +1365,21 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 // as to a reader: an agent retries a server error and does not retry a
 // 404, so collapsing a missing row into a tool-execution failure buys a
 // retry loop that cannot succeed.
+// translateTaskRuleError renders a taskrules refusal as the error a tool
+// caller is owed. A rule violated by an agent's arguments is bad
+// arguments, not a server failure: the REST handlers answer the same
+// violations as a 422 naming the field, and this is the other half of
+// that split.
+func translateTaskRuleError(err error) error {
+	switch taskrules.Classify(err) {
+	case taskrules.ViolationNone:
+		return nil
+	case taskrules.ViolationTitleEmpty, taskrules.ViolationDueBeforeStart:
+		return apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+}
+
 func translateItemkitMCPError(err error, notFound *apierrors.Spec) error {
 	if err == nil {
 		return nil
@@ -1678,9 +1704,9 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	wsRole, err := requireWorkspaceMember(ctx, deps, s)
-	if err != nil {
-		return nil, err
+	wsRole, wsErr := requireWorkspaceMember(ctx, deps, s)
+	if wsErr != nil {
+		return nil, wsErr
 	}
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	if deps.Embedder == nil {
@@ -1876,10 +1902,16 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	).Scan(&parentProjectID); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// Every step title is checked before the transaction opens, so a
+	// blank one partway down the list is refused as bad arguments rather
+	// than aborting a batch that has already inserted its predecessors.
+	stepTitles := make([]taskrules.Title, 0, len(in.Steps))
 	for _, st := range in.Steps {
-		if st.Title == "" {
-			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		title, terr := taskrules.NewTitle(st.Title)
+		if terr != nil {
+			return nil, translateTaskRuleError(terr)
 		}
+		stepTitles = append(stepTitles, title)
 	}
 
 	// All children are created in one transaction. Task-number allocation
@@ -1892,13 +1924,13 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.apply_steps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		created = created[:0]
 		childIDs = childIDs[:0]
-		for _, st := range in.Steps {
+		for i, st := range in.Steps {
 			child, err := taskcreate.New(ctx, tx, taskcreate.Args{
 				WorkspaceID:  s.workspaceID,
 				ProjectID:    parentProjectID,
 				ParentTaskID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				Title:        st.Title,
+				Title:        stepTitles[i],
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 				Priority:     st.Priority,
 			})
@@ -1915,9 +1947,13 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	// Events are appended after commit so they reference committed rows and
 	// a retried transaction cannot publish a child that was rolled back.
-	for i, st := range in.Steps {
+	for i := range in.Steps {
 		childID := childIDs[i]
 		// The children are committed; a retry would create them again.
+		// The event carries the title the row actually holds, not the one
+		// the caller submitted: the rule trims before the insert, and an
+		// append-only event naming the untrimmed string would disagree with
+		// the task forever.
 		recordMutation(ctx, deps, s, mutation{
 			EventType:    eventbus.TaskCreated,
 			AuditAction:  "task.apply_steps",
@@ -1926,7 +1962,7 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			TaskID:       &childID,
 			Payload: map[string]any{
 				"taskId":       created[i],
-				"title":        st.Title,
+				"title":        stepTitles[i].String(),
 				"parentTaskId": parentPub.String(),
 				"via":          "mcp:apply_steps",
 			},
@@ -2277,9 +2313,9 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	wsRole, err := requireWorkspaceMember(ctx, deps, s)
-	if err != nil {
-		return nil, err
+	wsRole, wsErr := requireWorkspaceMember(ctx, deps, s)
+	if wsErr != nil {
+		return nil, wsErr
 	}
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	if deps.Embedder == nil {
@@ -2861,12 +2897,13 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if in.Title == "" {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
-	}
-	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	parentTitle, err := taskrules.NewTitle(in.Title)
 	if err != nil {
-		return nil, err
+		return nil, translateTaskRuleError(err)
+	}
+	wsRole, wsErr := requireWorkspaceMember(ctx, deps, s)
+	if wsErr != nil {
+		return nil, wsErr
 	}
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
@@ -2923,7 +2960,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
 			ActorUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Title:       in.Title,
+			Title:       parentTitle,
 			Description: sql.NullString{String: in.Description, Valid: in.Description != ""},
 		})
 		if err != nil {
@@ -2933,7 +2970,12 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		parentID = parent.ID
 
 		for _, st := range proposal.Subtasks {
-			if st.Title == "" {
+			// A subtask the model returned without a usable title is
+			// dropped rather than failing the batch: the parent and its
+			// siblings are what the caller asked for, and one unnameable
+			// child is not worth losing them.
+			childTitle, terr := taskrules.NewTitle(st.Title)
+			if terr != nil {
 				continue
 			}
 			child, cerr := taskcreate.New(ctx, tx, taskcreate.Args{
@@ -2941,14 +2983,14 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 				ProjectID:    prjID,
 				ParentTaskID: sql.NullInt32{Int32: int32(parent.ID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				ActorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true},  //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				Title:        st.Title,
+				Title:        childTitle,
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 				Priority:     smartCreatePriorityToInt(st.Priority),
 			})
 			if cerr != nil {
 				return cerr
 			}
-			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: st.Title})
+			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: childTitle.String()})
 		}
 		return nil
 	}); txErr != nil {
@@ -2967,7 +3009,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		TaskID:       &parentID,
 		Payload: map[string]any{
 			"taskId": parentPub.String(),
-			"title":  in.Title,
+			"title":  parentTitle.String(),
 			"via":    "mcp:smart_create_task",
 		},
 		CallSite: "mcp.smart_create_task",
@@ -3563,6 +3605,19 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	isLinked := evt.TaskID.Valid
 	titleChanged := in.Title != nil && *in.Title != evt.Title
 
+	// A linked event shares its title with the task, so the rename below
+	// writes tasks.title and the title faces the task rule. Resolved
+	// before the transaction so a refusal answers as bad arguments
+	// rather than surfacing from inside a retryable unit of work.
+	var renameTitle taskrules.Title
+	if isLinked && titleChanged {
+		var terr error
+		renameTitle, terr = taskrules.NewTitle(*in.Title)
+		if terr != nil {
+			return nil, translateTaskRuleError(terr)
+		}
+	}
+
 	var newStartAt, newEndAt time.Time
 	timeChanged := false
 	switch {
@@ -3725,7 +3780,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 				WorkspaceID: s.workspaceID,
 				ActorUserID: s.userID,
 				EventID:     evt.ID,
-				NewTitle:    *in.Title,
+				NewTitle:    renameTitle,
 			}); err != nil {
 				answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
 				return err
