@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -64,6 +65,13 @@ func runListDescriptionVersions(ctx context.Context, deps Deps, s *session, raw 
 	return map[string]any{"versions": out}, nil
 }
 
+// runRestoreDescriptionVersion restores a stored description version onto its task.
+//
+// task-precondition: date-order not-applicable — the update writes the task's
+// stored due and start dates back unchanged, having read both from the row it
+// is restoring into, so it cannot put them out of order. Rows predating the
+// rule may already hold an inverted pair; checking here would refuse a
+// description restore over dates the restore does not touch.
 func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
@@ -168,6 +176,10 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		Payload:      map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": newPub.String(), "via": "mcp"},
 		CallSite:     "mcp.restore_description_version",
 	})
+	// A restore replaces the task's description, so the embedding follows it
+	// back. The pair passed is what the update wrote: the title it carried
+	// through unchanged, and the restored body.
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, taskRow.Title, version.Body)
 
 	return map[string]any{"ok": true, "newVersionId": newPub.String()}, nil
 }

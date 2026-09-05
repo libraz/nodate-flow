@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -443,6 +444,12 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				},
 			})
 		}
+
+		// The embedded text is the stored text. The conversion trims the
+		// item's title, so embedding the item's string would index a
+		// padded one against a row holding the trimmed one and a search
+		// would match on characters the task does not carry.
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(taskID), title.String(), nullStr(item.Body)) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 		out := &ConvertIntakeItemOutput{}
 		out.Body.Ok = true

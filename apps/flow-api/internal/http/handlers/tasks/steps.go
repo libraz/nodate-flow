@@ -331,6 +331,15 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			},
 		})
 
+		// Each step is a task in its own right, so it carries its own
+		// embedding. The embedded text is the stored text: the step
+		// title is trimmed on the way in, so embedding the submitted
+		// one would index a padded string against a row holding the
+		// trimmed one.
+		for i, st := range in.Body.Steps {
+			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(childIDs[i]), stepTitles[i].String(), st.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		}
+
 		out := &ApplyStepsOutput{}
 		out.Body.Created = created
 		return out, nil

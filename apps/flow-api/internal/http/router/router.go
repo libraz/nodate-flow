@@ -1028,7 +1028,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember, reauthorize))
 		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
-		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient, Audit: shared.auditRec}
 		intakehandlers.Register(subAPI, intakeDeps)
 		importDeps := importhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		importhandlers.Register(subAPI, importDeps)

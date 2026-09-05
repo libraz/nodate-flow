@@ -1188,6 +1188,10 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		},
 		CallSite: "mcp.create_task",
 	})
+	// The embedded text is the stored text. The rule trims the title before
+	// the insert, so embedding the submitted string would index a padded
+	// string against a row holding the trimmed one.
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(taskID), title.String(), in.Description) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -1247,6 +1251,11 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	titleChanged := in.Title != nil && title.String() != current.Title
 	dueOnChanged := in.DueOn != nil && due != current.DueOn
+	// Whether the embedded text moved, not whether the caller named it. A
+	// call that re-sends the stored title leaves the row's text where it
+	// was, and re-embedding it would bill the workspace's embedding budget
+	// for a vector it already holds.
+	textChanged := titleChanged || (in.Description != nil && desc != current.Description)
 
 	needsItemkit := false
 	if titleChanged || dueOnChanged {
@@ -1335,6 +1344,14 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		if txErr != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 		}
+	}
+
+	// Ahead of the event append rather than after it: the field values are
+	// committed by here, and the append below can answer with an error that
+	// leaves this function. A refresh placed past that point would be
+	// skipped for a write the task is already carrying.
+	if textChanged {
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, title.String(), desc.String)
 	}
 
 	taskID64 := int64(taskInternal)
@@ -1968,6 +1985,10 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			},
 			CallSite: "mcp.apply_steps",
 		})
+		// Each step is a task in its own right, so it carries its own
+		// embedding. Left unrefreshed a step would be absent from semantic
+		// search entirely rather than merely stale.
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(childID), stepTitles[i].String(), in.Steps[i].Description) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 	return map[string]any{"created": created}, nil
 }
@@ -2948,6 +2969,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		id    int64
 		pub   string
 		title string
+		desc  string
 	}
 	var (
 		parentPub types.PublicID
@@ -2990,7 +3012,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			if cerr != nil {
 				return cerr
 			}
-			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: childTitle.String()})
+			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: childTitle.String(), desc: st.Description})
 		}
 		return nil
 	}); txErr != nil {
@@ -3014,6 +3036,10 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		},
 		CallSite: "mcp.smart_create_task",
 	})
+	// The parent and every child are separate tasks with separate
+	// embeddings, and the children hold text the model wrote that nothing
+	// else indexes.
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(parentID), parentTitle.String(), in.Description) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	subtaskIDs := make([]string, 0, len(children))
 	for i := range children {
 		childID := children[i].id
@@ -3031,6 +3057,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			},
 			CallSite: "mcp.smart_create_task",
 		})
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(childID), children[i].title, children[i].desc) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 		subtaskIDs = append(subtaskIDs, children[i].pub)
 	}
 

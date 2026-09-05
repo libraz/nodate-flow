@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -102,6 +103,12 @@ func GetDescriptionVersion(deps Deps) func(context.Context, *GetDescriptionVersi
 }
 
 // RestoreDescriptionVersion handles POST /tasks/{id}/description-history/{versionId}/restore.
+//
+// task-precondition: date-order not-applicable — the update writes the task's
+// stored due and start dates back unchanged, having read both from the row it
+// is restoring into, so it cannot put them out of order. Rows predating the
+// rule may already hold an inverted pair; checking here would refuse a
+// description restore over dates the restore does not touch.
 func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescriptionVersionInput) (*RestoreDescriptionVersionOutput, error) {
 	return func(ctx context.Context, in *RestoreDescriptionVersionInput) (*RestoreDescriptionVersionOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -218,6 +225,11 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 				},
 			})
 		}
+
+		// A restore replaces the description the task is stored under, so
+		// the embedding follows it. The title is untouched by this write,
+		// so the row's own title is what pairs with the restored body.
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, taskRow.Title, version.Body)
 
 		out := &RestoreDescriptionVersionOutput{}
 		out.Body.Ok = true

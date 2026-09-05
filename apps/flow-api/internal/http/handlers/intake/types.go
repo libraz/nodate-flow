@@ -6,6 +6,7 @@ package intake
 import (
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -15,7 +16,12 @@ import (
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
-	Audit   *audit.Recorder
+	// Embedder upserts the embedding of the task a conversion creates.
+	// A converted item is a task like any other, so it is searchable
+	// under its own text rather than only after the reindex cron runs.
+	// Optional: nil disables write-time embedding.
+	Embedder *embed.Client
+	Audit    *audit.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

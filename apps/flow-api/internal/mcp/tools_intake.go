@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -271,6 +272,10 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		Payload:      map[string]any{"taskId": taskPub.String(), "title": title.String(), "source": "intake_convert_mcp"},
 		CallSite:     "mcp.convert_intake_to_task",
 	})
+	// The conversion is a task creation, so the task starts with an
+	// embedding like any other. The text is what the insert stored: the
+	// trimmed title and the item's body.
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(taskID), title.String(), item.Body.String) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 	return map[string]any{"ok": true, "taskId": taskPub.String()}, nil
 }

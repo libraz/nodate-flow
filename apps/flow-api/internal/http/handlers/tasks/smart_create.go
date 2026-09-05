@@ -304,6 +304,11 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		// the trimmed one, so a search would match on characters the task
 		// does not carry.
 		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(parentID), parentTitle.String(), in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		// A subtask is a task in its own right, so it is searchable under
+		// its own text rather than only under its parent's.
+		for i, sub := range subtasks {
+			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(sub.ID), subtaskTitles[i].String(), in.Body.Subtasks[i].Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		}
 
 		out := &ApplySmartOutput{}
 		out.Body.TaskID = parentPub.String()
