@@ -418,6 +418,18 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				ResourceID:   pub.String(),
 				Metadata:     map[string]any{"taskId": taskPub.String()},
 			})
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.create",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task",
+				ResourceID:   taskPub.String(),
+				Metadata: map[string]any{
+					"title":     item.Title,
+					"projectId": in.Body.ProjectID,
+					"source":    "intake_convert",
+				},
+			})
 		}
 
 		out := &ConvertIntakeItemOutput{}

@@ -248,6 +248,23 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			},
 		})
 
+		// Each subtask is a task in its own right, so its own history has
+		// to start where the others do.
+		for i, sub := range in.Body.Subtasks {
+			deps.Audit.Record(ctx, audit.Entry{
+				Action:       "task.create",
+				ActorID:      actorID,
+				WorkspaceID:  ws.ID,
+				ResourceType: "task",
+				ResourceID:   subtaskIDs[i],
+				Metadata: map[string]any{
+					"title":        sub.Title,
+					"projectId":    in.Body.ProjectID,
+					"parentTaskId": parentPub.String(),
+				},
+			})
+		}
+
 		// Write-time embedding for the parent task (best-effort).
 		if deps.Embedder != nil {
 			_ = deps.Embedder.EmbedTask(ctx, ws.ID, uint32(parentID), in.Body.Title, in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments

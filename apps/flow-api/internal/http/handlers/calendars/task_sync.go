@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -147,6 +148,20 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 
 		// itemkit already emitted item.scheduled + legacy calendar.event.created.
 		// No extra eventbus append here.
+
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "calendar.event.create",
+			ActorID:      actorID,
+			WorkspaceID:  wsID,
+			ResourceType: "calendar.event",
+			ResourceID:   eventPublicID.String(),
+			Metadata: map[string]any{
+				"calendarId": input.CalID,
+				"title":      title,
+				"kind":       string(calendar.CalendarEventsKindEvent),
+				"taskId":     taskPublicID.String(),
+			},
+		})
 
 		return out, nil
 	}

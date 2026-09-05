@@ -410,6 +410,18 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			Payload:     map[string]any{"labelId": labelPub.String()},
 		}, "labels.AddTaskLabel")
 
+		if deps.Audit != nil {
+			if actorID, ok := middleware.ActorFromContext(ctx); ok {
+				deps.Audit.Record(ctx, audit.Entry{
+					Action:       "task.label.add",
+					ActorID:      actorID,
+					WorkspaceID:  ws.ID,
+					ResourceType: "task_label",
+					ResourceID:   labelPub.String(),
+				})
+			}
+		}
+
 		return &AddTaskLabelOutput{Body: TaskLabel{
 			ID:          labelPub.String(),
 			Name:        label.Name,
