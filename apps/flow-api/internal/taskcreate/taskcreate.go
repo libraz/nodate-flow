@@ -105,6 +105,16 @@ func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	if args.Title.String() == "" {
 		return Result{}, taskrules.ErrTitleEmpty
 	}
+	// The date rule is not carried by a type, so it is applied here rather
+	// than at each caller. Both dates are plain fields a caller can fill
+	// without passing anything, and most creating paths write neither, so
+	// the ones that do would each have to remember. Applying it at the
+	// insert makes "no stored task starts after it is due" hold for every
+	// path that reaches this function, including those that take their
+	// dates from a file rather than from a request.
+	if err := taskrules.DateOrder(args.DueOn, args.StartedOn); err != nil {
+		return Result{}, err
+	}
 	visibility, err := resolveVisibility(args.Visibility)
 	if err != nil {
 		return Result{}, err
