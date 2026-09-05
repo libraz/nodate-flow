@@ -28,6 +28,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
@@ -1251,11 +1252,15 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	titleChanged := in.Title != nil && title.String() != current.Title
 	dueOnChanged := in.DueOn != nil && due != current.DueOn
+	// Whether the stored body moved, not whether the caller named it: the
+	// history holds the bodies the task has actually carried, so a call
+	// re-sending the current description appends nothing to it.
+	descChanged := in.Description != nil && desc != current.Description
 	// Whether the embedded text moved, not whether the caller named it. A
 	// call that re-sends the stored title leaves the row's text where it
 	// was, and re-embedding it would bill the workspace's embedding budget
 	// for a vector it already holds.
-	textChanged := titleChanged || (in.Description != nil && desc != current.Description)
+	textChanged := titleChanged || descChanged
 
 	needsItemkit := false
 	if titleChanged || dueOnChanged {
@@ -1280,10 +1285,26 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	if !needsItemkit {
+		// Same transaction boundary as the itemkit branch below. The
+		// description version has to commit with the update it records, so
+		// this path cannot write the row outside a transaction: a body that
+		// commits without its snapshot is one no restore can return to.
+		//
 		// Not an existence check: MySQL counts changed rows, so an update
 		// carrying the task's current values reports zero. The task is
 		// resolved into `current` above.
-		if _, err := deps.Queries.UpdateTask(ctx, updateParams); err != nil {
+		if err := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
+				return err
+			}
+			if descChanged {
+				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
 	} else {
@@ -1298,6 +1319,13 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			qtx := deps.Queries.WithTx(tx.RawTx())
 			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 				return err
+			}
+			// Same reason as the branch above: the snapshot shares the
+			// transaction that writes the description.
+			if descChanged {
+				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
+					return err
+				}
 			}
 			if titleChanged {
 				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{

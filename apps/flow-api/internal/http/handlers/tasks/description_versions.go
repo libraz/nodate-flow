@@ -13,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -174,23 +175,13 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// Get the next version number.
-		nextVer, err := qtx.NextDescriptionVersionNumber(ctx, task.ID)
+		// The restored body becomes the newest version rather than rewinding
+		// the history to the one it came from.
+		restored, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID,
+			sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+			version.Body,
+		)
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Create a new version snapshot for the restored content.
-		newPub := types.New()
-		if _, err := qtx.CreateDescriptionVersion(ctx, generated.CreateDescriptionVersionParams{
-			PublicID:      newPub,
-			WorkspaceID:   ws.ID,
-			TaskID:        task.ID,
-			AuthorUserID:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			VersionNumber: uint32(nextVer),                                   //#nosec G115 -- per-task version sequence, fits uint32
-			Body:          version.Body,
-			BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
-		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -207,8 +198,8 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			Payload: map[string]any{
 				"taskId":        types.FromUUID(task.PublicID).String(),
 				"restoredFrom":  versionPub.String(),
-				"newVersionId":  newPub.String(),
-				"versionNumber": nextVer,
+				"newVersionId":  restored.PublicID.String(),
+				"versionNumber": restored.Number,
 			},
 		}, "tasks.RestoreDescriptionVersion")
 
@@ -221,7 +212,7 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 				ResourceID:   types.FromUUID(task.PublicID).String(),
 				Metadata: map[string]any{
 					"restoredVersionId": versionPub.String(),
-					"newVersionId":      newPub.String(),
+					"newVersionId":      restored.PublicID.String(),
 				},
 			})
 		}

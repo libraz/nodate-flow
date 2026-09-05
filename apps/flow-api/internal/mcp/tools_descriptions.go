@@ -14,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 )
 
 func runListDescriptionVersions(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -142,21 +143,13 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	nextVer, err := qtx.NextDescriptionVersionNumber(ctx, taskInternal)
+	// The restored body becomes the newest version rather than rewinding
+	// the history to the one it came from.
+	restored, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal,
+		sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		version.Body,
+	)
 	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	newPub := newPublicID()
-	if _, err := qtx.CreateDescriptionVersion(ctx, generated.CreateDescriptionVersionParams{
-		PublicID:      newPub,
-		WorkspaceID:   s.workspaceID,
-		TaskID:        taskInternal,
-		AuthorUserID:  sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		VersionNumber: uint32(nextVer),                                    //#nosec G115 -- per-task version sequence, fits uint32
-		Body:          version.Body,
-		BodyLength:    uint32(len(version.Body)), //#nosec G115 -- description body length capped at 50KB by handler validation, fits uint32
-	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
@@ -173,7 +166,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		ResourceType: "task",
 		ResourceID:   taskPub.String(),
 		TaskID:       &taskIDInt64,
-		Payload:      map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": newPub.String(), "via": "mcp"},
+		Payload:      map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": restored.PublicID.String(), "via": "mcp"},
 		CallSite:     "mcp.restore_description_version",
 	})
 	// A restore replaces the task's description, so the embedding follows it
@@ -181,5 +174,5 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 	// through unchanged, and the restored body.
 	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, taskRow.Title, version.Body)
 
-	return map[string]any{"ok": true, "newVersionId": newPub.String()}, nil
+	return map[string]any{"ok": true, "newVersionId": restored.PublicID.String()}, nil
 }

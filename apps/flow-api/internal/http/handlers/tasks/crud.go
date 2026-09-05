@@ -20,6 +20,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
@@ -873,6 +874,11 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 
 		titleChanged := in.Body.Title != nil && newTitle.String() != current.Title
 		dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
+		// Against the stored value, not the presence of the field: a client
+		// that round-trips the whole task re-sends a description it never
+		// edited, and a version is a body the task has held rather than a
+		// record of who sent what.
+		descChanged := in.Body.Description != nil && newDesc != current.Description
 
 		needsItemkit := false
 		if titleChanged || dueOnChanged {
@@ -924,6 +930,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
+				// Inside the transaction that writes the description: a body
+				// that commits without its snapshot is one no restore can
+				// return to.
+				if descChanged {
+					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
+						return err
+					}
+				}
 				return eventbus.Append(ctx, tx, updateEvent)
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -939,6 +953,13 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				qtx := deps.Queries.WithTx(tx.RawTx())
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
+				}
+				// Same reason as the branch above: the snapshot shares the
+				// transaction that writes the description.
+				if descChanged {
+					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
+						return err
+					}
 				}
 				if titleChanged {
 					if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
@@ -990,11 +1011,9 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			ResourceType: "task",
 			ResourceID:   task.PublicID.String(),
 		})
-		// Against the stored values, not the presence of the fields: a
-		// client that round-trips the whole task re-sends text it never
-		// edited, and a refresh costs a provider call the workspace pays
-		// for. Only text that actually moved invalidates the vector.
-		textChanged := titleChanged || (in.Body.Description != nil && newDesc != current.Description)
+		// Only text that actually moved invalidates the vector: a refresh
+		// costs a provider call the workspace pays for.
+		textChanged := titleChanged || descChanged
 		if textChanged {
 			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, newTitle.String(), nullStr(newDesc))
 		}

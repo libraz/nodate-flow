@@ -18,6 +18,10 @@
 //     column DEFAULT never applies and a zero-valued Go field reaches
 //     MySQL as ”, which STRICT_TRANS_TABLES rejects outright.
 //
+// The first version of the task's description is written here too, for
+// the same reason: it is the only copy of the body the task started with,
+// and every creating path passes through this function.
+//
 // taskcreate does NOT authorize the actor and does NOT append
 // task.created; callers own both. Event emission is deliberately left
 // out because call sites differ on whether they publish before commit,
@@ -34,6 +38,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
@@ -145,6 +150,16 @@ func New(ctx context.Context, tx *dbretry.Tx, args Args) (Result, error) {
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("taskcreate: insert task: %w", err)
+	}
+	// The body a task is created with is the first version of its
+	// description, and it is the one a restore has to be able to return
+	// to: once the description is edited, nothing else holds the original.
+	// Written here rather than at each caller for the same reason the task
+	// number is — every creating path reaches this function, and a path
+	// that skipped the snapshot would produce a task whose history is
+	// missing its own starting point with nothing to signal it.
+	if _, err := taskdesc.Snapshot(ctx, q, args.WorkspaceID, uint32(id), args.ActorUserID, args.Description.String); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		return Result{}, err
 	}
 	// Every transport reaches the tasks table through this one call, so
 	// the counter needs no other instrumentation point. The caller owns
