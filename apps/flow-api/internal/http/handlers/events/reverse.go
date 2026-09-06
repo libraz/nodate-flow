@@ -38,6 +38,46 @@ var reverseStateRollback = map[eventbus.Kind]string{
 	eventbus.TaskAutoCompleted: taskstate.TransitionReopen,
 }
 
+// reverseTransitionAuditAction is the audit action a task state
+// transition is recorded under, whatever moved it: the /transitions
+// handler and the MCP transition tool both write this name, and the
+// rollback below reaches the same operation a third way. One operation
+// has one action name — a second spelling would split every query an
+// administrator runs to find who moved a task's state.
+const reverseTransitionAuditAction = "task.transition"
+
+// reverseTransitionReason and reverseTransitionVia label the rollback
+// transition on both rows that describe it: taskstate stamps them onto
+// the event payload it appends, and the audit metadata repeats them.
+// They are constants so the two descriptions of one transition cannot
+// drift, which would leave a reader comparing the tables unable to say
+// which is stale.
+const (
+	reverseTransitionReason = "reverse"
+	reverseTransitionVia    = "api.reverse"
+)
+
+// stateRollback reports what the optional rollback did, so the caller
+// can record the audit half of the transition only when one actually
+// moved the task.
+//
+// applied is false for a reversal whose event kind maps to no
+// transition, for one whose event carries no task, and for one the
+// state machine refused. None of those changed a derived_state, and an
+// audit row is a claim that something changed.
+type stateRollback struct {
+	applied bool
+	// taskPublicID names the task the transition targeted. The
+	// transition is a change to the task, not to the event that
+	// triggered it, so this is what an audit query filters on.
+	taskPublicID string
+	// transition, fromState and toState describe the move, matching the
+	// keys taskstate writes onto the event it appends.
+	transition string
+	fromState  string
+	toState    string
+}
+
 // errReverseAnswered rolls the reversal transaction back when the
 // handler has already decided what to answer (a 409 for a lost race, a
 // rejected rollback). It never reaches the client and is not transient,
@@ -179,18 +219,27 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			// Returning it through the closure would make it look like a
 			// transaction failure, so it travels alongside the sentinel.
 			answered error
+			// rollback carries what the transition did out to the audit
+			// record below, which only the committed attempt may describe.
+			rollback stateRollback
 		)
 		txErr := dbretry.InTx(ctx, deps.DB, "events.Reverse", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
+			// Cleared with answered on every attempt: dbretry runs this
+			// closure again after a deadlock, and a transition from an
+			// attempt that rolled back moved nothing.
+			rollback = stateRollback{}
 
 			// Optional state rollback. Runs BEFORE the compensating event
 			// append so a failed rollback cannot leave a half-applied
 			// reversal on the timeline (the tx rolls back atomically).
 			if transition, needsRollback := reverseStateRollback[targetKind]; needsRollback {
-				if err := applyStateRollback(ctx, tx, ws.ID, eventPub, transition, actorInternal); err != nil {
-					answered = err
+				rb, rerr := applyStateRollback(ctx, tx, ws.ID, eventPub, transition, actorInternal)
+				if rerr != nil {
+					answered = rerr
 					return errReverseAnswered
 				}
+				rollback = rb
 			}
 
 			// Append the compensating event. Type is preserved (the
@@ -256,6 +305,42 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 			},
 			CallSite: "events.Reverse",
 		})
+
+		// The reversal's other half. A rollback drove the task through
+		// taskstate.ApplyTransitionTx, which appends the transition event
+		// itself and leaves no audit row: it is shared across transports
+		// and cannot know which one called it. Recording only the reversal
+		// answers "who undid this event" while an audit query for who
+		// moved the task's state finds nothing, even though this request
+		// is what moved it.
+		//
+		// Guarded on applied because most reversals perform no transition
+		// at all — the kind maps to none, the event carries no task, or
+		// the state machine refused the verb — and an audit row for one of
+		// those claims a state change that did not happen. The lost-race
+		// and rejected-rollback branches return before this line, so an
+		// attempt whose transaction rolled back records nothing either.
+		//
+		// The metadata repeats the payload taskstate wrote onto the event
+		// rather than describing the same transition a second way, and
+		// carries public ids only.
+		if rollback.applied {
+			deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorInternal, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				AuditAction:  reverseTransitionAuditAction,
+				ResourceType: "task",
+				ResourceID:   rollback.taskPublicID,
+				Payload: map[string]any{
+					"taskId":                   rollback.taskPublicID,
+					"transition":               rollback.transition,
+					"fromState":                rollback.fromState,
+					"toState":                  rollback.toState,
+					"reason":                   reverseTransitionReason,
+					"via":                      reverseTransitionVia,
+					"reversed_event_public_id": eventPub.String(),
+				},
+				CallSite: "events.Reverse (taskstate.ApplyTransitionTx appended the event)",
+			})
+		}
 
 		return &ReverseOutput{
 			Status: 201,
@@ -329,7 +414,11 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 // timeline shows the reverse, the user expectation is that the undo
 // landed; an unrelated state mismatch does not invalidate that
 // record.
-func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventPublicID types.PublicID, transition string, actorInternal uint32) error {
+//
+// The returned [stateRollback] reports whether a transition actually
+// moved the task, which is what decides whether the caller records the
+// audit half of it.
+func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventPublicID types.PublicID, transition string, actorInternal uint32) (stateRollback, error) {
 	// Re-fetch the task pointer from the event row using the same tx
 	// so the lock-order with the upcoming ApplyTransitionTx FOR UPDATE
 	// stays consistent. We deliberately query the event again instead
@@ -348,33 +437,33 @@ func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventP
 			// Event vanished between FindEventForReverse and now? That
 			// would be an invariant violation; surface as INTERNAL to
 			// preserve the 404 vs. 500 distinction.
-			return httpErr(apierrors.InternalUnexpected)
+			return stateRollback{}, httpErr(apierrors.InternalUnexpected)
 		}
-		return httpErr(apierrors.InternalUnexpected)
+		return stateRollback{}, httpErr(apierrors.InternalUnexpected)
 	}
 	if !taskID.Valid {
 		// Event has no associated task — there is nothing to walk
 		// back. The compensating event is still appended by the
 		// caller; we just skip the transition.
-		return nil
+		return stateRollback{}, nil
 	}
 
 	actor := int64(actorInternal)
-	_, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+	result, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 		WorkspaceID: wsID,
 		TaskID:      uint32(taskID.Int32), //#nosec G115 -- tasks.id fits uint32 within realistic deployments
 		PublicID:    taskPubID,
 		Transition:  transition,
 		ActorUserID: &actor,
-		Reason:      "reverse",
-		Via:         "api.reverse",
+		Reason:      reverseTransitionReason,
+		Via:         reverseTransitionVia,
 		ExtraPayload: map[string]any{
 			"reversed_event_public_id": eventPublicID.String(),
 		},
 	})
 	if applyErr != nil {
 		// Underlying DB failure; bubble up so the tx rolls back.
-		return httpErr(apierrors.InternalUnexpected)
+		return stateRollback{}, httpErr(apierrors.InternalUnexpected)
 	}
 	if spec != nil {
 		switch spec.Code {
@@ -387,10 +476,16 @@ func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventP
 				slog.String("transition", transition),
 				logutil.LogEntityPID("event", eventPublicID),
 			)
-			return nil
+			return stateRollback{}, nil
 		default:
-			return httpErr(spec)
+			return stateRollback{}, httpErr(spec)
 		}
 	}
-	return nil
+	return stateRollback{
+		applied:      true,
+		taskPublicID: taskPubID.String(),
+		transition:   transition,
+		fromState:    string(result.FromState),
+		toState:      string(result.ToState),
+	}, nil
 }
