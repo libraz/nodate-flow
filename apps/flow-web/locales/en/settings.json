@@ -409,11 +409,13 @@
         "event_undated": "No date",
         "event_all_day": "All day",
         "override_notice": {
-          "label": "The public page is showing an old time",
+          "label": "The public page is showing an out-of-date version of this event",
           "moved": "This event still shows {from} on the public page. That date has moved to {to}.",
-          "attach": "Add the new time",
-          "attached": "The new time is now on the public page",
-          "confidential": "This event still shows {from} on the public page. That date has moved to {to}, but the event at the new time is private and cannot be published here. Make it visible, or take this event off the page."
+          "changed": "This event still shows the original version of {at} on the public page. The replacement for that date is not published here.",
+          "attach": "Publish the update",
+          "attached": "The public page now shows the updated event",
+          "confidential_moved": "This event still shows {from} on the public page. That date has moved to {to}, but the event at the new time is private and cannot be published here. Make it visible, or take this event off the page.",
+          "confidential_changed": "This event still shows the original version of {at} on the public page. The replacement for that date is private and cannot be published here. Make it visible, or take this event off the page."
         },
         "table": {
           "event": "Event",
