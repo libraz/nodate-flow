@@ -56,11 +56,18 @@ const deleteMentionsForComment = `-- name: DeleteMentionsForComment :exec
 UPDATE mentions
 SET enabled = FALSE
 WHERE comment_id = ?
+  AND workspace_id = ?
 `
 
-// Remove all mentions for a specific comment (before re-extracting).
-func (q *Queries) DeleteMentionsForComment(ctx context.Context, commentID sql.NullInt32) error {
-	_, err := q.db.ExecContext(ctx, deleteMentionsForComment, commentID)
+type DeleteMentionsForCommentParams struct {
+	CommentID   sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+}
+
+// Remove the workspace's mentions for a specific comment (before
+// re-extracting). The workspace bounds the clear, as above.
+func (q *Queries) DeleteMentionsForComment(ctx context.Context, arg DeleteMentionsForCommentParams) error {
+	_, err := q.db.ExecContext(ctx, deleteMentionsForComment, arg.CommentID, arg.WorkspaceID)
 	return err
 }
 
@@ -68,12 +75,20 @@ const deleteMentionsForTaskDescription = `-- name: DeleteMentionsForTaskDescript
 UPDATE mentions
 SET enabled = FALSE
 WHERE task_id = ?
+  AND workspace_id = ?
   AND source = 'task_description'
 `
 
-// Remove all task_description mentions for a task (before re-extracting).
-func (q *Queries) DeleteMentionsForTaskDescription(ctx context.Context, taskID sql.NullInt32) error {
-	_, err := q.db.ExecContext(ctx, deleteMentionsForTaskDescription, taskID)
+type DeleteMentionsForTaskDescriptionParams struct {
+	TaskID      sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+}
+
+// Remove the workspace's task_description mentions for a task (before
+// re-extracting). The workspace bounds the clear: a task id alone would
+// let one tenant's re-extraction disable rows belonging to another.
+func (q *Queries) DeleteMentionsForTaskDescription(ctx context.Context, arg DeleteMentionsForTaskDescriptionParams) error {
+	_, err := q.db.ExecContext(ctx, deleteMentionsForTaskDescription, arg.TaskID, arg.WorkspaceID)
 	return err
 }
 

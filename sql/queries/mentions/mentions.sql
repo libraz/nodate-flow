@@ -58,14 +58,19 @@ ORDER BY m.created_at ASC, m.public_id ASC
 LIMIT ? OFFSET ?;
 
 -- name: DeleteMentionsForTaskDescription :exec
--- Remove all task_description mentions for a task (before re-extracting).
+-- Remove the workspace's task_description mentions for a task (before
+-- re-extracting). The workspace bounds the clear: a task id alone would
+-- let one tenant's re-extraction disable rows belonging to another.
 UPDATE mentions
 SET enabled = FALSE
 WHERE task_id = ?
+  AND workspace_id = ?
   AND source = 'task_description';
 
 -- name: DeleteMentionsForComment :exec
--- Remove all mentions for a specific comment (before re-extracting).
+-- Remove the workspace's mentions for a specific comment (before
+-- re-extracting). The workspace bounds the clear, as above.
 UPDATE mentions
 SET enabled = FALSE
-WHERE comment_id = ?;
+WHERE comment_id = ?
+  AND workspace_id = ?;

@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	types "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
@@ -176,6 +177,77 @@ func (q *Queries) FindWorkspaceMemberUserInternalIdByPublicId(ctx context.Contex
 	var id uint32
 	err := row.Scan(&id)
 	return id, err
+}
+
+const findWorkspaceMemberUserInternalIdsByPublicIds = `-- name: FindWorkspaceMemberUserInternalIdsByPublicIds :many
+SELECT
+  u.id,
+  u.public_id
+FROM users u
+INNER JOIN workspace_members wm
+  ON wm.user_id = u.id
+  AND wm.workspace_id = ?
+  AND wm.enabled = TRUE
+WHERE u.public_id IN (/*SLICE:public_ids*/?)
+  AND u.enabled = TRUE
+ORDER BY u.id ASC
+`
+
+type FindWorkspaceMemberUserInternalIdsByPublicIdsParams struct {
+	WorkspaceID uint32           `json:"-"`
+	PublicIds   []types.PublicID `json:"publicIds"`
+}
+
+type FindWorkspaceMemberUserInternalIdsByPublicIdsRow struct {
+	ID       uint32         `json:"-"`
+	PublicID types.PublicID `json:"publicId"`
+}
+
+// Resolve a set of users' internal ids from their public UUIDs, scoped to
+// a workspace. A row comes back only for an enabled user who is an enabled
+// member of the workspace; unknown and non-member ids are simply absent.
+//
+// The membership is part of the lookup, not a check left to the caller.
+// FindUserByPublicId in the auth queries resolves a user globally and is
+// the wrong tool here: a body may name any UUID, and a global resolution
+// turns an id from another tenant into a mention that leaks the workspace's
+// content to a user outside it.
+//
+// public_id is returned alongside id so the caller can map each resolved
+// row back to the UUID it came from. The result is bounded by the size of
+// the id set.
+func (q *Queries) FindWorkspaceMemberUserInternalIdsByPublicIds(ctx context.Context, arg FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
+	query := findWorkspaceMemberUserInternalIdsByPublicIds
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkspaceID)
+	if len(arg.PublicIds) > 0 {
+		for _, v := range arg.PublicIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:public_ids*/?", strings.Repeat(",?", len(arg.PublicIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:public_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindWorkspaceMemberUserInternalIdsByPublicIdsRow{}
+	for rows.Next() {
+		var i FindWorkspaceMemberUserInternalIdsByPublicIdsRow
+		if err := rows.Scan(&i.ID, &i.PublicID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getWorkspaceMemberRole = `-- name: GetWorkspaceMemberRole :one

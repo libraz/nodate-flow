@@ -113,6 +113,32 @@ WHERE u.public_id = ?
   AND u.enabled = TRUE
 LIMIT 1;
 
+-- name: FindWorkspaceMemberUserInternalIdsByPublicIds :many
+-- Resolve a set of users' internal ids from their public UUIDs, scoped to
+-- a workspace. A row comes back only for an enabled user who is an enabled
+-- member of the workspace; unknown and non-member ids are simply absent.
+--
+-- The membership is part of the lookup, not a check left to the caller.
+-- FindUserByPublicId in the auth queries resolves a user globally and is
+-- the wrong tool here: a body may name any UUID, and a global resolution
+-- turns an id from another tenant into a mention that leaks the workspace's
+-- content to a user outside it.
+--
+-- public_id is returned alongside id so the caller can map each resolved
+-- row back to the UUID it came from. The result is bounded by the size of
+-- the id set.
+SELECT
+  u.id,
+  u.public_id
+FROM users u
+INNER JOIN workspace_members wm
+  ON wm.user_id = u.id
+  AND wm.workspace_id = ?
+  AND wm.enabled = TRUE
+WHERE u.public_id IN (sqlc.slice('public_ids'))
+  AND u.enabled = TRUE
+ORDER BY u.id ASC;
+
 -- name: GetWorkspaceMemberRole :one
 -- Return the role string for an enabled workspace member. Returns
 -- sql.ErrNoRows when the user is not a member.

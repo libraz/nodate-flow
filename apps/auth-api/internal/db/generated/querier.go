@@ -418,6 +418,20 @@ type Querier interface {
 	// so task actor handlers cannot attach users from other tenants.
 	// id is required: returned as the FK value for task_actors.user_id.
 	FindWorkspaceMemberUserInternalIdByPublicId(ctx context.Context, arg FindWorkspaceMemberUserInternalIdByPublicIdParams) (uint32, error)
+	// Resolve a set of users' internal ids from their public UUIDs, scoped to
+	// a workspace. A row comes back only for an enabled user who is an enabled
+	// member of the workspace; unknown and non-member ids are simply absent.
+	//
+	// The membership is part of the lookup, not a check left to the caller.
+	// FindUserByPublicId in the auth queries resolves a user globally and is
+	// the wrong tool here: a body may name any UUID, and a global resolution
+	// turns an id from another tenant into a mention that leaks the workspace's
+	// content to a user outside it.
+	//
+	// public_id is returned alongside id so the caller can map each resolved
+	// row back to the UUID it came from. The result is bounded by the size of
+	// the id set.
+	FindWorkspaceMemberUserInternalIdsByPublicIds(ctx context.Context, arg FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error)
 	// Fetch just the timezone and country columns by internal id. Used by the
 	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
