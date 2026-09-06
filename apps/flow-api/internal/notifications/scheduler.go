@@ -16,12 +16,9 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 )
-
-// reminderEventType is the events.type (and notifications.event_type)
-// value for a scheduler-driven calendar reminder.
-const reminderEventType = "calendar.reminder"
 
 // reminderSystemSource is the events.actor_system_source value stamped
 // on reminder event rows. Reminders are time-driven — no user or agent
@@ -198,9 +195,17 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 // It calls [generated.Queries.AppendEvent] directly instead of going
 // through eventbus.Append because the fan-out needs the inserted
 // events.id, which eventbus.Append does not surface. The trade-off is
-// that eventbus notify hooks do not fire for this row; that is safe
-// because calendar.reminder is not a classified fan-out type, so the
-// hook path would be a no-op anyway.
+// that eventbus notify hooks do not fire for this row, so nothing that
+// hangs off the hook — the notification fan-out, the SSE tap — sees the
+// reminder. The notification is not lost: the scheduler dispatches it
+// itself, with the occurrence's own title, which is why the kind is
+// classified silent in the fan-out's table.
+//
+// What the bypass does not exempt is the kind's name. The row is a
+// [eventbus.CalendarReminder] like any other event: it is read back off
+// the events table by the timeline and the activity filters, so the
+// constant has to be declared, and the conversion below is what keeps
+// the name traceable from here to the column.
 func appendReminderEvent(
 	ctx context.Context,
 	queries *generated.Queries,
@@ -216,7 +221,7 @@ func appendReminderEvent(
 		PublicID:          types.New(),
 		WorkspaceID:       n.WorkspaceID,
 		ActorSystemSource: sql.NullString{String: reminderSystemSource, Valid: true},
-		Type:              reminderEventType,
+		Type:              string(eventbus.CalendarReminder),
 		PayloadJson:       payload,
 		OccurredAt:        time.Now().UTC(),
 	})

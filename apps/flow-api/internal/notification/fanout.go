@@ -401,7 +401,7 @@ func (f *Fanout) DeliverCalendarReminder(
 			RecipientUserID:  recipientID,
 			ActorUserID:      sql.NullInt32{},
 			SourceEventID:    srcEventID,
-			EventType:        "calendar.reminder",
+			EventType:        string(eventbus.CalendarReminder),
 			ResourceType:     "calendar_event",
 			ResourcePublicID: eventPublicID,
 			Title:            title,
@@ -866,6 +866,13 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.CalMemoUpdated:              silent,
 	eventbus.CalMemoCompleted:            silent,
 	eventbus.CalMemoDeleted:              silent,
+
+	// A reminder does notify, but not from this table: the scheduler calls
+	// [Fanout.DeliverCalendarReminder] with the occurrence's own title, so
+	// the row a recipient sees names the meeting rather than a fixed
+	// sentence. This table is read by the hook fan-out only, which never
+	// sees the kind, and a title here would be copy nothing renders.
+	eventbus.CalendarReminder: silent,
 
 	eventbus.CalEventCommentCreated:    silent,
 	eventbus.CalEventCommentUpdated:    silent,

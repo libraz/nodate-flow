@@ -248,6 +248,15 @@ const (
 	CalMemoUpdated   Kind = "calendar.memo.updated"
 	CalMemoCompleted Kind = "calendar.memo.completed"
 	CalMemoDeleted   Kind = "calendar.memo.deleted"
+
+	// CalendarReminder is appended by the reminder scheduler when an
+	// occurrence's notification window opens and this process wins the
+	// claim for that (event, occurrence). It is time-driven: the row
+	// carries actor_system_source rather than an actor, and its id anchors
+	// the notification rows the reminder fans out to. The name has no
+	// `event.` segment because the reminder is about the occurrence, which
+	// for a series is not a row of its own.
+	CalendarReminder Kind = "calendar.reminder"
 )
 
 // Calendar event detail events — the comments, attachments, checklist

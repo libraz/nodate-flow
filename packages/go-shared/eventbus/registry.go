@@ -69,6 +69,7 @@ var declaredKinds = []Kind{
 	CalEventCreated, CalEventUpdated, CalEventDeleted,
 	CalMemberAdded, CalMemberRemoved, CalMemberRoleChanged,
 	CalMemoCreated, CalMemoUpdated, CalMemoCompleted, CalMemoDeleted,
+	CalendarReminder,
 
 	CalEventCommentCreated, CalEventCommentUpdated, CalEventCommentDeleted,
 	CalEventAttachmentCreated, CalEventAttachmentDeleted,
