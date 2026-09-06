@@ -156,6 +156,11 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not save comment",
   },
+  CALENDAR_EVENT_ALREADY_OCCURRENCE_OVERRIDE: {
+    code: "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE",
+    status: 422,
+    message: "This event already replaces a single occurrence and cannot be divided further",
+  },
   CALENDAR_EVENT_DATE_RANGE_UNPARSEABLE: {
     code: "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE",
     status: 422,
@@ -181,6 +186,16 @@ export const CalendarErrors = {
     status: 404,
     message: "Event not found",
   },
+  CALENDAR_EVENT_NOT_RECURRING: {
+    code: "CALENDAR.EVENT.NOT_RECURRING",
+    status: 422,
+    message: "This event does not repeat, so it has no single occurrence to act on",
+  },
+  CALENDAR_EVENT_OCCURRENCE_START_REQUIRED: {
+    code: "CALENDAR.EVENT.OCCURRENCE_START_REQUIRED",
+    status: 422,
+    message: "occurrenceStart is required when the request targets a single occurrence",
+  },
   CALENDAR_EVENT_OWNER_USER_ID_MALFORMED: {
     code: "CALENDAR.EVENT.OWNER_USER_ID_MALFORMED",
     status: 400,
@@ -195,6 +210,11 @@ export const CalendarErrors = {
     code: "CALENDAR.EVENT.OWNER_USER_RESOLVE_INTERRUPTED",
     status: 500,
     message: "Could not resolve owner user",
+  },
+  CALENDAR_EVENT_RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED: {
+    code: "CALENDAR.EVENT.RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED",
+    status: 422,
+    message: "A single occurrence cannot carry its own recurrence rule, recurrence end or exception list",
   },
   CALENDAR_EVENT_RECURRENCE_RULE_INVALID: {
     code: "CALENDAR.EVENT.RECURRENCE_RULE_INVALID",

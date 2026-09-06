@@ -62,6 +62,18 @@ resources:
         description: "Returned when an admin endpoint references a user that does not exist."
         userAction: "Verify the user ID."
 
+  oauth_allowlist:
+    breadcrumb: "Instance > OAuth Allowlist"
+    errors:
+      not_found:
+        code: INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND
+        status: 404
+        message: "OAuth sign-in allowlist entry not found"
+        message_ja: "OAuth サインイン許可リストの項目が見つかりません"
+        message_zh: "未找到 OAuth 登录允许列表条目"
+        description: "Returned when an admin endpoint references an OAuth sign-in allowlist entry that does not exist, was already removed, or is not a well-formed identifier."
+        userAction: "Refresh the allowlist and try again."
+
   workspace:
     breadcrumb: "Instance > Workspace"
     errors:

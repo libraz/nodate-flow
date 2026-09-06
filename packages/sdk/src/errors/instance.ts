@@ -21,6 +21,11 @@ export const InstanceErrors = {
     status: 500,
     message: "Could not determine instance administrator status",
   },
+  INSTANCE_OAUTH_ALLOWLIST_NOT_FOUND: {
+    code: "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND",
+    status: 404,
+    message: "OAuth sign-in allowlist entry not found",
+  },
   INSTANCE_QUOTA_EXCEEDED: {
     code: "INSTANCE.QUOTA.EXCEEDED",
     status: 429,

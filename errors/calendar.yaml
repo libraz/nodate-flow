@@ -200,6 +200,42 @@ resources:
         description: "Returned when the supplied recurrence rule is malformed, such as an unsupported freq, a non-positive interval, an unparseable byDay, or a conflicting until / count."
         userAction: "Provide a valid recurrence rule with a supported freq, positive interval, and well-formed byDay, until, or count."
 
+      occurrence_start_required:
+        code: CALENDAR.EVENT.OCCURRENCE_START_REQUIRED
+        status: 422
+        message: "occurrenceStart is required when the request targets a single occurrence"
+        message_ja: "個別の回を対象にする場合は occurrenceStart を指定してください"
+        message_zh: "针对单次日程时必须提供 occurrenceStart"
+        description: "Returned when a request uses the occurrence or thisAndFollowing scope without an occurrenceStart. The original start of the occurrence is what identifies which one the request means."
+        userAction: "Send the occurrence's original start as occurrenceStart, or use the series scope to act on every occurrence."
+
+      not_recurring:
+        code: CALENDAR.EVENT.NOT_RECURRING
+        status: 422
+        message: "This event does not repeat, so it has no single occurrence to act on"
+        message_ja: "このイベントは繰り返しではないため、個別の回を対象にできません"
+        message_zh: "此事件不是重复事件，无法指定其中的单次日程"
+        description: "Returned when a request uses the occurrence or thisAndFollowing scope on an event that carries no recurrence rule."
+        userAction: "Use the series scope, or add a recurrence rule before addressing a single occurrence."
+
+      already_occurrence_override:
+        code: CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE
+        status: 422
+        message: "This event already replaces a single occurrence and cannot be divided further"
+        message_ja: "このイベントは既に個別の回を置き換えたものであり、さらに分割できません"
+        message_zh: "此事件已是对单次日程的替代，无法再进一步拆分"
+        description: "Returned when a request uses the occurrence or thisAndFollowing scope on an override row. An override stands for exactly one occurrence of its series and produces none of its own."
+        userAction: "Address the recurring event this row replaces an occurrence of, or edit this row itself with the series scope."
+
+      recurrence_on_occurrence_not_allowed:
+        code: CALENDAR.EVENT.RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED
+        status: 422
+        message: "A single occurrence cannot carry its own recurrence rule, recurrence end or exception list"
+        message_ja: "個別の回に繰り返しルール・繰り返し終了・除外リストを設定することはできません"
+        message_zh: "单次日程无法拥有自己的重复规则、重复结束时间或例外列表"
+        description: "Returned when a request sets or clears recurrenceRule, recurrenceEnd or recurrenceExceptions on a single occurrence. Those fields describe the series and belong to the recurring event alone."
+        userAction: "Send recurrence changes to the recurring event with the series scope."
+
   memo:
     breadcrumb: "Calendar > Memo"
     errors:
