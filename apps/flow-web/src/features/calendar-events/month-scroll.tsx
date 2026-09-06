@@ -202,6 +202,13 @@ export interface MonthScrollProps {
   /** Bumped by the toolbar "Today" button to request a re-scroll. */
   scrollToTodaySignal: number;
   /**
+   * The month now pinned at the top, as `YYYY-MM`, reported whenever it
+   * changes. The view scrolls a year either way while its data is
+   * fetched for one month at a time, so the surrounding route needs to
+   * hear where the scroll has arrived to fetch for it.
+   */
+  onVisibleMonthChange?: (monthKey: string) => void;
+  /**
    * The route's move gesture, shared with the desktop grid. Omitted, the
    * view is tap-only — every day an event can be dropped on can still be
    * typed into the dialog, so nothing is unreachable without it.
@@ -599,6 +606,17 @@ const ESTIMATED_WEEK_PX = 112;
 const TODAY_SCROLL_INSET_PX = 32;
 
 /**
+ * How long the pinned month has to stay put before it is reported, in
+ * milliseconds.
+ *
+ * Long enough that a flick across several months reports only the one it
+ * lands on — each is a fetch — and short enough that coming to rest and
+ * waiting for days to appear does not read as the view having missed the
+ * scroll. Exported because the tests would otherwise have to guess it.
+ */
+export const VISIBLE_MONTH_SETTLE_MS = 200;
+
+/**
  * Height of one rendered row, measured only by the resize observer.
  *
  * `virtualizer.measureElement` is attached as a ref, so the measurement
@@ -653,6 +671,7 @@ export default function MonthScroll({
   zone,
   stateColor,
   scrollToTodaySignal,
+  onVisibleMonthChange,
   drag,
   onDayCreate,
   onEventOpen,
@@ -698,6 +717,65 @@ export default function MonthScroll({
   // without a second scroll listener.
   const activeHeaderRef = useRef(headerIndexes[0] ?? 0);
 
+  /**
+   * Telling the parent which month is pinned.
+   *
+   * Two things keep the call out of the range extractor's own turn.
+   *
+   * The extractor is where the pinned index is resolved, and the library
+   * runs it from its own render and again while it measures and commits
+   * — the same path the row measurement above had to be kept out of. A
+   * parent `setState` reached from there is an update made from inside
+   * another component's render or commit, which React answers with a
+   * deferred flush or a warning rather than with the render that was
+   * asked for.
+   *
+   * And a report is a fetch. A flick from today to a year out crosses
+   * twelve month boundaries in a couple of seconds, and reporting each
+   * one would put twelve windows in flight for eleven months nobody
+   * stopped on. So the call trails the scroll: each crossing restarts
+   * the wait, and the month is read when it finally runs, which is the
+   * one the scroll came to rest on.
+   *
+   * The month the view opens on is not reported. The parent is already
+   * showing it, and the first range is computed before the opening
+   * auto-scroll has moved anything — a year above where the view is
+   * about to settle.
+   */
+  const reportRef = useRef(onVisibleMonthChange);
+  const reportedHeaderRef = useRef<number | null>(null);
+  const reportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    reportRef.current = onVisibleMonthChange;
+    // Cleared on unmount so a timer that outlives the view has nothing
+    // left to call. Nothing is flushed on the way out: the parent is
+    // being torn down with it, and the month a view no longer on screen
+    // was last resting on is not a window worth fetching.
+    return () => {
+      reportRef.current = undefined;
+    };
+  }, [onVisibleMonthChange]);
+
+  useEffect(() => {
+    return () => {
+      if (reportTimerRef.current !== null) clearTimeout(reportTimerRef.current);
+    };
+  }, []);
+
+  const scheduleMonthReport = (): void => {
+    if (reportTimerRef.current !== null) clearTimeout(reportTimerRef.current);
+    reportTimerRef.current = setTimeout(() => {
+      reportTimerRef.current = null;
+      const index = activeHeaderRef.current;
+      if (index === reportedHeaderRef.current) return;
+      const item = items[index];
+      if (item?.kind !== 'header') return;
+      reportedHeaderRef.current = index;
+      reportRef.current?.(item.monthKey);
+    }, VISIBLE_MONTH_SETTLE_MS);
+  };
+
   // Every day of the range to the row that draws it, so the week a drag
   // started in can be named from the day the pill was picked up.
   const rowIndexByDayKey = useMemo(() => {
@@ -740,6 +818,7 @@ export default function MonthScroll({
         active = index;
       }
       activeHeaderRef.current = active;
+      if (active !== reportedHeaderRef.current) scheduleMonthReport();
       const indexes = new Set(defaultRangeExtractor(range));
       indexes.add(active);
       if (dragRowIndex !== null) indexes.add(dragRowIndex);
@@ -765,6 +844,9 @@ export default function MonthScroll({
   // Initial position: align today's week just under the pinned header.
   useLayoutEffect(() => {
     scrollToToday(false);
+    // Baseline for the month report: whatever was pinned before the
+    // scroll is not a month the user navigated to.
+    reportedHeaderRef.current = activeHeaderRef.current;
   }, [scrollToToday]);
 
   // Toolbar "Today" button bumps the signal; re-scroll on an actual change.
