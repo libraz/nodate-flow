@@ -551,6 +551,15 @@ resources:
         description: "Returned when attempting to convert an intake item that has already been converted to a task."
         userAction: "The item has already been converted. Open the linked task instead."
 
+      snooze_deadline_required:
+        code: WS.INTAKE.SNOOZE_DEADLINE_REQUIRED
+        status: 422
+        message: "Snoozing an intake item requires a deadline"
+        message_ja: "インテークアイテムをスヌーズするには期限が必要です"
+        message_zh: "延后收件项需要设置截止时间"
+        description: "Returned when a triage request sets the status to snoozed without a snoozeUntil deadline. The pending queue is filtered on triage status alone, so an item parked as snoozed with no deadline leaves the pending list with no date at which anything brings it back."
+        userAction: "Supply a snoozeUntil timestamp in the future, or choose a different triage status."
+
   description_version:
     breadcrumb: "Workspace > Description Version"
     errors:

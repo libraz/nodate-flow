@@ -44,6 +44,24 @@ resources:
         description: "Returned when a non-owner attempts an owner-only operation such as deleting a calendar."
         userAction: "Ask a calendar owner to perform this action on your behalf."
 
+      editor_role_required:
+        code: CALENDAR.CALENDAR.EDITOR_ROLE_REQUIRED
+        status: 403
+        message: "Changing this calendar's contents requires the editor role"
+        message_ja: "このカレンダーの内容を変更するには編集者ロールが必要です"
+        message_zh: "更改此日历的内容需要编辑者角色"
+        description: "Returned when the actor is a member of the calendar but holds a role below editor, and the operation changes the calendar's contents: events, attendees, comments, attachments, memos, checklists or invites."
+        userAction: "Ask a calendar manager or owner to raise your role to editor."
+
+      manager_role_required:
+        code: CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED
+        status: 403
+        message: "Changing this calendar or its members requires the manager role"
+        message_ja: "このカレンダーやメンバーを変更するにはマネージャーロールが必要です"
+        message_zh: "更改此日历或其成员需要管理员角色"
+        description: "Returned when the actor is a member of the calendar but holds a role below manager, and the operation changes the calendar itself or who may reach it: calendar settings or membership."
+        userAction: "Ask a calendar owner to raise your role to manager."
+
       list_query_interrupted:
         code: CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED
         status: 500
@@ -98,8 +116,8 @@ resources:
         message: "You do not have permission to edit this event"
         message_ja: "このイベントを編集する権限がありません"
         message_zh: "您没有编辑此事件的权限"
-        description: "Returned when the actor is neither the event owner, a calendar owner/manager, nor an attendee with edit rights."
-        userAction: "Ask the event owner to grant you edit access or to make the change."
+        description: "Returned when the actor is not the event's owner and holds no other authority the request accepts. Changing or deleting an event also accepts a calendar manager or an attendee given edit rights, and filing an event under another user accepts a calendar manager; an event's attendee list and its invites stay with the event owner alone."
+        userAction: "Ask the event owner to make the change. They can also give you edit rights on the event, which covers changing or deleting the event itself but not its attendee list or invites."
 
       list_query_interrupted:
         code: CALENDAR.EVENT.LIST_QUERY_INTERRUPTED

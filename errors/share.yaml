@@ -28,6 +28,24 @@ resources:
         description: "Returned when the share's expires_at is in the past. The row still exists but the public render refuses to serve it."
         userAction: "Ask a workspace member to extend or rotate the share, then use the new URL."
 
+      expires_at_not_in_future:
+        code: SHARE.SHARE.EXPIRES_AT_NOT_IN_FUTURE
+        status: 422
+        message: "Share expiry must be in the future"
+        message_ja: "共有の有効期限は未来の時刻である必要があります"
+        message_zh: "分享的过期时间必须为将来的时间"
+        description: "Returned when a share is created or updated with an expires_at that is not later than the time the request is handled, which would produce a share that is already expired when it is returned. Distinct from SHARE.SHARE.EXPIRED, which refuses a reader whose share has since run out."
+        userAction: "Pick an expiry timestamp later than the current time, or omit it for a share that does not expire."
+
+      expires_at_out_of_range:
+        code: SHARE.SHARE.EXPIRES_AT_OUT_OF_RANGE
+        status: 422
+        message: "Share expiry is outside the range this field can hold"
+        message_ja: "共有の有効期限が、この項目で保持できる範囲を外れています"
+        message_zh: "分享的过期时间超出了该字段可保存的范围"
+        description: "Returned when a share is created or updated with an expires_at that the stored expiry field cannot represent, so the value could never be persisted or read back. The bound is the representable range of the field itself, not a policy limit on how far ahead a share may be scheduled. Distinct from SHARE.SHARE.EXPIRES_AT_NOT_IN_FUTURE, which refuses a writer setting a moment that has already passed, and from SHARE.SHARE.EXPIRED, which refuses a reader whose share has since run out."
+        userAction: "Pick an expiry timestamp within the range the field accepts, or omit it for a share that does not expire."
+
       token_invalid:
         code: SHARE.SHARE.TOKEN_INVALID
         status: 404

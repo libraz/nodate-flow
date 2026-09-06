@@ -71,6 +71,11 @@ export const WsErrors = {
     status: 404,
     message: "Intake item not found",
   },
+  WS_INTAKE_SNOOZE_DEADLINE_REQUIRED: {
+    code: "WS.INTAKE.SNOOZE_DEADLINE_REQUIRED",
+    status: 422,
+    message: "Snoozing an intake item requires a deadline",
+  },
   WS_LABEL_NAME_ALREADY_TAKEN: {
     code: "WS.LABEL.NAME_ALREADY_TAKEN",
     status: 409,

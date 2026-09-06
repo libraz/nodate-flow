@@ -32,6 +32,8 @@ var (
 	WsIntakeAlreadyTriaged = &Spec{Code: "WS.INTAKE.ALREADY_TRIAGED", Status: 409, Message: "This intake item has already been triaged", Description: "Returned when attempting to triage an intake item that has already been triaged.", UserAction: "The item has already been triaged. No further action is needed."}
 	// WS.INTAKE.NOT_FOUND — Intake item not found
 	WsIntakeNotFound = &Spec{Code: "WS.INTAKE.NOT_FOUND", Status: 404, Message: "Intake item not found", Description: "Returned when an intake item with the given public_id does not exist or has been removed.", UserAction: "Verify the intake item ID, or refresh the list to see current items."}
+	// WS.INTAKE.SNOOZE_DEADLINE_REQUIRED — Snoozing an intake item requires a deadline
+	WsIntakeSnoozeDeadlineRequired = &Spec{Code: "WS.INTAKE.SNOOZE_DEADLINE_REQUIRED", Status: 422, Message: "Snoozing an intake item requires a deadline", Description: "Returned when a triage request sets the status to snoozed without a snoozeUntil deadline. The pending queue is filtered on triage status alone, so an item parked as snoozed with no deadline leaves the pending list with no date at which anything brings it back.", UserAction: "Supply a snoozeUntil timestamp in the future, or choose a different triage status."}
 	// WS.LABEL.NAME_ALREADY_TAKEN — A label with this name already exists
 	WsLabelNameAlreadyTaken = &Spec{Code: "WS.LABEL.NAME_ALREADY_TAKEN", Status: 409, Message: "A label with this name already exists", Description: "Returned when the requested label name already exists within the same workspace/project scope.", UserAction: "Choose a different name."}
 	// WS.LABEL.NOT_FOUND — Label not found

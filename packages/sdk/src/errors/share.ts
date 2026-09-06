@@ -11,6 +11,16 @@ export const ShareErrors = {
     status: 410,
     message: "Share page has expired",
   },
+  SHARE_SHARE_EXPIRES_AT_NOT_IN_FUTURE: {
+    code: "SHARE.SHARE.EXPIRES_AT_NOT_IN_FUTURE",
+    status: 422,
+    message: "Share expiry must be in the future",
+  },
+  SHARE_SHARE_EXPIRES_AT_OUT_OF_RANGE: {
+    code: "SHARE.SHARE.EXPIRES_AT_OUT_OF_RANGE",
+    status: 422,
+    message: "Share expiry is outside the range this field can hold",
+  },
   SHARE_SHARE_NOT_FOUND: {
     code: "SHARE.SHARE.NOT_FOUND",
     status: 404,

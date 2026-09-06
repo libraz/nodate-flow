@@ -76,10 +76,20 @@ export const CalendarErrors = {
     status: 403,
     message: "You do not have access to this calendar",
   },
+  CALENDAR_CALENDAR_EDITOR_ROLE_REQUIRED: {
+    code: "CALENDAR.CALENDAR.EDITOR_ROLE_REQUIRED",
+    status: 403,
+    message: "Changing this calendar's contents requires the editor role",
+  },
   CALENDAR_CALENDAR_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.CALENDAR.LIST_QUERY_INTERRUPTED",
     status: 500,
     message: "Could not retrieve calendars",
+  },
+  CALENDAR_CALENDAR_MANAGER_ROLE_REQUIRED: {
+    code: "CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED",
+    status: 403,
+    message: "Changing this calendar or its members requires the manager role",
   },
   CALENDAR_CALENDAR_NOT_FOUND: {
     code: "CALENDAR.CALENDAR.NOT_FOUND",
