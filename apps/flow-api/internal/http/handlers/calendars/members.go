@@ -344,6 +344,13 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 
 		// The last owner cannot leave or be removed, including by
 		// themselves — a calendar with no owner can never regain one.
+		//
+		// Removing someone from the workspace keeps the same invariant by
+		// the other means: memberkit hands a sole-owned calendar to a
+		// remaining workspace owner before it retires the grants, because
+		// offboarding a person has to succeed. Refusing is only affordable
+		// here, where the caller asked about one calendar and can pick
+		// another owner first.
 		if target.Role == calendar.CalendarMembersRoleOwner {
 			owners, oerr := deps.CalendarQueries.CountCalendarOwners(ctx, cal.ID)
 			if oerr != nil {

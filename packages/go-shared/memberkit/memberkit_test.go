@@ -644,6 +644,286 @@ func TestRemoveWorkspaceMember_ReAddDoesNotRestoreSharedGrants(t *testing.T) {
 	}
 }
 
+// seedGroupCalendar inserts a calendar that belongs to no one in
+// particular — owner_user_id NULL, the shape the schema reserves for a
+// calendar that outlives any single member — and returns its internal id.
+func seedGroupCalendar(ctx context.Context, t *testing.T, db *sql.DB, wsID uint32, name string) uint32 {
+	t.Helper()
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color)
+		 VALUES (?, ?, 'personal', ?, '#34A853')`,
+		dbtype.New(), wsID, name)
+	if err != nil {
+		t.Fatalf("seed group calendar %q: %v", name, err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed group calendar LastInsertId: %v", err)
+	}
+	return uint32(id) //#nosec G115 -- test-scoped LastInsertId fits uint32
+}
+
+// grantOnCalendar writes a calendar_members row at the given role.
+func grantOnCalendar(ctx context.Context, t *testing.T, db *sql.DB, wsID, calID, userID uint32, role string) {
+	t.Helper()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO calendar_members
+		 (public_id, workspace_id, calendar_id, user_id, role, member_color)
+		 VALUES (?, ?, ?, ?, ?, '#34A853')`,
+		dbtype.New(), wsID, calID, userID, role); err != nil {
+		t.Fatalf("seed %s grant on calendar %d: %v", role, calID, err)
+	}
+}
+
+// loadGrant returns the role and enabled flag of one user's grant on one
+// calendar. found is false when no row exists at all, which is different
+// from a revoked one and the two must not be conflated.
+func loadGrant(ctx context.Context, t *testing.T, db *sql.DB, calID, userID uint32) (role string, enabled, found bool) {
+	t.Helper()
+	err := db.QueryRowContext(ctx,
+		`SELECT role, enabled FROM calendar_members
+		 WHERE calendar_id = ? AND user_id = ?`,
+		calID, userID).Scan(&role, &enabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, false
+	}
+	if err != nil {
+		t.Fatalf("load grant on calendar %d for user %d: %v", calID, userID, err)
+	}
+	return role, enabled, true
+}
+
+// removeMember runs the removal and returns its result, failing the test
+// on error.
+func removeMember(ctx context.Context, t *testing.T, db *sql.DB, ws wsFixture, userID uint32) RemoveWorkspaceMemberResult {
+	t.Helper()
+	var res RemoveWorkspaceMemberResult
+	withTx(t, db, func(tx *dbretry.Tx) {
+		r, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, ActorUserID: ws.actorID,
+		})
+		if err != nil {
+			t.Fatalf("remove: %v", err)
+		}
+		res = r
+	})
+	return res
+}
+
+// joinWorkspace adds a plain member with the personal-calendar layer.
+func joinWorkspace(ctx context.Context, t *testing.T, db *sql.DB, ws wsFixture, userID uint32) {
+	t.Helper()
+	withTx(t, db, func(tx *dbretry.Tx) {
+		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
+			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
+		}); err != nil {
+			t.Fatalf("add: %v", err)
+		}
+	})
+}
+
+// TestRemoveWorkspaceMember_TransfersSoleOwnedCalendar verifies that a
+// shared calendar whose only owner leaves the workspace keeps an owner.
+// Nothing grants an owner to a calendar that has none, so the alternative
+// is a calendar nobody can ever administer or delete again.
+func TestRemoveWorkspaceMember_TransfersSoleOwnedCalendar(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, userID)
+
+	teamCal := seedGroupCalendar(ctx, t, db, ws.wsID, "Team")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, userID, "owner")
+
+	res := removeMember(ctx, t, db, ws, userID)
+
+	// Only the team calendar is in scope: the member's own personal
+	// calendar is sole-owned too and is deliberately left to the
+	// disable step below it.
+	if res.CalendarsTransferred != 1 {
+		t.Errorf("expected 1 calendar transferred, got %d", res.CalendarsTransferred)
+	}
+
+	role, enabled, found := loadGrant(ctx, t, db, teamCal, ws.actorID)
+	if !found {
+		t.Fatal("the remaining workspace owner should hold a grant on the calendar they inherited")
+	}
+	if role != "owner" || !enabled {
+		t.Errorf("expected a live owner grant for the recipient, got role=%q enabled=%v", role, enabled)
+	}
+
+	// The departing member keeps nothing, transfer or no transfer.
+	if _, enabled, _ := loadGrant(ctx, t, db, teamCal, userID); enabled {
+		t.Error("the departing member's grant should not survive the removal")
+	}
+}
+
+// TestRemoveWorkspaceMember_LeavesCoOwnedCalendarAlone verifies that the
+// transfer is scoped to calendars that would otherwise be left without an
+// owner. A second owner already answers the question, and promoting a
+// third person would hand out access nobody asked for.
+func TestRemoveWorkspaceMember_LeavesCoOwnedCalendarAlone(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, userID)
+	coOwner := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, coOwner)
+
+	teamCal := seedGroupCalendar(ctx, t, db, ws.wsID, "Team")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, userID, "owner")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, coOwner, "owner")
+
+	res := removeMember(ctx, t, db, ws, userID)
+
+	if res.CalendarsTransferred != 0 {
+		t.Errorf("a calendar with a second owner needs no transfer, got %d", res.CalendarsTransferred)
+	}
+	if _, _, found := loadGrant(ctx, t, db, teamCal, ws.actorID); found {
+		t.Error("the workspace owner should not have been given access to a calendar that still has an owner")
+	}
+	role, enabled, found := loadGrant(ctx, t, db, teamCal, coOwner)
+	if !found || role != "owner" || !enabled {
+		t.Errorf("the remaining owner's grant should be untouched, got role=%q enabled=%v found=%v", role, enabled, found)
+	}
+}
+
+// TestRemoveWorkspaceMember_DoesNotTransferPersonalCalendar verifies that
+// the member's own calendar is not handed to somebody else. It is
+// disabled along with them, and its contents are theirs — a departure is
+// not a reason to open it to the workspace owner.
+func TestRemoveWorkspaceMember_DoesNotTransferPersonalCalendar(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, userID)
+
+	var personalCal uint32
+	if err := db.QueryRowContext(ctx,
+		`SELECT id FROM calendars
+		 WHERE workspace_id = ? AND kind = 'personal' AND owner_user_id = ?`,
+		ws.wsID, userID).Scan(&personalCal); err != nil {
+		t.Fatalf("load personal calendar: %v", err)
+	}
+
+	res := removeMember(ctx, t, db, ws, userID)
+
+	if res.CalendarsTransferred != 0 {
+		t.Errorf("a personal calendar should not change hands, got %d transferred", res.CalendarsTransferred)
+	}
+	if _, _, found := loadGrant(ctx, t, db, personalCal, ws.actorID); found {
+		t.Error("the workspace owner should not inherit a member's personal calendar")
+	}
+	if res.PersonalCalsDisabled != 1 {
+		t.Errorf("expected the personal calendar to be disabled instead, got %d", res.PersonalCalsDisabled)
+	}
+}
+
+// TestRemoveWorkspaceMember_RecipientIsLongestStandingOwner pins which of
+// several remaining owners inherits. The rule is the oldest membership
+// row, not the oldest user: the earlyOwner below has a lower users.id and
+// joined later, so a test that only happened to agree with the server's
+// row order would pick them.
+func TestRemoveWorkspaceMember_RecipientIsLongestStandingOwner(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+
+	// Created before the fixture, so this user's id is below the founding
+	// owner's while their membership row is above it.
+	earlyUser := seedUser(ctx, t, db)
+
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role, joined_at)
+		 VALUES (?, ?, ?, 'owner', NOW())`,
+		dbtype.New(), ws.wsID, earlyUser); err != nil {
+		t.Fatalf("seed early user as owner: %v", err)
+	}
+	lateOwner := addOwner(ctx, t, db, ws.wsID)
+
+	userID := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, userID)
+
+	teamCal := seedGroupCalendar(ctx, t, db, ws.wsID, "Team")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, userID, "owner")
+
+	res := removeMember(ctx, t, db, ws, userID)
+	if res.CalendarsTransferred != 1 {
+		t.Fatalf("expected 1 calendar transferred, got %d", res.CalendarsTransferred)
+	}
+
+	role, enabled, found := loadGrant(ctx, t, db, teamCal, ws.actorID)
+	if !found || role != "owner" || !enabled {
+		t.Errorf("the founding owner should inherit, got role=%q enabled=%v found=%v", role, enabled, found)
+	}
+	for name, other := range map[string]uint32{"earlyUser": earlyUser, "lateOwner": lateOwner} {
+		if _, _, found := loadGrant(ctx, t, db, teamCal, other); found {
+			t.Errorf("%s should not have inherited; exactly one owner takes over", name)
+		}
+	}
+}
+
+// TestRemoveWorkspaceMember_TransferPromotesExistingMember verifies the
+// case where the recipient can already reach the calendar. Promotion has
+// to lift the role they hold rather than insert a duplicate, and it must
+// leave the colour that identifies them there alone.
+func TestRemoveWorkspaceMember_TransferPromotesExistingMember(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	joinWorkspace(ctx, t, db, ws, userID)
+
+	teamCal := seedGroupCalendar(ctx, t, db, ws.wsID, "Team")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, userID, "owner")
+	grantOnCalendar(ctx, t, db, ws.wsID, teamCal, ws.actorID, "viewer")
+	if _, err := db.ExecContext(ctx,
+		`UPDATE calendar_members SET member_color = '#FF00FF'
+		 WHERE calendar_id = ? AND user_id = ?`,
+		teamCal, ws.actorID); err != nil {
+		t.Fatalf("recolour recipient grant: %v", err)
+	}
+
+	if res := removeMember(ctx, t, db, ws, userID); res.CalendarsTransferred != 1 {
+		t.Fatalf("expected 1 calendar transferred, got %d", res.CalendarsTransferred)
+	}
+
+	var (
+		grants int
+		role   string
+		color  string
+	)
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*), MIN(role), MIN(member_color) FROM calendar_members
+		 WHERE calendar_id = ? AND user_id = ?`,
+		teamCal, ws.actorID).Scan(&grants, &role, &color); err != nil {
+		t.Fatalf("load recipient grant: %v", err)
+	}
+	if grants != 1 {
+		t.Errorf("expected the existing grant to be promoted, got %d rows", grants)
+	}
+	if role != "owner" {
+		t.Errorf("expected role=owner after promotion, got %q", role)
+	}
+	if color != "#FF00FF" {
+		t.Errorf("promotion should not repaint the recipient, got colour %q", color)
+	}
+}
+
 // TestRemoveWorkspaceMember_ReturnsNotFoundForUnknownUser verifies
 // that RemoveWorkspaceMember returns sql.ErrNoRows when the target
 // membership doesn't exist at all.
