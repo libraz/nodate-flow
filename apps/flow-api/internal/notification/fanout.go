@@ -87,6 +87,12 @@ type Fanout struct {
 	// without a live database.
 	fetchPreferences func(ctx context.Context, params generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error)
 
+	// publishChange tells the realtime stream that this workspace has
+	// notification rows it has not seen. Nil when the stream is
+	// disabled, which is the only reason the fan-out may skip it: the
+	// bell then refreshes on the reader's next poll or navigation.
+	publishChange func(ctx context.Context, workspaceID uint32)
+
 	// resolveMentionedUsers turns the public ids a mention payload names
 	// into the internal ids of the workspace members behind them.
 	// Production code leaves this nil and the lookup falls through to
@@ -107,6 +113,35 @@ func NewFanout(db *sql.DB, q *generated.Queries, emailSender email.Sender) *Fano
 		email:   emailSender,
 		timeout: defaultFanoutTimeout,
 	}
+}
+
+// SetNotificationPublisher installs the callback that announces new
+// notification rows on the realtime stream, normally
+// stream.EventbusTap.PublishNotification. Leaving it unset keeps the
+// fan-out silent on the stream, which is what a deployment with
+// streaming turned off wants.
+//
+// Safe to call once at start-up before any hook fires; not safe under
+// concurrent fan-out.
+func (f *Fanout) SetNotificationPublisher(publish func(ctx context.Context, workspaceID uint32)) {
+	f.publishChange = publish
+}
+
+// notificationsChanged announces that this workspace gained notification
+// rows. Callers must have written at least one, because the stream event
+// reaches every client subscribed to the workspace and tells all of them
+// to re-read the bell.
+//
+// Delivery is best effort by design and reports nothing back. The rows
+// are committed before this runs, so there is no write left to fail; a
+// subscriber that misses the event still sees the rows on its next
+// refetch and on the resync marker the SSE handler writes when the
+// connection is re-established.
+func (f *Fanout) notificationsChanged(ctx context.Context, workspaceID uint32) {
+	if f.publishChange == nil {
+		return
+	}
+	f.publishChange(ctx, workspaceID)
 }
 
 // SetTimeout overrides the per-event fan-out timeout. Values <= 0
@@ -394,6 +429,7 @@ func (f *Fanout) DeliverCalendarReminder(
 	}
 
 	var firstErr error
+	var inserted int64
 	for _, recipientID := range recipientUserIDs {
 		affected, err := f.queries.CreateNotification(ctx, generated.CreateNotificationParams{
 			PublicID:         types.New(),
@@ -432,7 +468,19 @@ func (f *Fanout) DeliverCalendarReminder(
 				slog.String("event_public_id", eventPublicID.String()),
 				slog.Int64("source_event_id", sourceEventID))
 			obs.IncNotificationFanoutDedup("unique_collision")
+			continue
 		}
+		inserted++
+	}
+
+	// A reminder that reached at least one recipient is news on the
+	// stream for the same reason the hook fan-out is, and it is
+	// announced the same way: once for the delivery rather than once per
+	// recipient, since the wire event addresses the workspace. A
+	// delivery the unique key collapsed in full was already announced by
+	// whoever wrote those rows.
+	if inserted > 0 {
+		f.notificationsChanged(ctx, workspaceID)
 	}
 	return firstErr
 }
@@ -1024,10 +1072,22 @@ const insertChunkSize = 100
 // collapses a re-fired hook, and the affected-row count still tells new
 // rows from deduplicated ones — per chunk now rather than per row,
 // which is all the dedup metric ever used it for.
+//
+// This is also where the pass announces itself on the realtime stream,
+// because it is the only place that knows whether anything was written.
+// Every way a pass can reach nobody — a [silent] kind, a recipient set
+// that is empty once the actor is removed, a category every recipient
+// muted — arrives here with no rows, and the kinds marked silent are
+// most of them.
 func (f *Fanout) insertNotifications(ctx context.Context, b notificationBatch) {
 	if len(b.rows) == 0 {
 		return
 	}
+	// Rows this call actually created, as opposed to attempted. A batch
+	// the unique key collapsed in full describes rows a previous pass
+	// already announced, and a batch whose statements all failed
+	// describes nothing at all; neither is news for a subscriber.
+	var inserted int64
 	const columns = 12
 	for start := 0; start < len(b.rows); start += insertChunkSize {
 		end := start + insertChunkSize
@@ -1081,6 +1141,7 @@ func (f *Fanout) insertNotifications(ctx context.Context, b notificationBatch) {
 				slog.String("err", err.Error()))
 			continue
 		}
+		inserted += affected
 		if deduped := int64(len(chunk)) - affected; deduped > 0 {
 			// The unique key collapsed rows that already existed. This
 			// is the at-least-once happy path, so it stays at debug —
@@ -1095,5 +1156,12 @@ func (f *Fanout) insertNotifications(ctx context.Context, b notificationBatch) {
 				obs.IncNotificationFanoutDedup("unique_collision")
 			}
 		}
+	}
+
+	// Once for the pass, after the last chunk. Announcing per chunk
+	// would wake the workspace repeatedly for one event, and the wire
+	// event carries no payload that could distinguish the repeats.
+	if inserted > 0 {
+		f.notificationsChanged(ctx, b.workspaceID)
 	}
 }

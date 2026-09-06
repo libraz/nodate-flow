@@ -177,6 +177,29 @@ func (t *EventbusTap) PublishAiInvocation(ctx context.Context, workspaceInternal
 	})
 }
 
+// PublishNotification is a dedicated entry point for notifications
+// writes, which the fan-out performs outside eventbus.Append. Call it
+// from the notification fan-out once a pass has written at least one
+// row.
+//
+// One call covers the whole pass. [Event] addresses a workspace, not a
+// reader — the notifier keys subscribers by workspace public id alone —
+// so the many rows one event produces across recipients are one thing to
+// say, and saying it per row would only repeat it. The converse is the
+// caller's obligation: a pass that wrote nothing must not call this, or
+// every client in the workspace refetches a bell that did not change.
+func (t *EventbusTap) PublishNotification(ctx context.Context, workspaceInternalID uint32) {
+	publicID, ok := t.workspacePublicID(ctx, workspaceInternalID)
+	if !ok {
+		return
+	}
+	t.notifier.Publish(ctx, Event{
+		Kind:        KindNotificationChanged,
+		WorkspaceID: publicID,
+		At:          time.Now().Unix(),
+	})
+}
+
 // DBWorkspaceResolver reads the public id straight from the workspaces
 // table. The mapping never changes, so a hit is cached for the life of
 // the process and this runs at most once per workspace per replica

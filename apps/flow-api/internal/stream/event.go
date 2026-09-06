@@ -25,7 +25,7 @@ import "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 type Kind string
 
 // Known kinds. Keep this list in sync with
-// apps/web/src/features/realtime/event-to-keys.ts and with the ADR
+// apps/flow-web/src/features/realtime/event-to-keys.ts and with the ADR
 // 0005 §Wire format table.
 const (
 	// KindTaskChanged fires on any `task.*` append for the workspace.
@@ -44,8 +44,14 @@ const (
 	// invalidates the ai-invocations audit list.
 	KindAiInvocationWritten Kind = "ai.invocation.written"
 
-	// KindNotificationChanged fires on any notification-related event.
-	// The frontend invalidates the notification list and unread count.
+	// KindNotificationChanged fires when a fan-out pass writes at least
+	// one row into the notifications table for the workspace. The
+	// frontend invalidates the notification list and unread count.
+	//
+	// Both queries are scoped to the reader on the server, so the
+	// members a pass wrote no row for refetch and see nothing new. That
+	// is the cost of a workspace-addressed wire format, and it is the
+	// reason a pass that writes nothing at all publishes nothing.
 	KindNotificationChanged Kind = "notification.changed"
 
 	// KindTimeboxChanged fires on any `timebox.*` append for the
@@ -157,8 +163,13 @@ var streamKindForFamily = map[eventbus.Family]Kind{
 // any published family.
 //
 // [KindNotificationChanged] and [KindAiInvocationWritten] have no entry
-// above because no row in `events` carries them: they are published
-// straight to the notifier by the fan-out and the invocation writer.
+// above because no row in `events` carries them. Each names a write to a
+// table of its own, so the tap exposes a dedicated entry point per kind
+// and the writer calls it: [EventbusTap.PublishNotification] from the
+// notification fan-out, [EventbusTap.PublishAiInvocation] from the
+// invocation logger. Mapping either one off an event family instead
+// would fire on the append that triggered the write rather than on the
+// write, which is the case where nothing was written at all.
 func KindForEventType(eventType string) (Kind, bool) {
 	family, ok := eventbus.FamilyForEventType(eventType)
 	if !ok {

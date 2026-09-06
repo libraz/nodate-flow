@@ -231,6 +231,10 @@ func main() {
 	var tap *stream.EventbusTap
 	var streamRemember stream.RememberWorkspaceFunc
 	var aiInvocationPublisher func(context.Context, uint32)
+	// Notification rows are written by the fan-out rather than by
+	// eventbus.Append, so the tap has to be told about them separately;
+	// nothing else reaches the bell live.
+	var notificationPublisher func(context.Context, uint32)
 	// Every resident loop below hands back one stopper, called in the
 	// shutdown sequence at the bottom of main. A no-op stands in while
 	// the feature that owns the loop is disabled, so the shutdown path
@@ -258,6 +262,7 @@ func main() {
 		eventbus.AddNotifyHook(tap.Publish)
 		streamRemember = tap.RememberWorkspace
 		aiInvocationPublisher = tap.PublishAiInvocation
+		notificationPublisher = tap.PublishNotification
 
 		// The tap only sees appends made by this binary. When another
 		// product writes to the same database its changes reach this
@@ -463,6 +468,7 @@ func main() {
 	// bounded by NF_NOTIFICATION_FANOUT_TIMEOUT (default 30s).
 	notifFanout := notification.NewFanout(db, queries, emailSender)
 	notifFanout.SetTimeout(cfg.NotificationFanoutTimeout)
+	notifFanout.SetNotificationPublisher(notificationPublisher)
 	eventbus.AddNotifyHook(notifFanout.Hook())
 
 	// Webhook delivery worker: creates delivery rows for matching

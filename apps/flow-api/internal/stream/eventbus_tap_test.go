@@ -68,6 +68,30 @@ func TestTapPublishesAiInvocationWithNoLocalSubscriber(t *testing.T) {
 	}
 }
 
+// Notification rows are written by the fan-out rather than by
+// eventbus.Append, so they reach subscribers through an entry point of
+// their own. Without it the bell has a live-update path the frontend
+// already listens on and nothing that ever fires it.
+func TestTapPublishesNotificationWithNoLocalSubscriber(t *testing.T) {
+	t.Parallel()
+
+	rec := &recorder{}
+	tap := NewEventbusTap(rec)
+	tap.SetWorkspaceResolver(&countingResolver{byID: map[uint32]string{11: "ws-public-11"}})
+
+	tap.PublishNotification(context.Background(), 11)
+
+	if len(rec.events) != 1 {
+		t.Fatalf("published %d events, want 1", len(rec.events))
+	}
+	if rec.events[0].Kind != KindNotificationChanged {
+		t.Errorf("kind = %q, want %q", rec.events[0].Kind, KindNotificationChanged)
+	}
+	if rec.events[0].WorkspaceID != "ws-public-11" {
+		t.Errorf("workspace = %q, want %q", rec.events[0].WorkspaceID, "ws-public-11")
+	}
+}
+
 // The resolver is the fallback, not the path: a workspace whose id is
 // already known must not cost a query per event.
 func TestTapResolvesEachWorkspaceOnce(t *testing.T) {

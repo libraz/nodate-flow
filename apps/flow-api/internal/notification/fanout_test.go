@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
 // TestHook_DetachesFromParentContext verifies that cancelling the
@@ -341,6 +342,34 @@ func TestFanoutMetrics_PreferenceFetchErrorTypeLabel(t *testing.T) {
 	}
 	if got, want := testutil.ToFloat64(timeoutCounter)-timeoutBefore, 2.0; got != want {
 		t.Fatalf("type=timeout delta: got %v want %v", got, want)
+	}
+}
+
+// TestFanout_SilentKindAnnouncesNothing covers the cheapest way a pass
+// notifies nobody: the classifications table answers [silent] and the
+// pass ends before it reads anything. Most declared kinds land here, so
+// announcing on them would put the bulk of the event stream on the wire
+// as invalidations for a bell that never changed.
+//
+// The nil database is part of the assertion. A silent kind must be
+// settled from the table alone, so reaching any query panics here rather
+// than costing a round trip per event in production.
+func TestFanout_SilentKindAnnouncesNothing(t *testing.T) {
+	t.Parallel()
+
+	kind := eventbus.ReactionAdded
+	if got := classifications[kind]; got != silent {
+		t.Fatalf("%s is classified %+v; this test needs a kind that notifies nobody", kind, got)
+	}
+
+	var announced atomic.Int64
+	f := NewFanout(nil, nil, nil)
+	f.SetNotificationPublisher(func(context.Context, uint32) { announced.Add(1) })
+
+	f.fanout(context.Background(), 1, string(kind), 1)
+
+	if got := announced.Load(); got != 0 {
+		t.Fatalf("announced %d times for a kind that notifies nobody, want 0", got)
 	}
 }
 

@@ -8,6 +8,8 @@ package notification
 import (
 	"context"
 	"database/sql"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -159,6 +161,106 @@ func runFanout(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *F
 	f := NewFanout(db, q, nil)
 	f.fanout(context.Background(), fx.wsID, eventType, fx.eventInternalID)
 	return f
+}
+
+// publishRecorder captures the workspaces a fan-out pass announced on
+// the realtime stream, standing in for
+// stream.EventbusTap.PublishNotification.
+type publishRecorder struct {
+	mu  sync.Mutex
+	ids []uint32
+}
+
+func (r *publishRecorder) publish(_ context.Context, workspaceID uint32) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ids = append(r.ids, workspaceID)
+}
+
+func (r *publishRecorder) announced() []uint32 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.ids)
+}
+
+// runFanoutRecordingPublishes runs the same production fan-out method as
+// [runFanout] with the realtime publisher captured, so a test can assert
+// on what the pass announced alongside what it wrote.
+func runFanoutRecordingPublishes(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *publishRecorder {
+	t.Helper()
+	rec := &publishRecorder{}
+	f := NewFanout(db, generated.New(db), nil)
+	f.SetNotificationPublisher(rec.publish)
+	f.fanout(context.Background(), fx.wsID, eventType, fx.eventInternalID)
+	return rec
+}
+
+// TestFanout_AnnouncesAPassThatWroteRows is the positive half of the
+// realtime contract: the frontend maps notification.changed onto the
+// bell list and the unread badge, so a pass that writes a row and says
+// nothing leaves both stale until something unrelated refetches.
+//
+// The workspace id is asserted, not just the count, because the wire
+// event is addressed by workspace and an event addressed to the wrong
+// one reaches nobody just as silently.
+func TestFanout_AnnouncesAPassThatWroteRows(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+
+	rec := runFanoutRecordingPublishes(t, db, fx, "task.created")
+
+	require.Equal(t, []string{"in_app"},
+		listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID),
+		"fixture must write a row for the announcement to be about something")
+	require.Equal(t, []uint32{fx.wsID}, rec.announced())
+}
+
+// TestFanout_AnnouncesNothingWhenNobodyIsNotified is the pairing
+// assertion. It differs from TestFanout_AnnouncesAPassThatWroteRows by
+// the mute alone, so the two together show one code path deciding both
+// ways rather than a publisher that is simply never called.
+//
+// Announcing here would wake every client subscribed to the workspace to
+// re-read a bell that gained nothing, and most declared event kinds are
+// classified silent — so the cost is not an edge case.
+func TestFanout_AnnouncesNothingWhenNobodyIsNotified(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+
+	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "in_app", true)
+
+	rec := runFanoutRecordingPublishes(t, db, fx, "task.created")
+
+	require.Empty(t,
+		listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID),
+		"fixture must write no row for the silence to be the property under test")
+	require.Empty(t, rec.announced())
+}
+
+// TestFanout_AnnouncesOnlyTheRefireThatWroteSomething pins the gate to
+// rows created rather than rows attempted. A re-fired hook builds the
+// same batch and the unique key collapses all of it, so an announcement
+// on the second pass would describe rows the first pass already
+// announced.
+func TestFanout_AnnouncesOnlyTheRefireThatWroteSomething(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+
+	first := runFanoutRecordingPublishes(t, db, fx, "task.created")
+	require.Equal(t, []uint32{fx.wsID}, first.announced())
+
+	second := runFanoutRecordingPublishes(t, db, fx, "task.created")
+	require.Empty(t, second.announced())
+
+	require.Equal(t, []string{"in_app"},
+		listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID),
+		"the refire must not have created a second row either")
 }
 
 // TestFanout_RespectsExplicitChannelPreference verifies that a
