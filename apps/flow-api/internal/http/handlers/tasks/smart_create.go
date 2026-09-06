@@ -277,9 +277,9 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		// title an event carries is the title the row carries: recording
 		// the submitted one instead would describe the task as having a
 		// name it was never stored under.
-		emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, parentID, parentPub, prjPub, parentTitle.String())
+		emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, parentID, parentPub, prjPub, parentTitle.String(), nil)
 		for i, sub := range subtasks {
-			emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, sub.ID, sub.PublicID, prjPub, subtaskTitles[i].String())
+			emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, sub.ID, sub.PublicID, prjPub, subtaskTitles[i].String(), &parentPub)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{
@@ -380,18 +380,27 @@ func resolveAssignee(ctx context.Context, qtx *generated.Queries, wsID uint32, u
 }
 
 // emitCreatedEvent appends a TaskCreated event for a newly created task.
-func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, taskID int64, taskPub, prjPub types.PublicID, title string) {
+// The payload names the route that produced the task, and carries
+// parentTaskId when parent is non-nil so a subtask reads as a subtask from
+// the event alone. A top-level task carries no parentTaskId key at all;
+// parent is positional so a caller has to say which of the two it is.
+func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, taskID int64, taskPub, prjPub types.PublicID, title string, parent *types.PublicID) {
 	actorIDv := int64(actorID)
+	payload := map[string]any{
+		"taskId":    taskPub.String(),
+		"projectId": prjPub.String(),
+		"title":     title,
+		"via":       "api:smart_create",
+	}
+	if parent != nil {
+		payload["parentTaskId"] = parent.String()
+	}
 	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(db), eventbus.Event{
 		Type:        eventbus.TaskCreated,
 		WorkspaceID: wsID,
 		ActorUserID: &actorIDv,
 		TaskID:      &taskID,
-		Payload: map[string]any{
-			"taskId":    taskPub.String(),
-			"projectId": prjPub.String(),
-			"title":     title,
-		},
+		Payload:     payload,
 	}, "tasks.emitCreatedEvent")
 }
 
