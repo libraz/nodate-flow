@@ -67,6 +67,11 @@ type Config struct {
 	// the operator (random 32+ byte string) and distributed via
 	// NF_FLOW_API_SIGNAL_TOKEN to flow-api, flow-worker, and
 	// presence-discord. Verified with a constant-time comparison.
+	//
+	// A non-empty value shorter than minSignalTokenLen fails the boot:
+	// these routes have no second guard behind them. Surrounding
+	// whitespace is stripped before the comparison, so a value that is
+	// only whitespace is the same as an unset one.
 	FlowAPISignalToken string `env:"NF_FLOW_API_SIGNAL_TOKEN" envDefault:""`
 
 	// CookieSecure toggles the Secure flag on the nd_rt refresh cookie.
@@ -398,5 +403,33 @@ func validateEnums(cfg *Config) error {
 		slog.Warn("config: NF_FLOW_WEBHOOKS_INSECURE=true; webhook signature verification is disabled")
 	}
 
+	// The service token is the only thing standing in front of POST
+	// /signals' machine path and the whole /internal/* group, and those
+	// endpoints sit behind nothing else — no session, no membership, no
+	// per-workspace scoping. A short value there is guessable inside the
+	// global per-IP rate limit, so it is rejected rather than warned
+	// about: a warning scrolls past while the surface stays open.
+	//
+	// The webhook secrets above need an explicit opt-out flag because a
+	// deployment can legitimately want those endpoints reachable with
+	// verification off. This one needs no flag — empty already IS the
+	// opt-out, and it closes both surfaces completely. So there is no
+	// configuration that wants the surface open behind a weak secret,
+	// and every non-empty value is either a real secret or a mistake.
+	//
+	// Whitespace-only counts as empty, matching how the middleware
+	// normalizes the configured token before comparing it: a value the
+	// guard treats as absent must not read as present here.
+	if token := strings.TrimSpace(cfg.FlowAPISignalToken); token != "" && len(token) < minSignalTokenLen {
+		return fmt.Errorf("config: NF_FLOW_API_SIGNAL_TOKEN must be at least %d characters (got %d); generate one with `openssl rand -hex 32`, or leave it empty to disable the service-token endpoints entirely", minSignalTokenLen, len(token))
+	}
+
 	return nil
 }
+
+// minSignalTokenLen is the shortest NF_FLOW_API_SIGNAL_TOKEN that boots.
+// It matches the length the variable is documented and generated at
+// (`openssl rand -hex 32` yields 64 characters, so a correctly generated
+// token clears it with room to spare) and is low enough that the only
+// values it rejects are ones no generator produces.
+const minSignalTokenLen = 32

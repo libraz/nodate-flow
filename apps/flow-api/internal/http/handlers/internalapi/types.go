@@ -1,8 +1,9 @@
 // Package internalapi exposes service-token-only endpoints under the
 // /internal/* path prefix. The endpoints in this package are not part of
-// the public web SDK contract and are mounted behind RequireSignalsAuth
-// so that only callers presenting the configured shared secret can
-// reach them. The current consumers are:
+// the public web SDK contract and are mounted behind
+// middleware.RequireServiceTokenOnly, which admits nothing but the
+// configured shared secret: no JWT, PAT or MCP bearer reaches a handler
+// here. The current consumers are:
 //
 //   - presence-discord (apps/presence-discord) — resolves a Discord
 //     snowflake to a flow user + default workspace before emitting a
@@ -14,8 +15,6 @@
 package internalapi
 
 import (
-	"database/sql"
-
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
@@ -25,7 +24,6 @@ import (
 // bundle is intentionally narrow — adding a field here is a request
 // for an additional capability that should be reviewed.
 type Deps struct {
-	DB      *sql.DB
 	Queries *generated.Queries
 }
 

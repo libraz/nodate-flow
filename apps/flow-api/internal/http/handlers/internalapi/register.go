@@ -8,9 +8,17 @@ import (
 
 // Register wires every operation in the package under the /internal/*
 // path prefix. The caller MUST mount this on a chi sub-router whose only
-// middleware is RequireSignalsAuth (or an equivalent service-token
-// guard); the standard JWT chain must NOT be present, because these
-// endpoints are not meant to be reachable with a user bearer at all.
+// middleware is middleware.RequireServiceTokenOnly, and the standard JWT
+// chain must NOT be present: these endpoints are not meant to be
+// reachable with a user bearer at all.
+//
+// middleware.RequireSignalsAuth is NOT an acceptable substitute despite
+// the similar name. It falls through to the JWT chain for any bearer
+// that is not the service token, so mounting it here would admit every
+// valid user session — and the handlers below carry no membership check,
+// because the guard is meant to leave them nothing to check. The
+// snowflake lookup would then answer any logged-in user of any workspace
+// with another workspace's user and workspace ids.
 //
 // Every operation here is marked Hidden so it stays fully routable for
 // the service-token caller (e.g. presence-discord) while being excluded

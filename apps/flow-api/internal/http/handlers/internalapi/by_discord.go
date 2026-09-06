@@ -9,9 +9,15 @@ import (
 )
 
 // ByDiscord handles GET /internal/users/by-discord/{snowflake}. The
-// route is mounted behind RequireSignalsAuth so the only authentication
-// mode is the shared service-token bearer; JWT / PAT / MCP callers
-// receive 401 from the middleware before this function runs.
+// route is mounted behind middleware.RequireServiceTokenOnly so the only
+// authentication mode is the shared service-token bearer; JWT / PAT /
+// MCP callers receive 401 from the middleware before this function runs.
+//
+// That guard is the whole of the authorization for this lookup. The
+// resolution below is deliberately not scoped to a caller — there is no
+// actor on a service-token request — so it returns a user id and a
+// workspace id for any snowflake in the deployment. Nothing here would
+// stop a request that reached it wrongly.
 //
 // Resolution proceeds in two steps:
 //

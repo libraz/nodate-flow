@@ -26,7 +26,7 @@ import (
 func RequireAuth(resolvers ...TokenResolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
+			tok, ok := BearerFromHeader(r.Header.Get("Authorization"))
 			if !ok {
 				writeJSON401Missing(w)
 				return
@@ -86,12 +86,26 @@ func resolveChain(ctx context.Context, token string, resolvers []TokenResolver) 
 	return TokenDetails{}, ErrTokenInvalid
 }
 
-func bearerFromHeader(h string) (string, bool) {
-	if h == "" {
-		return "", false
-	}
+// BearerFromHeader parses an Authorization header value and returns the
+// bearer token it carries.
+//
+// This is the one parser for every bearer surface in the product. A
+// second copy drifts from this one without anything failing: the drift
+// surfaces only as a 401 on a request the operator believes is correct,
+// which is the hardest kind of answer to diagnose.
+//
+// The auth-scheme match is case-insensitive because RFC 7235 defines the
+// scheme as a case-insensitive token. Machine clients written against
+// other stacks routinely send "bearer", and rejecting those spells the
+// difference as an authentication failure.
+//
+// The token is returned trimmed. Anything comparing it against a
+// configured secret MUST trim that secret identically, or a stray space
+// in the deployment's own configuration makes the correct client token
+// unmatchable while the feature still reports as configured.
+func BearerFromHeader(h string) (string, bool) {
 	const prefix = "Bearer "
-	if !strings.HasPrefix(h, prefix) {
+	if len(h) < len(prefix) || !strings.EqualFold(h[:len(prefix)], prefix) {
 		return "", false
 	}
 	tok := strings.TrimSpace(h[len(prefix):])
