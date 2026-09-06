@@ -16,8 +16,8 @@
 //
 // The --check mode also scans every apps/*/locales/*/*.json (and
 // apps/*/src/locales/*/*.json for apps that co-locate locales with the
-// source tree) for string values that are empty, so a regressed codegen
-// pipeline — like the one that previously shipped
+// source tree) for string values that are empty or whitespace-only, so a
+// regressed codegen pipeline — like the one that previously shipped
 // apps/flow-web/locales/ja/errors.json as 253 empty strings — fails CI
 // instead of silently surfacing English copy inside the JA UI.
 //
@@ -92,6 +92,47 @@ function collectLocaleRoots() {
   return roots;
 }
 
+/**
+ * Every locale JSON file under `apps/<app>/locales/<lang>/` and
+ * `apps/<app>/src/locales/<lang>/`, including the reference language.
+ * The value lints below hold for every language — English copy can be
+ * blank or malformed too — so nothing here filters by language.
+ */
+function collectLocaleJsonFiles() {
+  const files = [];
+  const appsDir = join(repo, 'apps');
+  let apps = [];
+  try {
+    apps = readdirSync(appsDir);
+  } catch {
+    return files;
+  }
+  for (const app of apps.sort()) {
+    for (const rel of ['locales', join('src', 'locales')]) {
+      const root = join(appsDir, app, rel);
+      let langs = [];
+      try {
+        langs = readdirSync(root).sort();
+      } catch {
+        continue;
+      }
+      for (const lang of langs) {
+        const leaf = join(root, lang);
+        if (!isDirectory(leaf)) continue;
+        for (const entry of readdirSync(leaf).sort()) {
+          if (entry.endsWith('.json')) files.push(join(leaf, entry));
+        }
+      }
+    }
+  }
+  return files;
+}
+
+/** Repo-relative path, for output someone can paste into an editor. */
+function relative(path) {
+  return path.startsWith(`${repo}/`) ? path.slice(repo.length + 1) : path;
+}
+
 function readJson(path) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -136,10 +177,7 @@ for (const { root, langs } of collectLocaleRoots()) {
       if (missing.length === 0 && stale.length === 0) continue;
       missingTotal += missing.length;
       staleTotal += stale.length;
-      const rel = targetPath.startsWith(`${repo}/`)
-        ? targetPath.slice(repo.length + 1)
-        : targetPath;
-      report.push({ rel, missing, stale });
+      report.push({ rel: relative(targetPath), missing, stale });
 
       if (mode === 'write' && missing.length > 0) {
         for (const { path, value } of missing) {
@@ -164,58 +202,23 @@ if (report.length > 0) {
   }
 }
 
+// Both value lints below hold every locale file to the same rules, so
+// they walk one shared listing.
+const localeJsonFiles = collectLocaleJsonFiles();
+
 // --- Empty-value lint ---------------------------------------------------
 //
-// Scan every apps/*/locales/<lang>/errors.json and flag any string leaf
-// whose value is "". Empty values are indistinguishable from a real
-// translation at runtime, so i18next returns "" and the UI falls back to
-// the English server message — exactly the failure mode that shipped
-// ja/errors.json as 253 empty strings. Scope is intentionally limited to
-// errors.json (the codegen'd catalog) so we only catch regressions in the
-// file this check exists to guard; hand-authored common.json / etc. are
-// caught by the existing missing-key check above.
+// Flag any string leaf that is empty or whitespace-only, in every locale
+// file and every language. A blank value is invisible to the key-parity
+// check above — the key is present in both locales, so the catalogs agree
+// — but i18next returns "" at runtime, and the UI renders nothing: a
+// blank accessible name trips an accessibility rule, and a blank error
+// message shows the user an empty alert.
+//
+// Whitespace-only is reported separately from "" because it is invisible
+// in a diff and reads as a filled-in value to anyone editing the file.
 
 const emptyFindings = [];
-
-function collectErrorsJsonFiles() {
-  const files = [];
-  const appsDir = join(repo, 'apps');
-  let apps = [];
-  try {
-    apps = readdirSync(appsDir);
-  } catch {
-    return files;
-  }
-  for (const app of apps) {
-    const candidates = [join(appsDir, app, 'locales'), join(appsDir, app, 'src', 'locales')];
-    for (const root of candidates) {
-      let langs = [];
-      try {
-        langs = readdirSync(root);
-      } catch {
-        continue;
-      }
-      for (const lang of langs) {
-        const leaf = join(root, lang);
-        let s;
-        try {
-          s = statSync(leaf);
-        } catch {
-          continue;
-        }
-        if (!s.isDirectory()) continue;
-        const candidate = join(leaf, 'errors.json');
-        try {
-          statSync(candidate);
-        } catch {
-          continue;
-        }
-        files.push(candidate);
-      }
-    }
-  }
-  return files;
-}
 
 function scanForEmpty(full) {
   let parsed;
@@ -228,20 +231,21 @@ function scanForEmpty(full) {
   const flat = new Map();
   walk(parsed, '', flat);
   for (const [path, value] of flat) {
-    if (typeof value === 'string' && value.length === 0) {
-      emptyFindings.push({ file: full, path, reason: 'empty string' });
-    }
+    if (typeof value !== 'string' || value.trim().length > 0) continue;
+    emptyFindings.push({
+      file: full,
+      path,
+      reason: value.length === 0 ? 'empty string' : 'whitespace only',
+    });
   }
 }
 
-for (const file of collectErrorsJsonFiles()) scanForEmpty(file);
+for (const file of localeJsonFiles) scanForEmpty(file);
 
 if (emptyFindings.length > 0) {
   console.error(`\n${emptyFindings.length} empty locale value(s) found:`);
   for (const { file, path, reason } of emptyFindings) {
-    // Trim repo prefix for readable output.
-    const rel = file.startsWith(`${repo}/`) ? file.slice(repo.length + 1) : file;
-    console.error(`  ${rel} :: ${path} (${reason})`);
+    console.error(`  ${relative(file)} :: ${path} (${reason})`);
   }
 }
 
@@ -264,56 +268,14 @@ if (emptyFindings.length > 0) {
 const DOUBLE_BRACE = /\{\{[A-Za-z_][A-Za-z0-9_]*\}\}/;
 const doubleBraceFindings = [];
 
-function collectAllLocaleJsonFiles() {
-  const files = [];
-  const appsDir = join(repo, 'apps');
-  let apps = [];
-  try {
-    apps = readdirSync(appsDir);
-  } catch {
-    return files;
-  }
-  for (const app of apps) {
-    const roots = [join(appsDir, app, 'locales'), join(appsDir, app, 'src', 'locales')];
-    for (const root of roots) {
-      let langs = [];
-      try {
-        langs = readdirSync(root);
-      } catch {
-        continue;
-      }
-      for (const lang of langs) {
-        const leaf = join(root, lang);
-        let s;
-        try {
-          s = statSync(leaf);
-        } catch {
-          continue;
-        }
-        if (!s.isDirectory()) continue;
-        let entries = [];
-        try {
-          entries = readdirSync(leaf);
-        } catch {
-          continue;
-        }
-        for (const entry of entries) {
-          if (!entry.endsWith('.json')) continue;
-          files.push(join(leaf, entry));
-        }
-      }
-    }
-  }
-  return files;
-}
-
 function scanForDoubleBrace(full) {
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(full, 'utf8'));
   } catch {
-    // JSON errors are reported by the errors.json scan above or by
-    // upstream tooling; skip silently here to avoid duplicate noise.
+    // Every file here was already parsed by the empty-value scan above,
+    // which reports the parse failure; skip silently to avoid duplicate
+    // noise.
     return;
   }
   const flat = new Map();
@@ -327,15 +289,16 @@ function scanForDoubleBrace(full) {
   }
 }
 
-for (const file of collectAllLocaleJsonFiles()) scanForDoubleBrace(file);
+for (const file of localeJsonFiles) scanForDoubleBrace(file);
 
 if (doubleBraceFindings.length > 0) {
   console.error(
     `\n${doubleBraceFindings.length} locale value(s) use i18next-native '{{var}}' under an ICU backend:`,
   );
   for (const { file, path, snippet } of doubleBraceFindings) {
-    const rel = file.startsWith(`${repo}/`) ? file.slice(repo.length + 1) : file;
-    console.error(`  ${rel} :: ${path} (found '${snippet}', expected '${snippet.slice(1, -1)}')`);
+    console.error(
+      `  ${relative(file)} :: ${path} (found '${snippet}', expected '${snippet.slice(1, -1)}')`,
+    );
   }
 }
 
@@ -355,7 +318,7 @@ if (
   }
   if (emptyFindings.length > 0) {
     console.error(
-      `\n${emptyFindings.length} empty string value(s) in locale files. Every leaf must carry a translation (or a "[TODO:ja] ..." placeholder).`,
+      `\n${emptyFindings.length} blank value(s) in locale files. A blank value passes the key-parity check above but renders as nothing, so every leaf must carry a translation (or a "[TODO:<lang>] ..." placeholder).`,
     );
   }
   if (doubleBraceFindings.length > 0) {
