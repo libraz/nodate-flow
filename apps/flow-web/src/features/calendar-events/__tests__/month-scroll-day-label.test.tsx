@@ -241,6 +241,10 @@ describe('MonthScroll day column label', () => {
     // A bar crossing the day, a chip on it, and two tasks — four
     // entries, of which the cell draws at most three and the task list
     // at most two. The label answers for the day, not for the drawing.
+    // The disagreement is the point, not a defect to reconcile: making
+    // the label match the rendering would make it wrong, because the
+    // reader who depends on the label is the one who cannot see the
+    // rendering.
     renderView({
       events: [
         makeEvent('bar', dayOfWeek(0), 'Offsite', 3),
