@@ -1072,8 +1072,21 @@ type Querier interface {
 	GetPageDepth(ctx context.Context, id uint32) (interface{}, error)
 	// Fetch a single suggestion by public_id with source/target task info.
 	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
-	// Read the raw agent_memo JSON for a task. Returns NULL when unset; callers
-	// treat that as an empty memo. workspace_id is required for tenant scope.
+	// Read the raw agent_memo JSON for a task. The column is NOT NULL and
+	// defaults to '{}', so a matching row always answers with an object; a task
+	// that is absent or disabled answers with no row at all, which callers treat
+	// as an empty memo. workspace_id is required for tenant scope.
+	// task-visibility: not-applicable — every caller is a background pass with no
+	// reader: the timer-driven auto-action scan and the queued agent run. Neither
+	// has an actor whose visibility could scope this, and a predicate written
+	// against a zero actor would silently answer every read with an empty memo,
+	// which resets the handoff loop budget and the attempt counter rather than
+	// withholding anything. workspace_id is the bound instead. The memo is
+	// decoded into an attempt count, a handoff count and a handoff status, and
+	// none of the memo text is copied into an event payload, a log line or a
+	// response; the reader-facing projection of this column is
+	// FindTaskByPublicId, which resolves the task through the shared task ACL
+	// before it runs.
 	GetTaskAgentMemo(ctx context.Context, arg GetTaskAgentMemoParams) (json.RawMessage, error)
 	// Queries dedicated to the constraint engine.
 	// Keyed off the internal task_id, but every read also filters on
@@ -1504,6 +1517,38 @@ type Querier interface {
 	ListLensesForProject(ctx context.Context, arg ListLensesForProjectParams) ([]ListLensesForProjectRow, error)
 	// List the events a task is linked to (optionally filtered by relation).
 	// @relation may be an empty string to include all relations.
+	//
+	// A task and the calendars its links point at have separate audiences: a
+	// workspace holds calendars whose member lists do not coincide, so
+	// reaching the task says nothing about reaching the events hanging off
+	// it. Without the membership join below, this list hands every reader of
+	// the task the title, times and calendar name of events on calendars they
+	// cannot open.
+	//
+	// The join is the whole rule and it lives here rather than in the caller,
+	// so the rows and the total that describes them come out of one
+	// statement. Membership is read the way ListCalendarsForUser reads it —
+	// an enabled calendar_members row at any role, on an enabled calendar —
+	// so a calendar this list sees through is one the event routes open too.
+	//
+	// A link the actor cannot see through is returned rather than dropped.
+	// The link, its relation and the fact that the task has it are the task's
+	// own data, which this caller may read; what belongs to the calendar is
+	// the event's title, its times and the calendar's name. event_hidden
+	// carries the verdict per row, and the row's calendar-owned fields are
+	// the ones the caller withholds from the response — a reader must not
+	// have to read an empty title as an untitled event. Dropping the row
+	// instead would make the task look like it has fewer links than it has.
+	//
+	// The verdict is a column rather than a redaction written into the SELECT
+	// list because wrapping a column in an expression costs it its type: an
+	// IF() over ce.title or ce.start_at generates as an untyped value, and a
+	// response assembled out of those is one type assertion away from
+	// rendering a time as nothing at all.
+	//
+	// The two public ids are not withheld anywhere: a UUID names a row
+	// without describing it, and every route that accepts one applies this
+	// same membership floor.
 	ListLinkedEventsForTask(ctx context.Context, arg ListLinkedEventsForTaskParams) ([]ListLinkedEventsForTaskRow, error)
 	// List the tasks linked to an event (optionally filtered by relation).
 	ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error)
@@ -2292,6 +2337,13 @@ type Querier interface {
 	// provider='discord'); pass NULL for providers that do not set it.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 	// Create or update a user's view preference for a specific scope.
+	// Conflicts on (workspace_id, user_id, scope_type, scope_key); scope_key is
+	// generated from the scope_public_id supplied below, so every column of the
+	// key is determined by this statement's own values.
+	//
+	// enabled is reset because the reads below only return live rows: without it a
+	// save against a soft-deleted row updates that row in place, reports success,
+	// and leaves the preference still invisible.
 	UpsertViewPreference(ctx context.Context, arg UpsertViewPreferenceParams) error
 	// Withdraw an entry by clearing its enabled flag. The row stays: it is what
 	// holds the (entry_kind, entry_value) claim that lets the same entry be added

@@ -8,6 +8,14 @@ CREATE TABLE lenses (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = workspace-wide)',
+  -- Scope value for the name-uniqueness key below. project_id stays
+  -- nullable because NULL is what "workspace-wide" means and the foreign
+  -- key cascade depends on it, but a unique index never treats an entry
+  -- containing NULL as a duplicate: keyed on project_id directly, the
+  -- key bound only project-scoped lenses and let a workspace hold any
+  -- number of live workspace-wide lenses called the same thing. See
+  -- sql/core/conformance/schema/50-nullable-unique-keys.sql.
+  scope_project_id INT UNSIGNED GENERATED ALWAYS AS (IFNULL(project_id, 0)) VIRTUAL NOT NULL COMMENT 'The project this lens is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide lenses; AUTO_INCREMENT never issues 0, so it cannot name a real project.',
   creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   name VARCHAR(100) NOT NULL COMMENT 'Display name',
@@ -33,7 +41,7 @@ CREATE TABLE lenses (
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
   UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_lenses_workspace_id_scope_project_id_name_active (workspace_id, scope_project_id, name, active),
   UNIQUE KEY uniq_lenses_public_token_hash (public_token_hash),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),

@@ -1120,6 +1120,7 @@ SELECT
   tel.relation,
   tel.sort_weight,
   tel.created_at  AS link_created_at,
+  cm.id IS NULL   AS event_hidden,
   ce.public_id    AS event_public_id,
   ce.title        AS event_title,
   ce.start_at,
@@ -1133,6 +1134,11 @@ FROM task_event_links tel
 INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
 INNER JOIN calendar_events ce ON ce.id = tel.event_id AND ce.enabled = TRUE
 INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
+LEFT JOIN calendar_members cm
+  ON cm.calendar_id = c.id
+ AND cm.workspace_id = tel.workspace_id
+ AND cm.user_id = ?
+ AND cm.enabled = TRUE
 WHERE tel.workspace_id = ?
   AND t.public_id = ?
   AND tel.enabled = TRUE
@@ -1142,6 +1148,7 @@ LIMIT ? OFFSET ?
 `
 
 type ListLinkedEventsForTaskParams struct {
+	ActorUserID uint32                 `json:"-"`
 	WorkspaceID uint32                 `json:"-"`
 	PublicID    types.PublicID         `json:"publicId"`
 	Relation    TaskEventLinksRelation `json:"relation"`
@@ -1154,6 +1161,7 @@ type ListLinkedEventsForTaskRow struct {
 	Relation         TaskEventLinksRelation `json:"relation"`
 	SortWeight       int32                  `json:"sortWeight"`
 	LinkCreatedAt    time.Time              `json:"linkCreatedAt"`
+	EventHidden      bool                   `json:"eventHidden"`
 	EventPublicID    types.PublicID         `json:"eventPublicId"`
 	EventTitle       string                 `json:"eventTitle"`
 	StartAt          sql.NullTime           `json:"startAt"`
@@ -1167,8 +1175,41 @@ type ListLinkedEventsForTaskRow struct {
 
 // List the events a task is linked to (optionally filtered by relation).
 // @relation may be an empty string to include all relations.
+//
+// A task and the calendars its links point at have separate audiences: a
+// workspace holds calendars whose member lists do not coincide, so
+// reaching the task says nothing about reaching the events hanging off
+// it. Without the membership join below, this list hands every reader of
+// the task the title, times and calendar name of events on calendars they
+// cannot open.
+//
+// The join is the whole rule and it lives here rather than in the caller,
+// so the rows and the total that describes them come out of one
+// statement. Membership is read the way ListCalendarsForUser reads it —
+// an enabled calendar_members row at any role, on an enabled calendar —
+// so a calendar this list sees through is one the event routes open too.
+//
+// A link the actor cannot see through is returned rather than dropped.
+// The link, its relation and the fact that the task has it are the task's
+// own data, which this caller may read; what belongs to the calendar is
+// the event's title, its times and the calendar's name. event_hidden
+// carries the verdict per row, and the row's calendar-owned fields are
+// the ones the caller withholds from the response — a reader must not
+// have to read an empty title as an untitled event. Dropping the row
+// instead would make the task look like it has fewer links than it has.
+//
+// The verdict is a column rather than a redaction written into the SELECT
+// list because wrapping a column in an expression costs it its type: an
+// IF() over ce.title or ce.start_at generates as an untyped value, and a
+// response assembled out of those is one type assertion away from
+// rendering a time as nothing at all.
+//
+// The two public ids are not withheld anywhere: a UUID names a row
+// without describing it, and every route that accepts one applies this
+// same membership floor.
 func (q *Queries) ListLinkedEventsForTask(ctx context.Context, arg ListLinkedEventsForTaskParams) ([]ListLinkedEventsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listLinkedEventsForTask,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.PublicID,
 		arg.Relation,
@@ -1188,6 +1229,7 @@ func (q *Queries) ListLinkedEventsForTask(ctx context.Context, arg ListLinkedEve
 			&i.Relation,
 			&i.SortWeight,
 			&i.LinkCreatedAt,
+			&i.EventHidden,
 			&i.EventPublicID,
 			&i.EventTitle,
 			&i.StartAt,

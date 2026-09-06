@@ -554,6 +554,48 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
 
+-- name: DisableCalendarEventsByTask :exec
+-- Soft-delete every event projected from one task. A task carrying a date
+-- is a calendar event, so removing the task removes the rows that stand for
+-- it; one left enabled renders a deadline for something that is gone.
+--
+-- Keyed on the internal task id and scoped by workspace as well. The id is
+-- unique across tenants, so the workspace predicate selects no extra row
+-- and drops none — it is here so that no write in this family is the one
+-- that would follow a mismatched id into another tenant.
+--
+-- affected-rows: not-applicable — the count is how many events the task
+-- happened to carry, which is a set size rather than a claim about a named
+-- row. A task with no dates carries none, and whether the task itself
+-- exists is already settled by the read that resolved it, so a zero here
+-- has no question left to answer.
+UPDATE calendar_events
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND enabled = TRUE;
+
+-- name: DisableCalendarEventTimeBlocksByTask :exec
+-- Withdraw every time block on one task. `scheduled` is a role a task may
+-- hold several times, so clearing it takes all of them at once.
+--
+-- The role is written into the statement rather than taken as a parameter.
+-- The other role, `due`, mirrors tasks.due_on: disabling one of those rows
+-- without clearing that column in the same transaction leaves the task
+-- claiming a deadline no event stands for, which is the desync this package
+-- exists to prevent. A parameter would make that reachable by passing a
+-- value; a literal does not.
+--
+-- affected-rows: not-applicable — a task that was never given a time block
+-- has none to withdraw, so zero is the ordinary count for an ordinary task
+-- rather than a report that something named could not be found.
+UPDATE calendar_events
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND task_role = 'scheduled'
+  AND enabled = TRUE;
+
 -- ListAllCalendarEvents was consumed only by the deleted ICS export path;
 -- the replacement will query via calendar_public_shares.
 

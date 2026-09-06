@@ -1,5 +1,12 @@
 -- name: UpsertViewPreference :exec
 -- Create or update a user's view preference for a specific scope.
+-- Conflicts on (workspace_id, user_id, scope_type, scope_key); scope_key is
+-- generated from the scope_public_id supplied below, so every column of the
+-- key is determined by this statement's own values.
+--
+-- enabled is reset because the reads below only return live rows: without it a
+-- save against a soft-deleted row updates that row in place, reports success,
+-- and leaves the preference still invisible.
 INSERT INTO user_view_preferences (
   public_id,
   workspace_id,
@@ -10,6 +17,7 @@ INSERT INTO user_view_preferences (
 ) VALUES (?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
   prefs_json = VALUES(prefs_json),
+  enabled = TRUE,
   updated_at = NOW();
 
 -- name: FindViewPreference :one

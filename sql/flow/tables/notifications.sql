@@ -33,9 +33,16 @@ CREATE TABLE notifications (
   UNIQUE KEY uniq_notifications_public_id (public_id),
   UNIQUE KEY uniq_notifications_workspace_public_id (workspace_id, public_id),
   -- At-least-once dedup: a single (recipient, source_event, channel) tuple
-  -- yields exactly one row even if the fan-out goroutine retries.
-  -- MySQL UNIQUE treats NULLs as distinct, so rows with source_event_id IS NULL
-  -- (scheduler / system paths) are not deduplicated by this key.
+  -- yields exactly one row even if the fan-out goroutine retries, so a
+  -- replayed hook cannot show the same thing twice in someone's inbox.
+  --
+  -- A unique index never treats an entry containing NULL as a duplicate,
+  -- and that is the behaviour a row with no source event needs: two
+  -- notifications a background process raised for the same recipient are
+  -- two different things to say, not one said twice, and there is no
+  -- identity to collapse them on. The protection is therefore only as
+  -- wide as the writers make it — a caller that has an events row and
+  -- omits it opts its notifications out of dedup.
   UNIQUE KEY uniq_notifications_recipient_source_channel (recipient_user_id, source_event_id, channel),
   KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),

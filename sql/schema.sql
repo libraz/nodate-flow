@@ -1932,6 +1932,14 @@ CREATE TABLE labels (
   public_id       BINARY(16) NOT NULL                    COMMENT 'UUID v7, the only externally visible ID',
   workspace_id    INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to workspaces.id',
   project_id      INT UNSIGNED NULL                       COMMENT 'NULL = workspace-wide label',
+  -- Scope value for the name-uniqueness key below. project_id stays
+  -- nullable because NULL is what "workspace-wide" means and the foreign
+  -- key cascade depends on it, but a unique index never treats an entry
+  -- containing NULL as a duplicate: keyed on project_id directly, the
+  -- key bound only project-scoped labels and let a workspace hold any
+  -- number of live workspace-wide labels called the same thing. See
+  -- sql/core/conformance/schema/50-nullable-unique-keys.sql.
+  scope_project_id INT UNSIGNED GENERATED ALWAYS AS (IFNULL(project_id, 0)) VIRTUAL NOT NULL COMMENT 'The project this label is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide labels; AUTO_INCREMENT never issues 0, so it cannot name a real project.',
   parent_label_id INT UNSIGNED NULL                       COMMENT 'Self-ref for hierarchy; NULL = root',
   created_by_user_id INT UNSIGNED NULL                    COMMENT 'Creator user.id (audit field; NULL when creator is removed)',
 
@@ -1952,7 +1960,7 @@ CREATE TABLE labels (
 
   UNIQUE KEY uniq_labels_public_id (public_id),
   UNIQUE KEY uniq_labels_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_labels_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_labels_workspace_id_scope_project_id_name_active (workspace_id, scope_project_id, name, active),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
   KEY idx_labels_created_by_user_id (created_by_user_id),
@@ -1974,6 +1982,14 @@ CREATE TABLE lenses (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = workspace-wide)',
+  -- Scope value for the name-uniqueness key below. project_id stays
+  -- nullable because NULL is what "workspace-wide" means and the foreign
+  -- key cascade depends on it, but a unique index never treats an entry
+  -- containing NULL as a duplicate: keyed on project_id directly, the
+  -- key bound only project-scoped lenses and let a workspace hold any
+  -- number of live workspace-wide lenses called the same thing. See
+  -- sql/core/conformance/schema/50-nullable-unique-keys.sql.
+  scope_project_id INT UNSIGNED GENERATED ALWAYS AS (IFNULL(project_id, 0)) VIRTUAL NOT NULL COMMENT 'The project this lens is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide lenses; AUTO_INCREMENT never issues 0, so it cannot name a real project.',
   creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
   name VARCHAR(100) NOT NULL COMMENT 'Display name',
@@ -1999,7 +2015,7 @@ CREATE TABLE lenses (
 
   UNIQUE KEY uniq_lenses_public_id (public_id),
   UNIQUE KEY uniq_lenses_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_lenses_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_lenses_workspace_id_scope_project_id_name_active (workspace_id, scope_project_id, name, active),
   UNIQUE KEY uniq_lenses_public_token_hash (public_token_hash),
   KEY idx_lenses_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_lenses_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
@@ -2193,9 +2209,16 @@ CREATE TABLE notifications (
   UNIQUE KEY uniq_notifications_public_id (public_id),
   UNIQUE KEY uniq_notifications_workspace_public_id (workspace_id, public_id),
   -- At-least-once dedup: a single (recipient, source_event, channel) tuple
-  -- yields exactly one row even if the fan-out goroutine retries.
-  -- MySQL UNIQUE treats NULLs as distinct, so rows with source_event_id IS NULL
-  -- (scheduler / system paths) are not deduplicated by this key.
+  -- yields exactly one row even if the fan-out goroutine retries, so a
+  -- replayed hook cannot show the same thing twice in someone's inbox.
+  --
+  -- A unique index never treats an entry containing NULL as a duplicate,
+  -- and that is the behaviour a row with no source event needs: two
+  -- notifications a background process raised for the same recipient are
+  -- two different things to say, not one said twice, and there is no
+  -- identity to collapse them on. The protection is therefore only as
+  -- wide as the writers make it — a caller that has an events row and
+  -- omits it opts its notifications out of dedup.
   UNIQUE KEY uniq_notifications_recipient_source_channel (recipient_user_id, source_event_id, channel),
   KEY idx_notifications_workspace_id_recipient_read (workspace_id, recipient_user_id, read_at, created_at DESC),
   KEY idx_notifications_workspace_id_recipient_archived (workspace_id, recipient_user_id, archived_at, created_at DESC),
@@ -2217,6 +2240,8 @@ CREATE TABLE notifications (
 -- Wiki/documentation pages with tree structure.
 -- A page belongs to a workspace and optionally scopes to a project.
 -- Self-referential parent_page_id enables nested page hierarchies.
+-- Titles are unique among the live children of one parent, root pages
+-- included.
 -- ====================================
 CREATE TABLE pages (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -2225,8 +2250,16 @@ CREATE TABLE pages (
   project_id INT UNSIGNED NULL COMMENT 'Internal FK to projects.id (NULL = workspace-wide)',
   creator_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
   parent_page_id INT UNSIGNED NULL COMMENT 'Internal FK to pages.id (NULL = root page)',
+  -- Parent value for the title-uniqueness key below. parent_page_id stays
+  -- nullable because NULL is what "root page" means and the foreign key
+  -- depends on it, but a unique index never treats an entry containing
+  -- NULL as a duplicate: keyed on parent_page_id directly the key would
+  -- bind only child pages and let a workspace hold any number of live
+  -- root pages with the same title — which is most pages. See
+  -- sql/core/conformance/schema/50-nullable-unique-keys.sql.
+  scope_parent_page_id INT UNSIGNED GENERATED ALWAYS AS (IFNULL(parent_page_id, 0)) VIRTUAL NOT NULL COMMENT 'The page this one sits under, or 0 when it is a root page. Exists only so the title-uniqueness key binds on root pages; AUTO_INCREMENT never issues 0, so it cannot name a real page. VIRTUAL rather than STORED because a STORED NOT NULL generated column fails the precondition check for the ON DELETE SET NULL foreign key on parent_page_id.',
 
-  title VARCHAR(500) NOT NULL COMMENT 'Page title',
+  title VARCHAR(500) NOT NULL COMMENT 'Page title. Unique among live siblings under the same parent. The comparison is the table collation, which is case- and accent-insensitive and compares kana by primary weight, so two sibling titles differing only in letter case, accents or kana form are the same title — matching what a reader can tell apart in the tree, and matching how the title search already compares.',
   body MEDIUMTEXT NOT NULL COMMENT 'Page content',
   is_ai_generated BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the page was generated by AI',
   archived_at DATETIME(3) NULL COMMENT 'Set when page is archived (distinct from enabled)',
@@ -2234,14 +2267,32 @@ CREATE TABLE pages (
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order among siblings',
   notes TEXT NULL COMMENT 'Admin notes',
   enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  -- Liveness marker scoping the title-uniqueness key below to live rows:
+  -- 1 while enabled, NULL once soft-deleted, so a deleted page releases
+  -- its title and tombstones accumulate without colliding with each
+  -- other. See the soft-delete rule in
+  -- sql/core/conformance/schema/40-soft-delete-uniqueness.sql.
+  active TINYINT UNSIGNED GENERATED ALWAYS AS (IF(enabled, 1, NULL)) VIRTUAL COMMENT 'NULL once soft-deleted; exists only to scope the title-uniqueness key below to live rows',
   updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
   UNIQUE KEY uniq_pages_public_id (public_id),
   UNIQUE KEY uniq_pages_workspace_public_id (workspace_id, public_id),
+  -- One live page per title among the children of one parent. The tree is
+  -- navigated by reading sibling titles, so two siblings sharing one is a
+  -- pair a reader cannot tell apart, and the API answers the second
+  -- attempt with a conflict rather than creating it. workspace_id leads
+  -- the key because a page id is only meaningful inside its workspace and
+  -- because every read of this table is already workspace-scoped.
+  UNIQUE KEY uniq_pages_workspace_id_scope_parent_page_id_title_active (workspace_id, scope_parent_page_id, title, active),
   KEY idx_pages_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_pages_workspace_id_enabled_sort_weight (workspace_id, enabled, sort_weight),
   KEY idx_pages_workspace_id_project_id (workspace_id, project_id),
+  -- Bare parent_page_id index backing the self-referential foreign key.
+  -- The unique key above leads with workspace_id and keys the de-NULLed
+  -- projection rather than the column itself, so it cannot serve either
+  -- the constraint or a parent_page_id-only lookup, and leaving this out
+  -- would have InnoDB create an unnamed index instead.
   KEY idx_pages_parent_page_id (parent_page_id),
   FULLTEXT KEY ft_pages_title (title),
 
@@ -3031,7 +3082,17 @@ CREATE TABLE user_view_preferences (
   user_id         INT UNSIGNED NOT NULL,
 
   scope_type      ENUM('workspace','project','lens','timebox') NOT NULL,
-  scope_public_id BINARY(16) NULL COMMENT 'NULL for workspace scope',
+  scope_public_id BINARY(16) NULL COMMENT 'public_id of the scoped entity; NULL for workspace scope, which the row''s own workspace already identifies',
+  -- Scope value for the uniqueness key below. A unique index never treats
+  -- an entry containing NULL as a duplicate, so keyed on scope_public_id
+  -- directly the key bound nothing at workspace scope — the scope most
+  -- rows carry. The upsert then found no row to update and appended a new
+  -- one on every save, leaving the read to return whichever of the
+  -- accumulated rows the index reached first.
+  --
+  -- The substitute for NULL is an all-zero id, which no scope can carry:
+  -- every public_id is a UUID v7 and therefore has the version nibble set.
+  scope_key       BINARY(16) GENERATED ALWAYS AS (IFNULL(scope_public_id, 0x00000000000000000000000000000000)) VIRTUAL NOT NULL COMMENT 'The scope this row applies to: scope_public_id, or all zero bytes at workspace scope. Exists only so the uniqueness key below binds on workspace-scoped rows.',
   prefs_json      JSON NOT NULL COMMENT 'view_mode, group_by, density, column_order, hidden_columns...',
 
   sort_weight     INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -3042,8 +3103,17 @@ CREATE TABLE user_view_preferences (
 
   UNIQUE KEY uniq_user_view_prefs_public_id (public_id),
   UNIQUE KEY uniq_user_view_prefs_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_user_view_prefs_user_scope (user_id, scope_type, scope_public_id),
-  KEY idx_user_view_prefs_workspace_user (workspace_id, user_id),
+  -- One preference row per (workspace, user, scope). workspace_id leads
+  -- the key because the workspace is part of the scope, not a filter on
+  -- it: without it a user who belongs to two workspaces has one
+  -- workspace-scoped row for both, and saving a preference in one
+  -- overwrites the other. The key doubles as the (workspace_id, user_id)
+  -- lookup index, so no separate one is declared.
+  UNIQUE KEY uniq_user_view_prefs_user_scope (workspace_id, user_id, scope_type, scope_key),
+  -- Bare user_id index for ON DELETE CASCADE on users. The unique key
+  -- above leads with workspace_id and cannot serve a user_id-only lookup,
+  -- and leaving it out would have InnoDB create an unnamed one instead.
+  KEY idx_user_view_prefs_user_id (user_id),
 
   CONSTRAINT fk_user_view_prefs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_view_prefs_user      FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE
@@ -3062,7 +3132,7 @@ CREATE TABLE webhook_deliveries (
   subscription_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to webhook_subscriptions.id',
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'The event that triggered this delivery',
-  event_public_id BINARY(16) NULL COMMENT 'public_id of the source event',
+  event_public_id BINARY(16) NULL COMMENT 'public_id of the events row this delivery carries. NULL on a test ping, which an operator sends from the subscription screen and which stands for no event.',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'The JSON payload that was/will be sent',
   status ENUM('pending','delivering','delivered','failed','dead') NOT NULL DEFAULT 'pending' COMMENT 'Delivery state',
   http_status SMALLINT UNSIGNED NULL COMMENT 'HTTP response status from the target',
@@ -3081,11 +3151,15 @@ CREATE TABLE webhook_deliveries (
 
   UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
   UNIQUE KEY uniq_webhook_deliveries_workspace_public_id (workspace_id, public_id),
-  -- DB-level dedupe: at most one delivery row per (subscription, source event).
-  -- MySQL UNIQUE treats NULLs as distinct, so legacy rows with event_public_id
-  -- IS NULL (older code paths that never set the column) do not collide; the
-  -- worker is being updated in parallel to populate event_public_id so new
-  -- rows get the constraint enforcement.
+  -- At most one delivery per (subscription, source event), so a fan-out
+  -- that fires twice for one event does not POST it twice to the
+  -- subscriber.
+  --
+  -- A unique index never treats an entry containing NULL as a duplicate,
+  -- and that is what the key needs here: a test ping carries no event and
+  -- is a fresh dispatch every time it is asked for, not a repeat of the
+  -- last one. Deduplicating those would make the second press of the test
+  -- button do nothing.
   UNIQUE KEY uniq_webhook_deliveries_subscription_event (subscription_id, event_public_id),
   KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
   KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),

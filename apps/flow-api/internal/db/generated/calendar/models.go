@@ -3372,6 +3372,8 @@ type Label struct {
 	WorkspaceID uint32 `json:"-"`
 	// NULL = workspace-wide label
 	ProjectID sql.NullInt32 `json:"-"`
+	// The project this label is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide labels; AUTO_INCREMENT never issues 0, so it cannot name a real project.
+	ScopeProjectID uint32 `json:"-"`
 	// Self-ref for hierarchy; NULL = root
 	ParentLabelID sql.NullInt32 `json:"-"`
 	// Creator user.id (audit field; NULL when creator is removed)
@@ -3404,6 +3406,8 @@ type Lense struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to projects.id (NULL = workspace-wide)
 	ProjectID sql.NullInt32 `json:"-"`
+	// The project this lens is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide lenses; AUTO_INCREMENT never issues 0, so it cannot name a real project.
+	ScopeProjectID uint32 `json:"-"`
 	// Internal FK to users.id
 	CreatorID uint32 `json:"-"`
 	// Display name
@@ -3677,7 +3681,9 @@ type Page struct {
 	CreatorID uint32 `json:"-"`
 	// Internal FK to pages.id (NULL = root page)
 	ParentPageID sql.NullInt32 `json:"-"`
-	// Page title
+	// The page this one sits under, or 0 when it is a root page. Exists only so the title-uniqueness key binds on root pages; AUTO_INCREMENT never issues 0, so it cannot name a real page. VIRTUAL rather than STORED because a STORED NOT NULL generated column fails the precondition check for the ON DELETE SET NULL foreign key on parent_page_id.
+	ScopeParentPageID uint32 `json:"-"`
+	// Page title. Unique among live siblings under the same parent. The comparison is the table collation, which is case- and accent-insensitive and compares kana by primary weight, so two sibling titles differing only in letter case, accents or kana form are the same title — matching what a reader can tell apart in the tree, and matching how the title search already compares.
 	Title string `json:"title"`
 	// Page content
 	Body string `json:"body"`
@@ -3690,9 +3696,11 @@ type Page struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
-	Enabled   bool         `json:"enabled"`
-	UpdatedAt sql.NullTime `json:"updatedAt"`
-	CreatedAt time.Time    `json:"createdAt"`
+	Enabled bool `json:"enabled"`
+	// NULL once soft-deleted; exists only to scope the title-uniqueness key below to live rows
+	Active    sql.NullInt16 `json:"-"`
+	UpdatedAt sql.NullTime  `json:"updatedAt"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 // User personal access tokens for REST/CLI
@@ -4412,8 +4420,10 @@ type UserViewPreference struct {
 	WorkspaceID uint32                       `json:"-"`
 	UserID      uint32                       `json:"-"`
 	ScopeType   UserViewPreferencesScopeType `json:"scopeType"`
-	// NULL for workspace scope
+	// public_id of the scoped entity; NULL for workspace scope, which the row's own workspace already identifies
 	ScopePublicID sql.NullString `json:"scopePublicId"`
+	// The scope this row applies to: scope_public_id, or all zero bytes at workspace scope. Exists only so the uniqueness key below binds on workspace-scoped rows.
+	ScopeKey []byte `json:"-"`
 	// view_mode, group_by, density, column_order, hidden_columns...
 	PrefsJson json.RawMessage `json:"prefsJson"`
 	// Display order
@@ -4740,7 +4750,7 @@ type WebhookDelivery struct {
 	SubscriptionID uint32 `json:"-"`
 	// The event that triggered this delivery
 	EventType string `json:"eventType"`
-	// public_id of the source event
+	// public_id of the events row this delivery carries. NULL on a test ping, which an operator sends from the subscription screen and which stands for no event.
 	EventPublicID sql.NullString `json:"eventPublicId"`
 	// The JSON payload that was/will be sent
 	PayloadJson json.RawMessage `json:"payloadJson"`

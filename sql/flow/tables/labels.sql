@@ -8,6 +8,14 @@ CREATE TABLE labels (
   public_id       BINARY(16) NOT NULL                    COMMENT 'UUID v7, the only externally visible ID',
   workspace_id    INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to workspaces.id',
   project_id      INT UNSIGNED NULL                       COMMENT 'NULL = workspace-wide label',
+  -- Scope value for the name-uniqueness key below. project_id stays
+  -- nullable because NULL is what "workspace-wide" means and the foreign
+  -- key cascade depends on it, but a unique index never treats an entry
+  -- containing NULL as a duplicate: keyed on project_id directly, the
+  -- key bound only project-scoped labels and let a workspace hold any
+  -- number of live workspace-wide labels called the same thing. See
+  -- sql/core/conformance/schema/50-nullable-unique-keys.sql.
+  scope_project_id INT UNSIGNED GENERATED ALWAYS AS (IFNULL(project_id, 0)) VIRTUAL NOT NULL COMMENT 'The project this label is scoped to, or 0 when it is workspace-wide. Exists only so the name-uniqueness key binds on workspace-wide labels; AUTO_INCREMENT never issues 0, so it cannot name a real project.',
   parent_label_id INT UNSIGNED NULL                       COMMENT 'Self-ref for hierarchy; NULL = root',
   created_by_user_id INT UNSIGNED NULL                    COMMENT 'Creator user.id (audit field; NULL when creator is removed)',
 
@@ -28,7 +36,7 @@ CREATE TABLE labels (
 
   UNIQUE KEY uniq_labels_public_id (public_id),
   UNIQUE KEY uniq_labels_workspace_public_id (workspace_id, public_id),
-  UNIQUE KEY uniq_labels_workspace_id_project_id_name_active (workspace_id, project_id, name, active),
+  UNIQUE KEY uniq_labels_workspace_id_scope_project_id_name_active (workspace_id, scope_project_id, name, active),
   KEY idx_labels_workspace_id_project_id_enabled (workspace_id, project_id, enabled),
   KEY idx_labels_parent_label_id (parent_label_id),
   KEY idx_labels_created_by_user_id (created_by_user_id),

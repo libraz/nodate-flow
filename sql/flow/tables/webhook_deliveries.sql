@@ -10,7 +10,7 @@ CREATE TABLE webhook_deliveries (
   subscription_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to webhook_subscriptions.id',
 
   event_type VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'The event that triggered this delivery',
-  event_public_id BINARY(16) NULL COMMENT 'public_id of the source event',
+  event_public_id BINARY(16) NULL COMMENT 'public_id of the events row this delivery carries. NULL on a test ping, which an operator sends from the subscription screen and which stands for no event.',
   payload_json JSON NOT NULL CHECK (JSON_VALID(payload_json)) COMMENT 'The JSON payload that was/will be sent',
   status ENUM('pending','delivering','delivered','failed','dead') NOT NULL DEFAULT 'pending' COMMENT 'Delivery state',
   http_status SMALLINT UNSIGNED NULL COMMENT 'HTTP response status from the target',
@@ -29,11 +29,15 @@ CREATE TABLE webhook_deliveries (
 
   UNIQUE KEY uniq_webhook_deliveries_public_id (public_id),
   UNIQUE KEY uniq_webhook_deliveries_workspace_public_id (workspace_id, public_id),
-  -- DB-level dedupe: at most one delivery row per (subscription, source event).
-  -- MySQL UNIQUE treats NULLs as distinct, so legacy rows with event_public_id
-  -- IS NULL (older code paths that never set the column) do not collide; the
-  -- worker is being updated in parallel to populate event_public_id so new
-  -- rows get the constraint enforcement.
+  -- At most one delivery per (subscription, source event), so a fan-out
+  -- that fires twice for one event does not POST it twice to the
+  -- subscriber.
+  --
+  -- A unique index never treats an entry containing NULL as a duplicate,
+  -- and that is what the key needs here: a test ping carries no event and
+  -- is a fresh dispatch every time it is asked for, not a repeat of the
+  -- last one. Deduplicating those would make the second press of the test
+  -- button do nothing.
   UNIQUE KEY uniq_webhook_deliveries_subscription_event (subscription_id, event_public_id),
   KEY idx_webhook_deliveries_workspace_id_subscription_id_created_at (workspace_id, subscription_id, created_at DESC),
   KEY idx_webhook_deliveries_status_next_retry_at (status, next_retry_at),
