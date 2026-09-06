@@ -1,0 +1,55 @@
+/**
+ * Moved-occurrence notice, rendered as a full-width row under the series
+ * it belongs to in the attached-events table.
+ */
+
+.cell {
+  padding: 0 var(--nf-space-3) var(--nf-space-3);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-warning-subtle);
+  color: var(--nf-color-warning-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.icon {
+  flex: none;
+  margin-block-start: var(--nf-space-1);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.label {
+  margin: 0;
+  font-weight: var(--nf-weight-medium);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.action {
+  flex: none;
+}

@@ -9649,6 +9649,25 @@ export interface components {
             startAt?: number;
             timezone: string;
             title: string;
+            /** @description Occurrences of this series the share still shows at a start they moved away from */
+            unpublishedOverrides?: components["schemas"]["ShareOverrideWarning"][] | null;
+            visibility: string;
+        };
+        ShareOverrideWarning: {
+            /** @description Public ID of the override event */
+            eventId: string;
+            /**
+             * Format: int64
+             * @description Unix seconds; the occurrence the page still shows
+             */
+            originalStart: number;
+            /**
+             * Format: int64
+             * @description Unix seconds; where the occurrence actually moved to
+             */
+            startAt: number;
+            title: string;
+            /** @description A confidential override cannot be published on a share */
             visibility: string;
         };
         ShiftCandidateDTO: {

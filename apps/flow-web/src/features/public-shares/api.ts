@@ -25,6 +25,11 @@ export type PublicShareWithToken =
   | components['schemas']['PublicShareCreateResponse']
   | components['schemas']['PublicShareRotateResponse'];
 export type ShareEvent = components['schemas']['ShareEventResponse'];
+/**
+ * One occurrence of a published series whose replacement row is not on the
+ * share, so the public page still shows the start it moved away from.
+ */
+export type ShareOverrideWarning = components['schemas']['ShareOverrideWarning'];
 export type ShareDetail = components['schemas']['GetPublicShareOutputBody'];
 export type CrossCalendarEvent = components['schemas']['CrossCalendarEventResponse'];
 export type CreatePublicShareInput = components['schemas']['CreatePublicShareInputBody'];

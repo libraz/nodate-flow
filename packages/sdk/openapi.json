@@ -10134,6 +10134,13 @@
           "title": {
             "type": "string"
           },
+          "unpublishedOverrides": {
+            "description": "Occurrences of this series the share still shows at a start they moved away from",
+            "items": {
+              "$ref": "#/components/schemas/ShareOverrideWarning"
+            },
+            "type": ["array", "null"]
+          },
           "visibility": {
             "type": "string"
           }
@@ -10150,6 +10157,34 @@
           "linkSortWeight",
           "linkCreatedAt"
         ],
+        "type": "object"
+      },
+      "ShareOverrideWarning": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "description": "Public ID of the override event",
+            "type": "string"
+          },
+          "originalStart": {
+            "description": "Unix seconds; the occurrence the page still shows",
+            "format": "int64",
+            "type": "integer"
+          },
+          "startAt": {
+            "description": "Unix seconds; where the occurrence actually moved to",
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "visibility": {
+            "description": "A confidential override cannot be published on a share",
+            "type": "string"
+          }
+        },
+        "required": ["originalStart", "eventId", "startAt", "title", "visibility"],
         "type": "object"
       },
       "ShiftCandidateDTO": {

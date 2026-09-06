@@ -66,21 +66,44 @@ type PublicShareRotateResponse struct {
 	Token string `json:"token"`
 }
 
+// ShareOverrideWarning names one occurrence of a published series that the
+// share page still advertises at the start it moved away from.
+//
+// Both instants are unix seconds, which is what every other time on this
+// response is. The render path spells the same kind of instant as RFC 3339
+// instead, because there it feeds the client-side recurrence expander
+// alongside recurrence_exceptions and has to parse as one of those; nothing
+// here is expanded, so the editor reads a time the way it reads the event's
+// own startAt beside it.
+//
+// visibility is carried because a confidential override can never be
+// published — the attach path refuses it — so the warning is the only thing
+// that will ever mention the occurrence. It lets the editor separate an
+// override it may offer to publish from one a person has to resolve.
+type ShareOverrideWarning struct {
+	OriginalStart int64  `json:"originalStart" doc:"Unix seconds; the occurrence the page still shows"`
+	EventID       string `json:"eventId" doc:"Public ID of the override event"`
+	StartAt       int64  `json:"startAt" doc:"Unix seconds; where the occurrence actually moved to"`
+	Title         string `json:"title"`
+	Visibility    string `json:"visibility" doc:"A confidential override cannot be published on a share"`
+}
+
 // ShareEventResponse is the editor-facing projection of an event published on a share.
 type ShareEventResponse struct {
-	LinkID         string  `json:"linkId"`
-	EventID        string  `json:"eventId"`
-	Title          string  `json:"title"`
-	StartAt        *int64  `json:"startAt,omitempty"`
-	EndAt          *int64  `json:"endAt,omitempty"`
-	AllDay         bool    `json:"allDay"`
-	Timezone       string  `json:"timezone"`
-	Location       *string `json:"location,omitempty"`
-	Visibility     string  `json:"visibility"`
-	CalendarID     string  `json:"calendarId"`
-	CalendarName   string  `json:"calendarName"`
-	LinkSortWeight int32   `json:"linkSortWeight"`
-	LinkCreatedAt  int64   `json:"linkCreatedAt"`
+	LinkID               string                 `json:"linkId"`
+	EventID              string                 `json:"eventId"`
+	Title                string                 `json:"title"`
+	StartAt              *int64                 `json:"startAt,omitempty"`
+	EndAt                *int64                 `json:"endAt,omitempty"`
+	AllDay               bool                   `json:"allDay"`
+	Timezone             string                 `json:"timezone"`
+	Location             *string                `json:"location,omitempty"`
+	Visibility           string                 `json:"visibility"`
+	CalendarID           string                 `json:"calendarId"`
+	CalendarName         string                 `json:"calendarName"`
+	LinkSortWeight       int32                  `json:"linkSortWeight"`
+	LinkCreatedAt        int64                  `json:"linkCreatedAt"`
+	UnpublishedOverrides []ShareOverrideWarning `json:"unpublishedOverrides,omitempty" required:"false" doc:"Occurrences of this series the share still shows at a start they moved away from"`
 }
 
 // CreatePublicShareInput is the body for creating a new share page.
@@ -360,11 +383,17 @@ func GetPublicShare(deps Deps) func(context.Context, *GetPublicShareInput) (*Get
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
 		}
+		// One read for the whole listing, keyed by the master public id the
+		// editor rows already carry.
+		warnings, err := unpublishedOverridesByMaster(ctx, deps.CalendarQueries, wsID, sharePID)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarCalendarStoreReadInterrupted)
+		}
 		out := &GetPublicShareOutput{}
 		out.Body.Share = publicShareFromRow(row, int64(len(events)))
 		out.Body.Events = make([]ShareEventResponse, len(events))
 		for i, e := range events {
-			out.Body.Events[i] = shareEventFromEditorRow(e)
+			out.Body.Events[i] = shareEventFromEditorRow(e, warnings)
 		}
 		return out, nil
 	}
@@ -1003,20 +1032,30 @@ func publicShareFromListRow(r calendar.ListPublicSharesRow) PublicShareResponse 
 	return resp
 }
 
-func shareEventFromEditorRow(r calendar.ListPublicShareEventsForEditorRow) ShareEventResponse {
+// shareEventFromEditorRow projects one published event for the editor.
+//
+// warnings is the whole share's unpublished overrides, grouped by the
+// public id of the master they belong to; an event that heads no such
+// series takes nothing from it and the field stays absent.
+func shareEventFromEditorRow(
+	r calendar.ListPublicShareEventsForEditorRow,
+	warnings map[string][]ShareOverrideWarning,
+) ShareEventResponse {
+	eventID := r.EventPublicID.String()
 	return ShareEventResponse{
-		LinkID:         r.LinkPublicID.String(),
-		EventID:        r.EventPublicID.String(),
-		Title:          r.EventTitle,
-		StartAt:        nullTimeUnixPtr(r.StartAt),
-		EndAt:          nullTimeUnixPtr(r.EndAt),
-		AllDay:         r.AllDay,
-		Timezone:       r.EventTimezone,
-		Location:       nullStringPtr(r.Location),
-		Visibility:     string(r.Visibility),
-		CalendarID:     r.CalendarPublicID.String(),
-		CalendarName:   r.CalendarName,
-		LinkSortWeight: r.LinkSortWeight,
-		LinkCreatedAt:  r.LinkCreatedAt.Unix(),
+		LinkID:               r.LinkPublicID.String(),
+		EventID:              eventID,
+		Title:                r.EventTitle,
+		StartAt:              nullTimeUnixPtr(r.StartAt),
+		EndAt:                nullTimeUnixPtr(r.EndAt),
+		AllDay:               r.AllDay,
+		Timezone:             r.EventTimezone,
+		Location:             nullStringPtr(r.Location),
+		Visibility:           string(r.Visibility),
+		CalendarID:           r.CalendarPublicID.String(),
+		CalendarName:         r.CalendarName,
+		LinkSortWeight:       r.LinkSortWeight,
+		LinkCreatedAt:        r.LinkCreatedAt.Unix(),
+		UnpublishedOverrides: warnings[eventID],
 	}
 }

@@ -469,6 +469,39 @@ type Querier interface {
 	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
 	// List recurring events whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error)
+	// Occurrences a share page is still advertising at the time they moved
+	// away from, for the workspace-authenticated share editor.
+	//
+	// Publishing the master of a recurring series publishes every occurrence
+	// its rule expands to. Moving one occurrence does not change that rule;
+	// it writes a separate override row. Unless that row is published on the
+	// same share, the page keeps drawing the occurrence at its original start
+	// and nothing on either side reports the disagreement. This names those
+	// overrides so the editor can warn and offer to publish them.
+	//
+	// "The share does not publish it" is decided by absence from
+	// published_events, which is ListPublicShareEventsByTokenHash's join and
+	// filter set keyed by the share rather than by the token hash — the
+	// editor is authenticated and holds no token. Attached is not the same as
+	// drawn: an override whose link row exists but whose event the render
+	// query filters out is still missing from the page, so reading the
+	// exclusion off "has no link row" would drop the very rows this query
+	// exists to report. The same relation decides which masters count, so
+	// neither half can drift from the other or from the render.
+	//
+	// Candidate overrides carry the render query's own row-level gates —
+	// enabled, live calendar, a start to show — so the editor is never told
+	// to publish something that would not appear once published. Visibility
+	// is deliberately not one of them: a confidential override can never be
+	// published, which makes its occurrence the one most worth reporting and
+	// not the one to hide. visibility is returned so the caller can say that
+	// instead of offering an attach the publish path would refuse.
+	//
+	// recurrence_original_start is the occurrence the page still shows and
+	// start_at is where it actually moved to; describing the discrepancy
+	// needs both. The master is identified by public_id so the warning can be
+	// placed on the row the editor already lists without a second lookup.
+	ListUnpublishedShareOverrides(ctx context.Context, arg ListUnpublishedShareOverridesParams) ([]ListUnpublishedShareOverridesRow, error)
 	// Stamp accepted_at when the recipient clicks the magic link
 	// successfully.
 	MarkCalendarEventInviteAccepted(ctx context.Context, id uint32) error

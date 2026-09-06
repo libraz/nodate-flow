@@ -684,6 +684,115 @@ func (q *Queries) ListPublicShares(ctx context.Context, workspaceID uint32) ([]L
 	return items, nil
 }
 
+const listUnpublishedShareOverrides = `-- name: ListUnpublishedShareOverrides :many
+WITH published_events (event_id) AS (
+  SELECT ce.id
+  FROM calendar_public_shares cps
+  INNER JOIN calendar_public_share_events cpse ON cpse.share_id = cps.id AND cpse.enabled = TRUE
+  INNER JOIN calendar_events ce ON ce.id = cpse.event_id AND ce.enabled = TRUE
+  INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
+  WHERE cps.workspace_id = ?
+    AND cps.public_id = ?
+    AND cps.enabled = TRUE
+    AND ce.visibility <> 'confidential'
+    AND ce.start_at IS NOT NULL
+)
+SELECT
+  ovr.public_id AS event_public_id,
+  ovr.title,
+  ovr.start_at,
+  ovr.visibility,
+  ovr.recurrence_original_start,
+  series.public_id AS master_public_id
+FROM calendar_events ovr
+INNER JOIN calendars oc ON oc.id = ovr.calendar_id AND oc.enabled = TRUE
+INNER JOIN calendar_events series ON series.id = ovr.recurrence_parent_id
+WHERE ovr.workspace_id = ?
+  AND ovr.enabled = TRUE
+  AND ovr.start_at IS NOT NULL
+  AND ovr.recurrence_original_start IS NOT NULL
+  AND series.id IN (SELECT event_id FROM published_events)
+  AND ovr.id NOT IN (SELECT event_id FROM published_events)
+ORDER BY ovr.recurrence_original_start ASC, ovr.public_id ASC
+LIMIT 2000
+`
+
+type ListUnpublishedShareOverridesParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type ListUnpublishedShareOverridesRow struct {
+	EventPublicID           types.PublicID           `json:"eventPublicId"`
+	Title                   string                   `json:"title"`
+	StartAt                 sql.NullTime             `json:"startAt"`
+	Visibility              CalendarEventsVisibility `json:"visibility"`
+	RecurrenceOriginalStart sql.NullTime             `json:"recurrenceOriginalStart"`
+	MasterPublicID          types.PublicID           `json:"masterPublicId"`
+}
+
+// Occurrences a share page is still advertising at the time they moved
+// away from, for the workspace-authenticated share editor.
+//
+// Publishing the master of a recurring series publishes every occurrence
+// its rule expands to. Moving one occurrence does not change that rule;
+// it writes a separate override row. Unless that row is published on the
+// same share, the page keeps drawing the occurrence at its original start
+// and nothing on either side reports the disagreement. This names those
+// overrides so the editor can warn and offer to publish them.
+//
+// "The share does not publish it" is decided by absence from
+// published_events, which is ListPublicShareEventsByTokenHash's join and
+// filter set keyed by the share rather than by the token hash — the
+// editor is authenticated and holds no token. Attached is not the same as
+// drawn: an override whose link row exists but whose event the render
+// query filters out is still missing from the page, so reading the
+// exclusion off "has no link row" would drop the very rows this query
+// exists to report. The same relation decides which masters count, so
+// neither half can drift from the other or from the render.
+//
+// Candidate overrides carry the render query's own row-level gates —
+// enabled, live calendar, a start to show — so the editor is never told
+// to publish something that would not appear once published. Visibility
+// is deliberately not one of them: a confidential override can never be
+// published, which makes its occurrence the one most worth reporting and
+// not the one to hide. visibility is returned so the caller can say that
+// instead of offering an attach the publish path would refuse.
+//
+// recurrence_original_start is the occurrence the page still shows and
+// start_at is where it actually moved to; describing the discrepancy
+// needs both. The master is identified by public_id so the warning can be
+// placed on the row the editor already lists without a second lookup.
+func (q *Queries) ListUnpublishedShareOverrides(ctx context.Context, arg ListUnpublishedShareOverridesParams) ([]ListUnpublishedShareOverridesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnpublishedShareOverrides, arg.WorkspaceID, arg.PublicID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnpublishedShareOverridesRow{}
+	for rows.Next() {
+		var i ListUnpublishedShareOverridesRow
+		if err := rows.Scan(
+			&i.EventPublicID,
+			&i.Title,
+			&i.StartAt,
+			&i.Visibility,
+			&i.RecurrenceOriginalStart,
+			&i.MasterPublicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const patchPublicShare = `-- name: PatchPublicShare :execrows
 UPDATE calendar_public_shares
 SET title                  = COALESCE(?, title),

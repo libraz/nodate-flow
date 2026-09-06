@@ -28,6 +28,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -41,11 +42,17 @@ import { confirmAction } from '../../lib/confirm-action';
 import AddEventsDialog from './add-events-dialog';
 import {
   type ShareEvent,
+  type ShareOverrideWarning,
+  useAttachEventsToShare,
   useDetachEventFromShare,
   usePublicShareDetailQuery,
   useReorderShareEvents,
 } from './api';
 import styles from './share-detail.module.css';
+import ShareOverrideNotice from './share-override-notice';
+
+/** Columns in the attached-events table, so a notice can span the row. */
+const TABLE_COLUMNS = 5;
 
 export interface ShareDetailProps {
   workspaceId: string;
@@ -84,6 +91,7 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
   const { data } = usePublicShareDetailQuery(workspaceId, shareId);
   const detach = useDetachEventFromShare(workspaceId, shareId);
   const reorder = useReorderShareEvents(workspaceId, shareId);
+  const attach = useAttachEventsToShare(workspaceId, shareId);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Local, optimistic ordering mirrors the server list but is mutated
@@ -191,6 +199,35 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
     }
   };
 
+  /**
+   * Publish the row that replaces a moved occurrence. The server is still
+   * the authority on whether it may be published, so a response that
+   * attached nothing is reported as a failure rather than announced as a
+   * fix — the page would otherwise keep showing the old time under a
+   * success message.
+   */
+  const handleAttachOverride = async (warning: ShareOverrideWarning): Promise<void> => {
+    try {
+      const result = await attach.mutateAsync([warning.eventId]);
+      if (result.attached < 1) {
+        toaster.show({
+          tone: 'danger',
+          message: t('workspace.public_shares.detail.errors.attach_failed'),
+        });
+        return;
+      }
+      toaster.show({
+        tone: 'success',
+        message: t('workspace.public_shares.detail.override_notice.attached'),
+      });
+    } catch (err) {
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'workspace.public_shares.detail.errors.attach_failed'),
+      });
+    }
+  };
+
   const allDayLabel = t('workspace.public_shares.detail.event_all_day');
   const attachedIds = new Set(orderedEvents.map((e) => e.eventId));
   const dragHandleLabel = t('workspace.public_shares.detail.reorder_handle_label');
@@ -248,11 +285,13 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
             <table className={styles.table}>
               <thead>
                 <tr className={styles.headerRow}>
-                  <th
-                    scope="col"
-                    className={styles.handleHeaderCell}
-                    aria-label={dragHandleLabel}
-                  />
+                  {/* The label is carried as hidden text rather than an
+                      aria-label: a header cell with no text content is
+                      reported as an empty header, and screen readers read
+                      the text either way. */}
+                  <th scope="col" className={styles.handleHeaderCell}>
+                    <VisuallyHidden>{dragHandleLabel}</VisuallyHidden>
+                  </th>
                   <th scope="col" className={styles.headerCell}>
                     {t('workspace.public_shares.detail.table.event')}
                   </th>
@@ -282,7 +321,9 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
                       detachLabel={t('workspace.public_shares.detail.detach')}
                       handleLabel={dragHandleLabel}
                       disabled={reordering}
+                      attaching={attach.isPending}
                       onDetach={handleDetach}
+                      onAttachOverride={handleAttachOverride}
                     />
                   ))}
                 </tbody>
@@ -323,7 +364,9 @@ interface SortableRowProps {
   detachLabel: string;
   handleLabel: string;
   disabled: boolean;
+  attaching: boolean;
   onDetach: (event: ShareEvent) => Promise<void>;
+  onAttachOverride: (warning: ShareOverrideWarning) => Promise<void>;
 }
 
 /**
@@ -331,6 +374,10 @@ interface SortableRowProps {
  * button in the first cell so the rest of the row (especially the Remove action)
  * stays clickable without triggering drags. Keyboard users focus the handle and
  * use Space + arrow keys via `@dnd-kit`'s KeyboardSensor.
+ *
+ * A series the share still shows at a start it moved away from carries a
+ * second row underneath it. Only the sortable row is a drag item; the notice
+ * repeats its transform so the two travel together.
  */
 function SortableRow({
   event,
@@ -340,7 +387,9 @@ function SortableRow({
   detachLabel,
   handleLabel,
   disabled,
+  attaching,
   onDetach,
+  onAttachOverride,
 }: SortableRowProps): ReactElement {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: event.linkId,
@@ -359,39 +408,59 @@ function SortableRow({
     zIndex: isDragging ? 1 : undefined,
   };
 
+  // `unpublishedOverrides` is absent on a series with nothing wrong, so the
+  // notice is driven by the list being non-empty rather than by the field
+  // being present.
+  const warnings = event.unpublishedOverrides ?? [];
+
   return (
-    <tr ref={setNodeRef} className={styles.row} style={rowStyle}>
-      <td className={styles.handleCell}>
-        <button
-          type="button"
-          aria-label={handleLabel}
-          disabled={disabled}
-          {...attributes}
-          {...listeners}
-          className={styles.dragHandle}
-        >
-          <GripVertical size={14} aria-hidden />
-        </button>
-      </td>
-      <td className={styles.cell}>
-        <div className={styles.eventTitle}>{event.title}</div>
-        {event.location ? <div className={styles.eventLocation}>{event.location}</div> : null}
-      </td>
-      <td className={styles.cell}>
-        {event.startAt ? formatWhen(event, locale, allDayLabel) : undatedLabel}
-      </td>
-      <td className={styles.cell}>{event.calendarName}</td>
-      <td className={styles.cellActions}>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            void onDetach(event);
+    <>
+      <tr ref={setNodeRef} className={styles.row} style={rowStyle}>
+        <td className={styles.handleCell}>
+          <button
+            type="button"
+            aria-label={handleLabel}
+            disabled={disabled}
+            {...attributes}
+            {...listeners}
+            className={styles.dragHandle}
+          >
+            <GripVertical size={14} aria-hidden />
+          </button>
+        </td>
+        <td className={styles.cell}>
+          <div className={styles.eventTitle}>{event.title}</div>
+          {event.location ? <div className={styles.eventLocation}>{event.location}</div> : null}
+        </td>
+        <td className={styles.cell}>
+          {event.startAt ? formatWhen(event, locale, allDayLabel) : undatedLabel}
+        </td>
+        <td className={styles.cell}>{event.calendarName}</td>
+        <td className={styles.cellActions}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              void onDetach(event);
+            }}
+          >
+            {detachLabel}
+          </Button>
+        </td>
+      </tr>
+      {warnings.length > 0 ? (
+        <ShareOverrideNotice
+          warnings={warnings}
+          allDay={event.allDay}
+          locale={locale}
+          columnCount={TABLE_COLUMNS}
+          busy={attaching}
+          rowStyle={rowStyle}
+          onAttach={(warning) => {
+            void onAttachOverride(warning);
           }}
-        >
-          {detachLabel}
-        </Button>
-      </td>
-    </tr>
+        />
+      ) : null}
+    </>
   );
 }

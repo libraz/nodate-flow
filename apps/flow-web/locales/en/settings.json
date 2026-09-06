@@ -408,6 +408,13 @@
         "detached": "Event removed",
         "event_undated": "No date",
         "event_all_day": "All day",
+        "override_notice": {
+          "label": "The public page is showing an old time",
+          "moved": "This event still shows {from} on the public page. That date has moved to {to}.",
+          "attach": "Add the new time",
+          "attached": "The new time is now on the public page",
+          "confidential": "This event still shows {from} on the public page. That date has moved to {to}, but the event at the new time is private and cannot be published here. Make it visible, or take this event off the page."
+        },
         "table": {
           "event": "Event",
           "when": "When",
