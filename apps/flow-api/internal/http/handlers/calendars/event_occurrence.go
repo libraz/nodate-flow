@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -17,26 +18,31 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
-// occurrenceScope names which occurrences of a recurring series a patch
-// reaches.
+// The scope vocabulary, the fallback bases, the window merge, the
+// truncation point and the exception list all live in
+// [github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence],
+// because the MCP calendar tools offer the same three scopes over the
+// same rows. What is left in this package is the part that is HTTP's:
+// reading the scope out of a body or a query string, and rendering a
+// refusal as RFC 9457 with the member it is about.
 //
-// A series is one master row, so a patch that says nothing rewrites every
-// occurrence it produces. The scope is what separates "move this week's
-// stand-up" from "move the stand-up".
-type occurrenceScope string
+// The names are re-declared as aliases rather than spelled out at every
+// call site: the handlers read the same as they did when the definitions
+// were here, and there is still only one definition.
+type occurrenceScope = calendaroccurrence.Scope
 
 const (
 	// scopeSeries rewrites the master, and with it every occurrence the
 	// rule produces. An absent scope resolves here, so a caller that does
 	// not send the field keeps the behaviour it always had.
-	scopeSeries occurrenceScope = "series"
+	scopeSeries = calendaroccurrence.ScopeSeries
 	// scopeOccurrence replaces exactly one occurrence with an override
 	// row, leaving the rest of the series untouched.
-	scopeOccurrence occurrenceScope = "occurrence"
+	scopeOccurrence = calendaroccurrence.ScopeOccurrence
 	// scopeThisAndFollowing splits the series: the master stops producing
 	// occurrences at the split, and a new master carries the edit plus the
 	// remainder of the rule.
-	scopeThisAndFollowing occurrenceScope = "thisAndFollowing"
+	scopeThisAndFollowing = calendaroccurrence.ScopeThisAndFollowing
 )
 
 // invalidBodyField refuses a body member whose value the row cannot hold,
@@ -63,23 +69,20 @@ func occurrenceRefusal(spec *apierrors.Spec, field string) error {
 // decodeOccurrenceScope reads the scope a patch names, defaulting to the
 // whole series.
 //
-// The enum is also declared on the field, so an unrecognised value is
-// normally refused before the handler runs; repeating the closed set here
-// keeps a value the schema stops describing from silently selecting the
-// series path and rewriting every occurrence.
+// An absent pointer is an omitted member, which the shared parser reads
+// the same way it reads an empty string. The refusal is this route's own
+// because the value arrived in a body here; the delete route reads the
+// same scopes out of a query string and names the parameter instead.
 func decodeOccurrenceScope(raw *string) (occurrenceScope, error) {
-	if raw == nil || *raw == "" {
-		return scopeSeries, nil
+	value := ""
+	if raw != nil {
+		value = *raw
 	}
-	switch occurrenceScope(*raw) {
-	case scopeSeries:
-		return scopeSeries, nil
-	case scopeOccurrence:
-		return scopeOccurrence, nil
-	case scopeThisAndFollowing:
-		return scopeThisAndFollowing, nil
+	scope, ok := calendaroccurrence.ParseScope(value)
+	if !ok {
+		return "", invalidBodyField("scope")
 	}
-	return "", invalidBodyField("scope")
+	return scope, nil
 }
 
 // patchTouchesRecurrenceFields reports whether a patch carries any of the
@@ -132,209 +135,84 @@ func requireOccurrenceScope(
 		return nil
 	}
 
-	// Which occurrence is singled out is the whole content of a
-	// non-series scope. Without it the request names nothing.
-	if input.Body.OccurrenceStart == nil {
-		return occurrenceRefusal(apierrors.CalendarEventOccurrenceStartRequired, "occurrenceStart")
+	// A patch carries the occurrence in its body, where an omitted member
+	// is a nil pointer rather than a zero; the shared refusal reads zero
+	// as omitted, which is the form the delete route's query parameter
+	// arrives in.
+	var occurrenceStart int64
+	if input.Body.OccurrenceStart != nil {
+		occurrenceStart = *input.Body.OccurrenceStart
 	}
-
-	// A two-level chain. An override of an override inserts happily and
-	// is then unreachable: the expander subtracts the occurrence the
-	// first override replaced from the master, and nothing expands an
-	// override, so the second row is written and never read.
-	if isOverride {
-		return occurrenceRefusal(apierrors.CalendarEventAlreadyOccurrenceOverride, "scope")
-	}
-
-	// There is no occurrence to single out on a row that produces one.
-	if !hasRecurrenceRule(evt.RecurrenceRule) {
-		return occurrenceRefusal(apierrors.CalendarEventNotRecurring, "scope")
+	if spec, field := calendaroccurrence.ScopeRefusal(
+		scope, occurrenceStart,
+		calendaroccurrence.HasRule(evt.RecurrenceRule), isOverride); spec != nil {
+		return occurrenceRefusal(spec, field)
 	}
 
 	// A single occurrence is a leaf. The rule, the recurrence end and the
 	// exception list describe the series and belong to the master alone.
+	// No MCP tool takes any of the three, so this refusal has no
+	// counterpart to share and stays here.
 	if scope == scopeOccurrence && touchesRecurrence {
 		return occurrenceRefusal(apierrors.CalendarEventRecurrenceOnOccurrenceNotAllowed, "recurrenceRule")
 	}
 	return nil
 }
 
-// hasRecurrenceRule reports whether a stored recurrence_rule column holds
-// a rule. A NULL column scans as a nil slice; a JSON null is stored by
-// nothing but reads as one value here either way.
-func hasRecurrenceRule(raw json.RawMessage) bool {
-	return len(raw) > 0 && string(raw) != "null"
-}
-
 // occurrenceFields is the whole occurrence an override row carries.
-//
-// Every column has a value because an override is not a delta: the row
-// stands in for the occurrence entirely, and a column left unset would
-// read as the absence of a value rather than as the series' own.
-type occurrenceFields struct {
-	Kind               calendar.CalendarEventsKind
-	Visibility         calendar.CalendarEventsVisibility
-	ShowAs             calendar.CalendarEventsShowAs
-	Flexibility        calendar.CalendarEventsFlexibility
-	Title              string
-	AllDay             bool
-	StartAt            sql.NullTime
-	EndAt              sql.NullTime
-	Timezone           string
-	Location           sql.NullString
-	Memo               sql.NullString
-	URL                sql.NullString
-	BlockLabel         sql.NullString
-	NotificationOffset sql.NullInt32
-}
+type occurrenceFields = calendaroccurrence.Fields
 
-// masterOccurrenceBase is what a member the caller did not send falls
-// back to when the occurrence has no override yet: the series' own
-// values, in the slot the occurrence holds under the rule — its original
-// start, for as long as the master's own window lasts.
-func masterOccurrenceBase(
-	master calendar.FindCalendarEventByPublicIdRow,
-	originalStart time.Time,
-) occurrenceFields {
-	var duration time.Duration
-	if master.StartAt.Valid && master.EndAt.Valid {
-		duration = master.EndAt.Time.Sub(master.StartAt.Time)
-	}
-	return occurrenceFields{
-		Kind:               master.Kind,
-		Visibility:         master.Visibility,
-		ShowAs:             master.ShowAs,
-		Flexibility:        master.Flexibility,
-		Title:              master.Title,
-		AllDay:             master.AllDay,
-		StartAt:            sql.NullTime{Time: originalStart, Valid: true},
-		EndAt:              sql.NullTime{Time: originalStart.Add(duration), Valid: true},
-		Timezone:           master.Timezone,
-		Location:           master.Location,
-		Memo:               master.Memo,
-		URL:                master.Url,
-		BlockLabel:         master.BlockLabel,
-		NotificationOffset: master.NotificationOffset,
-	}
-}
-
-// overrideOccurrenceBase is what a member the caller did not send falls
-// back to once an override already stands in for the occurrence.
+// occurrencePatch reads the members a patch request sends into the shape
+// the shared merge takes.
 //
-// The override row is the occurrence. It exists precisely where the
-// occurrence differs from the series, so a default read off the master
-// returns it to the values the override was created to leave behind: an
-// occurrence moved to another time and later renamed would move back.
-//
-// Whether the row is enabled does not enter here. A soft-deleted override
-// is still the occurrence's own last state, and the update that follows
-// revives it.
-func overrideOccurrenceBase(existing calendar.FindCalendarEventOverrideRow) occurrenceFields {
-	return occurrenceFields{
-		Kind:               existing.Kind,
-		Visibility:         existing.Visibility,
-		ShowAs:             existing.ShowAs,
-		Flexibility:        existing.Flexibility,
-		Title:              existing.Title,
-		AllDay:             existing.AllDay,
-		StartAt:            existing.StartAt,
-		EndAt:              existing.EndAt,
-		Timezone:           existing.Timezone,
-		Location:           existing.Location,
-		Memo:               existing.Memo,
-		URL:                existing.Url,
-		BlockLabel:         existing.BlockLabel,
-		NotificationOffset: existing.NotificationOffset,
+// It is the whole of what this route contributes to the merge: which HTTP
+// member stands for which column, and that this route moves the window as
+// a pair or not at all — an invariant settled before the handler reaches
+// here, so a sent start implies a sent end and a request that sends
+// neither keeps the occurrence's own window.
+func occurrencePatch(input *PatchEventInput, cleared clearableEventFields) calendaroccurrence.Patch {
+	p := calendaroccurrence.Patch{
+		Kind:               input.Body.Kind,
+		Visibility:         input.Body.Visibility,
+		ShowAs:             input.Body.ShowAs,
+		Flexibility:        input.Body.Flexibility,
+		Title:              input.Body.Title,
+		Timezone:           input.Body.Timezone,
+		AllDay:             input.Body.AllDay,
+		Location:           input.Body.Location,
+		Memo:               input.Body.Memo,
+		URL:                input.Body.URL,
+		BlockLabel:         input.Body.BlockLabel,
+		NotificationOffset: input.Body.NotificationOffset,
+		Clear: calendaroccurrence.Clears{
+			Location:           cleared.location == 1,
+			Memo:               cleared.memo == 1,
+			URL:                cleared.url == 1,
+			BlockLabel:         cleared.blockLabel == 1,
+			NotificationOffset: cleared.notificationOffset == 1,
+		},
 	}
+	if input.Body.StartAt != nil && input.Body.EndAt != nil {
+		start := handlerutil.UnixToTime(*input.Body.StartAt)
+		end := handlerutil.UnixToTime(*input.Body.EndAt)
+		p.StartAt, p.EndAt = &start, &end
+	}
+	return p
 }
 
 // mergeOccurrenceFields folds the caller's sent members over the values
-// the occurrence falls back to.
-//
-// A clear wins over a value sent for the same member, matching the
-// precedence PatchCalendarEvent applies: sending both is contradictory,
-// and the destructive reading is the one that cannot silently leave a
-// value the caller asked to be rid of.
-//
-// The window moves as a pair or not at all. That invariant is settled
-// before this runs, so a sent start implies a sent end, and a request
-// that sends neither keeps the base's window.
+// the occurrence falls back to, and renders a refusal from the shared
+// rules as this transport's own.
 func mergeOccurrenceFields(
 	base occurrenceFields,
 	input *PatchEventInput,
 	cleared clearableEventFields,
-) occurrenceFields {
-	f := occurrenceFields{
-		Kind:               base.Kind,
-		Visibility:         base.Visibility,
-		ShowAs:             base.ShowAs,
-		Flexibility:        base.Flexibility,
-		Title:              base.Title,
-		AllDay:             base.AllDay,
-		StartAt:            base.StartAt,
-		EndAt:              base.EndAt,
-		Timezone:           mergeString(base.Timezone, input.Body.Timezone),
-		Location:           base.Location,
-		Memo:               base.Memo,
-		URL:                base.URL,
-		BlockLabel:         base.BlockLabel,
-		NotificationOffset: base.NotificationOffset,
+) (occurrenceFields, error) {
+	fields, err := occurrencePatch(input, cleared).Apply(base)
+	if err != nil {
+		return occurrenceFields{}, handlerutil.HTTPErrFromAPIError(err)
 	}
-	if input.Body.StartAt != nil && input.Body.EndAt != nil {
-		f.StartAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.StartAt), Valid: true}
-		f.EndAt = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.EndAt), Valid: true}
-	}
-	if input.Body.Kind != nil {
-		f.Kind = calendar.CalendarEventsKind(*input.Body.Kind)
-	}
-	if input.Body.Visibility != nil {
-		f.Visibility = calendar.CalendarEventsVisibility(*input.Body.Visibility)
-	}
-	if input.Body.ShowAs != nil {
-		f.ShowAs = calendar.CalendarEventsShowAs(*input.Body.ShowAs)
-	}
-	if input.Body.Flexibility != nil {
-		f.Flexibility = calendar.CalendarEventsFlexibility(*input.Body.Flexibility)
-	}
-	if input.Body.Title != nil {
-		f.Title = *input.Body.Title
-	}
-	if input.Body.AllDay != nil {
-		f.AllDay = *input.Body.AllDay
-	}
-	f.Location = mergeNullString(f.Location, input.Body.Location, cleared.location)
-	f.Memo = mergeNullString(f.Memo, input.Body.Memo, cleared.memo)
-	f.URL = mergeNullString(f.URL, input.Body.URL, cleared.url)
-	f.BlockLabel = mergeNullString(f.BlockLabel, input.Body.BlockLabel, cleared.blockLabel)
-	switch {
-	case cleared.notificationOffset == 1:
-		f.NotificationOffset = sql.NullInt32{}
-	case input.Body.NotificationOffset != nil:
-		f.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
-	}
-	f.StartAt, f.EndAt = normalizeAllDayBounds(f.AllDay, f.StartAt, f.EndAt)
-	return f
-}
-
-// mergeString takes the sent value for a NOT NULL text member, or keeps
-// the stored one. There is no clear flag: the column cannot hold nothing.
-func mergeString(stored string, sent *string) string {
-	if sent != nil {
-		return *sent
-	}
-	return stored
-}
-
-// mergeNullString applies one nullable text member's clear flag and sent
-// value over the stored value.
-func mergeNullString(stored sql.NullString, sent *string, cleared int64) sql.NullString {
-	if cleared == 1 {
-		return sql.NullString{}
-	}
-	if sent != nil {
-		return sql.NullString{String: *sent, Valid: true}
-	}
-	return stored
+	return fields, nil
 }
 
 // patchEventOccurrence replaces a single occurrence of a recurring series
@@ -389,11 +267,15 @@ func patchEventOccurrence(
 		// so it is decided here rather than before the transaction: an
 		// override written between the two would otherwise be updated from
 		// the series' values.
-		base := masterOccurrenceBase(master, originalStart)
+		base := calendaroccurrence.MasterBase(master, originalStart)
 		if overridden {
-			base = overrideOccurrenceBase(existing)
+			base = calendaroccurrence.OverrideBase(existing)
 		}
-		fields := mergeOccurrenceFields(base, input, cleared)
+		fields, mergeErr := mergeOccurrenceFields(base, input, cleared)
+		if mergeErr != nil {
+			answered = mergeErr
+			return mergeErr
+		}
 		// The zone written is whichever survived the merge — the caller's,
 		// the override's or the master's. Checking the merged value is what
 		// keeps a column no renderer can resolve out of the row, whichever
@@ -512,14 +394,17 @@ func patchEventFollowing(
 	// The continuing series starts from the master alone: it is a new
 	// master carrying the remainder of the rule, not an edit of an
 	// occurrence, so no override row describes it.
-	fields := mergeOccurrenceFields(masterOccurrenceBase(master, splitStart), input, cleared)
+	fields, err := mergeOccurrenceFields(calendaroccurrence.MasterBase(master, splitStart), input, cleared)
+	if err != nil {
+		return calendar.FindCalendarEventByPublicIdRow{}, err
+	}
 	// The continuing series carries whichever zone survived the merge, so
 	// it is checked here rather than only where the caller's value entered.
 	if err := requireValidTimezone("timezone", fields.Timezone); err != nil {
 		return calendar.FindCalendarEventByPublicIdRow{}, err
 	}
 
-	truncateAt := seriesTruncationPoint(master, splitStart)
+	truncateAt := calendaroccurrence.TruncationPoint(master, splitStart)
 
 	newPublicID := types.New()
 	newMaster := calendar.CreateCalendarEventParams{

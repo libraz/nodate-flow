@@ -18,11 +18,17 @@ package precondition
 //
 //	sink        a place a calendar table is written: a statement in
 //	            sql/queries that INSERTs into, UPDATEs or DELETEs FROM a
-//	            calendar_* table, or a hand-written function whose body
-//	            builds such a statement as a literal. The second kind is
-//	            not an afterthought — event deletion goes through one, so
-//	            a derivation that read only sql/queries would have held
-//	            the delete tool to nothing.
+//	            calendar_* table, and every hand-written function whose
+//	            body issues such a write — either by calling the generated
+//	            method that carries the statement, or by building the SQL
+//	            as a literal. The function kind is not an afterthought: a
+//	            statement is shared by every caller, so the statement on
+//	            its own says only that the column is written somewhere,
+//	            while the function says which write site it is. Reading
+//	            only the statement collapses a deletion performed under
+//	            the write gate together with one performed by a task
+//	            propagation that never sees it, and the pair then
+//	            disqualifies each other.
 //	governed    a sink every REST operation reaches through the calendar
 //	            write gate. REST is the reference because it is where the
 //	            rule is stated; a sink some REST operation writes without
@@ -86,16 +92,53 @@ var calendarStatementWrite = regexp.MustCompile(
 var calendarLiteralWrite = regexp.MustCompile(
 	`(?is)(?:insert\s+into|update|delete\s+from)\s+(calendar[a-z_]*)\b`)
 
+// WriteForm says how a sink issues its write. It is what the check
+// asserts on to prove each half of the derivation is still matching: a
+// half that stops matching removes sinks rather than adding findings, so
+// nothing else would notice.
+type WriteForm int
+
+const (
+	// StatementSink is a named statement in sql/queries. Every caller of
+	// the generated method shares it, so it says the column is written,
+	// not which site wrote it.
+	StatementSink WriteForm = iota
+	// NamedCallSink is a Go function that issues the write by calling the
+	// generated method carrying a named statement. This is the form the
+	// repository asks new code to be written in.
+	NamedCallSink
+	// LiteralSink is a Go function that builds the write as a string
+	// literal. Inline SQL is not gone from this tree, so this form still
+	// has to be read.
+	LiteralSink
+)
+
+// String renders the form for a failure message.
+func (f WriteForm) String() string {
+	switch f {
+	case StatementSink:
+		return "named statement"
+	case NamedCallSink:
+		return "call to a named statement"
+	case LiteralSink:
+		return "SQL literal"
+	default:
+		return "unknown"
+	}
+}
+
 // WriteSink is one place a calendar table is written.
 type WriteSink struct {
 	// Name is how a call to it appears in the call graph.
 	Name string
-	// Symbol is the package-qualified function for a sink built from a
-	// literal, and empty for a sqlc statement. The two are matched
-	// differently and deliberately so: a statement is performed through a
-	// method on a generated querier, which the call graph can only match
-	// by name, whereas a function is matched by symbol so a same-named
-	// method on some other value is never mistaken for it.
+	// Form says how the write is issued.
+	Form WriteForm
+	// Symbol is the package-qualified function for a sink that is a write
+	// site in the Go tree, and empty for a sqlc statement. The two are
+	// matched differently and deliberately so: a statement is performed
+	// through a method on a generated querier, which the call graph can
+	// only match by name, whereas a function is matched by symbol so a
+	// same-named method on some other value is never mistaken for it.
 	Symbol string
 	// Table is the calendar table written.
 	Table string
@@ -106,6 +149,20 @@ type WriteSink struct {
 // Location renders the sink's position for a failure message.
 func (s WriteSink) Location() string { return s.Where }
 
+// Key identifies a sink uniquely.
+//
+// A name is not enough. A statement's name is unique within sql/queries,
+// but a handler that issues it commonly carries the same name, and two
+// packages can each declare a write site by the same name. Keying a
+// report by name alone would merge a governed site with an ungoverned one
+// and answer for both at once.
+func (s WriteSink) Key() string {
+	if s.Symbol != "" {
+		return s.Symbol
+	}
+	return s.Name
+}
+
 // reachedBy reports whether the reach sets of an entry include this sink.
 func (s WriteSink) reachedBy(qualified, names map[string]bool) bool {
 	if s.Symbol != "" {
@@ -114,52 +171,138 @@ func (s WriteSink) reachedBy(qualified, names map[string]bool) bool {
 	return names[s.Name]
 }
 
-// CalendarWriteSinks derives every candidate sink: the sqlc statements
-// that write a calendar table, and the hand-written functions that build
-// such a write as a literal.
-func CalendarWriteSinks(src *Source, statements []Statement) []WriteSink {
-	var out []WriteSink
+// calendarWritingStatements indexes, by statement name, the calendar
+// table each named statement writes.
+//
+// The statement name is also the name of the generated method a caller
+// invokes, so the same index answers both "does this statement write a
+// calendar table" and "does this call write one". Deriving the table from
+// sql/queries rather than from the generated Go keeps the source of truth
+// where the repository puts it: the generated package is rebuilt from
+// these files and carries no statement text of its own that this would be
+// reading instead.
+func calendarWritingStatements(statements []Statement) map[string]string {
+	out := map[string]string{}
 	for _, st := range statements {
 		if m := calendarStatementWrite.FindStringSubmatch(st.SQL); m != nil {
-			out = append(out, WriteSink{Name: st.Name, Table: m[1], Where: st.Location()})
+			out[st.Name] = m[1]
+		}
+	}
+	return out
+}
+
+// CalendarWriteSinks derives every candidate sink: the sqlc statements
+// that write a calendar table, and the hand-written functions that issue
+// such a write — through the generated method that carries the statement,
+// or as a Go string literal.
+//
+// Both kinds of Go write site have to be read, and reading only one is
+// how this derivation has already gone blind once. A derivation that read
+// only the literals saw exactly the call sites that break the
+// repository's own rule that SQL lives in sql/queries, and stopped seeing
+// a write the moment it was moved to the named statement it belongs in —
+// so it covered less as the tree got cleaner, silently.
+func CalendarWriteSinks(src *Source, statements []Statement) []WriteSink {
+	var out []WriteSink
+	writes := calendarWritingStatements(statements)
+	for _, st := range statements {
+		if table, ok := writes[st.Name]; ok {
+			out = append(out, WriteSink{Name: st.Name, Table: table, Where: st.Location()})
 		}
 	}
 	for symbol, fn := range src.funcs {
-		table, pos := literalCalendarWrite(src, fn)
-		if table == "" {
+		site, found := calendarWriteSite(src, fn, writes)
+		if !found {
 			continue
 		}
 		out = append(out, WriteSink{
 			Name:   symbol[strings.LastIndex(symbol, ".")+1:],
+			Form:   site.form,
 			Symbol: symbol,
-			Table:  table,
-			Where:  pos,
+			Table:  site.table,
+			Where:  site.pos,
 		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Symbol < out[j].Symbol
+	})
 	return out
 }
 
-// literalCalendarWrite returns the calendar table a function writes
-// through a string literal, and where the literal sits.
-func literalCalendarWrite(src *Source, fn *funcDecl) (table, pos string) {
+// writeSite is what a function's own body was found to do.
+type writeSite struct {
+	table string
+	pos   string
+	form  WriteForm
+}
+
+// calendarWriteSite returns the calendar write a function's own body
+// issues. The first write in source order answers for the function; a
+// function that writes two calendar tables is one sink either way, and
+// taking the first keeps a failure naming the same position on every run.
+//
+// Two forms are read. A string literal carrying the statement is matched
+// by its text. A call to a generated query method is matched by the
+// method's name, which is the statement's name in sql/queries — the same
+// name-based match the statement half of the derivation already relies
+// on, because a generated querier is a value and a call on it has no
+// import path to resolve against.
+//
+// A call qualified by an imported package name is not one of those: it is
+// a call to a Go function, whatever that function is called, and if it
+// issues a write it is derived as its own sink from its own body. Reading
+// it here would credit the caller with a write it does not perform.
+func calendarWriteSite(src *Source, fn *funcDecl, writes map[string]string) (writeSite, bool) {
+	var site writeSite
+	found := false
 	ast.Inspect(fn.decl.Body, func(n ast.Node) bool {
-		if table != "" {
+		if found {
 			return false
 		}
-		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
+		switch node := n.(type) {
+		case *ast.BasicLit:
+			if node.Kind != token.STRING {
+				return true
+			}
+			m := calendarLiteralWrite.FindStringSubmatch(node.Value)
+			if m == nil {
+				return true
+			}
+			site = writeSite{
+				table: strings.ToLower(m[1]),
+				pos:   src.fset.Position(node.Pos()).String(),
+				form:  LiteralSink,
+			}
+			found = true
+			return false
+		case *ast.CallExpr:
+			sel, ok := node.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			written, ok := writes[sel.Sel.Name]
+			if !ok {
+				return true
+			}
+			if qualifier, ok := sel.X.(*ast.Ident); ok {
+				if _, imported := fn.owner.imports[qualifier.Name]; imported {
+					return true
+				}
+			}
+			site = writeSite{
+				table: written,
+				pos:   src.fset.Position(node.Pos()).String(),
+				form:  NamedCallSink,
+			}
+			found = true
+			return false
 		}
-		m := calendarLiteralWrite.FindStringSubmatch(lit.Value)
-		if m == nil {
-			return true
-		}
-		table = strings.ToLower(m[1])
-		pos = src.fset.Position(lit.Pos()).String()
-		return false
+		return true
 	})
-	return table, pos
+	return site, found
 }
 
 // reachSet is one entry's call-graph closure, computed once.
@@ -187,6 +330,9 @@ func reachAll(src *Source) []reachSet {
 // states that it holds a calendar's contents, and inferring it from the
 // table name would make the rule an opinion of this file rather than a
 // reading of the product.
+//
+// The report is keyed by [WriteSink.Key] rather than by name, so a
+// statement and a handler that share a name each answer for themselves.
 func GovernedWriteSinks(reach []reachSet, candidates []WriteSink) (governed []WriteSink, ungoverned map[string][]string) {
 	ungoverned = map[string][]string{}
 	for _, sink := range candidates {
@@ -200,14 +346,14 @@ func GovernedWriteSinks(reach []reachSet, candidates []WriteSink) (governed []Wr
 				gated++
 				continue
 			}
-			ungoverned[sink.Name] = append(ungoverned[sink.Name], r.entry.Name)
+			ungoverned[sink.Key()] = append(ungoverned[sink.Key()], r.entry.Name)
 		}
 		if writers > 0 && writers == gated {
 			governed = append(governed, sink)
 			continue
 		}
 		if writers == 0 {
-			ungoverned[sink.Name] = nil
+			ungoverned[sink.Key()] = nil
 		}
 	}
 	return governed, ungoverned

@@ -3,11 +3,11 @@ package calendars
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -42,86 +42,12 @@ func requireDeleteOccurrenceScope(
 	evt calendar.FindCalendarEventByPublicIdRow,
 	parentID sql.NullInt32,
 ) error {
-	if scope == scopeSeries {
-		return nil
-	}
-
-	// Which occurrence is singled out is the whole content of a
-	// non-series scope. Without it the request names nothing.
-	if occurrenceStart == 0 {
-		return occurrenceRefusal(apierrors.CalendarEventOccurrenceStartRequired, "occurrenceStart")
-	}
-
-	// An override stands in for exactly one occurrence and produces
-	// none, so it has no occurrence to single out and no series to
-	// truncate. Deleting it is the series scope's job.
-	if parentID.Valid {
-		return occurrenceRefusal(apierrors.CalendarEventAlreadyOccurrenceOverride, "scope")
-	}
-
-	// Nor does a row that repeats not at all.
-	if !hasRecurrenceRule(evt.RecurrenceRule) {
-		return occurrenceRefusal(apierrors.CalendarEventNotRecurring, "scope")
+	if spec, field := calendaroccurrence.ScopeRefusal(
+		scope, occurrenceStart,
+		calendaroccurrence.HasRule(evt.RecurrenceRule), parentID.Valid); spec != nil {
+		return occurrenceRefusal(spec, field)
 	}
 	return nil
-}
-
-// seriesTruncationPoint returns the recurrence_end that stops a series
-// just before a split.
-//
-// The master is truncated through recurrence_end rather than by
-// rewriting the rule's own until. The expanders read the two as
-// independent upper bounds and honour whichever is earlier, so a
-// recurrence_end set just before the split truncates a rule bounded by
-// until and a rule bounded by count alike; rewriting until would leave a
-// count-bounded rule emitting the occurrences the split removed, and
-// would rewrite JSON the caller supplied.
-//
-// A master that already stops earlier keeps its own bound, so this never
-// extends a series that a later recurrence_end would revive.
-func seriesTruncationPoint(master calendar.FindCalendarEventByPublicIdRow, splitStart time.Time) time.Time {
-	truncateAt := splitStart.Add(-time.Millisecond)
-	if master.RecurrenceEnd.Valid && master.RecurrenceEnd.Time.Before(truncateAt) {
-		return master.RecurrenceEnd.Time
-	}
-	return truncateAt
-}
-
-// appendRecurrenceException adds one occurrence start to a stored
-// exception list, and reports whether the list changed.
-//
-// The entry is written as an RFC 3339 instant in UTC, the spelling
-// buildExceptions turns into an exact skip keyed by unix seconds — so
-// the entry matches the occurrence whatever timezone the series is drawn
-// in. An entry already naming the same instant is left alone rather than
-// repeated.
-//
-// A stored list that does not parse is an error rather than a fresh
-// list: starting over would drop every occurrence the series had already
-// cancelled, and they would all come back.
-func appendRecurrenceException(stored json.RawMessage, start time.Time) (json.RawMessage, bool, error) {
-	var list []string
-	if len(stored) > 0 && string(stored) != "null" {
-		if err := json.Unmarshal(stored, &list); err != nil {
-			return nil, false, err
-		}
-	}
-
-	entry := start.UTC().Format(time.RFC3339)
-	for _, existing := range list {
-		if existing == entry {
-			return nil, false, nil
-		}
-		if at, err := time.Parse(time.RFC3339, existing); err == nil && at.Equal(start) {
-			return nil, false, nil
-		}
-	}
-
-	encoded, err := json.Marshal(append(list, entry))
-	if err != nil {
-		return nil, false, err
-	}
-	return encoded, true, nil
 }
 
 // deleteEventOccurrence cancels one occurrence of a series.
@@ -141,7 +67,7 @@ func deleteEventOccurrence(
 	master calendar.FindCalendarEventByPublicIdRow,
 	occurrenceStart time.Time,
 ) error {
-	exceptions, changed, err := appendRecurrenceException(master.RecurrenceExceptions, occurrenceStart)
+	exceptions, changed, err := calendaroccurrence.AppendException(master.RecurrenceExceptions, occurrenceStart)
 	if err != nil {
 		return httpErr(apierrors.CalendarEventStoreReadInterrupted)
 	}
@@ -216,7 +142,7 @@ func deleteEventFollowing(
 	master calendar.FindCalendarEventByPublicIdRow,
 	splitStart time.Time,
 ) error {
-	truncateAt := seriesTruncationPoint(master, splitStart)
+	truncateAt := calendaroccurrence.TruncationPoint(master, splitStart)
 	parentID := handlerutil.NullInt32From(master.ID)
 
 	var answered error

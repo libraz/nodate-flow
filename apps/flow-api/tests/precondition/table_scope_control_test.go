@@ -82,7 +82,7 @@ func TestSinksAreAttributedByTable(t *testing.T) {
 		{rule: tableRules[0], want: []string{"WriteFixtureEvent"}},
 		{rule: tableRules[1], want: []string{"PatchFixtureItem"}},
 	} {
-		got := sinkNames(Sinks(statements, tc.rule))
+		got := sinkNames(Sinks(nil, statements, tc.rule))
 		if len(got) != len(tc.want) {
 			t.Fatalf("rule %q derived sinks %v, want %v", tc.rule.Name, got, tc.want)
 		}
@@ -102,7 +102,7 @@ func TestTableNameEndsWhereTheTableEnds(t *testing.T) {
 
 	statements := parseQueryFile("sql/queries/tables.sql", tableSQL)
 	for _, rule := range tableRules {
-		if _, ok := Sinks(statements, rule)["WriteFixtureEventNote"]; ok {
+		if _, ok := Sinks(nil, statements, rule)["WriteFixtureEventNote"]; ok {
 			t.Errorf("rule %q claims a write to fixture_events_notes; the table name is being matched as a prefix", rule.Name)
 		}
 	}
@@ -209,7 +209,7 @@ func TestEntriesAreAttributedToTheirTablesRule(t *testing.T) {
 }
 
 // sinkNames renders a derived sink set in a stable order.
-func sinkNames(sinks map[string]Statement) []string {
+func sinkNames(sinks map[string]WriteSink) []string {
 	out := make([]string, 0, len(sinks))
 	for name := range sinks {
 		out = append(out, name)

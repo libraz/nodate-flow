@@ -12,11 +12,15 @@
 //
 // So the scope is derived rather than listed:
 //
-//	sink        a statement in sql/queries that INSERTs into or UPDATEs
-//	            the rule's table and writes one of the rule's columns. The
-//	            SQL is the shared source both transports reach the row
-//	            through, so a new write statement is in scope the moment
-//	            it is committed.
+//	sink        a place the rule's columns are written on the rule's
+//	            table: a statement in sql/queries that INSERTs into or
+//	            UPDATEs it, and every hand-written function whose body
+//	            builds such a write as a Go string literal. Both forms are
+//	            read because reading only the first covers exactly the
+//	            paths that follow the convention SQL lives in sql/queries
+//	            — coverage that falls as more is written inline. A write a
+//	            reader cannot attribute to a column is reported rather
+//	            than skipped; see [UnattributableWrite].
 //	entry       an MCP tool's run function, read out of the register
 //	            calls, or a REST operation's handler, read out of the
 //	            huma.Register calls. Neither is a list anyone maintains:
@@ -34,10 +38,12 @@
 // exemption with nothing after the marker is not an exemption.
 //
 // Call edges are literal. A call through an imported package name is an
-// edge to that package's function; a method call on a value contributes
-// its name — which is how a statement is matched — but no edge, so a
-// helper is never credited to a package-level function that happens to
-// share a name with a generated query method.
+// edge to that package's function and nothing more; a method call on a
+// value contributes its name — which is how a statement is matched — but
+// no edge. Neither stands in for the other, so a helper is never credited
+// to a package-level function that happens to share a name with a
+// generated query method, and a package-level function is never credited
+// with the statement whose name it happens to carry.
 package precondition
 
 import (
@@ -250,21 +256,6 @@ func (s Statement) WritesColumn(table, column string) bool {
 	default:
 		return false
 	}
-}
-
-// Sinks returns the statements that write any of the rule's columns on
-// the rule's table.
-func Sinks(statements []Statement, rule Rule) map[string]Statement {
-	out := map[string]Statement{}
-	for _, s := range statements {
-		for _, col := range rule.Columns {
-			if s.WritesColumn(rule.Table, col) {
-				out[s.Name] = s
-				break
-			}
-		}
-	}
-	return out
 }
 
 var headerPattern = regexp.MustCompile(`^--\s*name:\s*(\S+)\s+:(\S+)`)
@@ -492,7 +483,10 @@ type Entry struct {
 
 // Source is the parsed flow-api tree, indexed for reachability.
 type Source struct {
-	fset  *token.FileSet
+	fset *token.FileSet
+	// root is the repository root the tree was read under, so a position
+	// can be reported relative to it.
+	root  string
 	files []*goFile
 	// funcs maps "importPath.Function" onto its declaration.
 	funcs map[string]*funcDecl
@@ -513,7 +507,7 @@ type funcDecl struct {
 // rather than call them, so indexing them would make every caller look
 // like a callee of every other.
 func Parse(root string) (*Source, error) {
-	src := &Source{fset: token.NewFileSet(), funcs: map[string]*funcDecl{}}
+	src := &Source{fset: token.NewFileSet(), root: root, funcs: map[string]*funcDecl{}}
 	base := filepath.Join(root, "apps", "flow-api", "internal")
 
 	packageNames := map[string]string{}
@@ -722,19 +716,26 @@ func (s *Source) Reach(symbol string) (qualified, names map[string]bool) {
 				qualified[sym] = true
 				queue = append(queue, sym)
 			case *ast.SelectorExpr:
-				names[callee.Sel.Name] = true
-				qualifier, ok := callee.X.(*ast.Ident)
-				if !ok {
-					return true
+				qualifier, isIdent := callee.X.(*ast.Ident)
+				path, imported := "", false
+				if isIdent {
+					path, imported = fn.owner.imports[qualifier.Name]
 				}
-				path, ok := fn.owner.imports[qualifier.Name]
-				if !ok {
+				if !imported {
 					// A method on a value, not a package function. Its
-					// name is recorded above; crediting it to a
-					// same-named function here is how a rule would
-					// appear to run without doing so.
+					// name is what matches a statement performed through
+					// a generated querier; crediting it to a same-named
+					// package function as well is how a rule would appear
+					// to run without doing so.
+					names[callee.Sel.Name] = true
 					return true
 				}
+				// A call to an imported package's function. It is an edge
+				// to that function and nothing else: a generated querier
+				// is a value, so no statement is ever issued this way,
+				// and recording the name would let a package function
+				// that happens to share a statement's name stand in for
+				// the write.
 				sym := path + "." + callee.Sel.Name
 				qualified[sym] = true
 				queue = append(queue, sym)
@@ -780,9 +781,10 @@ type Finding struct {
 	Entry Entry
 	// Rule is the rule's name.
 	Rule string
-	// Via is the statement that put the entry in scope, empty for a
-	// marker that covers nothing.
-	Via Statement
+	// Via is the sink that put the entry in scope — a named statement or
+	// a write built as a Go string literal — and is zero for a marker
+	// that covers nothing.
+	Via WriteSink
 	// Kind says which of the two failures this is.
 	Kind FindingKind
 }
@@ -819,11 +821,11 @@ func Check(src *Source, statements []Statement, rules []Rule) ([]Finding, InScop
 	scope := InScope{}
 
 	for _, rule := range rules {
-		sinks := Sinks(statements, rule)
+		sinks := Sinks(src, statements, rule)
 		scope[rule.Name] = map[string][]Entry{}
 		for _, entry := range src.Entries {
 			qualified, called := src.Reach(entry.Symbol)
-			via, writes := firstSink(called, sinks)
+			via, writes := firstSink(qualified, called, sinks)
 			marked := src.Marked(entry.Symbol, rule)
 
 			if !writes {
@@ -849,20 +851,26 @@ func Check(src *Source, statements []Statement, rules []Rule) ([]Finding, InScop
 	return findings, scope
 }
 
-// firstSink returns the sink statement an entry calls, in a stable order
-// so a failure names the same statement on every run.
-func firstSink(called map[string]bool, sinks map[string]Statement) (Statement, bool) {
-	names := make([]string, 0, len(sinks))
-	for name := range sinks {
-		if called[name] {
-			names = append(names, name)
+// firstSink returns the sink an entry reaches, in a stable order so a
+// failure names the same one on every run.
+//
+// The two kinds are matched differently and deliberately so. A statement
+// is performed through a method on a generated querier, which the call
+// graph can only match by name; a write site in the Go tree is matched by
+// its package-qualified symbol, so a same-named method on some other
+// value is never mistaken for it.
+func firstSink(qualified, called map[string]bool, sinks map[string]WriteSink) (WriteSink, bool) {
+	keys := make([]string, 0, len(sinks))
+	for key, sink := range sinks {
+		if sink.reachedBy(qualified, called) {
+			keys = append(keys, key)
 		}
 	}
-	if len(names) == 0 {
-		return Statement{}, false
+	if len(keys) == 0 {
+		return WriteSink{}, false
 	}
-	sort.Strings(names)
-	return sinks[names[0]], true
+	sort.Strings(keys)
+	return sinks[keys[0]], true
 }
 
 // reachesAny reports whether any enforcer is in the reached set.

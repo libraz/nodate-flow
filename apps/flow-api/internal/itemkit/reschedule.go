@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -36,7 +37,17 @@ type RescheduleEventArgs struct {
 // tasks.due_on. Pure time-of-day changes (same date) do NOT touch
 // the task — tasks have DATE precision, not DATETIME.
 func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error {
-	if !args.StartAt.IsZero() && !args.EndAt.IsZero() && args.EndAt.Before(args.StartAt) {
+	// The window is ordered by the rule both transports answer with, so a
+	// browser and an agent sending the same inverted pair are refused for
+	// the same reason. What each of them is told is still theirs to decide:
+	// the refusal leaves here as an itemkit invariant, which the REST and
+	// MCP translators already map onto their own vocabularies.
+	//
+	// A zero instant is "no such end of the window" rather than year one,
+	// which is what UnixSeconds encodes; the rule then has nothing to
+	// order, and clearing a window is refused further down instead.
+	if calendarrules.RequireEventChronology(
+		calendarrules.UnixSeconds(args.StartAt), calendarrules.UnixSeconds(args.EndAt)) != nil {
 		return wrapInvariant("chronology", "end_at before start_at")
 	}
 	disarm, err := armProjectionGuard(ctx, tx)
@@ -65,6 +76,11 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 	snap := applySnap(args.StartAt, args.EndAt, args.Snap)
 	args.StartAt = snap.NewStart
 	args.EndAt = snap.NewEnd
+	// The row's own all-day flag decides the shape of the window it can
+	// hold: this call moves an event but never converts one, so an all-day
+	// row stays a date and the instants that stand for it stay canonical
+	// whichever transport asked for the move.
+	args.StartAt, args.EndAt = allDayWindow(evt.allDay, args.StartAt, args.EndAt)
 
 	const updateSQL = `UPDATE calendar_events
 	                   SET start_at = ?, end_at = ?
@@ -84,7 +100,7 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		role := DateRole(evt.taskRole.String)
 		if role == RoleDue {
 			if !args.StartAt.IsZero() {
-				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt, evt.timezone); err != nil { //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+				if err := propagateTaskDateFromRole(ctx, tx, uint32(evt.taskID.Int32), role, args.StartAt, evt.timezone, evt.allDay); err != nil { //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 					return err
 				}
 			}

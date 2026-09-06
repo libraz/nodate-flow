@@ -57,25 +57,56 @@ func TestWriteACLSinkDerivationSeparatesWritesFromReads(t *testing.T) {
 
 	got := map[string]WriteSink{}
 	for _, s := range CalendarWriteSinks(src, statements) {
-		got[s.Name] = s
+		got[s.Key()] = s
 	}
 
-	for _, want := range []string{"WriteContents", "WriteOwnRsvp", "DeleteEvent"} {
+	for _, want := range []string{
+		"WriteContents", "WriteOwnRsvp",
+		itemkitSymbol("DeleteEvent"), itemkitSymbol("WithdrawEvent"),
+	} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("%s writes a calendar table but is not derived as a sink", want)
 		}
 	}
-	for _, unwanted := range []string{"ReadContents", "WriteElsewhere", "describesADelete"} {
+	for _, unwanted := range []string{
+		"ReadContents", "WriteElsewhere", itemkitSymbol("describesADelete"),
+		// A package function that shares its name with a statement, and
+		// the tool that calls it. Neither issues the statement, and
+		// crediting the name alone would report a write nobody performs.
+		modulePath + "/internal/http/handlers/calendars.WriteContents",
+		modulePath + "/internal/mcp.runPackageNamesake",
+	} {
 		if _, ok := got[unwanted]; ok {
-			t.Errorf("%s is derived as a sink; it reads a calendar table, writes another table, or only describes a write in prose", unwanted)
+			t.Errorf("%s is derived as a sink; it reads a calendar table, writes another table, only describes a write in prose, or merely shares a name with a statement", unwanted)
 		}
 	}
-	if sink := got["DeleteEvent"]; sink.Symbol == "" {
+
+	// Each form is a separate way of finding a write, and one that stops
+	// matching subtracts sinks rather than adding findings.
+	for _, want := range []struct {
+		key  string
+		form WriteForm
+	}{
+		{key: "WriteContents", form: StatementSink},
+		{key: itemkitSymbol("DeleteEvent"), form: LiteralSink},
+		{key: itemkitSymbol("WithdrawEvent"), form: NamedCallSink},
+	} {
+		if sink, ok := got[want.key]; ok && sink.Form != want.form {
+			t.Errorf("%s is derived as a %s, want a %s", want.key, sink.Form, want.form)
+		}
+	}
+	if sink := got[itemkitSymbol("DeleteEvent")]; sink.Symbol == "" {
 		t.Error("the literal-built delete is derived by name rather than by symbol; matching it by name would credit any same-named method on a value")
 	}
 	if sink := got["WriteContents"]; sink.Symbol != "" {
 		t.Error("a sqlc statement is derived by symbol; it is performed through a method on a generated querier and can only be matched by name")
 	}
+}
+
+// itemkitSymbol names a function in the control tree's itemkit package,
+// which is where its write sites sit.
+func itemkitSymbol(name string) string {
+	return modulePath + "/internal/itemkit." + name
 }
 
 // TestWriteACLClassificationReadsREST is the control for the
@@ -92,19 +123,24 @@ func TestWriteACLClassificationReadsREST(t *testing.T) {
 	statements := parseQueryFile("sql/queries/control.sql", controlWriteSQL)
 	governed, ungoverned := GovernedWriteSinks(reachAll(src), CalendarWriteSinks(src, statements))
 
-	names := make([]string, 0, len(governed))
+	keys := make([]string, 0, len(governed))
 	for _, s := range governed {
-		names = append(names, s.Name)
+		keys = append(keys, s.Key())
 	}
-	sort.Strings(names)
+	sort.Strings(keys)
 
-	want := []string{"DeleteEvent", "WriteContents"}
-	if len(names) != len(want) {
-		t.Fatalf("classified %v as writes to a calendar's contents, want %v", names, want)
+	want := []string{
+		"WriteContents",
+		itemkitSymbol("DeleteEvent"),
+		itemkitSymbol("WithdrawEvent"),
 	}
-	for i := range names {
-		if names[i] != want[i] {
-			t.Errorf("classified sink %d is %q, want %q", i, names[i], want[i])
+	sort.Strings(want)
+	if len(keys) != len(want) {
+		t.Fatalf("classified %v as writes to a calendar's contents, want %v", keys, want)
+	}
+	for i := range keys {
+		if keys[i] != want[i] {
+			t.Errorf("classified sink %d is %q, want %q", i, keys[i], want[i])
 		}
 	}
 	if writers := ungoverned["WriteOwnRsvp"]; len(writers) != 1 || writers[0] != "rsvp" {
@@ -120,9 +156,11 @@ func TestWriteACLClassificationReadsREST(t *testing.T) {
 // marker, one whose marker states no reason, one whose marker covers
 // nothing, a tool that only names the rule in prose, a tool that calls a
 // same-named method on a value, a tool that writes only the sink REST
-// itself writes outside the gate, and a tool that reaches the write
-// through a literal-built helper. Only the ones that genuinely skip the
-// rule may be reported.
+// itself writes outside the gate, a tool that reaches the write through a
+// literal-built helper, one that reaches it through a helper issuing the
+// named statement, and one that calls a package function which merely
+// shares a statement's name. Only the ones that genuinely skip the rule
+// may be reported.
 func TestWriteACLScanReportsWhatItIsMeantToReport(t *testing.T) {
 	t.Parallel()
 
@@ -139,7 +177,8 @@ func TestWriteACLScanReportsWhatItIsMeantToReport(t *testing.T) {
 	for _, want := range []string{
 		"applies", "skips", "via_helper", "marked", "reasonless", "stale_marker",
 		"mentions_in_prose", "same_named_method", "rsvp_only", "deletes",
-		"contents-create", "contents-delete", "rsvp",
+		"withdraws", "package_namesake",
+		"contents-create", "contents-delete", "contents-withdraw", "rsvp",
 	} {
 		if _, ok := entries[want]; !ok {
 			t.Fatalf("the control tree did not yield entry %q; the registry walk is not reading the fixture", want)
@@ -167,6 +206,7 @@ func TestWriteACLScanReportsWhatItIsMeantToReport(t *testing.T) {
 		{name: "same_named_method", kind: Unenforced},
 		{name: "skips", kind: Unenforced},
 		{name: "stale_marker", kind: StaleMarker},
+		{name: "withdraws", kind: Unenforced},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("the scan reported %v, want %v", got, want)
@@ -178,10 +218,11 @@ func TestWriteACLScanReportsWhatItIsMeantToReport(t *testing.T) {
 	}
 
 	// The findings above are only meaningful if the tools that were not
-	// reported were actually looked at, so the scope is asserted too.
-	// Eight of the ten tools write a governed sink; stale_marker only
-	// reads one and rsvp_only writes the sink REST leaves outside the
-	// gate.
+	// reported were actually looked at, so the scope is asserted too. The
+	// three tools left out are the ones that write no governed sink:
+	// stale_marker only reads one, rsvp_only writes the sink REST leaves
+	// outside the gate, and package_namesake calls a package function
+	// that happens to share a statement's name.
 	var scoped []string
 	for _, e := range inScope {
 		scoped = append(scoped, e.Name)
@@ -189,7 +230,7 @@ func TestWriteACLScanReportsWhatItIsMeantToReport(t *testing.T) {
 	sort.Strings(scoped)
 	wantScope := []string{
 		"applies", "deletes", "marked", "mentions_in_prose",
-		"reasonless", "same_named_method", "skips", "via_helper",
+		"reasonless", "same_named_method", "skips", "via_helper", "withdraws",
 	}
 	if len(scoped) != len(wantScope) {
 		t.Fatalf("the rule was held against %v, want %v", scoped, wantScope)
@@ -225,6 +266,11 @@ func resolveCalendarWrite(cq *Queries) error {
 	_ = DecideCalendarWrite("", "")
 	return nil
 }
+
+// WriteContents shares its name with the statement and issues no SQL. A
+// call to it is a call to a package function, so a caller must not be
+// credited with the statement's write.
+func WriteContents(ctx Ctx) error { return nil }
 `)
 
 	write("apps/flow-api/internal/http/handlers/calendars/events.go", `package calendars
@@ -245,6 +291,13 @@ func DeleteEvent(deps Deps) func() {
 	}
 }
 
+func WithdrawEvent(deps Deps) func() {
+	return func() {
+		_ = resolveCalendarWrite(deps.Cal)
+		_ = itemkit.WithdrawEvent(ctx, tx)
+	}
+}
+
 // RsvpEvent is the write this package performs without the calendar write
 // gate: answering an invitation is the caller's own row.
 func RsvpEvent(deps Deps) func() {
@@ -258,6 +311,15 @@ func RsvpEvent(deps Deps) func() {
 
 func DeleteEvent(ctx Ctx, tx TX) error {
 	_, _ = tx.ExecContext(ctx, "UPDATE calendar_events SET enabled = FALSE WHERE id = ?")
+	return nil
+}
+
+// WithdrawEvent issues the same kind of write the way this repository
+// asks for it: through the generated method that carries the named
+// statement, with no SQL in the Go source at all.
+func WithdrawEvent(ctx Ctx, tx TX) error {
+	cq := queries(tx)
+	_, _ = cq.WriteContents(ctx, params)
 	return nil
 }
 
@@ -286,6 +348,8 @@ func (h *Handler) registerAll() {
 	h.register(auth.FloorWorkspaceMember, tool{name: "same_named_method", run: runSameNamedMethod})
 	h.register(auth.FloorWorkspaceMember, tool{name: "rsvp_only", run: runRsvpOnly})
 	h.register(auth.FloorWorkspaceMember, tool{name: "deletes", run: runDeletes})
+	h.register(auth.FloorWorkspaceMember, tool{name: "withdraws", run: runWithdraws})
+	h.register(auth.FloorWorkspaceMember, tool{name: "package_namesake", run: runPackageNamesake})
 }
 
 func runApplies(q *Queries) {
@@ -341,6 +405,14 @@ func runRsvpOnly(q *Queries) {
 func runDeletes(q *Queries) {
 	_ = itemkit.DeleteEvent(ctx, tx)
 }
+
+func runWithdraws(q *Queries) {
+	_ = itemkit.WithdrawEvent(ctx, tx)
+}
+
+func runPackageNamesake(q *Queries) {
+	_ = calendars.WriteContents(ctx)
+}
 `)
 
 	write("apps/flow-api/internal/http/router/router.go", `package router
@@ -354,6 +426,7 @@ import (
 func build(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{OperationID: "contents-create"}, calendars.CreateEvent(deps))
 	huma.Register(api, huma.Operation{OperationID: "contents-delete"}, calendars.DeleteEvent(deps))
+	huma.Register(api, huma.Operation{OperationID: "contents-withdraw"}, calendars.WithdrawEvent(deps))
 	huma.Register(api, huma.Operation{OperationID: "rsvp"}, calendars.RsvpEvent(deps))
 }
 `)

@@ -30,7 +30,7 @@ func TestCalendarWritesReachTheirPreconditions(t *testing.T) {
 					rule.Name, enforcer)
 			}
 		}
-		if len(Sinks(statements, rule)) == 0 {
+		if len(Sinks(src, statements, rule)) == 0 {
 			t.Fatalf("no statement in sql/queries writes any of %s on %s, so rule %q is held against nothing; the SQL derivation has stopped matching rather than the writes having gone away",
 				strings.Join(rule.Columns, " / "), rule.Table, rule.Name)
 		}
@@ -100,7 +100,7 @@ func TestEntriesAreDerivedFromBothRegistries(t *testing.T) {
 func TestSinksAreWritesRatherThanMentions(t *testing.T) {
 	t.Parallel()
 
-	_, statements := load(t)
+	src, statements := load(t)
 	byName := map[string]Statement{}
 	for _, s := range statements {
 		byName[s.Name] = s
@@ -110,7 +110,7 @@ func TestSinksAreWritesRatherThanMentions(t *testing.T) {
 	if chronology.Name != "chronology" {
 		t.Fatalf("the first rule is %q; this check is about the window rule", chronology.Name)
 	}
-	sinks := Sinks(statements, chronology)
+	sinks := Sinks(src, statements, chronology)
 
 	for _, want := range []string{"CreateCalendarEvent", "PatchCalendarEvent"} {
 		if _, ok := byName[want]; !ok {

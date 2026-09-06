@@ -44,11 +44,11 @@ func TestMCPCalendarWritesReachTheWriteRule(t *testing.T) {
 	for _, f := range findings {
 		switch f.Kind {
 		case Unenforced:
-			t.Errorf("MCP tool %s (%s, registered at %s) writes %s through %s (%s) but nothing reachable from it calls %s.\n"+
+			t.Errorf("MCP tool %s (%s, registered at %s) writes %s through %s (%s, %s) but nothing reachable from it calls %s.\n"+
 				"  Every REST operation that writes the same sink goes through %s, so a caller reaches the same rows under two different rules: REST refuses a member below editor and refuses a provider-fed calendar at any role, and this tool refuses neither.\n"+
 				"  Route the write through the shared decision, or say at the tool why this write is not a write to a calendar's contents: %s",
 				f.Entry.Name, f.Entry.Symbol, f.Entry.Pos,
-				f.Via.Table, f.Via.Name, f.Via.Location(),
+				f.Via.Table, f.Via.Name, f.Via.Form, f.Via.Location(),
 				CalendarWriteDecisionSymbol, CalendarWriteGateSymbol, WriteACLMarkerForm)
 		case StaleMarker:
 			t.Errorf("MCP tool %s (%s) carries a write-ACL exemption that covers nothing — it either writes no governed calendar sink or applies the rule anyway. It exempts nothing and reads as though something was reasoned about; drop it",
@@ -79,23 +79,33 @@ func TestGovernedSinksSeparateContentsFromEverythingElse(t *testing.T) {
 
 	src, statements := load(t)
 	candidates := CalendarWriteSinks(src, statements)
-	byName := map[string]WriteSink{}
+	// Keyed rather than named: a statement and the handler that issues it
+	// commonly share a name, and one of the pair being governed says
+	// nothing about the other.
+	byKey := map[string]WriteSink{}
 	for _, s := range candidates {
-		byName[s.Name] = s
+		byKey[s.Key()] = s
 	}
 
 	governed, ungoverned := GovernedWriteSinks(reachAll(src), candidates)
 	isGoverned := map[string]bool{}
 	for _, s := range governed {
-		isGoverned[s.Name] = true
+		isGoverned[s.Key()] = true
 	}
 
 	// Writes to a calendar's contents, each performed by a REST operation
 	// that goes through the write gate. Naming them here is not the scope
 	// of the check — the scope is every sink the derivation finds — it is
-	// the assertion that the derivation still finds anything.
-	for _, want := range []string{"CreateCalendarEvent", "PatchCalendarEvent", "UpdateCalendarMemo", "DeleteEvent"} {
-		if _, ok := byName[want]; !ok {
+	// the assertion that the derivation still finds anything. Event
+	// deletion is named by symbol because it is a write site in the Go
+	// tree rather than a statement.
+	for _, want := range []string{
+		"CreateCalendarEvent",
+		"PatchCalendarEvent",
+		"UpdateCalendarMemo",
+		modulePath + "/internal/itemkit.DeleteEvent",
+	} {
+		if _, ok := byKey[want]; !ok {
 			t.Fatalf("%s is no longer derived as a calendar write at all; the check is being verified against a sink that does not exist", want)
 		}
 		if !isGoverned[want] {
@@ -104,30 +114,34 @@ func TestGovernedSinksSeparateContentsFromEverythingElse(t *testing.T) {
 		}
 	}
 
-	// A statement sink and a literal sink both have to survive
-	// classification. Event deletion is performed as a literal, so a
-	// classification that only kept sqlc statements would hold the delete
-	// tool to nothing while still looking green.
-	statementKinds, literalKinds := 0, 0
+	// Every form the derivation reads has to survive classification. Each
+	// form is a separate way of finding a write, and a form that stops
+	// matching removes sinks instead of adding findings — so the check
+	// would go on passing while holding the tools it covered to nothing.
+	//
+	// The named-call form is the one the repository asks new code to use:
+	// SQL lives in sql/queries and reaches Go through the generated
+	// method. A derivation blind to it covers less as the tree gets
+	// cleaner, which is the opposite of what a guard is for.
+	forms := map[WriteForm]int{}
 	for _, s := range governed {
-		if s.Symbol == "" {
-			statementKinds++
-		} else {
-			literalKinds++
-		}
+		forms[s.Form]++
 	}
-	if statementKinds == 0 {
+	if forms[StatementSink] == 0 {
 		t.Error("no sqlc statement survived classification; the statement half of the derivation has stopped matching")
 	}
-	if literalKinds == 0 {
-		t.Error("no literal-built write survived classification; event deletion is one, and a derivation that reads only sql/queries holds the delete path to nothing")
+	if forms[NamedCallSink] == 0 {
+		t.Error("no write issued through a generated query method survived classification; that is how this repository asks a write to be spelled, so the derivation is now blind to the call sites that follow its own rule")
+	}
+	if forms[LiteralSink] == 0 {
+		t.Error("no literal-built write survived classification; inline SQL is not gone from this tree, and a derivation that stops reading it holds those paths to nothing")
 	}
 
 	// Writes REST performs outside the gate. Holding MCP to a rule REST
 	// does not hold itself to would report a divergence that does not
 	// exist.
 	for _, unwanted := range []string{"UpdateAttendeeRsvp", "PatchCalendar", "UpsertCalendarMember", "PatchCalendarSubscription"} {
-		if _, ok := byName[unwanted]; !ok {
+		if _, ok := byKey[unwanted]; !ok {
 			t.Fatalf("%s is no longer derived as a calendar write at all; the check is being verified against a sink that does not exist", unwanted)
 		}
 		if isGoverned[unwanted] {

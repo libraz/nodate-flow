@@ -66,7 +66,7 @@ func TestSinkDerivationSeparatesWritesFromReads(t *testing.T) {
 	if len(statements) != 5 {
 		t.Fatalf("the fixture parsed into %d statements, want 5; the header scan is not reading the file", len(statements))
 	}
-	sinks := Sinks(statements, controlRule)
+	sinks := Sinks(nil, statements, controlRule)
 
 	got := make([]string, 0, len(sinks))
 	for name := range sinks {
@@ -90,9 +90,15 @@ func TestSinkDerivationSeparatesWritesFromReads(t *testing.T) {
 // It pins, in one pass over one tree: an entry that applies the rule, one
 // that does not, one that reaches it through a helper, one exempted by a
 // marker, one whose marker states no reason, one whose marker covers
-// nothing, an entry that only names the rule in prose, and an entry that
-// calls a same-named method on a value. Only the ones that genuinely skip
-// the rule may be reported.
+// nothing, an entry that only names the rule in prose, an entry that
+// calls a same-named method on a value, and an entry whose write is built
+// as a Go string literal rather than declared in sql/queries. Only the
+// ones that genuinely skip the rule may be reported.
+//
+// The literal-writing entry is not a variation on the others. It is the
+// form a sink set derived from sql/queries alone cannot see at all, so
+// without it the whole check would keep passing over every write that
+// stops following the convention.
 func TestScanReportsWhatItIsMeantToReport(t *testing.T) {
 	t.Parallel()
 
@@ -108,14 +114,15 @@ func TestScanReportsWhatItIsMeantToReport(t *testing.T) {
 	}
 	for _, want := range []string{
 		"applies", "skips", "via_helper", "marked", "reasonless",
-		"stale_marker", "mentions_in_prose", "same_named_method", "rest-skips",
+		"stale_marker", "mentions_in_prose", "same_named_method",
+		"writes_via_literal", "rest-skips",
 	} {
 		if _, ok := entries[want]; !ok {
 			t.Fatalf("the control tree did not yield entry %q; the registry walk is not reading the fixture", want)
 		}
 	}
-	if len(src.Entries) != 9 {
-		t.Fatalf("the control tree yielded %d entries, want 9", len(src.Entries))
+	if len(src.Entries) != 10 {
+		t.Fatalf("the control tree yielded %d entries, want 10", len(src.Entries))
 	}
 
 	statements := parseQueryFile("sql/queries/control.sql", controlSQL)
@@ -143,6 +150,7 @@ func TestScanReportsWhatItIsMeantToReport(t *testing.T) {
 		{name: "same_named_method", kind: Unenforced},
 		{name: "skips", kind: Unenforced},
 		{name: "stale_marker", kind: StaleMarker},
+		{name: "writes_via_literal", kind: Unenforced},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("the scan reported %v, want %v", got, want)
@@ -155,10 +163,10 @@ func TestScanReportsWhatItIsMeantToReport(t *testing.T) {
 
 	// The findings above are only meaningful if the entries that are not
 	// reported were actually looked at, so the scope is asserted too.
-	// Seven of the eight tools write the window; stale_marker only reads
+	// Eight of the nine tools write the window; stale_marker only reads
 	// it, which is why its marker covers nothing.
-	if n := len(scope[controlRule.Name]["MCP tool"]); n != 7 {
-		t.Errorf("the rule was held against %d MCP tools, want 7", n)
+	if n := len(scope[controlRule.Name]["MCP tool"]); n != 8 {
+		t.Errorf("the rule was held against %d MCP tools, want 8", n)
 	}
 	if n := len(scope[controlRule.Name]["REST operation"]); n != 1 {
 		t.Errorf("the rule was held against %d REST operations, want 1", n)
@@ -186,9 +194,24 @@ func writeControlTree(t *testing.T) string {
 func RequireEventChronology(startAt, endAt *int64) error { return nil }
 `)
 
+	write("apps/flow-api/internal/itemkit/schedule.go", `package itemkit
+
+// ScheduleEvent writes the window the way this repository asks it not to
+// be written: as SQL in the Go source. The statement is nowhere in
+// sql/queries, so a sink set derived from the query files alone contains
+// nothing that reaches it.
+func ScheduleEvent(ctx Ctx, tx TX) error {
+	_, _ = tx.ExecContext(ctx, "INSERT INTO calendar_events (public_id, start_at, end_at) VALUES (?, ?, ?)")
+	return nil
+}
+`)
+
 	write("apps/flow-api/internal/mcp/tools.go", `package mcp
 
-import "`+modulePath+`/internal/calendarrules"
+import (
+	"`+modulePath+`/internal/calendarrules"
+	"`+modulePath+`/internal/itemkit"
+)
 
 func (h *Handler) registerAll() {
 	h.register(auth.FloorWorkspaceMember, tool{name: "applies", run: runApplies})
@@ -199,6 +222,7 @@ func (h *Handler) registerAll() {
 	h.register(auth.FloorWorkspaceMember, tool{name: "stale_marker", run: runStaleMarker})
 	h.register(auth.FloorWorkspaceMember, tool{name: "mentions_in_prose", run: runMentionsInProse})
 	h.register(auth.FloorWorkspaceMember, tool{name: "same_named_method", run: runSameNamedMethod})
+	h.register(auth.FloorWorkspaceMember, tool{name: "writes_via_literal", run: runWritesViaLiteral})
 }
 
 func runApplies(q *Queries) {
@@ -245,6 +269,10 @@ func runMentionsInProse(q *Queries) {
 func runSameNamedMethod(q *Queries, guard *Guard) {
 	_ = guard.RequireEventChronology(nil, nil)
 	_, _ = q.WriteWindow(ctx, params)
+}
+
+func runWritesViaLiteral(q *Queries) {
+	_ = itemkit.ScheduleEvent(ctx, tx)
 }
 `)
 
