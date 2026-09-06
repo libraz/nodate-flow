@@ -174,11 +174,15 @@ func (e *Executor) RunOnce(ctx context.Context) error {
 }
 
 // taskRow holds the fields needed for evaluation and mutation.
+//
+// The task's title is deliberately absent. The rule engine decides on
+// state, dates and actor facts alone, so reading the title would put a
+// task's own content on the wire for a pass that has no reader to show
+// it to and no actor to scope it by.
 type taskRow struct {
 	id           uint32
 	publicID     types.PublicID
 	workspaceID  uint32
-	title        string
 	derivedState string
 	priority     int32
 	dueOn        sql.NullTime
@@ -373,8 +377,51 @@ func (e *Executor) listWorkspaceTargets(ctx context.Context) ([]workspaceTarget,
 	return targets, nil
 }
 
-// taskQuery is now built dynamically in processWorkspaceWithThreshold
-// using the minimum idle threshold from the workspace's rule config.
+// taskScanTemplate is the per-workspace task scan, completed at run time
+// by [Executor.processWorkspaceWithThreshold] with the derived_state
+// filter and the idle interval its rule config resolves to. Both of those
+// are the substituted fragments; nothing else about the statement varies.
+//
+// What it projects is the rule engine's whole input. No title, no
+// description, no notes: the engine decides on state, dates and actor
+// facts, so reading a task's own words would put them on the wire for a
+// pass with no reader. agent_memo is the exception and is read as
+// counters — see [decodeAgentMemo].
+const taskScanTemplate = `
+SELECT t.id, t.public_id, t.workspace_id, t.derived_state,
+       t.priority, t.due_on, t.updated_at, t.created_at,
+       -- role, not kind. task_actors.kind is the actor type
+       -- ('user' | 'agent') and role is the relationship
+       -- ('assignee' | 'reviewer' | ...), so kind = 'assignee' matches
+       -- nothing the enum can hold: has_assignee was false for every
+       -- task, and the executor kept proposing an owner for tasks that
+       -- already had one while never nudging the assignees that did
+       -- exist. Both rules read this one column.
+       EXISTS(
+         SELECT 1 FROM task_actors ta
+         WHERE ta.task_id = t.id AND ta.role = 'assignee' AND ta.enabled = TRUE
+       ) AS has_assignee,
+       ag.id   AS agent_id,
+       ag.public_id AS agent_public_id,
+       t.agent_memo
+FROM tasks t
+LEFT JOIN task_actors agent_ta
+  ON agent_ta.task_id = t.id
+  AND agent_ta.kind = 'agent'
+  AND agent_ta.role = 'assignee'
+  AND agent_ta.enabled = TRUE
+LEFT JOIN ai_agents ag
+  ON ag.id = agent_ta.agent_id
+  AND ag.enabled = TRUE
+WHERE t.workspace_id = ? AND t.enabled = TRUE
+  %s
+  AND (
+    (t.due_on IS NOT NULL AND t.due_on < CURDATE())
+    OR
+    COALESCE(t.updated_at, t.created_at) < NOW() - INTERVAL %s
+  )
+LIMIT 200
+`
 
 // rulesQuery fetches the per-workspace rule overrides. When no rows
 // exist, the executor falls back to DefaultRuleConfigs().
@@ -428,6 +475,18 @@ func (e *Executor) loadRuleConfigs(ctx context.Context, wsID uint32) []RuleConfi
 	return result
 }
 
+// processWorkspaceWithThreshold evaluates one workspace's tasks against
+// its resolved rule config and applies every action that clears the
+// confidence threshold.
+//
+// task-visibility: not-applicable — this pass runs on a timer rather than
+// for a reader, so there is no actor whose visibility could scope it and
+// a predicate written against a zero actor would quietly reduce it to
+// evaluating nothing. The scan is bounded by workspace_id instead, and
+// the one content column it reads, agent_memo, is decoded by
+// [decodeAgentMemo] into an attempt count and a timestamp; neither the
+// memo nor anything derived from it is copied into an event payload, a
+// log line or a response, so no task text leaves this function
 func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint32, threshold float32) {
 	rules := e.loadRuleConfigs(ctx, wsID)
 
@@ -464,41 +523,7 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	if archiveEnabled {
 		stateFilter = "AND (t.derived_state NOT IN ('done', 'cancelled') OR (t.derived_state IN ('done', 'cancelled') AND t.archived_at IS NULL))"
 	}
-	dynamicTaskQuery := fmt.Sprintf(`
-SELECT t.id, t.public_id, t.workspace_id, t.title, t.derived_state,
-       t.priority, t.due_on, t.updated_at, t.created_at,
-       -- role, not kind. task_actors.kind is the actor type
-       -- ('user' | 'agent') and role is the relationship
-       -- ('assignee' | 'reviewer' | ...), so kind = 'assignee' matches
-       -- nothing the enum can hold: has_assignee was false for every
-       -- task, and the executor kept proposing an owner for tasks that
-       -- already had one while never nudging the assignees that did
-       -- exist. Both rules read this one column.
-       EXISTS(
-         SELECT 1 FROM task_actors ta
-         WHERE ta.task_id = t.id AND ta.role = 'assignee' AND ta.enabled = TRUE
-       ) AS has_assignee,
-       ag.id   AS agent_id,
-       ag.public_id AS agent_public_id,
-       t.agent_memo
-FROM tasks t
-LEFT JOIN task_actors agent_ta
-  ON agent_ta.task_id = t.id
-  AND agent_ta.kind = 'agent'
-  AND agent_ta.role = 'assignee'
-  AND agent_ta.enabled = TRUE
-LEFT JOIN ai_agents ag
-  ON ag.id = agent_ta.agent_id
-  AND ag.enabled = TRUE
-WHERE t.workspace_id = ? AND t.enabled = TRUE
-  %s
-  AND (
-    (t.due_on IS NOT NULL AND t.due_on < CURDATE())
-    OR
-    COALESCE(t.updated_at, t.created_at) < NOW() - INTERVAL %s
-  )
-LIMIT 200
-`, stateFilter, idleInterval)
+	dynamicTaskQuery := fmt.Sprintf(taskScanTemplate, stateFilter, idleInterval)
 
 	rows, err := e.DB.QueryContext(ctx, dynamicTaskQuery, wsID)
 	if err != nil {
@@ -516,7 +541,7 @@ LIMIT 200
 			agentMemoBytes []byte
 		)
 		if err := rows.Scan(
-			&r.id, &r.publicID, &r.workspaceID, &r.title,
+			&r.id, &r.publicID, &r.workspaceID,
 			&r.derivedState, &r.priority, &r.dueOn, &r.updatedAt,
 			&r.createdAt, &r.hasAssignee,
 			&agentIDNull, &agentPubIDRaw, &agentMemoBytes,
@@ -767,6 +792,13 @@ func readMemoCounters(ctx context.Context, q HandoffQuerier, workspaceID, taskID
 type txActorDisabler struct{ tx *sql.Tx }
 
 // DisableAgentActor flips enabled=FALSE on the agent assignee row.
+//
+// A zero count is an error rather than a quiet success. The row was seen
+// by the scan that selected this task, so zero means it went away in
+// between — the agent was taken off the task by something else. The
+// caller has already inserted the handoff event and is about to bump the
+// handoff counter in agent_memo, and both of those describe a hand-back
+// that this run did not perform; failing here is what rolls them back.
 func (d *txActorDisabler) DisableAgentActor(ctx context.Context, workspaceID, taskID, agentID uint32) error {
 	const q = `UPDATE task_actors
 		SET enabled = FALSE
@@ -776,8 +808,16 @@ func (d *txActorDisabler) DisableAgentActor(ctx context.Context, workspaceID, ta
 		  AND kind = 'agent'
 		  AND role = 'assignee'
 		  AND enabled = TRUE`
-	if _, err := d.tx.ExecContext(ctx, q, workspaceID, taskID, agentID); err != nil {
+	res, err := d.tx.ExecContext(ctx, q, workspaceID, taskID, agentID)
+	if err != nil {
 		return err
+	}
+	disabled, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if disabled == 0 {
+		return fmt.Errorf("no enabled agent assignee row for task %d, agent %d", taskID, agentID)
 	}
 	return nil
 }

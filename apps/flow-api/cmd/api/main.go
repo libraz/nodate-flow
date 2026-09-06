@@ -359,17 +359,23 @@ func main() {
 					})
 				},
 				Applier: judgeApplier,
-				// Wire the three PromptDeps lookups so
-				// the runner renders the full context window
-				// (recent tasks + linked tasks + judge_instructions +
-				// "now in workspace timezone") instead of falling back
-				// to the composeJudgePrompt JSON snapshot.
-				// The lookups are narrow raw-SQL adapters that mirror
-				// the integration-test inline adapters in
-				// apps/flow-api/tests/signaljudge/prompt_render_test.go;
-				// caps (MaxRecentTasks=20 / MaxLinkedTasks=10) are
-				// enforced inside BuildPromptContext regardless of how
-				// many rows the lookups return.
+				// Wire the three PromptDeps lookups so the runner
+				// renders the full context window (recent tasks +
+				// linked tasks + judge_instructions) instead of falling
+				// back to the composeJudgePrompt JSON snapshot.
+				// WorkspaceNow is left nil, so the "Now" timestamp the
+				// judge reasons against is UTC and not the workspace's
+				// own timezone.
+				//
+				// The lookups are narrow raw-SQL adapters that
+				// apps/flow-api/tests/signaljudge/prompt_render_test.go
+				// constructs and runs directly, so the statements that
+				// test exercises are the statements a judge run
+				// executes. Caps (MaxRecentTasks=20 /
+				// MaxLinkedTasks=10) are enforced inside
+				// BuildPromptContext regardless of how many rows the
+				// lookups return, and a lookup that fails there fails
+				// the run rather than shortening the prompt.
 				Prompt: signaljudge.PromptDeps{
 					RecentTasks:       &signaljudge.SQLRecentTasksLookup{DB: db},
 					LinkedTasks:       &signaljudge.SQLLinkedTasksLookup{DB: db},

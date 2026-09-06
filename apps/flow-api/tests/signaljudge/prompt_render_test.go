@@ -1,20 +1,22 @@
 // signal_judge prompt rendering integration tests.
 //
 // These tests are the end-to-end deterministic snapshot of the full
-// rendered judge prompt against a real testcontainer MySQL. They wire
-// the three [signaljudge.PromptDeps] lookups against the live schema
-// via inline SQL adapters (the unit tests in
-// apps/flow-api/internal/ai/signaljudge/prompt_test.go cover the cap
-// math with fakes; this file exercises the SQL specifically).
+// rendered judge prompt against a real testcontainer MySQL. The unit
+// tests in apps/flow-api/internal/ai/signaljudge/prompt_test.go cover the
+// cap math with fakes; this file exercises the SQL.
 //
-// Production wiring of the lookups in
-// apps/flow-api/cmd/api/main.go is NOT yet in place: the judgeRunner
-// constructor leaves [signaljudge.Runner.Prompt] zero-valued, which
-// causes [signaljudge.Runner.renderUserPrompt] to fall back to the
-// legacy [signaljudge.composeJudgePrompt] shape. Until the runner is
-// wired with these adapters, the rendered prompt these tests assert is
-// not exercised on the live path. The adapter shapes here mirror what
-// the production wiring will need so the gap is mechanical to close.
+// The lookups are the exported production ones — the same values
+// apps/flow-api/cmd/api/main.go binds into [signaljudge.Runner.Prompt].
+// They were once retyped here as inline adapters said to mirror them, and
+// a bound added to the real statements did not reach the copies: the
+// tests went on asserting a contract the shipped code had moved past, and
+// would have gone on passing had the bound been dropped again. A test of
+// a statement has to be a test of that statement.
+//
+// Only the clock is a fixture. [signaljudge.PromptDeps.WorkspaceNow] is
+// left nil in production, which renders the workspace's own current time;
+// pinning it is what lets two renders of one context be compared byte for
+// byte.
 package signaljudgetests
 
 import (
@@ -32,116 +34,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/signaljudge"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
-
-// ----- Inline SQL adapters --------------------------------------------------
-//
-// These mirror the shape the production wiring at
-// apps/flow-api/cmd/api/main.go will eventually use. They are
-// deliberately small SELECTs against the live schema so the test
-// exercises the real SQL contract (column types, NULL handling,
-// ordering) instead of stubbing it out.
-
-// sqlRecentTasksLookup loads the most recent tasks for a workspace
-// ordered by created_at DESC (newest first). The order is pinned so
-// the rendered prompt is byte-stable across re-runs.
-type sqlRecentTasksLookup struct{ db *sql.DB }
-
-// LoadRecent implements [signaljudge.RecentTasksLookup].
-func (l *sqlRecentTasksLookup) LoadRecent(ctx context.Context, workspaceID uint32, limit int) ([]signaljudge.TaskSummary, error) {
-	const q = `
-		SELECT BIN_TO_UUID(public_id, 0), title, derived_state, due_on
-		FROM tasks
-		WHERE workspace_id = ? AND enabled = TRUE
-		ORDER BY created_at DESC, id DESC
-		LIMIT ?`
-	rows, err := l.db.QueryContext(ctx, q, workspaceID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	out := []signaljudge.TaskSummary{}
-	for rows.Next() {
-		var pub, title, state string
-		var due sql.NullTime
-		if err := rows.Scan(&pub, &title, &state, &due); err != nil {
-			return nil, err
-		}
-		ts := signaljudge.TaskSummary{
-			PublicID:     pub,
-			Title:        title,
-			DerivedState: state,
-		}
-		if due.Valid {
-			ts.DueOn = due.Time.UTC().Format("2006-01-02")
-		}
-		out = append(out, ts)
-	}
-	return out, rows.Err()
-}
-
-// sqlLinkedTasksLookup loads tasks attached to a calendar_event subject
-// via task_event_links (the M:N table). Mirrors the JOIN shape of
-// queries.ListLinkedTasksForEvent without the windowed COUNT — the
-// prompt builder caps the result independently.
-type sqlLinkedTasksLookup struct{ db *sql.DB }
-
-// LoadLinked implements [signaljudge.LinkedTasksLookup]. The
-// eventInternalID matches signals.subject_id when SubjectType is
-// calendar_event.
-func (l *sqlLinkedTasksLookup) LoadLinked(ctx context.Context, workspaceID uint32, eventInternalID int32, limit int) ([]signaljudge.TaskSummary, error) {
-	const q = `
-		SELECT BIN_TO_UUID(t.public_id, 0), t.title, t.derived_state, t.due_on
-		FROM task_event_links tel
-		INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
-		WHERE tel.workspace_id = ? AND tel.event_id = ? AND tel.enabled = TRUE
-		ORDER BY tel.sort_weight ASC, tel.created_at ASC, tel.id ASC
-		LIMIT ?`
-	rows, err := l.db.QueryContext(ctx, q, workspaceID, eventInternalID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	out := []signaljudge.TaskSummary{}
-	for rows.Next() {
-		var pub, title, state string
-		var due sql.NullTime
-		if err := rows.Scan(&pub, &title, &state, &due); err != nil {
-			return nil, err
-		}
-		ts := signaljudge.TaskSummary{
-			PublicID:     pub,
-			Title:        title,
-			DerivedState: state,
-		}
-		if due.Valid {
-			ts.DueOn = due.Time.UTC().Format("2006-01-02")
-		}
-		out = append(out, ts)
-	}
-	return out, rows.Err()
-}
-
-// sqlJudgeInstructionsLookup reads ai_settings.judge_instructions for
-// the workspace. An absent row returns "" (no per-workspace policy);
-// a NULL judge_instructions column also returns "".
-type sqlJudgeInstructionsLookup struct{ db *sql.DB }
-
-// LoadInstructions implements [signaljudge.JudgeInstructionsLookup].
-func (l *sqlJudgeInstructionsLookup) LoadInstructions(ctx context.Context, workspaceID uint32) (string, error) {
-	const q = `SELECT judge_instructions FROM ai_settings WHERE workspace_id = ? LIMIT 1`
-	var raw sql.NullString
-	err := l.db.QueryRowContext(ctx, q, workspaceID).Scan(&raw)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	if !raw.Valid {
-		return "", nil
-	}
-	return raw.String, nil
-}
 
 // ----- Test fixtures --------------------------------------------------------
 
@@ -380,15 +272,18 @@ func readSignalSnapshot(t *testing.T, db *sql.DB, signalID int64) signaljudge.Si
 	return snap
 }
 
-// fixedNowDeps returns a [signaljudge.PromptDeps] whose WorkspaceNow
-// hook is pinned to a fixed RFC3339 timestamp. The fixed-clock lets
-// the deterministic-rendering test assert byte equality between two
-// renders without flake from time.Now().
+// fixedNowDeps returns the production [signaljudge.PromptDeps] with its
+// clock pinned to a fixed RFC3339 timestamp.
+//
+// The three lookups are the shipped ones, so what these tests render is
+// what a judge run renders. Only WorkspaceNow is substituted, and only
+// because two renders of the same context cannot be compared byte for
+// byte while one of them reads the wall clock.
 func fixedNowDeps(db *sql.DB) signaljudge.PromptDeps {
 	return signaljudge.PromptDeps{
-		RecentTasks:       &sqlRecentTasksLookup{db: db},
-		LinkedTasks:       &sqlLinkedTasksLookup{db: db},
-		JudgeInstructions: &sqlJudgeInstructionsLookup{db: db},
+		RecentTasks:       &signaljudge.SQLRecentTasksLookup{DB: db},
+		LinkedTasks:       &signaljudge.SQLLinkedTasksLookup{DB: db},
+		JudgeInstructions: &signaljudge.SQLJudgeInstructionsLookup{DB: db},
 		WorkspaceNow: func(_ context.Context, _ uint32) (string, error) {
 			return "2026-05-17T12:00:00Z", nil
 		},

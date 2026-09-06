@@ -108,7 +108,6 @@ func makeTaskRow(t *testing.T) taskRow {
 		id:               42,
 		publicID:         types.New(),
 		workspaceID:      7,
-		title:            "stuck task",
 		derivedState:     string(StateOpen),
 		hasAgentAssignee: true,
 		agentID:          99,

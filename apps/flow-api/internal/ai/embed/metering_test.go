@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,14 +112,28 @@ func TestEmbedTask_MeteringSuccess(t *testing.T) {
 	if rec.WorkspaceID != 7 || rec.Purpose != "embed_task" || rec.Model != "text-embedding-3-small" || rec.Status != "ok" {
 		t.Fatalf("unexpected invocation record: %+v", rec)
 	}
-	if rec.PromptRedacted != "redacted:Title\n\nDescription" {
-		t.Fatalf("prompt was not redacted/composed: %q", rec.PromptRedacted)
+	// ai_invocations is readable by every workspace member and the caller
+	// that embeds a task has no actor to scope the read by, so the row
+	// must not carry the task's own words — only the marker saying they
+	// were left out.
+	if rec.PromptRedacted != "redacted:"+TaskTextOmitted {
+		t.Fatalf("prompt was not replaced by the omission marker: %q", rec.PromptRedacted)
+	}
+	if strings.Contains(rec.PromptRedacted, "Title") || strings.Contains(rec.PromptRedacted, "Description") {
+		t.Fatalf("the embedded task's text reached the invocation row: %q", rec.PromptRedacted)
 	}
 	if rec.ResponseRedacted != "embedding vector omitted" {
 		t.Fatalf("unexpected response marker: %q", rec.ResponseRedacted)
 	}
+	// Omitting the text must not cost the row its accounting: the token
+	// estimate is still measured on what the provider was actually sent,
+	// which is longer than the marker.
 	if rec.TokensInput == 0 {
 		t.Fatal("tokens_input must be estimated for embedding cost accounting")
+	}
+	if want := estimateTokens(composeTaskText("Title", "Description")); rec.TokensInput != want {
+		t.Errorf("tokens_input = %d, want %d — the estimate must follow the text the provider saw, not the marker",
+			rec.TokensInput, want)
 	}
 	if len(metrics) != 1 || metrics[0].provider != "fake-embed" || metrics[0].model != "text-embedding-3-small" {
 		t.Fatalf("unexpected metrics: %+v", metrics)
@@ -150,6 +165,53 @@ func TestEmbedTask_BudgetBlockSkipsProvider(t *testing.T) {
 	}
 	if store.upserts != 0 {
 		t.Fatalf("upserts = %d, want 0", store.upserts)
+	}
+}
+
+// TestEmbedTask_FailedInvocationOmitsTaskText covers the other half of
+// the omission.
+//
+// A provider that refuses the request still writes an ai_invocations row,
+// and that row is read by exactly the same workspace-wide audience as the
+// successful one. Fixing only the success path would leave the task's
+// title reaching every member of the workspace whenever the embedding
+// endpoint is down, which is the case an operator is most likely to open
+// the panel on.
+func TestEmbedTask_FailedInvocationOmitsTaskText(t *testing.T) {
+	t.Parallel()
+
+	upstream := errors.New("embedding endpoint refused the request")
+	store := &fakeStore{getErr: sql.ErrNoRows}
+	var logged []InvocationRecord
+	client := New(&fakeProvider{err: upstream}, store).WithMetering(
+		&fakeGuard{},
+		func(_ context.Context, rec InvocationRecord) { logged = append(logged, rec) },
+		nil,
+		func(s string) string { return "redacted:" + s },
+	)
+
+	const (
+		title = "Salary review for the contractor"
+		desc  = "Rates discussed in the private thread"
+	)
+	if err := client.EmbedTask(context.Background(), 7, 42, title, desc); !errors.Is(err, upstream) {
+		t.Fatalf("EmbedTask error = %v, want %v", err, upstream)
+	}
+	if len(logged) != 1 {
+		t.Fatalf("logged records = %d, want 1", len(logged))
+	}
+	rec := logged[0]
+	if rec.Status != "error" {
+		t.Errorf("status = %q, want %q", rec.Status, "error")
+	}
+	if rec.PromptRedacted != "redacted:"+TaskTextOmitted {
+		t.Errorf("prompt = %q, want the omission marker", rec.PromptRedacted)
+	}
+	for _, leaked := range []string{title, desc} {
+		if strings.Contains(rec.PromptRedacted, leaked) || strings.Contains(rec.ErrorCode, leaked) {
+			t.Errorf("the task's text reached the failed invocation row: prompt %q, errorCode %q",
+				rec.PromptRedacted, rec.ErrorCode)
+		}
 	}
 }
 

@@ -137,6 +137,19 @@ func (c *Client) WithMetering(guard CostGuard, log InvocationLogger, onInvocatio
 	return c
 }
 
+// TaskTextOmitted is what an embed_task invocation row carries in place
+// of the task's own title and description.
+//
+// ai_invocations is readable by every member of the workspace, and the
+// pipeline that embeds a task runs off an event with no actor to scope
+// the read by — so writing the composed task text into the audit row
+// would hand a private task's title to readers the task's own visibility
+// keeps it from. The row still carries the purpose, the model, the token
+// estimate and the cost, which is what it is read for; the text itself
+// is not part of that question. Mirrors the "embedding vector omitted"
+// marker on the response side.
+const TaskTextOmitted = "task text omitted"
+
 // EmbedTask generates and upserts the embedding for a task. If the
 // (task_id, model) row already exists with the same content hash the
 // call is a no-op, so repeated PATCHes that don't change title or
@@ -146,6 +159,9 @@ func (c *Client) WithMetering(guard CostGuard, log InvocationLogger, onInvocatio
 // duplicate-detection query layer can scope by workspace without joining
 // through tasks. It MUST match the owning task's workspace_id; the FK on
 // task_embeddings.workspace_id enforces that the row exists in workspaces.
+//
+// The provider sees the task text; the invocation row does not. See
+// [TaskTextOmitted].
 func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, title, description string) error {
 	text := composeTaskText(title, description)
 	if text == "" {
@@ -161,7 +177,7 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 	if err == nil && existing.ContentHash == hash {
 		return nil
 	}
-	raw, err := c.meteredEmbed(ctx, workspaceID, purposeEmbedTask, text)
+	raw, err := c.meteredEmbed(ctx, workspaceID, purposeEmbedTask, text, TaskTextOmitted)
 	if err != nil {
 		return err
 	}
@@ -184,8 +200,12 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 // The call still spends the provider's tokens, so workspaceID is
 // required: it scopes the budget the guard enforces and the
 // ai_invocations row the call is accounted for in.
+//
+// A query embedding is the caller's own words rather than a stored
+// task's, so the audit row records it as written — unlike
+// [Client.EmbedTask], see [TaskTextOmitted].
 func (c *Client) EmbedQuery(ctx context.Context, workspaceID uint32, text string) ([]float32, error) {
-	return c.meteredEmbed(ctx, workspaceID, purposeEmbedQuery, text)
+	return c.meteredEmbed(ctx, workspaceID, purposeEmbedQuery, text, text)
 }
 
 // meteredEmbed is the only place the provider is called. Every embedding
@@ -196,7 +216,15 @@ func (c *Client) EmbedQuery(ctx context.Context, workspaceID uint32, text string
 //
 // The returned vector is normalized to unit length, which is what makes
 // Cosine a plain dot product.
-func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, text string) ([]float32, error) {
+//
+// text is what the provider is asked to embed; audit is what the
+// invocation row records in its place. They are separate parameters
+// because the two have different audiences: the provider call is scoped
+// to the workspace's own configured endpoint, while ai_invocations is
+// readable by every member of the workspace. Cost and token counts are
+// always derived from text, so splitting the two cannot make the audit
+// row understate spend.
+func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, text, audit string) ([]float32, error) {
 	if c.Guard != nil {
 		if err := c.Guard.Check(ctx, workspaceID); err != nil {
 			return nil, err
@@ -210,13 +238,13 @@ func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, 
 	raw, err := c.Provider.Embed(ctx, text)
 	if err != nil {
 		c.recordMetrics(0, 0, time.Since(start), err)
-		c.logFailure(ctx, workspaceID, purpose, text, err)
+		c.logFailure(ctx, workspaceID, purpose, audit, err)
 		return nil, fmt.Errorf("provider embed: %w", err)
 	}
 	if len(raw) == 0 {
 		err := errors.New("embed: provider returned empty vector")
 		c.recordMetrics(0, 0, time.Since(start), err)
-		c.logFailure(ctx, workspaceID, purpose, text, err)
+		c.logFailure(ctx, workspaceID, purpose, audit, err)
 		return nil, err
 	}
 	elapsed := time.Since(start)
@@ -224,7 +252,7 @@ func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, 
 
 	costMicros := estimateCostMicros(c.Model(), text)
 	c.recordMetrics(estimateTokens(text), costMicros, elapsed, nil)
-	c.logSuccess(ctx, workspaceID, purpose, text, costMicros)
+	c.logSuccess(ctx, workspaceID, purpose, audit, estimateTokens(text), costMicros)
 	return raw, nil
 }
 
@@ -241,7 +269,10 @@ func (c *Client) recordMetrics(inputTokens int, costMicros int64, elapsed time.D
 	c.OnInvocation(providerName(c.Provider), c.Model(), inputTokens, 0, costMicros, elapsed, err)
 }
 
-func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, purpose, text string, costMicros int64) {
+// logSuccess writes the audit row. audit is what the row shows in place
+// of the prompt and tokensInput is measured on the text that was
+// actually sent, so an omitted prompt never costs the row its accounting.
+func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, purpose, audit string, tokensInput int, costMicros int64) {
 	if c.LogInvoke == nil {
 		return
 	}
@@ -249,16 +280,16 @@ func (c *Client) logSuccess(ctx context.Context, workspaceID uint32, purpose, te
 		WorkspaceID:      workspaceID,
 		Purpose:          purpose,
 		Model:            c.Model(),
-		PromptRedacted:   c.redact(text),
+		PromptRedacted:   c.redact(audit),
 		ResponseRedacted: "embedding vector omitted",
-		TokensInput:      estimateTokens(text),
+		TokensInput:      tokensInput,
 		CostMicros:       costMicros,
 		CostCents:        costMicros / 10_000,
 		Status:           "ok",
 	})
 }
 
-func (c *Client) logFailure(ctx context.Context, workspaceID uint32, purpose, text string, err error) {
+func (c *Client) logFailure(ctx context.Context, workspaceID uint32, purpose, audit string, err error) {
 	if c.LogInvoke == nil {
 		return
 	}
@@ -266,7 +297,7 @@ func (c *Client) logFailure(ctx context.Context, workspaceID uint32, purpose, te
 		WorkspaceID:    workspaceID,
 		Purpose:        purpose,
 		Model:          c.Model(),
-		PromptRedacted: c.redact(text),
+		PromptRedacted: c.redact(audit),
 		Status:         "error",
 		ErrorCode:      c.redact(err.Error()),
 	})

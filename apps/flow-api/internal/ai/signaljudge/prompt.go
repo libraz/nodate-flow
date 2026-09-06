@@ -62,8 +62,11 @@ Each run gives you:
 - An optional "Linked tasks" section when the signal subject is a calendar_event; these are the tasks that event is tied to.
 - An optional "Judge instructions" section with workspace-specific policy from the operator. Treat these as guidance, not as overrides of safety rules.
 - A "Now" timestamp in the workspace timezone for time-sensitive judgement.
+- An optional "Context gaps" section, present only when part of the context above could not be assembled or did not fit and was left out.
 
 The "Recent tasks" and "Linked tasks" sections are capped; if a task you would target is not listed, return "noop".
+
+When a "Context gaps" section is present the context is incomplete, and nothing missing from it may be read as absent: an empty or shortened list is not evidence that the workspace has nothing in it. Return "defer" or "noop", and keep confidence at or below 0.5.
 
 # Actions
 
@@ -257,7 +260,44 @@ type PromptContext struct {
 	// "just happened" framing). Empty falls back to a runtime
 	// time.Now() string at render time.
 	Now string
+	// ContextGaps names the parts of the context that could not be
+	// assembled and were substituted or left out. It is rendered into
+	// the prompt itself rather than only logged, because the prompt is
+	// what the model reads and what ai_invocations.prompt_redacted
+	// preserves: a context missing something must never be presented as
+	// a complete one to either reader.
+	//
+	// Only the degradations the builder is willing to proceed through
+	// appear here. A gap that would change which tasks the judge may act
+	// on aborts the build instead — see [BuildPromptContext].
+	ContextGaps []string
 }
+
+// ContextGapWorkspaceClock is recorded when a configured
+// [PromptDeps.WorkspaceNow] did not yield a timestamp and the builder
+// fell back to UTC.
+//
+// The workspace clock is the only lookup whose failure is survivable: it
+// supplies no evidence, only the frame of reference for "overdue" and
+// "just happened", and UTC is a correct substitute for it. The
+// substitution is still named, because a judge reasoning about a due date
+// against the wrong timezone and a judge reasoning against the right one
+// produce the same-looking verdict.
+const ContextGapWorkspaceClock = "workspace clock unavailable; the Now timestamp is UTC, not the workspace timezone"
+
+// The gaps [RenderUserPrompt] records when a section does not fit inside
+// MaxContextBytes and is dropped whole.
+//
+// Dropping for size and failing to load produce the same body — a heading
+// that is not there — so they are reported the same way. A capped list the
+// model is told about is a list it can decline to conclude from; a capped
+// list it is not told about is a workspace that appears to contain
+// nothing.
+const (
+	ContextGapRecentTasksDropped       = "the Recent tasks section did not fit the context budget and was dropped"
+	ContextGapLinkedTasksDropped       = "the Linked tasks section did not fit the context budget and was dropped"
+	ContextGapJudgeInstructionsDropped = "the Judge instructions section did not fit the context budget and was dropped"
+)
 
 // Caps for context rendering. All four are exported so callers (and
 // tests) can introspect them; the runner does not let the LLM see
@@ -290,6 +330,13 @@ const (
 // rendered prompt rather than an error. This lets the runner be
 // wired progressively — each lookup binds independently and the
 // judge keeps working with whatever subset is available.
+//
+// A lookup that is wired and then fails is a different thing entirely,
+// and is not optional: leaving a section out because nobody asked for it
+// is a deployment's choice, while leaving one out because the query
+// failed hands the judge a context it cannot tell apart from an empty
+// workspace. [BuildPromptContext] refuses that case rather than rendering
+// it.
 type PromptDeps struct {
 	// RecentTasks loads the most recent tasks in the workspace.
 	// Implementations should return at most MaxRecentTasks rows;
@@ -337,11 +384,26 @@ type JudgeInstructionsLookup interface {
 // [PromptContext]; the caller renders it via [RenderUserPrompt] when
 // it is ready to ship the LLM call.
 //
-// Failure handling: lookups that return an error are logged via the
-// supplied deps but do NOT abort the build. The audit trail prefers
-// a partial context to a crashed judge run; the LLM then sees the
-// signal alone and most likely returns noop, which is the correct
-// behaviour when the workspace state cannot be enumerated.
+// Failure handling: a wired lookup that returns an error aborts the
+// build and the error reaches the caller, which fails the judge run
+// before any provider call is made or billed.
+//
+// The three content lookups decide what the judge is allowed to act on,
+// and their absence is not legible to the model: a prompt whose "Recent
+// tasks" section never rendered looks exactly like a workspace with no
+// tasks. The judge then follows its own instructions, finds no listed
+// task to target, and returns a noop at ordinary confidence — recording
+// in ai_invocations a considered decision that nobody made. Refusing the
+// run costs one retryable failure; proceeding costs the audit trail its
+// meaning.
+//
+// [PromptDeps.WorkspaceNow] is the exception. It carries no evidence,
+// only the frame of reference for time-sensitive judgement, and UTC is a
+// correct substitute; a failure there falls back to UTC and appends
+// [ContextGapWorkspaceClock] to [PromptContext.ContextGaps], which
+// [RenderUserPrompt] writes into the prompt so neither the model nor an
+// operator reading the invocation row is left to assume the timestamp is
+// the workspace's.
 //
 // Capping happens at two layers: each section is capped at its own
 // limit (MaxRecentTasks / MaxLinkedTasks / MaxJudgeInstructionsLen),
@@ -364,28 +426,39 @@ func BuildPromptContext(ctx context.Context, deps PromptDeps, sig SignalSnapshot
 
 	if deps.RecentTasks != nil {
 		recent, err := deps.RecentTasks.LoadRecent(ctx, sig.WorkspaceID, MaxRecentTasks)
-		if err == nil {
-			pc.RecentTasks = capTasks(recent, MaxRecentTasks)
+		if err != nil {
+			return PromptContext{}, fmt.Errorf("signaljudge: load recent tasks for judge context: %w", err)
 		}
+		pc.RecentTasks = capTasks(recent, MaxRecentTasks)
 	}
 
 	if deps.LinkedTasks != nil && sig.SubjectType == "calendar_event" && sig.SubjectID.Valid {
 		linked, err := deps.LinkedTasks.LoadLinked(ctx, sig.WorkspaceID, sig.SubjectID.Int32, MaxLinkedTasks)
-		if err == nil {
-			pc.LinkedTasks = capTasks(linked, MaxLinkedTasks)
+		if err != nil {
+			return PromptContext{}, fmt.Errorf("signaljudge: load linked tasks for judge context: %w", err)
 		}
+		pc.LinkedTasks = capTasks(linked, MaxLinkedTasks)
 	}
 
 	if deps.JudgeInstructions != nil {
 		raw, err := deps.JudgeInstructions.LoadInstructions(ctx, sig.WorkspaceID)
-		if err == nil && raw != "" {
+		if err != nil {
+			return PromptContext{}, fmt.Errorf("signaljudge: load judge instructions for judge context: %w", err)
+		}
+		if raw != "" {
 			pc.JudgeInstructions = capJudgeInstructions(redactFreeForm(raw))
 		}
 	}
 
 	if deps.WorkspaceNow != nil {
+		// An empty string is treated as the failure it is: a configured
+		// clock that answered nothing leaves the same UTC fallback behind
+		// as one that returned an error, and the reader of the prompt has
+		// no way to tell the two apart afterwards.
 		now, err := deps.WorkspaceNow(ctx, sig.WorkspaceID)
-		if err == nil {
+		if err != nil || now == "" {
+			pc.ContextGaps = append(pc.ContextGaps, ContextGapWorkspaceClock)
+		} else {
 			pc.Now = now
 		}
 	}
@@ -435,26 +508,38 @@ func capJudgeInstructions(s string) string {
 // Truncation: when the rendered body exceeds MaxContextBytes the
 // function drops RecentTasks first (noisiest, least signal-specific),
 // then LinkedTasks, then JudgeInstructions. The Signal block is
-// never dropped — without it the judge has nothing to judge.
+// never dropped — without it the judge has nothing to judge. Neither is
+// the Context gaps block: it is the one part of the body whose purpose is
+// to say that something else is missing.
+//
+// Every section dropped for size is named there before it goes. A
+// section removed to fit the budget leaves behind exactly what a section
+// that failed to load leaves behind — no heading — and the model cannot
+// tell either apart from a workspace that has nothing to show.
 func RenderUserPrompt(pc PromptContext) string {
 	body := renderFull(pc)
 	if len(body) <= MaxContextBytes {
 		return body
 	}
-	// Truncate noisy sections in priority order. Each truncation
-	// keeps the section header but strips its body so the LLM still
-	// sees "this section existed but was truncated".
+	// Drop noisy sections in priority order, recording each one. The
+	// gaps are copied rather than appended in place so a caller holding
+	// the original context does not find entries in it that describe a
+	// render it did not ask for.
 	trimmed := pc
+	trimmed.ContextGaps = append([]string(nil), pc.ContextGaps...)
 	if len(body) > MaxContextBytes && len(trimmed.RecentTasks) > 0 {
 		trimmed.RecentTasks = nil
+		trimmed.ContextGaps = append(trimmed.ContextGaps, ContextGapRecentTasksDropped)
 		body = renderFull(trimmed)
 	}
 	if len(body) > MaxContextBytes && len(trimmed.LinkedTasks) > 0 {
 		trimmed.LinkedTasks = nil
+		trimmed.ContextGaps = append(trimmed.ContextGaps, ContextGapLinkedTasksDropped)
 		body = renderFull(trimmed)
 	}
 	if len(body) > MaxContextBytes && trimmed.JudgeInstructions != "" {
 		trimmed.JudgeInstructions = ""
+		trimmed.ContextGaps = append(trimmed.ContextGaps, ContextGapJudgeInstructionsDropped)
 		body = renderFull(trimmed)
 	}
 	return body
@@ -466,6 +551,17 @@ func RenderUserPrompt(pc PromptContext) string {
 func renderFull(pc PromptContext) string {
 	var b strings.Builder
 	b.Grow(1024)
+
+	// First, so that an operator scanning
+	// ai_invocations.prompt_redacted reads what was missing before
+	// reading the verdict it produced.
+	if len(pc.ContextGaps) > 0 {
+		b.WriteString("## Context gaps\n\n")
+		for _, gap := range pc.ContextGaps {
+			fmt.Fprintf(&b, "- %s\n", gap)
+		}
+		b.WriteString("\n")
+	}
 
 	b.WriteString("## Signal\n\n")
 	if pc.Signal.PublicID != "" {

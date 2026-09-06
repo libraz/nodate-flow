@@ -172,6 +172,11 @@ func TestBuildPromptContextRedactsSignalPayload(t *testing.T) {
 
 // TestRenderUserPromptTruncates asserts that when the rendered body
 // exceeds MaxContextBytes the truncator drops RecentTasks first.
+//
+// The titles go into the context as they are. Running them through
+// capTasks first, as this once did, shortens each to MaxTaskTitleLen and
+// leaves the whole section around 3 KB — under the cap, so nothing was
+// truncated and the size assertion held for the wrong reason.
 func TestRenderUserPromptTruncates(t *testing.T) {
 	t.Parallel()
 	// Build a context where RecentTasks alone is many KB long.
@@ -186,11 +191,14 @@ func TestRenderUserPromptTruncates(t *testing.T) {
 	}
 	pc := PromptContext{
 		Signal:      SignalContext{Kind: "manual", PayloadJSON: json.RawMessage(`{"x":1}`)},
-		RecentTasks: capTasks(bigTasks, MaxRecentTasks),
+		RecentTasks: bigTasks,
 	}
 	out := RenderUserPrompt(pc)
 	if len(out) > MaxContextBytes {
 		t.Fatalf("rendered body too large after truncation: %d bytes", len(out))
+	}
+	if strings.Contains(out, "## Recent tasks") {
+		t.Fatalf("the oversized section survived, so the truncator did not run")
 	}
 	if !strings.Contains(out, "## Signal") {
 		t.Fatalf("Signal section dropped during truncation; must always survive")

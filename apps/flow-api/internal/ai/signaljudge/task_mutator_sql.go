@@ -356,14 +356,15 @@ SELECT COALESCE(
 // generate_retro branch.
 //
 // Flow:
-//  1. SELECT the source task's workspace, project_id, title, and
-//     first enabled human assignee user_id (best-effort).
+//  1. SELECT the source task's workspace, project_id, title,
+//     visibility, and first enabled human assignee user_id
+//     (best-effort).
 //  2. BEGIN TX.
-//  3. taskcreate.New, carrying the optional inherited assignee, plus
-//     AddDependency(kind='retro_of'). Every write goes through the
-//     sqlc-generated queries bound to the open transaction so the
-//     existing prepared-statement cache and instrumentation are
-//     reused.
+//  3. taskcreate.New, carrying the source's visibility and the optional
+//     inherited assignee, plus AddDependency(kind='retro_of'). Every
+//     write goes through the sqlc-generated queries bound to the open
+//     transaction so the existing prepared-statement cache and
+//     instrumentation are reused.
 //  4. COMMIT. Returns the new task's internal id and public id so
 //     the Applier can embed them in the TaskRetroDrafted event.
 //
@@ -452,11 +453,18 @@ func (m *SQLTaskMutator) DraftRetroTask(
 			})
 		}
 
+		// The retro carries the source's audience rather than the
+		// create-path default. Its title and description quote the source
+		// task's title, so a retro that defaulted to `public` would put a
+		// private task's words in front of the whole workspace — the copy
+		// has no visibility rule of its own to fall back on once it is
+		// written.
 		created, err := taskcreate.New(ctx, tx, attr, taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   src.ProjectID,
 			Title:       retroTitle,
 			Description: sql.NullString{String: description, Valid: true},
+			Visibility:  src.Visibility,
 		})
 		if err != nil {
 			return fmt.Errorf("taskcreate.New: %w", err)
@@ -500,23 +508,37 @@ func (m *SQLTaskMutator) DraftRetroTask(
 // so a future column addition does not ripple into the public
 // interface.
 type retroSourceTask struct {
-	ProjectID      uint32
-	Title          string
+	ProjectID uint32
+	Title     string
+	// Visibility is the source task's own audience. It is read because
+	// the retro draft quotes the source's title, and a copy that chose
+	// its own audience would be a way for a private task's title to be
+	// read by people the source keeps it from.
+	Visibility     generated.TasksVisibility
 	AssigneeUserID sql.NullInt32
 }
 
 // loadRetroSource performs the read-only lookup of the source task's
-// (project_id, title, first enabled assignee user_id). Returns
-// errors.Is(err, sql.ErrNoRows) when the source task does not exist
-// in the workspace — the Applier resolved its internal id from a
+// (project_id, title, visibility, first enabled assignee user_id).
+// Returns errors.Is(err, sql.ErrNoRows) when the source task does not
+// exist in the workspace — the Applier resolved its internal id from a
 // public_id so a missing row here is a TOCTOU between the resolver
 // and the mutator; the caller surfaces it as
 // "retro_creation_failed".
+//
+// task-visibility: not-applicable — a retro is drafted from a judge
+// verdict, not for a reader, so there is no actor to scope the read by
+// and no response this row is projected into. The title goes into one
+// place only: the retro task [SQLTaskMutator.DraftRetroTask] creates,
+// which is inserted in the source's project and under the source's own
+// visibility, so the copy is readable by exactly the audience the
+// original already had and by nobody else
 func (m *SQLTaskMutator) loadRetroSource(ctx context.Context, workspaceID uint32, sourceTaskInternalID int64) (retroSourceTask, error) {
 	const q = `
 SELECT
   t.project_id,
   t.title,
+  t.visibility,
   (
     SELECT ta.user_id
     FROM task_actors ta
@@ -536,6 +558,7 @@ LIMIT 1`
 	if err := m.DB.QueryRowContext(ctx, q, workspaceID, sourceTaskInternalID).Scan(
 		&src.ProjectID,
 		&src.Title,
+		&src.Visibility,
 		&src.AssigneeUserID,
 	); err != nil {
 		return retroSourceTask{}, err

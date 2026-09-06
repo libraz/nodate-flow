@@ -10,9 +10,14 @@
 // the matching sqlc queries either project a much wider row than the
 // [TaskSummary] shape needs (ListTasksForWorkspace) or do not exist
 // (calendar-event linked tasks). Raw SQL keeps the audit surface
-// minimal and mirrors the inline test adapters in
-// apps/flow-api/tests/signaljudge/prompt_render_test.go so the
-// integration test continues to exercise the same SQL contract.
+// minimal.
+//
+// The integration test in
+// apps/flow-api/tests/signaljudge/prompt_render_test.go constructs these
+// adapters and runs them, rather than restating their SQL in the test.
+// A retyped copy of a statement is a second place the audience bound has
+// to be kept, and a test asserting against the copy proves nothing about
+// the statement a judge run executes.
 //
 // Internal ids stay internal. The [TaskSummary] rows these adapters
 // produce expose only public_id, title, derived_state, and due_on;
@@ -26,6 +31,24 @@ import (
 	"errors"
 	"fmt"
 )
+
+// publicOnly is the audience bound both task lookups in this file carry,
+// named once so the two cannot drift and so a test can hold them to it.
+//
+// A judge run has no actor. The prompt it builds is stored in
+// ai_invocations.prompt_redacted, which is readable by every member of
+// the workspace, so the only audience that is safe without an actor to
+// compare against is the one every member already belongs to.
+const publicOnly = `visibility = 'public'`
+
+// recentTasksQuery is the statement behind
+// [SQLRecentTasksLookup.LoadRecent].
+const recentTasksQuery = `SELECT BIN_TO_UUID(public_id, 0), title, derived_state, due_on
+	FROM tasks
+	WHERE workspace_id = ? AND enabled = TRUE
+	  AND ` + publicOnly + `
+	ORDER BY created_at DESC, id DESC
+	LIMIT ?`
 
 // SQLRecentTasksLookup loads the most recent tasks for a workspace.
 // Implements [RecentTasksLookup] against the live `tasks` table.
@@ -48,6 +71,18 @@ type SQLRecentTasksLookup struct {
 // `due_on` is rendered as a YYYY-MM-DD string when present; NULL
 // produces an empty [TaskSummary.DueOn]. Other columns are projected
 // verbatim from the row.
+//
+// task-visibility: not-applicable — a judge run is started by a signal
+// rather than by a person, so there is no actor to compare a task's
+// audience against, and every title this returns is rendered into the
+// prompt that lands in ai_invocations.prompt_redacted, which every member
+// of the workspace can read. The reader is therefore the whole
+// membership, and the stronger bound is the one that holds for all of
+// them at once: only tasks whose audience is already the whole workspace
+// take part. That is why the predicate is visibility = 'public' rather
+// than acl.TaskVisibilityFilter, which against a zero actor would return
+// nothing at all and leave every judge run with an empty context while
+// reporting success
 func (l *SQLRecentTasksLookup) LoadRecent(ctx context.Context, workspaceID uint32, limit int) ([]TaskSummary, error) {
 	if l == nil || l.DB == nil {
 		return nil, nil
@@ -55,12 +90,7 @@ func (l *SQLRecentTasksLookup) LoadRecent(ctx context.Context, workspaceID uint3
 	if limit <= 0 {
 		return nil, nil
 	}
-	const q = `SELECT BIN_TO_UUID(public_id, 0), title, derived_state, due_on
-		FROM tasks
-		WHERE workspace_id = ? AND enabled = TRUE
-		ORDER BY created_at DESC, id DESC
-		LIMIT ?`
-	rows, err := l.DB.QueryContext(ctx, q, workspaceID, limit)
+	rows, err := l.DB.QueryContext(ctx, recentTasksQuery, workspaceID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("signaljudge: load recent tasks: %w", err)
 	}
@@ -87,6 +117,49 @@ func (l *SQLRecentTasksLookup) LoadRecent(ctx context.Context, workspaceID uint3
 	}
 	return out, nil
 }
+
+// linkedTasksQuery is the statement behind
+// [SQLLinkedTasksLookup.LoadLinked]. Both branches of the UNION carry
+// [publicOnly]: a task does not become visible to the workspace by being
+// attached to one of its calendar events.
+const linkedTasksQuery = `
+	SELECT public_id_str, title, derived_state, due_on FROM (
+		SELECT
+			BIN_TO_UUID(t.public_id, 0) AS public_id_str,
+			t.title                     AS title,
+			t.derived_state             AS derived_state,
+			t.due_on                    AS due_on,
+			t.created_at                AS created_at,
+			t.id                        AS task_id
+		FROM tasks t
+		INNER JOIN task_event_links tel
+			ON tel.task_id = t.id
+			AND tel.enabled = TRUE
+			AND tel.workspace_id = ?
+			AND tel.event_id = ?
+		WHERE t.enabled = TRUE
+			AND t.workspace_id = ?
+			AND t.` + publicOnly + `
+		UNION
+		SELECT
+			BIN_TO_UUID(t.public_id, 0) AS public_id_str,
+			t.title                     AS title,
+			t.derived_state             AS derived_state,
+			t.due_on                    AS due_on,
+			t.created_at                AS created_at,
+			t.id                        AS task_id
+		FROM tasks t
+		INNER JOIN calendar_events ce
+			ON ce.task_id = t.id
+			AND ce.enabled = TRUE
+			AND ce.workspace_id = ?
+			AND ce.id = ?
+		WHERE t.enabled = TRUE
+			AND t.workspace_id = ?
+			AND t.` + publicOnly + `
+	) AS linked
+	ORDER BY created_at DESC, task_id DESC
+	LIMIT ?`
 
 // SQLLinkedTasksLookup loads the tasks attached to a calendar event
 // subject. Implements [LinkedTasksLookup] against the live schema.
@@ -123,6 +196,12 @@ type SQLLinkedTasksLookup struct {
 // Internal ids (`t.id`, `ce.id`, `tel.id`) are NEVER projected —
 // only the audit-safe [TaskSummary] fields the prompt builder needs
 // surface to the caller.
+//
+// task-visibility: not-applicable — the rows this returns are quoted
+// into a prompt every workspace member can read and the run has no
+// actor, so both branches are bound to visibility = 'public' instead,
+// which is the stronger rule and the only one that holds without an
+// actor
 func (l *SQLLinkedTasksLookup) LoadLinked(ctx context.Context, workspaceID uint32, eventInternalID int32, limit int) ([]TaskSummary, error) {
 	if l == nil || l.DB == nil {
 		return nil, nil
@@ -130,43 +209,7 @@ func (l *SQLLinkedTasksLookup) LoadLinked(ctx context.Context, workspaceID uint3
 	if limit <= 0 {
 		return nil, nil
 	}
-	const q = `
-		SELECT public_id_str, title, derived_state, due_on FROM (
-			SELECT
-				BIN_TO_UUID(t.public_id, 0) AS public_id_str,
-				t.title                     AS title,
-				t.derived_state             AS derived_state,
-				t.due_on                    AS due_on,
-				t.created_at                AS created_at,
-				t.id                        AS task_id
-			FROM tasks t
-			INNER JOIN task_event_links tel
-				ON tel.task_id = t.id
-				AND tel.enabled = TRUE
-				AND tel.workspace_id = ?
-				AND tel.event_id = ?
-			WHERE t.enabled = TRUE
-				AND t.workspace_id = ?
-			UNION
-			SELECT
-				BIN_TO_UUID(t.public_id, 0) AS public_id_str,
-				t.title                     AS title,
-				t.derived_state             AS derived_state,
-				t.due_on                    AS due_on,
-				t.created_at                AS created_at,
-				t.id                        AS task_id
-			FROM tasks t
-			INNER JOIN calendar_events ce
-				ON ce.task_id = t.id
-				AND ce.enabled = TRUE
-				AND ce.workspace_id = ?
-				AND ce.id = ?
-			WHERE t.enabled = TRUE
-				AND t.workspace_id = ?
-		) AS linked
-		ORDER BY created_at DESC, task_id DESC
-		LIMIT ?`
-	rows, err := l.DB.QueryContext(ctx, q,
+	rows, err := l.DB.QueryContext(ctx, linkedTasksQuery,
 		workspaceID, eventInternalID, workspaceID,
 		workspaceID, eventInternalID, workspaceID,
 		limit,

@@ -91,6 +91,19 @@ ORDER BY id DESC LIMIT 1`
 // processTask embeds the given task (if needed), finds similar tasks
 // via cosine similarity, and creates relation_suggestions for
 // candidates above the threshold.
+//
+// task-visibility: not-applicable — this runs off an event rather than
+// for a reader, so there is no actor to scope the read by, and a
+// predicate written against a zero actor would leave every private and
+// project-scoped task permanently unembedded while reporting nothing.
+// The read is bounded by workspace_id instead, and the title and
+// description it takes reach only the embedding provider and the vector
+// derived from them: [embed.Client.EmbedTask] records the invocation
+// under [embed.TaskTextOmitted] rather than under the task's own words,
+// because ai_invocations is readable by every member of the workspace.
+// What the reader eventually sees is a relation_suggestions row, and
+// every statement that projects a suggestion's task titles carries the
+// Layer 4 rule against both ends
 func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID uint32) {
 	if p.Embedder == nil {
 		return
@@ -213,14 +226,8 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		return
 	}
 
-	// The suggestion event names both tasks so a client can open them.
-	// Only the public id can do that: the internal key identifies nothing
-	// the client can look up, and every other event spells taskId as a
-	// UUID string, so a number here would also split the field's type in
-	// the generated SDK.
-	var srcPub types.PublicID
-	const srcPubQuery = `SELECT public_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`
-	if err := p.DB.QueryRowContext(ctx, srcPubQuery, taskID, workspaceID).Scan(&srcPub); err != nil {
+	srcPub, err := p.sourceTaskPublicID(ctx, workspaceID, taskID)
+	if err != nil {
 		slog.Error("relations pipeline: resolve source task public id", "err", err)
 		return
 	}
@@ -276,6 +283,29 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 			continue
 		}
 	}
+}
+
+// sourceTaskPublicID resolves the task's external identifier for the
+// suggestion event.
+//
+// The suggestion event names both tasks so a client can open them. Only
+// the public id can do that: the internal key identifies nothing the
+// client can look up, and every other event spells taskId as a UUID
+// string, so a number here would also split the field's type in the
+// generated SDK.
+//
+// It is its own function rather than a few lines inside [processTask]
+// because a public id says nothing about what a task is: keeping it out
+// of the function that reads title and description keeps the reason that
+// function states about task content from being read as a claim about
+// this lookup too.
+func (p *Pipeline) sourceTaskPublicID(ctx context.Context, workspaceID, taskID uint32) (types.PublicID, error) {
+	var pub types.PublicID
+	const q = `SELECT public_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`
+	if err := p.DB.QueryRowContext(ctx, q, taskID, workspaceID).Scan(&pub); err != nil {
+		return types.PublicID{}, err
+	}
+	return pub, nil
 }
 
 // toBytes coerces an interface{} column (returned by sqlc for VECTOR
