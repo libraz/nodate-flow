@@ -40,11 +40,13 @@ type CalendarTestTenant struct {
 //
 // It must go through CreateTestTenant rather than INSERT the user, the
 // workspace and the owner membership with sqlc and hand-sign a JWT.
-// POST /workspaces is where a workspace gets its personal calendar
-// (EnsurePersonalCalendar), so a seed that writes the rows directly
-// leaves the whole register → create workspace → provision personal
-// calendar chain unexercised by every calendar test in this package —
-// which is exactly the wiring those tests exist to protect.
+// POST /workspaces is where a workspace gets its personal calendar: the
+// handler calls memberkit.AddWorkspaceMember, which materialises the
+// calendar, the owner's grant on it and the owner's subscription in the
+// same transaction as the membership. A seed that writes the rows
+// directly leaves the whole register → create workspace → provision
+// personal calendar chain unexercised by every calendar test in this
+// package — which is exactly the wiring those tests exist to protect.
 func CreateCalendarTestTenant(t *testing.T, srv *TestServer) *CalendarTestTenant {
 	t.Helper()
 

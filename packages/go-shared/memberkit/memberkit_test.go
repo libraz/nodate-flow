@@ -103,6 +103,7 @@ func purgeWorkspace(t *testing.T, db *sql.DB, wsID uint32) {
 	for _, q := range []string{
 		`DELETE FROM events WHERE workspace_id = ?`,
 		`DELETE FROM calendar_subscriptions WHERE workspace_id = ?`,
+		`DELETE FROM calendar_members WHERE workspace_id = ?`,
 		`DELETE FROM calendars WHERE workspace_id = ?`,
 		`DELETE FROM task_actors WHERE task_id IN (SELECT id FROM tasks WHERE workspace_id = ?)`,
 		`DELETE FROM project_members WHERE project_id IN (SELECT id FROM projects WHERE workspace_id = ?)`,
@@ -202,6 +203,23 @@ func TestAddWorkspaceMember_NewMemberCreatesCalendar(t *testing.T) {
 		t.Errorf("expected 1 subscription, got %d", subCount)
 	}
 
+	// Verify the ownership grant. The subscription above is a display
+	// preference; this row is what ListCalendarsForUser drives off, so
+	// without it the calendar counted above is unreachable.
+	var grantRole string
+	if err := db.QueryRowContext(ctx,
+		`SELECT cm.role FROM calendar_members cm
+		 INNER JOIN calendars c ON c.id = cm.calendar_id
+		 WHERE cm.workspace_id = ? AND cm.user_id = ?
+		   AND c.kind = 'personal' AND c.owner_user_id = ?
+		   AND cm.enabled = TRUE`,
+		ws.wsID, userID, userID).Scan(&grantRole); err != nil {
+		t.Fatalf("load personal calendar grant: %v", err)
+	}
+	if grantRole != "owner" {
+		t.Errorf("expected owner grant on own personal calendar, got %q", grantRole)
+	}
+
 	// Verify audit event.
 	var eventCount int
 	if err := db.QueryRowContext(ctx,
@@ -265,6 +283,112 @@ func TestAddWorkspaceMember_IdempotentOnExistingEnabled(t *testing.T) {
 	}
 	if calCount != 1 {
 		t.Errorf("expected 1 calendar, got %d", calCount)
+	}
+}
+
+// TestAddWorkspaceMember_GrantsAccessToPreexistingCalendar verifies
+// that the branch which reuses an already-present personal calendar
+// still writes the grant. Rows created before the grant was part of the
+// add path have a calendar and no membership, and no creation path will
+// ever run for that user again — the next add has to converge them.
+func TestAddWorkspaceMember_GrantsAccessToPreexistingCalendar(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+
+	// A personal calendar with no calendar_members row: the state the
+	// old add path left behind.
+	calRes, err := db.ExecContext(ctx,
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, owner_user_id)
+		 VALUES (?, ?, 'personal', 'Orphan', '#4285F4', ?)`,
+		dbtype.New(), ws.wsID, userID)
+	if err != nil {
+		t.Fatalf("seed orphan calendar: %v", err)
+	}
+	calID, _ := calRes.LastInsertId()
+
+	var res AddWorkspaceMemberResult
+	withTx(t, db, func(tx *dbretry.Tx) {
+		r, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
+			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
+		})
+		if err != nil {
+			t.Fatalf("add: %v", err)
+		}
+		res = r
+	})
+
+	if res.CreatedCalendar {
+		t.Error("existing calendar should be reused, not recreated")
+	}
+	if res.PersonalCalendarID != uint32(calID) { //#nosec G115 -- test-scoped LastInsertId fits uint32
+		t.Errorf("expected the seeded calendar %d, got %d", calID, res.PersonalCalendarID)
+	}
+
+	var grantRole string
+	if err := db.QueryRowContext(ctx,
+		`SELECT role FROM calendar_members
+		 WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE`,
+		calID, userID).Scan(&grantRole); err != nil {
+		t.Fatalf("load grant on pre-existing calendar: %v", err)
+	}
+	if grantRole != "owner" {
+		t.Errorf("expected owner grant, got %q", grantRole)
+	}
+}
+
+// TestAddWorkspaceMember_ReAddKeepsGrantColorAndRole verifies that the
+// grant written on the first add survives a second one. The re-add
+// re-enables the row rather than rewriting it, so a colour or role
+// assigned since is not silently reset by an unrelated join.
+func TestAddWorkspaceMember_ReAddKeepsGrantColorAndRole(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	add := func() {
+		withTx(t, db, func(tx *dbretry.Tx) {
+			if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
+				WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
+				InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
+			}); err != nil {
+				t.Fatalf("add: %v", err)
+			}
+		})
+	}
+	add()
+
+	if _, err := db.ExecContext(ctx,
+		`UPDATE calendar_members SET member_color = '#FF00FF', role = 'manager'
+		 WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, userID); err != nil {
+		t.Fatalf("recolour grant: %v", err)
+	}
+
+	add()
+
+	var (
+		grantCount int
+		role       string
+		color      string
+	)
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*), MIN(role), MIN(member_color) FROM calendar_members
+		 WHERE workspace_id = ? AND user_id = ?`,
+		ws.wsID, userID).Scan(&grantCount, &role, &color); err != nil {
+		t.Fatalf("load grant: %v", err)
+	}
+	if grantCount != 1 {
+		t.Errorf("expected 1 grant after re-add, got %d", grantCount)
+	}
+	if role != "manager" || color != "#FF00FF" {
+		t.Errorf("re-add should not rewrite the grant: role=%q color=%q", role, color)
 	}
 }
 
@@ -361,6 +485,162 @@ func TestRemoveWorkspaceMember_CascadesSoftDisable(t *testing.T) {
 		ws.wsID, userID).Scan(&enabledSubs)
 	if enabledSubs != 0 {
 		t.Errorf("expected 0 enabled subscriptions after remove, got %d", enabledSubs)
+	}
+}
+
+// seedSharedCalendar inserts a calendar owned by the workspace's admin
+// and grants userID access to it at the given role, the shape a member
+// gets when somebody adds them to a calendar that is not their own.
+// Returns the calendar's internal id.
+func seedSharedCalendar(ctx context.Context, t *testing.T, db *sql.DB, ws wsFixture, userID uint32, name, role string) uint32 {
+	t.Helper()
+	calRes, err := db.ExecContext(ctx,
+		`INSERT INTO calendars (public_id, workspace_id, kind, name, color, owner_user_id)
+		 VALUES (?, ?, 'personal', ?, '#34A853', ?)`,
+		dbtype.New(), ws.wsID, name, ws.actorID)
+	if err != nil {
+		t.Fatalf("seed shared calendar %q: %v", name, err)
+	}
+	calID, err := calRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed shared calendar LastInsertId: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO calendar_members
+		 (public_id, workspace_id, calendar_id, user_id, role, member_color)
+		 VALUES (?, ?, ?, ?, ?, '#34A853')`,
+		dbtype.New(), ws.wsID, calID, userID, role); err != nil {
+		t.Fatalf("seed grant on %q: %v", name, err)
+	}
+	return uint32(calID) //#nosec G115 -- test-scoped LastInsertId fits uint32
+}
+
+// countEnabledGrants returns how many live calendar_members rows a user
+// holds in a workspace.
+func countEnabledGrants(ctx context.Context, t *testing.T, db *sql.DB, wsID, userID uint32) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM calendar_members
+		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE`,
+		wsID, userID).Scan(&n); err != nil {
+		t.Fatalf("count enabled grants: %v", err)
+	}
+	return n
+}
+
+// grantEnabled reports whether the user's grant on one calendar is live.
+func grantEnabled(ctx context.Context, t *testing.T, db *sql.DB, calID, userID uint32) bool {
+	t.Helper()
+	var enabled bool
+	if err := db.QueryRowContext(ctx,
+		`SELECT enabled FROM calendar_members WHERE calendar_id = ? AND user_id = ?`,
+		calID, userID).Scan(&enabled); err != nil {
+		t.Fatalf("load grant on calendar %d: %v", calID, err)
+	}
+	return enabled
+}
+
+// TestRemoveWorkspaceMember_DisablesCalendarGrants verifies that the
+// removal revokes the per-calendar grants the workspace membership
+// implied, both on the member's own personal calendar and on a calendar
+// somebody else shared with them.
+func TestRemoveWorkspaceMember_DisablesCalendarGrants(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	withTx(t, db, func(tx *dbretry.Tx) {
+		if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
+			InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
+		}); err != nil {
+			t.Fatalf("add: %v", err)
+		}
+	})
+	sharedCal := seedSharedCalendar(ctx, t, db, ws, userID, "Shared", "editor")
+
+	if got := countEnabledGrants(ctx, t, db, ws.wsID, userID); got != 2 {
+		t.Fatalf("expected 2 live grants before removal (personal + shared), got %d", got)
+	}
+
+	var res RemoveWorkspaceMemberResult
+	withTx(t, db, func(tx *dbretry.Tx) {
+		r, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, ActorUserID: ws.actorID,
+		})
+		if err != nil {
+			t.Fatalf("remove: %v", err)
+		}
+		res = r
+	})
+
+	if res.CalendarGrantsDisabled != 2 {
+		t.Errorf("expected 2 calendar grants disabled, got %d", res.CalendarGrantsDisabled)
+	}
+	if got := countEnabledGrants(ctx, t, db, ws.wsID, userID); got != 0 {
+		t.Errorf("expected no live grants after removal, got %d", got)
+	}
+	if grantEnabled(ctx, t, db, sharedCal, userID) {
+		t.Error("the grant on the shared calendar should not survive the removal")
+	}
+}
+
+// TestRemoveWorkspaceMember_ReAddDoesNotRestoreSharedGrants verifies
+// what the removal buys: rejoining the workspace hands back the personal
+// calendar the add path provisions, and nothing else. A grant an
+// administrator revoked by hand while the user was still a member stays
+// revoked, and so does one they merely held.
+func TestRemoveWorkspaceMember_ReAddDoesNotRestoreSharedGrants(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+
+	userID := seedUser(ctx, t, db)
+	add := func() {
+		withTx(t, db, func(tx *dbretry.Tx) {
+			if _, err := AddWorkspaceMember(ctx, tx, AddWorkspaceMemberArgs{
+				WorkspaceID: ws.wsID, UserID: userID, Role: RoleMember,
+				InvitedByUserID: ws.actorID, EnsurePersonalCalendar: true,
+			}); err != nil {
+				t.Fatalf("add: %v", err)
+			}
+		})
+	}
+	add()
+
+	held := seedSharedCalendar(ctx, t, db, ws, userID, "Held", "editor")
+	revoked := seedSharedCalendar(ctx, t, db, ws, userID, "Revoked", "editor")
+	if _, err := db.ExecContext(ctx,
+		`UPDATE calendar_members SET enabled = FALSE WHERE calendar_id = ? AND user_id = ?`,
+		revoked, userID); err != nil {
+		t.Fatalf("revoke grant by hand: %v", err)
+	}
+
+	withTx(t, db, func(tx *dbretry.Tx) {
+		if _, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{
+			WorkspaceID: ws.wsID, UserID: userID, ActorUserID: ws.actorID,
+		}); err != nil {
+			t.Fatalf("remove: %v", err)
+		}
+	})
+
+	add()
+
+	if grantEnabled(ctx, t, db, held, userID) {
+		t.Error("rejoining should not hand back a calendar the member merely used to reach")
+	}
+	if grantEnabled(ctx, t, db, revoked, userID) {
+		t.Error("rejoining should not undo a grant an administrator revoked")
+	}
+
+	// The personal calendar is the one grant the add path is meant to
+	// (re)provision, so exactly one live grant is the expected end state.
+	if got := countEnabledGrants(ctx, t, db, ws.wsID, userID); got != 1 {
+		t.Errorf("expected only the personal-calendar grant after rejoining, got %d live grants", got)
 	}
 }
 

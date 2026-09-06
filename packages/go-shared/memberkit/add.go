@@ -36,9 +36,10 @@ type AddWorkspaceMemberArgs struct {
 	// JoinedAt" (self-registration / direct-add flow).
 	InvitedAt time.Time
 	// EnsurePersonalCalendar controls whether memberkit materialises
-	// a personal calendar + subscription on add. Normally true; set
-	// false only for specialised flows (e.g. re-enabling an existing
-	// member who already had a calendar).
+	// a personal calendar, the owner's grant on it and the owner's
+	// subscription on add. Normally true; set false only for
+	// specialised flows (e.g. re-enabling an existing member who
+	// already had a calendar).
 	EnsurePersonalCalendar bool
 }
 
@@ -61,10 +62,12 @@ type AddWorkspaceMemberResult struct {
 // returns their existing row without touching the calendar side; a
 // previously-removed (soft-disabled) member is re-enabled.
 //
-// Invariant: the three possible side effects (member row, personal
-// calendar, personal subscription) all happen inside the caller's
-// transaction. If any step fails, the caller rolls back and none of
-// the rows stick.
+// Invariant: the possible side effects (member row, personal calendar,
+// the owner's grant on it, personal subscription) all happen inside the
+// caller's transaction. If any step fails, the caller rolls back and
+// none of the rows stick. The calendar and the grant that reaches it
+// are written together for that reason — a calendar committed without
+// its grant belongs to nobody and can never be listed.
 func AddWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args AddWorkspaceMemberArgs) (AddWorkspaceMemberResult, error) {
 	if !args.Role.IsValid() {
 		return AddWorkspaceMemberResult{}, fmt.Errorf("memberkit: invalid role %q", args.Role)
@@ -137,8 +140,11 @@ func AddWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args AddWorkspaceMe
 		return res, fmt.Errorf("memberkit: find member: %w", err)
 	}
 
-	// Step 2: ensure personal calendar if asked. Skipped on re-enable
-	// because the calendar already exists.
+	// Step 2: ensure personal calendar if asked. The calendar row is
+	// only created when the member has none; the ownership grant is
+	// ensured either way, because a calendar found here may predate the
+	// grant being written at all and no other creation path will ever
+	// run for this user again.
 	if args.EnsurePersonalCalendar {
 		calID, cerr := findPersonalCalendar(ctx, tx, args.WorkspaceID, args.UserID)
 		switch {
@@ -146,17 +152,21 @@ func AddWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args AddWorkspaceMe
 			res.PersonalCalendarID = calID
 		case errors.Is(cerr, sql.ErrNoRows):
 			name := findUserDisplayName(ctx, tx, args.UserID)
-			calID, err := createCalendar(ctx, tx, args.WorkspaceID, "personal", name, "#4285F4", args.UserID, "")
+			calID, err := createCalendar(ctx, tx, args.WorkspaceID, "personal", name, personalCalendarColor, args.UserID, "")
 			if err != nil {
 				return res, err
 			}
-			if err := createSubscription(ctx, tx, args.WorkspaceID, calID, args.UserID, "#4285F4"); err != nil {
+			if err := createSubscription(ctx, tx, args.WorkspaceID, calID, args.UserID, personalCalendarColor); err != nil {
 				return res, err
 			}
 			res.PersonalCalendarID = calID
 			res.CreatedCalendar = true
 		default:
 			return res, fmt.Errorf("memberkit: find personal calendar: %w", cerr)
+		}
+		if err := grantCalendarOwnership(ctx, tx, args.WorkspaceID,
+			res.PersonalCalendarID, args.UserID, personalCalendarColor); err != nil {
+			return res, err
 		}
 	}
 

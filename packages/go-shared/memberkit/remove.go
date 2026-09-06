@@ -29,6 +29,7 @@ type RemoveWorkspaceMemberArgs struct {
 type RemoveWorkspaceMemberResult struct {
 	MemberDisabled         bool
 	SubscriptionsDisabled  int64
+	CalendarGrantsDisabled int64
 	PersonalCalsDisabled   int64
 	TaskActorsDisabled     int64
 	ProjectMembersDisabled int64
@@ -116,7 +117,33 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	}
 	res.SubscriptionsDisabled = n
 
-	// Step 2: soft-disable personal calendars. Events on the
+	// Step 2: soft-disable the calendar grants the workspace
+	// membership implied. Membership in a workspace is what makes a
+	// per-calendar grant meaningful, so the grants end with it.
+	//
+	// Leaving them enabled is what makes a later re-add restore every
+	// calendar the user could once reach, including the ones an
+	// administrator revoked by hand while they were still a member. The
+	// add path grants the personal calendar back deliberately; nothing
+	// there decides that the rest should return.
+	//
+	// Zero rows is a normal outcome: a member may hold no grant at all.
+	//
+	// This is one of two writers that retire a grant. The other is the
+	// DisableCalendarMember query, which revokes a single (calendar,
+	// user) pair when someone is removed from one calendar rather than
+	// from the workspace. A change to how a revoked grant is represented
+	// has to reach both.
+	n, err = execCount(ctx, tx,
+		`UPDATE calendar_members SET enabled = FALSE
+		 WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE`,
+		args.WorkspaceID, args.UserID)
+	if err != nil {
+		return res, fmt.Errorf("memberkit: disable calendar grants: %w", err)
+	}
+	res.CalendarGrantsDisabled = n
+
+	// Step 3: soft-disable personal calendars. Events on the
 	// calendar stay enabled — other users may be attendees and an
 	// audit trail is more useful than pretending the events never
 	// happened.
@@ -130,7 +157,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	}
 	res.PersonalCalsDisabled = n
 
-	// Step 3: soft-disable task_actors rows.
+	// Step 4: soft-disable task_actors rows.
 	n, err = execCount(ctx, tx,
 		`UPDATE task_actors SET enabled = FALSE
 		 WHERE user_id = ?
@@ -142,7 +169,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	}
 	res.TaskActorsDisabled = n
 
-	// Step 4: soft-disable project_members rows.
+	// Step 5: soft-disable project_members rows.
 	n, err = execCount(ctx, tx,
 		`UPDATE project_members SET enabled = FALSE
 		 WHERE user_id = ?
@@ -154,7 +181,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	}
 	res.ProjectMembersDisabled = n
 
-	// Step 5: soft-disable the member row itself last so the earlier
+	// Step 6: soft-disable the member row itself last so the earlier
 	// steps can still JOIN to workspace_members if they ever need to.
 	n, err = execCount(ctx, tx,
 		`UPDATE workspace_members SET enabled = FALSE
@@ -167,7 +194,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 		res.MemberDisabled = true
 	}
 
-	// Step 6: append audit event.
+	// Step 7: append audit event.
 	actor := args.ActorUserID
 	if actor == 0 {
 		actor = args.UserID
@@ -183,6 +210,7 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 		Payload: map[string]any{
 			"userId":                 userPub.String(),
 			"subscriptionsDisabled":  res.SubscriptionsDisabled,
+			"calendarGrantsDisabled": res.CalendarGrantsDisabled,
 			"personalCalsDisabled":   res.PersonalCalsDisabled,
 			"taskActorsDisabled":     res.TaskActorsDisabled,
 			"projectMembersDisabled": res.ProjectMembersDisabled,

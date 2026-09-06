@@ -166,35 +166,42 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			systemSlug = sql.NullString{String: *input.Body.SystemSlug, Valid: true}
 		}
 
-		calID, err := deps.CalendarQueries.CreateCalendar(ctx, calendar.CreateCalendarParams{
-			PublicID:    calPublicID,
-			WorkspaceID: wsID,
-			Kind:        calendar.CalendarsKind(input.Body.Kind),
-			Name:        input.Body.Name,
-			Description: desc,
-			Color:       input.Body.Color,
-			CoverUrl:    coverURL,
-			OwnerUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			SystemSlug:  systemSlug,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
-		}
+		// The calendar row and the creator's owner grant are one write.
+		// Access to a calendar is calendar_members and every resolution
+		// helper reads it, so a calendar that commits without its grant
+		// belongs to nobody — not even the caller who just created it —
+		// and no endpoint here can reach it again to repair it.
+		var calID32 uint32
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.CreateCalendar", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
 
-		calID32 := uint32(calID) //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			calID, err := cqtx.CreateCalendar(ctx, calendar.CreateCalendarParams{
+				PublicID:    calPublicID,
+				WorkspaceID: wsID,
+				Kind:        calendar.CalendarsKind(input.Body.Kind),
+				Name:        input.Body.Name,
+				Description: desc,
+				Color:       input.Body.Color,
+				CoverUrl:    coverURL,
+				OwnerUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				SystemSlug:  systemSlug,
+			})
+			if err != nil {
+				return err
+			}
+			calID32 = uint32(calID) //#nosec G115 -- LastInsertId for calendars.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
-		// The creator becomes the calendar's owner member. Without this row
-		// the calendar would exist with nobody able to reach it: access is
-		// calendar_members, and every resolution helper reads it.
-		_, err = deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
-			PublicID:    types.New(),
-			WorkspaceID: wsID,
-			CalendarID:  calID32,
-			UserID:      actorID,
-			Role:        calendar.CalendarMembersRoleOwner,
-			MemberColor: input.Body.Color,
+			_, err = cqtx.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{
+				PublicID:    types.New(),
+				WorkspaceID: wsID,
+				CalendarID:  calID32,
+				UserID:      actorID,
+				Role:        calendar.CalendarMembersRoleOwner,
+				MemberColor: input.Body.Color,
+			})
+			return err
 		})
-		if err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.CalendarCalendarStoreWriteInterrupted)
 		}
 

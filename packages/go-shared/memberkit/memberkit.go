@@ -152,6 +152,11 @@ func findPersonalCalendar(ctx context.Context, tx TX, wsID, userID uint32) (uint
 	return id, err
 }
 
+// personalCalendarColor is the colour a personal calendar, its owner's
+// grant and its owner's subscription are all created with. The three
+// rows describe one calendar, so they start out agreeing.
+const personalCalendarColor = "#4285F4"
+
 // createCalendar inserts a calendars row and returns its internal id.
 // kind must be 'personal' or 'system'. For 'personal' the caller must
 // pass a non-zero ownerUserID; for 'system' ownerUserID must be 0 and
@@ -181,6 +186,34 @@ func createCalendar(ctx context.Context, tx TX, wsID uint32, kind, name, color s
 		return 0, fmt.Errorf("memberkit: LastInsertId: %w", err)
 	}
 	return uint32(id), nil //#nosec G115 -- AUTO_INCREMENT LastInsertId is non-negative and calendars.id is INT UNSIGNED
+}
+
+// grantCalendarOwnership inserts (or re-enables) the calendar_members
+// row that lets the calendar's owner reach it. Access is read from
+// calendar_members, so without this row the calendar exists and is
+// invisible: ListCalendarsForUser drives off the membership and treats
+// the subscription as an optional display preference.
+//
+// Idempotent on (calendar_id, user_id) like createSubscription: a
+// duplicate insert only re-enables. role and member_color are left as
+// they are on a row that already exists, because a grant may have been
+// re-coloured or re-roled since it was written and reviving it is not a
+// reason to discard that.
+//
+// invited_by_user_id stays NULL — nobody granted the owner access to
+// their own calendar; it came with the calendar.
+func grantCalendarOwnership(ctx context.Context, tx TX, wsID, calendarID, userID uint32, color string) error {
+	publicID := dbtype.New()
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO calendar_members
+		 (public_id, workspace_id, calendar_id, user_id, role, member_color)
+		 VALUES (?, ?, ?, ?, 'owner', ?)
+		 ON DUPLICATE KEY UPDATE enabled = TRUE`,
+		publicID[:], wsID, calendarID, userID, color)
+	if err != nil {
+		return fmt.Errorf("memberkit: grant calendar ownership: %w", err)
+	}
+	return nil
 }
 
 // createSubscription inserts (or re-enables) a calendar_subscriptions
