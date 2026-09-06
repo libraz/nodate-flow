@@ -331,6 +331,79 @@ func TestImportWorkerReapsAbandonedJobs(t *testing.T) {
 	require.Contains(t, *job.ErrorLog, "abandoned")
 }
 
+// TestImportedTasksNameTheInitiatorAsCreator covers who an imported row
+// belongs to. The rows came in because somebody asked for them, and a
+// task created with no creator is one nothing can trace back to a
+// person: there is no request to look up afterwards and nobody the
+// history names. The user who started the job is that person.
+func TestImportedTasksNameTheInitiatorAsCreator(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tenant := newTenant(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Single-column rows: a comma in a title would be read as a second
+	// column and the task would be stored under a shorter name.
+	const (
+		firstTitle  = "imported row with a recorded creator"
+		secondTitle = "second imported row with a recorded creator"
+	)
+
+	jobPub, jobID := createImportJob(ctx, t, tenant, "csv",
+		map[string]any{"csv": "title\n" + firstTitle + "\n" + secondTitle + "\n"})
+	runImportWorkerFor(ctx, t, newImportWorker(t), jobID)
+
+	require.Equal(t, "completed", readImportJob(t, tenant, jobPub).Status)
+	require.Equal(t, 2, countTasksInProject(ctx, t, tenant.ProjectPublicID))
+
+	// Read back through the API: what the column holds only counts if
+	// the public surface answers with it, and it must answer with the
+	// public id rather than the internal one.
+	var list struct {
+		Tasks []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"tasks"`
+	}
+	doJSON(t, http.MethodGet,
+		testServerURL+"/tasks?projectId="+tenant.ProjectPublicID+"&limit=100",
+		tenant.AccessToken, nil, &list)
+
+	listed := map[string]string{}
+	for _, task := range list.Tasks {
+		listed[task.Title] = task.ID
+	}
+
+	for _, title := range []string{firstTitle, secondTitle} {
+		taskID := listed[title]
+		require.NotEmptyf(t, taskID, "the imported row %q must be listed as a task", title)
+
+		var task struct {
+			CreatedByUserID string `json:"createdByUserId"`
+		}
+		doJSON(t, http.MethodGet, testServerURL+"/tasks/"+taskID, tenant.AccessToken, nil, &task)
+		require.Equalf(t, tenant.UserPublicID, task.CreatedByUserID,
+			"the task imported from %q must name the user who started the job as its creator", title)
+
+		// The other half of the rule, and the one a creator-only check
+		// would miss: asking for a file to be imported says who wanted
+		// the rows, not who is going to do them. Assigning every row to
+		// whoever uploaded it hands somebody a queue they never took on.
+		var actors struct {
+			Actors []struct {
+				UserID string `json:"userId"`
+				Role   string `json:"role"`
+			} `json:"actors"`
+		}
+		doJSON(t, http.MethodGet, testServerURL+"/tasks/"+taskID+"/actors",
+			tenant.AccessToken, nil, &actors)
+		require.Emptyf(t, actors.Actors,
+			"the task imported from %q must have been created with no assignee", title)
+	}
+}
+
 // TestImportCreateRejectsOversizedCSV keeps the payload ceiling on the
 // request. Storing a megabyte in the queue row and only then reporting
 // that it was too big wastes a round trip and leaves the rejected data

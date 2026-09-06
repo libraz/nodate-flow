@@ -438,9 +438,9 @@ func TestMCPConvertIntakeToTaskAttribution(t *testing.T) {
 }
 
 // TestCSVImportAttribution records what the CSV importer does about
-// actors. It is the one create path with no acting user at all — the row
-// it writes names no creator — so it is the surface where "attach the
-// creator" has nobody to attach.
+// actors. It is the one create path whose acting user is not the person
+// making the request but whoever queued the job, and it still attaches
+// nobody: importing a file says who wanted the rows, not who will do them.
 func TestCSVImportAttribution(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -455,17 +455,13 @@ func TestCSVImportAttribution(t *testing.T) {
 	runImportWorkerFor(ctx, t, newImportWorker(t), jobID)
 
 	var imported string
-	var createdBy sql.NullString
 	require.NoError(t, testDB.QueryRowContext(ctx,
-		`SELECT BIN_TO_UUID(t.public_id, 0), BIN_TO_UUID(u.public_id, 0)
+		`SELECT BIN_TO_UUID(t.public_id, 0)
 		   FROM tasks t
 		   JOIN projects p ON p.id = t.project_id
-		   LEFT JOIN users u ON u.id = t.created_by_user_id
 		  WHERE p.public_id = UUID_TO_BIN(?, 0) AND t.title = ?`,
 		tt.ProjectPublicID, importedTitle,
-	).Scan(&imported, &createdBy))
+	).Scan(&imported))
 
 	requireNoActors(t, imported, "CSV import")
-	require.Falsef(t, createdBy.Valid,
-		"the importer names no creator on the row, so there is nobody an attribution rule could attach")
 }
