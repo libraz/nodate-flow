@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -101,6 +102,95 @@ func (q *Queries) CreateCalendarEvent(ctx context.Context, arg CreateCalendarEve
 	return result.LastInsertId()
 }
 
+const createCalendarEventOverride = `-- name: CreateCalendarEventOverride :execlastid
+INSERT INTO calendar_events (
+  public_id,
+  workspace_id,
+  calendar_id,
+  recurrence_parent_id,
+  recurrence_original_start,
+  kind,
+  visibility,
+  show_as,
+  flexibility,
+  title,
+  all_day,
+  start_at,
+  end_at,
+  timezone,
+  location,
+  memo,
+  url,
+  owner_user_id,
+  created_by_user_id,
+  block_label,
+  notification_offset
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type CreateCalendarEventOverrideParams struct {
+	PublicID                types.PublicID            `json:"publicId"`
+	WorkspaceID             uint32                    `json:"-"`
+	CalendarID              uint32                    `json:"-"`
+	RecurrenceParentID      sql.NullInt32             `json:"-"`
+	RecurrenceOriginalStart sql.NullTime              `json:"recurrenceOriginalStart"`
+	Kind                    CalendarEventsKind        `json:"kind"`
+	Visibility              CalendarEventsVisibility  `json:"visibility"`
+	ShowAs                  CalendarEventsShowAs      `json:"showAs"`
+	Flexibility             CalendarEventsFlexibility `json:"flexibility"`
+	Title                   string                    `json:"title"`
+	AllDay                  bool                      `json:"allDay"`
+	StartAt                 sql.NullTime              `json:"startAt"`
+	EndAt                   sql.NullTime              `json:"endAt"`
+	Timezone                string                    `json:"timezone"`
+	Location                sql.NullString            `json:"location"`
+	Memo                    sql.NullString            `json:"memo"`
+	Url                     sql.NullString            `json:"url"`
+	OwnerUserID             uint32                    `json:"-"`
+	CreatedByUserID         uint32                    `json:"-"`
+	BlockLabel              sql.NullString            `json:"blockLabel"`
+	NotificationOffset      sql.NullInt32             `json:"notificationOffset"`
+}
+
+// Insert the row that replaces a single occurrence of a recurring event.
+//
+// An override is a leaf. recurrence_rule, recurrence_end and
+// recurrence_exceptions describe the series and belong to the master alone,
+// and task_id is absent because a task projection is written by the item
+// projection engine and is never an override: the projection guard trigger
+// rejects a row that breaks either rule with SQLSTATE 45000. The same
+// trigger rejects a row carrying only one of recurrence_parent_id /
+// recurrence_original_start, so both are required parameters.
+func (q *Queries) CreateCalendarEventOverride(ctx context.Context, arg CreateCalendarEventOverrideParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, createCalendarEventOverride,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.CalendarID,
+		arg.RecurrenceParentID,
+		arg.RecurrenceOriginalStart,
+		arg.Kind,
+		arg.Visibility,
+		arg.ShowAs,
+		arg.Flexibility,
+		arg.Title,
+		arg.AllDay,
+		arg.StartAt,
+		arg.EndAt,
+		arg.Timezone,
+		arg.Location,
+		arg.Memo,
+		arg.Url,
+		arg.OwnerUserID,
+		arg.CreatedByUserID,
+		arg.BlockLabel,
+		arg.NotificationOffset,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const disableCalendarEvent = `-- name: DisableCalendarEvent :execrows
 UPDATE calendar_events
 SET enabled = FALSE
@@ -121,6 +211,36 @@ type DisableCalendarEventParams struct {
 // marker (no separate deleted_at column).
 func (q *Queries) DisableCalendarEvent(ctx context.Context, arg DisableCalendarEventParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, disableCalendarEvent, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const disableCalendarEventOverridesByParent = `-- name: DisableCalendarEventOverridesByParent :execrows
+UPDATE calendar_events
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND recurrence_parent_id = ?
+  AND enabled = TRUE
+`
+
+type DisableCalendarEventOverridesByParentParams struct {
+	WorkspaceID        uint32        `json:"-"`
+	RecurrenceParentID sql.NullInt32 `json:"-"`
+}
+
+// Soft-delete every override of a series along with the series itself.
+//
+// fk_calendar_events_recurrence_parent cascades on DELETE, but deleting a
+// series never deletes a row: DisableCalendarEvent clears `enabled` and the
+// master stays, so the cascade never fires and nothing reaches the
+// children. An override left behind still has enabled = TRUE and no
+// recurrence_rule of its own, which is exactly what the non-recurring range
+// queries select — the deleted series would reappear as a scatter of
+// standalone events. This statement is how the delete reaches them.
+func (q *Queries) DisableCalendarEventOverridesByParent(ctx context.Context, arg DisableCalendarEventOverridesByParentParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, disableCalendarEventOverridesByParent, arg.WorkspaceID, arg.RecurrenceParentID)
 	if err != nil {
 		return 0, err
 	}
@@ -249,6 +369,63 @@ func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalen
 	return i, err
 }
 
+const findCalendarEventOverride = `-- name: FindCalendarEventOverride :one
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  ce.recurrence_original_start,
+  ce.start_at,
+  ce.end_at,
+  ce.owner_user_id,
+  ce.enabled
+FROM calendar_events ce
+WHERE ce.workspace_id = ?
+  AND ce.recurrence_parent_id = ?
+  AND ce.recurrence_original_start = ?
+LIMIT 1
+`
+
+type FindCalendarEventOverrideParams struct {
+	WorkspaceID             uint32        `json:"-"`
+	RecurrenceParentID      sql.NullInt32 `json:"-"`
+	RecurrenceOriginalStart sql.NullTime  `json:"recurrenceOriginalStart"`
+}
+
+type FindCalendarEventOverrideRow struct {
+	PublicID                types.PublicID `json:"publicId"`
+	CalendarID              uint32         `json:"-"`
+	RecurrenceOriginalStart sql.NullTime   `json:"recurrenceOriginalStart"`
+	StartAt                 sql.NullTime   `json:"startAt"`
+	EndAt                   sql.NullTime   `json:"endAt"`
+	OwnerUserID             uint32         `json:"-"`
+	Enabled                 bool           `json:"enabled"`
+}
+
+// The override standing in for one occurrence, if there is one. The unique
+// key on (recurrence_parent_id, recurrence_original_start) makes this at
+// most one row, so an empty result is what separates the first edit of an
+// occurrence from an edit of one already overridden.
+//
+// Soft-deleted overrides are returned, which is why `enabled` is selected
+// rather than filtered on. That unique key counts disabled rows: an
+// occurrence that was overridden, reverted to the series, and then edited
+// again must revive the row this returns, because inserting a second one
+// would collide.
+func (q *Queries) FindCalendarEventOverride(ctx context.Context, arg FindCalendarEventOverrideParams) (FindCalendarEventOverrideRow, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarEventOverride, arg.WorkspaceID, arg.RecurrenceParentID, arg.RecurrenceOriginalStart)
+	var i FindCalendarEventOverrideRow
+	err := row.Scan(
+		&i.PublicID,
+		&i.CalendarID,
+		&i.RecurrenceOriginalStart,
+		&i.StartAt,
+		&i.EndAt,
+		&i.OwnerUserID,
+		&i.Enabled,
+	)
+	return i, err
+}
+
 const findCalendarEventOwner = `-- name: FindCalendarEventOwner :one
 
 SELECT owner_user_id, calendar_id, workspace_id
@@ -278,6 +455,89 @@ func (q *Queries) FindCalendarEventOwner(ctx context.Context, arg FindCalendarEv
 	var i FindCalendarEventOwnerRow
 	err := row.Scan(&i.OwnerUserID, &i.CalendarID, &i.WorkspaceID)
 	return i, err
+}
+
+const listCalendarEventOverriddenStarts = `-- name: ListCalendarEventOverriddenStarts :many
+
+SELECT
+  ov.recurrence_parent_id,
+  ov.recurrence_original_start
+FROM calendar_events ov
+WHERE ov.workspace_id = ?
+  AND ov.recurrence_parent_id IN (/*SLICE:parent_ids*/?)
+  AND ov.enabled = TRUE
+ORDER BY ov.recurrence_parent_id ASC, ov.recurrence_original_start ASC
+LIMIT 5000
+`
+
+type ListCalendarEventOverriddenStartsParams struct {
+	WorkspaceID uint32          `json:"-"`
+	ParentIds   []sql.NullInt32 `json:"-"`
+}
+
+type ListCalendarEventOverriddenStartsRow struct {
+	RecurrenceParentID      sql.NullInt32 `json:"-"`
+	RecurrenceOriginalStart sql.NullTime  `json:"recurrenceOriginalStart"`
+}
+
+// ====================================
+// Occurrence overrides
+//
+// Changing one occurrence of a recurring series is a second row naming the
+// master in recurrence_parent_id and the replaced occurrence in
+// recurrence_original_start. That row has no recurrence_rule, so the
+// non-recurring range queries above select it on their own and it renders
+// at its new time — which is correct, and why none of them excludes it.
+// ====================================
+// The occurrences a live override already stands in for, for a set of
+// recurring masters. The expander subtracts these starts from what it emits
+// for each master so the occurrence appears once, at the override's time,
+// rather than twice.
+//
+// Deliberately not filtered by a date range. An override may be moved
+// anywhere, including outside the window being expanded, and it still
+// replaces the occurrence it names; filtering by the override's own dates
+// would let the master re-emit the occurrence that was moved away, which is
+// the duplicate this read exists to prevent.
+//
+// Both columns are internal: this result is joined against masters the
+// caller already holds and never reaches an API response.
+//
+// The LIMIT is a runaway bound, not a page size. Truncation here would
+// resurrect duplicates, so it sits far above the number of overrides a
+// single expansion can meaningfully carry.
+func (q *Queries) ListCalendarEventOverriddenStarts(ctx context.Context, arg ListCalendarEventOverriddenStartsParams) ([]ListCalendarEventOverriddenStartsRow, error) {
+	query := listCalendarEventOverriddenStarts
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkspaceID)
+	if len(arg.ParentIds) > 0 {
+		for _, v := range arg.ParentIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:parent_ids*/?", strings.Repeat(",?", len(arg.ParentIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:parent_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCalendarEventOverriddenStartsRow{}
+	for rows.Next() {
+		var i ListCalendarEventOverriddenStartsRow
+		if err := rows.Scan(&i.RecurrenceParentID, &i.RecurrenceOriginalStart); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCalendarEventsAcrossCalendars = `-- name: ListCalendarEventsAcrossCalendars :many
@@ -1373,6 +1633,124 @@ func (q *Queries) PatchCalendarEvent(ctx context.Context, arg PatchCalendarEvent
 		arg.ClearNotificationOffset,
 		arg.NotificationOffset,
 		arg.TaskID,
+		arg.PublicID,
+		arg.CalendarID,
+		arg.WorkspaceID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const reparentCalendarEventOverridesFromStart = `-- name: ReparentCalendarEventOverridesFromStart :execrows
+UPDATE calendar_events
+SET recurrence_parent_id = ?
+WHERE workspace_id = ?
+  AND recurrence_parent_id = ?
+  AND recurrence_original_start >= ?
+`
+
+type ReparentCalendarEventOverridesFromStartParams struct {
+	NewParentID sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+	OldParentID sql.NullInt32 `json:"-"`
+	SplitStart  sql.NullTime  `json:"splitStart"`
+}
+
+// Hand the overrides at or after a split point to the series that continues
+// past it. A "this and following" edit truncates the master and creates a
+// new master for the remainder; an override whose recurrence_original_start
+// is at or after the split describes an occurrence of the new series, and
+// left on the truncated master it names an occurrence that master no longer
+// produces.
+//
+// Soft-deleted overrides move with the live ones. The row records an
+// occurrence of the continuing series either way, and one revived after the
+// split would otherwise point at a master that cannot produce it.
+func (q *Queries) ReparentCalendarEventOverridesFromStart(ctx context.Context, arg ReparentCalendarEventOverridesFromStartParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, reparentCalendarEventOverridesFromStart,
+		arg.NewParentID,
+		arg.WorkspaceID,
+		arg.OldParentID,
+		arg.SplitStart,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateCalendarEventOverride = `-- name: UpdateCalendarEventOverride :execrows
+UPDATE calendar_events
+SET kind                = ?,
+    visibility          = ?,
+    show_as             = ?,
+    flexibility         = ?,
+    title               = ?,
+    all_day             = ?,
+    start_at            = ?,
+    end_at              = ?,
+    timezone            = ?,
+    location            = ?,
+    memo                = ?,
+    url                 = ?,
+    block_label         = ?,
+    notification_offset = ?,
+    enabled             = TRUE
+WHERE public_id = ?
+  AND calendar_id = ?
+  AND workspace_id = ?
+  AND recurrence_parent_id IS NOT NULL
+`
+
+type UpdateCalendarEventOverrideParams struct {
+	Kind               CalendarEventsKind        `json:"kind"`
+	Visibility         CalendarEventsVisibility  `json:"visibility"`
+	ShowAs             CalendarEventsShowAs      `json:"showAs"`
+	Flexibility        CalendarEventsFlexibility `json:"flexibility"`
+	Title              string                    `json:"title"`
+	AllDay             bool                      `json:"allDay"`
+	StartAt            sql.NullTime              `json:"startAt"`
+	EndAt              sql.NullTime              `json:"endAt"`
+	Timezone           string                    `json:"timezone"`
+	Location           sql.NullString            `json:"location"`
+	Memo               sql.NullString            `json:"memo"`
+	Url                sql.NullString            `json:"url"`
+	BlockLabel         sql.NullString            `json:"blockLabel"`
+	NotificationOffset sql.NullInt32             `json:"notificationOffset"`
+	PublicID           types.PublicID            `json:"publicId"`
+	CalendarID         uint32                    `json:"-"`
+	WorkspaceID        uint32                    `json:"-"`
+}
+
+// Rewrite the occurrence an override stands for. Every ordinary column is
+// set: the caller sends the whole occurrence, not a delta. The recurrence
+// columns are absent because an override owns none of them, and its parent
+// link already says which occurrence it replaces.
+//
+// enabled is set back to TRUE and the WHERE clause does not require it, so
+// this also revives an override that was reverted to the series — the only
+// way to edit that occurrence again without colliding on the unique key.
+//
+// recurrence_parent_id IS NOT NULL confines the statement to override rows,
+// so a public_id naming a master or an ordinary event matches nothing.
+func (q *Queries) UpdateCalendarEventOverride(ctx context.Context, arg UpdateCalendarEventOverrideParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateCalendarEventOverride,
+		arg.Kind,
+		arg.Visibility,
+		arg.ShowAs,
+		arg.Flexibility,
+		arg.Title,
+		arg.AllDay,
+		arg.StartAt,
+		arg.EndAt,
+		arg.Timezone,
+		arg.Location,
+		arg.Memo,
+		arg.Url,
+		arg.BlockLabel,
+		arg.NotificationOffset,
 		arg.PublicID,
 		arg.CalendarID,
 		arg.WorkspaceID,

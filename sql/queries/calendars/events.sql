@@ -551,3 +551,166 @@ WHERE public_id = ?
   AND workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
+
+-- ====================================
+-- Occurrence overrides
+--
+-- Changing one occurrence of a recurring series is a second row naming the
+-- master in recurrence_parent_id and the replaced occurrence in
+-- recurrence_original_start. That row has no recurrence_rule, so the
+-- non-recurring range queries above select it on their own and it renders
+-- at its new time — which is correct, and why none of them excludes it.
+-- ====================================
+
+-- name: ListCalendarEventOverriddenStarts :many
+-- The occurrences a live override already stands in for, for a set of
+-- recurring masters. The expander subtracts these starts from what it emits
+-- for each master so the occurrence appears once, at the override's time,
+-- rather than twice.
+--
+-- Deliberately not filtered by a date range. An override may be moved
+-- anywhere, including outside the window being expanded, and it still
+-- replaces the occurrence it names; filtering by the override's own dates
+-- would let the master re-emit the occurrence that was moved away, which is
+-- the duplicate this read exists to prevent.
+--
+-- Both columns are internal: this result is joined against masters the
+-- caller already holds and never reaches an API response.
+--
+-- The LIMIT is a runaway bound, not a page size. Truncation here would
+-- resurrect duplicates, so it sits far above the number of overrides a
+-- single expansion can meaningfully carry.
+SELECT
+  ov.recurrence_parent_id,
+  ov.recurrence_original_start
+FROM calendar_events ov
+WHERE ov.workspace_id = ?
+  AND ov.recurrence_parent_id IN (sqlc.slice('parent_ids'))
+  AND ov.enabled = TRUE
+ORDER BY ov.recurrence_parent_id ASC, ov.recurrence_original_start ASC
+LIMIT 5000;
+
+-- name: CreateCalendarEventOverride :execlastid
+-- Insert the row that replaces a single occurrence of a recurring event.
+--
+-- An override is a leaf. recurrence_rule, recurrence_end and
+-- recurrence_exceptions describe the series and belong to the master alone,
+-- and task_id is absent because a task projection is written by the item
+-- projection engine and is never an override: the projection guard trigger
+-- rejects a row that breaks either rule with SQLSTATE 45000. The same
+-- trigger rejects a row carrying only one of recurrence_parent_id /
+-- recurrence_original_start, so both are required parameters.
+INSERT INTO calendar_events (
+  public_id,
+  workspace_id,
+  calendar_id,
+  recurrence_parent_id,
+  recurrence_original_start,
+  kind,
+  visibility,
+  show_as,
+  flexibility,
+  title,
+  all_day,
+  start_at,
+  end_at,
+  timezone,
+  location,
+  memo,
+  url,
+  owner_user_id,
+  created_by_user_id,
+  block_label,
+  notification_offset
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: FindCalendarEventOverride :one
+-- The override standing in for one occurrence, if there is one. The unique
+-- key on (recurrence_parent_id, recurrence_original_start) makes this at
+-- most one row, so an empty result is what separates the first edit of an
+-- occurrence from an edit of one already overridden.
+--
+-- Soft-deleted overrides are returned, which is why `enabled` is selected
+-- rather than filtered on. That unique key counts disabled rows: an
+-- occurrence that was overridden, reverted to the series, and then edited
+-- again must revive the row this returns, because inserting a second one
+-- would collide.
+SELECT
+  ce.public_id,
+  ce.calendar_id,
+  ce.recurrence_original_start,
+  ce.start_at,
+  ce.end_at,
+  ce.owner_user_id,
+  ce.enabled
+FROM calendar_events ce
+WHERE ce.workspace_id = ?
+  AND ce.recurrence_parent_id = ?
+  AND ce.recurrence_original_start = ?
+LIMIT 1;
+
+-- name: UpdateCalendarEventOverride :execrows
+-- Rewrite the occurrence an override stands for. Every ordinary column is
+-- set: the caller sends the whole occurrence, not a delta. The recurrence
+-- columns are absent because an override owns none of them, and its parent
+-- link already says which occurrence it replaces.
+--
+-- enabled is set back to TRUE and the WHERE clause does not require it, so
+-- this also revives an override that was reverted to the series — the only
+-- way to edit that occurrence again without colliding on the unique key.
+--
+-- recurrence_parent_id IS NOT NULL confines the statement to override rows,
+-- so a public_id naming a master or an ordinary event matches nothing.
+UPDATE calendar_events
+SET kind                = ?,
+    visibility          = ?,
+    show_as             = ?,
+    flexibility         = ?,
+    title               = ?,
+    all_day             = ?,
+    start_at            = ?,
+    end_at              = ?,
+    timezone            = ?,
+    location            = ?,
+    memo                = ?,
+    url                 = ?,
+    block_label         = ?,
+    notification_offset = ?,
+    enabled             = TRUE
+WHERE public_id = ?
+  AND calendar_id = ?
+  AND workspace_id = ?
+  AND recurrence_parent_id IS NOT NULL;
+
+-- name: DisableCalendarEventOverridesByParent :execrows
+-- Soft-delete every override of a series along with the series itself.
+--
+-- fk_calendar_events_recurrence_parent cascades on DELETE, but deleting a
+-- series never deletes a row: DisableCalendarEvent clears `enabled` and the
+-- master stays, so the cascade never fires and nothing reaches the
+-- children. An override left behind still has enabled = TRUE and no
+-- recurrence_rule of its own, which is exactly what the non-recurring range
+-- queries select — the deleted series would reappear as a scatter of
+-- standalone events. This statement is how the delete reaches them.
+UPDATE calendar_events
+SET enabled = FALSE
+WHERE workspace_id = ?
+  AND recurrence_parent_id = ?
+  AND enabled = TRUE;
+
+-- name: ReparentCalendarEventOverridesFromStart :execrows
+-- Hand the overrides at or after a split point to the series that continues
+-- past it. A "this and following" edit truncates the master and creates a
+-- new master for the remainder; an override whose recurrence_original_start
+-- is at or after the split describes an occurrence of the new series, and
+-- left on the truncated master it names an occurrence that master no longer
+-- produces.
+--
+-- Soft-deleted overrides move with the live ones. The row records an
+-- occurrence of the continuing series either way, and one revived after the
+-- split would otherwise point at a master that cannot produce it.
+UPDATE calendar_events
+SET recurrence_parent_id = sqlc.arg('new_parent_id')
+WHERE workspace_id = ?
+  AND recurrence_parent_id = sqlc.arg('old_parent_id')
+  AND recurrence_original_start >= sqlc.arg('split_start');

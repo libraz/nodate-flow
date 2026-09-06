@@ -67,6 +67,16 @@ type Querier interface {
 	// accepted_at and sent_at are left NULL by default; the caller uses
 	// LastInsertId from the returned sql.Result to follow up with reads.
 	CreateCalendarEventInvite(ctx context.Context, arg CreateCalendarEventInviteParams) (sql.Result, error)
+	// Insert the row that replaces a single occurrence of a recurring event.
+	//
+	// An override is a leaf. recurrence_rule, recurrence_end and
+	// recurrence_exceptions describe the series and belong to the master alone,
+	// and task_id is absent because a task projection is written by the item
+	// projection engine and is never an override: the projection guard trigger
+	// rejects a row that breaks either rule with SQLSTATE 45000. The same
+	// trigger rejects a row carrying only one of recurrence_parent_id /
+	// recurrence_original_start, so both are required parameters.
+	CreateCalendarEventOverride(ctx context.Context, arg CreateCalendarEventOverrideParams) (int64, error)
 	// Add a shared memo/to-do item to a calendar.
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
 	// Subscribe a user to a calendar with display preferences.
@@ -135,6 +145,16 @@ type Querier interface {
 	// one that names nothing. A zero count here is a revoke that landed
 	// between that lookup and this write, and the invite is revoked either way.
 	DisableCalendarEventInvite(ctx context.Context, id uint32) error
+	// Soft-delete every override of a series along with the series itself.
+	//
+	// fk_calendar_events_recurrence_parent cascades on DELETE, but deleting a
+	// series never deletes a row: DisableCalendarEvent clears `enabled` and the
+	// master stays, so the cascade never fires and nothing reaches the
+	// children. An override left behind still has enabled = TRUE and no
+	// recurrence_rule of its own, which is exactly what the non-recurring range
+	// queries select — the deleted series would reappear as a scatter of
+	// standalone events. This statement is how the delete reaches them.
+	DisableCalendarEventOverridesByParent(ctx context.Context, arg DisableCalendarEventOverridesByParentParams) (int64, error)
 	// Revoke a membership. The row survives so the grant history stays
 	// readable and so a later re-add updates it in place.
 	DisableCalendarMember(ctx context.Context, arg DisableCalendarMemberParams) (sql.Result, error)
@@ -184,6 +204,17 @@ type Querier interface {
 	// fail — which meant a participant could never be invited again after
 	// one revocation.
 	FindCalendarEventInviteForAttendee(ctx context.Context, arg FindCalendarEventInviteForAttendeeParams) (CalendarEventInvite, error)
+	// The override standing in for one occurrence, if there is one. The unique
+	// key on (recurrence_parent_id, recurrence_original_start) makes this at
+	// most one row, so an empty result is what separates the first edit of an
+	// occurrence from an edit of one already overridden.
+	//
+	// Soft-deleted overrides are returned, which is why `enabled` is selected
+	// rather than filtered on. That unique key counts disabled rows: an
+	// occurrence that was overridden, reverted to the series, and then edited
+	// again must revive the row this returns, because inserting a second one
+	// would collide.
+	FindCalendarEventOverride(ctx context.Context, arg FindCalendarEventOverrideParams) (FindCalendarEventOverrideRow, error)
 	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
@@ -248,6 +279,33 @@ type Querier interface {
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.
 	ListCalendarEventInvitesForEvent(ctx context.Context, arg ListCalendarEventInvitesForEventParams) ([]ListCalendarEventInvitesForEventRow, error)
+	// ====================================
+	// Occurrence overrides
+	//
+	// Changing one occurrence of a recurring series is a second row naming the
+	// master in recurrence_parent_id and the replaced occurrence in
+	// recurrence_original_start. That row has no recurrence_rule, so the
+	// non-recurring range queries above select it on their own and it renders
+	// at its new time — which is correct, and why none of them excludes it.
+	// ====================================
+	// The occurrences a live override already stands in for, for a set of
+	// recurring masters. The expander subtracts these starts from what it emits
+	// for each master so the occurrence appears once, at the override's time,
+	// rather than twice.
+	//
+	// Deliberately not filtered by a date range. An override may be moved
+	// anywhere, including outside the window being expanded, and it still
+	// replaces the occurrence it names; filtering by the override's own dates
+	// would let the master re-emit the occurrence that was moved away, which is
+	// the duplicate this read exists to prevent.
+	//
+	// Both columns are internal: this result is joined against masters the
+	// caller already holds and never reaches an API response.
+	//
+	// The LIMIT is a runaway bound, not a page size. Truncation here would
+	// resurrect duplicates, so it sits far above the number of overrides a
+	// single expansion can meaningfully carry.
+	ListCalendarEventOverriddenStarts(ctx context.Context, arg ListCalendarEventOverriddenStartsParams) ([]ListCalendarEventOverriddenStartsRow, error)
 	// Cross-calendar query: list events across multiple calendars for a user
 	// within a workspace and time range. Used by the unified calendar view.
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
@@ -399,6 +457,17 @@ type Querier interface {
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) (int64, error)
 	// Update mutable share fields. NULL arguments leave columns untouched.
 	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) (int64, error)
+	// Hand the overrides at or after a split point to the series that continues
+	// past it. A "this and following" edit truncates the master and creates a
+	// new master for the remainder; an override whose recurrence_original_start
+	// is at or after the split describes an occurrence of the new series, and
+	// left on the truncated master it names an occurrence that master no longer
+	// produces.
+	//
+	// Soft-deleted overrides move with the live ones. The row records an
+	// occurrence of the continuing series either way, and one revived after the
+	// split would otherwise point at a master that cannot produce it.
+	ReparentCalendarEventOverridesFromStart(ctx context.Context, arg ReparentCalendarEventOverridesFromStartParams) (int64, error)
 	// Bring an invite row back into service with a fresh capability:
 	// install a new token_hash + expires_at, clear the delivery state, and
 	// re-enable the row.
@@ -436,6 +505,18 @@ type Querier interface {
 	UpdateCalendarChecklistItem(ctx context.Context, arg UpdateCalendarChecklistItemParams) (int64, error)
 	// Edit a comment's body and stamp edited_at.
 	UpdateCalendarEventComment(ctx context.Context, arg UpdateCalendarEventCommentParams) (int64, error)
+	// Rewrite the occurrence an override stands for. Every ordinary column is
+	// set: the caller sends the whole occurrence, not a delta. The recurrence
+	// columns are absent because an override owns none of them, and its parent
+	// link already says which occurrence it replaces.
+	//
+	// enabled is set back to TRUE and the WHERE clause does not require it, so
+	// this also revives an override that was reverted to the series — the only
+	// way to edit that occurrence again without colliding on the unique key.
+	//
+	// recurrence_parent_id IS NOT NULL confines the statement to override rows,
+	// so a public_id naming a master or an ordinary event matches nothing.
+	UpdateCalendarEventOverride(ctx context.Context, arg UpdateCalendarEventOverrideParams) (int64, error)
 	// Change a member's role. RowsAffected = 0 means the target holds no live
 	// membership, which the caller maps to a 404 rather than silently
 	// reporting success.
