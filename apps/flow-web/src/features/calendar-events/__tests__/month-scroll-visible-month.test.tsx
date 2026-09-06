@@ -160,9 +160,7 @@ function Harness({
           report(monthKey);
           setMonth(monthKey);
         }}
-        onDayCreate={noop}
-        onEventOpen={noop}
-        onTaskOpen={noop}
+        onDayOpen={noop}
       />
     </>
   );

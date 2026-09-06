@@ -133,9 +133,7 @@ function renderView(): ReturnType<typeof render> {
       zone={viewZone}
       stateColor={() => 'red'}
       scrollToTodaySignal={0}
-      onDayCreate={noop}
-      onEventOpen={noop}
-      onTaskOpen={noop}
+      onDayOpen={noop}
     />,
   );
 }

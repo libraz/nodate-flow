@@ -197,8 +197,14 @@
     },
     "month_scroll": {
       "aria_label": "月历，按周垂直滚动",
-      "day_label": "{date}",
-      "day_label_holiday": "{date}，{holiday}"
+      "day_label": "{date}，{count, plural, =0 {无安排} other {# 项安排}}",
+      "day_label_holiday": "{date}，{holiday}，{count, plural, =0 {无安排} other {# 项安排}}"
+    },
+    "day_detail": {
+      "all_day": "全天",
+      "task_due": "截止",
+      "empty": "当天暂无安排。",
+      "create": "新建事件"
     },
     "layers": "图层",
     "layer": {

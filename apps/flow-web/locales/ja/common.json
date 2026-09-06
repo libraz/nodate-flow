@@ -197,8 +197,14 @@
     },
     "month_scroll": {
       "aria_label": "月間カレンダー、週単位で縦にスクロール",
-      "day_label": "{date}",
-      "day_label_holiday": "{date}、{holiday}"
+      "day_label": "{date}、{count, plural, =0 {予定なし} other {# 件}}",
+      "day_label_holiday": "{date}、{holiday}、{count, plural, =0 {予定なし} other {# 件}}"
+    },
+    "day_detail": {
+      "all_day": "終日",
+      "task_due": "期日",
+      "empty": "この日に予定はありません。",
+      "create": "イベントを作成"
     },
     "layers": "レイヤー",
     "layer": {

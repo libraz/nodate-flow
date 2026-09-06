@@ -10,8 +10,17 @@
  *
  * Data is fed in from the route (the same layer-filtered events, tasks,
  * and holidays the desktop grid consumes) so nothing is refetched. The
- * component is purely presentational + layout; all mutations (open
- * event, open task, reschedule) flow back through callbacks.
+ * component is purely presentational + layout; all mutations (open the
+ * day, reschedule) flow back through callbacks.
+ *
+ * Nothing inside a day column is a press target of its own. A week of
+ * days on a phone leaves each chip about eighteen pixels tall, which is
+ * half the touch bar, and a chip nested in a clickable cell made a tap
+ * near one a coin flip between opening an event and creating one. The
+ * whole column is one target instead: it opens the day, and the sheet it
+ * opens is where a row is large enough to press. Chips keep the drag
+ * gesture below, which starts from a press that is held rather than from
+ * a tap, so the two do not compete.
  *
  * All visual values resolve from design tokens; see the sibling CSS
  * module.
@@ -41,6 +50,7 @@ import {
 import { Users } from 'lucide-react';
 import {
   type ReactElement,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -52,6 +62,7 @@ import { useTranslation } from 'react-i18next';
 
 import { dateKey, todayKey as todayKeyIn } from '../../lib/date-utils';
 import type { CalendarDragPayload } from './lib/drag-payload';
+import { markerColorForKind } from './lib/kind-color';
 import type { PointerDragHandle } from './lib/pointer-drag';
 import {
   eventStartKey,
@@ -165,20 +176,6 @@ function dateNumberClass(date: Date, hasHoliday: boolean): string | undefined {
   return undefined;
 }
 
-/** Per-kind pill accent colour token (matches the desktop grid's markers). */
-function markerColorForKind(kind: string): string {
-  switch (kind) {
-    case 'block':
-      return 'var(--nf-cal-block-color)';
-    case 'free':
-      return 'var(--nf-cal-free-color)';
-    case 'milestone':
-      return 'var(--nf-cal-milestone-color)';
-    default:
-      return 'var(--nf-cal-event-color)';
-  }
-}
-
 export interface MonthScrollProps {
   /** Layer-filtered calendar events (single- and multi-day). */
   events: CalendarEvent[];
@@ -214,12 +211,12 @@ export interface MonthScrollProps {
    * typed into the dialog, so nothing is unreachable without it.
    */
   drag?: PointerDragHandle<CalendarDragPayload>;
-  /** Open the unified create dialog for an empty cell. */
-  onDayCreate: (dateKey: string) => void;
-  /** Open an event in edit mode. */
-  onEventOpen: (event: CalendarEvent) => void;
-  /** Open a task detail. */
-  onTaskOpen: (task: CalendarTask) => void;
+  /**
+   * Open a day in full. Every press this view answers arrives here —
+   * the chips and bars are drawn, not pressed — and creating an event,
+   * opening one, and opening a task all live in what this opens.
+   */
+  onDayOpen: (dateKey: string) => void;
 }
 
 /** Vertical metrics (rem) that keep single-day chips aligned with multi-day bars. */
@@ -252,8 +249,15 @@ const EMPTY_DAY_TRACKS: DayTracks = { reserved: new Set<number>(), slots: [] };
  * distance the pill travelled — so the day it was taken hold of is what
  * the delta is measured from, not the day the bar happens to begin on
  * (which, for a week it only passes through, is not even its own).
+ *
+ * A tap asks the same question. The bar is drawn in an overlay above the
+ * columns, so a press on it never reaches a cell to bubble up from, and
+ * the day it opens has to be resolved here the same way.
  */
-function grabbedColumn(e: ReactPointerEvent<HTMLElement>, p: PositionedEvent): number {
+function grabbedColumn(
+  e: ReactPointerEvent<HTMLElement> | ReactMouseEvent<HTMLElement>,
+  p: PositionedEvent,
+): number {
   const rect = e.currentTarget.getBoundingClientRect();
   if (rect.width <= 0) return p.startCol;
   const ratio = (e.clientX - rect.left) / rect.width;
@@ -274,9 +278,9 @@ interface WeekRowProps {
   drag?: PointerDragHandle<CalendarDragPayload> | undefined;
   /** Day key a drop would land on right now, or null. */
   dragOverKey: string | null;
-  onDayCreate: (dateKey: string) => void;
-  onEventOpen: (event: CalendarEvent) => void;
-  onTaskOpen: (task: CalendarTask) => void;
+  /** Names a day in the reader's locale, for the cell's accessible name. */
+  dayFormat: Intl.DateTimeFormat;
+  onDayOpen: (dateKey: string) => void;
 }
 
 function WeekRow({
@@ -289,9 +293,8 @@ function WeekRow({
   stateColor,
   drag,
   dragOverKey,
-  onDayCreate,
-  onEventOpen,
-  onTaskOpen,
+  dayFormat,
+  onDayOpen,
 }: WeekRowProps): ReactElement {
   const { t } = useTranslation('common');
   const week = useMemo(
@@ -366,18 +369,27 @@ function WeekRow({
 
   return (
     <div className={styles.weekRow} data-week={dateKey(weekStart)}>
-      {/* Multi-day bar overlay sits above the day columns. */}
+      {/* Multi-day bar overlay sits above the day columns.
+
+          Hidden from assistive tech, like the chips inside the cells:
+          a bar is drawn, not pressed, and the days it covers name it in
+          their own labels and list it in the sheet they open. */}
       {barTracks > 0 ? (
-        <div className={styles.barOverlay} style={{ blockSize: `${barTracks * TRACK_REM}rem` }}>
+        <div
+          aria-hidden
+          className={styles.barOverlay}
+          style={{ blockSize: `${barTracks * TRACK_REM}rem` }}
+        >
           {positioned.map((p: PositionedEvent) => {
             if (p.track >= MAX_VISIBLE_TRACKS) return null;
             const insetStart = `calc(${(p.startCol * 100) / 7}% + var(--nf-space-px))`;
             const width = `calc(${(p.span * 100) / 7}% - var(--nf-space-1))`;
             const sourceKey = `bar-${p.event.id}@${dateKey(weekStart)}-${p.startCol}`;
             return (
-              <button
+              // biome-ignore lint/a11y/noStaticElementInteractions: the bar is a drag source and a pass-through to the day it was pressed on; it is aria-hidden and carries no interaction of its own, so there is no keyboard path to mirror.
+              // biome-ignore lint/a11y/useKeyWithClickEvents: same — the day it opens is reachable from the cell below, which is the focusable control.
+              <div
                 key={`${p.event.id}-${p.startCol}`}
-                type="button"
                 className={cx(
                   styles.bar,
                   p.continuesLeft && styles['bar--clipStart'],
@@ -393,10 +405,6 @@ function WeekRow({
                   borderInlineStartColor: markerColorForKind(p.event.kind),
                 }}
                 title={`${p.event.title} · ${p.event.workspaceName}`}
-                aria-label={t('calendar.event_detail.open_label', {
-                  title: p.event.title,
-                  workspace: p.event.workspaceName,
-                })}
                 onPointerDown={(e) => {
                   drag?.pressSource(e, sourceKey, {
                     type: 'event',
@@ -406,16 +414,18 @@ function WeekRow({
                     dotColor: markerColorForKind(p.event.kind),
                   });
                 }}
-                onClick={() => {
+                onClick={(e) => {
                   // A drag ends in a click on the pill it started from;
-                  // opening the dialog then would bury the move under a
-                  // form.
+                  // opening anything then would bury the move.
                   if (drag?.wasDragged()) return;
-                  onEventOpen(p.event);
+                  // The overlay floats above the columns, so this press
+                  // reaches no cell to bubble from — it opens the day it
+                  // landed on itself.
+                  onDayOpen(dateKey(addDays(weekStart, grabbedColumn(e, p))));
                 }}
               >
                 <span className={styles.barTitle}>{p.event.title}</span>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -454,7 +464,18 @@ function WeekRow({
             return { kind: 'chip' as const, key: slot.evt.id, evt: slot.evt };
           });
 
+          // What the cell says it holds. Counted from what the day
+          // carries rather than from what the row had room to draw: the
+          // sheet the press opens lists all of it, so a label that
+          // stopped at the cap would undercount the day it opens.
+          const itemCount = reserved.size + slots.length + dayTasks.length;
+          const dayName = dayFormat.format(day);
+
           return (
+            // The whole column is the press target, and the one place a
+            // press in this view is answered. `role="button"` rather than
+            // a real one because the cell holds a task list and a track
+            // column — flow content, which a `<button>` may not contain.
             <div
               key={key}
               // Registers the column as a drop target: the gesture
@@ -467,20 +488,31 @@ function WeekRow({
               ref={drag?.dropCellRef(key)}
               className={cx(styles.dayCol, dragOverKey === key && styles['dayCol--dragOver'])}
               data-cell-key={key}
+              role="button"
+              tabIndex={0}
+              aria-label={
+                primaryHoliday
+                  ? t('calendar.month_scroll.day_label_holiday', {
+                      date: dayName,
+                      holiday: primaryHoliday.name,
+                      count: itemCount,
+                    })
+                  : t('calendar.month_scroll.day_label', { date: dayName, count: itemCount })
+              }
+              onClick={() => {
+                // The release that ended a drag arrives here as a click
+                // on the pill it started from, which bubbles; opening
+                // the day then would bury the move under a sheet.
+                if (drag?.wasDragged()) return;
+                onDayOpen(key);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onDayOpen(key);
+              }}
             >
-              <button
-                type="button"
-                className={cx(styles.dayHead, isToday && styles['dayHead--today'])}
-                onClick={() => onDayCreate(key)}
-                aria-label={
-                  primaryHoliday
-                    ? t('calendar.month_scroll.day_label_holiday', {
-                        date: key,
-                        holiday: primaryHoliday.name,
-                      })
-                    : t('calendar.month_scroll.day_label', { date: key })
-                }
-              >
+              <span className={cx(styles.dayHead, isToday && styles['dayHead--today'])}>
                 <span
                   className={cx(
                     styles.dayNumber,
@@ -490,7 +522,7 @@ function WeekRow({
                 >
                   {day.getDate()}
                 </span>
-              </button>
+              </span>
 
               {primaryHoliday ? (
                 <span className={styles.holidayLabel} title={primaryHoliday.name}>
@@ -510,9 +542,12 @@ function WeekRow({
                   const evt = tc.evt;
                   const sourceKey = `chip-${evt.id}@${key}`;
                   return (
-                    <button
+                    // A chip is drawn, not pressed: it is a drag source
+                    // and nothing else, and a tap on it bubbles to the
+                    // cell, which opens the day. It carries no click
+                    // handler of its own for that reason.
+                    <div
                       key={tc.key}
-                      type="button"
                       className={cx(
                         styles.chip,
                         drag?.holdingKey === sourceKey && styles['pill--holding'],
@@ -523,10 +558,6 @@ function WeekRow({
                         borderInlineStartColor: markerColorForKind(evt.kind),
                       }}
                       title={`${evt.title} · ${evt.workspaceName}`}
-                      aria-label={t('calendar.event_detail.open_label', {
-                        title: evt.title,
-                        workspace: evt.workspaceName,
-                      })}
                       onPointerDown={(e) => {
                         drag?.pressSource(e, sourceKey, {
                           type: 'event',
@@ -536,13 +567,6 @@ function WeekRow({
                           dotColor: markerColorForKind(evt.kind),
                         });
                       }}
-                      onClick={() => {
-                        // The release that ended a drag arrives here as a
-                        // click on the source; a tap that never lifted is
-                        // still a tap and still opens the event.
-                        if (drag?.wasDragged()) return;
-                        onEventOpen(evt);
-                      }}
                     >
                       <span className={styles.chipTitle}>{evt.title}</span>
                       {evt.attendeeCount > 0 ? (
@@ -551,21 +575,22 @@ function WeekRow({
                           {evt.attendeeCount}
                         </span>
                       ) : null}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
 
-              {/* Task dots row — tasks render below events as compact chips. */}
+              {/* Task dots row — tasks render below events as compact
+                  chips. Drawn, not pressed, for the same reason the
+                  event chips are: the day they belong to is the target,
+                  and the sheet it opens is where a task is opened. */}
               {dayTasks.length > 0 ? (
                 <ul className={styles.taskList}>
                   {dayTasks.slice(0, 2).map((task) => (
                     <li key={task.id}>
-                      <button
-                        type="button"
+                      <span
                         className={styles.taskChip}
                         title={`${task.title} · ${task.workspaceName}`}
-                        onClick={() => onTaskOpen(task)}
                       >
                         <span
                           aria-hidden
@@ -573,7 +598,7 @@ function WeekRow({
                           style={{ background: stateColor(task.derivedState) }}
                         />
                         <span className={styles.taskTitle}>{task.title}</span>
-                      </button>
+                      </span>
                     </li>
                   ))}
                   {dayTasks.length > 2 ? (
@@ -673,9 +698,7 @@ export default function MonthScroll({
   scrollToTodaySignal,
   onVisibleMonthChange,
   drag,
-  onDayCreate,
-  onEventOpen,
-  onTaskOpen,
+  onDayOpen,
 }: MonthScrollProps): ReactElement {
   const { t } = useTranslation('common');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -709,6 +732,21 @@ export default function MonthScroll({
 
   const monthFmt = useMemo(
     () => new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }),
+    [locale],
+  );
+
+  // The cell's accessible name. A day column shows nothing but a number,
+  // so the label has to say which day that number belongs to — built
+  // once here rather than per cell, since a rendered range is several
+  // hundred of them.
+  const dayFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
     [locale],
   );
 
@@ -921,9 +959,8 @@ export default function MonthScroll({
                   stateColor={stateColor}
                   drag={drag}
                   dragOverKey={drag?.drag?.overKey ?? null}
-                  onDayCreate={onDayCreate}
-                  onEventOpen={onEventOpen}
-                  onTaskOpen={onTaskOpen}
+                  dayFormat={dayFmt}
+                  onDayOpen={onDayOpen}
                 />
               </div>
             );

@@ -188,9 +188,7 @@ function renderView(events: CalendarEvent[]): void {
       zone={viewZone}
       stateColor={() => 'red'}
       scrollToTodaySignal={0}
-      onDayCreate={noop}
-      onEventOpen={noop}
-      onTaskOpen={noop}
+      onDayOpen={noop}
     />,
   );
 }
@@ -258,7 +256,11 @@ describe('MonthScroll week tracks', () => {
     expect(chipTitles(thursday)).toEqual(['Standup']);
     expect(chipTitles(await cell(dayKey(dayOfWeek(4))))).toEqual(['Retro']);
 
-    const bars = [...document.querySelectorAll('button')].filter((el) => hasStyle(el, 'bar'));
+    // A bar is drawn rather than pressed, so it is not a button; the
+    // class is what names it.
+    const bars = [...document.querySelectorAll('[data-week] *')].filter((el) =>
+      hasStyle(el, 'bar'),
+    );
     expect(bars.map((el) => el.textContent)).toContain('Offsite');
   });
 

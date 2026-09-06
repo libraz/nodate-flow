@@ -105,6 +105,12 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
+/*
+ * The whole column is the press target: it opens the day. Everything
+ * drawn inside it — chips, bars, task rows — is a picture of the day,
+ * not a control, so the target is the full 5.5rem box rather than the
+ * date square it used to be.
+ */
 .dayCol {
   display: flex;
   flex-direction: column;
@@ -115,10 +121,18 @@
   padding: var(--nf-space-px);
   border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
   overflow: hidden;
+  cursor: pointer;
 }
 
 .dayCol:last-child {
   border-inline-end: none;
+}
+
+/* Inset, for the same reason the drop highlight is: an outer ring on a
+   column this narrow falls under its neighbour, which paints over it. */
+.dayCol:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 var(--nf-focus-ring-width) var(--nf-color-focus-ring);
 }
 
 /* The day a drop would land on.
@@ -130,8 +144,9 @@
   box-shadow: inset 0 0 0 2px var(--nf-color-accent);
 }
 
+/* The date square. Drawn, not pressed — the column around it is the
+   control — so it carries no cursor or focus ring of its own. */
 .dayHead {
-  all: unset;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,13 +156,6 @@
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.5rem;
   border-radius: var(--nf-radius-pill);
-  cursor: pointer;
-  transition: background var(--nf-duration-fast);
-}
-
-.dayHead:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
 }
 
 .dayHead--today {
@@ -197,7 +205,6 @@
 }
 
 .chip {
-  all: unset;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -210,13 +217,7 @@
   border-radius: var(--nf-radius-sm);
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
-  cursor: pointer;
   overflow: hidden;
-}
-
-.chip:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
 }
 
 .chipTitle {
@@ -255,7 +256,6 @@
 }
 
 .bar {
-  all: unset;
   position: absolute;
   box-sizing: border-box;
   /* nf-token-override: component dimension, not a spacing step */
@@ -271,11 +271,6 @@
   cursor: pointer;
   pointer-events: auto;
   overflow: hidden;
-}
-
-.bar:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
 }
 
 .bar--clipStart {
@@ -307,7 +302,6 @@
 }
 
 .taskChip {
-  all: unset;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -318,13 +312,7 @@
   background: var(--nf-color-bg);
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
-  cursor: pointer;
   overflow: hidden;
-}
-
-.taskChip:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
 }
 
 .taskDot {
@@ -378,30 +366,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dayHead {
-    transition: none;
-  }
-
   .pill--holding {
     transition: none;
     transform: none;
   }
 }
 
-/* ───── touch hit areas ───── */
+/* ───── phone density ───── */
 
 /*
- * This view only renders below `md`, so every press here is a fingertip
- * and the 1.5rem date square is under the 32px bar on both axes.
- * `--nf-space-8` is the step that lands on it.
+ * This view only renders below `md`. The date square is drawn larger
+ * there so the number, and the filled pill "today" is marked with, stay
+ * readable at arm's length on a column a seventh of a phone wide.
  *
- * Widening the hit area past the painted square was the alternative and
- * it does not work in this column: the square sits one pixel from the
- * column's block-start and inline-start edges, and `.dayCol` clips, so a
- * symmetric overlay loses its outer edges and never reaches 32px. The
- * square itself has to grow.
- *
- * `.barOverlay` follows it. That offset is the head's height plus the
+ * `.barOverlay` follows it. That offset is the square's height plus the
  * gap under it — left where it was, the multi-day bars would start
  * inside the enlarged square. The column's `min-block-size` does not
  * follow: it is a floor for an empty day, not a cap, so a day with

@@ -55,6 +55,7 @@ import {
   type RecurrenceScope,
   useUpdateEvent,
 } from '../features/calendar-events/api';
+import DayDetailSheet from '../features/calendar-events/day-detail-sheet';
 import EventDialog, {
   type EventDialogMode,
   type ItemKind,
@@ -115,6 +116,15 @@ const WEEKDAY_KEYS_BY_START: Record<WeekStart, readonly Weekday[]> = {
 
 /** JS `Date.getDay()` value (Sun=0..Sat=6) for the weekStart anchor. */
 const WEEKSTART_TO_DOW: Record<WeekStart, number> = { sun: 0, mon: 1, sat: 6 };
+
+/**
+ * Shared empties for a day the maps have no entry for, so the day sheet
+ * is handed the same identity on every render of an empty day rather
+ * than a fresh array that invalidates everything memoized on it.
+ */
+const EMPTY_EVENTS: CalendarEvent[] = [];
+const EMPTY_TASKS: CalendarTask[] = [];
+const EMPTY_HOLIDAYS: HolidayEntry[] = [];
 
 /**
  * Day of week as 0..6 with the user's chosen start day as 0.
@@ -531,6 +541,15 @@ function CalendarRoute(): ReactElement {
   });
   const isMobile = useIsMobile();
   const [railOpen, setRailOpen] = useState(false);
+  /**
+   * The day the mobile view has open, as `YYYY-MM-DD`, or null.
+   *
+   * Only the phone view opens one: its chips are too small to press, so
+   * the day sheet is where an event or a task is opened and where a new
+   * event is created. The desktop grid operates on its cells directly
+   * and never sets this.
+   */
+  const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   // Bumped by the "Today" button so the mobile month-scroll re-centers.
   const [scrollToTodaySignal, setScrollToTodaySignal] = useState(0);
 
@@ -538,6 +557,12 @@ function CalendarRoute(): ReactElement {
   // (the Drawer primitive owns Escape / focus-trap while it is open).
   useEffect(() => {
     if (!isMobile) setRailOpen(false);
+  }, [isMobile]);
+
+  // Same for the day sheet: grown past the breakpoint the grid behind it
+  // is the desktop one, which the sheet has no place over.
+  useEffect(() => {
+    if (!isMobile) setOpenDayKey(null);
   }, [isMobile]);
 
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -1182,9 +1207,7 @@ function CalendarRoute(): ReactElement {
               // on a phone raises the same scope question, sends the same
               // request, and reports the same refusal.
               drag={pointerDrag}
-              onDayCreate={(key) => handleCellClick(key, false)}
-              onEventOpen={handleEventOpen}
-              onTaskOpen={handleTaskOpen}
+              onDayOpen={setOpenDayKey}
             />
           ) : (
             <>
@@ -1214,7 +1237,14 @@ function CalendarRoute(): ReactElement {
                   const holidayTitle = dayHolidays.map((h) => h.name).join(', ');
                   const dateNumberCls = dateNumberClass(cell.date, dayHolidays.length > 0);
                   return (
-                    // biome-ignore lint/a11y/noStaticElementInteractions: month grid cells are pointer drag-and-drop targets for moving events; they expose no keyboard interaction of their own.
+                    // A cell carries its handlers whether or not it is a
+                    // day of the month on screen, but only a day of the
+                    // month is given a role — a leading or trailing cell
+                    // is filler, and both handlers no-op on one. The rule
+                    // reads the role as an expression rather than a value
+                    // and so cannot see the one the day cells get, and it
+                    // is right about the filler ones either way.
+                    // biome-ignore lint/a11y/noStaticElementInteractions: role is conditional on `cell.inMonth`; the handlers below are inert for the cells that have none.
                     <div
                       key={cell.key}
                       // Registers the cell as a drop target: the gesture
@@ -1419,6 +1449,34 @@ function CalendarRoute(): ReactElement {
         >
           <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />
         </Drawer>
+      ) : null}
+
+      {/* The day the phone view has open. Each handler closes it first:
+          what it opens is a dialog or another route, and a sheet left
+          standing behind either is a surface nobody asked to keep. */}
+      {isMobile && openDayKey !== null ? (
+        <DayDetailSheet
+          dateKey={openDayKey}
+          locale={locale}
+          zone={zone}
+          events={eventsByDate.get(openDayKey) ?? EMPTY_EVENTS}
+          tasks={byDate.get(openDayKey) ?? EMPTY_TASKS}
+          holidays={holidaysByDate.get(openDayKey) ?? EMPTY_HOLIDAYS}
+          stateColor={stateColor}
+          onClose={() => setOpenDayKey(null)}
+          onEventOpen={(event) => {
+            setOpenDayKey(null);
+            handleEventOpen(event);
+          }}
+          onTaskOpen={(task) => {
+            setOpenDayKey(null);
+            handleTaskOpen(task);
+          }}
+          onCreate={(key) => {
+            setOpenDayKey(null);
+            handleCellClick(key, false);
+          }}
+        />
       ) : null}
 
       {editTarget !== null ? (

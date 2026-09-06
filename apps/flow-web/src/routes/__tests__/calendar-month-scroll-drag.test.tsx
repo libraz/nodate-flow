@@ -5,7 +5,8 @@
  * view is virtualized and scrolls through two years of weeks, so what
  * these tests pin is what only happens here: that a finger which held
  * still long enough moves an event and sends the shifted range, that one
- * which did not still opens it, and that a drop in a month other than
+ * which did not opens the day rather than the event — the pills here are
+ * drag sources and nothing else — and that a drop in a month other than
  * the one the pill came from arrives with the right delta rather than
  * dying with the row it started in.
  *
@@ -356,10 +357,14 @@ async function bar(title: string): Promise<HTMLElement> {
   return pillWithClass('bar', title);
 }
 
+/**
+ * A pill is drawn rather than pressed — it is a drag source and nothing
+ * else, so it is not a button — and the class is what names it.
+ */
 async function pillWithClass(local: string, title: string): Promise<HTMLElement> {
   let found: HTMLElement | undefined;
   await waitFor(() => {
-    found = [...document.querySelectorAll<HTMLElement>('button')].find(
+    found = [...document.querySelectorAll<HTMLElement>('[data-week] *')].find(
       (el) => hasStyle(el, local) && (el.textContent?.includes(title) ?? false),
     );
     if (!found) throw new Error(`no ${local} for ${title}`);
@@ -442,13 +447,15 @@ describe('month scroll pointer drag', () => {
     // A row that does not repeat has no occurrences to choose between.
     expect(vars.body.scope).toBeUndefined();
 
-    // The release that ended the drag reaches the pill as a click. It
-    // must not also open the event on top of the move.
+    // The release that ended the drag reaches the pill as a click, which
+    // bubbles to the day cell. It must not also open anything on top of
+    // the move.
     fireEvent.click(pill);
     expect(screen.queryByTestId('event-dialog')).toBeNull();
+    expect(screen.queryByTestId('day-detail-sheet')).toBeNull();
   });
 
-  it('opens the event when a finger lets go before the hold', async () => {
+  it('opens the day when a finger lets go before the hold', async () => {
     mocks.events = [baseEvent()];
     renderCalendar();
     const pill = await chip('Design review');
@@ -470,7 +477,10 @@ describe('month scroll pointer drag', () => {
     });
     fireEvent.click(pill);
 
-    expect(await screen.findByTestId('event-dialog')).toBeTruthy();
+    // A tap that lands on a pill is a tap on the day under it: the pill
+    // is 18px tall, which is not a target a finger can aim at.
+    expect(await screen.findByTestId('day-detail-sheet')).toBeTruthy();
+    expect(screen.queryByTestId('event-dialog')).toBeNull();
     expect(mocks.updateMutate).not.toHaveBeenCalled();
   });
 

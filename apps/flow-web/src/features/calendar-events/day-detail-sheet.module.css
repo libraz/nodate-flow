@@ -1,0 +1,110 @@
+/**
+ * DayDetailSheet — day-detail styles for the phone month view.
+ *
+ * All visual values resolve from design tokens (`--nf-color-*`,
+ * `--nf-space-*`, `--nf-radius-*`, `--nf-text-*`). No hardcoded colours
+ * so the four-theme switcher keeps working, and logical properties
+ * throughout for RTL safety. Nothing here animates, so there is no
+ * motion for a reduced-motion reader to opt out of — the Drawer
+ * primitive this sits in does not animate either.
+ */
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
+}
+
+.holiday {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-regular);
+  color: var(--nf-color-danger-fg);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+/*
+ * A row is the touch target the month chip could not be: the sheet
+ * exists so that opening an event is a press a finger can land, and
+ * `--nf-space-12` (3rem) is the first step of the scale at or above the
+ * 44px bar.
+ */
+.row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  inline-size: 100%;
+  min-block-size: var(--nf-space-12);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/*
+ * The same accent the grid chip carries on its inline-start border, so a
+ * reader can tie a row here back to the chip they tapped.
+ */
+.marker {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.25rem;
+  align-self: stretch;
+  border-radius: var(--nf-radius-pill);
+}
+
+.time {
+  flex-shrink: 0;
+  /* nf-token-override: column width for the clock, not a spacing step */
+  min-inline-size: 4.5rem;
+  font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+.rowBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  gap: var(--nf-space-px);
+}
+
+.rowTitle {
+  font-size: var(--nf-text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create {
+  inline-size: 100%;
+  margin-block-start: var(--nf-space-2);
+}
