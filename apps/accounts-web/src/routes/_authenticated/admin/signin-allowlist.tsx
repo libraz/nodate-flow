@@ -24,6 +24,9 @@ import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Input from '@nodate-flow/ui/primitives/input';
+import SegmentedControl, {
+  type SegmentedControlOption,
+} from '@nodate-flow/ui/primitives/segmented-control';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createFileRoute } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
@@ -219,6 +222,16 @@ export function SignInAllowlistPage(): ReactElement {
   const active = entries.filter((entry) => entry.enabled);
   const withdrawn = entries.filter((entry) => !entry.enabled);
 
+  /*
+   * Both kinds stay visible: picking one decides whether the field beside it
+   * takes a whole address or a bare domain, and it relabels that field. A
+   * choice that reshapes the rest of the form should not sit behind a menu.
+   */
+  const kindOptions: SegmentedControlOption<EntryKind>[] = [
+    { value: 'domain', label: t('signin_allowlist.kind_domain') },
+    { value: 'email', label: t('signin_allowlist.kind_email') },
+  ];
+
   const renderKind = (entryKind: EntryKind): ReactElement => (
     <span
       className={`aw-badge ${entryKind === 'domain' ? styles.kindDomain : styles.kindEmail}`}
@@ -364,20 +377,30 @@ export function SignInAllowlistPage(): ReactElement {
         </h2>
         <form className={styles.form} onSubmit={(e) => void handleAdd(e)}>
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="allowlist-kind">
+            {/*
+             * Not a `<label htmlFor>`: the control below is a radiogroup, and
+             * a radiogroup is not a labelable element. The group carries the
+             * same string as its own accessible name instead.
+             */}
+            <span className={styles.label} aria-hidden="true">
               {t('signin_allowlist.add_kind_label')}
-            </label>
-            <select
-              id="allowlist-kind"
-              className="aw-select"
+            </span>
+            <SegmentedControl<EntryKind>
+              size="sm"
               value={kind}
-              onChange={(e) => setKind(e.target.value as EntryKind)}
-            >
-              <option value="domain">{t('signin_allowlist.kind_domain')}</option>
-              <option value="email">{t('signin_allowlist.kind_email')}</option>
-            </select>
+              onChange={setKind}
+              options={kindOptions}
+              ariaLabel={t('signin_allowlist.add_kind_label')}
+            />
           </div>
           <div className={`${styles.field} ${styles.fieldGrow}`}>
+            {/*
+             * The label names the value, not the kind. A field called
+             * "Domain" would carry the accessible name of the segment that
+             * selected it -- the segments name themselves the same way --
+             * leaving two controls a screen reader cannot tell apart, one of
+             * which decides what the other means.
+             */}
             <label className={styles.label} htmlFor="allowlist-value">
               {kind === 'domain'
                 ? t('signin_allowlist.add_domain_label')

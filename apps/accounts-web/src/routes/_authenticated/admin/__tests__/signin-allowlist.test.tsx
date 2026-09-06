@@ -248,6 +248,107 @@ describe('sign-in allowlist', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('shows both kinds at once, and switching kind relabels the value it will send', async () => {
+    // Kind decides what the field beside it means -- a whole address or a
+    // bare domain -- so both options stay on screen and the switch has to
+    // carry through to the label, the placeholder and the request body.
+    primeList([]);
+    sdkMocks.post.mockResolvedValue({
+      data: { ...withdrawnAddress, enabled: true },
+      error: null,
+      response: new Response(null, { status: 200 }),
+    });
+
+    mount();
+
+    const group = await screen.findByRole('radiogroup', { name: copy.add_kind_label });
+    const [domain, email] = within(group).getAllByRole('radio');
+    expect(domain?.getAttribute('aria-checked')).toBe('true');
+    expect(email?.getAttribute('aria-checked')).toBe('false');
+
+    await userEvent.click(email as HTMLElement);
+    expect(email?.getAttribute('aria-checked')).toBe('true');
+    expect(domain?.getAttribute('aria-checked')).toBe('false');
+
+    const value = await screen.findByLabelText(copy.add_email_label);
+    expect(value.getAttribute('placeholder')).toBe(copy.add_email_placeholder);
+    await userEvent.type(value, 'someone@vendor.test');
+    await userEvent.click(screen.getByRole('button', { name: copy.add_submit }));
+
+    await waitFor(() => {
+      expect(sdkMocks.post).toHaveBeenCalled();
+    });
+    expect(sdkMocks.post.mock.calls[0]?.[1]?.body).toEqual({
+      kind: 'email',
+      value: 'someone@vendor.test',
+    });
+  });
+
+  it('names the kind segment and the field it relabels differently', async () => {
+    // A segment names itself with its own label, so a value field named
+    // after the kind it holds would leave the form with two controls
+    // called the same thing -- one of which decides what the other means.
+    // Every lookup here is a getBy*, which throws on a second match, so
+    // each name has to reach exactly one control.
+    primeList([]);
+
+    mount();
+
+    const group = await screen.findByRole('radiogroup', { name: copy.add_kind_label });
+    const [domain, email] = within(group).getAllByRole('radio');
+
+    const field = screen.getByRole('textbox', { name: copy.add_domain_label });
+    expect(screen.getByLabelText(copy.add_domain_label)).toBe(field);
+    expect(screen.getByLabelText(copy.kind_domain)).toBe(domain);
+
+    // Switching kind relabels that same field, and the new name is its own
+    // as well.
+    await userEvent.click(email as HTMLElement);
+    expect(screen.getByLabelText(copy.add_email_label)).toBe(field);
+    expect(screen.getByLabelText(copy.kind_email)).toBe(email);
+  });
+
+  it('warns that an address is rewritten before it is stored, not only a domain', async () => {
+    // The server lower-cases and trims whichever kind is sent, and takes a
+    // leading @ off a domain on top of that. A hint that named only
+    // domains would leave an administrator expecting Person@Vendor.test to
+    // be kept as typed, and reading the row it comes back as as a
+    // different entry from the one they added.
+    primeList([]);
+
+    mount();
+
+    const hint = (await screen.findByText(copy.add_hint)).textContent ?? '';
+    expect(hint.toLowerCase()).toContain(copy.kind_domain.toLowerCase());
+    expect(hint.toLowerCase()).toContain(copy.kind_email.toLowerCase());
+    expect(hint).toMatch(/lower ?case/i);
+  });
+
+  it('lets the keyboard reach and change the kind without a pointer', async () => {
+    // A roving tabindex means only the selected segment is tabbable, so the
+    // group is one Tab stop and the arrow keys move the selection.
+    primeList([]);
+
+    mount();
+
+    const group = await screen.findByRole('radiogroup', { name: copy.add_kind_label });
+    const [domain, email] = within(group).getAllByRole('radio');
+    expect(domain?.getAttribute('tabindex')).toBe('0');
+    expect(email?.getAttribute('tabindex')).toBe('-1');
+
+    (domain as HTMLElement).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(email?.getAttribute('aria-checked')).toBe('true');
+    expect(document.activeElement).toBe(email);
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(domain?.getAttribute('aria-checked')).toBe('true');
+    // Tabbing on from the group lands on the value field, not on the
+    // unselected segment.
+    await userEvent.tab();
+    expect(document.activeElement).toBe(await screen.findByLabelText(copy.add_domain_label));
+  });
+
   it('reports a refused withdrawal instead of dropping the entry off the screen', async () => {
     primeList([liveDomain]);
     confirmMock.fn.mockResolvedValue(true);
