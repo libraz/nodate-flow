@@ -49,11 +49,23 @@ func taskCreatedEvents(t *testing.T, taskPublicID string) []map[string]any {
 }
 
 // requireOwnCreatedEvent asserts a task has exactly one task.created event
-// addressed to its own row, and that the payload describes that same task.
+// addressed to its own row, and that the payload describes that same task:
+// its id, its title, its place in the tree and the route that produced it.
 // Matching the payload too is what keeps the ids aligned: an event carried
 // out of a batch under a sibling's internal id would still be reachable
 // from a task, just not from the one it names.
-func requireOwnCreatedEvent(t *testing.T, taskPublicID, wantTitle, surface string) {
+//
+// Parentage and via belong in the same check because they are what a
+// reader of the log has to go on. A subtask whose payload carries no
+// parentTaskId reads as a top-level task to everything downstream, and
+// which route made it is the only thing separating one batch path's
+// output from the other's.
+//
+// wantParent is the parent's public id, or the empty string for a
+// top-level task — in which case the payload must carry no parentTaskId
+// key at all. A present-but-empty key is a different shape from an
+// absent one, and only the absent one says "this task has no parent".
+func requireOwnCreatedEvent(t *testing.T, taskPublicID, wantTitle, wantParent, wantVia, surface string) {
 	t.Helper()
 
 	events := taskCreatedEvents(t, taskPublicID)
@@ -63,6 +75,15 @@ func requireOwnCreatedEvent(t *testing.T, taskPublicID, wantTitle, surface strin
 		"%s addressed task %s with an event naming another task", surface, taskPublicID)
 	require.Equalf(t, wantTitle, events[0]["title"],
 		"%s recorded a title the task %s was never stored under", surface, taskPublicID)
+	if wantParent == "" {
+		require.NotContainsf(t, events[0], "parentTaskId",
+			"%s gave top-level task %s a parentTaskId key", surface, taskPublicID)
+	} else {
+		require.Equalf(t, wantParent, events[0]["parentTaskId"],
+			"%s recorded task %s under the wrong parent", surface, taskPublicID)
+	}
+	require.Equalf(t, wantVia, events[0]["via"],
+		"%s recorded task %s as having come from another route", surface, taskPublicID)
 }
 
 // TestRESTApplySmartSubtaskCreatedEvents holds that every task apply-smart
@@ -103,9 +124,12 @@ func TestRESTApplySmartSubtaskCreatedEvents(t *testing.T) {
 	require.NotEmpty(t, applied.TaskID)
 	require.Len(t, applied.SubtaskIDs, 2)
 
-	requireOwnCreatedEvent(t, applied.TaskID, parentTitle, "REST apply-smart parent")
-	requireOwnCreatedEvent(t, applied.SubtaskIDs[0], firstTitle, "REST apply-smart first subtask")
-	requireOwnCreatedEvent(t, applied.SubtaskIDs[1], secondTitle, "REST apply-smart second subtask")
+	requireOwnCreatedEvent(t, applied.TaskID, parentTitle, "", "api:smart_create",
+		"REST apply-smart parent")
+	requireOwnCreatedEvent(t, applied.SubtaskIDs[0], firstTitle, applied.TaskID, "api:smart_create",
+		"REST apply-smart first subtask")
+	requireOwnCreatedEvent(t, applied.SubtaskIDs[1], secondTitle, applied.TaskID, "api:smart_create",
+		"REST apply-smart second subtask")
 }
 
 // TestRESTApplyStepsChildCreatedEvents holds the same rule on the sibling
@@ -144,6 +168,8 @@ func TestRESTApplyStepsChildCreatedEvents(t *testing.T) {
 		}, &applied)
 	require.Len(t, applied.Created, 2)
 
-	requireOwnCreatedEvent(t, applied.Created[0], firstStep, "REST apply-steps first child")
-	requireOwnCreatedEvent(t, applied.Created[1], secondStep, "REST apply-steps second child")
+	requireOwnCreatedEvent(t, applied.Created[0], firstStep, parent.ID, "api:apply_steps",
+		"REST apply-steps first child")
+	requireOwnCreatedEvent(t, applied.Created[1], secondStep, parent.ID, "api:apply_steps",
+		"REST apply-steps second child")
 }
