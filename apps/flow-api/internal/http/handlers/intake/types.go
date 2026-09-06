@@ -7,9 +7,9 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
@@ -21,14 +21,15 @@ type Deps struct {
 	// under its own text rather than only after the reindex cron runs.
 	// Optional: nil disables write-time embedding.
 	Embedder *embed.Client
-	Audit    *audit.Recorder
+	// Mutations records every change these handlers make, in both the
+	// event log and the audit log. It replaces a bare audit recorder so
+	// neither half can be written without the other; mutation_static_test.go
+	// is what keeps a later handler from reaching around it.
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.
 var httpErr = handlerutil.HTTPErr
-
-// actorPtr delegates to handlerutil.ActorPtr.
-var actorPtr = handlerutil.ActorPtr
 
 // totalAsInt64 delegates to handlerutil.TotalAsInt64.
 var totalAsInt64 = handlerutil.TotalAsInt64
@@ -118,9 +119,14 @@ type GetIntakeItemOutput struct {
 // ---- Triage ----
 
 // TriageIntakeItemBody is the JSON body for PATCH /workspaces/{wsId}/intake/{id}.
+//
+// SnoozeUntil carries no schema `minimum`: the bound is conditional on
+// Status, which a tag cannot express, and a partial tag would answer a
+// missing deadline and a non-positive one with two different codes for
+// one malformed snooze. The handler states the whole rule instead.
 type TriageIntakeItemBody struct {
 	Status      string `json:"status" enum:"accepted,rejected,snoozed,duplicate"`
-	SnoozeUntil *int64 `json:"snoozeUntil,omitempty" doc:"Unix seconds timestamp for snooze expiry"`
+	SnoozeUntil *int64 `json:"snoozeUntil,omitempty" doc:"Unix seconds timestamp for snooze expiry. Required and must be positive when status is snoozed; ignored for every other status."`
 }
 
 // TriageIntakeItemInput is the request for PATCH /workspaces/{wsId}/intake/{id}.

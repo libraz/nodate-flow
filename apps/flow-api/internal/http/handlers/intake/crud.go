@@ -7,7 +7,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -15,10 +14,24 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
+
+// actor reads the workspace and the acting user off the request
+// context as the one value both halves of a record are stamped with.
+//
+// The actor is resolved unconditionally. Recording it was previously
+// conditional on the context carrying one, which meant an
+// actor-less request appended the event and skipped the audit row —
+// exactly the half-recorded change the mutation log exists to prevent.
+// A missing actor is a NULL column, not a reason to record nothing.
+func actor(ctx context.Context, ws middleware.WorkspaceContext) mutationlog.Actor {
+	actorID, _ := middleware.ActorFromContext(ctx)
+	return mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
+}
 
 // requireNonGuest rejects workspace guests. Guests have read-only access to
 // the intake queue (list/get); creating, triaging, and converting items are
@@ -71,25 +84,16 @@ func Create(deps Deps) func(context.Context, *CreateIntakeItemInput) (*CreateInt
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.IntakeItemCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"intakeItemId": pub.String()},
-		}, "intake.Create")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "intake.create",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "intake_item",
-					ResourceID:   pub.String(),
-					Metadata:     map[string]any{"title": in.Body.Title},
-				})
-			}
-		}
+		// The row is committed on its own connection by now, so the
+		// record is written after the fact and never fails the request.
+		deps.Mutations.Record(ctx, actor(ctx, ws), mutationlog.Mutation{
+			EventType:    eventbus.IntakeItemCreated,
+			AuditAction:  "intake.create",
+			ResourceType: "intake_item",
+			ResourceID:   pub.String(),
+			Payload:      map[string]any{"intakeItemId": pub.String(), "title": in.Body.Title},
+			CallSite:     "intake.Create",
+		})
 
 		row, err := deps.Queries.FindIntakeItemByPublicId(ctx, generated.FindIntakeItemByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -227,6 +231,32 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			return nil, httpErr(spec)
 		}
 
+		// A snooze is a deadline, and nothing resurfaces an item without
+		// one: the intake queue is filtered by triage_status alone, and no
+		// job scans snooze_until. An item parked as snoozed with a NULL
+		// snooze_until leaves the pending list with no date at which
+		// anything brings it back, so it is lost rather than deferred —
+		// and a non-positive deadline says the same thing, since epoch or
+		// earlier is not a date anything waits for. The check sits with
+		// the other argument validation, before the item is read, so a
+		// malformed call does not depend on the item existing. The MCP
+		// triage tool refuses the same inputs.
+		//
+		// The bound is not a schema `minimum` on the field: it is
+		// conditional on the status, which a struct tag cannot express,
+		// and a partial tag would answer one malformed snooze with two
+		// different codes.
+		var snoozeUntil sql.NullTime
+		if in.Body.Status == "snoozed" {
+			if in.Body.SnoozeUntil == nil || *in.Body.SnoozeUntil <= 0 {
+				return nil, httpErr(apierrors.WsIntakeSnoozeDeadlineRequired)
+			}
+			snoozeUntil = sql.NullTime{Time: time.Unix(*in.Body.SnoozeUntil, 0), Valid: true}
+		}
+		// A deadline sent with any other status is dropped rather than
+		// stored: only a snoozed item has something to resurface from, and
+		// the column is written unconditionally by the update below.
+
 		pub, err := types.Parse(in.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsIntakeNotFound)
@@ -247,11 +277,6 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		var snoozeUntil sql.NullTime
-		if in.Body.Status == "snoozed" && in.Body.SnoozeUntil != nil {
-			snoozeUntil = sql.NullTime{Time: time.Unix(*in.Body.SnoozeUntil, 0), Valid: true}
-		}
-
 		// Not an existence check: re-triaging an item to the status it
 		// already holds changes nothing and MySQL counts zero. The item is
 		// re-read below and that read is what fails if it is gone.
@@ -265,24 +290,17 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		triageType := triageEventKind(in.Body.Status)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        triageType,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
-		}, "intake.Triage")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "intake.triage",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "intake_item",
-				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"status": in.Body.Status},
-			})
-		}
+		// The event kind is chosen from the decision, so it is the one
+		// mutation here the static check cannot read off the literal;
+		// triageEventKind is total over the enum the schema accepts.
+		deps.Mutations.Record(ctx, actor(ctx, ws), mutationlog.Mutation{
+			EventType:    triageEventKind(in.Body.Status),
+			AuditAction:  "intake.triage",
+			ResourceType: "intake_item",
+			ResourceID:   pub.String(),
+			Payload:      map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
+			CallSite:     "intake.Triage",
+		})
 
 		row, err := deps.Queries.FindIntakeItemByPublicId(ctx, generated.FindIntakeItemByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -362,6 +380,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			taskID  int64
 			taskPub types.PublicID
 		)
+		act := actor(ctx, ws)
 		if err := dbretry.InTx(ctx, deps.DB, "intake.Convert", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			qtx := deps.Queries.WithTx(tx.RawTx())
 
@@ -383,65 +402,63 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			// The item was resolved earlier in this transaction and the task it
 			// is being linked to was just inserted, so the count adds nothing the
 			// transaction does not already guarantee.
-			_, err = qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+			if _, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 				TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				WorkspaceID: ws.ID,
 				PublicID:    pub,
-			})
-			return err
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+			}); err != nil {
+				return err
+			}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.IntakeItemAccepted,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskID,
-			Payload: map[string]any{
-				"intakeItemId": pub.String(),
-				"taskId":       taskPub.String(),
-				"projectId":    prjPub.String(),
-			},
-		}, "intake.Convert")
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskID,
-			// The task's title, not the item's: the conversion trims what
-			// the item carried, so recording the item's string would name
-			// the task by something it was never stored under.
-			Payload: map[string]any{
-				"taskId":    taskPub.String(),
-				"projectId": prjPub.String(),
-				"title":     title.String(),
-				"source":    "intake_convert",
-			},
-		}, "intake.Convert")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "intake.convert",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+			// One request, two changes: the item is triaged and a task
+			// comes into existence. They are recorded separately because
+			// they are separate changes to whoever reads either log — a
+			// task board watching task.created has no reason to know the
+			// task came from intake.
+			//
+			// Both records join this transaction. Recording them after it
+			// would leave a window where the task exists and nothing says
+			// so, and would let a rolled-back conversion still be
+			// answered by an audit query. The audit rows are registered
+			// on the commit, so an attempt that rolls back takes its own
+			// records with it.
+			if err := deps.Mutations.RecordInTx(ctx, tx, act, mutationlog.Mutation{
+				EventType:    eventbus.IntakeItemAccepted,
+				AuditAction:  "intake.convert",
 				ResourceType: "intake_item",
 				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"taskId": taskPub.String()},
-			})
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.create",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+				TaskID:       &taskID,
+				Payload: map[string]any{
+					"intakeItemId": pub.String(),
+					"taskId":       taskPub.String(),
+					"projectId":    prjPub.String(),
+				},
+				CallSite: "intake.Convert",
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, act, mutationlog.Mutation{
+				EventType:    eventbus.TaskCreated,
+				AuditAction:  "task.create",
 				ResourceType: "task",
 				ResourceID:   taskPub.String(),
-				Metadata: map[string]any{
+				TaskID:       &taskID,
+				// The task's title, not the item's: the conversion trims
+				// what the item carried, so recording the item's string
+				// would name the task by something it was never stored
+				// under. The project is named by the id the row holds,
+				// not by the string the request sent, so the two logs
+				// cannot disagree about which project it landed in.
+				Payload: map[string]any{
+					"taskId":    taskPub.String(),
+					"projectId": prjPub.String(),
 					"title":     title.String(),
-					"projectId": in.Body.ProjectID,
 					"source":    "intake_convert",
 				},
+				CallSite: "intake.Convert",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// The embedded text is the stored text. The conversion trims the

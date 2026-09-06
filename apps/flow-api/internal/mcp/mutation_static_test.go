@@ -1,12 +1,10 @@
 package mcp
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog/mutationguard"
 )
 
 // mutationLogGates are the entry points that record a change. Every one
@@ -17,6 +15,21 @@ var mutationLogGates = map[string]bool{
 	"recordMutationStrict":  true,
 	"recordTxMutationAudit": true,
 }
+
+// mutationLogOwner is the file holding those entry points, and the only
+// file in this package allowed to reach the event bus.
+const mutationLogOwner = "mutationlog.go"
+
+// eventAppends are the event-bus calls that put a change on the timeline.
+// A tool reaching one of them directly has appended the event and skipped
+// the audit row, which is the half-recorded change the gates exist to
+// prevent.
+var eventAppends = []string{"eventbus.Append", "eventbus.AppendBestEffort"}
+
+// eventOptionalGates is the gate whose event another writer already
+// appended, so a mutation handed to it names no kind and every other one
+// must.
+var eventOptionalGates = map[string]bool{"recordTxMutationAudit": true}
 
 // writeToolsWithoutMutationLog lists the write-scoped tools that record
 // nothing because they change nothing a person could later find missing.
@@ -51,6 +64,24 @@ var readToolsRequiringMutationLog = map[string]string{
 	"export_tasks": "bulk extraction of task data; REST records the same export",
 }
 
+// analyzeMCPPackage parses this package for the structural checks below.
+//
+// The graph is restricted to plain identifier calls, which is the shape
+// the tools and their helpers reach the gates through. Reachability only
+// grows as edges are added, so recording a selector's last segment as a
+// call could turn a tool that reaches no gate into one that appears to,
+// never the reverse — a package whose recorder is never reached through a
+// field would be buying nothing and paying for it with the check's
+// meaning.
+func analyzeMCPPackage(t *testing.T) *mutationguard.Analysis {
+	t.Helper()
+	a, err := mutationguard.Load(".", mutationguard.PlainCallsOnly())
+	if err != nil {
+		t.Fatalf("analyse this package: %v", err)
+	}
+	return a
+}
+
 // TestMCPMutatingToolsRecordBothHalves walks the registered tool table
 // and proves every tool that changes something, or takes something out
 // in bulk, reaches the one place that records it.
@@ -66,7 +97,7 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 	if len(h.tools) == 0 {
 		t.Fatal("no tools registered")
 	}
-	graph := mcpPackageCallGraph(t)
+	analysis := analyzeMCPPackage(t)
 	registry := mcpRegisteredTools(t)
 
 	seenExempt := map[string]bool{}
@@ -85,12 +116,12 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 			continue
 		}
 		entry := mcpRunFuncName(t, registry, name)
-		if !reachesAny(graph, entry, mutationLogGates) {
+		if !analysis.Reaches(entry, mutationLogGates) {
 			t.Errorf("tool %q (%s) changes the workspace but never reaches a mutation-log gate (%s); "+
 				"route it through recordMutation / recordMutationStrict, or through recordTxMutationAudit "+
 				"when a shared transactional helper already appended the event, or add it to "+
 				"writeToolsWithoutMutationLog with the reason it persists nothing",
-				name, entry, strings.Join(sortedKeys(mutationLogGates), " / "))
+				name, entry, strings.Join(mutationguard.SortedKeys(mutationLogGates), " / "))
 		}
 	}
 
@@ -114,31 +145,14 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 // is the exact state most of these tools were in. Keeping the append in
 // one file is what makes "event and audit row together" a property of
 // the package rather than a habit.
+//
+// The owner half matters as much: a check whose owner has stopped
+// calling the thing it owns has quietly become a check on nothing.
 func TestMCPEventbusAppendCentralized(t *testing.T) {
 	t.Parallel()
 
-	const owner = "mutationlog.go"
-	banned := []string{"eventbus.Append(", "eventbus.AppendBestEffort("}
-	for _, name := range mcpPackageSourceFiles(t) {
-		if name == owner {
-			continue
-		}
-		b, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatalf("read %s: %v", name, err)
-		}
-		for _, call := range banned {
-			if strings.Contains(string(b), call) {
-				t.Errorf("%s calls %s directly; append through %s so the audit row cannot go missing", name, call, owner)
-			}
-		}
-	}
-
-	src := readMCPSource(t, owner)
-	for _, want := range []string{"eventbus.Append(", "eventbus.AppendBestEffort("} {
-		if !strings.Contains(src, want) {
-			t.Errorf("%s must be the file that calls %s", owner, want)
-		}
+	for _, finding := range analyzeMCPPackage(t).Centralized(mutationLogOwner, eventAppends) {
+		t.Error(finding.String())
 	}
 }
 
@@ -153,77 +167,17 @@ func TestMCPEventbusAppendCentralized(t *testing.T) {
 func TestMCPMutationLiteralsNameBothHalves(t *testing.T) {
 	t.Parallel()
 
-	fset := token.NewFileSet()
-	found := 0
-	for _, name := range mcpPackageSourceFiles(t) {
-		file, err := parser.ParseFile(fset, name, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", name, err)
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			fn, ok := call.Fun.(*ast.Ident)
-			if !ok || !mutationLogGates[fn.Name] {
-				return true
-			}
-			lit := mutationLiteralArg(call)
-			if lit == nil {
-				// A value assembled elsewhere; the runtime guard in
-				// mutationlog.go is what covers that shape.
-				return true
-			}
-			found++
-			keys := compositeKeys(lit)
-			pos := fset.Position(call.Pos())
-			if !keys["AuditAction"] {
-				t.Errorf("%s:%d: %s literal has no AuditAction; name the audit_logs action REST uses for this change",
-					name, pos.Line, fn.Name)
-			}
-			if fn.Name != "recordTxMutationAudit" && !keys["EventType"] {
-				t.Errorf("%s:%d: %s literal has no EventType; name the eventbus kind, or use recordTxMutationAudit if a shared helper already appended it",
-					name, pos.Line, fn.Name)
-			}
-			if fn.Name == "recordTxMutationAudit" && keys["EventType"] {
-				t.Errorf("%s:%d: recordTxMutationAudit literal sets EventType, which it will not append; use recordMutation if this change needs its own event",
-					name, pos.Line)
-			}
-			return true
-		})
+	findings, examined := analyzeMCPPackage(t).Literals(mutationguard.LiteralSpec{
+		TypeName:           "mutation",
+		Gates:              mutationLogGates,
+		Required:           []string{"AuditAction"},
+		EventOptionalGates: eventOptionalGates,
+		EventField:         "EventType",
+	})
+	for _, finding := range findings {
+		t.Error(finding.String())
 	}
-	if found == 0 {
+	if examined == 0 {
 		t.Fatal("no mutation literals found; the guard is passing because it is looking at nothing")
 	}
-}
-
-// mutationLiteralArg returns the mutation composite literal passed to a
-// mutation-log gate, or nil when the argument is not written inline.
-func mutationLiteralArg(call *ast.CallExpr) *ast.CompositeLit {
-	for _, arg := range call.Args {
-		lit, ok := arg.(*ast.CompositeLit)
-		if !ok {
-			continue
-		}
-		if id, ok := lit.Type.(*ast.Ident); ok && id.Name == "mutation" {
-			return lit
-		}
-	}
-	return nil
-}
-
-// compositeKeys returns the field names a keyed composite literal sets.
-func compositeKeys(lit *ast.CompositeLit) map[string]bool {
-	out := map[string]bool{}
-	for _, elt := range lit.Elts {
-		kv, ok := elt.(*ast.KeyValueExpr)
-		if !ok {
-			continue
-		}
-		if id, ok := kv.Key.(*ast.Ident); ok {
-			out[id.Name] = true
-		}
-	}
-	return out
 }
