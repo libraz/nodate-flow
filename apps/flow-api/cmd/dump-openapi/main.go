@@ -14,6 +14,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
 func main() {
@@ -30,7 +31,7 @@ func main() {
 	}
 
 	res := router.BuildResult(router.Deps{JWT: issuer})
-	merged, err := router.MergeAPIs(res.APIs)
+	merged, err := openapiutil.MergeAPIs(res.APIs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dump-openapi: %v\n", err)
 		os.Exit(1)

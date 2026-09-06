@@ -70,6 +70,11 @@ func TestSpecDeclaresTheBearerScheme(t *testing.T) {
 // TestAuthenticatedSubRouterAlwaysAuthenticated, and the ones that never
 // do by TestPublicSubRouterIsAuthFree — so this compares the contract
 // against enforced behaviour rather than against another declaration.
+//
+// Hidden operations are out of scope here by construction: the document
+// does not contain them, so there is no declaration to compare against.
+// They are still guarded, and still walked — by the route-tree checks,
+// which ask what a request gets rather than what the document says.
 func TestSpecSecurityMatchesTheMiddleware(t *testing.T) {
 	t.Parallel()
 	res := BuildResult(stubDeps(t))
@@ -80,6 +85,9 @@ func TestSpecSecurityMatchesTheMiddleware(t *testing.T) {
 	}
 
 	for _, op := range res.AuthenticatedOps {
+		if op.Hidden {
+			continue
+		}
 		key := op.Method + " " + op.Path
 		req := security[key]
 		if len(req) == 0 {

@@ -10048,6 +10048,8 @@ export interface components {
             eventAllDay?: boolean;
             /** Format: int64 */
             eventEndAt?: number;
+            /** @description The event is on a calendar the caller cannot see; its title, times and calendar name are withheld */
+            eventHidden?: boolean;
             eventId?: string;
             /** Format: int64 */
             eventStartAt?: number;
@@ -10362,7 +10364,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Unix seconds timestamp for snooze expiry
+             * @description Unix seconds timestamp for snooze expiry. Required and must be positive when status is snoozed; ignored for every other status.
              */
             snoozeUntil?: number;
             /** @enum {string} */
@@ -10871,6 +10873,12 @@ export interface components {
             useCount: number;
         };
         WorkspaceMember: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkspaceMember.json
+             */
+            readonly $schema?: string;
             avatarUrl?: string;
             /** Format: int64 */
             createdAt: number;

@@ -10,15 +10,16 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
+	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
 // TestDumpOpenAPIMatchesLiveServedSpec pins that the document shipped to
 // the SDK is the document the server answers with.
 //
-// Both sides call the same router.MergeAPIs, so this no longer guards
-// two hand-written folds against drifting apart — that was its original
-// job, and unifying the folds retired it. Two things it still pins, both
-// of which the unification did not cover:
+// Both sides call the same openapiutil.MergeAPIs, so this no longer
+// guards two hand-written folds against drifting apart — that was its
+// original job, and unifying the folds retired it. Two things it still
+// pins, both of which the unification did not cover:
 //
 // The route has to actually serve the merged document. buildOpenAPIJSON
 // renders it once at build time and the handler closes over the bytes;
@@ -28,10 +29,9 @@ import (
 //
 // And the merge has to stay repeatable. The live handler has already
 // folded these same huma.API values by the time the test folds them
-// again, so a fold that wrote into the sub-APIs it reads — as it did
-// while both copies existed — makes the second fold disagree with the
-// first, or fail outright. This is the assertion that fails if MergeAPIs
-// stops building a fresh document.
+// again, so a fold that wrote into the sub-APIs it reads makes the
+// second fold disagree with the first, or fail outright. This is the
+// assertion that fails if MergeAPIs stops building a fresh document.
 //
 // Neither is implied by the two sides sharing a function, so the test is
 // weaker than it was but not vacuous.
@@ -60,7 +60,7 @@ func TestDumpOpenAPIMatchesLiveServedSpec(t *testing.T) {
 		t.Fatalf("unmarshal live openapi: %v", err)
 	}
 
-	merged, err := router.MergeAPIs(res.APIs)
+	merged, err := openapiutil.MergeAPIs(res.APIs)
 	if err != nil {
 		t.Fatalf("merge apis: %v", err)
 	}

@@ -11,8 +11,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
-
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/router"
 	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
@@ -31,8 +29,16 @@ func main() {
 	}
 
 	res := router.BuildResult(router.Deps{JWT: issuer})
-	merged := mergeSpecs(res.APIs)
-	openapiutil.PatchErrorModelSchema(merged)
+	// The fold lives in go-shared because flow-api needs the same one:
+	// two hand-written folds can only be compared after they have already
+	// drifted, and the comparison cannot say which one was right. It
+	// normalizes the ErrorModel as part of producing the document, so
+	// nothing here has to remember to.
+	merged, err := openapiutil.MergeAPIs(res.APIs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dump-openapi: %v\n", err)
+		os.Exit(1)
+	}
 
 	buf, err := json.MarshalIndent(merged, "", "  ")
 	if err != nil {
@@ -44,69 +50,4 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("dump-openapi: wrote %s (%d paths)\n", *out, len(merged.Paths))
-}
-
-// mergeSpecs merges every sub-API's OpenAPI document into a single spec.
-func mergeSpecs(apis []huma.API) *huma.OpenAPI {
-	if len(apis) == 0 {
-		return &huma.OpenAPI{OpenAPI: "3.1.0"}
-	}
-	root := apis[0].OpenAPI()
-	if root.Paths == nil {
-		root.Paths = map[string]*huma.PathItem{}
-	}
-	if root.Components == nil {
-		root.Components = &huma.Components{}
-	}
-	for _, a := range apis[1:] {
-		spec := a.OpenAPI()
-		for path, item := range spec.Paths {
-			if existing, ok := root.Paths[path]; ok {
-				mergePathItem(existing, item)
-			} else {
-				root.Paths[path] = item
-			}
-		}
-		if spec.Components == nil {
-			continue
-		}
-		if spec.Components.Schemas != nil && root.Components.Schemas != nil {
-			rootMap := root.Components.Schemas.Map()
-			for name, schema := range spec.Components.Schemas.Map() {
-				if _, ok := rootMap[name]; ok {
-					continue
-				}
-				rootMap[name] = schema
-			}
-		}
-	}
-	openapiutil.PatchErrorModelSchema(root)
-	return root
-}
-
-func mergePathItem(dst, src *huma.PathItem) {
-	if dst.Get == nil {
-		dst.Get = src.Get
-	}
-	if dst.Put == nil {
-		dst.Put = src.Put
-	}
-	if dst.Post == nil {
-		dst.Post = src.Post
-	}
-	if dst.Delete == nil {
-		dst.Delete = src.Delete
-	}
-	if dst.Patch == nil {
-		dst.Patch = src.Patch
-	}
-	if dst.Head == nil {
-		dst.Head = src.Head
-	}
-	if dst.Options == nil {
-		dst.Options = src.Options
-	}
-	if dst.Trace == nil {
-		dst.Trace = src.Trace
-	}
 }

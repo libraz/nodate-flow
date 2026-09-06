@@ -11074,6 +11074,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "eventHidden": {
+            "description": "The event is on a calendar the caller cannot see; its title, times and calendar name are withheld",
+            "type": "boolean"
+          },
           "eventId": {
             "type": "string"
           },
@@ -11766,7 +11770,7 @@
             "type": "string"
           },
           "snoozeUntil": {
-            "description": "Unix seconds timestamp for snooze expiry",
+            "description": "Unix seconds timestamp for snooze expiry. Required and must be positive when status is snoozed; ignored for every other status.",
             "format": "int64",
             "type": "integer"
           },
@@ -12867,6 +12871,13 @@
       "WorkspaceMember": {
         "additionalProperties": false,
         "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkspaceMember.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
           "avatarUrl": {
             "type": "string"
           },

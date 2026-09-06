@@ -76,6 +76,29 @@ func stubDeps(t *testing.T) Deps {
 	}
 }
 
+// serviceTokenForTests is the shared secret the service-token harness
+// configures. It is a fixed literal because the checks that use it need
+// both halves of the comparison: a request carrying it, and requests
+// carrying values that differ from it in length and in content.
+// #nosec G101 -- in-process test value; the router is built with it rather than reading any environment
+const serviceTokenForTests = "router-checks-service-token"
+
+// stubDepsWithServiceToken is stubDeps with FlowAPISignalToken set.
+//
+// It exists alongside stubDeps rather than replacing it because the two
+// harnesses answer different questions. stubDeps leaves the secret unset,
+// which is what most checks want: /internal/* is closed, /signals accepts
+// only user bearers, and the surface under test is the ordinary one.
+// A 401 observed against it, though, is ambiguous — a guard that compared
+// a credential and a group that was never configured produce the same
+// response. This harness is what tells them apart.
+func stubDepsWithServiceToken(t *testing.T) Deps {
+	t.Helper()
+	deps := stubDeps(t)
+	deps.FlowAPISignalToken = serviceTokenForTests
+	return deps
+}
+
 // pathPlaceholders maps every Huma path parameter the router uses to a
 // concrete fixture value. The actual values do not matter — the auth
 // middleware never inspects them — but they MUST be present for chi to
@@ -107,18 +130,23 @@ var pathPlaceholders = map[string]string{
 	"prjId":         "01HX000000000000000000000E",
 	"providerId":    "01HX000000000000000000000F",
 	"reactionId":    "01HX000000000000000000000G",
-	"shareId":       "01HX000000000000000000000X",
-	"snowflake":     "123456789012345678",
-	"suggestionId":  "01HX000000000000000000000H",
-	"taskId":        "01HX000000000000000000000I",
-	"timeboxId":     "01HX000000000000000000000J",
-	"token":         "share-token-stub",
-	"tokenId":       "01HX000000000000000000000K",
-	"userId":        "01HX000000000000000000000L",
-	"versionId":     "01HX000000000000000000000M",
-	"webhookId":     "01HX000000000000000000000N",
-	"widgetId":      "01HX000000000000000000000O",
-	"wsId":          "01HX000000000000000000000P",
+	// /schemas/{schema} takes a component name, not an id. The value names
+	// a schema the merged document actually declares, so probing the route
+	// exercises a lookup that can succeed rather than one that always
+	// misses.
+	"schema":       "HealthOutputBody",
+	"shareId":      "01HX000000000000000000000X",
+	"snowflake":    "123456789012345678",
+	"suggestionId": "01HX000000000000000000000H",
+	"taskId":       "01HX000000000000000000000I",
+	"timeboxId":    "01HX000000000000000000000J",
+	"token":        "share-token-stub",
+	"tokenId":      "01HX000000000000000000000K",
+	"userId":       "01HX000000000000000000000L",
+	"versionId":    "01HX000000000000000000000M",
+	"webhookId":    "01HX000000000000000000000N",
+	"widgetId":     "01HX000000000000000000000O",
+	"wsId":         "01HX000000000000000000000P",
 }
 
 // resolvePath substitutes Huma {param} placeholders with fixture values
@@ -214,6 +242,11 @@ func TestAuthAPIBuilderIsEmpty(t *testing.T) {
 // not enough — it is a four-word headline. We require a real
 // 1-2 sentence Description on every operation.
 //
+// It reads the registration record rather than the OpenAPI document,
+// which is what makes it cover the hidden operations too. Those are the
+// ones whose consumers have no reference UI and no generated client to
+// read: another backend process calling them has the prose or nothing.
+//
 // When this test fails it lists every operation that is missing the
 // field. Add `Description: "..."` to the offending huma.Operation
 // (typically in apps/flow-api/internal/http/router/router.go or in a
@@ -230,37 +263,17 @@ func TestEveryOperationHasDescription(t *testing.T) {
 	}
 	seen := map[string]missing{}
 
-	for _, a := range res.APIs {
-		spec := a.OpenAPI()
-		if spec == nil || spec.Paths == nil {
-			continue
-		}
-		for path, item := range spec.Paths {
-			if item == nil {
+	for _, set := range [][]OperationRef{res.AuthenticatedOps, res.PublicOps, res.AuthOps} {
+		for _, op := range set {
+			if strings.TrimSpace(op.Description) != "" {
 				continue
 			}
-			verbs := map[string]*huma.Operation{
-				http.MethodGet:     item.Get,
-				http.MethodPost:    item.Post,
-				http.MethodPut:     item.Put,
-				http.MethodPatch:   item.Patch,
-				http.MethodDelete:  item.Delete,
-				http.MethodHead:    item.Head,
-				http.MethodOptions: item.Options,
-			}
-			for method, op := range verbs {
-				if op == nil {
-					continue
-				}
-				if strings.TrimSpace(op.Description) == "" {
-					key := method + " " + path + " " + op.OperationID
-					seen[key] = missing{
-						method:      method,
-						path:        path,
-						operationID: op.OperationID,
-						summary:     op.Summary,
-					}
-				}
+			key := op.Method + " " + op.Path + " " + op.OperationID
+			seen[key] = missing{
+				method:      op.Method,
+				path:        op.Path,
+				operationID: op.OperationID,
+				summary:     op.Summary,
 			}
 		}
 	}
@@ -289,6 +302,11 @@ func TestEveryOperationHasDescription(t *testing.T) {
 // tags collapse the SDK side-bar into a single un-grouped list. Same
 // failure surface as TestEveryOperationHasDescription — the failure
 // message lists each offender so the fix is mechanical.
+//
+// Unlike that one, this reads the published document, and deliberately:
+// a tag is a heading in a rendered document, so it means nothing on an
+// operation the document does not contain. Requiring one on a hidden
+// operation would be requiring a value nothing reads.
 func TestEveryOperationHasTags(t *testing.T) {
 	t.Parallel()
 	res := BuildResult(stubDeps(t))
@@ -766,12 +784,22 @@ var tokenBindingCrossWorkspaceOps = map[string]struct{}{
 // on every operation this builder registers. What this test pins down is the
 // classification — which is where a new route can quietly acquire an
 // unchecked path.
+//
+// The service-token-only surface is outside the question entirely: no PAT or
+// MCP token reaches it, bound or not, because its group refuses every bearer
+// but the configured secret. That set is read off the router source rather
+// than listed here, so an operation leaving the guarded group starts being
+// classified again instead of keeping an exemption it no longer earns.
 func TestBearerTokenWorkspaceBindingCoversEveryOp(t *testing.T) {
 	t.Parallel()
 	res := BuildResult(stubDeps(t))
+	serviceTokenOnly := serviceTokenOnlyOpIDs(parseHTTPSource(t))
 
 	used := map[string]struct{}{}
 	for _, op := range res.AuthenticatedOps {
+		if serviceTokenOnly[op.OperationID] {
+			continue
+		}
 		scope := middleware.TokenWorkspaceScopeFor(op.Path)
 		_, declared := tokenBindingCrossWorkspaceOps[op.OperationID]
 		if scope == middleware.TokenWorkspaceScopeCrossWorkspace {

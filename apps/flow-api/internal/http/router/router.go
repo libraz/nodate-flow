@@ -33,6 +33,7 @@
 package router
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -88,6 +89,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/webhooks"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
@@ -96,6 +98,7 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
+	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/ratelimit"
 )
 
@@ -230,12 +233,19 @@ type Deps struct {
 // (TestPublicSubRouterIsAuthFree / TestAuthenticatedSubRouterAlwaysAuthenticated)
 // see only the operations that belong to their builder rather than
 // the merged super-set. AuthOps is empty today (see buildAuthAPI).
+//
+// RoutableOps is the independent half of the same picture: every
+// (method, path) the assembled mux will match, read back off the chi
+// route tree rather than off anything the wiring code recorded. The two
+// answer different questions and neither substitutes for the other — see
+// snapshotOps and snapshotRoutable.
 type Result struct {
 	Handler          http.Handler
 	APIs             []huma.API
 	AuthenticatedOps []OperationRef
 	PublicOps        []OperationRef
 	AuthOps          []OperationRef
+	RoutableOps      []RoutableRef
 }
 
 // OperationRef identifies a single huma operation by its HTTP method,
@@ -252,6 +262,24 @@ type OperationRef struct {
 	// the same call that mounts the middleware, so a group cannot claim a
 	// floor it does not enforce.
 	WriteFloor auth.Floor
+	// Hidden mirrors huma.Operation.Hidden: the operation is routed
+	// exactly like any other but is left out of the OpenAPI document and
+	// therefore out of the generated SDK. A hidden operation is still
+	// reachable over HTTP, so every reachability check has to see it.
+	Hidden bool
+	// Summary and Description are carried on the ref because the
+	// published document does not contain the hidden operations at all,
+	// so a check that reads prose off the document cannot reach them.
+	Summary     string
+	Description string
+}
+
+// RoutableRef is one (method, path) pair the composed chi mux will match.
+// It has no operation id or floor because the route tree does not carry
+// either: what it carries is the fact that a request can arrive.
+type RoutableRef struct {
+	Method string
+	Path   string
 }
 
 // aclFloor pairs the label a group records on its operations with the
@@ -333,46 +361,69 @@ func plainGroups(apis []huma.API) []groupAPI {
 	return out
 }
 
-// snapshotOps reads each sub-API's OpenAPI document and emits one
-// OperationRef per registered (verb, path) pair, tagged with its group's
-// ACL floor. It reads each builder's own document, so an operation is
-// attributed to the group that registered it rather than to the merged
-// super-set.
+// snapshotOps emits one OperationRef per operation registered on each
+// group, tagged with that group's ACL floor. It reads the per-group
+// registration record rather than the group's OpenAPI document, because
+// the document is not the set of operations — it is the set of operations
+// meant to be published. Huma skips oapi.AddOperation entirely for an
+// operation marked Hidden, so a document-derived inventory silently omits
+// every hidden route, and the checks built on that inventory then pass by
+// not looking at them.
+//
+// The record is complete because it is taken by huma.Register itself
+// (recordingAPI.DocumentOperation), not by wiring code that has to
+// remember to call something. What keeps it honest against a route added
+// outside huma altogether is snapshotRoutable, which derives the same
+// surface from the chi tree and can be compared against this one.
 func snapshotOps(groups []groupAPI) []OperationRef {
 	var ops []OperationRef
 	for _, g := range groups {
-		a := g.api
-		spec := a.OpenAPI()
-		if spec == nil || spec.Paths == nil {
+		rec, ok := g.api.(*recordingAPI)
+		if !ok {
+			// Every sub-API is built by newSubAPI / newPublicSubAPI, both of
+			// which return a recordingAPI. An API arriving here by another
+			// route would contribute no operations to the inventory, so it
+			// is left out deliberately rather than papered over with a
+			// document read that would under-report hidden operations.
 			continue
 		}
-		for path, item := range spec.Paths {
-			if item == nil {
-				continue
-			}
-			verbs := map[string]*huma.Operation{
-				http.MethodGet:     item.Get,
-				http.MethodPost:    item.Post,
-				http.MethodPut:     item.Put,
-				http.MethodPatch:   item.Patch,
-				http.MethodDelete:  item.Delete,
-				http.MethodHead:    item.Head,
-				http.MethodOptions: item.Options,
-			}
-			for method, op := range verbs {
-				if op == nil {
-					continue
-				}
-				ops = append(ops, OperationRef{
-					Method:      method,
-					Path:        path,
-					OperationID: op.OperationID,
-					WriteFloor:  g.floor,
-				})
-			}
+		for _, op := range rec.ops {
+			ops = append(ops, OperationRef{
+				Method:      op.Method,
+				Path:        op.Path,
+				OperationID: op.OperationID,
+				WriteFloor:  g.floor,
+				Hidden:      op.Hidden,
+				Summary:     op.Summary,
+				Description: op.Description,
+			})
 		}
 	}
 	return ops
+}
+
+// snapshotRoutable walks the assembled chi route tree and returns every
+// (method, path) pair the mux will match.
+//
+// This is the router's ground truth for reachability, and it is derived
+// from the thing that does the routing rather than from any record the
+// wiring kept: a route reaches this list by existing in the tree, so
+// nothing can be added to the server and stay out of it — not a hidden
+// huma operation, not a raw chi handler registered without huma at all.
+// Its limit is the mirror image: the tree knows nothing about operation
+// ids, builders, or ACL floors, so attribution still comes from
+// snapshotOps.
+//
+// Call it after every builder has run; routes registered later would not
+// be in the tree yet.
+func snapshotRoutable(r chi.Routes) []RoutableRef {
+	var out []RoutableRef
+	// Walk only fails when the callback does, and this one never does.
+	_ = chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		out = append(out, RoutableRef{Method: method, Path: route})
+		return nil
+	})
+	return out
 }
 
 // Build mounts every nodate-flow API route onto a fresh chi router and
@@ -469,12 +520,20 @@ func BuildResult(deps Deps) Result {
 	// populated and the write-only members can be read off them.
 	errormodel.LearnWriteOnlyFields(apis)
 
-	// OpenAPI spec and Scalar API reference UI — public, no auth.
-	specJSON := buildOpenAPIJSON(apis)
+	// OpenAPI spec, JSON Schema and Scalar API reference UI — public, no
+	// auth. All three describe the API rather than any workspace's data.
+	//
+	// These run after every builder, and that ordering carries meaning: each
+	// sub-API mounts /schemas/{schema} from its own registry on this same
+	// mux, so the registration below is what decides the answer instead of
+	// leaving it to whichever group happened to be constructed last.
+	merged := mergeOpenAPI(apis)
+	specJSON := marshalOpenAPI(merged)
 	r.Get("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(specJSON) //nolint:errcheck // best-effort write to HTTP client
 	})
+	mountSchemasRoute(r, merged)
 	r.Get("/api-reference", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(scalarHTML)) //nolint:errcheck // best-effort write to HTTP client
@@ -486,6 +545,9 @@ func BuildResult(deps Deps) Result {
 		AuthenticatedOps: authedOps,
 		PublicOps:        publicOps,
 		AuthOps:          authOps,
+		// Taken last: every builder plus the spec routes above are mounted
+		// by now, so the walk sees the whole surface a request can reach.
+		RoutableOps: snapshotRoutable(r),
 	}
 }
 
@@ -496,8 +558,14 @@ func BuildResult(deps Deps) Result {
 // instantiated exactly once even though the router has multiple sub
 // builders.
 type sharedDeps struct {
-	aclDB                passthroughDB
-	auditRec             *audit.Recorder
+	aclDB    passthroughDB
+	auditRec *audit.Recorder
+	// mutationRec records a workspace-visible change in both the event
+	// log and the audit log, so a handler cannot write one without the
+	// other. Feature packages that have moved onto it take this instead
+	// of auditRec; the two coexist while the rest of the handlers still
+	// hold a bare audit recorder.
+	mutationRec          *mutationlog.Recorder
 	embedClient          *embed.Client
 	aiOrch               *ai.Orchestrator
 	nlQueryCompiler      *nlquery.Compiler
@@ -519,6 +587,7 @@ type sharedDeps struct {
 // individual builder functions stay focused on huma.Register calls.
 func buildSharedDeps(deps Deps) *sharedDeps {
 	auditRec := audit.New(deps.Queries)
+	mutationRec := mutationlog.New(deps.DB, deps.Queries)
 	aclDB := passthroughDB{deps.DB}
 	invocationLogger := newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher)
 
@@ -716,13 +785,14 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 	return &sharedDeps{
 		aclDB:                aclDB,
 		auditRec:             auditRec,
+		mutationRec:          mutationRec,
 		embedClient:          embedClient,
 		aiOrch:               aiOrch,
 		nlQueryCompiler:      nlQueryCompiler,
 		nlConstraintCompiler: nlConstraintCompiler,
 		nlCommandResolver:    nlCommandResolver,
 		prjDeps:              projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec},
+		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec},
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
@@ -746,8 +816,38 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			EmailFrom:       deps.EmailFrom,
 			FlowWebURL:      deps.FlowWebURL,
 			Storage:         deps.Storage,
+			Embedder:        embedClient,
 		},
 	}
+}
+
+// recordingAPI is a huma.API that keeps every operation registered
+// against it, published or not.
+//
+// It implements huma.OperationDocumenter, which huma.Register calls in
+// place of its own oapi.AddOperation call. That default is the reason the
+// wrapper exists: huma skips AddOperation for an operation marked Hidden,
+// so the OpenAPI document — the only inventory the router used to have —
+// omits exactly the routes that are deliberately kept out of the public
+// contract while remaining fully reachable over HTTP.
+//
+// The recording is not something a caller can forget: every operation
+// reaches this method by virtue of going through huma.Register, so the
+// record is complete for anything registered as a huma operation at all.
+type recordingAPI struct {
+	huma.API
+	ops []huma.Operation
+}
+
+// DocumentOperation records the operation and then publishes it unless it
+// is hidden, which is what huma.Register would otherwise do on its own.
+// The record is taken after publication so it reflects any mutation the
+// document hooks make.
+func (r *recordingAPI) DocumentOperation(op *huma.Operation) {
+	if !op.Hidden {
+		r.API.OpenAPI().AddOperation(op)
+	}
+	r.ops = append(r.ops, *op)
 }
 
 // newSubAPI constructs a fresh humachi.API on the given chi router.
@@ -756,14 +856,14 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 // sub-APIs would point every group at the same registry and panic on
 // duplicate anonymous "ListOutputBody" style schema names.
 func newSubAPI(sub chi.Router) huma.API {
-	return humachi.New(sub, newAPIConfig(true))
+	return &recordingAPI{API: humachi.New(sub, newAPIConfig(true))}
 }
 
 // newPublicSubAPI is newSubAPI for a group that carries no auth
 // middleware. Its operations are documented without a security
 // requirement, because a bearer changes nothing about what they return.
 func newPublicSubAPI(sub chi.Router) huma.API {
-	return humachi.New(sub, newAPIConfig(false))
+	return &recordingAPI{API: humachi.New(sub, newAPIConfig(false))}
 }
 
 // bearerSchemeName is the OpenAPI key under which the API's JWT bearer
@@ -788,6 +888,30 @@ const bearerSchemeName = "bearerAuth"
 // registered on a group that authenticates.
 func newAPIConfig(authenticated bool) huma.Config {
 	cfg := huma.DefaultConfig("nodate-flow", "0.0.0")
+
+	// Every sub-API is built from this config and mounted on the same mux,
+	// so any path the config carries is registered once per group and the
+	// group constructed last silently owns it. That is the whole reason the
+	// spec surface is not left to the config: a document route mounted this
+	// way serves one group's document, chosen by builder order, under a name
+	// that reads like the API's.
+	//
+	// Clearing OpenAPIPath drops all four document routes huma derives from
+	// it (.json, .yaml, -3.0.json, -3.0.yaml); BuildResult mounts
+	// /openapi.json itself, once, from the merged document. DocsPath is
+	// cleared because BuildResult serves the reference UI at /api-reference.
+	//
+	// SchemasPath deliberately keeps its default. It is not only a route:
+	// huma's link transformer reads it to build the $schema URL stamped into
+	// every response body and into the published document's examples, so
+	// clearing it would not remove those URLs — it would repoint them at the
+	// server root, where nothing answers. BuildResult re-mounts
+	// /schemas/{schema} after every group, from the merged registry, so the
+	// advertised URLs resolve and the answer does not depend on which group
+	// was built last.
+	cfg.OpenAPIPath = ""
+	cfg.DocsPath = ""
+
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		bearerSchemeName: {
 			Type:         "http",
@@ -1028,7 +1152,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember, reauthorize))
 		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
-		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient, Audit: shared.auditRec}
+		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient, Mutations: shared.mutationRec}
 		intakehandlers.Register(subAPI, intakeDeps)
 		importDeps := importhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		importhandlers.Register(subAPI, importDeps)
@@ -1214,7 +1338,11 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	r.Group(func(sub chi.Router) {
 		sub.Use(middleware.RequireServiceTokenOnly(deps.FlowAPISignalToken))
 		subAPI := mountGroup(sub, floorNone, &apis)
-		internalapi.Register(subAPI, internalapi.Deps{DB: deps.DB, Queries: deps.Queries})
+		// Queries only: the handlers here read through sqlc and never open a
+		// transaction, and the package documents its bundle as narrow by
+		// design. Passing the raw handle anyway would hand the group a
+		// capability nothing in it asked for.
+		internalapi.Register(subAPI, internalapi.Deps{Queries: deps.Queries})
 	})
 
 	// Inbox + notifications + favorites + relations (auth only;
@@ -2084,21 +2212,27 @@ const scalarHTML = `<!DOCTYPE html>
 </body>
 </html>`
 
-// buildOpenAPIJSON merges the separate huma.API OpenAPI documents into a
-// single spec and returns the marshaled JSON bytes. It runs the same
-// MergeAPIs that cmd/dump-openapi runs, at router build time, so the
-// running server can serve the spec without a filesystem artifact.
+// mergeOpenAPI merges the separate huma.API OpenAPI documents into a
+// single spec. It runs the same openapiutil.MergeAPIs that cmd/dump-openapi
+// runs, at router build time, so the running server can serve the spec
+// without a filesystem artifact.
 //
-// A merge error means two sub-APIs claim one schema name for two
-// different types, so there is no spec that describes both. Panicking
-// stops the process at build time, where huma already panics for a
-// duplicate operation ID; the alternative is a server that starts and
-// serves a document describing one of the two operations wrongly.
-func buildOpenAPIJSON(apis []huma.API) []byte {
-	merged, err := MergeAPIs(apis)
+// A merge error means two sub-APIs claim one component name for two
+// different definitions, so there is no spec that describes both.
+// Panicking stops the process at build time, where huma already panics
+// for a duplicate operation ID; the alternative is a server that starts
+// and serves a document describing one of the two operations wrongly.
+func mergeOpenAPI(apis []huma.API) *huma.OpenAPI {
+	merged, err := openapiutil.MergeAPIs(apis)
 	if err != nil {
 		panic(err)
 	}
+	return merged
+}
+
+// marshalOpenAPI renders the merged document as the bytes /openapi.json
+// serves.
+func marshalOpenAPI(merged *huma.OpenAPI) []byte {
 	buf, err := json.Marshal(merged)
 	if err != nil {
 		// Should never happen: Huma's OpenAPI types are always
@@ -2107,6 +2241,86 @@ func buildOpenAPIJSON(apis []huma.API) []byte {
 		return []byte(`{"openapi":"3.1.0","info":{"title":"nodate-flow","version":"0.0.0"},"paths":{}}`)
 	}
 	return buf
+}
+
+// schemasRoutePath is the prefix the JSON Schema of a request or response
+// body is served under. It has to stay equal to the SchemasPath the
+// sub-API config carries, because that is the value huma's link
+// transformer builds the $schema URL from: a response advertises
+// {host}/schemas/{Name}.json, and this is the route that has to answer it.
+const schemasRoutePath = "/schemas"
+
+// schemaRefPrefix is how a component reference is spelled inside the
+// document. Names run from the end of this prefix to the closing quote.
+const schemaRefPrefix = "#/components/schemas/"
+
+// mountSchemasRoute serves each component schema of the merged document
+// under /schemas/{schema}.
+//
+// It is mounted here, from the merged registry, rather than left to the
+// per-sub-API route huma's config mounts. Each sub-API has its own schema
+// registry holding only the types its own group registered, so that route
+// answers for one group's types and returns a JSON null for every other
+// group's — including, today, the types named by the $schema URLs those
+// same groups stamp into their responses. Which group answers is decided
+// by the order the builders ran in.
+func mountSchemasRoute(r chi.Router, merged *huma.OpenAPI) {
+	var schemas map[string]*huma.Schema
+	if merged != nil && merged.Components != nil && merged.Components.Schemas != nil {
+		schemas = merged.Components.Schemas.Map()
+	}
+	r.Get(schemasRoutePath+"/{schema}", func(w http.ResponseWriter, req *http.Request) {
+		// The .json suffix is part of the advertised URL rather than of the
+		// component name, and some routers dislike a path parameter with a
+		// suffix, so it is stripped here instead.
+		name := strings.TrimSuffix(chi.URLParam(req, "schema"), ".json")
+		schema, ok := schemas[name]
+		if !ok {
+			http.NotFound(w, req)
+			return
+		}
+		buf, err := json.Marshal(schema)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(rewriteSchemaRefs(buf)) //nolint:errcheck // best-effort write to HTTP client
+	})
+}
+
+// rewriteSchemaRefs turns every in-document component reference into the
+// URL this route serves that component under, so a nested $ref resolves
+// the same way the top-level $schema URL does. Without it a caller that
+// followed a $schema URL would land on a schema whose own references point
+// into a document it does not have.
+//
+// The scan is a literal one because the grammar is literal: a fixed prefix
+// followed by a component name that runs to the closing quote.
+func rewriteSchemaRefs(b []byte) []byte {
+	prefix := []byte(schemaRefPrefix)
+	out := make([]byte, 0, len(b))
+	rest := b
+	for {
+		i := bytes.Index(rest, prefix)
+		if i < 0 {
+			return append(out, rest...)
+		}
+		out = append(out, rest[:i]...)
+		rest = rest[i:]
+		name := rest[len(prefix):]
+		j := bytes.IndexByte(name, '"')
+		if j < 0 {
+			// No closing quote: the input is not the JSON this assumes, so
+			// emit the remainder unchanged rather than truncating it.
+			return append(out, rest...)
+		}
+		out = append(out, schemasRoutePath...)
+		out = append(out, '/')
+		out = append(out, name[:j]...)
+		out = append(out, ".json"...)
+		rest = name[j:]
+	}
 }
 
 // passthroughDB adapts *sql.DB to middleware.ACLDB.
