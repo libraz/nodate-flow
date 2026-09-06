@@ -70,6 +70,27 @@ func TestLoginTotp_ChallengeIsSingleUse(t *testing.T) {
 // elect exactly one winner. Sequential retirement alone would leave a
 // window where every racer verifies the second factor before any of them
 // records the redemption.
+//
+// A loser may be refused in either of two ways, and which one it gets is
+// decided by goroutine scheduling rather than by anything the caller does.
+// The handler reads the identity row (carrying the last consumed TOTP
+// time-step) before it verifies the code, and the winner advances that
+// step only after it has claimed the challenge:
+//
+//   - A loser whose identity read happened before the winner advanced the
+//     step sees an unconsumed step, passes code verification, and is then
+//     turned away by the challenge claim as AuthSessionExpired.
+//   - A loser whose identity read landed after the winner advanced the
+//     step sees the step already consumed, so the one-time-use rule on the
+//     code itself rejects it as AuthTotpCodeMismatch before the challenge
+//     claim is ever reached.
+//
+// Both are correct single-use refusals — the second is the replay defence
+// on the code doing its job — so the test counts them together. What must
+// not vary is that exactly one racer walks away with a session and every
+// other racer is refused; a broken challenge claim shows up as more than
+// one winner, because racers that read the identity concurrently all see
+// an unconsumed step and none of them would be stopped by the code rule.
 func TestLoginTotp_ConcurrentSameChallenge_SingleUse(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
@@ -91,12 +112,16 @@ func TestLoginTotp_ConcurrentSameChallenge_SingleUse(t *testing.T) {
 		code := internauth.TotpCode(secret, time.Now())
 
 		var (
-			wg         sync.WaitGroup
-			mu         sync.Mutex
-			okCount    int
-			spentCount int
-			unexpected error
-			start      = make(chan struct{})
+			wg sync.WaitGroup
+			mu sync.Mutex
+			// okCount is the discriminating assertion: it stays at one
+			// only while the challenge claim is atomic.
+			okCount int
+			// refusedCount pools both legitimate refusal shapes, since
+			// which one a loser receives is scheduling-dependent.
+			refusedCount int
+			unexpected   error
+			start        = make(chan struct{})
 		)
 		for i := 0; i < racers; i++ {
 			wg.Add(1)
@@ -113,9 +138,16 @@ func TestLoginTotp_ConcurrentSameChallenge_SingleUse(t *testing.T) {
 					return
 				}
 				var problem *handlerutil.ProblemDetails
-				if errors.As(herr, &problem) && problem.Type == apierrors.AuthSessionExpired.Code {
-					spentCount++
-					return
+				if errors.As(herr, &problem) {
+					switch problem.Type {
+					// Lost the claim on the challenge itself.
+					case apierrors.AuthSessionExpired.Code,
+						// Read the identity after the winner advanced
+						// the time-step, so the code counted as a replay.
+						apierrors.AuthTotpCodeMismatch.Code:
+						refusedCount++
+						return
+					}
 				}
 				unexpected = herr
 			}()
@@ -124,9 +156,9 @@ func TestLoginTotp_ConcurrentSameChallenge_SingleUse(t *testing.T) {
 		wg.Wait()
 
 		require.NoError(t, unexpected,
-			"round %d: a racer that lost the challenge claim must be told the challenge is spent", round)
+			"round %d: a racer that lost must be refused as a spent challenge or a replayed code, nothing else", round)
 		require.Equal(t, 1, okCount, "round %d: exactly one racer may redeem the challenge", round)
-		require.Equal(t, racers-1, spentCount, "round %d: every other racer must be refused", round)
+		require.Equal(t, racers-1, refusedCount, "round %d: every other racer must be refused", round)
 	}
 }
 
