@@ -334,6 +334,15 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # added_by_public_id is users.public_id under an alias, LEFT JOINed
+          # on the OAuth sign-in allowlist because the adder's account may be
+          # gone. Non-pointer like granted_by_public_id: PublicID scans NULL
+          # as the zero UUID and the mapper reads that back as "nobody".
+          - column: "*.added_by_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
           - column: "*.initiated_by_user_id"
             go_struct_tag: 'json:"-"'
           # tasks.agent_memo is JSON NOT NULL DEFAULT JSON_OBJECT(). The
@@ -350,6 +359,8 @@ sql:
           # block and forgotten in another publishes the same sequence
           # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
           # in apps/flow-api/internal/db compares the three.
+          - column: "*.added_by_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.granted_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.invited_by_user_id"
@@ -513,6 +524,8 @@ sql:
           # block and forgotten in another publishes the same sequence
           # from whichever app reads it. TestGeneratedIDFieldsAreNotSerialized
           # in apps/flow-api/internal/db compares the three.
+          - column: "*.added_by_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.author_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.comment_id"
@@ -644,6 +657,8 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.invited_by_user_id"
             go_struct_tag: 'json:"-"'
+          - column: "*.added_by_user_id"
+            go_struct_tag: 'json:"-"'
           - column: "*.granted_by_user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.updated_by_user_id"
@@ -679,6 +694,15 @@ sql:
               package: "types"
               type: "PublicID"
           - column: "*.granted_by_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          # added_by_public_id is users.public_id under an alias, LEFT JOINed
+          # on the OAuth sign-in allowlist because the adder's account may be
+          # gone. Non-pointer like granted_by_public_id above: PublicID scans
+          # NULL as the zero UUID and the mapper reads that back as "nobody".
+          - column: "*.added_by_public_id"
             go_type:
               import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"

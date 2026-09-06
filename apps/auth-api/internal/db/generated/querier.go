@@ -313,6 +313,11 @@ type Querier interface {
 	FindLocalIdentityByUserId(ctx context.Context, userID uint32) (FindLocalIdentityByUserIdRow, error)
 	// Resolve a magic link token by its SHA-256 hash. Caller validates expiry.
 	FindMagicLinkByTokenHash(ctx context.Context, tokenHash string) (FindMagicLinkByTokenHashRow, error)
+	// One entry by public_id, shaped exactly like a row of the list above so a
+	// write handler can answer with the entry as it now stands -- including the
+	// created_at and the adder it cannot know from its own input, and, after an
+	// upsert that revived a withdrawn row, the values that row actually carries.
+	FindOauthSigninAllowlistEntry(ctx context.Context, publicID types.PublicID) (FindOauthSigninAllowlistEntryRow, error)
 	// Read the payload of an OAuth state row so the callback handler can
 	// recover (user_id, provider, redirect_to). This is a plain read and
 	// carries NO single-use guarantee on its own: the caller MUST follow
@@ -510,6 +515,51 @@ type Querier interface {
 	// and `public_id` because the refresher logs the row it worked on and
 	// an internal id must not appear in a log line.
 	ListConnectionsExpiringBefore(ctx context.Context, accessTokenExpiresAt sql.NullTime) ([]ListConnectionsExpiringBeforeRow, error)
+	// oauth_signin_allowlist statements.
+	//
+	// There is no workspace_id predicate anywhere in this file and none is
+	// missing: the table is instance-level. Sign-in resolves who the caller is
+	// before any workspace is chosen, so an entry admits a person to the
+	// deployment rather than to a tenant, and a tenant predicate would have
+	// nothing to bind to.
+	//
+	// The statements live under queries/auth because the read that decides a
+	// sign-in is part of the OIDC callback pipeline; the administrator's
+	// statements stay beside it rather than under queries/admin so that one
+	// table's writes and its liveness rule are read together. The Admin* naming
+	// prefix travels with the queries/admin directory, so it is not used here.
+	//
+	// No statement here compares entry_value to users.email and none can:
+	// entry_value is latin1_bin and users.email is latin1_swedish_ci, so MySQL
+	// rejects a predicate over the two columns outright (error 1267, illegal mix
+	// of collations). Matching an address against the list is the caller's job,
+	// over the rows ListEnabledOauthSigninAllowlistEntries returns. Comparing
+	// entry_value against a bind parameter is unaffected.
+	// Every live entry, as the OIDC callback needs it: the kind and the value and
+	// nothing else, since the match itself runs in memory over the whole list.
+	//
+	// No LIMIT, deliberately. The convention that bounds a list exists to stop an
+	// unbounded user-generated table from being read whole; this one is operator-
+	// maintained and small, and the query is a membership test rather than a page
+	// of results. A LIMIT here would silently drop the tail of the allowlist and
+	// turn everyone below the cut into a rejected sign-in, with nothing in the
+	// response to say why.
+	//
+	// (entry_kind, entry_value) is unique, so ordering by the pair is already a
+	// total order and needs no further tie-breaker.
+	ListEnabledOauthSigninAllowlistEntries(ctx context.Context) ([]ListEnabledOauthSigninAllowlistEntriesRow, error)
+	// Every entry for the administrator's screen, withdrawn ones included: a
+	// withdrawn entry keeps its claim on (entry_kind, entry_value) and can be
+	// brought back, so it has to stay visible. That is what separates this from
+	// the sign-in read above, which must see live entries only.
+	//
+	// The adder is resolved to the user's public_id: added_by_user_id is an
+	// internal sequence and must not reach a response. The join is LEFT because
+	// the FK is ON DELETE SET NULL, so an entry outlives the account that added
+	// it; PublicID scans NULL as the zero UUID, which the mapper reads back as
+	// "nobody" -- the same treatment granted_by_public_id gets on the instance
+	// admin list.
+	ListOauthSigninAllowlistEntries(ctx context.Context, arg ListOauthSigninAllowlistEntriesParams) ([]ListOauthSigninAllowlistEntriesRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
@@ -682,6 +732,27 @@ type Querier interface {
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (int64, error)
 	// Update workspace name and slug by public_id.
 	UpdateWorkspaceFull(ctx context.Context, arg UpdateWorkspaceFullParams) (int64, error)
+	// Add an entry, or revive the one that already holds this
+	// (entry_kind, entry_value) pair.
+	//
+	// uniq_oauth_signin_allowlist_kind_value covers withdrawn entries too: taking
+	// an entry out only clears its enabled flag, so the row keeps the pair and a
+	// plain INSERT of the same domain or address collides instead of restoring
+	// it. Without the revival branch an operator who removes an entry can never
+	// add it back -- and the failure surfaces as a duplicate-key error on a
+	// perfectly ordinary request.
+	//
+	// Re-adding states the entry afresh: the notes given now, the administrator
+	// doing it now, and the public_id the caller has already minted for the
+	// response. Leaving the old public_id in place would answer the request with
+	// an identifier that addresses nothing.
+	//
+	// Not :execrows. An upsert always leaves the row in the state the caller
+	// asked for, so there is no claim to lose; MySQL still reports zero affected
+	// rows when the revived row already held these exact values, and a caller
+	// reading that as "nothing happened" would skip the audit entry for a write
+	// that did take effect.
+	UpsertOauthSigninAllowlistEntry(ctx context.Context, arg UpsertOauthSigninAllowlistEntryParams) error
 	// Insert or replace a user+provider integration. The uniq
 	// (user_id, provider) key guarantees only one active row per
 	// provider per user; on conflict we refresh every token column.
@@ -689,6 +760,15 @@ type Querier interface {
 	// {"external_user_id": "<snowflake>", "verified_at": "..."} for
 	// provider='discord'); pass NULL for providers that do not set it.
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
+	// Withdraw an entry by clearing its enabled flag. The row stays: it is what
+	// holds the (entry_kind, entry_value) claim that lets the same entry be added
+	// back later, and deleting it would strand that path.
+	//
+	// The WHERE re-checks enabled, so an entry withdrawn by another path between
+	// the caller's read and this write matches nothing. Callers MUST inspect
+	// RowsAffected and treat 0 as "no live entry by that id" rather than
+	// recording a withdrawal that never happened.
+	WithdrawOauthSigninAllowlistEntry(ctx context.Context, publicID types.PublicID) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

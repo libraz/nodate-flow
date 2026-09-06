@@ -1189,6 +1189,48 @@ func (ns NullNotificationsSeverity) Value() (driver.Value, error) {
 	return string(ns.NotificationsSeverity), nil
 }
 
+type OauthSigninAllowlistEntryKind string
+
+const (
+	OauthSigninAllowlistEntryKindDomain OauthSigninAllowlistEntryKind = "domain"
+	OauthSigninAllowlistEntryKindEmail  OauthSigninAllowlistEntryKind = "email"
+)
+
+func (e *OauthSigninAllowlistEntryKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OauthSigninAllowlistEntryKind(s)
+	case string:
+		*e = OauthSigninAllowlistEntryKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OauthSigninAllowlistEntryKind: %T", src)
+	}
+	return nil
+}
+
+type NullOauthSigninAllowlistEntryKind struct {
+	OauthSigninAllowlistEntryKind OauthSigninAllowlistEntryKind `json:"oauthSigninAllowlistEntryKind"`
+	Valid                         bool                          `json:"valid"` // Valid is true if OauthSigninAllowlistEntryKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOauthSigninAllowlistEntryKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.OauthSigninAllowlistEntryKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OauthSigninAllowlistEntryKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOauthSigninAllowlistEntryKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OauthSigninAllowlistEntryKind), nil
+}
+
 type OauthStatesProvider string
 
 const (
@@ -3578,6 +3620,28 @@ type NotificationPreference struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Instance-level OAuth/OIDC sign-in allowlist
+type OauthSigninAllowlist struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to users.id (who added the entry, null once that account is gone)
+	AddedByUserID sql.NullInt32 `json:"-"`
+	// What entry_value names: domain matches the part after the final '@', email matches the whole address
+	EntryKind OauthSigninAllowlistEntryKind `json:"entryKind"`
+	// The domain or address this entry admits, normalized to lower case before it is written; latin1_bin keeps every comparison byte-exact, so cafe.example and café.example are distinct entries rather than one
+	EntryValue string `json:"entryValue"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag — FALSE withdraws the entry without releasing its (entry_kind, entry_value) claim, so re-adding it revives this row via ON DUPLICATE KEY UPDATE
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`

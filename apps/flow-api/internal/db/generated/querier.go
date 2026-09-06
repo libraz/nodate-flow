@@ -800,6 +800,11 @@ type Querier interface {
 	FindMcpTokenByHash(ctx context.Context, tokenHash string) (FindMcpTokenByHashRow, error)
 	// Check if a specific event category + channel is muted for a user.
 	FindNotificationPreference(ctx context.Context, arg FindNotificationPreferenceParams) (FindNotificationPreferenceRow, error)
+	// One entry by public_id, shaped exactly like a row of the list above so a
+	// write handler can answer with the entry as it now stands -- including the
+	// created_at and the adder it cannot know from its own input, and, after an
+	// upsert that revived a withdrawn row, the values that row actually carries.
+	FindOauthSigninAllowlistEntry(ctx context.Context, publicID types.PublicID) (FindOauthSigninAllowlistEntryRow, error)
 	// Read the payload of an OAuth state row so the callback handler can
 	// recover (user_id, provider, redirect_to). This is a plain read and
 	// carries NO single-use guarantee on its own: the caller MUST follow
@@ -1355,6 +1360,39 @@ type Querier interface {
 	ListDependencyStatesForEngine(ctx context.Context, arg ListDependencyStatesForEngineParams) ([]ListDependencyStatesForEngineRow, error)
 	// List all description versions for a task, newest first.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
+	// oauth_signin_allowlist statements.
+	//
+	// There is no workspace_id predicate anywhere in this file and none is
+	// missing: the table is instance-level. Sign-in resolves who the caller is
+	// before any workspace is chosen, so an entry admits a person to the
+	// deployment rather than to a tenant, and a tenant predicate would have
+	// nothing to bind to.
+	//
+	// The statements live under queries/auth because the read that decides a
+	// sign-in is part of the OIDC callback pipeline; the administrator's
+	// statements stay beside it rather than under queries/admin so that one
+	// table's writes and its liveness rule are read together. The Admin* naming
+	// prefix travels with the queries/admin directory, so it is not used here.
+	//
+	// No statement here compares entry_value to users.email and none can:
+	// entry_value is latin1_bin and users.email is latin1_swedish_ci, so MySQL
+	// rejects a predicate over the two columns outright (error 1267, illegal mix
+	// of collations). Matching an address against the list is the caller's job,
+	// over the rows ListEnabledOauthSigninAllowlistEntries returns. Comparing
+	// entry_value against a bind parameter is unaffected.
+	// Every live entry, as the OIDC callback needs it: the kind and the value and
+	// nothing else, since the match itself runs in memory over the whole list.
+	//
+	// No LIMIT, deliberately. The convention that bounds a list exists to stop an
+	// unbounded user-generated table from being read whole; this one is operator-
+	// maintained and small, and the query is a membership test rather than a page
+	// of results. A LIMIT here would silently drop the tail of the allowlist and
+	// turn everyone below the cut into a rejected sign-in, with nothing in the
+	// response to say why.
+	//
+	// (entry_kind, entry_value) is unique, so ordering by the pair is already a
+	// total order and needs no further tie-breaker.
+	ListEnabledOauthSigninAllowlistEntries(ctx context.Context) ([]ListEnabledOauthSigninAllowlistEntriesRow, error)
 	// List a project's timeline via v_task_timeline. Filters events whose
 	// owning task lives in the given project (events with no task_id are
 	// excluded by virtue of project_public_id being NULL). Projects
@@ -1542,6 +1580,18 @@ type Querier interface {
 	// Uses the existing idx_notifications_workspace_id_recipient_read index
 	// (workspace_id, recipient_user_id, read_at, created_at DESC).
 	ListNotificationsForWorkspaceKeyset(ctx context.Context, arg ListNotificationsForWorkspaceKeysetParams) ([]ListNotificationsForWorkspaceKeysetRow, error)
+	// Every entry for the administrator's screen, withdrawn ones included: a
+	// withdrawn entry keeps its claim on (entry_kind, entry_value) and can be
+	// brought back, so it has to stay visible. That is what separates this from
+	// the sign-in read above, which must see live entries only.
+	//
+	// The adder is resolved to the user's public_id: added_by_user_id is an
+	// internal sequence and must not reach a response. The join is LEFT because
+	// the FK is ON DELETE SET NULL, so an entry outlives the account that added
+	// it; PublicID scans NULL as the zero UUID, which the mapper reads back as
+	// "nobody" -- the same treatment granted_by_public_id gets on the instance
+	// admin list.
+	ListOauthSigninAllowlistEntries(ctx context.Context, arg ListOauthSigninAllowlistEntriesParams) ([]ListOauthSigninAllowlistEntriesRow, error)
 	// List every enabled non-paused agent whose event_trigger_types
 	// contains the given event kind. Driven by the eventbus notify hook
 	// so the fan-out from a single eventbus.Append to N agents is one
@@ -2156,6 +2206,27 @@ type Querier interface {
 	// every reader keeps skipping the row while the API reports the value
 	// the caller just wrote.
 	UpsertNotificationPreference(ctx context.Context, arg UpsertNotificationPreferenceParams) error
+	// Add an entry, or revive the one that already holds this
+	// (entry_kind, entry_value) pair.
+	//
+	// uniq_oauth_signin_allowlist_kind_value covers withdrawn entries too: taking
+	// an entry out only clears its enabled flag, so the row keeps the pair and a
+	// plain INSERT of the same domain or address collides instead of restoring
+	// it. Without the revival branch an operator who removes an entry can never
+	// add it back -- and the failure surfaces as a duplicate-key error on a
+	// perfectly ordinary request.
+	//
+	// Re-adding states the entry afresh: the notes given now, the administrator
+	// doing it now, and the public_id the caller has already minted for the
+	// response. Leaving the old public_id in place would answer the request with
+	// an identifier that addresses nothing.
+	//
+	// Not :execrows. An upsert always leaves the row in the state the caller
+	// asked for, so there is no claim to lose; MySQL still reports zero affected
+	// rows when the revived row already held these exact values, and a caller
+	// reading that as "nothing happened" would skip the audit entry for a write
+	// that did take effect.
+	UpsertOauthSigninAllowlistEntry(ctx context.Context, arg UpsertOauthSigninAllowlistEntryParams) error
 	// Record or refresh a recent visit. If the user already visited this entity,
 	// update the timestamp and title snapshot.
 	UpsertRecentVisit(ctx context.Context, arg UpsertRecentVisitParams) error
@@ -2190,6 +2261,15 @@ type Querier interface {
 	UpsertUserIntegration(ctx context.Context, arg UpsertUserIntegrationParams) (int64, error)
 	// Create or update a user's view preference for a specific scope.
 	UpsertViewPreference(ctx context.Context, arg UpsertViewPreferenceParams) error
+	// Withdraw an entry by clearing its enabled flag. The row stays: it is what
+	// holds the (entry_kind, entry_value) claim that lets the same entry be added
+	// back later, and deleting it would strand that path.
+	//
+	// The WHERE re-checks enabled, so an entry withdrawn by another path between
+	// the caller's read and this write matches nothing. Callers MUST inspect
+	// RowsAffected and treat 0 as "no live entry by that id" rather than
+	// recording a withdrawal that never happened.
+	WithdrawOauthSigninAllowlistEntry(ctx context.Context, publicID types.PublicID) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)
