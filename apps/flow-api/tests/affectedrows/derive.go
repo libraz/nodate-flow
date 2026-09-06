@@ -167,6 +167,62 @@ func (s Statement) CountIsReachable() bool {
 	return s.Annotation == "execrows" || s.Annotation == "execresult"
 }
 
+// GuardedClaim reports whether this statement's predicate restricts on
+// something beyond the rows the caller named, so that a zero count says
+// the claim did not win.
+//
+// The package doc above names the shape and declines to read a 404 out of
+// it, which stands: "already in the target state" and "never there" are
+// the same zero, so nothing here can be turned into a not-found. What the
+// zero does say, unambiguously, is that this statement changed nothing —
+// and that is worth reading whenever the caller goes on to say it changed
+// something. Every removal is also a guarded claim; the two are separate
+// questions about the same count, and a statement is asked both.
+//
+// The guard is read off the predicate rather than off a list of columns. A
+// term comparing a column to a value the caller supplied is that caller
+// naming rows; anything else — a bare boolean column, a comparison against
+// a literal, an IS NULL — is a condition on the row's state that the rows
+// can stop meeting between the read that chose them and the write.
+func (s Statement) GuardedClaim() bool {
+	switch head(s.SQL) {
+	case "update", "delete":
+		return guardedPredicate(predicate(s.SQL))
+	default:
+		return false
+	}
+}
+
+// guardedPredicate reports whether a normalized WHERE clause constrains a
+// column against anything other than a value its caller supplied.
+//
+// It works by subtraction: the caller-supplied comparisons are removed,
+// then the connectives and constants that carry no column, and whatever
+// column name is still standing is the state the write is conditional on.
+// Subtracting rather than enumerating is what keeps a predicate spelled in
+// an unanticipated way inside the shape rather than quietly outside it.
+func guardedPredicate(where string) bool {
+	rest := boundComparison.ReplaceAllString(where, " ")
+	rest = predicateNoise.ReplaceAllString(rest, " ")
+	return predicateIdentifier.MatchString(rest)
+}
+
+var (
+	// boundComparison matches a column tested against a value the caller
+	// passed in, in either spelling sqlc emits.
+	boundComparison = regexp.MustCompile(
+		`[a-z_][a-z0-9_.]*\s*(?:=|<>|!=|<=|>=|<|>)\s*(?:\?|sqlc\.[a-z]+\([^)]*\))` +
+			`|[a-z_][a-z0-9_.]*\s+in\s*\(\s*(?:\?|sqlc\.[a-z]+\([^)]*\))[^)]*\)`)
+	// predicateNoise matches what a predicate holds besides column names:
+	// its connectives, its literals, and the placeholders left over from a
+	// comparison whose column has already been subtracted.
+	predicateNoise = regexp.MustCompile(
+		`\b(?:and|or|not|is|null|true|false|in|between|like|exists|limit|order|by|group|asc|desc)\b` +
+			`|\?|\bsqlc\.[a-z]+\([^)]*\)|\b\d+\b|[^a-z0-9_]`)
+	// predicateIdentifier matches a surviving column name.
+	predicateIdentifier = regexp.MustCompile(`[a-z_][a-z0-9_]*`)
+)
+
 var headerPattern = regexp.MustCompile(`^--\s*name:\s*(\S+)\s+:(\S+)`)
 
 // marker matches one removal-marker column inside a normalized clause.

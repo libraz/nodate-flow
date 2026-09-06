@@ -928,15 +928,43 @@ func (e *Executor) recordProposal(ctx context.Context, r taskRow, act *Action) {
 
 // autoArchive sets archived_at on a completed/cancelled task that has
 // been idle longer than the configured threshold.
+//
+// The write is a claim rather than a patch, so it can succeed and change
+// nothing: the scan selects tasks whose archived_at is still NULL, and
+// the predicate re-asserts that at write time, so a task archived by
+// anyone else in between takes this pass's UPDATE down to zero rows. The
+// event and the log below both describe an archive, and neither is true
+// of a pass that archived nothing — an appended event would put an
+// archive entry on the task's timeline with no archive behind it, one per
+// pass for as long as the rule keeps matching the row.
 func (e *Executor) autoArchive(ctx context.Context, r taskRow, act *Action) {
 	// As in escalate: the transaction is opened through dbretry.InTx so
 	// the archive event reaches its subscribers once the row is durable.
+	//
+	// archived is reset inside the closure because InTx re-runs it on a
+	// transient error, and the attempt that commits is the one whose count
+	// the log below is about.
+	var archived int64
 	if err := dbretry.InTx(ctx, e.DB, "autoactions.autoArchive", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		if _, err := tx.ExecContext(ctx,
+		archived = 0
+		res, err := tx.ExecContext(ctx,
 			"UPDATE tasks SET archived_at = NOW(), updated_at = NOW() WHERE id = ? AND archived_at IS NULL",
 			r.id,
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+		archived, err = res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		// Zero is not a failure. The predicate guards on archived_at, so
+		// the count answers whether this pass archived the task, never
+		// whether the task is there — and a task that is already archived
+		// is in the state the action wanted. There is nothing to undo and
+		// nothing to report, so the transaction commits without the event.
+		if archived == 0 {
+			return nil
 		}
 		taskInternal := int64(r.id)
 		return eventbus.Append(ctx, tx, eventbus.Event{
@@ -950,6 +978,16 @@ func (e *Executor) autoArchive(ctx context.Context, r taskRow, act *Action) {
 		})
 	}); err != nil {
 		e.Logger.Error("auto-action executor: auto-archive", "task", r.publicID.String(), "err", err)
+		return
+	}
+	if archived == 0 {
+		// Reported the way handoff_to_user reports an action with nothing
+		// left to do: the pass ran and changed nothing, which is worth
+		// seeing and is not an archive.
+		e.Logger.Info("auto-action skipped: auto-archive (task already archived)",
+			"task", r.publicID.String(),
+			"state", r.derivedState,
+		)
 		return
 	}
 	e.Logger.Info("auto-action applied: auto-archive",

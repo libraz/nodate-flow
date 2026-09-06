@@ -230,12 +230,32 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		// the direction itemkit uses for linked writes — the event
 		// is the richer source.
 		const upd = `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled`
+		var healed int64
 		if err := r.heal(ctx, "reconciler.dateDrift", func(ctx context.Context) error {
-			_, err := r.DB.ExecContext(ctx, upd, d.eventDate, d.taskID)
+			healed = 0
+			res, err := r.DB.ExecContext(ctx, upd, d.eventDate, d.taskID)
+			if err != nil {
+				return err
+			}
+			healed, err = res.RowsAffected()
 			return err
 		}); err != nil {
 			r.logError("heal drift failed", err,
 				"kind", kind, "task_id", d.taskID, "event_id", d.eventID)
+			continue
+		}
+		// The counter has to mean "this pass closed the drift", so a
+		// statement that matched nothing does not raise it. The predicate
+		// carries `AND enabled`, so the count answers whether this write
+		// won, never whether the task is there: zero is the task having
+		// been disabled between the scan and the write, or its due date
+		// having reached the event's by some other writer. Neither is an
+		// error — the drift is gone or the next pass finds it again — but
+		// neither is a heal, and counting one would make a drift that
+		// cannot be healed report a heal on every pass. The gap between
+		// this counter and the inconsistency it was counted under is what
+		// says a drift is not closing.
+		if healed == 0 {
 			continue
 		}
 		if r.Metrics != nil {

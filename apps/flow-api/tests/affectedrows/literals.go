@@ -53,6 +53,35 @@ func InlineStatement(sql, path string, line int) (Statement, bool) {
 	return s, true
 }
 
+// InlineWrite classifies one Go SQL string literal as a write whose zero
+// count carries an answer, and reports whether it is one.
+//
+// It is the union the call-site scan works over: every removal, plus every
+// guarded claim. Which of the two a given write is stays on the statement,
+// because the two zeros mean different things — so a removal written
+// inline still answers as a removal, and the wider shape only adds the
+// writes the removal shape was never about.
+func InlineWrite(sqlText, path string, line int) (Statement, bool) {
+	if removal, ok := InlineStatement(sqlText, path, line); ok {
+		return removal, true
+	}
+	s := Statement{
+		Annotation: InlineAnnotation,
+		Path:       path,
+		Line:       line,
+		SQL:        normalize(sqlText),
+	}
+	if !s.GuardedClaim() {
+		return Statement{}, false
+	}
+	if head(s.SQL) == "delete" {
+		s.Name = describeInline("DELETE from", deleteTarget(s.SQL))
+	} else {
+		s.Name = describeInline("UPDATE of", updateTarget(s.SQL))
+	}
+	return s, true
+}
+
 // describeInline names an inline write the way a failure message reads
 // it. There is no query name to quote, so the shape and the table stand
 // in for one.

@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 // A removal statement that returns its affected-row count has already done
@@ -35,11 +36,11 @@ import (
 // syntax rather than off a line distance. A marker is the comment attached
 // to a statement, and it reaches that statement plus the ones written
 // directly beneath it with no blank line between — the paragraph gofmt
-// already draws — up to and including the first removal in it. A doc
-// comment reaches the function it introduces. Nothing carries across a
+// already draws — up to and including the first in-scope write in it. A
+// doc comment reaches the function it introduces. Nothing carries across a
 // paragraph break, a block or a function, so a reason written about one
-// removal cannot exempt an unrelated one further down the file, and a
-// marker that reaches nothing is reported at its own line rather than at
+// write cannot exempt an unrelated one further down the file, and a marker
+// that reaches nothing is reported at its own line rather than at
 // whichever marker happened to be left over at the end.
 //
 // Both forms of write are read. A call to the generated method carrying a
@@ -47,13 +48,62 @@ import (
 // as a Go string literal is the exception it still contains — see
 // literals.go for why matching only the first would cover less and less
 // as more SQL is written inline.
+//
+// A second thing puts a call in scope, and it is not a removal.
+//
+// A guarded claim — a write whose predicate restricts on the row's state
+// and not only on the rows the caller named — can succeed and change
+// nothing, because the rows it chose may stop meeting the guard between
+// the read that chose them and the write. Its zero count cannot be turned
+// into a 404, which is why the removal rule above does not reach it. It
+// can still be turned into the one thing it does say: this statement
+// changed nothing.
+//
+// Nobody has to read that. What nobody may do is drop it and then say the
+// write landed, because from there a claim that won and a claim that lost
+// are the same in everything the system records — and the losing one keeps
+// losing, so a condition that can never be repaired reports a repair on
+// every pass. That is worse than an absent counter: a stuck loop reads as
+// a working one.
+//
+// So the second rule is a conjunction, and both halves are read off the
+// syntax:
+//
+//	the write     an UPDATE or DELETE whose predicate carries a state
+//	              guard, whose count the call site assigns to the blank
+//	              identifier.
+//	the claim     something the function does after that write, in one of
+//	              the blocks the write sits in, that says the write took
+//	              effect: raising a counter of writes that landed, passing
+//	              such an outcome in a message, or returning the constant
+//	              true.
+//
+// "After the write, in one of the blocks it sits in" is what keeps the
+// write's own error handling out of it. The branch taken when the write
+// failed is written inside the statement that performs the write, not
+// after it, so a failure logged as "heal failed" is not a claim that the
+// heal happened; the counter raised past the end of that statement is.
+//
+// A guarded claim whose count is dropped and about which the function says
+// nothing is not a finding. Nothing is being asserted, so there is nothing
+// for the count to contradict — and a check that reported every dropped
+// count would be reporting the shape of most writes in the tree rather
+// than a defect in any of them.
 
-// callSite is one call to a removal statement in hand-written Go.
+// callSite is one call, in hand-written Go, to a statement whose zero
+// affected-row count carries an answer.
 type callSite struct {
 	// Query is the sqlc query name, File and Line where it is called.
 	Query string
 	File  string
 	Line  int
+	// Removal records that the statement takes a row out of the live set,
+	// so a zero count is the caller's not-found. A site that is not one is
+	// in scope only through ClaimedAt.
+	Removal bool
+	// ClaimedAt is the line where the function states this write took
+	// effect, or zero where it states nothing.
+	ClaimedAt int
 	// pos is the same position Line renders, kept so a marker's reach can
 	// be compared against the syntax it was written in.
 	pos token.Pos
@@ -89,18 +139,19 @@ type staleMarker struct {
 // as though the count was considered, which is the thing the marker
 // exists to make impossible.
 const (
-	// markerReachesNoRemoval is a marker whose paragraph performs no
-	// removal at all: the code it was written about has moved or gone.
-	markerReachesNoRemoval = "it reaches no call that drops a removal count"
+	// markerReachesNoWrite is a marker whose paragraph performs no
+	// in-scope write at all: the code it was written about has moved or
+	// gone.
+	markerReachesNoWrite = "it reaches no call that drops an affected-row count"
 	// markerCoversABoundCount is a marker over a call that binds its
 	// count. Exempting a call that needs no exemption is the same defect
 	// as omitting one that does; the count is already being read, so the
 	// marker only obscures that.
-	markerCoversABoundCount = "the removal under it binds its affected-row count, so there is nothing to exempt"
+	markerCoversABoundCount = "the write under it binds its affected-row count, so there is nothing to exempt"
 	// markerRepeatsAnExemption is a second marker over a call an earlier
 	// marker already covers. One marker covers one call in both
 	// directions, so the surplus reason stands for no decision.
-	markerRepeatsAnExemption = "the removal under it is already exempted by the marker above this one"
+	markerRepeatsAnExemption = "the write under it is already exempted by the marker above this one"
 )
 
 // TestRemovalCallersReadTheAffectedRowCount fails on a caller that drops
@@ -113,11 +164,21 @@ func TestRemovalCallersReadTheAffectedRowCount(t *testing.T) {
 		if !site.Discarded || site.Marked {
 			continue
 		}
-		t.Errorf("%s:%d: %s discards the affected-row count of %s. Zero rows here means "+
-			"nothing matched, so answering ok records a removal that did not happen. Bind "+
-			"the count and map zero onto the not-found error for the resource, or say here "+
-			"why it cannot answer: %s",
-			site.File, site.Line, site.Function, site.Query, MarkerForm)
+		if site.Removal {
+			t.Errorf("%s:%d: %s discards the affected-row count of %s. Zero rows here means "+
+				"nothing matched, so answering ok records a removal that did not happen. Bind "+
+				"the count and map zero onto the not-found error for the resource, or say here "+
+				"why it cannot answer: %s",
+				site.File, site.Line, site.Function, site.Query, MarkerForm)
+			continue
+		}
+		t.Errorf("%s:%d: %s discards the affected-row count of %s and then says the write "+
+			"took effect, at line %d. The predicate carries a state guard, so zero rows is "+
+			"the claim losing — the rows stopped meeting it between the read and the write — "+
+			"and the report then stands for a change that did not happen, on this pass and on "+
+			"every pass after it. Bind the count and let a zero one skip the report, or say "+
+			"here why it cannot answer: %s",
+			site.File, site.Line, site.Function, site.Query, site.ClaimedAt, MarkerForm)
 	}
 	for _, marker := range stale {
 		t.Errorf("%s:%d: this affected-rows marker exempts nothing: %s. It reads as though "+
@@ -138,7 +199,10 @@ func TestRemovalHandlersHaveANotFoundToReport(t *testing.T) {
 		if site.Discarded || site.Marked || site.SeesNotFound {
 			continue
 		}
-		if !site.AnswersRequests || !site.NamedByTheCaller {
+		// Only a removal has a not-found to report. A guarded claim's zero
+		// count says the claim lost, which is not the resource being
+		// absent and has no 404 to become.
+		if !site.Removal || !site.AnswersRequests || !site.NamedByTheCaller {
 			continue
 		}
 		t.Errorf("%s:%d: %s reads the affected-row count of %s but names no not-found "+
@@ -216,8 +280,9 @@ func inlineViaConstant(tx *sql.Tx) {
 }
 
 // inlineClaim writes a guarded claim rather than a removal: the row comes
-// back out of the archived state, so a zero count here says it was
-// already archived, not that it was never there.
+// back out of the archived state, so a zero count here says the claim did
+// not win, not that the row was never there. It says nothing about the
+// write afterwards, so the count it drops contradicts nothing.
 func inlineClaim(tx *sql.Tx) {
 	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET archived_at = NOW() WHERE id = ? AND archived_at IS NULL` + "`" + `, id)
 }
@@ -234,10 +299,7 @@ func inlineNotAnExec(log *Logger) {
 	if err != nil {
 		t.Fatalf("parse sample: %v", err)
 	}
-	inScope := map[string]Statement{
-		"DisableLabel": {Name: "DisableLabel"},
-		"DeleteLens":   {Name: "DeleteLens"},
-	}
+	inScope := controlScope(controlStatements)
 	sites, stale := scanFile(fset, file, "sample.go", inScope)
 
 	var discarded []int
@@ -270,9 +332,140 @@ func inlineNotAnExec(log *Logger) {
 		found = append(found, site.Line)
 	}
 	if want := []int{5, 11, 20, 21, 28, 41, 46, 57}; !equalInts(found, want) {
-		t.Errorf("scan found removal call sites at lines %v, want %v; a guarded claim "+
-			"(line 64) and a literal handed to something that returns no count (line 70) "+
-			"are not sites, and both literal forms must be", found, want)
+		t.Errorf("scan found removal call sites at lines %v, want %v; a guarded claim that "+
+			"asserts nothing (line 66) and a literal handed to something that returns no "+
+			"count (line 72) are not sites, and both literal forms must be", found, want)
+	}
+}
+
+// TestGuardedClaimIsASiteOnlyWhereSomethingSaysItLanded is the control for
+// the second rule. It pins both halves of the conjunction, and the two
+// near misses that would make the rule mean something else.
+//
+// The near misses are the point. A rule that reported every dropped count
+// would report the shape of most writes rather than a defect in any of
+// them, and a rule that read the write's own failure branch as a success
+// would report the one function that already handles the case correctly.
+func TestGuardedClaimIsASiteOnlyWhereSomethingSaysItLanded(t *testing.T) {
+	t.Parallel()
+
+	const src = `package p
+
+// silent drops the count of a guarded claim and then says nothing about
+// the write, so the count contradicts nothing.
+func silent(tx *sql.Tx) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+}
+
+// counted drops the count and then raises a counter of writes that landed.
+func counted(tx *sql.Tx, m *Metrics) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+	m.IncHeal(kind)
+}
+
+// reported drops the count and then logs the write as having happened.
+func reported(tx *sql.Tx, log *Logger) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+	log.Info("drift healed", "task", id)
+}
+
+// answered drops the count and hands its caller a done.
+func answered(tx *sql.Tx) bool {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+	return true
+}
+
+// onlyOnFailure names the outcome in the branch it takes when the write
+// failed. That branch is written inside the statement performing the
+// write, so it runs instead of the write having landed rather than after
+// it, and it claims nothing.
+func onlyOnFailure(tx *sql.Tx, log *Logger) {
+	if _, err := tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id); err != nil {
+		log.Error("heal failed", "err", err)
+		return
+	}
+}
+
+// pastTheLoop raises the counter a block further out than the write, which
+// is still after it in a block the write sits in.
+func pastTheLoop(tx *sql.Tx, m *Metrics) {
+	for _, id := range ids {
+		if _, err := tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id); err != nil {
+			log.Error("heal failed", "err", err)
+			continue
+		}
+		m.IncHeal(kind)
+	}
+}
+
+// boundAndCounted reads the count before it counts, which is the shape the
+// rule asks for. It is a site so a marker over it can be told apart from
+// one over nothing, and it is not a finding.
+func boundAndCounted(tx *sql.Tx, m *Metrics) {
+	res, err := tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+	_ = err
+	if n, _ := res.RowsAffected(); n > 0 {
+		m.IncHeal(kind)
+	}
+}
+
+// markedClaim states at the call why the count cannot answer.
+//
+// affected-rows: not-applicable — the fixture reason for a guarded claim.
+func markedClaim(tx *sql.Tx, m *Metrics) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET due_on = ? WHERE id = ? AND enabled` + "`" + `, due, id)
+	m.IncHeal(kind)
+}
+
+// namedByTheCaller carries no state guard: every term compares a column to
+// a value the caller passed, so the write cannot lose a race it never
+// entered and its zero count says only that the row already held the value.
+func namedByTheCaller(tx *sql.Tx, m *Metrics) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET title = ? WHERE workspace_id = ? AND public_id = ?` + "`" + `, title, ws, id)
+	m.IncHeal(kind)
+}
+`
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "sample.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse sample: %v", err)
+	}
+	sites, stale := scanFile(fset, file, "sample.go", controlScope(controlStatements))
+
+	type reported struct {
+		line      int
+		claimedAt int
+		discarded bool
+		marked    bool
+	}
+	var got []reported
+	for _, site := range sites {
+		if site.Removal {
+			t.Errorf("line %d was classified as a removal; this fixture writes only guarded claims", site.Line)
+		}
+		got = append(got, reported{
+			line:      site.Line,
+			claimedAt: site.ClaimedAt,
+			discarded: site.Discarded,
+			marked:    site.Marked,
+		})
+	}
+	want := []reported{
+		{line: 11, claimedAt: 12, discarded: true},
+		{line: 17, claimedAt: 18, discarded: true},
+		{line: 23, claimedAt: 24, discarded: true},
+		{line: 42, claimedAt: 46, discarded: true},
+		{line: 54, claimedAt: 57},
+		{line: 65, claimedAt: 66, discarded: true, marked: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("scan found guarded-claim sites %+v, want %+v; the one that asserts nothing "+
+			"(line 6), the one whose only outcome word is in its failure branch (line 32) and "+
+			"the one whose predicate names no state (line 74) are not sites", got, want)
+	}
+	if len(stale) != 0 {
+		t.Errorf("scan reported stale markers %+v, want none", stale)
 	}
 }
 
@@ -326,10 +519,7 @@ func twiceOver(q *Queries) {
 	if err != nil {
 		t.Fatalf("parse sample: %v", err)
 	}
-	inScope := map[string]Statement{
-		"DisableLabel": {Name: "DisableLabel"},
-		"DeleteLens":   {Name: "DeleteLens"},
-	}
+	inScope := controlScope(controlStatements)
 	sites, stale := scanFile(fset, file, "sample.go", inScope)
 
 	var discarded []int
@@ -367,6 +557,28 @@ func equalInts(got, want []int) bool {
 	return slices.Equal(got, want)
 }
 
+// controlScope builds the in-scope set a fixture is scanned against.
+//
+// Each statement carries its SQL because the shape is what decides which
+// rule reaches a call to it: a removal is in scope on its own, a guarded
+// claim only where the function goes on to say the write landed. A fixture
+// naming statements without their text would be scanned as though every
+// one of them were neither.
+func controlScope(statements map[string]string) map[string]Statement {
+	out := make(map[string]Statement, len(statements))
+	for name, sql := range statements {
+		out[name] = Statement{Name: name, Annotation: "execresult", SQL: normalize(sql)}
+	}
+	return out
+}
+
+// controlStatements are the two named statements the fixtures call: one
+// removal of each kind.
+var controlStatements = map[string]string{
+	"DisableLabel": "UPDATE labels SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE",
+	"DeleteLens":   "DELETE FROM lenses WHERE public_id = ?",
+}
+
 // scanRepository parses every hand-written Go file in the workspace and
 // returns the calls to removal statements, plus the markers that covered
 // nothing.
@@ -386,14 +598,26 @@ func scanRepository(t *testing.T) ([]callSite, []staleMarker) {
 		t.Fatalf("read sql/queries: %v", err)
 	}
 	inScope := map[string]Statement{}
-	for _, s := range Removals(statements) {
-		if s.CountIsReachable() {
-			inScope[s.Name] = s
+	removals := 0
+	for _, s := range statements {
+		if !s.CountIsReachable() {
+			continue
 		}
+		if s.RemovalKind() == NotRemoval && !s.GuardedClaim() {
+			continue
+		}
+		if s.RemovalKind() != NotRemoval {
+			removals++
+		}
+		inScope[s.Name] = s
 	}
-	if len(inScope) == 0 {
+	if removals == 0 {
 		t.Fatal("no removal statement returns its affected-row count; the SQL derivation " +
 			"has stopped matching rather than the removals having gone away")
+	}
+	if len(inScope) == removals {
+		t.Fatal("no guarded claim returns its affected-row count; the predicate derivation " +
+			"has stopped matching rather than the guards having gone away")
 	}
 
 	fset := token.NewFileSet()
@@ -421,10 +645,18 @@ func scanRepository(t *testing.T) ([]callSite, []staleMarker) {
 
 // scanFile returns the in-scope calls in one parsed file and the markers
 // that covered none of them.
+//
+// A call is in scope when it removes a row, or when it is a guarded claim
+// the function goes on to report as having landed. The two are one site
+// list because one marker covers one call whichever rule reached it: a
+// reason written above a write should not have to say which of the two
+// questions it is answering, and pairing them separately would let the
+// same comment stand for two decisions.
 func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[string]Statement) ([]callSite, []staleMarker) {
 	imports := importNames(file)
 	answersRequests := strings.Contains(name, "/internal/http/handlers/")
 	fileConstants := packageConstants(file)
+	lists := statementLists(file)
 
 	var sites []callSite
 
@@ -441,6 +673,7 @@ func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[stri
 			constants: mergeConstants(fileConstants, stringConstants(fn.Body)),
 		}
 		discarded := discardedCalls(fn.Body, resolver)
+		var candidates []callSite
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
@@ -450,10 +683,11 @@ func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[stri
 			if !ok {
 				return true
 			}
-			sites = append(sites, callSite{
+			candidates = append(candidates, callSite{
 				Query:            statement.Name,
 				File:             name,
 				Line:             fset.Position(call.Pos()).Line,
+				Removal:          statement.RemovalKind() != NotRemoval,
 				pos:              call.Pos(),
 				Discarded:        discarded[call.Pos()],
 				Function:         fn.Name.Name,
@@ -463,19 +697,209 @@ func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[stri
 			})
 			return true
 		})
+		for _, candidate := range candidates {
+			candidate.ClaimedAt = successClaim(fset, fn, lists, candidate.pos)
+			if !candidate.Removal && candidate.ClaimedAt == 0 {
+				continue
+			}
+			sites = append(sites, candidate)
+		}
 	}
 	sort.Slice(sites, func(i, j int) bool { return sites[i].pos < sites[j].pos })
 
 	return sites, pairMarkers(fset, file, name, sites)
 }
 
+// successClaim returns the line where a function states that the write at
+// pos took effect, or zero where it states nothing.
+//
+// What counts is fixed by [statesAnOutcome]. Where it counts is fixed by
+// [trailingSpans]: after the write, in one of the blocks the write sits
+// in. That is the whole of the "success path" this check needs, and it is
+// read off the syntax rather than off a dataflow analysis — the branch
+// entered when the write failed is nested inside the statement performing
+// the write, so it is never after it.
+func successClaim(fset *token.FileSet, fn *ast.FuncDecl, lists map[token.Pos]stmtRun, pos token.Pos) int {
+	spans := trailingSpans(lists, pos)
+	if len(spans) == 0 {
+		return 0
+	}
+	line := 0
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		if n == nil || line != 0 {
+			return false
+		}
+		if !within(spans, n.Pos()) || !statesAnOutcome(n) {
+			return true
+		}
+		line = fset.Position(n.Pos()).Line
+		return false
+	})
+	return line
+}
+
+// span is a half-open source range.
+type span struct{ from, to token.Pos }
+
+// trailingSpans returns what runs after a write within each block the
+// write sits in.
+//
+// For every statement enclosing the write, the siblings written after it
+// in the same statement list are one span. Walking outwards this way is
+// what lets a counter raised at the end of the surrounding loop count,
+// while the error branch written inside the write's own if-statement does
+// not: the branch is within that statement rather than after it.
+func trailingSpans(lists map[token.Pos]stmtRun, pos token.Pos) []span {
+	var out []span
+	for start, run := range lists {
+		stmt := run.list[run.index]
+		if start > pos || pos >= stmt.End() {
+			continue
+		}
+		if run.index+1 >= len(run.list) {
+			continue
+		}
+		out = append(out, span{
+			from: run.list[run.index+1].Pos(),
+			to:   run.list[len(run.list)-1].End(),
+		})
+	}
+	return out
+}
+
+// within reports whether a position falls in any span.
+func within(spans []span, pos token.Pos) bool {
+	for _, s := range spans {
+		if pos >= s.from && pos < s.to {
+			return true
+		}
+	}
+	return false
+}
+
+// statesAnOutcome reports whether a node says a write took effect.
+//
+// Three forms say it, and they are the three a caller has: raising a
+// counter of writes that landed, naming the outcome in a message it
+// passes, and handing back the constant true. Nothing else is read as a
+// claim — a function that returns nil, or logs that it attempted
+// something, has said only what is true of a write that matched no rows.
+func statesAnOutcome(n ast.Node) bool {
+	switch node := n.(type) {
+	case *ast.ReturnStmt:
+		for _, result := range node.Results {
+			if ident, ok := result.(*ast.Ident); ok && ident.Name == "true" {
+				return true
+			}
+		}
+	case *ast.CallExpr:
+		sel, ok := node.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return false
+		}
+		if countsAnOutcome(sel.Sel.Name) {
+			return true
+		}
+		for _, arg := range node.Args {
+			lit, ok := arg.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				continue
+			}
+			if text, ok := GoStringLiteral(lit.Value); ok && namesAnOutcome(text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// countingVerbs are the method-name prefixes that mean "raise a count of".
+//
+// A method name is only read as a claim behind one of these. Without the
+// prefix the word is the action rather than the tally of it, and the
+// helper that performs the write is commonly named for the thing it is
+// trying to do — heal — so reading the bare word would let one write's own
+// call stand as a claim about the write before it.
+var countingVerbs = []string{"Inc", "Add", "Count", "Record", "Observe"}
+
+// outcomeWords are what a function counts or reports when what it is
+// counting or reporting is a write that landed.
+//
+// It is a vocabulary and not a derivation, so it is the one part of this
+// check that can go quiet as new words are used. It is kept to words that
+// state a completed outcome for that reason: a name that describes the
+// attempt is not on it, because the attempt is equally true of a write
+// that matched nothing.
+var outcomeWords = map[string]bool{
+	"heal": true, "heals": true, "healed": true, "healing": true,
+	"repair": true, "repairs": true, "repaired": true,
+	"fixed": true, "applied": true, "reconciled": true, "resolved": true,
+	"succeeded": true, "success": true, "successes": true,
+	"done": true, "complete": true, "completed": true,
+}
+
+// countsAnOutcome reports whether a method name raises a count of writes
+// that landed.
+func countsAnOutcome(method string) bool {
+	for _, verb := range countingVerbs {
+		if !strings.HasPrefix(method, verb) || method == verb {
+			continue
+		}
+		if namesAnOutcome(method[len(verb):]) {
+			return true
+		}
+	}
+	return false
+}
+
+// namesAnOutcome reports whether any word in the text is an outcome word.
+// The text is split on case and on everything that is not a letter, so a
+// word inside an identifier is read and a word that only happens to be a
+// substring of a longer one — the fix in prefix — is not.
+func namesAnOutcome(text string) bool {
+	for _, word := range words(text) {
+		if outcomeWords[word] {
+			return true
+		}
+	}
+	return false
+}
+
+// words splits text into lowercase words at case changes and at every
+// character that cannot continue an identifier.
+func words(text string) []string {
+	var out []string
+	var cur []rune
+	flush := func() {
+		if len(cur) > 0 {
+			out = append(out, strings.ToLower(string(cur)))
+			cur = nil
+		}
+	}
+	for _, r := range text {
+		switch {
+		case unicode.IsUpper(r):
+			flush()
+			cur = append(cur, r)
+		case unicode.IsLetter(r):
+			cur = append(cur, r)
+		default:
+			flush()
+		}
+	}
+	flush()
+	return out
+}
+
 // pairMarkers gives each marker the call it was written about and reports
 // the ones that were written about nothing. It marks the sites in place.
 //
-// A marker takes the first removal its paragraph reaches that no earlier
-// marker has taken. Taking rather than merely matching is what keeps one
-// marker to one call: a paragraph holding two removals needs two reasons,
-// and a second marker over a single removal has none left to cover.
+// A marker takes the first in-scope write its paragraph reaches that no
+// earlier marker has taken. Taking rather than merely matching is what
+// keeps one marker to one call: a paragraph holding two such writes needs
+// two reasons, and a second marker over a single one has none left to
+// cover. Which of the two rules put the write in scope makes no difference
+// here — a reason stands over a call, and a call is covered once.
 func pairMarkers(fset *token.FileSet, file *ast.File, name string, sites []callSite) []staleMarker {
 	comments := ast.NewCommentMap(fset, file, file.Comments)
 	lists := statementLists(file)
@@ -506,7 +930,7 @@ func pairMarkers(fset *token.FileSet, file *ast.File, name string, sites []callS
 		case free < 0 && reached:
 			report(markerRepeatsAnExemption)
 		case free < 0:
-			report(markerReachesNoRemoval)
+			report(markerReachesNoWrite)
 		case !sites[free].Discarded:
 			taken[free] = true
 			report(markerCoversABoundCount)
@@ -574,7 +998,7 @@ func markerScope(fset *token.FileSet, owner ast.Node, lists map[token.Pos]stmtRu
 	end := run.list[run.index].End()
 	for i := run.index; i < len(run.list); i++ {
 		end = run.list[i].End()
-		if performsARemoval(run.list[i], sites) || i+1 == len(run.list) {
+		if performsAScopedWrite(run.list[i], sites) || i+1 == len(run.list) {
 			break
 		}
 		if fset.Position(end).Line+1 != fset.Position(run.list[i+1].Pos()).Line {
@@ -584,8 +1008,8 @@ func markerScope(fset *token.FileSet, owner ast.Node, lists map[token.Pos]stmtRu
 	return run.list[run.index].Pos(), end
 }
 
-// performsARemoval reports whether a statement holds an in-scope call.
-func performsARemoval(stmt ast.Stmt, sites []callSite) bool {
+// performsAScopedWrite reports whether a statement holds an in-scope call.
+func performsAScopedWrite(stmt ast.Stmt, sites []callSite) bool {
 	for i := range sites {
 		if sites[i].pos >= stmt.Pos() && sites[i].pos < stmt.End() {
 			return true
@@ -693,7 +1117,7 @@ func (r sqlResolver) namedStatement(call *ast.CallExpr) (Statement, bool) {
 	return statement, true
 }
 
-// inlineStatement reports the removal an exec call performs with SQL
+// inlineStatement reports the write an exec call performs with SQL
 // written as a Go string literal, whether the literal sits in the call or
 // is bound to a constant just above it.
 //
@@ -710,7 +1134,7 @@ func (r sqlResolver) inlineStatement(call *ast.CallExpr) (Statement, bool) {
 		if !ok {
 			continue
 		}
-		if statement, ok := InlineStatement(text, r.file, r.fset.Position(arg.Pos()).Line); ok {
+		if statement, ok := InlineWrite(text, r.file, r.fset.Position(arg.Pos()).Line); ok {
 			return statement, true
 		}
 	}
