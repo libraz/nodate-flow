@@ -300,7 +300,7 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 			}
 			w.publishProgress(ctx, job.ID, *out, log)
 		}
-		if err := w.createTask(ctx, job.WorkspaceID, projectID, row); err != nil {
+		if err := w.createTask(ctx, job.WorkspaceID, projectID, job.InitiatedByUserID, row); err != nil {
 			out.failed++
 			out.note("line %d: %v", row.Line, err)
 			continue
@@ -311,9 +311,18 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 }
 
 // createTask inserts one row's task through the canonical create path,
-// so an imported task is indistinguishable from one made through the
-// API: same task-number allocation, same defaults, same created event.
-func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, row Row) error {
+// so an imported task allocates its task number, fills its defaults and
+// emits its created event the same way one made through the API does.
+//
+// initiatedBy is the user the queue row names as having started the
+// import, and it becomes the task's creator and the created event's
+// actor: the rows came in because somebody asked for them, and a whole
+// file of tasks nobody is recorded as having made cannot be traced back
+// afterwards. It is the creator only, never an assignee — asking for a
+// file to be imported says nothing about who will do the hundreds of
+// tasks inside it. A job with no initiator recorded creates the tasks
+// unattributed, with an anonymous event.
+func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, initiatedBy sql.NullInt32, row Row) error {
 	// The parser already refuses a row whose title column is blank, so
 	// this restates the rule at the sink rather than adding one: an
 	// imported task passes the same check as a task made through the API.
@@ -321,8 +330,15 @@ func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, 
 	if err != nil {
 		return err
 	}
+	attribution := taskcreate.Unattributed()
+	var actorUserID *int64
+	if initiatedBy.Valid {
+		attribution = taskcreate.AuthoredBy(uint32(initiatedBy.Int32)) //#nosec G115 -- import_jobs.initiated_by_user_id references users.id, positive by construction
+		actor := int64(initiatedBy.Int32)
+		actorUserID = &actor
+	}
 	return dbretry.InTx(ctx, w.DB, "importer.createTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		created, err := taskcreate.New(ctx, tx, taskcreate.Unattributed(), taskcreate.Args{
+		created, err := taskcreate.New(ctx, tx, attribution, taskcreate.Args{
 			WorkspaceID: workspaceID,
 			ProjectID:   projectID,
 			Title:       title,
@@ -339,6 +355,7 @@ func (w *Worker) createTask(ctx context.Context, workspaceID, projectID uint32, 
 			Type:        eventbus.TaskCreated,
 			WorkspaceID: workspaceID,
 			TaskID:      &taskID,
+			ActorUserID: actorUserID,
 			// The stored title, not the parsed cell: the two differ when a
 			// cell arrives with a formula guard, and an event naming a task
 			// by a title the row does not carry cannot be corrected.

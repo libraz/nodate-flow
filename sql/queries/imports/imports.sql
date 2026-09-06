@@ -102,6 +102,7 @@ SELECT
   ij.public_id,
   ij.workspace_id,
   ij.project_id,
+  ij.initiated_by_user_id,
   ij.source,
   ij.config_json
 FROM import_jobs ij

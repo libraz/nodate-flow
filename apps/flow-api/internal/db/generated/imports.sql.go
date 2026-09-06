@@ -387,6 +387,7 @@ SELECT
   ij.public_id,
   ij.workspace_id,
   ij.project_id,
+  ij.initiated_by_user_id,
   ij.source,
   ij.config_json
 FROM import_jobs ij
@@ -397,12 +398,13 @@ LIMIT ?
 `
 
 type ListPendingImportJobsRow struct {
-	ID          uint32           `json:"-"`
-	PublicID    types.PublicID   `json:"publicId"`
-	WorkspaceID uint32           `json:"-"`
-	ProjectID   sql.NullInt32    `json:"-"`
-	Source      ImportJobsSource `json:"source"`
-	ConfigJson  json.RawMessage  `json:"configJson"`
+	ID                uint32           `json:"-"`
+	PublicID          types.PublicID   `json:"publicId"`
+	WorkspaceID       uint32           `json:"-"`
+	ProjectID         sql.NullInt32    `json:"-"`
+	InitiatedByUserID sql.NullInt32    `json:"-"`
+	Source            ImportJobsSource `json:"source"`
+	ConfigJson        json.RawMessage  `json:"configJson"`
 }
 
 // The worker's claim candidates, oldest first. Claiming is a separate
@@ -422,6 +424,7 @@ func (q *Queries) ListPendingImportJobs(ctx context.Context, limit int32) ([]Lis
 			&i.PublicID,
 			&i.WorkspaceID,
 			&i.ProjectID,
+			&i.InitiatedByUserID,
 			&i.Source,
 			&i.ConfigJson,
 		); err != nil {
