@@ -50,9 +50,11 @@ type Deps struct {
 	DisableRateLimit  bool
 	TrustedProxyHops  int
 
-	// OAuthAllowedDomains / OAuthAllowedEmails carry the opt-in OAuth/OIDC
-	// sign-in allowlist (normalized in config.Load). Empty (both) means
-	// no restriction — any verified email may sign in.
+	// OAuthAllowedDomains / OAuthAllowedEmails carry the environment half
+	// of the opt-in OAuth/OIDC sign-in allowlist (normalized in
+	// config.Load). The sign-in check unions them with the enabled
+	// allowlist rows, so empty (both) means no restriction only while the
+	// database names no entry either.
 	OAuthAllowedDomains []string
 	OAuthAllowedEmails  []string
 

@@ -55,9 +55,15 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		// provider-agnostic gate here.
 		// Enforce the opt-in sign-in allowlist on the verified email
 		// before any provisioning or session issuance. Gates both
-		// new-user creation and existing-user login. No-op (allows all)
-		// when the allowlist is unconfigured.
-		if !deps.isSignInEmailAllowed(email) {
+		// new-user creation and existing-user login. Allows all when
+		// neither the environment nor the database names an entry; the
+		// error path means the allowlist could not be read, which is not
+		// the same answer as "this address is not on it".
+		allowed, err := deps.isSignInEmailAllowed(ctx, email)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
 			return nil, httpErr(apierrors.AuthOidcDomainNotAllowed)
 		}
 

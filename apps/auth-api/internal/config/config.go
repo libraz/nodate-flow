@@ -58,20 +58,23 @@ type Config struct {
 	// OAuthAllowedDomains is an opt-in sign-in allowlist of email
 	// domains permitted to authenticate via OAuth/OIDC (e.g.
 	// "example.com,corp.example.org"). Entries are normalized to lower
-	// case, trimmed, and a leading "@" is stripped during Load. When
-	// both this and OAuthAllowedEmails are empty the allowlist is
-	// inactive and any verified email may sign in (today's open
-	// default); set this only to lock an instance to specific
-	// organizations.
+	// case, trimmed, and a leading "@" is stripped during Load. This is
+	// the floor an operator can always set from the environment: the
+	// sign-in check unions it with the allowlist rows an administrator
+	// maintains in the database, so a row can add to it but never take
+	// an entry away. Set this only to lock an instance to specific
+	// organizations; with neither this, OAuthAllowedEmails, nor an
+	// enabled row, any verified email may sign in.
 	OAuthAllowedDomains []string `env:"NF_OAUTH_ALLOWED_DOMAINS" envSeparator:"," envDefault:""`
 
 	// OAuthAllowedEmails is an opt-in exact-address sign-in allowlist
 	// for OAuth/OIDC (e.g. "ceo@example.com,ops@vendor.example"). Entries
 	// are normalized to lower case and trimmed during Load. Combined
-	// with OAuthAllowedDomains via OR: a sign-in is permitted when the
-	// email matches an exact entry here OR its domain is in
-	// OAuthAllowedDomains. Empty (with an empty domain list) means no
-	// restriction.
+	// with OAuthAllowedDomains and with the database allowlist via OR: a
+	// sign-in is permitted when the email matches an exact entry here OR
+	// its domain is in OAuthAllowedDomains OR either matches an enabled
+	// allowlist row. Empty (with an empty domain list and no enabled
+	// row) means no restriction.
 	OAuthAllowedEmails []string `env:"NF_OAUTH_ALLOWED_EMAILS" envSeparator:"," envDefault:""`
 
 	// MinPasswordLength is the minimum accepted password length for
@@ -230,38 +233,6 @@ func normalizeAllowlist(in []string, stripAt bool) []string {
 		return nil
 	}
 	return out
-}
-
-// IsSignInEmailAllowed reports whether the given email may sign in under
-// the instance's opt-in OAuth/OIDC allowlist.
-//
-// When both OAuthAllowedDomains and OAuthAllowedEmails are empty the
-// allowlist is inactive and every email is allowed, preserving the
-// default open sign-in behavior. Otherwise the email is allowed when its
-// lower-cased form matches an entry in OAuthAllowedEmails, OR its domain
-// (the part after the final "@") matches an entry in OAuthAllowedDomains.
-// A malformed address with no "@" is rejected once any allowlist is set.
-func (c *Config) IsSignInEmailAllowed(email string) bool {
-	if len(c.OAuthAllowedDomains) == 0 && len(c.OAuthAllowedEmails) == 0 {
-		return true
-	}
-	normalized := strings.ToLower(strings.TrimSpace(email))
-	for _, allowed := range c.OAuthAllowedEmails {
-		if normalized == allowed {
-			return true
-		}
-	}
-	at := strings.LastIndex(normalized, "@")
-	if at < 0 || at == len(normalized)-1 {
-		return false
-	}
-	domain := normalized[at+1:]
-	for _, allowed := range c.OAuthAllowedDomains {
-		if domain == allowed {
-			return true
-		}
-	}
-	return false
 }
 
 // IsDev reports whether the auth-api is running in a development

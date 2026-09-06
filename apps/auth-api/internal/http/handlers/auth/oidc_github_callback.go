@@ -55,9 +55,15 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		// Enforce the opt-in sign-in allowlist on the verified email
 		// (GitHub's exchanger already rejected unverified primary
 		// emails above) before any provisioning or session issuance.
-		// Gates both new-user creation and existing-user login. No-op
-		// (allows all) when the allowlist is unconfigured.
-		if !deps.isSignInEmailAllowed(claims.Email) {
+		// Gates both new-user creation and existing-user login. Allows
+		// all when neither the environment nor the database names an
+		// entry; the error path means the allowlist could not be read,
+		// which is not the same answer as "this address is not on it".
+		allowed, err := deps.isSignInEmailAllowed(ctx, claims.Email)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
 			return nil, httpErr(apierrors.AuthOidcDomainNotAllowed)
 		}
 

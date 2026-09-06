@@ -103,9 +103,10 @@ func TestOIDCMicrosoftCallback_AcceptsVerifiedEmailWithoutDB(t *testing.T) {
 		OIDCMicrosoft:             ms,
 		MicrosoftAllowedTenantIDs: []string{testMicrosoftTenantID},
 		Audit:                     audit.NoopSink{},
-		// Queries is nil — the handler will panic when it reaches the
-		// FindIdentityByProviderSubject call. That's the assertion: we
-		// got past Microsoft claim validation without being short-circuited.
+		// Queries is nil — the handler will panic at the first statement
+		// past the claim gates, the sign-in allowlist read. That's the
+		// assertion: we got past Microsoft claim validation without being
+		// short-circuited.
 	}
 	state, stateCookie := signedMicrosoftState(t, &deps)
 	handler := OIDCMicrosoftCallback(deps)
@@ -215,9 +216,9 @@ func TestOIDCMicrosoftCallback_PreferredUsernameFallback(t *testing.T) {
 	handler := OIDCMicrosoftCallback(deps)
 	defer func() {
 		// Past the email-derivation step the handler dereferences
-		// deps.Queries; in this test that's nil, which is the signal
-		// we made it past Microsoft claim validation with the fallback
-		// email substituted in.
+		// deps.Queries for the sign-in allowlist read; in this test
+		// that's nil, which is the signal we made it past Microsoft
+		// claim validation with the fallback email substituted in.
 		_ = recover()
 	}()
 	_, _ = handler(context.Background(), &OIDCCallbackInput{

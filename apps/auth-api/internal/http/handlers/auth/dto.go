@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strings"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
@@ -72,11 +71,14 @@ type Deps struct {
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	// When false, POST /auth/register returns 403.
 	RegistrationOpen bool
-	// OAuthAllowedDomains / OAuthAllowedEmails carry the opt-in OAuth/OIDC
-	// sign-in allowlist, normalized (lower-cased, trimmed, "@" stripped
-	// from domains) in config.Load. When both are empty the allowlist is
-	// inactive and any verified email may sign in. Evaluated by
-	// isSignInEmailAllowed in the OIDC callback handlers.
+	// OAuthAllowedDomains / OAuthAllowedEmails carry the environment half
+	// of the opt-in OAuth/OIDC sign-in allowlist, normalized (lower-cased,
+	// trimmed, "@" stripped from domains) in config.Load. They are a floor:
+	// isSignInEmailAllowed unions them with the enabled rows of
+	// oauth_signin_allowlist, so an entry an operator sets here cannot be
+	// taken away through the database. The allowlist is inactive, and any
+	// verified email may sign in, only when both these and the enabled rows
+	// are empty.
 	OAuthAllowedDomains []string
 	OAuthAllowedEmails  []string
 	// Audit records audit log entries for sensitive auth operations.
@@ -109,39 +111,6 @@ func (d Deps) minPwLen() int {
 		return d.MinPasswordLength
 	}
 	return 8
-}
-
-// isSignInEmailAllowed reports whether the given verified email may sign
-// in under the instance's opt-in OAuth/OIDC allowlist.
-//
-// When both OAuthAllowedDomains and OAuthAllowedEmails are empty the
-// allowlist is inactive and every email is allowed, preserving the
-// default open sign-in behavior. Otherwise the email is allowed when its
-// lower-cased form matches an entry in OAuthAllowedEmails, OR its domain
-// (the part after the final "@") matches an entry in OAuthAllowedDomains.
-// A malformed address with no "@" is rejected once any allowlist is set.
-// The allowlist entries are already normalized by config.Load.
-func (d Deps) isSignInEmailAllowed(email string) bool {
-	if len(d.OAuthAllowedDomains) == 0 && len(d.OAuthAllowedEmails) == 0 {
-		return true
-	}
-	normalized := strings.ToLower(strings.TrimSpace(email))
-	for _, allowed := range d.OAuthAllowedEmails {
-		if normalized == allowed {
-			return true
-		}
-	}
-	at := strings.LastIndex(normalized, "@")
-	if at < 0 || at == len(normalized)-1 {
-		return false
-	}
-	domain := normalized[at+1:]
-	for _, allowed := range d.OAuthAllowedDomains {
-		if domain == allowed {
-			return true
-		}
-	}
-	return false
 }
 
 // CapabilitiesOutput is the response for GET /auth/capabilities.

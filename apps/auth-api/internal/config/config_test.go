@@ -44,44 +44,10 @@ func TestValidateProductionGuards(t *testing.T) {
 	}
 }
 
-func TestIsSignInEmailAllowed(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		domains []string
-		emails  []string
-		email   string
-		want    bool
-	}{
-		{"empty allowlists allow anyone", nil, nil, "anyone@anywhere.test", true},
-		{"empty allowlists allow even malformed", nil, nil, "not-an-email", true},
-		{"domain match", []string{"example.com"}, nil, "alice@example.com", true},
-		{"domain non-match", []string{"example.com"}, nil, "alice@other.com", false},
-		{"exact email match", nil, []string{"vip@vendor.test"}, "vip@vendor.test", true},
-		{"exact email non-match", nil, []string{"vip@vendor.test"}, "other@vendor.test", false},
-		{"domain OR email — email branch", []string{"example.com"}, []string{"contractor@vendor.test"}, "contractor@vendor.test", true},
-		{"domain OR email — domain branch", []string{"example.com"}, []string{"contractor@vendor.test"}, "bob@example.com", true},
-		{"domain OR email — neither", []string{"example.com"}, []string{"contractor@vendor.test"}, "eve@evil.test", false},
-		{"case-insensitive domain", []string{"example.com"}, nil, "Alice@EXAMPLE.CoM", true},
-		{"case-insensitive exact email", nil, []string{"vip@vendor.test"}, "VIP@Vendor.Test", true},
-		{"whitespace around email", []string{"example.com"}, nil, "  alice@example.com  ", true},
-		{"malformed no at rejected when restricted", []string{"example.com"}, nil, "no-at-sign", false},
-		{"trailing at rejected when restricted", []string{"example.com"}, nil, "alice@", false},
-		{"subdomain is not the apex domain", []string{"example.com"}, nil, "alice@sub.example.com", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			c := &Config{
-				OAuthAllowedDomains: tt.domains,
-				OAuthAllowedEmails:  tt.emails,
-			}
-			if got := c.IsSignInEmailAllowed(tt.email); got != tt.want {
-				t.Fatalf("IsSignInEmailAllowed(%q) = %v, want %v", tt.email, got, tt.want)
-			}
-		})
-	}
-}
+// Which address the allowlist admits is not decided here. Config carries
+// the environment half of the allowlist; the sign-in rule reads it
+// together with the database rows, so it is exercised where it lives, in
+// the auth handler package.
 
 func TestNormalizeAllowlist(t *testing.T) {
 	t.Parallel()
