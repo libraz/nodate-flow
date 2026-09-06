@@ -63,18 +63,20 @@ func (f Freq) Valid() bool {
 
 // Rule is the stored recurrence rule.
 //
-// BySetPos is accepted and ignored: the column's grammar lists it, no
-// writer sets it, and the browser expander does not read it either.
-// Silently accepting it keeps the two implementations agreeing on the
-// rules that actually exist rather than inventing a meaning here.
+// BySetPos is kept as raw JSON rather than as a typed selector because
+// nothing applies it: no expander in the product reads it, so a decoded
+// value would only invite one of them to start. Holding the raw member
+// lets Validate refuse a rule that carries it whatever shape it was
+// written in, while a row already storing one still decodes and expands
+// on the fields that do have a meaning.
 type Rule struct {
-	Freq       Freq     `json:"freq"`
-	Interval   *int     `json:"interval"`
-	ByDay      []string `json:"byDay"`
-	ByMonthDay []int    `json:"byMonthDay"`
-	BySetPos   []int    `json:"bySetPos"`
-	Until      string   `json:"until"`
-	Count      *int     `json:"count"`
+	Freq       Freq            `json:"freq"`
+	Interval   *int            `json:"interval"`
+	ByDay      []string        `json:"byDay"`
+	ByMonthDay []int           `json:"byMonthDay"`
+	BySetPos   json.RawMessage `json:"bySetPos"`
+	Until      string          `json:"until"`
+	Count      *int            `json:"count"`
 }
 
 // Event is the minimal projection of a recurring calendar_events row.
@@ -144,8 +146,7 @@ var dayNumbers = map[string]time.Weekday{
 // value, or the JSON literal null, yields (nil, nil): not recurring is
 // not an error.
 func ParseRule(raw []byte) (*Rule, error) {
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
+	if isAbsent(raw) {
 		return nil, nil
 	}
 	var r Rule
@@ -160,8 +161,7 @@ func ParseRule(raw []byte) (*Rule, error) {
 
 // ParseExceptions decodes a stored recurrence_exceptions JSON array.
 func ParseExceptions(raw []byte) []string {
-	trimmed := strings.TrimSpace(string(raw))
-	if trimmed == "" || trimmed == "null" {
+	if isAbsent(raw) {
 		return nil
 	}
 	var out []string
@@ -415,10 +415,23 @@ func matchesByMonthDay(t time.Time, byMonthDay []int) bool {
 	return false
 }
 
+// parseWeekday resolves one byDay token.
+//
+// Case and surrounding space are ignored, matching the browser expander,
+// which lowercases and trims the same token before looking it up. The set
+// itself is closed: an unrecognised token has no weekday to stand for, so
+// Validate refuses one rather than letting it be dropped here — dropping
+// the only token of a weekly rule silently turns it into "weekly on
+// whatever day the series is anchored to".
+func parseWeekday(v string) (time.Weekday, bool) {
+	d, ok := dayNumbers[strings.ToLower(strings.TrimSpace(v))]
+	return d, ok
+}
+
 func normalizeByDay(values []string) []time.Weekday {
 	var out []time.Weekday
 	for _, v := range values {
-		if d, ok := dayNumbers[strings.ToLower(strings.TrimSpace(v))]; ok {
+		if d, ok := parseWeekday(v); ok {
 			out = append(out, d)
 		}
 	}
@@ -452,6 +465,40 @@ func parseUntil(raw string, loc *time.Location) *time.Time {
 	return nil
 }
 
+// exceptionEntry is one resolved recurrence_exceptions value. Day is set
+// for a bare date naming a whole local day; otherwise At is the instant
+// the entry names.
+type exceptionEntry struct {
+	Day string
+	At  time.Time
+}
+
+// parseExceptionEntry resolves one stored exception value, in the three
+// spellings the column mixes:
+//
+//   - YYYY-MM-DD            a whole local day
+//   - RFC 3339              one instant, carrying its own offset
+//   - YYYY-MM-DDTHH:MM:SS   one instant, read in the event's timezone
+//
+// Validate refuses anything this refuses, so the list that reaches
+// expansion holds only entries that suppress an occurrence.
+func parseExceptionEntry(raw string, loc *time.Location) (exceptionEntry, bool) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return exceptionEntry{}, false
+	}
+	if isDateOnly(v) {
+		return exceptionEntry{Day: v}, true
+	}
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return exceptionEntry{At: t}, true
+	}
+	if t, err := time.ParseInLocation("2006-01-02T15:04:05", v, loc); err == nil {
+		return exceptionEntry{At: t}, true
+	}
+	return exceptionEntry{}, false
+}
+
 // buildExceptions splits a stored list of occurrence starts into the two
 // kinds it mixes: exact instants naming one occurrence, and bare dates
 // naming a local day.
@@ -462,25 +509,23 @@ func buildExceptions(values []string, loc *time.Location) (map[int64]bool, map[s
 	exact := map[int64]bool{}
 	days := map[string]bool{}
 	for _, raw := range values {
-		v := strings.TrimSpace(raw)
-		if v == "" {
+		entry, ok := parseExceptionEntry(raw, loc)
+		switch {
+		case !ok:
 			continue
-		}
-		if isDateOnly(v) {
-			days[v] = true
-			continue
-		}
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			exact[t.UTC().Unix()] = true
-			continue
-		}
-		if t, err := time.ParseInLocation("2006-01-02T15:04:05", v, loc); err == nil {
-			exact[t.UTC().Unix()] = true
+		case entry.Day != "":
+			days[entry.Day] = true
+		default:
+			exact[entry.At.UTC().Unix()] = true
 		}
 	}
 	return exact, days
 }
 
+// isDateOnly reports whether a value is a bare calendar date rather than
+// a timestamp. The length check is what separates the two: a timestamp
+// starts with the same ten characters, and only the length says the
+// value stops there.
 func isDateOnly(v string) bool {
 	if len(v) != 10 {
 		return false
