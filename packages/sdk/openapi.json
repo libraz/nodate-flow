@@ -152,6 +152,36 @@
         "required": ["email", "role"],
         "type": "object"
       },
+      "AddOAuthSignInAllowlistEntryInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/AddOAuthSignInAllowlistEntryInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "kind": {
+            "description": "What the value names: a domain matches the part after an address's final '@', an email matches the whole address",
+            "enum": ["domain", "email"],
+            "type": "string"
+          },
+          "notes": {
+            "description": "Administrator notes",
+            "maxLength": 10000,
+            "type": "string"
+          },
+          "value": {
+            "description": "The domain or address this entry admits",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["kind", "value"],
+        "type": "object"
+      },
       "AddProjectMemberBody": {
         "additionalProperties": false,
         "properties": {
@@ -5806,6 +5836,30 @@
         "required": ["total", "notifications", "nextCursor"],
         "type": "object"
       },
+      "ListOAuthSignInAllowlistOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListOAuthSignInAllowlistOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OAuthSignInAllowlistEntry"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "items"],
+        "type": "object"
+      },
       "ListPagesBody": {
         "additionalProperties": false,
         "properties": {
@@ -7337,6 +7391,50 @@
         "required": ["eventCategory", "channel", "muted"],
         "type": "object"
       },
+      "OAuthSignInAllowlistEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/OAuthSignInAllowlistEntry.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "addedByDisplayName": {
+            "type": "string"
+          },
+          "addedById": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["domain", "email"],
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "kind", "value", "enabled", "createdAt"],
+        "type": "object"
+      },
       "OIDCStartOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -7734,6 +7832,11 @@
             "format": "int32",
             "type": "integer"
           },
+          "occurrenceStart": {
+            "description": "The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series; identifies the occurrence even after the edit moves it.",
+            "format": "int64",
+            "type": "integer"
+          },
           "recurrenceEnd": {
             "description": "Recurrence end as unix seconds (UTC)",
             "format": "int64",
@@ -7744,6 +7847,11 @@
           },
           "recurrenceRule": {
             "description": "Recurrence rule"
+          },
+          "scope": {
+            "description": "Which occurrences of a recurring series this patch reaches. Omitted means the whole series.",
+            "enum": ["series", "occurrence", "thisAndFollowing"],
+            "type": "string"
           },
           "showAs": {
             "description": "Show-as status",
@@ -12574,6 +12682,25 @@
         ],
         "type": "object"
       },
+      "WithdrawOAuthSignInAllowlistEntryOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/WithdrawOAuthSignInAllowlistEntryOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "Workspace": {
         "additionalProperties": false,
         "properties": {
@@ -13115,6 +13242,156 @@
           }
         ],
         "summary": "Get instance-level statistics",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/oauth-signin-allowlist": {
+      "get": {
+        "description": "Lists every entry of the instance-level OAuth/OIDC sign-in allowlist, withdrawn entries included: a withdrawn entry keeps its claim on its (kind, value) pair and can be brought back, so it stays visible with enabled=false. With no enabled entry and nothing configured in the environment, every verified address may sign in.",
+        "operationId": "admin-list-oauth-signin-allowlist",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListOAuthSignInAllowlistOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List OAuth sign-in allowlist entries",
+        "tags": ["Admin"]
+      },
+      "post": {
+        "description": "Adds a domain or address to the sign-in allowlist, or revives the withdrawn entry that already holds that pair, restating its notes and adder. The value is normalized (lower-cased, trimmed, and for a domain stripped of a leading '@') before it is stored, so the returned entry may differ from what was sent. A domain carrying an '@', or an address without one, is refused with 422 VALIDATION.BODY.FIELD_INVALID. Logged to the audit trail.",
+        "operationId": "admin-add-oauth-signin-allowlist-entry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddOAuthSignInAllowlistEntryInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthSignInAllowlistEntry"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add an OAuth sign-in allowlist entry",
+        "tags": ["Admin"]
+      }
+    },
+    "/admin/oauth-signin-allowlist/{entryId}": {
+      "delete": {
+        "description": "Stops the named entry admitting sign-ins from the next attempt on. The row is kept so the same domain or address can be added back later. An entry that is already withdrawn, or an id that names nothing, is reported as not found and leaves no audit entry.",
+        "operationId": "admin-withdraw-oauth-signin-allowlist-entry",
+        "parameters": [
+          {
+            "description": "Allowlist entry public id (UUID v7)",
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "description": "Allowlist entry public id (UUID v7)",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawOAuthSignInAllowlistEntryOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Withdraw an OAuth sign-in allowlist entry",
         "tags": ["Admin"]
       }
     },
@@ -22936,6 +23213,28 @@
             "schema": {
               "description": "Event public ID",
               "type": "string"
+            }
+          },
+          {
+            "description": "Which occurrences of a recurring series this delete reaches. Omitted means the whole series.",
+            "explode": false,
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "description": "Which occurrences of a recurring series this delete reaches. Omitted means the whole series.",
+              "enum": ["series", "occurrence", "thisAndFollowing"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series.",
+            "explode": false,
+            "in": "query",
+            "name": "occurrenceStart",
+            "schema": {
+              "description": "The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series.",
+              "format": "int64",
+              "type": "integer"
             }
           }
         ],

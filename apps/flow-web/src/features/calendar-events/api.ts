@@ -42,6 +42,17 @@ export type CalendarEventResponse = components['schemas']['EventResponse'];
 export type CreateEventInput = components['schemas']['CreateEventInputBody'];
 export type PatchEventInput = components['schemas']['PatchEventInputBody'];
 
+/**
+ * Which occurrences of a repeating series a write reaches.
+ *
+ * Derived from the request body rather than restated so the vocabulary
+ * cannot drift from the document the API validates against. Omitting the
+ * member entirely means `series`, which is what every write did before
+ * the choice existed — so a caller that does not know about scopes keeps
+ * behaving exactly as it did.
+ */
+export type RecurrenceScope = NonNullable<PatchEventInput['scope']>;
+
 type FlowTask = components['schemas']['Task'];
 export type CreateTaskInput = components['schemas']['CreateTaskBody'];
 
@@ -256,17 +267,45 @@ export interface DeleteEventArgs {
   workspaceId: string;
   calendarId: string;
   eventId: string;
+  /**
+   * Which occurrences the delete reaches. Omit for the whole series —
+   * the API's own default, and the only shape a non-repeating row has.
+   */
+  scope?: RecurrenceScope;
+  /**
+   * The deleted occurrence's start under the series rule, as unix
+   * seconds. Required by every scope other than `series`, which is how
+   * the API identifies the instance the caller meant.
+   */
+  occurrenceStart?: number;
 }
 
-/** useDeleteEvent — DELETE /workspaces/{wsId}/calendars/{calId}/events/{evtId}. */
+/**
+ * useDeleteEvent — DELETE /workspaces/{wsId}/calendars/{calId}/events/{evtId}.
+ *
+ * `scope` / `occurrenceStart` travel as query parameters here rather
+ * than in a body, since the method carries none.
+ */
 export function useDeleteEvent(): UseMutationResult<void, ApiError, DeleteEventArgs> {
   const qc = useQueryClient();
   return useMutation<void, ApiError, DeleteEventArgs>({
-    mutationFn: async ({ workspaceId, calendarId, eventId }): Promise<void> => {
+    mutationFn: async ({
+      workspaceId,
+      calendarId,
+      eventId,
+      scope,
+      occurrenceStart,
+    }): Promise<void> => {
       await apiRequest(
         (client) =>
           client.DELETE('/workspaces/{wsId}/calendars/{calId}/events/{evtId}', {
-            params: { path: { wsId: workspaceId, calId: calendarId, evtId: eventId } },
+            params: {
+              path: { wsId: workspaceId, calId: calendarId, evtId: eventId },
+              query: {
+                ...(scope === undefined ? {} : { scope }),
+                ...(occurrenceStart === undefined ? {} : { occurrenceStart }),
+              },
+            },
           }),
         'Failed to delete event',
       );

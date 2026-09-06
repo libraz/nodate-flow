@@ -88,6 +88,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/oauth-signin-allowlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List OAuth sign-in allowlist entries
+         * @description Lists every entry of the instance-level OAuth/OIDC sign-in allowlist, withdrawn entries included: a withdrawn entry keeps its claim on its (kind, value) pair and can be brought back, so it stays visible with enabled=false. With no enabled entry and nothing configured in the environment, every verified address may sign in.
+         */
+        get: operations["admin-list-oauth-signin-allowlist"];
+        put?: never;
+        /**
+         * Add an OAuth sign-in allowlist entry
+         * @description Adds a domain or address to the sign-in allowlist, or revives the withdrawn entry that already holds that pair, restating its notes and adder. The value is normalized (lower-cased, trimmed, and for a domain stripped of a leading '@') before it is stored, so the returned entry may differ from what was sent. A domain carrying an '@', or an address without one, is refused with 422 VALIDATION.BODY.FIELD_INVALID. Logged to the audit trail.
+         */
+        post: operations["admin-add-oauth-signin-allowlist-entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/oauth-signin-allowlist/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw an OAuth sign-in allowlist entry
+         * @description Stops the named entry admitting sign-ins from the next attempt on. The row is kept so the same domain or address can be added back later. An entry that is already withdrawn, or an id that names nothing, is reported as not found and leaves no audit entry.
+         */
+        delete: operations["admin-withdraw-oauth-signin-allowlist-entry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/sessions/{sessionId}": {
         parameters: {
             query?: never;
@@ -4968,6 +5012,23 @@ export interface components {
              */
             role: "manager" | "editor" | "viewer";
         };
+        AddOAuthSignInAllowlistEntryInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AddOAuthSignInAllowlistEntryInputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description What the value names: a domain matches the part after an address's final '@', an email matches the whole address
+             * @enum {string}
+             */
+            kind: "domain" | "email";
+            /** @description Administrator notes */
+            notes?: string;
+            /** @description The domain or address this entry admits */
+            value: string;
+        };
         AddProjectMemberBody: {
             /**
              * Format: uri
@@ -7631,6 +7692,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListOAuthSignInAllowlistOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListOAuthSignInAllowlistOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["OAuthSignInAllowlistEntry"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListPagesBody: {
             /**
              * Format: uri
@@ -8274,6 +8346,26 @@ export interface components {
             /** @description True when delivery of this category on this channel is suppressed */
             muted: boolean;
         };
+        OAuthSignInAllowlistEntry: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OAuthSignInAllowlistEntry.json
+             */
+            readonly $schema?: string;
+            addedByDisplayName?: string;
+            addedById?: string;
+            /** Format: int64 */
+            createdAt: number;
+            enabled: boolean;
+            id: string;
+            /** @enum {string} */
+            kind: "domain" | "email";
+            notes?: string;
+            /** Format: int64 */
+            updatedAt?: number;
+            value: string;
+        };
         OIDCStartOutputBody: {
             /**
              * Format: uri
@@ -8461,6 +8553,11 @@ export interface components {
             notificationOffset?: number;
             /**
              * Format: int64
+             * @description The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series; identifies the occurrence even after the edit moves it.
+             */
+            occurrenceStart?: number;
+            /**
+             * Format: int64
              * @description Recurrence end as unix seconds (UTC)
              */
             recurrenceEnd?: number;
@@ -8468,6 +8565,11 @@ export interface components {
             recurrenceExceptions?: unknown;
             /** @description Recurrence rule */
             recurrenceRule?: unknown;
+            /**
+             * @description Which occurrences of a recurring series this patch reaches. Omitted means the whole series.
+             * @enum {string}
+             */
+            scope?: "series" | "occurrence" | "thisAndFollowing";
             /**
              * @description Show-as status
              * @enum {string}
@@ -10682,6 +10784,15 @@ export interface components {
             /** Format: int64 */
             width: number;
         };
+        WithdrawOAuthSignInAllowlistEntryOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WithdrawOAuthSignInAllowlistEntryOutputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         Workspace: {
             /**
              * Format: uri
@@ -10951,6 +11062,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstanceStatsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-list-oauth-signin-allowlist": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOAuthSignInAllowlistOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-add-oauth-signin-allowlist-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddOAuthSignInAllowlistEntryInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthSignInAllowlistEntry"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "admin-withdraw-oauth-signin-allowlist-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Allowlist entry public id (UUID v7) */
+                entryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawOAuthSignInAllowlistEntryOutputBody"];
                 };
             };
             /** @description Error */
@@ -16989,7 +17197,12 @@ export interface operations {
     };
     "events-delete": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which occurrences of a recurring series this delete reaches. Omitted means the whole series. */
+                scope?: "series" | "occurrence" | "thisAndFollowing";
+                /** @description The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series. */
+                occurrenceStart?: number;
+            };
             header?: never;
             path: {
                 /** @description Workspace public ID */

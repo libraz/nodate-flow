@@ -78,6 +78,13 @@ export function AdminLayout(): ReactElement | null {
           {t('nav.admins')}
         </Link>
         <Link
+          to="/admin/signin-allowlist"
+          className={styles.navLink}
+          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
+        >
+          {t('nav.signin_allowlist')}
+        </Link>
+        <Link
           to="/admin/stats"
           className={styles.navLink}
           activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}

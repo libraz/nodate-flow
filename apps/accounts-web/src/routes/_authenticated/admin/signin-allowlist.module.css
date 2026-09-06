@@ -1,0 +1,107 @@
+/**
+ * Sign-in allowlist page.
+ *
+ * The shared `aw-*` classes carry the page shell, the tables and the
+ * badges; what lives here is the part specific to this screen — the two
+ * standing notices that explain what an empty list means, the per-kind
+ * badge tones, and the muted treatment that keeps a withdrawn entry from
+ * reading as a live one. Every length and colour resolves to a `--nf-*`
+ * token so the four themes override them without touching this file.
+ */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border: 1px solid var(--nf-color-info);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-info-subtle);
+  font-size: var(--nf-text-sm);
+}
+
+.noticeOpen {
+  border-color: var(--nf-color-warning);
+  background: var(--nf-color-warning-subtle);
+}
+
+.noticeTitle {
+  margin: 0;
+  font-weight: var(--nf-weight-semibold);
+}
+
+.noticeBody {
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.kindDomain {
+  background: color-mix(in srgb, var(--nf-color-accent) 15%, transparent);
+  color: var(--nf-color-accent-fg);
+}
+
+.kindEmail {
+  background: color-mix(in srgb, var(--nf-color-info) 18%, transparent);
+  color: var(--nf-color-info-fg);
+}
+
+.statusWithdrawn {
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+}
+
+/*
+ * A withdrawn row admits nobody. It keeps its own section, and the muted
+ * foreground is the second signal so a glance at the table never reads it
+ * as one of the entries currently letting people in.
+ */
+.withdrawnRow {
+  color: var(--nf-color-fg-muted);
+}
+
+.value {
+  font-family: var(--nf-font-mono);
+  word-break: break-all;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nf-space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.fieldGrow {
+  flex: 1;
+}
+
+.label {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}

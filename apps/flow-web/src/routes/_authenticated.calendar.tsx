@@ -367,7 +367,20 @@ interface LayerFlags {
  */
 type EditTarget =
   | { mode: 'create'; date: string; initialItemKind: ItemKind }
-  | { mode: 'edit'; event: CalendarEvent };
+  | {
+      mode: 'edit';
+      event: CalendarEvent;
+      /**
+       * The start the series rule produced for the occurrence that was
+       * clicked, in unix seconds; null for a row that does not repeat.
+       *
+       * Captured here because the grid is the only surface that knows
+       * which instance was drawn — {@link expandCalendarEvents} rewrites
+       * `startAt` per occurrence, and by the time the dialog has been
+       * open for a keystroke that value is whatever the user typed.
+       */
+      occurrenceStart: number | null;
+    };
 
 /**
  * Active drag payload. A task drag only needs its id and origin day;
@@ -801,7 +814,13 @@ function CalendarRoute(): ReactElement {
   );
 
   const handleEventOpen = useCallback((event: CalendarEvent): void => {
-    setEditTarget({ mode: 'edit', event });
+    // The pill carries the instant the expander derived for this
+    // instance, so reading it at the click — before the dialog exists,
+    // let alone can edit anything — is what ties a per-occurrence write
+    // to the occurrence the user actually opened.
+    const occurrenceStart =
+      isRecurring(event) && typeof event.startAt === 'number' ? event.startAt : null;
+    setEditTarget({ mode: 'edit', event, occurrenceStart });
   }, []);
 
   const handleTaskOpen = useCallback(
@@ -1087,7 +1106,7 @@ function CalendarRoute(): ReactElement {
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditTarget({ mode: 'edit', event: ev });
+                                  handleEventOpen(ev);
                                 }}
                                 className={cx(
                                   styles.eventPill,
@@ -1189,6 +1208,12 @@ function toDialogMode(target: EditTarget): EventDialogMode {
     calendarId: ev.calendarId,
     initialKind: kind,
     event: ev,
+    // Omitted rather than nulled for a row that does not repeat: the
+    // dialog reads the member's absence as "there is no occurrence to
+    // scope a write to", and offers no extra step.
+    ...(target.occurrenceStart === null
+      ? {}
+      : { occurrence: { originalStartAt: target.occurrenceStart } }),
   };
 }
 

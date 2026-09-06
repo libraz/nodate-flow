@@ -83,6 +83,36 @@
       "monthly": "Monthly",
       "yearly": "Yearly",
       "custom": "Custom…"
+    },
+    "scope": {
+      "save": {
+        "title": "Save repeating event",
+        "legend": "Which events should this change apply to?",
+        "confirm": "Save"
+      },
+      "delete": {
+        "title": "Delete repeating event",
+        "legend": "Which events should be deleted?",
+        "confirm": "Delete"
+      },
+      "cancel": "Cancel",
+      "option": {
+        "occurrence": {
+          "label": "This event",
+          "save": "Changes only the occurrence you opened. The rest of the series stays as it is.",
+          "delete": "Removes only the occurrence you opened. The rest of the series stays as it is."
+        },
+        "thisAndFollowing": {
+          "label": "This and following events",
+          "save": "Changes this occurrence and every later one. Earlier events stay as they are.",
+          "delete": "Removes this occurrence and every later one. Earlier events stay as they are."
+        },
+        "series": {
+          "label": "All events",
+          "save": "Changes every event in the series, including ones that have already happened.",
+          "delete": "Removes every event in the series, including ones that have already happened."
+        }
+      }
     }
   },
   "notification": {

@@ -1,0 +1,79 @@
+/*
+ * RecurringScopeDialog layout.
+ *
+ * A short vertical stack: the question, three radio rows, then the
+ * actions. Each row is a two-line block — the name of the option above
+ * the sentence that says what it does to the series — so the row's own
+ * padding, not a gap between siblings, is what keeps the two lines
+ * reading as one choice.
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.legend {
+  padding: 0;
+  padding-block-end: var(--nf-space-3);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.option {
+  display: flex;
+  align-items: start;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.option:hover {
+  background: var(--nf-color-bg-sunken);
+}
+
+.option:has(:focus-visible) {
+  background: var(--nf-color-bg-sunken);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.optionLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.optionHint {
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}

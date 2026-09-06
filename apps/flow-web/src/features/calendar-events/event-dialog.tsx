@@ -53,6 +53,7 @@ import { PRIORITY_KEY } from '../tasks/constants';
 import {
   type CreateEventInput,
   type PatchEventInput,
+  type RecurrenceScope,
   rememberCalendarChoice,
   useCalendarsQuery,
   useCreateCalendarTask,
@@ -65,6 +66,7 @@ import {
 import AttendeesSection from './attendees-section';
 import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
+import RecurringScopeDialog from './recurring-scope-dialog';
 
 type FlowProject = components['schemas']['Project'];
 type CalEventLike = components['schemas']['MyCalendarEventResponse'];
@@ -121,6 +123,24 @@ export type NotificationPreset =
   | '1hour'
   | '1day';
 
+/**
+ * The rendered occurrence an edit dialog was opened from, for a row that
+ * repeats.
+ *
+ * `originalStartAt` is the instant the series rule produced for that
+ * occurrence — not the start the user is about to type. The two are the
+ * same number type and would be interchangeable if this were a bare
+ * `occurrenceStart: number` beside the event, and sending the edited one
+ * writes an override against an occurrence nobody opened. Naming it
+ * `originalStartAt` inside its own object keeps the form's `startDate` /
+ * `startTime` state and this value from ever standing in for each other,
+ * and makes the field impossible to populate except from the grid, which
+ * is the only place that knows which instance was clicked.
+ */
+export interface DialogOccurrence {
+  originalStartAt: number;
+}
+
 export type EventDialogMode =
   | { kind: 'create'; date: string; initialItemKind?: ItemKind }
   | {
@@ -129,7 +149,19 @@ export type EventDialogMode =
       calendarId: string;
       initialKind: CalEventKind;
       event: CalEventLike;
+      /** Absent when the dialog was not opened from an occurrence of a series. */
+      occurrence?: DialogOccurrence;
     };
+
+/**
+ * A commit that is waiting on the "which occurrences?" answer. The
+ * occurrence start is captured here when the question is raised, so the
+ * request that eventually goes out reads it from the prompt rather than
+ * from anything the form can still change.
+ */
+type ScopePrompt =
+  | { action: 'save'; body: PatchEventInput; occurrenceStart: number }
+  | { action: 'delete'; occurrenceStart: number };
 
 export interface EventDialogProps {
   open: boolean;
@@ -263,6 +295,35 @@ function defaultTimes(kind: CalEventKind): { start: string; end: string } {
     case 'milestone':
       return { start: '00:00', end: '00:00' };
   }
+}
+
+/**
+ * True when the value the API returned describes a repeat rule.
+ *
+ * `recurrenceRule` is typed `unknown` on both event shapes (it is free
+ * JSON on the wire), so presence is all the client can honestly read.
+ */
+function hasRecurrenceRule(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return typeof value === 'object';
+}
+
+/**
+ * Whether a patch body rewrites the series definition itself.
+ *
+ * The API refuses a per-occurrence scope on such a patch, and rightly:
+ * changing the rule is a statement about the whole series, so there is
+ * nothing to ask. Those edits go out unscoped, exactly as before.
+ */
+function touchesRecurrence(body: PatchEventInput): boolean {
+  if ('recurrenceRule' in body || 'recurrenceEnd' in body || 'recurrenceExceptions' in body) {
+    return true;
+  }
+  return (body.clear ?? []).some(
+    (field) =>
+      field === 'recurrenceRule' || field === 'recurrenceEnd' || field === 'recurrenceExceptions',
+  );
 }
 
 function blockPresetFromLabel(label?: string): BlockPreset {
@@ -648,6 +709,28 @@ export default function EventDialog({
     // change while a dialog is open.
   }, [detail, open, zone]);
 
+  /* ── recurring-scope choice ─── */
+
+  /**
+   * The occurrence a scope choice would act on, or null when the dialog
+   * must not ask.
+   *
+   * Null covers three cases that all mean the same thing: create mode,
+   * an edit the grid opened from a row it did not expand from a rule,
+   * and — once the authoritative row lands — a row the aggregate labelled
+   * as repeating but which carries no rule. Deriving one nullable number
+   * rather than a boolean beside it means every call site that acts on
+   * the choice has to hold the value it acts with.
+   */
+  const scopeOccurrenceStart: number | null =
+    mode.kind === 'edit' &&
+    mode.occurrence !== undefined &&
+    (detail === undefined || hasRecurrenceRule(detail.recurrenceRule))
+      ? mode.occurrence.originalStartAt
+      : null;
+
+  const [scopePrompt, setScopePrompt] = useState<ScopePrompt | null>(null);
+
   // Validation state.
   const [titleError, setTitleError] = useState<string | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
@@ -777,6 +860,27 @@ export default function EventDialog({
     if (isPending) return;
     if (!validate()) return;
 
+    if (kind !== 'task' && mode.kind === 'edit') {
+      const body = buildPatchBody();
+      // Nothing was touched: skip the round-trip rather than replay the
+      // stored values back at the server, which would append an update
+      // event and an audit row for a no-op.
+      if (Object.keys(body).length === 0) {
+        toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
+        onSaved();
+        return;
+      }
+      // A repeating row has to say which occurrences the edit reaches
+      // before anything is written. An edit that rewrites the rule is a
+      // series-level statement by construction, so it does not ask.
+      if (scopeOccurrenceStart !== null && !touchesRecurrence(body)) {
+        setScopePrompt({ action: 'save', body, occurrenceStart: scopeOccurrenceStart });
+        return;
+      }
+      await commitPatch(body, null);
+      return;
+    }
+
     try {
       if (kind === 'task') {
         await createTask.mutateAsync({
@@ -789,32 +893,61 @@ export default function EventDialog({
           visibility: 'project',
         });
         toaster.show({ tone: 'success', message: t('toast.created.task') });
-      } else if (isCreate) {
+      } else {
         const body = buildCreateBody();
         await createEvent.mutateAsync({ workspaceId, calendarId, body });
         rememberCalendarChoice(workspaceId, calendarId);
         toaster.show({ tone: 'success', message: t(TOAST_CREATED_KEYS[kind]) });
-      } else if (isEdit) {
-        const body = buildPatchBody();
-        // Nothing was touched: skip the round-trip rather than replay the
-        // stored values back at the server, which would append an update
-        // event and an audit row for a no-op.
-        if (Object.keys(body).length > 0) {
-          await updateEvent.mutateAsync({
-            workspaceId,
-            calendarId,
-            eventId: mode.eventId,
-            body,
-          });
-          rememberCalendarChoice(workspaceId, calendarId);
-        }
-        toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
       }
       onSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
         message: formatApiError(err, t, isCreate ? 'toast.createFailed' : 'toast.updateFailed'),
+      });
+    }
+  }
+
+  /**
+   * Send the PATCH.
+   *
+   * `scoped` is present only once a repeating row's scope has been
+   * answered, and it carries the occurrence start with it — the request
+   * therefore reads the instant from the answered question rather than
+   * from form state, which is what keeps an edited start from being
+   * mistaken for the occurrence's own. `series` sends no occurrence at
+   * all, since none identifies it.
+   */
+  async function commitPatch(
+    body: PatchEventInput,
+    scoped: { scope: RecurrenceScope; occurrenceStart: number } | null,
+  ): Promise<void> {
+    if (mode.kind !== 'edit') return;
+    const payload: PatchEventInput =
+      scoped === null
+        ? body
+        : scoped.scope === 'series'
+          ? { ...body, scope: 'series' }
+          : { ...body, scope: scoped.scope, occurrenceStart: scoped.occurrenceStart };
+    try {
+      await updateEvent.mutateAsync({
+        workspaceId,
+        calendarId,
+        eventId: mode.eventId,
+        body: payload,
+      });
+      rememberCalendarChoice(workspaceId, calendarId);
+      setScopePrompt(null);
+      toaster.show({ tone: 'success', message: t(TOAST_UPDATED_KEYS[kind]) });
+      onSaved();
+    } catch (err) {
+      // Back to the edit form with the reason on screen — including the
+      // typed refusals a scope can earn, which name a condition the user
+      // can act on by choosing differently.
+      setScopePrompt(null);
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'toast.updateFailed'),
       });
     }
   }
@@ -922,19 +1055,42 @@ export default function EventDialog({
   async function handleDelete(): Promise<void> {
     if (mode.kind !== 'edit') return;
     if (isPending) return;
+    // A repeating row is asked which occurrences the delete reaches
+    // instead of the plain confirm. That choice already is the
+    // confirmation — stacking a second one on top of it only teaches
+    // people to click through both.
+    if (scopeOccurrenceStart !== null) {
+      setScopePrompt({ action: 'delete', occurrenceStart: scopeOccurrenceStart });
+      return;
+    }
     const confirmed = await confirmAction({
       message: t('action.deleteConfirm', { kind: t(KIND_LABEL_KEYS[kind]) }),
     });
     if (!confirmed) return;
+    await commitDelete(null);
+  }
+
+  /** Send the DELETE. See {@link commitPatch} for why `scoped` is a pair. */
+  async function commitDelete(
+    scoped: { scope: RecurrenceScope; occurrenceStart: number } | null,
+  ): Promise<void> {
+    if (mode.kind !== 'edit') return;
     try {
       await deleteEvent.mutateAsync({
         workspaceId,
         calendarId: mode.calendarId,
         eventId: mode.eventId,
+        ...(scoped === null
+          ? {}
+          : scoped.scope === 'series'
+            ? { scope: 'series' as const }
+            : { scope: scoped.scope, occurrenceStart: scoped.occurrenceStart }),
       });
+      setScopePrompt(null);
       toaster.show({ tone: 'success', message: t(TOAST_DELETED_KEYS[kind]) });
       onSaved();
     } catch (err) {
+      setScopePrompt(null);
       toaster.show({
         tone: 'danger',
         message: formatApiError(err, t, 'toast.deleteFailed'),
@@ -977,70 +1133,116 @@ export default function EventDialog({
   const showMilestone = kind === 'milestone';
 
   return (
-    <Dialog
-      open={open}
-      onClose={() => {
-        void handleClose();
-      }}
-      title={headerTitle}
-      size="lg"
-    >
-      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.body}>
-        <div className={styles.bodyScroll}>
-          <SegmentedControl
-            ariaLabel={t('a11y.kind_picker')}
-            colourful
-            fullWidth
-            size="sm"
-            options={kindOptions}
-            value={kind}
-            onChange={editing('kind', setKind)}
-          />
-
-          {mode.kind === 'edit' ? (
-            <CreatorChip
-              displayName={mode.event.creatorDisplayName}
-              avatarUrl={mode.event.creatorAvatarUrl}
+    <>
+      <Dialog
+        open={open}
+        onClose={() => {
+          void handleClose();
+        }}
+        title={headerTitle}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={styles.body}>
+          <div className={styles.bodyScroll}>
+            <SegmentedControl
+              ariaLabel={t('a11y.kind_picker')}
+              colourful
+              fullWidth
+              size="sm"
+              options={kindOptions}
+              value={kind}
+              onChange={editing('kind', setKind)}
             />
-          ) : null}
 
-          <FormField label={t('field.title')} error={titleError ?? undefined}>
-            {(control) => (
-              <Input
-                {...control}
-                value={title}
-                onChange={(e) => {
-                  markDirty('title');
-                  setTitle(e.currentTarget.value);
-                }}
-                placeholder={t(PLACEHOLDER_TITLE_KEYS[kind])}
-                autoFocus={isCreate}
+            {mode.kind === 'edit' ? (
+              <CreatorChip
+                displayName={mode.event.creatorDisplayName}
+                avatarUrl={mode.event.creatorAvatarUrl}
               />
-            )}
-          </FormField>
+            ) : null}
 
-          {showCalendar ? (
-            <FormField label={t('field.calendar')} error={calendarError ?? undefined}>
-              {() => (
-                <Combobox
-                  options={calendarOptions}
-                  value={calendarId}
-                  onChange={editing('calendarId', setCalendarId)}
-                  aria-label={t('field.calendar')}
+            <FormField label={t('field.title')} error={titleError ?? undefined}>
+              {(control) => (
+                <Input
+                  {...control}
+                  value={title}
+                  onChange={(e) => {
+                    markDirty('title');
+                    setTitle(e.currentTarget.value);
+                  }}
+                  placeholder={t(PLACEHOLDER_TITLE_KEYS[kind])}
+                  autoFocus={isCreate}
                 />
               )}
             </FormField>
-          ) : null}
 
-          {/* Time row — morphs by kind */}
-          <div className={styles.timeRow}>
-            {showTaskFields ? (
-              <>
-                <FormField label={t('field.start')}>
+            {showCalendar ? (
+              <FormField label={t('field.calendar')} error={calendarError ?? undefined}>
+                {() => (
+                  <Combobox
+                    options={calendarOptions}
+                    value={calendarId}
+                    onChange={editing('calendarId', setCalendarId)}
+                    aria-label={t('field.calendar')}
+                  />
+                )}
+              </FormField>
+            ) : null}
+
+            {/* Time row — morphs by kind */}
+            <div className={styles.timeRow}>
+              {showTaskFields ? (
+                <>
+                  <FormField label={t('field.start')}>
+                    {() => (
+                      <DatePicker
+                        value={startDate}
+                        onChange={editing('startDate', setStartDate)}
+                        weekdayLabels={weekdayLabels}
+                        weekStart={weekStart}
+                        formatMonthYear={formatMonthYear}
+                        prevLabel={tCommon('calendar.prev')}
+                        nextLabel={tCommon('calendar.next')}
+                        triggerLabel={
+                          startDate
+                            ? formatDate(startDate, locale)
+                            : tCommon('common.date.placeholder')
+                        }
+                      />
+                    )}
+                  </FormField>
+                  <span className={styles.arrow} aria-hidden>
+                    →
+                  </span>
+                  <FormField label={t('field.end')}>
+                    {() => (
+                      <DatePicker
+                        value={endDate}
+                        onChange={editing('endDate', setEndDate)}
+                        weekdayLabels={weekdayLabels}
+                        weekStart={weekStart}
+                        formatMonthYear={formatMonthYear}
+                        prevLabel={tCommon('calendar.prev')}
+                        nextLabel={tCommon('calendar.next')}
+                        triggerLabel={
+                          endDate ? formatDate(endDate, locale) : tCommon('common.date.placeholder')
+                        }
+                        {...(startDate ? { minDate: startDate } : {})}
+                      />
+                    )}
+                  </FormField>
+                </>
+              ) : showMilestone ? (
+                <FormField label={t('field.date')}>
                   {() => (
                     <DatePicker
                       value={startDate}
-                      onChange={editing('startDate', setStartDate)}
+                      onChange={(v) => {
+                        markDirty('startDate');
+                        markDirty('endDate');
+                        setStartDate(v);
+                        setEndDate(v);
+                      }}
                       weekdayLabels={weekdayLabels}
                       weekStart={weekStart}
                       formatMonthYear={formatMonthYear}
@@ -1054,409 +1256,392 @@ export default function EventDialog({
                     />
                   )}
                 </FormField>
-                <span className={styles.arrow} aria-hidden>
-                  →
-                </span>
-                <FormField label={t('field.end')}>
-                  {() => (
-                    <DatePicker
-                      value={endDate}
-                      onChange={editing('endDate', setEndDate)}
-                      weekdayLabels={weekdayLabels}
-                      weekStart={weekStart}
-                      formatMonthYear={formatMonthYear}
-                      prevLabel={tCommon('calendar.prev')}
-                      nextLabel={tCommon('calendar.next')}
-                      triggerLabel={
-                        endDate ? formatDate(endDate, locale) : tCommon('common.date.placeholder')
-                      }
-                      {...(startDate ? { minDate: startDate } : {})}
+              ) : (
+                <>
+                  <FormField label={t('field.start')} error={timeError ?? undefined}>
+                    {() => (
+                      <div className={styles.inlineRow}>
+                        <div className={styles.inlineGrow}>
+                          <DatePicker
+                            value={startDate}
+                            onChange={editing('startDate', setStartDate)}
+                            weekdayLabels={weekdayLabels}
+                            weekStart={weekStart}
+                            formatMonthYear={formatMonthYear}
+                            prevLabel={tCommon('calendar.prev')}
+                            nextLabel={tCommon('calendar.next')}
+                            triggerLabel={
+                              startDate
+                                ? formatDate(startDate, locale)
+                                : tCommon('common.date.placeholder')
+                            }
+                          />
+                        </div>
+                        {allDay ? null : (
+                          <TimePicker
+                            value={startTime}
+                            onChange={editing('startTime', setStartTime)}
+                            step={15}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </FormField>
+                  <span className={styles.arrow} aria-hidden>
+                    →
+                  </span>
+                  <FormField label={t('field.end')}>
+                    {() => (
+                      <div className={styles.inlineRow}>
+                        <div className={styles.inlineGrow}>
+                          <DatePicker
+                            value={endDate}
+                            onChange={editing('endDate', setEndDate)}
+                            weekdayLabels={weekdayLabels}
+                            weekStart={weekStart}
+                            formatMonthYear={formatMonthYear}
+                            prevLabel={tCommon('calendar.prev')}
+                            nextLabel={tCommon('calendar.next')}
+                            triggerLabel={
+                              endDate
+                                ? formatDate(endDate, locale)
+                                : tCommon('common.date.placeholder')
+                            }
+                            {...(startDate ? { minDate: startDate } : {})}
+                          />
+                        </div>
+                        {allDay ? null : (
+                          <TimePicker
+                            value={endTime}
+                            onChange={editing('endTime', setEndTime)}
+                            step={15}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </FormField>
+                  {/* Switch first, label after — matches "toggle | what it controls" reading. */}
+                  <label htmlFor="nf-event-dialog-allday" className={styles.timeRowAllDay}>
+                    <Switch
+                      id="nf-event-dialog-allday"
+                      checked={allDay}
+                      onCheckedChange={handleAllDayChange}
                     />
-                  )}
-                </FormField>
-              </>
-            ) : showMilestone ? (
-              <FormField label={t('field.date')}>
-                {() => (
-                  <DatePicker
-                    value={startDate}
-                    onChange={(v) => {
-                      markDirty('startDate');
-                      markDirty('endDate');
-                      setStartDate(v);
-                      setEndDate(v);
-                    }}
-                    weekdayLabels={weekdayLabels}
-                    weekStart={weekStart}
-                    formatMonthYear={formatMonthYear}
-                    prevLabel={tCommon('calendar.prev')}
-                    nextLabel={tCommon('calendar.next')}
-                    triggerLabel={
-                      startDate ? formatDate(startDate, locale) : tCommon('common.date.placeholder')
-                    }
-                  />
-                )}
-              </FormField>
-            ) : (
-              <>
-                <FormField label={t('field.start')} error={timeError ?? undefined}>
-                  {() => (
-                    <div className={styles.inlineRow}>
-                      <div className={styles.inlineGrow}>
-                        <DatePicker
-                          value={startDate}
-                          onChange={editing('startDate', setStartDate)}
-                          weekdayLabels={weekdayLabels}
-                          weekStart={weekStart}
-                          formatMonthYear={formatMonthYear}
-                          prevLabel={tCommon('calendar.prev')}
-                          nextLabel={tCommon('calendar.next')}
-                          triggerLabel={
-                            startDate
-                              ? formatDate(startDate, locale)
-                              : tCommon('common.date.placeholder')
-                          }
-                        />
-                      </div>
-                      {allDay ? null : (
-                        <TimePicker
-                          value={startTime}
-                          onChange={editing('startTime', setStartTime)}
-                          step={15}
-                        />
-                      )}
-                    </div>
-                  )}
-                </FormField>
-                <span className={styles.arrow} aria-hidden>
-                  →
-                </span>
-                <FormField label={t('field.end')}>
-                  {() => (
-                    <div className={styles.inlineRow}>
-                      <div className={styles.inlineGrow}>
-                        <DatePicker
-                          value={endDate}
-                          onChange={editing('endDate', setEndDate)}
-                          weekdayLabels={weekdayLabels}
-                          weekStart={weekStart}
-                          formatMonthYear={formatMonthYear}
-                          prevLabel={tCommon('calendar.prev')}
-                          nextLabel={tCommon('calendar.next')}
-                          triggerLabel={
-                            endDate
-                              ? formatDate(endDate, locale)
-                              : tCommon('common.date.placeholder')
-                          }
-                          {...(startDate ? { minDate: startDate } : {})}
-                        />
-                      </div>
-                      {allDay ? null : (
-                        <TimePicker
-                          value={endTime}
-                          onChange={editing('endTime', setEndTime)}
-                          step={15}
-                        />
-                      )}
-                    </div>
-                  )}
-                </FormField>
-                {/* Switch first, label after — matches "toggle | what it controls" reading. */}
-                <label htmlFor="nf-event-dialog-allday" className={styles.timeRowAllDay}>
-                  <Switch
-                    id="nf-event-dialog-allday"
-                    checked={allDay}
-                    onCheckedChange={handleAllDayChange}
-                  />
-                  {t('field.allDay')}
-                </label>
-              </>
-            )}
-          </div>
+                    {t('field.allDay')}
+                  </label>
+                </>
+              )}
+            </div>
 
-          {/*
-           * Kind-specific morph zone. The wrapper has a fixed
-           * `min-block-size` matching the tallest variant so the
-           * dialog body does not reflow as the user flips the kind
-           * picker — the inner `.kindBlock` fades in over the same
-           * footprint regardless of which variant is mounted. See
-           * `.kindMorphZone` in event-dialog.module.css for the
-           * reasoning.
-           */}
-          <div className={styles.kindMorphZone}>
-            {showTaskFields ? (
-              <div className={styles.kindBlock}>
-                <div className={styles.inlineRow}>
-                  {projects.length > 0 ? (
-                    <FormField
-                      label={t('field.project')}
-                      error={projectError ?? undefined}
-                      className={styles.inlineGrow}
-                    >
-                      {(control) => (
-                        <Select
-                          {...control}
-                          value={projectId}
-                          onChange={(e) => {
-                            markDirty('projectId');
-                            setProjectId(e.currentTarget.value);
+            {/*
+             * Kind-specific morph zone. The wrapper has a fixed
+             * `min-block-size` matching the tallest variant so the
+             * dialog body does not reflow as the user flips the kind
+             * picker — the inner `.kindBlock` fades in over the same
+             * footprint regardless of which variant is mounted. See
+             * `.kindMorphZone` in event-dialog.module.css for the
+             * reasoning.
+             */}
+            <div className={styles.kindMorphZone}>
+              {showTaskFields ? (
+                <div className={styles.kindBlock}>
+                  <div className={styles.inlineRow}>
+                    {projects.length > 0 ? (
+                      <FormField
+                        label={t('field.project')}
+                        error={projectError ?? undefined}
+                        className={styles.inlineGrow}
+                      >
+                        {(control) => (
+                          <Select
+                            {...control}
+                            value={projectId}
+                            onChange={(e) => {
+                              markDirty('projectId');
+                              setProjectId(e.currentTarget.value);
+                            }}
+                          >
+                            {projects.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </Select>
+                        )}
+                      </FormField>
+                    ) : null}
+                    <FormField label={t('field.priority')} className={styles.inlineGrow}>
+                      {() => (
+                        <SegmentedControl
+                          ariaLabel={t('field.priority')}
+                          options={TASK_PRIORITIES.map((p) => ({
+                            value: String(p) as `${TaskPriority}`,
+                            label: tCommon(PRIORITY_KEY[p]),
+                          }))}
+                          value={String(priority) as `${TaskPriority}`}
+                          onChange={(v) => {
+                            markDirty('priority');
+                            setPriority(Number(v) as TaskPriority);
                           }}
-                        >
-                          {projects.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </Select>
+                        />
                       )}
                     </FormField>
-                  ) : null}
-                  <FormField label={t('field.priority')} className={styles.inlineGrow}>
+                  </div>
+                </div>
+              ) : null}
+
+              {showEventFields ? (
+                <div className={styles.kindBlock}>
+                  <FormField label={t('field.showAs')}>
                     {() => (
                       <SegmentedControl
-                        ariaLabel={t('field.priority')}
-                        options={TASK_PRIORITIES.map((p) => ({
-                          value: String(p) as `${TaskPriority}`,
-                          label: tCommon(PRIORITY_KEY[p]),
+                        ariaLabel={t('field.showAs')}
+                        fullWidth
+                        options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
+                          value: v,
+                          label: t(SHOW_AS_KEYS[v]),
                         }))}
-                        value={String(priority) as `${TaskPriority}`}
-                        onChange={(v) => {
-                          markDirty('priority');
-                          setPriority(Number(v) as TaskPriority);
+                        value={showAs}
+                        onChange={editing('showAs', setShowAs)}
+                      />
+                    )}
+                  </FormField>
+                  <FormField
+                    label={t('field.flexibility')}
+                    description={t('field.flexibilityHint')}
+                  >
+                    {() => (
+                      <SegmentedControl
+                        ariaLabel={t('field.flexibility')}
+                        fullWidth
+                        options={(['fixed', 'negotiable', 'conditional'] as const).map((v) => ({
+                          value: v,
+                          label: t(FLEXIBILITY_KEYS[v]),
+                        }))}
+                        value={flexibility}
+                        onChange={editing('flexibility', setFlexibility)}
+                      />
+                    )}
+                  </FormField>
+                  <FormField label={t('field.location')}>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        value={location}
+                        onChange={(e) => {
+                          markDirty('location');
+                          setLocation(e.currentTarget.value);
                         }}
                       />
                     )}
                   </FormField>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {showEventFields ? (
-              <div className={styles.kindBlock}>
-                <FormField label={t('field.showAs')}>
-                  {() => (
-                    <SegmentedControl
-                      ariaLabel={t('field.showAs')}
-                      fullWidth
-                      options={(['busy', 'free', 'tentative', 'oof'] as const).map((v) => ({
-                        value: v,
-                        label: t(SHOW_AS_KEYS[v]),
-                      }))}
-                      value={showAs}
-                      onChange={editing('showAs', setShowAs)}
-                    />
-                  )}
-                </FormField>
-                <FormField label={t('field.flexibility')} description={t('field.flexibilityHint')}>
-                  {() => (
-                    <SegmentedControl
-                      ariaLabel={t('field.flexibility')}
-                      fullWidth
-                      options={(['fixed', 'negotiable', 'conditional'] as const).map((v) => ({
-                        value: v,
-                        label: t(FLEXIBILITY_KEYS[v]),
-                      }))}
-                      value={flexibility}
-                      onChange={editing('flexibility', setFlexibility)}
-                    />
-                  )}
-                </FormField>
-                <FormField label={t('field.location')}>
-                  {(control) => (
-                    <Input
-                      {...control}
-                      value={location}
-                      onChange={(e) => {
-                        markDirty('location');
-                        setLocation(e.currentTarget.value);
-                      }}
-                    />
-                  )}
-                </FormField>
-              </div>
-            ) : null}
-
-            {showBlockFields ? (
-              <div className={styles.kindBlock}>
-                <FormField label={t('field.blockLabel')}>
-                  {() => (
-                    <>
-                      <ToggleChipGroup label={t('field.blockLabel')}>
-                        {(['working', 'focus', 'oof', 'custom'] as const).map((preset) => (
-                          <ToggleChip
-                            key={preset}
-                            pressed={blockPreset === preset}
-                            onPressedChange={(v) => {
-                              if (!v) return;
-                              markDirty('blockPreset');
-                              setBlockPreset(preset);
+              {showBlockFields ? (
+                <div className={styles.kindBlock}>
+                  <FormField label={t('field.blockLabel')}>
+                    {() => (
+                      <>
+                        <ToggleChipGroup label={t('field.blockLabel')}>
+                          {(['working', 'focus', 'oof', 'custom'] as const).map((preset) => (
+                            <ToggleChip
+                              key={preset}
+                              pressed={blockPreset === preset}
+                              onPressedChange={(v) => {
+                                if (!v) return;
+                                markDirty('blockPreset');
+                                setBlockPreset(preset);
+                              }}
+                            >
+                              {t(BLOCK_PRESET_KEYS[preset])}
+                            </ToggleChip>
+                          ))}
+                        </ToggleChipGroup>
+                        {blockPreset === 'custom' ? (
+                          <Input
+                            value={blockCustomLabel}
+                            onChange={(e) => {
+                              markDirty('blockCustomLabel');
+                              setBlockCustomLabel(e.currentTarget.value);
                             }}
-                          >
-                            {t(BLOCK_PRESET_KEYS[preset])}
-                          </ToggleChip>
-                        ))}
-                      </ToggleChipGroup>
-                      {blockPreset === 'custom' ? (
-                        <Input
-                          value={blockCustomLabel}
-                          onChange={(e) => {
-                            markDirty('blockCustomLabel');
-                            setBlockCustomLabel(e.currentTarget.value);
-                          }}
-                          style={{ marginBlockStart: 'var(--nf-space-2)' }}
-                        />
-                      ) : null}
-                    </>
-                  )}
-                </FormField>
-              </div>
-            ) : null}
-          </div>
+                            style={{ marginBlockStart: 'var(--nf-space-2)' }}
+                          />
+                        ) : null}
+                      </>
+                    )}
+                  </FormField>
+                </div>
+              ) : null}
+            </div>
 
-          {/* More options disclosure */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setExpanded((s) => !s)}
-            className={styles.disclosureToggle}
-            aria-expanded={expanded}
-          >
-            {t('action.moreOptions')}
-          </Button>
-          {expanded ? (
-            <div className={styles.disclosurePanel}>
-              <FormField label={t('field.recurrence')}>
-                {(control) => (
-                  <Select
-                    {...control}
-                    value={recurrence}
-                    onChange={(e) => {
-                      markDirty('recurrence');
-                      setRecurrence(e.currentTarget.value as RecurrencePreset);
-                    }}
-                  >
-                    {/*
+            {/* More options disclosure */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded((s) => !s)}
+              className={styles.disclosureToggle}
+              aria-expanded={expanded}
+            >
+              {t('action.moreOptions')}
+            </Button>
+            {expanded ? (
+              <div className={styles.disclosurePanel}>
+                <FormField label={t('field.recurrence')}>
+                  {(control) => (
+                    <Select
+                      {...control}
+                      value={recurrence}
+                      onChange={(e) => {
+                        markDirty('recurrence');
+                        setRecurrence(e.currentTarget.value as RecurrencePreset);
+                      }}
+                    >
+                      {/*
                       `custom` is listed only while it is the current
                       value: it describes a stored rule rather than a
                       choice, so offering it on an event that has no
                       such rule would be an option that does nothing.
                     */}
-                    {(recurrence === 'custom'
-                      ? ([
-                          'custom',
+                      {(recurrence === 'custom'
+                        ? ([
+                            'custom',
+                            'none',
+                            'daily',
+                            'weekdays',
+                            'weekly',
+                            'monthly',
+                            'yearly',
+                          ] as const)
+                        : (['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const)
+                      ).map((v) => (
+                        <option key={v} value={v}>
+                          {t(RECURRENCE_PRESET_KEYS[v])}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </FormField>
+                <FormField label={t('field.notification')}>
+                  {(control) => (
+                    <Select
+                      {...control}
+                      value={notification}
+                      onChange={(e) => {
+                        markDirty('notification');
+                        setNotification(e.currentTarget.value as NotificationPreset);
+                      }}
+                    >
+                      {(
+                        [
                           'none',
-                          'daily',
-                          'weekdays',
-                          'weekly',
-                          'monthly',
-                          'yearly',
-                        ] as const)
-                      : (['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const)
-                    ).map((v) => (
-                      <option key={v} value={v}>
-                        {t(RECURRENCE_PRESET_KEYS[v])}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </FormField>
-              <FormField label={t('field.notification')}>
-                {(control) => (
-                  <Select
-                    {...control}
-                    value={notification}
-                    onChange={(e) => {
-                      markDirty('notification');
-                      setNotification(e.currentTarget.value as NotificationPreset);
-                    }}
-                  >
-                    {(
-                      [
-                        'none',
-                        'at_time',
-                        '5min',
-                        '10min',
-                        '15min',
-                        '30min',
-                        '1hour',
-                        '1day',
-                      ] as const
-                    ).map((v) => (
-                      <option key={v} value={v}>
-                        {t(NOTIFICATION_PRESET_KEYS[v])}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </FormField>
-              <FormField label={showTaskFields ? t('field.description') : t('field.memo')}>
-                {(control) => (
-                  <Textarea
-                    {...control}
-                    value={memo}
-                    onChange={(e) => {
-                      markDirty('memo');
-                      setMemo(e.currentTarget.value);
-                    }}
-                    rows={3}
-                    // Typing into an empty box before the stored memo
-                    // lands would mark the field edited and send that
-                    // fragment over the real one, so the control stays
-                    // inert until it holds the actual value.
-                    disabled={detailLoading}
-                    aria-busy={detailLoading || undefined}
-                  />
-                )}
-              </FormField>
-            </div>
-          ) : null}
-        </div>
-
-        {mode.kind === 'edit' &&
-        (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
-          <AttendeesSection
-            workspaceId={workspaceId}
-            calendarId={mode.calendarId}
-            eventId={mode.eventId}
-            ownerUserId={mode.event.ownerUserId ?? null}
-            selfUserId={selfUserId}
-          />
-        ) : null}
-
-        {/* Footer — sibling of the scrolling body so it stays anchored. */}
-        <div className={styles.footer}>
-          {isEdit ? (
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                void handleDelete();
-              }}
-              disabled={isPending}
-              aria-label={t('a11y.delete_button')}
-            >
-              {t('action.delete')}
-            </Button>
-          ) : null}
-          <div className={styles.footerActions}>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                void handleClose();
-              }}
-              disabled={isPending}
-            >
-              {t('action.cancel')}
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
-            </Button>
+                          'at_time',
+                          '5min',
+                          '10min',
+                          '15min',
+                          '30min',
+                          '1hour',
+                          '1day',
+                        ] as const
+                      ).map((v) => (
+                        <option key={v} value={v}>
+                          {t(NOTIFICATION_PRESET_KEYS[v])}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </FormField>
+                <FormField label={showTaskFields ? t('field.description') : t('field.memo')}>
+                  {(control) => (
+                    <Textarea
+                      {...control}
+                      value={memo}
+                      onChange={(e) => {
+                        markDirty('memo');
+                        setMemo(e.currentTarget.value);
+                      }}
+                      rows={3}
+                      // Typing into an empty box before the stored memo
+                      // lands would mark the field edited and send that
+                      // fragment over the real one, so the control stays
+                      // inert until it holds the actual value.
+                      disabled={detailLoading}
+                      aria-busy={detailLoading || undefined}
+                    />
+                  )}
+                </FormField>
+              </div>
+            ) : null}
           </div>
-        </div>
-      </form>
-    </Dialog>
+
+          {mode.kind === 'edit' &&
+          (mode.initialKind === 'event' || mode.initialKind === 'milestone') ? (
+            <AttendeesSection
+              workspaceId={workspaceId}
+              calendarId={mode.calendarId}
+              eventId={mode.eventId}
+              ownerUserId={mode.event.ownerUserId ?? null}
+              selfUserId={selfUserId}
+            />
+          ) : null}
+
+          {/* Footer — sibling of the scrolling body so it stays anchored. */}
+          <div className={styles.footer}>
+            {isEdit ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  void handleDelete();
+                }}
+                disabled={isPending}
+                aria-label={t('a11y.delete_button')}
+              >
+                {t('action.delete')}
+              </Button>
+            ) : null}
+            <div className={styles.footerActions}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  void handleClose();
+                }}
+                disabled={isPending}
+              >
+                {t('action.cancel')}
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Dialog>
+
+      {/*
+       * Sibling of the edit dialog rather than a child of its form: the
+       * choice is a step of its own, and nothing inside it should reach
+       * the form's submit or its Cmd+Enter handler. Mounted only while
+       * the question stands, so each ask starts from the default answer.
+       */}
+      {scopePrompt !== null ? (
+        <RecurringScopeDialog
+          open
+          action={scopePrompt.action}
+          pending={isPending}
+          onCancel={() => {
+            setScopePrompt(null);
+          }}
+          onConfirm={(scope) => {
+            const scoped = { scope, occurrenceStart: scopePrompt.occurrenceStart };
+            if (scopePrompt.action === 'delete') void commitDelete(scoped);
+            else void commitPatch(scopePrompt.body, scoped);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

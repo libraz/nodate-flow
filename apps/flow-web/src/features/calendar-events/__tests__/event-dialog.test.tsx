@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   rememberCalendarChoice: vi.fn(),
   toastShow: vi.fn(),
   eventDetail: vi.fn(),
+  confirmAction: vi.fn(),
 }));
 
 vi.mock('../api', () => ({
@@ -56,6 +57,13 @@ vi.mock('../api', () => ({
 // The toast implementation isn't under test — silence it.
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: mocks.toastShow },
+}));
+
+// `confirmAction` resolves through a `ConfirmProvider` the test provider
+// tree does not mount, so the real one would hang forever. Stubbing it
+// also lets a test assert that a repeating delete never reaches it.
+vi.mock('../../../lib/confirm-action', () => ({
+  confirmAction: mocks.confirmAction,
 }));
 
 // AttendeesSection pulls workspace members + per-event attendees via
@@ -108,6 +116,29 @@ function editMode(event: Partial<CalEventLike> = {}): EventDialogMode {
 }
 
 /**
+ * The start the series rule gave the occurrence the grid was clicked on.
+ * Deliberately not the first occurrence and not the value any control in
+ * the form holds, so a payload that picked up the form's start instead
+ * fails rather than coincidentally matching.
+ */
+const OCCURRENCE_START = Date.UTC(2030, 6, 6, 9) / 1000;
+
+/**
+ * Edit mode as the month grid opens it for a repeating row: the event
+ * plus the occurrence that was drawn.
+ */
+function recurringEditMode(): EventDialogMode {
+  const base = editMode();
+  if (base.kind !== 'edit') throw new Error('editMode must produce an edit-mode dialog');
+  return { ...base, occurrence: { originalStartAt: OCCURRENCE_START } };
+}
+
+/** The three-way choice, by the option the caller wants to pick. */
+function scopeRadio(scope: 'occurrence' | 'thisAndFollowing' | 'series'): HTMLElement {
+  return screen.getByRole('radio', { name: `recurrence.scope.option.${scope}.label` });
+}
+
+/**
  * The full event row the dialog hydrates from. Distinct from the grid
  * aggregate {@link CalEventLike} in that it carries `memo`, which is the
  * whole reason the dialog re-reads the event instead of trusting the
@@ -157,6 +188,7 @@ beforeEach(() => {
   mocks.createTask.mockReset().mockResolvedValue({ id: 'task-new' });
   mocks.rememberCalendarChoice.mockReset();
   mocks.toastShow.mockReset();
+  mocks.confirmAction.mockReset().mockResolvedValue(true);
   // Create mode never fetches; edit-mode tests opt in via `withDetail`.
   mocks.eventDetail.mockReset().mockReturnValue({ data: undefined, isLoading: false });
 });
@@ -528,6 +560,195 @@ describe('<EventDialog>', () => {
     const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
     expect(args.body.startAt).toBe(startAt);
     expect(args.body.endAt).toBe(endAt);
+  });
+
+  /* ── recurring scope choice ─────────────────────────────────── */
+
+  it('saves a one-off event without asking which occurrences to touch', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    withDetail();
+    renderWithProviders(renderDialog({ mode: editMode(), onSaved }));
+
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed event');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    // No extra step: the patch went out on the first click, carrying no
+    // scope at all — the shape every save had before the choice existed.
+    expect(
+      screen.queryByRole('radio', { name: 'recurrence.scope.option.series.label' }),
+    ).toBeNull();
+    expect(mocks.updateEvent).toHaveBeenCalledTimes(1);
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect('scope' in args.body).toBe(false);
+    expect('occurrenceStart' in args.body).toBe(false);
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('deletes a one-off event through the plain confirm, with no scope', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    withDetail();
+    renderWithProviders(renderDialog({ mode: editMode(), onSaved }));
+
+    await user.click(screen.getByRole('button', { name: 'a11y.delete_button' }));
+
+    expect(mocks.confirmAction).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteEvent).toHaveBeenCalledTimes(1);
+    const args = mocks.deleteEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect('scope' in args).toBe(false);
+    expect('occurrenceStart' in args).toBe(false);
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('asks a repeating event which occurrences a save reaches, then sends them', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed occurrence');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    // Nothing is written until the question is answered.
+    expect(mocks.updateEvent).not.toHaveBeenCalled();
+    // The least destructive option is the one a mis-click lands on.
+    expect((scopeRadio('occurrence') as HTMLInputElement).checked).toBe(true);
+
+    await user.click(scopeRadio('thisAndFollowing'));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.save.confirm' }));
+
+    expect(mocks.updateEvent).toHaveBeenCalledTimes(1);
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.title).toBe('Renamed occurrence');
+    expect(args.body.scope).toBe('thisAndFollowing');
+    // The occurrence the grid was clicked on, not the start the form is
+    // holding — sending the latter overrides an occurrence nobody opened.
+    expect(args.body.occurrenceStart).toBe(OCCURRENCE_START);
+  });
+
+  it('sends no occurrence when the save is aimed at the whole series', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), '!');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    await user.click(scopeRadio('series'));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.save.confirm' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.scope).toBe('series');
+    // No single instant identifies "all of them"; sending one would be a
+    // claim the request does not mean.
+    expect('occurrenceStart' in args.body).toBe(false);
+  });
+
+  it('asks a repeating event which occurrences a delete reaches, instead of confirming twice', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode(), onSaved }));
+
+    await user.click(screen.getByRole('button', { name: 'a11y.delete_button' }));
+
+    // The choice replaces the confirm rather than stacking on top of it.
+    expect(mocks.confirmAction).not.toHaveBeenCalled();
+    expect(mocks.deleteEvent).not.toHaveBeenCalled();
+
+    await user.click(scopeRadio('occurrence'));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.delete.confirm' }));
+
+    expect(mocks.deleteEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteEvent.mock.calls[0]?.[0]).toMatchObject({
+      workspaceId: 'ws-1',
+      calendarId: 'cal-1',
+      eventId: 'evt-1',
+      scope: 'occurrence',
+      occurrenceStart: OCCURRENCE_START,
+    });
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('cancelling the choice writes nothing and leaves the edit dialog up', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode(), onSaved }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), '!');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.cancel' }));
+
+    expect(mocks.updateEvent).not.toHaveBeenCalled();
+    expect(mocks.deleteEvent).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    // Back on the form with the edit intact, not dropped on the floor.
+    expect(
+      screen.queryByRole('radio', { name: 'recurrence.scope.option.series.label' }),
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: 'action.submit.edit' })).toBeDefined();
+  });
+
+  it('opens the choice on the first option and lets Escape back out of it', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    await user.click(screen.getByRole('button', { name: 'a11y.delete_button' }));
+
+    // Focus has to land inside the step, or a keyboard user is answering
+    // a question they never reached.
+    expect(document.activeElement).toBe(scopeRadio('occurrence'));
+
+    await user.keyboard('{Escape}');
+
+    expect(mocks.deleteEvent).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('radio', { name: 'recurrence.scope.option.occurrence.label' }),
+    ).toBeNull();
+  });
+
+  it('does not ask when the edit is itself a rewrite of the repeat rule', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'daily' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    const select = await screen.findByRole('combobox', { name: 'field.recurrence' });
+    await user.selectOptions(select, 'none');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    // Stopping the repeat is a statement about the series, so there is
+    // nothing to scope — and the API refuses a scoped patch that touches
+    // the rule anyway.
+    expect(
+      screen.queryByRole('radio', { name: 'recurrence.scope.option.series.label' }),
+    ).toBeNull();
+    expect(mocks.updateEvent).toHaveBeenCalledTimes(1);
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.clear).toContain('recurrenceRule');
+    expect('scope' in args.body).toBe(false);
+  });
+
+  it('surfaces a refused scope instead of closing on it', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    mocks.updateEvent.mockRejectedValueOnce(new Error('This event does not repeat'));
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode(), onSaved }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), '!');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.save.confirm' }));
+
+    expect(mocks.toastShow).toHaveBeenCalledWith({
+      tone: 'danger',
+      message: 'This event does not repeat',
+    });
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('preserves backend error detail in mutation failure toasts', async () => {
