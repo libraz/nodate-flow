@@ -1301,6 +1301,12 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
 					return err
 				}
+				// Alongside the snapshot, not inside it: a body edited down to
+				// nothing writes no version and still has to stop naming the
+				// people it used to.
+				if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
+					return err
+				}
 			}
 			return nil
 		}); err != nil {
@@ -1319,10 +1325,13 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 				return err
 			}
-			// Same reason as the branch above: the snapshot shares the
-			// transaction that writes the description.
+			// Same reason as the branch above: the snapshot and the mention
+			// sync share the transaction that writes the description.
 			if descChanged {
 				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
+					return err
+				}
+				if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
 					return err
 				}
 			}
@@ -1551,12 +1560,22 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, err
 	}
 	cpub := newPublicID()
-	if _, err := deps.Queries.AddComment(ctx, generated.AddCommentParams{
-		PublicID:    cpub,
-		WorkspaceID: s.workspaceID,
-		TaskID:      sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
-		AuthorID:    s.userID,
-		Body:        in.Body,
+	// One commit boundary for the body and the mentions it names: a mention
+	// row that lands without its comment, or a comment that lands without
+	// its mentions, is a thread that says one thing and notifies another.
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_comment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		qtx := deps.Queries.WithTx(tx.RawTx())
+		id, e := qtx.AddComment(ctx, generated.AddCommentParams{
+			PublicID:    cpub,
+			WorkspaceID: s.workspaceID,
+			TaskID:      sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
+			AuthorID:    s.userID,
+			Body:        in.Body,
+		})
+		if e != nil {
+			return e
+		}
+		return syncCommentMentions(ctx, tx, s, taskInternal, pub, uint32(id), cpub, in.Body) //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -3216,6 +3235,9 @@ type mcpCalendarOccurrence struct {
 // day with the weekly one-to-ones missing, and the free-slot search
 // built its busy map from the same truncated set and offered those hours
 // as available.
+//
+// An occurrence a separate override row replaces is left to that row,
+// which the non-recurring query above already returns at its moved time.
 func listCalendarOccurrences(
 	ctx context.Context,
 	deps Deps,
@@ -3254,6 +3276,12 @@ func listCalendarOccurrences(
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+
+	overridden, err := overriddenOccurrenceStarts(ctx, deps, workspaceID, viewerUserID, series)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, r := range series {
 		if !r.StartAt.Valid || !r.EndAt.Valid {
 			continue
@@ -3267,12 +3295,13 @@ func listCalendarOccurrences(
 			seriesEnd = &r.RecurrenceEnd.Time
 		}
 		for _, inst := range recurrence.Expand(recurrence.Event{
-			StartAt:       r.StartAt.Time,
-			EndAt:         r.EndAt.Time,
-			Timezone:      r.Timezone,
-			Rule:          rule,
-			Exceptions:    recurrence.ParseExceptions(r.RecurrenceExceptions),
-			RecurrenceEnd: seriesEnd,
+			StartAt:          r.StartAt.Time,
+			EndAt:            r.EndAt.Time,
+			Timezone:         r.Timezone,
+			Rule:             rule,
+			Exceptions:       recurrence.ParseExceptions(r.RecurrenceExceptions),
+			OverriddenStarts: overridden[r.ID],
+			RecurrenceEnd:    seriesEnd,
 		}, startTime, endTime) {
 			out = append(out, mcpCalendarOccurrence{
 				row:     recurringRowAsPlain(r),
@@ -3296,9 +3325,61 @@ func listCalendarOccurrences(
 	return out, nil
 }
 
+// overriddenOccurrenceStarts returns, per master id, the occurrence
+// starts a live override row already stands in for, spelled as RFC 3339
+// UTC so the expander's exception parser resolves them to the same
+// instants it generates.
+//
+// One read for every series in the expansion. The masters are keyed by
+// their internal id, which is why the recurring query projects ce.id and
+// the id has to be taken from that row rather than from the narrowed one
+// recurringRowAsPlain returns.
+//
+// The viewer is the user the surrounding listing answers for, so the
+// subtraction matches what that user is served: an override they cannot
+// see does not reach them from any other read either, and taking its
+// original start away would remove the occurrence from their calendar
+// while the replacement stayed hidden. Such an occurrence keeps showing
+// at its original time instead.
+func overriddenOccurrenceStarts(
+	ctx context.Context,
+	deps Deps,
+	workspaceID, viewerUserID uint32,
+	series []calendar.ListRecurringCalendarEventsAcrossCalendarsRow,
+) (map[uint32][]string, error) {
+	if len(series) == 0 {
+		return nil, nil
+	}
+	parentIDs := make([]sql.NullInt32, 0, len(series))
+	for _, r := range series {
+		parentIDs = append(parentIDs, handlerutil.NullInt32From(r.ID))
+	}
+
+	rows, err := deps.CalendarQueries.ListCalendarEventOverriddenStarts(ctx, calendar.ListCalendarEventOverriddenStartsParams{
+		WorkspaceID:  workspaceID,
+		ParentIds:    parentIDs,
+		ViewerUserID: viewerUserID,
+	})
+	if err != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+
+	out := make(map[uint32][]string, len(rows))
+	for _, row := range rows {
+		if !row.RecurrenceParentID.Valid || !row.RecurrenceOriginalStart.Valid {
+			continue
+		}
+		parentID := handlerutil.Int32ToUint32(row.RecurrenceParentID)
+		out[parentID] = append(out[parentID], row.RecurrenceOriginalStart.Time.UTC().Format(time.RFC3339))
+	}
+	return out, nil
+}
+
 // recurringRowAsPlain narrows a recurring row to the shape the callers
-// project. The two queries select the same columns; sqlc names the row
-// types separately, so the copy is mechanical.
+// project. sqlc names the two row types separately, so the copy is
+// mechanical; the recurring row additionally carries the internal id the
+// override grouping keys on, and the plain shape has no field for it, so
+// anything needing that id must read it before the narrowing.
 func recurringRowAsPlain(r calendar.ListRecurringCalendarEventsAcrossCalendarsRow) calendar.ListCalendarEventsAcrossCalendarsRow {
 	return calendar.ListCalendarEventsAcrossCalendarsRow{
 		PublicID:                  r.PublicID,

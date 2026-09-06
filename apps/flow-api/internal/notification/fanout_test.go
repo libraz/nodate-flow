@@ -6,7 +6,9 @@ package notification
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 )
 
@@ -411,6 +414,112 @@ func TestClassifyEvent_AgentTaskEvents(t *testing.T) {
 				t.Errorf("category: got %q, want %q", got, tc.wantCategory)
 			}
 		})
+	}
+}
+
+// TestMentionRecipients narrows a mention to the people its payload names.
+//
+// The two cases are the whole contract of the intersection. A named user
+// who is in the recipient set is the only one delivered to, which is what
+// keeps a mention off everyone else's bell; a named user who is absent from
+// it is delivered nothing, because the set the visibility rule produced is
+// the one being narrowed and a mention cannot add to it. Nobody is the
+// correct answer in the second case, not an error.
+//
+// The resolution is stubbed at the same seam production reads it from, so
+// the test states what the workspace-scoped lookup returned rather than
+// re-deciding membership itself.
+func TestMentionRecipients(t *testing.T) {
+	t.Parallel()
+
+	visible := types.New()
+	invisible := types.New()
+	const (
+		visibleUserID   uint32 = 7
+		invisibleUserID uint32 = 9
+	)
+	recipients := []uint32{4, visibleUserID, 12}
+
+	byPublicID := map[types.PublicID]uint32{
+		visible:   visibleUserID,
+		invisible: invisibleUserID,
+	}
+
+	cases := []struct {
+		name    string
+		payload string
+		want    []uint32
+	}{
+		{
+			name:    "named user is in the recipient set",
+			payload: `{"taskId":"t","mentionedUserIds":["` + visible.String() + `"]}`,
+			want:    []uint32{visibleUserID},
+		},
+		{
+			name:    "named user is outside the recipient set",
+			payload: `{"taskId":"t","mentionedUserIds":["` + invisible.String() + `"]}`,
+			want:    nil,
+		},
+		{
+			name:    "one of each",
+			payload: `{"taskId":"t","mentionedUserIds":["` + invisible.String() + `","` + visible.String() + `"]}`,
+			want:    []uint32{visibleUserID},
+		},
+		{
+			name:    "payload names nobody",
+			payload: `{"taskId":"t"}`,
+			want:    nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := NewFanout(nil, nil, nil)
+			f.resolveMentionedUsers = func(_ context.Context, params generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
+				var rows []generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow
+				for _, id := range params.PublicIds {
+					if internal, ok := byPublicID[id]; ok {
+						rows = append(rows, generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow{
+							ID:       internal,
+							PublicID: id,
+						})
+					}
+				}
+				return rows, nil
+			}
+
+			got, err := f.mentionRecipients(context.Background(), 1, recipients, json.RawMessage(tc.payload))
+			if err != nil {
+				t.Fatalf("mentionRecipients returned error: %v", err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("recipients: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestMentionRecipients_ResolutionFailurePropagates keeps a failed lookup
+// from reading as "nobody was mentioned": the caller has to be able to tell
+// the two apart, because falling through with the unnarrowed set would send
+// the mention to everyone who can see the task.
+func TestMentionRecipients_ResolutionFailurePropagates(t *testing.T) {
+	t.Parallel()
+
+	f := NewFanout(nil, nil, nil)
+	f.resolveMentionedUsers = func(_ context.Context, _ generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
+		return nil, errors.New("driver: bad connection")
+	}
+
+	payload := json.RawMessage(`{"mentionedUserIds":["` + types.New().String() + `"]}`)
+	got, err := f.mentionRecipients(context.Background(), 1, []uint32{1, 2}, payload)
+	if err == nil {
+		t.Fatal("expected the resolution error to propagate, got nil")
+	}
+	if got != nil {
+		t.Fatalf("expected no recipients alongside the error, got %v", got)
 	}
 }
 

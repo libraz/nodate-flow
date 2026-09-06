@@ -6,6 +6,7 @@ package notification
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -85,6 +86,15 @@ type Fanout struct {
 	// so the retry-once-then-fall-back contract can be exercised
 	// without a live database.
 	fetchPreferences func(ctx context.Context, params generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error)
+
+	// resolveMentionedUsers turns the public ids a mention payload names
+	// into the internal ids of the workspace members behind them.
+	// Production code leaves this nil and the lookup falls through to
+	// [Fanout.queries.FindWorkspaceMemberUserInternalIdsByPublicIds],
+	// which scopes the resolution to the workspace. Tests override it so
+	// the payload-to-recipient narrowing can be exercised without a live
+	// database.
+	resolveMentionedUsers func(ctx context.Context, params generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error)
 }
 
 // NewFanout creates a Fanout backed by the given database and email
@@ -226,6 +236,22 @@ func (f *Fanout) fanout(ctx context.Context, workspaceID uint32, eventType strin
 			slog.Bool("task_scoped", row.taskID.Valid),
 			slog.String("err", err.Error()))
 		return
+	}
+
+	// A mention is addressed, not announced. Narrowing the recipients to
+	// the users the payload names keeps both properties the kind needs:
+	// nobody else is told, and a mention of someone who may not read the
+	// task delivers nothing, because that person was never in the set the
+	// visibility rule produced. An empty result is a correct outcome.
+	if eventbus.Kind(eventType) == eventbus.MentionCreated {
+		recipients, err = f.mentionRecipients(ctx, workspaceID, recipients, row.payloadJSON)
+		if err != nil {
+			slog.ErrorContext(ctx, "notification fanout: failed to resolve mentioned users",
+				slog.Uint64("workspace_id", uint64(workspaceID)),
+				slog.Uint64("event_id", eventInternalID),
+				slog.String("err", err.Error()))
+			return
+		}
 	}
 
 	actorUserID := uint32(0)
@@ -464,6 +490,11 @@ type eventRow struct {
 	// names one. It decides the recipient set: an event about a task
 	// may only notify people who may read that task.
 	taskID sql.NullInt64
+	// payloadJSON is the event's own payload. It carries public ids
+	// only — eventlog.ValidatePayloadIDs refuses an append whose payload
+	// names an internal id — so anything read from it has to be resolved
+	// through a workspace-scoped lookup before it means a user.
+	payloadJSON json.RawMessage
 }
 
 // eventByID fetches the row identified by (workspaceID, eventInternalID).
@@ -477,7 +508,8 @@ func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInterna
 		         WHEN e.task_id IS NOT NULL THEN (SELECT t.public_id FROM tasks t WHERE t.id = e.task_id)
 		         ELSE NULL
 		       END AS resource_public_id,
-		       e.task_id
+		       e.task_id,
+		       e.payload_json
 		FROM events e
 		WHERE e.id = ?
 		  AND e.workspace_id = ?
@@ -488,11 +520,102 @@ func (f *Fanout) eventByID(ctx context.Context, workspaceID uint32, eventInterna
 		&r.actorUserID,
 		&r.resourcePublicID,
 		&r.taskID,
+		&r.payloadJSON,
 	)
 	if err != nil {
 		return r, fmt.Errorf("eventByID: %w", err)
 	}
 	return r, nil
+}
+
+// mentionPayload is the part of a mention.created payload the fan-out
+// reads. The ids are the public UUIDs of the users the body named.
+type mentionPayload struct {
+	MentionedUserIDs []string `json:"mentionedUserIds"`
+}
+
+// mentionedUserIDs resolves the users a mention payload names into their
+// internal ids, scoped to the workspace the event belongs to.
+//
+// The resolution is the workspace-scoped one the extractor used, never a
+// global lookup by public id: a payload id that belongs to another tenant,
+// to a former member, or to nobody at all has to come back absent, and it
+// is the membership join that makes all three answer the same way.
+func (f *Fanout) mentionedUserIDs(ctx context.Context, workspaceID uint32, payload json.RawMessage) ([]uint32, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	var p mentionPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return nil, fmt.Errorf("mentionedUserIDs: parse payload: %w", err)
+	}
+
+	publicIDs := make([]types.PublicID, 0, len(p.MentionedUserIDs))
+	for _, raw := range p.MentionedUserIDs {
+		id, err := types.Parse(raw)
+		if err != nil {
+			// A string that is not a UUID names nobody, which is the
+			// answer the lookup below gives for an id that is not a
+			// member. Treating the two the same keeps a malformed
+			// payload from suppressing the mentions beside it.
+			continue
+		}
+		publicIDs = append(publicIDs, id)
+	}
+	if len(publicIDs) == 0 {
+		return nil, nil
+	}
+
+	resolve := f.resolveMentionedUsers
+	if resolve == nil {
+		resolve = f.queries.FindWorkspaceMemberUserInternalIdsByPublicIds
+	}
+	rows, err := resolve(ctx, generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams{
+		WorkspaceID: workspaceID,
+		PublicIds:   publicIDs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mentionedUserIDs: resolve public ids: %w", err)
+	}
+
+	ids := make([]uint32, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.ID)
+	}
+	return ids, nil
+}
+
+// mentionRecipients narrows a mention's recipients to the users its
+// payload names, preserving the recipient order.
+//
+// Only the recipient set shrinks. It is already the answer to "who may see
+// this", so a named id that is absent from it belongs to someone the event
+// was never allowed to reach, and the intersection is what says so without
+// a second visibility rule to keep in step with the first.
+func (f *Fanout) mentionRecipients(
+	ctx context.Context,
+	workspaceID uint32,
+	recipients []uint32,
+	payload json.RawMessage,
+) ([]uint32, error) {
+	named, err := f.mentionedUserIDs(ctx, workspaceID, payload)
+	if err != nil {
+		return nil, err
+	}
+	if len(named) == 0 {
+		return nil, nil
+	}
+	wanted := make(map[uint32]struct{}, len(named))
+	for _, id := range named {
+		wanted[id] = struct{}{}
+	}
+	out := recipients[:0:0]
+	for _, id := range recipients {
+		if _, ok := wanted[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }
 
 // taskVisibleMemberUserIDs returns the workspace members who may read
@@ -768,15 +891,16 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.PublicShareEventsReordered: silent,
 	eventbus.PublicShareEventDetached:   silent,
 
-	// Reactions, mentions and favourites. Mentions are the one that
-	// should reach a person, but the fan-out has no way to resolve the
-	// mentioned user from the event row, so it stays silent rather than
-	// notifying the whole workspace.
+	// Reactions and favourites are read from the row they are attached to.
 	eventbus.ReactionAdded:   silent,
 	eventbus.ReactionRemoved: silent,
-	eventbus.MentionCreated:  silent,
 	eventbus.FavoriteAdded:   silent,
 	eventbus.FavoriteRemoved: silent,
+
+	// A mention reaches the people the body names and nobody else; the
+	// resource is the task the body was written on, which is the only
+	// public id the event row can supply.
+	eventbus.MentionCreated: notify("You were mentioned", "task", generated.NotificationsSeverityNormal),
 
 	// Intake triage, description history and import jobs are read from
 	// the screen that started them.
@@ -832,7 +956,8 @@ func categoryForEventType(eventType string) string {
 	case "task.comment.added", "task.comment.edited", "task.comment.removed":
 		return prefs.CategoryTaskComment
 	case "task.actor.added", "task.actor.removed",
-		"item.actor.added", "item.actor.removed":
+		"item.actor.added", "item.actor.removed",
+		"mention.created":
 		return prefs.CategoryTaskMention
 	case "item.scheduled", "item.unscheduled", "item.rescheduled":
 		return prefs.CategoryTimebox

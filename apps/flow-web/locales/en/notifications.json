@@ -58,6 +58,7 @@
     "agent_task_handoff_to_user": "An agent handed back to you",
     "agent_task_handoff_to_agent": "A task was handed off to an agent",
     "agent_task_attached": "An agent was attached to a task",
-    "agent_task_detached": "An agent was detached from a task"
+    "agent_task_detached": "An agent was detached from a task",
+    "mention_created": "You were mentioned"
   }
 }

@@ -138,54 +138,59 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// Update the task description and create a new version snapshot,
-		// all within a transaction.
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
+		// Update the task description, snapshot it and re-derive the
+		// mentions it names, all on one commit boundary. dbretry.InTx rather
+		// than a bare transaction: the mention sync takes a commit boundary,
+		// which is what lets the event it appends defer its fan-out until
+		// the description it describes is observable.
+		var taskRow generated.FindTaskByPublicIdRow
+		var restored taskdesc.Version
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.RestoreDescriptionVersion", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
 
-		// Get the task public ID for the update query.
-		taskRow, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+			// Get the task public ID for the update query.
+			var rerr error
+			taskRow, rerr = qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
+			})
+			if rerr != nil {
+				return rerr
+			}
 
-		// Update the task description.
-		// Not an existence check: restoring a version whose body already
-		// matches the task changes nothing and MySQL counts zero. The task
-		// was read into taskRow above.
-		if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
-			Title:           taskRow.Title,
-			Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
-			Priority:        taskRow.Priority,
-			DueOn:           taskRow.DueOn,
-			StartedOn:       taskRow.StartedOn,
-			SortWeight:      taskRow.SortWeight,
-			Visibility:      taskRow.Visibility,
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			WorkspaceID:     ws.ID,
-			PublicID:        types.FromUUID(task.PublicID),
+			// Update the task description.
+			// Not an existence check: restoring a version whose body already
+			// matches the task changes nothing and MySQL counts zero. The task
+			// was read into taskRow above.
+			if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
+				Title:           taskRow.Title,
+				Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
+				Priority:        taskRow.Priority,
+				DueOn:           taskRow.DueOn,
+				StartedOn:       taskRow.StartedOn,
+				SortWeight:      taskRow.SortWeight,
+				Visibility:      taskRow.Visibility,
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				WorkspaceID:     ws.ID,
+				PublicID:        types.FromUUID(task.PublicID),
+			}); err != nil {
+				return err
+			}
+
+			// The restored body becomes the newest version rather than rewinding
+			// the history to the one it came from.
+			restored, rerr = taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID,
+				sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				version.Body,
+			)
+			if rerr != nil {
+				return rerr
+			}
+			// The restored body is the one the task now carries, so it is the
+			// body the mentions table has to agree with — including when the
+			// version being restored to named nobody.
+			return syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), version.Body)
 		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// The restored body becomes the newest version rather than rewinding
-		// the history to the one it came from.
-		restored, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID,
-			sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			version.Body,
-		)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if err := tx.Commit(); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

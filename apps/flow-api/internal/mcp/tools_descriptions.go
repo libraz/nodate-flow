@@ -10,6 +10,7 @@ import (
 	stderrors "errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -110,50 +111,61 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-	qtx := deps.Queries.WithTx(tx)
+	// One commit boundary for the update, the snapshot and the mentions the
+	// restored body names. dbretry.InTx rather than a bare transaction: the
+	// mention sync takes a commit boundary, which is what lets the event it
+	// appends defer its fan-out until the description it describes is
+	// observable.
+	// The title is what leaves the transaction: the update carries it
+	// through unchanged, and the embedding refresh below pairs it with the
+	// restored body. The row it is read from stays inside, where the task
+	// lookup belongs.
+	var taskTitle string
+	var restored taskdesc.Version
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.restore_description_version", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		qtx := deps.Queries.WithTx(tx.RawTx())
 
-	// Get current task state for the UpdateTask call. Access was already
-	// authorized by resolveTask above; this transaction-scoped load reads
-	// the row for a consistent update.
-	taskRow, err := loadTaskRow(ctx, qtx, s.workspaceID, taskPub)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
+		// Get current task state for the UpdateTask call. Access was already
+		// authorized by resolveTask above; this transaction-scoped load reads
+		// the row for a consistent update.
+		taskRow, rerr := loadTaskRow(ctx, qtx, s.workspaceID, taskPub)
+		if rerr != nil {
+			return rerr
+		}
+		taskTitle = taskRow.Title
 
-	// Not an existence check: restoring a version whose body already
-	// matches the task changes nothing and MySQL counts zero. The task is
-	// read into taskRow just above.
-	if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
-		Title:           taskRow.Title,
-		Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
-		Priority:        taskRow.Priority,
-		DueOn:           taskRow.DueOn,
-		StartedOn:       taskRow.StartedOn,
-		SortWeight:      taskRow.SortWeight,
-		Visibility:      taskRow.Visibility,
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		WorkspaceID:     s.workspaceID,
-		PublicID:        taskPub,
+		// Not an existence check: restoring a version whose body already
+		// matches the task changes nothing and MySQL counts zero. The task is
+		// read into taskRow just above.
+		if _, err := qtx.UpdateTask(ctx, generated.UpdateTaskParams{
+			Title:           taskRow.Title,
+			Description:     sql.NullString{String: version.Body, Valid: version.Body != ""},
+			Priority:        taskRow.Priority,
+			DueOn:           taskRow.DueOn,
+			StartedOn:       taskRow.StartedOn,
+			SortWeight:      taskRow.SortWeight,
+			Visibility:      taskRow.Visibility,
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			WorkspaceID:     s.workspaceID,
+			PublicID:        taskPub,
+		}); err != nil {
+			return err
+		}
+
+		// The restored body becomes the newest version rather than rewinding
+		// the history to the one it came from.
+		restored, rerr = taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal,
+			sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			version.Body,
+		)
+		if rerr != nil {
+			return rerr
+		}
+		// The restored body is the one the task now carries, so it is the
+		// body the mentions table has to agree with — including when the
+		// version being restored to named nobody.
+		return syncTaskDescriptionMentions(ctx, tx, s, taskInternal, taskPub, version.Body)
 	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	// The restored body becomes the newest version rather than rewinding
-	// the history to the one it came from.
-	restored, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal,
-		sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		version.Body,
-	)
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
@@ -172,7 +184,7 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 	// A restore replaces the task's description, so the embedding follows it
 	// back. The pair passed is what the update wrote: the title it carried
 	// through unchanged, and the restored body.
-	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, taskRow.Title, version.Body)
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, taskTitle, version.Body)
 
 	return map[string]any{"ok": true, "newVersionId": restored.PublicID.String()}, nil
 }

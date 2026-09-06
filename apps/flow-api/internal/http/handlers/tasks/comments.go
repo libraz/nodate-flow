@@ -31,18 +31,27 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		pub := types.New()
+		// One commit boundary for the body and the mentions it names: a
+		// mention row that lands without its comment, or a comment that
+		// lands without its mentions, is a thread that says one thing and
+		// notifies another.
+		//
 		// Retry on transient FK deadlocks: comments inherits FK locks
 		// on tasks/workspaces/users via its FKs and races with the
 		// task transition / fan-out paths under heavy parallel load.
-		if err := dbretry.Do(ctx, "tasks.AddComment", func(ctx context.Context) error {
-			_, e := deps.Queries.AddComment(ctx, generated.AddCommentParams{
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			id, e := qtx.AddComment(ctx, generated.AddCommentParams{
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
 				TaskID:      handlerutil.NullInt32From(task.ID),
 				AuthorID:    actorID,
 				Body:        in.Body.Body,
 			})
-			return e
+			if e != nil {
+				return e
+			}
+			return syncCommentMentions(ctx, tx, ws.ID, task, uint32(id), pub, actorPtr(ctx), in.Body.Body) //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -175,14 +184,19 @@ func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
 	}
 }
 
-// loadCommentAuthor returns the author internal id for a comment in this
-// workspace. ErrNoRows when the comment does not exist or is disabled.
-func loadCommentAuthor(ctx context.Context, db *sql.DB, wsID uint32, cid types.PublicID) (uint32, error) {
-	const q = `SELECT author_id FROM comments
+// loadCommentForWrite returns the internal id and the author internal id
+// for a comment in this workspace. ErrNoRows when the comment does not
+// exist or is disabled.
+//
+// The internal id is read here rather than at each caller because both
+// writers need it for the same thing: the mention sync addresses a comment
+// by its internal id, and the public id the request carries is the only
+// name the transport has.
+func loadCommentForWrite(ctx context.Context, db *sql.DB, wsID uint32, cid types.PublicID) (commentID, authorID uint32, err error) {
+	const q = `SELECT id, author_id FROM comments
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-	var uid uint32
-	err := db.QueryRowContext(ctx, q, wsID, cid).Scan(&uid)
-	return uid, err
+	err = db.QueryRowContext(ctx, q, wsID, cid).Scan(&commentID, &authorID)
+	return commentID, authorID, err
 }
 
 // EditComment handles PATCH /tasks/{id}/comments/{cid}. Author only.
@@ -204,21 +218,30 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		author, err := loadCommentAuthor(ctx, deps.DB, ws.ID, cid)
+		commentID, author, err := loadCommentForWrite(ctx, deps.DB, ws.ID, cid)
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 		if author != actorID {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		// Not an existence check: re-submitting the current body changes
-		// nothing and MySQL counts zero. Authorship, and with it the
-		// comment's existence, is established just above.
-		if _, err := deps.Queries.EditComment(ctx, generated.EditCommentParams{
-			Body:        in.Body.Body,
-			WorkspaceID: ws.ID,
-			PublicID:    cid,
-			AuthorID:    actorID,
+		// The body and the mentions it names share a commit boundary: a
+		// clear that committed without its re-insert would drop every
+		// mention the edited comment still makes.
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.EditComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			// Not an existence check: re-submitting the current body changes
+			// nothing and MySQL counts zero. Authorship, and with it the
+			// comment's existence, is established just above.
+			if _, e := qtx.EditComment(ctx, generated.EditCommentParams{
+				Body:        in.Body.Body,
+				WorkspaceID: ws.ID,
+				PublicID:    cid,
+				AuthorID:    actorID,
+			}); e != nil {
+				return e
+			}
+			return syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), in.Body.Body)
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -268,23 +291,38 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		author, err := loadCommentAuthor(ctx, deps.DB, ws.ID, cid)
+		commentID, author, err := loadCommentForWrite(ctx, deps.DB, ws.ID, cid)
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
 		if author != actorID && !ws.Role.AtLeast(middleware.WorkspaceRoleAdmin) {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		// Only matches a comment that is still live, so zero rows means a
-		// concurrent delete won and this request removed nothing.
-		rows, err := deps.Queries.DeleteComment(ctx, generated.DeleteCommentParams{
-			WorkspaceID: ws.ID,
-			PublicID:    cid,
-		})
-		if err != nil {
+		var gone bool
+		// The delete is a soft one, so no foreign key cascade reaches the
+		// mention rows. Clearing them here, on the same commit boundary, is
+		// what stops a comment nobody can read from going on naming people.
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.DeleteComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			gone = false
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			// Only matches a comment that is still live, so zero rows means a
+			// concurrent delete won and this request removed nothing.
+			rows, e := qtx.DeleteComment(ctx, generated.DeleteCommentParams{
+				WorkspaceID: ws.ID,
+				PublicID:    cid,
+			})
+			if e != nil {
+				return e
+			}
+			if rows == 0 {
+				gone = true
+				return nil
+			}
+			return syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), "")
+		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if rows == 0 {
+		if gone {
 			return nil, httpErr(apierrors.WsCommentNotFound)
 		}
 		taskInternal := int64(task.ID)

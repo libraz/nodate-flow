@@ -176,6 +176,32 @@ var Rules = []Rule{
 			"without appending it destroys the one thing a restore could " +
 			"have returned to",
 	},
+	{
+		Name:    "description-mentions",
+		Table:   "tasks",
+		Columns: []string{"description"},
+		Enforcers: []string{
+			modulePath + "/internal/mentions.SyncTaskDescription",
+		},
+		Marker: "task-precondition",
+		Why: "the mentions table caches who a body names, so a path that " +
+			"stores a description without re-deriving it leaves people " +
+			"notified about a mention nothing says any more, and the ones " +
+			"the new body names not notified at all",
+	},
+	{
+		Name:    "comment-mentions",
+		Table:   "comments",
+		Columns: []string{"body"},
+		Enforcers: []string{
+			modulePath + "/internal/mentions.SyncComment",
+		},
+		Marker: "comment-precondition",
+		Why: "the mentions table caches who a body names, so a path that " +
+			"stores a comment without re-deriving it leaves people notified " +
+			"about a mention nothing says any more, and the ones the new " +
+			"body names not notified at all",
+	},
 }
 
 // Statement is one named statement in sql/queries, normalised.

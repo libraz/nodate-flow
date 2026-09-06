@@ -929,6 +929,12 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
 						return err
 					}
+					// Alongside the snapshot, not inside it: a body edited down
+					// to nothing writes no version and still has to stop naming
+					// the people it used to.
+					if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
+						return err
+					}
 				}
 				return eventbus.Append(ctx, tx, updateEvent)
 			}); err != nil {
@@ -946,10 +952,14 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
-				// Same reason as the branch above: the snapshot shares the
-				// transaction that writes the description.
+				// Same reason as the branch above: the snapshot and the
+				// mention sync share the transaction that writes the
+				// description.
 				if descChanged {
 					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
+						return err
+					}
+					if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
 						return err
 					}
 				}

@@ -41,6 +41,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mentions"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/tasknumber"
@@ -130,6 +131,17 @@ func (a Attribution) WithActors(actors ...Actor) Attribution {
 // generated insert takes.
 func userRef(userID uint32) sql.NullInt32 {
 	return sql.NullInt32{Int32: int32(userID), Valid: true} //#nosec G115 -- users.id (INT UNSIGNED), fits int32 within realistic deployments
+}
+
+// actorRef widens the recorded creator onto the optional actor shape the
+// mention sync takes. An absent creator is a body a process wrote, which
+// the sync records with no actor rather than with a fabricated one.
+func actorRef(createdBy sql.NullInt32) *int64 {
+	if !createdBy.Valid {
+		return nil
+	}
+	id := int64(createdBy.Int32)
+	return &id
 }
 
 // Args carries everything a caller must decide about a new task.
@@ -244,6 +256,19 @@ func New(ctx context.Context, tx *dbretry.Tx, attr Attribution, args Args) (Resu
 	// that skipped the snapshot would produce a task whose history is
 	// missing its own starting point with nothing to signal it.
 	if _, err := taskdesc.Snapshot(ctx, q, args.WorkspaceID, uint32(id), attr.createdBy, args.Description.String); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		return Result{}, err
+	}
+	// Alongside the snapshot rather than inside it: the snapshot skips an
+	// empty body, and a description that names nobody still has to leave the
+	// mentions table saying nobody. Same transaction as the insert, so the
+	// row and the mentions it carries become durable together.
+	if err := mentions.SyncTaskDescription(ctx, tx, mentions.TaskDescriptionArgs{
+		WorkspaceID:  args.WorkspaceID,
+		TaskID:       uint32(id), //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		TaskPublicID: pub,
+		ActorUserID:  actorRef(attr.createdBy),
+		Body:         args.Description.String,
+	}); err != nil {
 		return Result{}, err
 	}
 	// The actors are part of the same answer as the recorded creator, so
