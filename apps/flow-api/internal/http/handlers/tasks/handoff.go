@@ -113,14 +113,33 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 		// Disable any prior agent assignee rows on the task. Soft-disable
 		// is sufficient — task_actors.public_id is preserved so audit
 		// history remains queryable.
+		//
+		// The rows were listed before the transaction opened, and the
+		// UPDATE runs the same predicate the listing did, so a zero count
+		// is that row having been disabled in between. The count is
+		// summed rather than checked per row: displacing some of the
+		// priors is still a handoff, and it is only when this request
+		// displaced none of the ones it read that its picture of the
+		// task's assignment is stale — and the event below already names
+		// one of them as the agent this handoff took over from.
+		displaced := int64(0)
 		for _, a := range existing {
-			if _, err := tx.ExecContext(ctx,
+			res, err := tx.ExecContext(ctx,
 				`UPDATE task_actors SET enabled = FALSE
 				 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
 				ws.ID, task.ID, a.ID,
-			); err != nil {
+			)
+			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			displaced += n
+		}
+		if len(existing) > 0 && displaced == 0 {
+			return nil, httpErr(apierrors.WsTaskUpdateConflict)
 		}
 
 		if _, err := qtx.AddAgentActor(ctx, generated.AddAgentActorParams{
@@ -266,14 +285,33 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 
 		// Disable every current agent assignee row so the task no
 		// longer routes new events to an agent.
+		//
+		// Taking the agent off the task is what this endpoint does, so a
+		// run that disabled nothing handed nothing back: the rows were
+		// listed before the transaction opened and the UPDATE runs the
+		// same predicate, so zero across all of them means another
+		// handoff got there first. Refused with the same code the empty
+		// listing above answers with, because it is the same state seen a
+		// moment later — and the rollback drops the handoff event and the
+		// memo patch that would otherwise record a second hand-back.
+		handedBack := int64(0)
 		for _, a := range existing {
-			if _, err := tx.ExecContext(ctx,
+			res, err := tx.ExecContext(ctx,
 				`UPDATE task_actors SET enabled = FALSE
 				 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
 				ws.ID, task.ID, a.ID,
-			); err != nil {
+			)
+			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			handedBack += n
+		}
+		if handedBack == 0 {
+			return nil, httpErr(apierrors.WsTaskAgentNotAssigned)
 		}
 
 		if hasTargetUser {

@@ -388,12 +388,27 @@ func (r *Reconciler) scanEnabledMismatch(ctx context.Context) {
 		r.Logger.Warn("item consistency drift detected",
 			"kind", "enabled_mismatch", "task_id", p.taskID, "event_id", p.eventID)
 		const upd = `UPDATE calendar_events SET enabled = FALSE WHERE id = ? AND enabled`
+		var disabled int64
 		if err := r.heal(ctx, "reconciler.enabledMismatch", func(ctx context.Context) error {
-			_, err := conn.ExecContext(ctx, upd, p.eventID)
+			disabled = 0
+			res, err := conn.ExecContext(ctx, upd, p.eventID)
+			if err != nil {
+				return err
+			}
+			disabled, err = res.RowsAffected()
 			return err
 		}); err != nil {
 			r.logError("heal enabled mismatch failed", err,
 				"task_id", p.taskID, "event_id", p.eventID)
+			continue
+		}
+		// The counter has to mean "this pass closed the drift", so a
+		// statement that matched nothing does not raise it. Zero here is
+		// the event having been disabled between the scan and the write,
+		// which is the invariant restored by somebody else; the
+		// inconsistency it was counted under stands, and the gap between
+		// the two counters is what says so.
+		if disabled == 0 {
 			continue
 		}
 		if r.Metrics != nil {

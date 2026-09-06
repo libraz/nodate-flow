@@ -1,6 +1,7 @@
 package affectedrows
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -29,6 +30,23 @@ import (
 // it exempts. One marker covers one call: a second removal in a function
 // that already carries a marker takes a second marker, which is the moment
 // somebody has to state a reason.
+//
+// Which call a marker covers is read the way a person reads it, off the
+// syntax rather than off a line distance. A marker is the comment attached
+// to a statement, and it reaches that statement plus the ones written
+// directly beneath it with no blank line between — the paragraph gofmt
+// already draws — up to and including the first removal in it. A doc
+// comment reaches the function it introduces. Nothing carries across a
+// paragraph break, a block or a function, so a reason written about one
+// removal cannot exempt an unrelated one further down the file, and a
+// marker that reaches nothing is reported at its own line rather than at
+// whichever marker happened to be left over at the end.
+//
+// Both forms of write are read. A call to the generated method carrying a
+// named statement is the form this repository asks for, and a write built
+// as a Go string literal is the exception it still contains — see
+// literals.go for why matching only the first would cover less and less
+// as more SQL is written inline.
 
 // callSite is one call to a removal statement in hand-written Go.
 type callSite struct {
@@ -36,6 +54,9 @@ type callSite struct {
 	Query string
 	File  string
 	Line  int
+	// pos is the same position Line renders, kept so a marker's reach can
+	// be compared against the syntax it was written in.
+	pos token.Pos
 	// Discarded records that the count was assigned to the blank
 	// identifier, so nothing downstream can read it.
 	Discarded bool
@@ -54,11 +75,33 @@ type callSite struct {
 	NamedByTheCaller bool
 }
 
-// staleMarker is a marker that no in-scope call needed.
+// staleMarker is a marker that exempted nothing, reported at its own
+// position so a reader is sent to the marker they have to delete.
 type staleMarker struct {
 	File string
 	Line int
+	// Reason says which way the marker failed to exempt anything, so the
+	// failure names the mistake and not only the line.
+	Reason string
 }
+
+// The ways a marker can exempt nothing. All three read to a later reader
+// as though the count was considered, which is the thing the marker
+// exists to make impossible.
+const (
+	// markerReachesNoRemoval is a marker whose paragraph performs no
+	// removal at all: the code it was written about has moved or gone.
+	markerReachesNoRemoval = "it reaches no call that drops a removal count"
+	// markerCoversABoundCount is a marker over a call that binds its
+	// count. Exempting a call that needs no exemption is the same defect
+	// as omitting one that does; the count is already being read, so the
+	// marker only obscures that.
+	markerCoversABoundCount = "the removal under it binds its affected-row count, so there is nothing to exempt"
+	// markerRepeatsAnExemption is a second marker over a call an earlier
+	// marker already covers. One marker covers one call in both
+	// directions, so the surplus reason stands for no decision.
+	markerRepeatsAnExemption = "the removal under it is already exempted by the marker above this one"
+)
 
 // TestRemovalCallersReadTheAffectedRowCount fails on a caller that drops
 // the count a removal statement went to the trouble of returning.
@@ -77,9 +120,9 @@ func TestRemovalCallersReadTheAffectedRowCount(t *testing.T) {
 			site.File, site.Line, site.Function, site.Query, MarkerForm)
 	}
 	for _, marker := range stale {
-		t.Errorf("%s:%d: this affected-rows marker covers no call that drops a removal "+
-			"count. It exempts nothing and reads as though something was checked; drop it",
-			marker.File, marker.Line)
+		t.Errorf("%s:%d: this affected-rows marker exempts nothing: %s. It reads as though "+
+			"the count was considered; delete it, or move it onto the call it is about",
+			marker.File, marker.Line, marker.Reason)
 	}
 }
 
@@ -149,6 +192,41 @@ func reasonless(q *Queries) {
 func spare(q *Queries) {
 	_, _ = q.UpdateLabel(ctx, params)
 }
+
+// inlineDiscards issues the removal as a Go string literal, which is the
+// form a scan matching only named statements cannot see at all.
+func inlineDiscards(tx *sql.Tx) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE labels SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE` + "`" + `, id)
+}
+
+// inlineBinds reads the count of the same write, so nothing is dropped.
+func inlineBinds(tx *sql.Tx) {
+	rows, err := tx.ExecContext(ctx, ` + "`" + `UPDATE labels SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE` + "`" + `, id)
+	_ = rows
+	_ = err
+}
+
+// inlineViaConstant binds the SQL a few lines above the call, which is
+// how the wrapped ones are written.
+func inlineViaConstant(tx *sql.Tx) {
+	const upd = ` + "`" + `UPDATE lenses
+		SET deleted_at = NOW()
+		WHERE public_id = ? AND deleted_at IS NULL` + "`" + `
+	_, _ = tx.ExecContext(ctx, upd, id)
+}
+
+// inlineClaim writes a guarded claim rather than a removal: the row comes
+// back out of the archived state, so a zero count here says it was
+// already archived, not that it was never there.
+func inlineClaim(tx *sql.Tx) {
+	_, _ = tx.ExecContext(ctx, ` + "`" + `UPDATE tasks SET archived_at = NOW() WHERE id = ? AND archived_at IS NULL` + "`" + `, id)
+}
+
+// inlineNotAnExec hands the same removal to something that returns no
+// count, so there is none to drop.
+func inlineNotAnExec(log *Logger) {
+	log.Debug(` + "`" + `UPDATE labels SET enabled = FALSE WHERE public_id = ? AND enabled = TRUE` + "`" + `)
+}
 `
 
 	fset := token.NewFileSet()
@@ -168,9 +246,10 @@ func spare(q *Queries) {
 			discarded = append(discarded, site.Line)
 		}
 	}
-	// The unmarked removal in bare, the second one in twice, and the one
-	// under the marker that states no reason.
-	if want := []int{11, 21, 28}; !equalInts(discarded, want) {
+	// The unmarked removal in bare, the second one in twice, the one under
+	// the marker that states no reason, and the two written as Go string
+	// literals — one spelled in the call, one bound to a constant above it.
+	if want := []int{11, 21, 28, 41, 57}; !equalInts(discarded, want) {
 		t.Errorf("scan reported unmarked discards at lines %v, want %v", discarded, want)
 	}
 	var stalest []int
@@ -179,6 +258,108 @@ func spare(q *Queries) {
 	}
 	if want := []int{33}; !equalInts(stalest, want) {
 		t.Errorf("scan reported stale markers at lines %v, want %v", stalest, want)
+	}
+
+	// The discards above are the failures; the whole set of sites is what
+	// says the literal half is matching at all. A form that stops matching
+	// removes sites rather than adding findings, so nothing else would
+	// notice — the write that binds its count and the two that are not
+	// removals are as much a part of the evidence as the reported ones.
+	var found []int
+	for _, site := range sites {
+		found = append(found, site.Line)
+	}
+	if want := []int{5, 11, 20, 21, 28, 41, 46, 57}; !equalInts(found, want) {
+		t.Errorf("scan found removal call sites at lines %v, want %v; a guarded claim "+
+			"(line 64) and a literal handed to something that returns no count (line 70) "+
+			"are not sites, and both literal forms must be", found, want)
+	}
+}
+
+// TestMarkerCoversOnlyTheCallItIsWrittenAbove pins the pairing itself.
+// The exemption is only worth something if it names the write it is about,
+// so a marker has to reach the removal beneath it and nothing else: not a
+// removal further down the function, and not a second one on the strength
+// of one reason. Each of these is a marker that reads to a later reader as
+// though the count was considered.
+func TestMarkerCoversOnlyTheCallItIsWrittenAbove(t *testing.T) {
+	t.Parallel()
+
+	const src = `package p
+
+// distant states its reason over a write that reads its count, while an
+// unrelated removal further down the function drops one.
+func distant(q *Queries) {
+	// affected-rows: not-applicable — written about the write below it.
+	rows, err := q.DisableLabel(ctx, params)
+	_ = rows
+	_ = err
+
+	if err := elsewhere(); err != nil {
+		return
+	}
+
+	_, _ = q.DeleteLens(ctx, params)
+}
+
+// paragraph keeps a marker with the statements written under it: the
+// argument the removal takes belongs to the same paragraph, and the blank
+// line after the removal ends it.
+func paragraph(q *Queries) {
+	// affected-rows: not-applicable — the removal below is idempotent here.
+	id := lookup()
+	_, _ = q.DisableLabel(ctx, id)
+
+	_, _ = q.DeleteLens(ctx, params)
+}
+
+// twiceOver states two reasons over one removal.
+func twiceOver(q *Queries) {
+	// affected-rows: not-applicable — one reason covers this removal.
+	// affected-rows: not-applicable — and this one covers nothing.
+	_, _ = q.DisableLabel(ctx, params)
+}
+`
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "sample.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse sample: %v", err)
+	}
+	inScope := map[string]Statement{
+		"DisableLabel": {Name: "DisableLabel"},
+		"DeleteLens":   {Name: "DeleteLens"},
+	}
+	sites, stale := scanFile(fset, file, "sample.go", inScope)
+
+	var discarded []int
+	for _, site := range sites {
+		if site.Discarded && !site.Marked {
+			discarded = append(discarded, site.Line)
+		}
+	}
+	// The removal distant drops four statements below its marker, and the
+	// one paragraph drops past the blank line that ended its marker's
+	// paragraph. Neither marker reaches them; the removals directly under
+	// the markers (line 24) and under the first of the pair (line 33) are
+	// the ones that are covered.
+	if want := []int{15, 26}; !equalInts(discarded, want) {
+		t.Errorf("scan reported unmarked discards at lines %v, want %v; a marker that "+
+			"reaches past the write it stands over exempts a removal nobody wrote a "+
+			"reason for", discarded, want)
+	}
+
+	var reported []string
+	for _, marker := range stale {
+		reported = append(reported, fmt.Sprintf("%d: %s", marker.Line, marker.Reason))
+	}
+	want := []string{
+		"6: " + markerCoversABoundCount,
+		"32: " + markerRepeatsAnExemption,
+	}
+	if !slices.Equal(reported, want) {
+		t.Errorf("scan reported stale markers %q, want %q; each is named at its own line "+
+			"so the reader is sent to the marker to delete", reported, want)
 	}
 }
 
@@ -243,44 +424,37 @@ func scanRepository(t *testing.T) ([]callSite, []staleMarker) {
 func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[string]Statement) ([]callSite, []staleMarker) {
 	imports := importNames(file)
 	answersRequests := strings.Contains(name, "/internal/http/handlers/")
+	fileConstants := packageConstants(file)
 
 	var sites []callSite
-	var stale []staleMarker
 
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok || fn.Body == nil {
 			continue
 		}
-		start := fn.Pos()
-		if fn.Doc != nil {
-			start = fn.Doc.Pos()
+		resolver := sqlResolver{
+			fset:      fset,
+			file:      name,
+			imports:   imports,
+			inScope:   inScope,
+			constants: mergeConstants(fileConstants, stringConstants(fn.Body)),
 		}
-		var markers []token.Pos
-		for _, group := range file.Comments {
-			for _, c := range group.List {
-				if c.Pos() >= start && c.End() <= fn.End() && MarkerPattern.MatchString(c.Text) {
-					markers = append(markers, c.Pos())
-				}
-			}
-		}
-		sort.Slice(markers, func(i, j int) bool { return markers[i] < markers[j] })
-
-		discarded := discardedCalls(fn.Body, imports, inScope)
-		var found []callSite
+		discarded := discardedCalls(fn.Body, resolver)
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			statement, ok := queryName(call, imports, inScope)
+			statement, ok := resolver.statementFor(call)
 			if !ok {
 				return true
 			}
-			found = append(found, callSite{
+			sites = append(sites, callSite{
 				Query:            statement.Name,
 				File:             name,
 				Line:             fset.Position(call.Pos()).Line,
+				pos:              call.Pos(),
 				Discarded:        discarded[call.Pos()],
 				Function:         fn.Name.Name,
 				AnswersRequests:  answersRequests,
@@ -289,33 +463,171 @@ func scanFile(fset *token.FileSet, file *ast.File, name string, inScope map[stri
 			})
 			return true
 		})
-		sort.Slice(found, func(i, j int) bool { return found[i].Line < found[j].Line })
+	}
+	sort.Slice(sites, func(i, j int) bool { return sites[i].pos < sites[j].pos })
 
-		// Markers pair with the discarded calls only, in source order: a
-		// call that reads its count needs no exemption, and a marker left
-		// over is one that stopped covering anything.
-		next := 0
-		for i := range found {
-			if !found[i].Discarded {
+	return sites, pairMarkers(fset, file, name, sites)
+}
+
+// pairMarkers gives each marker the call it was written about and reports
+// the ones that were written about nothing. It marks the sites in place.
+//
+// A marker takes the first removal its paragraph reaches that no earlier
+// marker has taken. Taking rather than merely matching is what keeps one
+// marker to one call: a paragraph holding two removals needs two reasons,
+// and a second marker over a single removal has none left to cover.
+func pairMarkers(fset *token.FileSet, file *ast.File, name string, sites []callSite) []staleMarker {
+	comments := ast.NewCommentMap(fset, file, file.Comments)
+	lists := statementLists(file)
+	taken := make([]bool, len(sites))
+
+	var stale []staleMarker
+	for _, marker := range markerComments(comments, file) {
+		from, to := markerScope(fset, marker.owner, lists, sites)
+		reached, free := false, -1
+		for i := range sites {
+			if sites[i].pos < from || sites[i].pos >= to {
 				continue
 			}
-			if next < len(markers) && fset.Position(markers[next]).Line < found[i].Line {
-				found[i].Marked = true
-				next++
+			reached = true
+			if !taken[i] {
+				free = i
+				break
 			}
 		}
-		for ; next < len(markers); next++ {
-			stale = append(stale, staleMarker{File: name, Line: fset.Position(markers[next]).Line})
+		report := func(reason string) {
+			stale = append(stale, staleMarker{
+				File:   name,
+				Line:   fset.Position(marker.pos).Line,
+				Reason: reason,
+			})
 		}
-		sites = append(sites, found...)
+		switch {
+		case free < 0 && reached:
+			report(markerRepeatsAnExemption)
+		case free < 0:
+			report(markerReachesNoRemoval)
+		case !sites[free].Discarded:
+			taken[free] = true
+			report(markerCoversABoundCount)
+		default:
+			taken[free] = true
+			sites[free].Marked = true
+		}
 	}
-	return sites, stale
+	return stale
+}
+
+// markerComment is one marker together with the node it is written about.
+type markerComment struct {
+	pos   token.Pos
+	owner ast.Node
+}
+
+// markerComments returns the file's markers in source order, each paired
+// with the node the comment map attaches it to. A marker the map attaches
+// to nothing keeps a nil owner: standing outside the syntax is what it is
+// being reported for, not a reason to stop looking at it.
+func markerComments(comments ast.CommentMap, file *ast.File) []markerComment {
+	owners := map[*ast.CommentGroup]ast.Node{}
+	for node, groups := range comments {
+		for _, group := range groups {
+			owners[group] = node
+		}
+	}
+	var out []markerComment
+	for _, group := range file.Comments {
+		for _, c := range group.List {
+			if !MarkerPattern.MatchString(c.Text) {
+				continue
+			}
+			out = append(out, markerComment{pos: c.Pos(), owner: owners[group]})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].pos < out[j].pos })
+	return out
+}
+
+// markerScope returns the source range one marker was written about.
+//
+// A doc comment introduces a declaration, so a marker in one reaches that
+// function's body. A marker inside a body is attached to a statement, and
+// reaches that statement plus the ones written directly beneath it in the
+// same statement list with no blank line between, stopping at the first
+// one that performs a removal. Stopping there is what keeps a marker from
+// reading past the call it sits on to a later one: the write it was
+// written above is the write it gets.
+func markerScope(fset *token.FileSet, owner ast.Node, lists map[token.Pos]stmtRun, sites []callSite) (token.Pos, token.Pos) {
+	if owner == nil {
+		return token.NoPos, token.NoPos
+	}
+	if fn, ok := owner.(*ast.FuncDecl); ok {
+		if fn.Body == nil {
+			return fn.Pos(), fn.End()
+		}
+		return fn.Body.Pos(), fn.Body.End()
+	}
+	run, ok := lists[owner.Pos()]
+	if !ok {
+		return owner.Pos(), owner.End()
+	}
+	end := run.list[run.index].End()
+	for i := run.index; i < len(run.list); i++ {
+		end = run.list[i].End()
+		if performsARemoval(run.list[i], sites) || i+1 == len(run.list) {
+			break
+		}
+		if fset.Position(end).Line+1 != fset.Position(run.list[i+1].Pos()).Line {
+			break
+		}
+	}
+	return run.list[run.index].Pos(), end
+}
+
+// performsARemoval reports whether a statement holds an in-scope call.
+func performsARemoval(stmt ast.Stmt, sites []callSite) bool {
+	for i := range sites {
+		if sites[i].pos >= stmt.Pos() && sites[i].pos < stmt.End() {
+			return true
+		}
+	}
+	return false
+}
+
+// stmtRun is a statement's place among its siblings.
+type stmtRun struct {
+	list  []ast.Stmt
+	index int
+}
+
+// statementLists indexes every statement by the list it is written in, so
+// the statements beneath a marker can be read off the syntax rather than
+// guessed at from a line distance.
+func statementLists(file *ast.File) map[token.Pos]stmtRun {
+	out := map[token.Pos]stmtRun{}
+	record := func(list []ast.Stmt) {
+		for i, stmt := range list {
+			out[stmt.Pos()] = stmtRun{list: list, index: i}
+		}
+	}
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.BlockStmt:
+			record(node.List)
+		case *ast.CaseClause:
+			record(node.Body)
+		case *ast.CommClause:
+			record(node.Body)
+		}
+		return true
+	})
+	return out
 }
 
 // discardedCalls returns the position of every in-scope call whose first
 // result is assigned to the blank identifier, which is where the count
 // stops being readable.
-func discardedCalls(body *ast.BlockStmt, imports map[string]bool, inScope map[string]Statement) map[token.Pos]bool {
+func discardedCalls(body *ast.BlockStmt, resolver sqlResolver) map[token.Pos]bool {
 	out := map[token.Pos]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		assign, ok := n.(*ast.AssignStmt)
@@ -326,7 +638,7 @@ func discardedCalls(body *ast.BlockStmt, imports map[string]bool, inScope map[st
 		if !ok {
 			return true
 		}
-		if _, ok := queryName(call, imports, inScope); !ok {
+		if _, ok := resolver.statementFor(call); !ok {
 			return true
 		}
 		if ident, ok := assign.Lhs[0].(*ast.Ident); ok && ident.Name == "_" {
@@ -337,26 +649,172 @@ func discardedCalls(body *ast.BlockStmt, imports map[string]bool, inScope map[st
 	return out
 }
 
-// queryName reports the removal statement a call invokes.
+// sqlResolver answers, for one function, which removal a call performs.
+// It carries the two vocabularies that question is decided against: the
+// named statements sql/queries declares, and the string constants the
+// surrounding source binds.
+type sqlResolver struct {
+	fset      *token.FileSet
+	file      string
+	imports   map[string]bool
+	inScope   map[string]Statement
+	constants map[string]string
+}
+
+// statementFor reports the removal a call performs, in either form: a
+// call to the generated method carrying a named statement, or an exec
+// call handed SQL built as a Go string literal.
+func (r sqlResolver) statementFor(call *ast.CallExpr) (Statement, bool) {
+	if statement, ok := r.namedStatement(call); ok {
+		return statement, true
+	}
+	return r.inlineStatement(call)
+}
+
+// namedStatement reports the removal statement a call invokes.
 //
 // The receiver is deliberately not inspected: *Queries, a WithTx copy and
 // a wrapper around either all reach the same statement, and a check keyed
 // on "deps.Queries" would be satisfied by renaming the field. What is
 // excluded is a call through an imported package name, because a handler
 // constructor can share a name with the statement it runs.
-func queryName(call *ast.CallExpr, imports map[string]bool, inScope map[string]Statement) (Statement, bool) {
+func (r sqlResolver) namedStatement(call *ast.CallExpr) (Statement, bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return Statement{}, false
 	}
-	statement, ok := inScope[sel.Sel.Name]
+	statement, ok := r.inScope[sel.Sel.Name]
 	if !ok {
 		return Statement{}, false
 	}
-	if ident, ok := sel.X.(*ast.Ident); ok && imports[ident.Name] {
+	if ident, ok := sel.X.(*ast.Ident); ok && r.imports[ident.Name] {
 		return Statement{}, false
 	}
 	return statement, true
+}
+
+// inlineStatement reports the removal an exec call performs with SQL
+// written as a Go string literal, whether the literal sits in the call or
+// is bound to a constant just above it.
+//
+// Only an exec call is read. A count exists because the driver returns
+// sql.Result, so a literal handed to anything else — a logger, a query,
+// a helper that builds a message — carries no count to drop.
+func (r sqlResolver) inlineStatement(call *ast.CallExpr) (Statement, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || !strings.HasPrefix(sel.Sel.Name, "Exec") {
+		return Statement{}, false
+	}
+	for _, arg := range call.Args {
+		text, ok := r.sqlArgument(arg)
+		if !ok {
+			continue
+		}
+		if statement, ok := InlineStatement(text, r.file, r.fset.Position(arg.Pos()).Line); ok {
+			return statement, true
+		}
+	}
+	return Statement{}, false
+}
+
+// sqlArgument returns the SQL text an argument carries.
+func (r sqlResolver) sqlArgument(arg ast.Expr) (string, bool) {
+	switch node := arg.(type) {
+	case *ast.BasicLit:
+		if node.Kind != token.STRING {
+			return "", false
+		}
+		return GoStringLiteral(node.Value)
+	case *ast.Ident:
+		text, ok := r.constants[node.Name]
+		return text, ok
+	default:
+		return "", false
+	}
+}
+
+// stringConstants maps every identifier the node binds to a plain string
+// literal onto that literal's text, so `const upd = "UPDATE ..."` a few
+// lines above the exec call resolves.
+//
+// A name bound twice in the same scan is dropped rather than guessed at:
+// crediting one binding's SQL to the other's call site would report a
+// write at a position that does not perform it.
+func stringConstants(nodes ...ast.Node) map[string]string {
+	out := map[string]string{}
+	ambiguous := map[string]bool{}
+	bind := func(name string, value ast.Expr) {
+		if name == "" || name == "_" {
+			return
+		}
+		lit, ok := value.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return
+		}
+		text, ok := GoStringLiteral(lit.Value)
+		if !ok {
+			return
+		}
+		if _, seen := out[name]; seen {
+			ambiguous[name] = true
+			return
+		}
+		out[name] = text
+	}
+
+	for _, node := range nodes {
+		ast.Inspect(node, func(n ast.Node) bool {
+			switch decl := n.(type) {
+			case *ast.ValueSpec:
+				for i, ident := range decl.Names {
+					if i < len(decl.Values) {
+						bind(ident.Name, decl.Values[i])
+					}
+				}
+			case *ast.AssignStmt:
+				if len(decl.Lhs) != len(decl.Rhs) {
+					return true
+				}
+				for i, lhs := range decl.Lhs {
+					if ident, ok := lhs.(*ast.Ident); ok {
+						bind(ident.Name, decl.Rhs[i])
+					}
+				}
+			}
+			return true
+		})
+	}
+	for name := range ambiguous {
+		delete(out, name)
+	}
+	return out
+}
+
+// packageConstants returns only the file's top-level string bindings. A
+// scan of the whole file would collect every function's locals into one
+// namespace, where two functions each declaring `const upd` would credit
+// one function's SQL to the other's call site.
+func packageConstants(file *ast.File) map[string]string {
+	var decls []ast.Node
+	for _, decl := range file.Decls {
+		if gen, ok := decl.(*ast.GenDecl); ok {
+			decls = append(decls, gen)
+		}
+	}
+	return stringConstants(decls...)
+}
+
+// mergeConstants layers a function's own bindings over the file's, which
+// is the order Go resolves them in.
+func mergeConstants(outer, inner map[string]string) map[string]string {
+	out := make(map[string]string, len(outer)+len(inner))
+	for name, text := range outer {
+		out[name] = text
+	}
+	for name, text := range inner {
+		out[name] = text
+	}
+	return out
 }
 
 // namesNotFound reports whether a function references a not-found error,

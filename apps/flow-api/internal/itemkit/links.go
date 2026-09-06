@@ -164,8 +164,22 @@ func UnlinkTaskFromEvent(ctx context.Context, tx TX, args UnlinkTaskFromEventArg
 	const updSQL = `UPDATE task_event_links
 	                SET enabled = FALSE
 	                WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE`
-	if _, err := tx.ExecContext(ctx, updSQL, args.WorkspaceID, args.LinkID); err != nil {
+	res, err := tx.ExecContext(ctx, updSQL, args.WorkspaceID, args.LinkID)
+	if err != nil {
 		return fmt.Errorf("itemkit: soft-disable link: %w", err)
+	}
+	disabled, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("itemkit: soft-disable link: %w", err)
+	}
+	if disabled == 0 {
+		// The predicate is the one the read above ran, so a zero here is
+		// the link going away between the two — another remover reached
+		// it first. Either way this caller named a link that is not
+		// there to remove, which is the same refusal the read returns
+		// for it, and the event below would otherwise record a removal
+		// this call did not perform.
+		return sql.ErrNoRows
 	}
 
 	payload := map[string]any{

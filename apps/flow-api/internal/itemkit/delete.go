@@ -59,9 +59,15 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 			return fmt.Errorf("itemkit: clear task due_on: %w", err)
 		}
 	case RoleScheduled:
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE calendar_events SET enabled = FALSE
-			 WHERE task_id = ? AND task_role = 'scheduled' AND enabled = TRUE`, task.id); err != nil {
+		// The role is part of the named statement rather than a parameter,
+		// so this cannot be pointed at the due projection, which has to
+		// clear tasks.due_on in the same breath and goes through the branch
+		// above instead.
+		if err := calendar.New(tx.RawTx()).DisableCalendarEventTimeBlocksByTask(ctx,
+			calendar.DisableCalendarEventTimeBlocksByTaskParams{
+				WorkspaceID: args.WorkspaceID,
+				TaskID:      taskIDParam(task.id),
+			}); err != nil {
 			return fmt.Errorf("itemkit: disable scheduled events: %w", err)
 		}
 	}
@@ -73,11 +79,26 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 		})
 }
 
-// unlinkEventRow soft-disables one event row. Used by UnscheduleTask,
-// DeleteEvent, and propagateEventFromTaskDate when the task date is
-// cleared.
+// unlinkEventRow soft-disables one event row. Used by UnscheduleTask for
+// the due role, and by propagateEventFromTaskDate when the task date is
+// cleared. Both reach it with an event they resolved by task link.
 func unlinkEventRow(ctx context.Context, tx TX, evt eventRow, actorID uint32, reason string) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE calendar_events SET enabled = FALSE WHERE id = ?`, evt.id); err != nil {
+	// Same named statement every other disable in this package goes
+	// through, so the column keeps one write path. Its key is (public_id,
+	// calendar_id, workspace_id); each caller resolves evt with
+	// findLinkedEvent inside this transaction, so all three are read off
+	// the row being withdrawn and identify it and nothing else.
+	//
+	// affected-rows: not-applicable — this helper is reached only after a
+	// caller has found a live link, and each of them already answers a
+	// missing one by returning nil. A zero therefore means another writer
+	// withdrew the row between that read and this statement, which leaves
+	// the state the caller asked for.
+	if _, err := calendar.New(tx.RawTx()).DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
+		PublicID:    evt.publicID,
+		CalendarID:  evt.calendarID,
+		WorkspaceID: evt.workspaceID,
+	}); err != nil {
 		return fmt.Errorf("itemkit: soft-disable event: %w", err)
 	}
 	var taskPtr *uint32
@@ -109,8 +130,11 @@ func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32)
 		}
 		return fmt.Errorf("itemkit: read task: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE calendar_events SET enabled = FALSE WHERE task_id = ? AND enabled = TRUE`, task.id); err != nil {
+	if err := calendar.New(tx.RawTx()).DisableCalendarEventsByTask(ctx,
+		calendar.DisableCalendarEventsByTaskParams{
+			WorkspaceID: workspaceID,
+			TaskID:      taskIDParam(task.id),
+		}); err != nil {
 		return fmt.Errorf("itemkit: soft-disable linked events: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET enabled = FALSE WHERE id = ?`, task.id); err != nil {
@@ -140,7 +164,27 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 		}
 		return fmt.Errorf("itemkit: read event: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE calendar_events SET enabled = FALSE WHERE id = ?`, evt.id); err != nil {
+	cq := calendar.New(tx.RawTx())
+	// The disable goes through the named query rather than an inline
+	// statement so that this path and the calendar handlers keep writing
+	// the column the same way: a predicate or a column added to
+	// DisableCalendarEvent reaches every caller, which an inline copy
+	// would silently miss. Its key is (public_id, calendar_id,
+	// workspace_id) and it is confined to enabled rows; findEventByID
+	// resolved all three off the row it read as live in this same
+	// transaction, so the statement lands on exactly that row.
+	//
+	// affected-rows: not-applicable — the count answers whether this
+	// writer's disable won, not whether the event exists, and a delete of
+	// something already deleted is the state the caller asked for. The
+	// missing-event case is already answered above by returning nil, so a
+	// zero here (another writer disabled the row between the read and this
+	// statement) must reach the same outcome rather than a not-found.
+	if _, err := cq.DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
+		PublicID:    evt.publicID,
+		CalendarID:  evt.calendarID,
+		WorkspaceID: workspaceID,
+	}); err != nil {
 		return fmt.Errorf("itemkit: soft-disable event: %w", err)
 	}
 	// A series' per-occurrence overrides are separate rows naming this
@@ -162,7 +206,7 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 	// their parent, and an event that is not a series has none, so zero is
 	// the ordinary count rather than something nobody found.
 	parentID := sql.NullInt32{Int32: int32(evt.id), Valid: true} //#nosec G115 -- recurrence_parent_id references calendar_events.id (INT UNSIGNED) and holds the same width
-	if _, err := calendar.New(tx.RawTx()).DisableCalendarEventOverridesByParent(ctx,
+	if _, err := cq.DisableCalendarEventOverridesByParent(ctx,
 		calendar.DisableCalendarEventOverridesByParentParams{
 			WorkspaceID:        workspaceID,
 			RecurrenceParentID: parentID,
