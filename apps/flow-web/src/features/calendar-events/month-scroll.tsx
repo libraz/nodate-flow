@@ -32,7 +32,12 @@ import type { HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import { Day, type Zone } from '@nodate-flow/ui/time';
-import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
+import {
+  defaultRangeExtractor,
+  measureElement as measureElementSize,
+  useVirtualizer,
+  type Virtualizer,
+} from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import {
   type ReactElement,
@@ -594,6 +599,37 @@ const ESTIMATED_WEEK_PX = 112;
 const TODAY_SCROLL_INSET_PX = 32;
 
 /**
+ * Height of one rendered row, measured only by the resize observer.
+ *
+ * `virtualizer.measureElement` is attached as a ref, so the measurement
+ * it takes when a row mounts happens while React is committing. A first
+ * measurement that disagrees with the estimate makes the virtualizer
+ * correct the scroll offset and re-render synchronously — a `flushSync`
+ * from inside a lifecycle method, which React declines and defers to a
+ * later render. That is not a corner case here: the view opens scrolled
+ * a year into the list, so every row mounting above the fold asks for
+ * that correction, and the rows are exactly the ones no fixed estimate
+ * can get right.
+ *
+ * Leaving the measurement to the observer costs nothing. The ref still
+ * registers the row with it, and its callback runs outside React and
+ * before the frame is painted — the same route the library already
+ * takes for rows that mount while the list is scrolling. Rows stay
+ * dynamically measured; the ref path reports the size already on file,
+ * which is no change and so asks for no re-render.
+ */
+function measureRowFromObserver(
+  el: HTMLDivElement,
+  entry: ResizeObserverEntry | undefined,
+  instance: Virtualizer<HTMLDivElement, HTMLDivElement>,
+): number {
+  if (entry) return measureElementSize(el, entry, instance);
+  const index = instance.indexFromElement(el);
+  const key = instance.options.getItemKey(index);
+  return instance.itemSizeCache.get(key) ?? instance.options.estimateSize(index);
+}
+
+/**
  * MonthScroll — top-level infinite-scroll month view. Builds the week
  * range once on mount (today never moves within a session) and renders
  * weekday labels, a scrollable body of week rows with sticky month
@@ -687,11 +723,12 @@ export default function MonthScroll({
   const dragRowIndex =
     drag?.drag == null ? null : (rowIndexByDayKey.get(drag.drag.payload.fromDate) ?? null);
 
-  const virtualizer = useVirtualizer({
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) =>
       items[index]?.kind === 'header' ? ESTIMATED_HEADER_PX : ESTIMATED_WEEK_PX,
+    measureElement: measureRowFromObserver,
     overscan: 3,
     rangeExtractor: (range) => {
       // The header for the month the top row belongs to is always kept
