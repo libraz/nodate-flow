@@ -178,6 +178,10 @@
     "prev": "上一个月",
     "next": "下一个月",
     "today": "今天",
+    "load_error": {
+      "message": "无法加载 {month}。由于请求失败，此月未能显示任何内容。",
+      "retry": "重试"
+    },
     "empty": "本月暂无已排期任务。",
     "noDue": "无截止日期",
     "more": "+{count} 更多",

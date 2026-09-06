@@ -36,7 +36,13 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
 import { Zone } from '@nodate-flow/ui/time';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { DateTime } from 'luxon';
@@ -184,7 +190,87 @@ function buildMonthGrid(year: number, monthIndex: number, weekStart: WeekStart):
   return cells;
 }
 
-/** Unix seconds → YYYY-MM-DD in the local tz. */
+/** The windows one calendar view fetches and draws from. */
+export interface CalendarViewRange {
+  /** Task query bounds — inclusive `YYYY-MM-DD` day keys. */
+  fromDate: string;
+  toDate: string;
+  /** Event query bounds — the same days as instants, read in `zone`. */
+  fromIso: string;
+  toIso: string;
+  /** The event bounds as `Date`s, for the recurrence expander. */
+  rangeStart: Date;
+  rangeEnd: Date;
+  /** Holiday provider bounds, in local-component `Date`s. */
+  holidayFrom: Date;
+  holidayTo: Date;
+}
+
+/**
+ * Every window the calendar reads, derived from the month at the cursor.
+ *
+ * `bufferMonths` widens the window by that many whole month grids on
+ * each side. The mobile month view scrolls through months freely, and a
+ * row reaches the top before the cursor that follows it can be fetched —
+ * so the months on either side are asked for in advance, or they arrive
+ * empty and fill in after the fact.
+ *
+ * All four windows are derived from one pair of days on purpose. A fetch
+ * that reaches further than the expansion window loads occurrences the
+ * expander then drops, and a holiday window that lags leaves the extra
+ * months unmarked; either one is invisible until someone scrolls there.
+ *
+ * The grid's own cells are local-component Dates, so their day keys
+ * round-trip in whatever frame they were built in. The instants sent as
+ * `start`/`end` are a different question: they are the bounds of "the
+ * days on screen", and a day boundary only exists relative to a zone.
+ * Taken from the browser they ask the server for a window offset from
+ * the one being drawn, so events at the first and last cell are fetched
+ * for the wrong day — or, for a viewer far enough east or west, not
+ * fetched at all.
+ */
+export function buildCalendarRange(
+  cursor: { year: number; month: number },
+  weekStart: WeekStart,
+  zone: Zone,
+  bufferMonths: number,
+): CalendarViewRange {
+  // `Date` normalises an out-of-range month index, so a buffer that
+  // crosses a year boundary needs no special case.
+  const leadingCells = buildMonthGrid(cursor.year, cursor.month - bufferMonths, weekStart);
+  const trailingCells =
+    bufferMonths === 0
+      ? leadingCells
+      : buildMonthGrid(cursor.year, cursor.month + bufferMonths, weekStart);
+  const fallback = new Date(cursor.year, cursor.month, 1);
+  const first = leadingCells[0]?.date ?? fallback;
+  const last = trailingCells[trailingCells.length - 1]?.date ?? fallback;
+  const firstKey = dateKey(first);
+  const lastKey = dateKey(last);
+  const startIso = startOfDayIso(firstKey, zone);
+  const endIso = endOfDayIso(lastKey, zone);
+  // The holiday window stays in local-component Dates because the
+  // provider compares against local-component Dates of its own. A
+  // holiday is a date, not an instant, so both sides being in the same
+  // arbitrary frame is what makes the comparison mean "the same square"
+  // — feeding it the zoned instants above would drop or add one at the
+  // edge of the grid.
+  const holidayStart = new Date(first);
+  holidayStart.setHours(0, 0, 0, 0);
+  const holidayEnd = new Date(last);
+  holidayEnd.setHours(23, 59, 59, 999);
+  return {
+    fromDate: firstKey,
+    toDate: lastKey,
+    fromIso: startIso,
+    toIso: endIso,
+    rangeStart: new Date(startIso),
+    rangeEnd: new Date(endIso),
+    holidayFrom: holidayStart,
+    holidayTo: holidayEnd,
+  };
+}
+
 /**
  * Differentiate calendar-event pills by kind. Returns inline style
  * fragments merged into the pill button, plus the 45-degree marker
@@ -497,51 +583,48 @@ function CalendarRoute(): ReactElement {
     return getOrCreateProvider(country);
   }, [country]);
 
-  // Range that covers the full 42-cell month grid (may span adjacent months).
-  //
-  // The grid's own cells are local-component Dates, so their day keys
-  // round-trip in whatever frame they were built in. The instants sent
-  // as `start`/`end` are a different question: they are the bounds of
-  // "the days on screen", and a day boundary only exists relative to a
-  // zone. Taken from the browser they asked the server for a window
-  // offset from the one being drawn, so events at the first and last
-  // cell were fetched for the wrong day — or, for a viewer far enough
-  // east or west, not fetched at all.
+  /**
+   * How far past the drawn month the fetch reaches, in whole month
+   * grids. The desktop grid draws exactly one month and navigates by
+   * button, so it asks for exactly that. The mobile view scrolls a year
+   * either way and moves the cursor as it goes, so it keeps the
+   * neighbouring months loaded and the rows around the fold filled.
+   */
+  const bufferMonths = isMobile ? 1 : 0;
+
+  // Range that covers the full 42-cell month grid (may span adjacent
+  // months), widened by the buffer above.
   const { fromDate, toDate, fromIso, toIso, rangeStart, rangeEnd, holidayFrom, holidayTo } =
-    useMemo(() => {
-      const cells = buildMonthGrid(cursor.year, cursor.month, weekStart);
-      const first = cells[0]?.date ?? new Date(cursor.year, cursor.month, 1);
-      const last = cells[cells.length - 1]?.date ?? new Date(cursor.year, cursor.month, 1);
-      const firstKey = dateKey(first);
-      const lastKey = dateKey(last);
-      const startIso = startOfDayIso(firstKey, zone);
-      const endIso = endOfDayIso(lastKey, zone);
-      // The holiday window stays in local-component Dates because the
-      // provider compares against local-component Dates of its own. A
-      // holiday is a date, not an instant, so both sides being in the
-      // same arbitrary frame is what makes the comparison mean "the same
-      // square" — feeding it the zoned instants above would drop or add
-      // one at the edge of the grid.
-      const holidayStart = new Date(first);
-      holidayStart.setHours(0, 0, 0, 0);
-      const holidayEnd = new Date(last);
-      holidayEnd.setHours(23, 59, 59, 999);
-      return {
-        fromDate: firstKey,
-        toDate: lastKey,
-        fromIso: startIso,
-        toIso: endIso,
-        rangeStart: new Date(startIso),
-        rangeEnd: new Date(endIso),
-        holidayFrom: holidayStart,
-        holidayTo: holidayEnd,
-      };
-    }, [cursor, weekStart, zone]);
+    useMemo(
+      () => buildCalendarRange(cursor, weekStart, zone, bufferMonths),
+      [cursor, weekStart, zone, bufferMonths],
+    );
 
   // Single cross-workspace task query (flow-api /me/tasks-with-dates).
+  //
+  // The window is part of the key, so moving the cursor asks a question
+  // that has never been answered and the data would be `undefined` until
+  // it is. Holding the last window on screen costs a moment of days that
+  // are one month stale and replaces the only alternative, which is no
+  // days at all.
+  //
+  // It is the mobile view this is for. There the cursor moves with the
+  // scroll, and the rows are a year long and drawn from the same data
+  // whatever the cursor says — so the held window keeps every row on
+  // screen populated while the next one is fetched, and dropping it
+  // blanks the month under the reader's finger on every crossing. The
+  // desktop grid draws the cursor month's own cells, so the days it
+  // shows move with the cursor and the held window covers only the seam
+  // the two grids share. Worth little there, worth a great deal here;
+  // it is not a blanket win and it is not dead weight either.
+  //
+  // It covers the wait and nothing else: a placeholder is consulted
+  // only while a query is pending, so a refusal still empties the grid.
+  // That is what the message below the toolbar is for.
   const tasksQuery = useQuery({
     queryKey: ['calendar', 'me-tasks', fromDate, toDate] as const,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<CalendarTask[]> => {
       const data = await apiRequest(
         (client) =>
@@ -557,9 +640,12 @@ function CalendarRoute(): ReactElement {
   const tasks = tasksQuery.data ?? [];
 
   // Single cross-workspace event query (/me/calendar-events).
+  // Keyed on the window and held across a change for the same reason as
+  // the task query above.
   const eventsQuery = useQuery({
     queryKey: ['calendar', 'me-events', fromIso, toIso] as const,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<CalendarEvent[]> => {
       const data = await apiRequest(
         (client) =>
@@ -861,6 +947,26 @@ function CalendarRoute(): ReactElement {
     [locale, cursor],
   );
 
+  /**
+   * What a failed window says for itself.
+   *
+   * A month that would not load is drawn exactly like a month with
+   * nothing in it: the held window covers the wait, not the refusal —
+   * a placeholder is only consulted while a query is pending, so an
+   * error empties the grid — and neither query surfaces its failure
+   * anywhere else. A reader cannot tell "you have nothing scheduled"
+   * from "this did not load", and the second is the one they would act
+   * on.
+   *
+   * Both queries feed one surface, so one line covers either failing,
+   * and the line names the month it failed for rather than the window,
+   * which is a wider span on the mobile view than anything on screen.
+   */
+  const loadFailed = tasksQuery.isError || eventsQuery.isError;
+  const loadErrorMessage = loadFailed
+    ? t('calendar.load_error.message', { month: monthLabel })
+    : null;
+
   const goPrev = (): void => {
     setCursor((c) => {
       const m = c.month - 1;
@@ -878,6 +984,23 @@ function CalendarRoute(): ReactElement {
     // Re-center the mobile month-scroll on today's week.
     setScrollToTodaySignal((n) => n + 1);
   };
+
+  /**
+   * Follow the month the mobile view has scrolled to.
+   *
+   * `cursor` is the single source of truth for both the fetch window and
+   * the toolbar label, and the scroll is the only thing that moves the
+   * mobile view between months — left where it started, every month but
+   * the first would be drawn from a window that was never fetched.
+   * Returning the same state object when the month already matches keeps
+   * a scroll within one month from re-rendering the route at all.
+   */
+  const handleVisibleMonthChange = useCallback((monthKey: string): void => {
+    const [year, month] = monthKey.split('-').map(Number);
+    if (!year || !month) return;
+    const monthIndex = month - 1;
+    setCursor((c) => (c.year === year && c.month === monthIndex ? c : { year, month: monthIndex }));
+  }, []);
 
   const stateColor = useCallback(
     (derivedState: string): string =>
@@ -1024,6 +1147,26 @@ function CalendarRoute(): ReactElement {
       <div className={calendarLayoutStyles.layout}>
         {isMobile ? null : <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />}
         <div className={styles.gridColumn}>
+          {/* Above the grid rather than in a toast: the window is
+              refetched on every month the scroll crosses, so a dead
+              network would raise one toast per crossing. It goes away
+              on its own the moment a refetch returns. */}
+          {loadErrorMessage !== null ? (
+            <div className={styles.loadError} role="status">
+              <p className={styles.loadError__message}>{loadErrorMessage}</p>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  void tasksQuery.refetch();
+                  void eventsQuery.refetch();
+                }}
+              >
+                {t('calendar.load_error.retry')}
+              </Button>
+            </div>
+          ) : null}
           {isMobile ? (
             <MonthScroll
               events={filteredEvents}
@@ -1034,6 +1177,7 @@ function CalendarRoute(): ReactElement {
               zone={zone}
               stateColor={stateColor}
               scrollToTodaySignal={scrollToTodaySignal}
+              onVisibleMonthChange={handleVisibleMonthChange}
               // The same gesture the desktop grid presses, so a move made
               // on a phone raises the same scope question, sends the same
               // request, and reports the same refusal.

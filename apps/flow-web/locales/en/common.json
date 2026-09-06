@@ -178,6 +178,10 @@
     "prev": "Previous month",
     "next": "Next month",
     "today": "Today",
+    "load_error": {
+      "message": "Could not load {month}. Nothing is shown for it because the request failed.",
+      "retry": "Try again"
+    },
     "empty": "No scheduled tasks this month.",
     "noDue": "No due date",
     "more": "+{count} more",

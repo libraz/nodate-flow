@@ -62,6 +62,32 @@
   min-inline-size: 0;
 }
 
+/**
+ * Sits above the grid on both the desktop and the mobile view, for as
+ * long as a window fails to load. Warning rather than danger tones: the
+ * month is unreadable, but the toolbar still works and moving to another
+ * month is a way out, so nothing here is lost or broken.
+ */
+.loadError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  margin-block-end: var(--nf-space-2);
+  border: var(--nf-space-px) solid var(--nf-color-warning);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-warning-subtle);
+}
+
+.loadError__message {
+  margin: 0;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-warning-fg);
+}
+
 .weekdayRow {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
