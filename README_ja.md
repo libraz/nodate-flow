@@ -54,6 +54,7 @@ make seed-flow    # デモ管理ユーザー + ワークスペース
 
 ```
 make dev-time     # カレンダースタックを起動
+make test-unit    # コンテナ不要の Go + TS テスト
 make test         # Go + TS テスト
 make gen          # codegen (sqlc + errors + SDK)
 make help         # 全ターゲット一覧

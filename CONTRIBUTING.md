@@ -29,7 +29,9 @@ make dev                       # runs Go API + React frontend in parallel
 | `make dev-api` | Run Go API only |
 | `make dev-web` | Run Vite dev server only |
 | `make lint` | Run all linters (golangci-lint + biome) |
-| `make test` | Run all tests |
+| `make check` | Static guards only -- lint, formatting, typecheck, `go vet`, locale and token guards |
+| `make test-unit` | Every suite that needs no container (Go + TS) |
+| `make test` | Run all tests, including the container-backed suites |
 | `make gen-errors` | Regenerate Go + TS error code files from `errors/*.yaml` |
 | `make gen-sqlc` | Regenerate sqlc Go types from `sql/` |
 | `make gen-sdk` | Regenerate TypeScript SDK from OpenAPI spec |
@@ -74,9 +76,11 @@ Detailed conventions live in `docs/conventions/`:
    The derived_state is updated by the constraint engine, not directly.
    ```
 
-3. **CI must be green**. The pre-commit hook runs biome (TS) and lint-staged
-   automatically. CI runs the full suite: biome, golangci-lint, typecheck,
-   and all test layers. `--no-verify` is not allowed.
+3. **CI must be green**. The pre-commit hook runs biome over the staged
+   files, the codegen checks whose inputs are staged, and the test suites
+   the staged files can break. CI runs the full suite: biome,
+   golangci-lint, typecheck, and all test layers. `--no-verify` is not
+   allowed.
 
 4. **Include tests**. Every feature PR must include corresponding tests.
    Test-less feature PRs will not be merged.
@@ -115,10 +119,23 @@ Tests must be parallel-safe. Use `createTestTenant` / `cleanupTenant` helpers
 to isolate test data. Never depend on execution order.
 
 ```sh
-make test              # run everything
+make test-unit         # everything that needs no container
+make test              # the above plus the container-backed suites
 make test-api          # Go tests only
 make test-web          # frontend tests only
 ```
+
+The suites come in tiers, and the tier decides where each one can run:
+
+| Tier | What it is | Where it runs |
+|---|---|---|
+| `make check` | Static guards. Reads the sources, runs no behaviour. | Locally, and step by step in CI |
+| `make test-unit` | Every suite that needs no container. No `-race`, and `-short` skips the whole-module source scanners. | Locally, and in the pre-commit hook, narrowed to the staged changes |
+| `make test` | The above plus the suites that boot MySQL and MinIO. Minutes, and they contend for the container reaper. | Locally on demand, and in full in CI |
+
+Nothing a faster tier skips is skipped everywhere: CI runs every suite
+with `-race` and without `-short`. The tiers exist to move the fast half
+of the signal before the commit, not to check less.
 
 ## Error codes
 
@@ -170,9 +187,12 @@ make db-schema   # layered sources -> sql/schema.sql
 make gen-sqlc    # schema + queries -> apps/*/internal/db/generated/
 ```
 
-`make verify-codegen` checks the pairing without writing anything, and
-is what the pre-commit hook and CI both run. The generator version is
-pinned in `scripts/check-codegen-drift.sh`, because two sqlc versions
+`make verify-codegen` checks the pairing without writing anything. CI
+runs the whole target; the pre-commit hook runs each check behind a gate
+on its own inputs, so a commit that touches none of them pays nothing and
+one that touches the schema, the error catalog, the signal-kind registry
+or the holiday provider is checked before it lands. The generator version
+is pinned in `scripts/check-codegen-drift.sh`, because two sqlc versions
 emit different code from identical input.
 
 ### Hooks
@@ -182,6 +202,18 @@ repository and reached through the global hooks directory. When
 `core.hooksPath` is configured, git ignores `.git/hooks` entirely, so
 anything a package manager installs there never runs; `git rev-parse
 --git-path hooks` shows which directory git actually reads.
+
+Every check in it is scoped to what was staged, because a hook that
+makes you wait on work you did not touch is a hook people learn to
+bypass. It formats and lints the staged files, runs the codegen checks
+whose inputs are among them, and runs the test suites those files can
+break -- the module or workspace holding each one, plus whatever
+replaces or depends on it. Container-backed suites stay out.
+
+One limitation worth knowing: the suites exercise the working tree, not
+the staged content, so a partially staged file is tested as it sits on
+disk. Isolating the staged half would mean stashing, which can discard
+work outright.
 
 ## License
 

@@ -60,6 +60,7 @@ make seed-flow    # demo admin user + workspace
 
 ```
 make reload       # stop-dev (kill by port) + dev, for a clean restart
+make test-unit    # Go + TS suites that need no container
 make test         # Go + TS tests
 make gen          # codegen (sqlc + errors + SDK)
 make help         # all targets
