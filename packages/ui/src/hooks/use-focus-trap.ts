@@ -26,6 +26,18 @@
  *      microtask, we let every sibling cleanup unwind first; the lock has
  *      removed `inert` from the opener's ancestor by the time the
  *      microtask runs, so focus actually lands on the trigger.
+ *
+ *   3. The snapshot is only consumed by a restoration that actually runs,
+ *      and a restoration only runs if the trap is still deactivated when
+ *      the microtask fires. Under StrictMode React mounts effects, tears
+ *      them down, and mounts them again **without re-rendering**, so a
+ *      cleanup that cleared the snapshot would destroy the only copy of
+ *      the opener: the render-phase capture cannot re-run, and the real
+ *      close later would have nothing to focus, leaving `<body>` active.
+ *      Each setup takes an activation number; a cleanup restores focus
+ *      only while its own activation is still the latest, which tells a
+ *      genuine close apart from a remount that immediately re-armed the
+ *      trap.
  */
 
 import { type RefObject, useLayoutEffect, useRef } from 'react';
@@ -45,17 +57,24 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
   // Render-phase capture. We snapshot the active element on the FIRST
   // render where `active` is true — before any layout effect (notably
   // `useOverlayLock`) gets a chance to mutate the DOM and move focus.
-  // The ref is intentionally cleared in cleanup so the next activation
+  // The ref is cleared by the restoration itself, so the next activation
   // captures fresh.
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   if (active && previouslyFocusedRef.current === null && typeof document !== 'undefined') {
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
   }
 
+  // Incremented by every effect setup. A cleanup owns the snapshot only
+  // while its activation is still current.
+  const activationRef = useRef(0);
+
   useLayoutEffect(() => {
     if (!active) return;
     const container = containerRef.current;
     if (!container) return;
+
+    activationRef.current += 1;
+    const activation = activationRef.current;
 
     const getFocusable = (): HTMLElement[] => {
       return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
@@ -97,16 +116,24 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
     return () => {
       container.removeEventListener('keydown', onKeyDown);
       const toFocus = previouslyFocusedRef.current;
-      previouslyFocusedRef.current = null;
+      if (!toFocus) return;
+      const restore = (): void => {
+        // A later setup has re-armed the trap since this cleanup ran, so
+        // this was a remount rather than a close: the trap owns focus and
+        // the snapshot still belongs to whoever opened it.
+        if (activationRef.current !== activation) return;
+        previouslyFocusedRef.current = null;
+        toFocus.focus?.();
+      };
       // Defer to a microtask so any sibling layout-effect cleanups
       // (notably `useOverlayLock`, which removes `inert` from the
       // opener's ancestor) finish first. Otherwise focus() lands on an
       // element that the browser still considers inert and silently
       // redirects to `<body>`.
-      if (toFocus && typeof queueMicrotask === 'function') {
-        queueMicrotask(() => toFocus.focus?.());
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(restore);
       } else {
-        toFocus?.focus?.();
+        restore();
       }
     };
   }, [active, containerRef]);

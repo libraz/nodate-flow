@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
@@ -129,6 +129,46 @@ describe('Drawer overlay lock + background inert', () => {
     expect(document.activeElement).toBe(trigger);
 
     await user.click(trigger);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Apply' }));
+
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('restores focus to the opener after close under StrictMode', async () => {
+    // The apps mount under StrictMode, which runs an effect's setup,
+    // cleanup, and setup again without re-rendering. The trap captures
+    // the opener during render, so that second setup gets no fresh
+    // capture: a cleanup that cleared the snapshot left the real close
+    // with nothing to focus and dropped the page onto `<body>`.
+    function Opener() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" data-testid="trigger" onClick={() => setOpen(true)}>
+            open drawer
+          </button>
+          {open ? (
+            <Drawer open onClose={() => setOpen(false)} title="t">
+              <button type="button">Apply</button>
+            </Drawer>
+          ) : null}
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <Opener />
+      </StrictMode>,
+    );
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+
+    await user.click(trigger);
+    // The remount must not hand focus back to the opener either — the
+    // drawer is open, so the trap owns focus.
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Apply' }));
 
     await user.keyboard('{Escape}');

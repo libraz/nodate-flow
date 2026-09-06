@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, StrictMode, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
@@ -362,6 +362,47 @@ describe('Dialog overlay lock + background inert', () => {
     // After close: lock released, inert removed, focus restored to trigger.
     // The microtask scheduled by useFocusTrap cleanup is flushed by the
     // `await` on userEvent.keyboard.
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('restores focus to the opener after close under StrictMode', async () => {
+    // Both apps mount under StrictMode, where React runs an effect's
+    // setup, cleanup, and setup again without re-rendering in between.
+    // The trap's snapshot of the opener is taken during render, so it
+    // cannot be re-taken for that second setup: a cleanup that cleared
+    // the snapshot left the real close with nothing to focus and the
+    // page sitting on `<body>`.
+    function Opener(): ReactElement {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" data-testid="trigger" onClick={() => setOpen(true)}>
+            open dialog
+          </button>
+          {open ? (
+            <Dialog open onClose={() => setOpen(false)} title="t">
+              <button type="button">OK</button>
+            </Dialog>
+          ) : null}
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <Opener />
+      </StrictMode>,
+    );
+    const trigger = screen.getByTestId('trigger');
+    trigger.focus();
+
+    await user.click(trigger);
+    // The remount must not hand focus back to the opener either — the
+    // dialog is open, so the trap owns focus.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'OK' }));
+
+    await user.keyboard('{Escape}');
     expect(document.activeElement).toBe(trigger);
   });
 
