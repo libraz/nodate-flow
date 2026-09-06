@@ -31,46 +31,50 @@ func TestValidateActors(t *testing.T) {
 		// --- zero actors ------------------------------------------------
 		{
 			name:      "none set is allowed (legacy system actor)",
-			evt:       Event{Type: "task.created", WorkspaceID: 1},
+			evt:       Event{Type: TaskCreated, WorkspaceID: 1},
 			expectErr: false,
 		},
 		// --- exactly one actor ------------------------------------------
 		{
 			name:      "user-only is allowed",
-			evt:       Event{Type: "task.created", WorkspaceID: 1, ActorUserID: &userOne},
+			evt:       Event{Type: TaskCreated, WorkspaceID: 1, ActorUserID: &userOne},
 			expectErr: false,
 		},
 		{
 			name:      "agent-only is allowed",
-			evt:       Event{Type: "ai.agent.run.started", WorkspaceID: 1, ActorAgentID: &agentOne},
+			evt:       Event{Type: AiAgentRunStarted, WorkspaceID: 1, ActorAgentID: &agentOne},
 			expectErr: false,
 		},
 		{
+			// SignalAttached is the event a worker tick produces: the
+			// calendar worker ingests a signal, and the event recording that
+			// carries the worker as its system source. The signal's own kind
+			// belongs to the signalkinds registry, not this one.
 			name:      "system-source-only is allowed",
-			evt:       Event{Type: "calendar.event_day_arrived", WorkspaceID: 1, ActorSystemSource: "worker.calendar"},
+			evt:       Event{Type: SignalAttached, WorkspaceID: 1, ActorSystemSource: "worker.calendar"},
 			expectErr: false,
 		},
 		// --- two actors -------------------------------------------------
 		{
 			name:      "user + agent is rejected",
-			evt:       Event{Type: "task.created", WorkspaceID: 1, ActorUserID: &userOne, ActorAgentID: &agentOne},
+			evt:       Event{Type: TaskCreated, WorkspaceID: 1, ActorUserID: &userOne, ActorAgentID: &agentOne},
 			expectErr: true,
 		},
 		{
 			name:      "user + system is rejected",
-			evt:       Event{Type: "task.created", WorkspaceID: 1, ActorUserID: &userOne, ActorSystemSource: "worker.retention"},
+			evt:       Event{Type: TaskCreated, WorkspaceID: 1, ActorUserID: &userOne, ActorSystemSource: "worker.retention"},
 			expectErr: true,
 		},
 		{
 			name:      "agent + system is rejected",
-			evt:       Event{Type: "task.created", WorkspaceID: 1, ActorAgentID: &agentOne, ActorSystemSource: "worker.calendar"},
+			evt:       Event{Type: TaskCreated, WorkspaceID: 1, ActorAgentID: &agentOne, ActorSystemSource: "worker.calendar"},
 			expectErr: true,
 		},
 		// --- all three actors -------------------------------------------
 		{
 			name: "all three set is rejected",
 			evt: Event{
-				Type:              "task.created",
+				Type:              TaskCreated,
 				WorkspaceID:       1,
 				ActorUserID:       &userOne,
 				ActorAgentID:      &agentOne,

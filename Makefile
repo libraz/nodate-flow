@@ -152,7 +152,7 @@ override NF_TEST_INTEGRATION := 1
 endif
 NF_TEST_INTEGRATION ?= 1
 
-.PHONY: test test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-holidays test-e2e test-contract test-openapi-diff test-schema-diff verify-codegen test-core-contract lighthouse
+.PHONY: test test-unit test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-holidays test-e2e test-contract test-openapi-diff test-schema-diff verify-codegen test-core-contract lighthouse
 
 # Every module that ships code has a target here and every target is
 # reachable from `test`. A suite nothing invokes is indistinguishable
@@ -169,6 +169,22 @@ GO_TEST_P ?= 4
 
 test: test-api test-auth-api test-worker test-presence test-go-shared \
       test-cli test-web test-accounts-web test-ui test-sdk test-holidays ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
+
+# The rung between `make check` and `make test`. `check` reads the sources
+# and runs no behaviour; `test` boots MySQL and MinIO through
+# testcontainers and takes minutes. Neither is something to run on every
+# commit, which is how a commit whose unit tests fail reaches the branch
+# with every local gate reporting green.
+#
+# This runs the suites in between: no container, no whole-module source
+# scan, the Go test cache left on. The same script backs the pre-commit
+# hook, which passes --staged to narrow the run to the modules and
+# workspaces a staged file can break — the module holding it, plus the ones
+# that replace or depend on that module. Discovery lives in the script
+# rather than here because the hook needs the path-to-module mapping too,
+# and one derivation cannot disagree with itself.
+test-unit: ## Run every suite that needs no container (Go -short, every TS workspace)
+	node scripts/run-unit-tests.mjs
 
 test-api: test-api-mock test-api-real ## Go tests (flow) — both NF_FLOW_AI_MOCK on and off
 
@@ -275,8 +291,8 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-metrics-wiring
-check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-metrics-wiring ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + tool response internal-id guard + goroutine FailNow guard + AI invocation outcome guard + calendar write-ACL guard + metrics wiring guard
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + tool response internal-id guard + goroutine FailNow guard + AI invocation outcome guard + calendar write-ACL guard + event kind/payload guard + metrics wiring guard
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -319,6 +335,9 @@ check-ai-outcome: ## Fail when an LLM provider call's outcome is recorded on onl
 
 check-calendar-write-acl: ## Fail when a tool writes a calendar's contents without the rule the REST handlers apply to the same write
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/precondition/
+
+check-event-kinds: ## Fail when an event kind is written as a string literal, or an event payload field carries a row's internal id
+	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/eventkinds/
 
 check-dtos: ## Fail when web routes/features hand-roll response DTOs instead of using SDK schemas
 	bash scripts/check-handrolled-dtos.sh

@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/kindscan"
 )
 
 // TestAppendRejectsJudgeKindsFromOutsideApplier locks in that calling
@@ -151,7 +152,9 @@ func TestIsJudgeEventKind(t *testing.T) {
 		TaskCreated,
 		SignalAttached,
 		AiAgentRunStarted,
-		"completely.unknown",
+		// The guard must also say no to a kind that is not declared at
+		// all, which no constant can express.
+		kindscan.Undeclared("completely.unknown"),
 	}
 	for _, k := range out {
 		if IsJudgeEventKind(k) {

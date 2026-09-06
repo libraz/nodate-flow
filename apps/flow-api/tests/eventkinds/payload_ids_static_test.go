@@ -1,4 +1,4 @@
-package eventbus_test
+package eventkinds
 
 import (
 	"fmt"
@@ -25,21 +25,24 @@ import (
 // so it produces false positives, the false positives go into an
 // allowlist, and the allowlist is where the next real leak hides.
 func TestNoInternalIDsInEventPayloads(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping type-checking scan in -short mode")
-	}
-
 	root := moduleRoot(t)
 	dirs := payloadPackages(t, filepath.Join(root, "internal"))
 	if len(dirs) == 0 {
 		t.Fatal("no payload-building packages found; the scan would prove nothing")
 	}
 
-	// Each package is type-checked independently, and the check spends
-	// most of its time waiting on `go list -export`, so the packages are
-	// walked concurrently. Serially this is the slowest test in the
-	// module by an order of magnitude, and a guard nobody wants to wait
-	// for is a guard that gets skipped.
+	// One cache for every package below. Each is type-checked
+	// independently, but they import much the same things, and an import
+	// resolved a second time costs another `go list` subprocess rather
+	// than a map lookup.
+	cache := payloadscan.NewExportCache()
+	if err := cache.Warm(root); err != nil {
+		t.Fatalf("warm export cache: %v", err)
+	}
+
+	// The packages are still walked concurrently: what remains after the
+	// cache is type-checking, and that is work the checker will happily
+	// do on as many cores as it is given.
 	var (
 		mu   sync.Mutex
 		wg   sync.WaitGroup
@@ -57,7 +60,7 @@ func TestNoInternalIDsInEventPayloads(t *testing.T) {
 			if err != nil {
 				rel = dir
 			}
-			findings, err := payloadscan.Scan(payloadscan.Config{Dir: dir})
+			findings, err := payloadscan.Scan(payloadscan.Config{Dir: dir, Cache: cache})
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {

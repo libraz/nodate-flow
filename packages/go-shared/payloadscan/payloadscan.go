@@ -17,6 +17,7 @@
 package payloadscan
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -57,6 +58,11 @@ type Config struct {
 	// values carry an event payload. Defaults to "Payload" and
 	// "ExtraPayload".
 	PayloadFields []string
+	// Cache holds the export-data locations resolved so far. A caller
+	// scanning many packages passes one cache to all of them, so an
+	// import shared by two packages is resolved once rather than twice.
+	// Nil means this scan resolves everything itself.
+	Cache *ExportCache
 }
 
 // Scan type-checks the package in cfg.Dir and reports every id-shaped
@@ -96,9 +102,17 @@ func Scan(cfg Config) ([]Finding, error) {
 		return nil, fmt.Errorf("payloadscan: %s has no buildable Go files", cfg.Dir)
 	}
 
+	// A scan given no cache still memoises within itself: the packages of
+	// one import graph overlap heavily, and resolving the same path twice
+	// in one type-check would cost two subprocesses.
+	cache := cfg.Cache
+	if cache == nil {
+		cache = NewExportCache()
+	}
+
 	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
 	conf := types.Config{
-		Importer: NewExportImporter(fset),
+		Importer: cache.Importer(fset),
 		// Errors are collected by Check and returned below; a dependency
 		// that cannot be resolved must not silently downgrade the scan to
 		// "found nothing".
@@ -267,30 +281,94 @@ func isStringType(t types.Type) bool {
 	return ok && basic.Info()&types.IsString != 0
 }
 
-// NewExportImporter builds an importer backed by the export data `go
-// list` writes into the build cache. It keeps the scan on the standard
-// library: no analysis toolchain dependency has to be added to a module
-// that ships a server.
+// ExportCache remembers where `go list` put each package's export data.
 //
-// Exported because the sibling static scans type-check packages the same
-// way; a second copy of this would be a second place for the build-cache
-// lookup to go wrong.
-func NewExportImporter(fset *token.FileSet) types.Importer {
-	var mu sync.Mutex
-	cache := map[string]string{}
+// Resolving one import costs a `go list` subprocess, and a subprocess
+// costs a few hundred milliseconds. That is affordable once and ruinous
+// per package: a scan of N packages asks for the same handful of common
+// imports N times, so the cost of checking a module grows with the
+// product of its packages and its import graph rather than with its size.
+// The cache is what makes it grow with the size — it is safe to share
+// across goroutines and across packages, because the answer it stores is
+// a property of the build, not of the package that asked.
+type ExportCache struct {
+	mu    sync.Mutex
+	files map[string]string
+}
+
+// NewExportCache returns an empty cache. [ExportCache.Warm] fills it in
+// one subprocess; without that it fills itself one import at a time.
+func NewExportCache() *ExportCache {
+	return &ExportCache{files: map[string]string{}}
+}
+
+// Warm resolves every package under root, and everything those packages
+// import, in a single `go list`.
+//
+// It is worth a dedicated pass for two reasons. The obvious one is that
+// one subprocess replaces one per import path. The other is that the
+// concurrent scans would otherwise race to build the same export data,
+// and `go list -export` fails under that contention — surfacing as a
+// type-check error naming a symbol that plainly exists, which reads as a
+// defect in the scanned code rather than in the scanner.
+//
+// Test-only imports are deliberately not listed: covering them means
+// compiling every test package in the module, which costs more than the
+// per-import fallback resolves them for. They fall through to that
+// fallback and are cached from then on.
+func (c *ExportCache) Warm(root string) error {
+	cmd := exec.Command("go", "list", "-export", "-e", "-deps", "-f", "{{.ImportPath}}\t{{.Export}}", "./...")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		detail := ""
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			detail = ": " + strings.TrimSpace(string(exit.Stderr))
+		}
+		return fmt.Errorf("payloadscan: warm export cache in %s: %w%s", root, err, detail)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	found := 0
+	for _, line := range strings.Split(string(out), "\n") {
+		path, file, ok := strings.Cut(line, "\t")
+		if !ok || file == "" {
+			continue
+		}
+		c.files[path] = file
+		found++
+	}
+	// A warm pass that resolved nothing leaves every scan falling back to
+	// its own subprocess per import. That still produces the right answer,
+	// which is why it would go unnoticed: the only symptom is the guard
+	// quietly costing what it cost before the cache existed.
+	if found == 0 {
+		return fmt.Errorf("payloadscan: warm export cache in %s: `go list` named no package with export data", root)
+	}
+	return nil
+}
+
+// Importer returns an importer that reads export data through c, falling
+// back to a subprocess for a path the cache does not hold.
+//
+// The fset is the importer's, not the cache's: positions of imported
+// objects belong to the file set of the scan that asked for them, so a
+// cache shared between scans must not pin one.
+//
+// A nil cache resolves every import itself, which is what a caller
+// scanning a single package wants.
+func (c *ExportCache) Importer(fset *token.FileSet) types.Importer {
 	lookup := func(path string) (io.ReadCloser, error) {
-		mu.Lock()
-		file, known := cache[path]
-		mu.Unlock()
+		file, known := c.get(path)
 		if !known {
 			out, err := exec.Command("go", "list", "-export", "-f", "{{.Export}}", path).Output()
 			if err != nil {
 				return nil, fmt.Errorf("go list -export %s: %w", path, err)
 			}
 			file = strings.TrimSpace(string(out))
-			mu.Lock()
-			cache[path] = file
-			mu.Unlock()
+			c.put(path, file)
 		}
 		if file == "" {
 			return nil, fmt.Errorf("no export data for %s", path)
@@ -298,4 +376,35 @@ func NewExportImporter(fset *token.FileSet) types.Importer {
 		return os.Open(filepath.Clean(file))
 	}
 	return importer.ForCompiler(fset, "gc", lookup)
+}
+
+func (c *ExportCache) get(path string) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	file, known := c.files[path]
+	return file, known
+}
+
+func (c *ExportCache) put(path, file string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.files[path] = file
+}
+
+// NewExportImporter builds an importer backed by the export data `go
+// list` writes into the build cache, resolving each import as it is
+// asked for. It keeps the scan on the standard library: no analysis
+// toolchain dependency has to be added to a module that ships a server.
+//
+// Callers that type-check more than one package should build an
+// [ExportCache] and use [ExportCache.Importer] instead, so the packages
+// share what they resolve.
+func NewExportImporter(fset *token.FileSet) types.Importer {
+	return NewExportCache().Importer(fset)
 }

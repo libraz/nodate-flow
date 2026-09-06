@@ -1,4 +1,4 @@
-package eventbus_test
+package eventkinds
 
 import (
 	"testing"
@@ -18,13 +18,9 @@ import (
 // rather than preventing.
 //
 // This module has no file that legitimately spells a kind out: the
-// constants live in packages/go-shared/eventbus and this package
+// constants live in packages/go-shared/eventbus and internal/eventbus
 // re-exports them, so the allowlist is empty.
 func TestNoEventKindLiterals(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping type-checking scan in -short mode")
-	}
-
 	msgs, err := kindscan.ScanModule(moduleRoot(t))
 	if err != nil {
 		t.Fatalf("scan module: %v", err)

@@ -87,7 +87,7 @@ func TestAppendReverseEventReportsAlreadyReversed(t *testing.T) {
 	actor := int64(5)
 	origin := int64(763)
 	_, err := AppendReverseEvent(context.Background(), dbretry.AutoCommit(db), Event{
-		Type:            "ai.agent.run.completed",
+		Type:            AiAgentRunCompleted,
 		WorkspaceID:     209,
 		ActorUserID:     &actor,
 		ReversesEventID: &origin,

@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/kindscan"
 )
 
 // TestEventTriggeredBySignalIDFlowsThroughTimeline locks in that
@@ -87,13 +88,15 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 			wsInternalID, task.ID).Scan(&taskInternalID))
 	require.Greater(t, taskInternalID, int64(0))
 
-	// Append the traceable event. The chosen type ("task.note") is not
-	// a real production kind on purpose — we want to be sure the
-	// assertion is keyed on `triggered_by_signal_id` rather than
-	// matching any incidental event the handlers emit.
+	// Append the traceable event. The chosen type is not a declared kind
+	// on purpose — nothing else can emit it, so the two events this test
+	// appends are the only ones the kind filter below can return, and the
+	// assertion is keyed on `triggered_by_signal_id` rather than on
+	// whatever the handlers happened to emit.
+	noteKind := kindscan.Undeclared("task.note")
 	actorUserID := int64(userInternalID)
 	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
-		Type:                "task.note",
+		Type:                noteKind,
 		WorkspaceID:         wsInternalID,
 		ActorUserID:         &actorUserID,
 		TaskID:              &taskInternalID,
@@ -106,7 +109,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 	// And append a sibling event with no signal lineage so the null
 	// branch of the mapper gets exercised by the same response.
 	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
-		Type:        "task.note",
+		Type:        noteKind,
 		WorkspaceID: wsInternalID,
 		ActorUserID: &actorUserID,
 		TaskID:      &taskInternalID,
@@ -128,7 +131,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 		} `json:"events"`
 	}
 	doJSON(t, http.MethodGet,
-		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/timeline?kind=task.note",
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/timeline?kind="+string(noteKind),
 		tt.AccessToken, nil, &tl)
 	require.Equal(t, int64(2), tl.Total, "timeline must surface both synthetic events")
 	require.Len(t, tl.Events, 2)
@@ -138,7 +141,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 		withoutSignal int
 	)
 	for _, ev := range tl.Events {
-		require.Equal(t, "task.note", ev.Type)
+		require.Equal(t, string(noteKind), ev.Type)
 		require.Nil(t, ev.ActorSystemSource,
 			"events without a worker-tick origin must surface actorSystemSource as null")
 		if ev.TriggeredBySignalID != nil {
@@ -170,8 +173,12 @@ func TestEventActorSystemSourceFlowsThroughTimeline(t *testing.T) {
 
 	wsInternalID, _ := lookupWorkspaceAndOwner(ctx, t, tt.WorkspacePublicID)
 
+	// Undeclared for the same reason as above: no handler emits this
+	// kind, so the kind-filtered timeline below returns exactly the one
+	// event this test appended.
+	tickKind := kindscan.Undeclared("workspace.tick")
 	require.NoError(t, eventbus.Append(ctx, dbretry.AutoCommit(testDB), eventbus.Event{
-		Type:              "workspace.tick",
+		Type:              tickKind,
 		WorkspaceID:       wsInternalID,
 		ActorSystemSource: "worker.calendar",
 		Payload: map[string]any{
@@ -189,7 +196,7 @@ func TestEventActorSystemSourceFlowsThroughTimeline(t *testing.T) {
 		} `json:"events"`
 	}
 	doJSON(t, http.MethodGet,
-		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/timeline?kind=workspace.tick",
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/timeline?kind="+string(tickKind),
 		tt.AccessToken, nil, &tl)
 	require.Equal(t, int64(1), tl.Total)
 	require.Len(t, tl.Events, 1)

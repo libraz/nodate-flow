@@ -13,6 +13,14 @@
 // than prevents, and a package it is never pointed at is not covered.
 // It is here because the alternative is nothing.
 //
+// The second rule covers where the kind stops being one. An event is
+// stored in a text column, so the params struct that carries it into the
+// row holds a plain string, and at that field the type system has
+// nothing left to say — a literal, a local constant and a name built at
+// run time are all equally acceptable to it. The fields listed in
+// [KindField] must therefore be written from a value that was a Kind, so
+// the name goes through the registry on its way to the column.
+//
 // The scan resolves types rather than matching source text. Asking the
 // type checker what a literal will become answers precisely — it sees
 // through a helper's parameter list, and it does not mistake an
@@ -25,11 +33,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
+	"go/constant"
 	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -44,16 +52,37 @@ import (
 // the type checker spells it.
 const KindTypeName = "github.com/libraz/nodate-flow/packages/go-shared/eventbus.Kind"
 
-// Finding is one string literal the type checker resolved to an event
-// kind.
+// Finding is one place a kind is spelled out where a constant belongs:
+// a string literal the type checker resolved to an event kind, an
+// [Undeclared] call handed a kind that is in fact declared, or a
+// [KindField] written from something that was never a kind.
 type Finding struct {
 	// Pos is the "file:line:col" of the literal.
 	Pos string
-	// Value is the literal as written, unquoted.
+	// Value is the literal as written, unquoted. For a [Field] finding it
+	// is the offending expression as written instead — the value there is
+	// not always a literal, and naming it as the source spells it is what
+	// makes the report point at something the reader can find.
 	Value string
+	// ViaUndeclared marks the second case. The literal is typed string
+	// there — it is an argument, not a kind — so nothing about the value
+	// itself is wrong; what is wrong is claiming the kind does not exist
+	// when it does.
+	ViaUndeclared bool
+	// Field marks the third case and names the field written to, e.g.
+	// "AppendEventParams.Type". Empty for the other two.
+	Field string
 }
 
 func (f Finding) String() string {
+	if f.Field != "" {
+		return fmt.Sprintf("%s: %s is set from %s, which was never an event kind; "+
+			"write string(<constant from packages/go-shared/eventbus>) so the kind is declared and the name is traceable to the column", f.Pos, f.Field, f.Value)
+	}
+	if f.ViaUndeclared {
+		return fmt.Sprintf("%s: kindscan.Undeclared(%q) names a declared event kind; "+
+			"the escape is for kinds that deliberately do not exist — use the constant from packages/go-shared/eventbus", f.Pos, f.Value)
+	}
 	return fmt.Sprintf("%s: %q is written as a literal where an event kind is expected; "+
 		"use the constant from packages/go-shared/eventbus, and declare one there first if the kind is new", f.Pos, f.Value)
 }
@@ -66,6 +95,15 @@ type Config struct {
 	// that declares the constants is the only legitimate place a kind is
 	// written as a literal.
 	AllowFiles []string
+	// Cache holds the export-data locations resolved so far, shared by
+	// every package of one module scan. Nil means this scan resolves
+	// everything itself.
+	Cache *payloadscan.ExportCache
+	// Fields are the struct fields held to the origin rule. Nil means the
+	// set every module is held to; a scan naming its own is how this
+	// package's tests point the rule at a fixture, since testdata cannot
+	// import the generated structs the real set names.
+	Fields []KindField
 }
 
 // Scan type-checks the package in cfg.Dir and reports every string
@@ -74,6 +112,13 @@ type Config struct {
 // Test files are included: a literal in a test is how a kind that no
 // production code can name gets asserted on, and a test asserting a
 // spelling nothing emits is worse than no test at all.
+//
+// It also reports the one sanctioned way around the rule being used
+// wrongly. An [Undeclared] argument is typed string, so the literal rule
+// cannot see it — which is what lets a test name a kind that does not
+// exist, and would equally let one name a kind that does. The second
+// pass here rules that out, so the escape widens to exactly the values
+// no constant covers.
 func Scan(cfg Config) ([]Finding, error) {
 	allow := map[string]bool{}
 	for _, name := range cfg.AllowFiles {
@@ -107,9 +152,26 @@ func Scan(cfg Config) ([]Finding, error) {
 		files = append(files, f)
 	}
 
-	info := &types.Info{Types: make(map[ast.Expr]types.TypeAndValue)}
+	// A scan given no cache still memoises within itself; see the same
+	// fallback in payloadscan.Scan.
+	cache := cfg.Cache
+	if cache == nil {
+		cache = payloadscan.NewExportCache()
+	}
+
+	info := &types.Info{
+		Types: make(map[ast.Expr]types.TypeAndValue),
+		// Uses resolves a call's callee to the function it names, which is
+		// how the Undeclared pass recognises the escape by identity rather
+		// than by the text "Undeclared" appearing in the source.
+		Uses: make(map[*ast.Ident]types.Object),
+		// Selections resolves `x.Field = v` to the struct the field belongs
+		// to, which is what lets the origin rule cover a params struct
+		// filled in after it is declared.
+		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+	}
 	conf := types.Config{
-		Importer: payloadscan.NewExportImporter(fset),
+		Importer: cache.Importer(fset),
 		// Errors are collected by Check and returned below. A dependency
 		// that will not resolve must not quietly downgrade the scan to
 		// "found nothing", which is what a passing guard looks like.
@@ -119,9 +181,47 @@ func Scan(cfg Config) ([]Finding, error) {
 		return nil, fmt.Errorf("kindscan: type-check %s: %w", cfg.Dir, err)
 	}
 
+	fields := cfg.Fields
+	if fields == nil {
+		fields = kindFields
+	}
+
 	var findings []Finding
+	report := func(pos token.Position, value string, viaUndeclared bool) {
+		if allow[filepath.Base(pos.Filename)] {
+			return
+		}
+		findings = append(findings, Finding{Pos: pos.String(), Value: value, ViaUndeclared: viaUndeclared})
+	}
+	reportFieldWrites := func(writes []fieldWrite) {
+		for _, w := range writes {
+			pos := fset.Position(w.expr.Pos())
+			if allow[filepath.Base(pos.Filename)] {
+				continue
+			}
+			findings = append(findings, Finding{
+				Pos:   pos.String(),
+				Value: types.ExprString(w.expr),
+				Field: w.field.String(),
+			})
+		}
+	}
 	for _, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok {
+				if value, pos, bad := badUndeclaredCall(fset, info, call); bad {
+					report(pos, value, true)
+				}
+				return true
+			}
+			if composite, ok := n.(*ast.CompositeLit); ok {
+				reportFieldWrites(compositeFieldWrites(info, fields, composite))
+				return true
+			}
+			if assign, ok := n.(*ast.AssignStmt); ok {
+				reportFieldWrites(assignFieldWrites(info, fields, assign))
+				return true
+			}
 			lit, ok := n.(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
 				return true
@@ -130,7 +230,14 @@ func Scan(cfg Config) ([]Finding, error) {
 			if !ok || tv.Type == nil {
 				return true
 			}
-			named, ok := tv.Type.(*types.Named)
+			// Unalias first. A module that re-exports the kind type —
+			// `type Kind = eventbus.Kind`, which is exactly what a package
+			// does to spare its call sites a second import — makes every
+			// literal typed through that spelling a types.Alias rather than
+			// a types.Named. Asserting straight to *types.Named skipped
+			// them, so the guard was blind to the one spelling the
+			// re-export exists to encourage.
+			named, ok := types.Unalias(tv.Type).(*types.Named)
 			if !ok || named.String() != KindTypeName {
 				return true
 			}
@@ -140,20 +247,51 @@ func Scan(cfg Config) ([]Finding, error) {
 				// push callers into naming a kind they do not have.
 				return true
 			}
-			pos := fset.Position(lit.Pos())
-			if allow[filepath.Base(pos.Filename)] {
-				return true
-			}
 			value, uerr := strconv.Unquote(lit.Value)
 			if uerr != nil {
 				value = lit.Value
 			}
-			findings = append(findings, Finding{Pos: pos.String(), Value: value})
+			report(fset.Position(lit.Pos()), value, false)
 			return true
 		})
 	}
 	sort.Slice(findings, func(i, j int) bool { return findings[i].Pos < findings[j].Pos })
 	return findings, nil
+}
+
+// badUndeclaredCall reports whether call is [Undeclared] applied to a
+// constant that names a declared kind, and where.
+//
+// Only constant arguments are decided here. A value assembled at run
+// time is left to Undeclared's own check: the scanner would have to
+// evaluate the program to say anything about it, and answering "looks
+// fine" would be worse than not answering.
+func badUndeclaredCall(fset *token.FileSet, info *types.Info, call *ast.CallExpr) (string, token.Position, bool) {
+	if len(call.Args) != 1 {
+		return "", token.Position{}, false
+	}
+	var id *ast.Ident
+	switch fun := ast.Unparen(call.Fun).(type) {
+	case *ast.Ident:
+		id = fun
+	case *ast.SelectorExpr:
+		id = fun.Sel
+	default:
+		return "", token.Position{}, false
+	}
+	fn, ok := info.Uses[id].(*types.Func)
+	if !ok || fn.FullName() != UndeclaredFuncName {
+		return "", token.Position{}, false
+	}
+	tv, ok := info.Types[call.Args[0]]
+	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
+		return "", token.Position{}, false
+	}
+	value := constant.StringVal(tv.Value)
+	if !IsDeclaredKind(value) {
+		return "", token.Position{}, false
+	}
+	return value, fset.Position(call.Pos()), true
 }
 
 // ScanModule type-checks every eventbus-referencing package under root
@@ -173,7 +311,12 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 	if len(dirs) == 0 {
 		return nil, fmt.Errorf("kindscan: no package under %s references the eventbus; a scan here would prove nothing", root)
 	}
-	if err := warmExportCache(root); err != nil {
+	// One cache for the whole module. Every package here imports much of
+	// what its neighbours import, and each resolved import costs a
+	// subprocess, so a cache per package makes the scan cost the packages
+	// times the import graph instead of the sum of the two.
+	cache := payloadscan.NewExportCache()
+	if err := cache.Warm(root); err != nil {
 		return nil, err
 	}
 
@@ -190,7 +333,7 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			findings, serr := Scan(Config{Dir: dir, AllowFiles: allowFiles})
+			findings, serr := Scan(Config{Dir: dir, AllowFiles: allowFiles, Cache: cache})
 			mu.Lock()
 			defer mu.Unlock()
 			if serr != nil {
@@ -208,32 +351,20 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 	return msgs, nil
 }
 
-// warmExportCache builds the module's export data once, serially, before
-// the concurrent scan starts.
-//
-// Without it the first scan to need a package races every other scan
-// that needs the same one, and `go list -export` fails under the
-// contention. The failure surfaces as a type-check error naming a symbol
-// that plainly exists, which reads as a defect in the scanned code
-// rather than in the scanner — so it is worth one subprocess to remove.
-func warmExportCache(root string) error {
-	cmd := exec.Command("go", "list", "-export", "-e", "./...")
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("kindscan: warm export cache in %s: %w: %s", root, err, out)
-	}
-	return nil
-}
-
 // Packages lists the package directories under root worth type-checking:
-// those whose source mentions the eventbus package at all.
+// those whose source mentions the eventbus package, or one of the structs
+// that carry a kind into a row.
 //
 // Narrowing by text first is a cost decision, not a correctness one — a
-// package that never names the eventbus cannot hold a literal the
-// checker would resolve to Kind. Discovering the rest by walking means a
-// new package is covered the day it is written rather than the day
-// somebody remembers to list it.
+// package that names none of these cannot hold a write either rule would
+// report. The second half of the marker set is not an optimisation
+// detail: the scheduler that appended `calendar.reminder` never mentioned
+// the eventbus, so the walk did not reach it, and a scan that never looks
+// at a file reports the same nothing as one that finds it clean.
+// Discovering the rest by walking means a new package is covered the day
+// it is written rather than the day somebody remembers to list it.
 func Packages(root string) ([]string, error) {
+	markers := append([]string{"eventbus"}, fieldMarkers(kindFields)...)
 	seen := map[string]struct{}{}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -253,8 +384,11 @@ func Packages(root string) ([]string, error) {
 		if rerr != nil {
 			return rerr
 		}
-		if strings.Contains(string(src), "eventbus") {
-			seen[filepath.Dir(path)] = struct{}{}
+		for _, marker := range markers {
+			if strings.Contains(string(src), marker) {
+				seen[filepath.Dir(path)] = struct{}{}
+				break
+			}
 		}
 		return nil
 	})
