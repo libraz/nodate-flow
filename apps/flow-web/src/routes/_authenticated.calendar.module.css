@@ -127,9 +127,14 @@
      cell border stays neutral so the row stays calm. */
 }
 
+/* The day a drop would land on.
+   The ring is carried on the border and an inset shadow rather than on a
+   fill alone: a finger covers the middle of a cell, and the only part of
+   the target still visible under it is its edge. */
 .cell--dragOver {
   background: var(--nf-color-accent-subtle);
-  border: 2px dashed var(--nf-color-accent);
+  border-color: var(--nf-color-accent);
+  box-shadow: inset 0 0 0 2px var(--nf-color-accent);
 }
 
 .cellHeader {
@@ -293,24 +298,111 @@
   padding-inline: var(--nf-space-1);
 }
 
-/* Draggable event pills get the grab affordance + a subtle hover lift,
-   mirroring the task pill. Recurring masters omit this class and keep
-   the default cursor. */
+/* Every event pill is movable, repeating ones included — a repeating
+   occurrence dropped elsewhere raises the scope question instead of
+   refusing the gesture. */
 .eventPill--draggable {
   cursor: grab;
-}
-
-.eventPill--draggable:active {
-  cursor: grabbing;
 }
 
 .eventPill--draggable:hover {
   box-shadow: inset 0 0 0 1px var(--nf-color-border);
 }
 
-/* The dragged source pill fades while the ghost is in flight. */
-.eventPill--draggable:active {
-  opacity: 0.6;
+/* ───── pointer drag ───── */
+
+/* A finger has to hold still before a pill lifts, and there is no cursor
+   to say so. The pill draws itself in during the hold and settles into
+   the lifted state at the end of it, so the wait reads as the gesture
+   working rather than as nothing happening. */
+.pill--holding {
+  transform: scale(0.97);
+  transition: transform var(--nf-duration-slow) var(--nf-ease-standard);
+  cursor: grabbing;
+}
+
+/* The source keeps its place in the day while the moving copy is out —
+   dimmed to an outline, so the row does not reflow mid-gesture and the
+   day it came from stays readable. */
+.pill--lifted {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+
+/* The moving copy. Physical viewport coordinates drive its transform, so
+   it is anchored at the origin and never laid out. */
+.dragProxy {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: var(--nf-z-popover);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-px) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-surface);
+  border: 1px solid var(--nf-color-accent);
+  box-shadow: var(--nf-shadow-lg);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+
+.dragProxy__marker {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.dragProxy__marker--dot {
+  transform: none;
+  border-radius: var(--nf-radius-pill);
+}
+
+.dragProxy__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-inline-size: 0;
+}
+
+/* Names the day the drop would reach, since a fingertip covers the cell
+   highlight it would otherwise be read from. */
+.dragProxy__target {
+  color: var(--nf-color-accent-fg);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  padding-inline-start: var(--nf-space-1);
+  border-inline-start: 1px solid var(--nf-color-border);
+}
+
+/* A press that becomes a drag must not also select the text under it or
+   raise the platform's long-press callout. */
+.taskPill,
+.eventPill {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Announces the day under the pointer to a screen reader, which has no
+   other way to read a gesture. */
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ───── mobile rail drawer ───── */
@@ -321,8 +413,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .eventPill--draggable {
+  .pill--holding {
     transition: none;
+    transform: none;
   }
 }
 

@@ -187,7 +187,10 @@
     "reschedule_error": "Failed to update due date",
     "event_move_success": "Event moved",
     "event_move_error": "Failed to move event",
-    "event_recurring_no_drag": "{title} · {workspace} (recurring events can't be dragged)",
+    "drag": {
+      "to_date": "Move to {date}",
+      "no_target": "Release to cancel"
+    },
     "month_scroll": {
       "aria_label": "Month calendar, scroll vertically by week",
       "day_label": "{date}",
@@ -760,6 +763,12 @@
       "preview": "Preview",
       "write": "Write",
       "preview_empty": "Nothing to preview"
+    },
+    "mentions": {
+      "listbox_label": "People you can mention",
+      "loading": "Loading people…",
+      "load_failed": "Could not load the people in this workspace",
+      "results": "{count, plural, =0 {No matching people} one {# person} other {# people}}"
     },
     "detail": {
       "title_edit": "Edit title",

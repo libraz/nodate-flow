@@ -187,7 +187,10 @@
     "reschedule_error": "期日の更新に失敗しました",
     "event_move_success": "イベントを移動しました",
     "event_move_error": "イベントの移動に失敗しました",
-    "event_recurring_no_drag": "{title} · {workspace}（繰り返しイベントはドラッグできません）",
+    "drag": {
+      "to_date": "{date} へ移動",
+      "no_target": "離すとキャンセル"
+    },
     "month_scroll": {
       "aria_label": "月間カレンダー、週単位で縦にスクロール",
       "day_label": "{date}",
@@ -760,6 +763,12 @@
       "preview": "プレビュー",
       "write": "編集",
       "preview_empty": "プレビューする内容がありません"
+    },
+    "mentions": {
+      "listbox_label": "メンションできるメンバー",
+      "loading": "メンバーを読み込んでいます…",
+      "load_failed": "このワークスペースのメンバーを読み込めませんでした",
+      "results": "{count, plural, =0 {該当するメンバーはいません} other {# 人が該当}}"
     },
     "detail": {
       "title_edit": "タイトルを編集",

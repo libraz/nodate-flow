@@ -187,7 +187,10 @@
     "reschedule_error": "更新截止日期失败",
     "event_move_success": "已移动事件",
     "event_move_error": "移动事件失败",
-    "event_recurring_no_drag": "{title} · {workspace}（重复事件无法拖动）",
+    "drag": {
+      "to_date": "移动到 {date}",
+      "no_target": "松开即取消"
+    },
     "month_scroll": {
       "aria_label": "月历，按周垂直滚动",
       "day_label": "{date}",
@@ -760,6 +763,12 @@
       "preview": "预览",
       "write": "编写",
       "preview_empty": "暂无可预览内容"
+    },
+    "mentions": {
+      "listbox_label": "可提及的成员",
+      "loading": "正在加载成员…",
+      "load_failed": "无法加载此工作区的成员",
+      "results": "{count, plural, =0 {没有匹配的成员} other {匹配 # 位成员}}"
     },
     "detail": {
       "title_edit": "编辑标题",

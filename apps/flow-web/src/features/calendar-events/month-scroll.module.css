@@ -121,6 +121,15 @@
   border-inline-end: none;
 }
 
+/* The day a drop would land on.
+   Carried on an inset ring rather than on a fill alone: a fingertip
+   covers the middle of a column this narrow, and its edge is the only
+   part of the target still visible under one. */
+.dayCol--dragOver {
+  background: var(--nf-color-accent-subtle);
+  box-shadow: inset 0 0 0 2px var(--nf-color-accent);
+}
+
 .dayHead {
   all: unset;
   display: flex;
@@ -341,8 +350,40 @@
   padding-inline: var(--nf-space-1);
 }
 
+/* ───── pointer drag ───── */
+
+/* A press that becomes a drag must not also select the text under it or
+   raise the platform's long-press callout — the gesture's own hold and
+   the system's fire at the same moment. */
+.chip,
+.bar {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* A finger has to hold still before a pill lifts, and there is no cursor
+   to say so. The pill draws itself in during the hold and settles into
+   the lifted state at the end of it, so the wait reads as the gesture
+   working rather than as nothing happening. */
+.pill--holding {
+  transform: scale(0.94);
+  transition: transform var(--nf-duration-slow) var(--nf-ease-standard);
+}
+
+/* The source keeps its place in the day while the moving copy is out —
+   dimmed to an outline, so the row does not reflow mid-gesture and the
+   day it came from stays readable. */
+.pill--lifted {
+  opacity: 0.35;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dayHead {
     transition: none;
+  }
+
+  .pill--holding {
+    transition: none;
+    transform: none;
   }
 }

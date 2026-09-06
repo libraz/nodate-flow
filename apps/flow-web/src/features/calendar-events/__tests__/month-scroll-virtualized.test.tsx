@@ -37,13 +37,14 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** @param spanDays Calendar days the event covers; 1 is a single-day event. */
 function makeEvent(id: string, start: Date, title: string, spanDays = 1): CalendarEvent {
   return {
     allDay: false,
     attendeeCount: 0,
     calendarId: 'cal-1',
     createdAt: 0,
-    endAt: Math.floor((start.getTime() + spanDays * MS_PER_DAY + 3_600_000) / 1000),
+    endAt: Math.floor((start.getTime() + (spanDays - 1) * MS_PER_DAY + 3_600_000) / 1000),
     flexibility: 'fixed',
     id,
     kind: 'event',
@@ -148,12 +149,9 @@ function stubElementMetrics(): void {
 
 const today = new Date();
 today.setHours(0, 0, 0, 0);
-// Spans two days so it lays out as a bar; the view only renders chips
-// for single-day events in weeks that already have a bar, which is how
-// it behaved before virtualizing and is not what these tests are about.
-const todayEvent = makeEvent('today-evt', new Date(today.getTime() + 9 * 3_600_000), 'Standup', 1);
+const todayEvent = makeEvent('today-evt', new Date(today.getTime() + 9 * 3_600_000), 'Standup');
 // A second event two months out, far outside the rendered window.
-const farEvent = makeEvent('far-evt', new Date(today.getTime() + 60 * MS_PER_DAY), 'Offsite', 1);
+const farEvent = makeEvent('far-evt', new Date(today.getTime() + 60 * MS_PER_DAY), 'Offsite');
 
 function renderView(): ReturnType<typeof render> {
   const noop = (): void => {};

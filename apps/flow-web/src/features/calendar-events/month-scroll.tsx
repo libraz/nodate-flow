@@ -14,8 +14,18 @@
  * event, open task, reschedule) flow back through callbacks.
  *
  * All visual values resolve from design tokens; see the sibling CSS
- * module. Drag-to-move is desktop-only (HTML5 DnD is poor on touch), so
- * this surface is tap-to-open.
+ * module.
+ *
+ * An event is moved to another day by the same gesture the desktop grid
+ * uses ({@link usePointerDrag}, passed in whole by the route): a finger
+ * holds a pill still, lifts it, and drops it on a day. Two things are
+ * this view's own. The gesture refuses the native scroll while it is
+ * lifted, so the hook moves the scroll body itself when the drag rests
+ * near its edge — without that the reachable days would be the six or
+ * seven already on screen. And the rows are virtualized, so the row the
+ * drag started in is held in the range until the gesture ends: recycled,
+ * it would take the lifted pill and the pointer capture with it, and a
+ * drag that scrolled into another month would die on the way.
  */
 
 import type { HolidayEntry } from '@nodate-flow/holidays';
@@ -24,10 +34,20 @@ import { cx } from '@nodate-flow/ui/lib/cx';
 import { Day, type Zone } from '@nodate-flow/ui/time';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
-import { type ReactElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+  type ReactElement,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { dateKey, todayKey as todayKeyIn } from '../../lib/date-utils';
+import type { CalendarDragPayload } from './lib/drag-payload';
+import type { PointerDragHandle } from './lib/pointer-drag';
 import {
   eventStartKey,
   groupEventsByWeek,
@@ -176,6 +196,12 @@ export interface MonthScrollProps {
   stateColor: (derivedState: string) => string;
   /** Bumped by the toolbar "Today" button to request a re-scroll. */
   scrollToTodaySignal: number;
+  /**
+   * The route's move gesture, shared with the desktop grid. Omitted, the
+   * view is tap-only — every day an event can be dropped on can still be
+   * typed into the dialog, so nothing is unreachable without it.
+   */
+  drag?: PointerDragHandle<CalendarDragPayload>;
   /** Open the unified create dialog for an empty cell. */
   onDayCreate: (dateKey: string) => void;
   /** Open an event in edit mode. */
@@ -190,6 +216,39 @@ const TRACK_REM = 1.25;
 /** Shared empty list so weeks with no events keep a stable prop identity. */
 const EMPTY_EVENTS: CalendarEvent[] = [];
 
+/** A single-day event and the track it was placed on within its day. */
+interface ChipSlot {
+  track: number;
+  evt: CalendarEvent;
+}
+
+/** The tracks one day column has spoken for: bars first, then its own chips. */
+interface DayTracks {
+  /** Tracks held by multi-day bars crossing this column. */
+  reserved: Set<number>;
+  /** Single-day chips, each on the lowest track no bar had taken. */
+  slots: ChipSlot[];
+}
+
+/** Stands in for a column index the row layout has no entry for. */
+const EMPTY_DAY_TRACKS: DayTracks = { reserved: new Set<number>(), slots: [] };
+
+/**
+ * The day column a press landed on inside a multi-day bar.
+ *
+ * A bar covers several days at once, and a drag moves an event by the
+ * distance the pill travelled — so the day it was taken hold of is what
+ * the delta is measured from, not the day the bar happens to begin on
+ * (which, for a week it only passes through, is not even its own).
+ */
+function grabbedColumn(e: ReactPointerEvent<HTMLElement>, p: PositionedEvent): number {
+  const rect = e.currentTarget.getBoundingClientRect();
+  if (rect.width <= 0) return p.startCol;
+  const ratio = (e.clientX - rect.left) / rect.width;
+  const offset = Math.min(p.span - 1, Math.max(0, Math.floor(ratio * p.span)));
+  return p.startCol + offset;
+}
+
 interface WeekRowProps {
   weekStart: Date;
   /** Effective zone; see MonthScrollProps.zone. */
@@ -199,6 +258,10 @@ interface WeekRowProps {
   holidaysByDate: Map<string, HolidayEntry[]>;
   todayKey: string;
   stateColor: (derivedState: string) => string;
+  /** Shared move gesture; see MonthScrollProps.drag. */
+  drag?: PointerDragHandle<CalendarDragPayload> | undefined;
+  /** Day key a drop would land on right now, or null. */
+  dragOverKey: string | null;
   onDayCreate: (dateKey: string) => void;
   onEventOpen: (event: CalendarEvent) => void;
   onTaskOpen: (task: CalendarTask) => void;
@@ -212,6 +275,8 @@ function WeekRow({
   holidaysByDate,
   todayKey,
   stateColor,
+  drag,
+  dragOverKey,
   onDayCreate,
   onEventOpen,
   onTaskOpen,
@@ -243,31 +308,60 @@ function WeekRow({
     return map;
   }, [events, week, zone]);
 
-  // Tracks reserved by multi-day bars for each day column.
-  const reservedByCol = useMemo(() => {
-    return week.map((_, col) => {
+  // Track assignment for every column of the row, resolved once. A
+  // multi-day bar holds the same track in each column it crosses, and a
+  // day's single-day chips take the lowest tracks those bars left free.
+  const dayTracks = useMemo<DayTracks[]>(() => {
+    return week.map((day, col) => {
       const reserved = new Set<number>();
       for (const p of positioned) {
         if (col >= p.startCol && col < p.startCol + p.span) reserved.add(p.track);
       }
-      return reserved;
+      const slots: ChipSlot[] = [];
+      const used = new Set(reserved);
+      let next = 0;
+      for (const evt of singleDayMap.get(dateKey(day)) ?? []) {
+        while (used.has(next)) next++;
+        slots.push({ track: next, evt });
+        used.add(next);
+        next++;
+      }
+      return { reserved, slots };
     });
-  }, [week, positioned]);
+  }, [week, positioned, singleDayMap]);
 
-  const tracksUsed = Math.min(
+  // The overlay is sized to the bars alone: nothing else is drawn into
+  // it, and it must not cover the chips beneath.
+  const barTracks = Math.min(
     MAX_VISIBLE_TRACKS,
     positioned.reduce((max, p) => Math.max(max, p.track + 1), 0),
+  );
+
+  // Every column of the row renders this many tracks, so a bar keeps the
+  // same vertical position across the days it spans and a busier day
+  // cannot push it out of line. The count is what the busiest column
+  // needs — bars and its own single-day chips alike, since a week with no
+  // bar still has chips to draw — capped at what a cell can show.
+  const rowTracks = Math.min(
+    MAX_VISIBLE_TRACKS,
+    dayTracks.reduce((max, day) => {
+      let needed = max;
+      for (const track of day.reserved) needed = Math.max(needed, track + 1);
+      for (const slot of day.slots) needed = Math.max(needed, slot.track + 1);
+      return needed;
+    }, 0),
   );
 
   return (
     <div className={styles.weekRow} data-week={dateKey(weekStart)}>
       {/* Multi-day bar overlay sits above the day columns. */}
-      {tracksUsed > 0 ? (
-        <div className={styles.barOverlay} style={{ blockSize: `${tracksUsed * TRACK_REM}rem` }}>
+      {barTracks > 0 ? (
+        <div className={styles.barOverlay} style={{ blockSize: `${barTracks * TRACK_REM}rem` }}>
           {positioned.map((p: PositionedEvent) => {
             if (p.track >= MAX_VISIBLE_TRACKS) return null;
             const insetStart = `calc(${(p.startCol * 100) / 7}% + var(--nf-space-px))`;
             const width = `calc(${(p.span * 100) / 7}% - var(--nf-space-1))`;
+            const sourceKey = `bar-${p.event.id}@${dateKey(weekStart)}-${p.startCol}`;
             return (
               <button
                 key={`${p.event.id}-${p.startCol}`}
@@ -276,6 +370,8 @@ function WeekRow({
                   styles.bar,
                   p.continuesLeft && styles['bar--clipStart'],
                   p.continuesRight && styles['bar--clipEnd'],
+                  drag?.holdingKey === sourceKey && styles['pill--holding'],
+                  drag?.drag?.sourceKey === sourceKey && styles['pill--lifted'],
                 )}
                 style={{
                   insetInlineStart: insetStart,
@@ -289,7 +385,22 @@ function WeekRow({
                   title: p.event.title,
                   workspace: p.event.workspaceName,
                 })}
-                onClick={() => onEventOpen(p.event)}
+                onPointerDown={(e) => {
+                  drag?.pressSource(e, sourceKey, {
+                    type: 'event',
+                    event: p.event,
+                    fromDate: dateKey(addDays(weekStart, grabbedColumn(e, p))),
+                    label: p.event.title,
+                    dotColor: markerColorForKind(p.event.kind),
+                  });
+                }}
+                onClick={() => {
+                  // A drag ends in a click on the pill it started from;
+                  // opening the dialog then would bury the move under a
+                  // form.
+                  if (drag?.wasDragged()) return;
+                  onEventOpen(p.event);
+                }}
               >
                 <span className={styles.barTitle}>{p.event.title}</span>
               </button>
@@ -305,28 +416,24 @@ function WeekRow({
           const dayHolidays = holidaysByDate.get(key) ?? [];
           const primaryHoliday = dayHolidays[0] ?? null;
           const dayTasks = tasksByDate.get(key) ?? [];
-          const reserved = reservedByCol[col] ?? new Set<number>();
+          const { reserved, slots } = dayTracks[col] ?? EMPTY_DAY_TRACKS;
 
-          // Place single-day chips into the tracks the bars left free.
-          const singles = singleDayMap.get(key) ?? [];
-          const slots: { track: number; evt: CalendarEvent }[] = [];
-          const used = new Set(reserved);
-          let next = 0;
-          for (const evt of singles) {
-            while (used.has(next)) next++;
-            slots.push({ track: next, evt });
-            used.add(next);
-            next++;
+          // What is genuinely not drawn: a bar or a chip whose track
+          // falls past the last one the row renders. An unfilled track is
+          // a spacer, not a hidden item, and tasks carry their own count
+          // in the list below.
+          let overflow = 0;
+          for (const track of reserved) {
+            if (track >= rowTracks) overflow++;
           }
-
-          const totalItems = reserved.size + singles.length + dayTasks.length;
-          const shownTracks = Math.min(MAX_VISIBLE_TRACKS, tracksUsed);
-          const overflow = Math.max(0, totalItems - shownTracks - dayTasks.length);
+          for (const slot of slots) {
+            if (slot.track >= rowTracks) overflow++;
+          }
 
           // Resolve each visible track to either a chip (single-day
           // event) or a spacer (reserved by a multi-day bar, or empty).
           // Keys embed the cell date so they are stable and unique.
-          const trackCells = Array.from({ length: shownTracks }, (_, track) => {
+          const trackCells = Array.from({ length: rowTracks }, (_, track) => {
             if (reserved.has(track)) {
               return { kind: 'spacer' as const, key: `${key}-bar-${track}` };
             }
@@ -336,7 +443,19 @@ function WeekRow({
           });
 
           return (
-            <div key={key} className={styles.dayCol} data-cell-key={key}>
+            <div
+              key={key}
+              // Registers the column as a drop target: the gesture
+              // hit-tests these rects rather than asking the DOM what is
+              // under the pointer, which a finger — whose events stay
+              // aimed at the element it started on — would answer
+              // wrongly. A row the virtualizer recycles unregisters its
+              // columns on the way out, so no drop can land on a day
+              // that is no longer drawn.
+              ref={drag?.dropCellRef(key)}
+              className={cx(styles.dayCol, dragOverKey === key && styles['dayCol--dragOver'])}
+              data-cell-key={key}
+            >
               <button
                 type="button"
                 className={cx(styles.dayHead, isToday && styles['dayHead--today'])}
@@ -370,18 +489,23 @@ function WeekRow({
               {/* Reserve vertical space so single-day chips line up under bars. */}
               <div
                 className={styles.trackArea}
-                style={{ blockSize: `${shownTracks * TRACK_REM}rem` }}
+                style={{ blockSize: `${rowTracks * TRACK_REM}rem` }}
               >
                 {trackCells.map((tc) => {
                   if (tc.kind === 'spacer') {
                     return <div key={tc.key} className={styles.trackSpacer} />;
                   }
                   const evt = tc.evt;
+                  const sourceKey = `chip-${evt.id}@${key}`;
                   return (
                     <button
                       key={tc.key}
                       type="button"
-                      className={styles.chip}
+                      className={cx(
+                        styles.chip,
+                        drag?.holdingKey === sourceKey && styles['pill--holding'],
+                        drag?.drag?.sourceKey === sourceKey && styles['pill--lifted'],
+                      )}
                       style={{
                         background: `color-mix(in oklch, ${markerColorForKind(evt.kind)} 18%, transparent)`,
                         borderInlineStartColor: markerColorForKind(evt.kind),
@@ -391,7 +515,22 @@ function WeekRow({
                         title: evt.title,
                         workspace: evt.workspaceName,
                       })}
-                      onClick={() => onEventOpen(evt)}
+                      onPointerDown={(e) => {
+                        drag?.pressSource(e, sourceKey, {
+                          type: 'event',
+                          event: evt,
+                          fromDate: key,
+                          label: evt.title,
+                          dotColor: markerColorForKind(evt.kind),
+                        });
+                      }}
+                      onClick={() => {
+                        // The release that ended a drag arrives here as a
+                        // click on the source; a tap that never lifted is
+                        // still a tap and still opens the event.
+                        if (drag?.wasDragged()) return;
+                        onEventOpen(evt);
+                      }}
                     >
                       <span className={styles.chipTitle}>{evt.title}</span>
                       {evt.attendeeCount > 0 ? (
@@ -466,7 +605,8 @@ const TODAY_SCROLL_INSET_PX = 32;
  * hundred day cells all mounted at once for a phone to lay out. The
  * month header for the row at the top stays pinned through the
  * virtualizer's range, since a `position: sticky` element cannot be one
- * of the absolutely-positioned rows around it.
+ * of the absolutely-positioned rows around it. The row a drag started in
+ * is kept in that range the same way, for as long as the drag lasts.
  */
 export default function MonthScroll({
   events,
@@ -477,6 +617,7 @@ export default function MonthScroll({
   zone,
   stateColor,
   scrollToTodaySignal,
+  drag,
   onDayCreate,
   onEventOpen,
   onTaskOpen,
@@ -521,6 +662,31 @@ export default function MonthScroll({
   // without a second scroll listener.
   const activeHeaderRef = useRef(headerIndexes[0] ?? 0);
 
+  // Every day of the range to the row that draws it, so the week a drag
+  // started in can be named from the day the pill was picked up.
+  const rowIndexByDayKey = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((item, index) => {
+      if (item.kind !== 'week') return;
+      for (let i = 0; i < 7; i++) map.set(dateKey(addDays(item.weekStart, i)), index);
+    });
+    return map;
+  }, [items]);
+
+  /**
+   * The row holding the drag in flight, kept in the virtualizer's range
+   * until the gesture ends.
+   *
+   * Recycled out from under a lifted pill, the row takes the source
+   * element with it — and with it the pointer capture the gesture set on
+   * it and the lifted state the day it came from is drawn in. Holding it
+   * is what makes a drag that scrolls from one month into another arrive
+   * intact; the row itself is off-screen by then, positioned where it
+   * has always been, so it can be hit-tested but not seen.
+   */
+  const dragRowIndex =
+    drag?.drag == null ? null : (rowIndexByDayKey.get(drag.drag.payload.fromDate) ?? null);
+
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
@@ -539,6 +705,7 @@ export default function MonthScroll({
       activeHeaderRef.current = active;
       const indexes = new Set(defaultRangeExtractor(range));
       indexes.add(active);
+      if (dragRowIndex !== null) indexes.add(dragRowIndex);
       return [...indexes].sort((a, b) => a - b);
     },
   });
@@ -633,6 +800,8 @@ export default function MonthScroll({
                   holidaysByDate={holidaysByDate}
                   todayKey={todayKey}
                   stateColor={stateColor}
+                  drag={drag}
+                  dragOverKey={drag?.drag?.overKey ?? null}
                   onDayCreate={onDayCreate}
                   onEventOpen={onEventOpen}
                   onTaskOpen={onTaskOpen}

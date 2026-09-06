@@ -283,6 +283,8 @@ export interface CreateCalendarEventArgs {
   kind?: 'event' | 'block' | 'free' | 'milestone';
   allDay?: boolean;
   timezone?: string;
+  /** Makes the row a series master, for tests about per-occurrence writes. */
+  recurrenceRule?: { freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; interval?: number };
 }
 
 /**
@@ -302,6 +304,7 @@ export async function createCalendarEvent(
     endAt: args.endAt,
     allDay: args.allDay ?? false,
     timezone: args.timezone ?? 'UTC',
+    ...(args.recurrenceRule === undefined ? {} : { recurrenceRule: args.recurrenceRule }),
   };
   const res = await fetch(
     `${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events`,

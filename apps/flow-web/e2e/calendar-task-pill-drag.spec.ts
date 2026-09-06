@@ -1,23 +1,27 @@
 /**
- * Calendar task-pill drag E2E.
+ * Calendar month-grid drag E2E.
  *
- * Source under test: apps/flow-web/src/routes/_authenticated.calendar.tsx.
- * Task pills (the `<Link draggable>` elements rendered for tasks with
- * a `dueOn` in the visible month) can be dragged onto a different day
- * cell. On drop the route fires `PATCH /tasks/{id}` with `{ dueOn }`
- * and updates the cell only after the mutation succeeds (pessimistic).
+ * Source under test: apps/flow-web/src/routes/_authenticated.calendar.tsx
+ * and apps/flow-web/src/features/calendar-events/lib/pointer-drag.ts.
  *
- * Calendar event pills (`<button>.eventPill`) are explicitly NOT
- * draggable — the source has no `draggable` attribute on them and no
- * onDragStart handler. The third test pins that behaviour.
+ * The grid moves a pill with pointer events rather than HTML5
+ * drag-and-drop, so a plain mouse gesture — press, move, release — is
+ * both what a person does and what these tests perform. On drop a task
+ * fires `PATCH /tasks/{id}` with `{ dueOn }` and an event fires `PATCH`
+ * on its calendar row with the shifted range. Nothing on the grid moves
+ * until the request succeeds, so a refusal needs no rollback.
+ *
+ * A repeating event is movable too: dropping one raises the same
+ * "this event / this and following / all events" choice the edit dialog
+ * asks before it saves, and the request carries the answer.
  *
  * Cells are addressed via the `data-cell-key="YYYY-MM-DD"` attribute
  * added to the cell wrapper for E2E reachability (CSS-module class
  * names are hashed). Source elements:
  *
- *   - Task pill: <a draggable> inside ul[styles.pillList], whose
- *     `title` attribute is "${task.title} · ${task.workspaceName}".
- *   - Event pill: <button> with the same parent, NOT draggable.
+ *   - Task pill: <a> inside ul[styles.pillList], whose `title` attribute
+ *     is "${task.title} · ${task.workspaceName}".
+ *   - Event pill: <button class*="eventPill"> with the same parent.
  *
  * The April 2026 month is used as a fixed test window; the calendar
  * uses local-tz date arithmetic but a tenant created with the default
@@ -25,7 +29,7 @@
  * regardless of where the test runs.
  */
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 
 import { loadTenants } from './fixtures/load-tenants';
@@ -74,47 +78,29 @@ async function goToApril2026(page: Page): Promise<void> {
 }
 
 /**
- * Synthesize an HTML5 drag from one element to another. Playwright's
- * mouse-based dragTo does not trigger the native dragstart that the
- * calendar route's `<Link draggable>` relies on, so we dispatch the
- * full DragEvent sequence directly with a shared DataTransfer.
+ * Drag one element onto another with the mouse.
+ *
+ * The grid listens for pointer events, which Playwright's own mouse
+ * produces, so no synthetic event dispatch is needed. The gesture is
+ * stepped rather than teleported: a press that lands on the target in
+ * one jump is indistinguishable from a click, and the grid deliberately
+ * requires a few pixels of travel before a press becomes a drag.
  */
-async function nativeDnd(
-  page: Page,
-  fromHandle: ReturnType<Page['locator']>,
-  toHandle: ReturnType<Page['locator']>,
-): Promise<void> {
-  await fromHandle.waitFor({ state: 'visible' });
-  await toHandle.waitFor({ state: 'visible' });
-  const fromEl = await fromHandle.elementHandle();
-  const toEl = await toHandle.elementHandle();
-  if (!fromEl || !toEl) throw new Error('drag source or target element handle was null');
-  await page.evaluate(
-    ([from, to]) => {
-      const dt = new DataTransfer();
-      from?.dispatchEvent(
-        new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      );
-      to?.dispatchEvent(
-        new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      );
-      to?.dispatchEvent(
-        new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      );
-      to?.dispatchEvent(
-        new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      );
-      from?.dispatchEvent(
-        new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      );
-    },
-    [fromEl, toEl] as const,
-  );
+async function pointerDrag(page: Page, from: Locator, to: Locator): Promise<void> {
+  await from.waitFor({ state: 'visible' });
+  await to.waitFor({ state: 'visible' });
+  const source = await from.boundingBox();
+  const target = await to.boundingBox();
+  if (!source || !target) throw new Error('drag source or target has no box');
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 });
+  await page.mouse.up();
 }
 
 /** Locate a task pill by its title (rendered inside the pill's link). */
 function taskPill(page: Page, title: string) {
-  return page.locator('a[draggable="true"]').filter({ hasText: title });
+  return page.locator('a[class*="taskPill"]').filter({ hasText: title });
 }
 
 /** Locate an event pill button by its visible title. */
@@ -143,7 +129,7 @@ async function fetchDueOn(tenant: TestTenant, taskId: string): Promise<string | 
   return body.dueOn ?? null;
 }
 
-test.describe('calendar task-pill drag (move dueOn)', () => {
+test.describe('calendar month-grid drag', () => {
   // Each test seeds its own data so they can execute independently.
 
   let tenant: TestTenant;
@@ -175,7 +161,7 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
     const settle = page.waitForResponse(
       (res) => res.url().includes(`/tasks/${created.id}`) && res.request().method() === 'PATCH',
     );
-    await nativeDnd(page, sourcePill, targetCell);
+    await pointerDrag(page, sourcePill, targetCell);
     const res = await settle;
     expect(res.status(), 'PATCH /tasks/{id} should succeed').toBe(200);
 
@@ -188,6 +174,9 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
       timeout: 10_000,
     });
     await expect(cellByKey(page, '2026-04-12').locator(taskPill(page, title))).toHaveCount(0);
+
+    // A drag must not also follow the link it started on.
+    await expect(page).toHaveURL(/\/calendar/);
 
     // Cleanup
     await fetch(`${API_BASE_URL}/tasks/${created.id}`, {
@@ -242,7 +231,7 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
     const settle = page.waitForResponse(
       (res) => res.url().includes(`/tasks/${created.id}`) && res.request().method() === 'PATCH',
     );
-    await nativeDnd(page, sourcePill, targetCell);
+    await pointerDrag(page, sourcePill, targetCell);
     const res = await settle;
     expect(res.status(), 'mocked PATCH should report 500').toBe(500);
 
@@ -266,7 +255,7 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
     }).catch(() => undefined);
   });
 
-  test('calendar event pills are not draggable and never PATCH /events', async ({ page }) => {
+  test('dragging an event pill to another day moves it', async ({ page }) => {
     const stamp = Date.now().toString(36);
     const title = `Cal-drag event ${stamp}`;
     // Event on 2026-04-12 12:00..13:00 UTC.
@@ -280,14 +269,115 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
     });
 
     await injectAuth(page.context(), tenant);
+    await page.goto('/calendar');
+    await goToApril2026(page);
 
-    // Network listener for any /events/{id} write — must stay at 0.
-    const eventWrites: string[] = [];
+    const pill = eventPillByTitle(page, title);
+    await expect(pill).toBeVisible({ timeout: 15_000 });
+
+    const settle = page.waitForResponse(
+      (res) => res.url().includes(`/events/${created.id}`) && res.request().method() === 'PATCH',
+    );
+    await pointerDrag(page, pill, cellByKey(page, '2026-04-15'));
+    const res = await settle;
+    expect(res.status(), 'PATCH on the event should succeed').toBe(200);
+
+    // A row that does not repeat is moved outright — three days on,
+    // duration intact, and no scope question in between.
+    const body = res.request().postDataJSON() as Record<string, unknown>;
+    expect(body.startAt).toBe(startAt + 3 * 86_400);
+    expect(body.endAt).toBe(endAt + 3 * 86_400);
+    expect(body.scope).toBeUndefined();
+
+    await expect(cellByKey(page, '2026-04-15').locator(eventPillByTitle(page, title))).toHaveCount(
+      1,
+      { timeout: 10_000 },
+    );
+
+    // Cleanup
+    await fetch(
+      `${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events/${created.id}`,
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${tenant.accessToken}` },
+      },
+    ).catch(() => undefined);
+  });
+
+  test('dropping a repeating event asks which occurrences the move reaches', async ({ page }) => {
+    const stamp = Date.now().toString(36);
+    const title = `Cal-drag series ${stamp}`;
+    // Repeats yearly from 2026-04-12, so exactly one occurrence falls in
+    // the visible month and the pill is unambiguous.
+    const startAt = Math.floor(Date.UTC(2026, 3, 12, 12, 0, 0) / 1000);
+    const created = await createCalendarEvent(tenant, calendarId, {
+      title,
+      startAt,
+      endAt: startAt + 3600,
+      kind: 'event',
+      recurrenceRule: { freq: 'yearly', interval: 1 },
+    });
+
+    await injectAuth(page.context(), tenant);
+    await page.goto('/calendar');
+    await goToApril2026(page);
+
+    const pill = eventPillByTitle(page, title);
+    await expect(pill).toBeVisible({ timeout: 15_000 });
+
+    // Nothing may be written before the question is answered.
+    const writes: string[] = [];
     page.on('request', (req) => {
-      const m = req.method();
-      if ((m === 'PATCH' || m === 'PUT' || m === 'POST') && req.url().includes('/events/')) {
-        eventWrites.push(`${m} ${req.url()}`);
-      }
+      if (req.method() === 'PATCH' && req.url().includes('/events/')) writes.push(req.url());
+    });
+
+    await pointerDrag(page, pill, cellByKey(page, '2026-04-15'));
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    expect(writes, 'the drop must not write before the scope is chosen').toEqual([]);
+
+    const settle = page.waitForResponse(
+      (res) => res.url().includes(`/events/${created.id}`) && res.request().method() === 'PATCH',
+    );
+    await dialog.getByRole('button', { name: /^save$|保存|保存$/i }).click();
+    const res = await settle;
+    expect(res.status(), 'the scoped PATCH should succeed').toBe(200);
+
+    // The default is the least destructive option, and the occurrence it
+    // names is the one that was drawn — not where the drag ended.
+    const body = res.request().postDataJSON() as Record<string, unknown>;
+    expect(body.scope).toBe('occurrence');
+    expect(body.occurrenceStart).toBe(startAt);
+    expect(body.startAt).toBe(startAt + 3 * 86_400);
+
+    // Cleanup
+    await fetch(
+      `${API_BASE_URL}/workspaces/${tenant.workspaceId}/calendars/${calendarId}/events/${created.id}`,
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${tenant.accessToken}` },
+      },
+    ).catch(() => undefined);
+  });
+
+  test('cancelling the scope choice leaves the event where it was', async ({ page }) => {
+    const stamp = Date.now().toString(36);
+    const title = `Cal-drag series cancel ${stamp}`;
+    const startAt = Math.floor(Date.UTC(2026, 3, 12, 12, 0, 0) / 1000);
+    const created = await createCalendarEvent(tenant, calendarId, {
+      title,
+      startAt,
+      endAt: startAt + 3600,
+      kind: 'event',
+      recurrenceRule: { freq: 'yearly', interval: 1 },
+    });
+
+    await injectAuth(page.context(), tenant);
+
+    const writes: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'PATCH' && req.url().includes('/events/')) writes.push(req.url());
     });
 
     await page.goto('/calendar');
@@ -296,30 +386,19 @@ test.describe('calendar task-pill drag (move dueOn)', () => {
     const pill = eventPillByTitle(page, title);
     await expect(pill).toBeVisible({ timeout: 15_000 });
 
-    // The element itself must not advertise itself as draggable. The
-    // attribute is either absent or set to "false"; we assert the
-    // explicit "false" / null shape rather than relying on missingness.
-    const draggableAttr = await pill.getAttribute('draggable');
-    expect(draggableAttr === null || draggableAttr === 'false').toBe(true);
+    await pointerDrag(page, pill, cellByKey(page, '2026-04-15'));
 
-    // Even if a user manages to fire dnd events on a non-draggable
-    // <button>, the route never wires a handler so dropping it on
-    // another cell must NOT issue a PATCH /events/{id}. We attempt the
-    // gesture and watch for either a PATCH /events/{id} (a regression)
-    // or, harmlessly, a PATCH /tasks (which would also be wrong since
-    // this is an event, not a task).
-    const targetCell = cellByKey(page, '2026-04-15');
-    await nativeDnd(page, pill, targetCell);
-    // Give any in-flight request a moment to leave the page.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await dialog.getByRole('button', { name: /^cancel$|キャンセル|取消/i }).click();
+    await expect(dialog).toBeHidden();
+
+    // Give any stray request a moment to leave the page.
     await page.waitForTimeout(500);
-
-    expect(eventWrites, 'event pill drag must not trigger any /events/ write').toEqual([]);
-
-    // The event must still appear in the same row of cells (we don't
-    // pin a single cell because all-day vs timed event placement is
-    // computed in local tz, but a successful no-op drag must leave the
-    // event visible exactly once on the calendar).
-    await expect(eventPillByTitle(page, title)).toHaveCount(1);
+    expect(writes, 'a dismissed question must write nothing').toEqual([]);
+    await expect(cellByKey(page, '2026-04-12').locator(eventPillByTitle(page, title))).toHaveCount(
+      1,
+    );
 
     // Cleanup
     await fetch(

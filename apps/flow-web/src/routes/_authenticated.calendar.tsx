@@ -6,13 +6,17 @@
  *   - `GET /me/calendar-events?start=&end=` — calendar events
  *
  * The month grid overlays five toggleable layers: task-due, calendar
- * events, blocks, free, and milestones. Dragging a task cell
- * reschedules it through itemkit (PATCH /tasks). Clicking a cell
- * opens the unified {@link EventDialog} in create mode (default kind:
- * event; shift-click shortcuts to block). Clicking an event pill opens
- * the same dialog in edit mode for that row; clicking a task pill
+ * events, blocks, free, and milestones. Pills are moved between days by
+ * a pointer drag ({@link usePointerDrag}) — a task rescheduled through
+ * PATCH /tasks, an event through PATCH on its calendar row. Clicking a
+ * cell opens the unified {@link EventDialog} in create mode (default
+ * kind: event; shift-click shortcuts to block). Clicking an event pill
+ * opens the same dialog in edit mode for that row; clicking a task pill
  * navigates to the task detail route (editing a task is out of scope
  * for the calendar dialog).
+ *
+ * Dragging is an addition to the dialog, never the only way to reach
+ * something: every date a drag can set can also be typed.
  *
  * The grid honours the user's `me.weekStart` preference — Monday,
  * Sunday, or Saturday — for both the header order and the leading
@@ -36,25 +40,25 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { DateTime } from 'luxon';
-import {
-  type DragEvent,
-  type ReactElement,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactElement, useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import { useUpdateEvent } from '../features/calendar-events/api';
+import {
+  type PatchEventInput,
+  type RecurrenceScope,
+  useUpdateEvent,
+} from '../features/calendar-events/api';
 import EventDialog, {
   type EventDialogMode,
   type ItemKind,
 } from '../features/calendar-events/event-dialog';
+import type { CalendarDragPayload } from '../features/calendar-events/lib/drag-payload';
 import { eventDayKeys } from '../features/calendar-events/lib/event-days';
+import { usePointerDrag } from '../features/calendar-events/lib/pointer-drag';
 import { shiftEventDays } from '../features/calendar-events/lib/shift-event';
 import MonthScroll from '../features/calendar-events/month-scroll';
+import RecurringScopeDialog from '../features/calendar-events/recurring-scope-dialog';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
 import calendarLayoutStyles from '../features/calendar-invites/pending-invites-panel.module.css';
 import CalendarsRail from '../features/calendars-rail/calendars-rail';
@@ -229,11 +233,14 @@ function pillStyleForKind(kind: string): {
 }
 
 /**
- * True when an event carries a recurrence rule. Recurring masters are
- * not drag-movable on the month grid: shifting a master would silently
- * rewrite every occurrence, and a per-occurrence this/all override flow
- * is out of scope here. Such pills stay clickable (tap to edit) but
- * decline the drag with a tooltip.
+ * True when an event carries a recurrence rule.
+ *
+ * Dropping such a pill on another day raises the same "this occurrence /
+ * this and following / the whole series" question the edit dialog asks
+ * before it saves, so a person meets one question however they move an
+ * event. Until a per-occurrence write existed these pills declined the
+ * drag outright, because a master shifted in place silently rewrites
+ * every occurrence it produces.
  */
 function isRecurring(event: CalendarEvent): boolean {
   const rule = event.recurrenceRule;
@@ -317,6 +324,13 @@ function expandCalendarEvents(
   }));
 }
 
+/** Local-component Date for a `YYYY-MM-DD` key, or null when it is not one. */
+function dateFromKey(key: string): Date | null {
+  const [y, m, d] = key.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
 /** Whole-day difference between two local `YYYY-MM-DD` keys (`to - from`). */
 function dayDeltaBetweenKeys(fromKey: string, toKey: string): number {
   const [fy, fm, fd] = fromKey.split('-').map(Number);
@@ -383,13 +397,20 @@ type EditTarget =
     };
 
 /**
- * Active drag payload. A task drag only needs its id and origin day;
- * an event drag carries the full row so the drop handler can shift the
- * start/end range by whole days while preserving duration.
+ * A move of a repeating event that is waiting on the scope question.
+ *
+ * Held whole rather than applied and revised: the day delta and the
+ * occurrence the drag started from are both read from the gesture, and
+ * cancelling the question has to leave the grid exactly as the drag
+ * found it.
  */
-type DragPayload =
-  | { type: 'task'; taskId: string; fromDate: string }
-  | { type: 'event'; event: CalendarEvent; fromDate: string };
+interface PendingRecurringMove {
+  event: CalendarEvent;
+  /** Whole days between the pill's own day and the day it was dropped on. */
+  delta: number;
+  /** The occurrence's start under the series rule, in unix seconds. */
+  occurrenceStart: number;
+}
 
 function CalendarRoute(): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -401,11 +422,6 @@ function CalendarRoute(): ReactElement {
     year: today.getFullYear(),
     month: today.getMonth(),
   });
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  // Drag payload is a discriminated union: tasks reschedule via dueOn,
-  // events shift their whole start/end range by the day delta.
-  const dragDataRef = useRef<DragPayload | null>(null);
-  const enterCountRef = useRef<Record<string, number>>({});
   const isMobile = useIsMobile();
   const [railOpen, setRailOpen] = useState(false);
   // Bumped by the "Today" button so the mobile month-scroll re-centers.
@@ -538,6 +554,20 @@ function CalendarRoute(): ReactElement {
     () => expandCalendarEvents(events, rangeStart, rangeEnd),
     [events, rangeStart, rangeEnd],
   );
+  /**
+   * The stored rows by public id, before expansion.
+   *
+   * A drawn occurrence carries the start the rule produced for it, not
+   * the one the series is stored with. A `series`-scoped move therefore
+   * has to shift the master's own window: shifting the occurrence's
+   * would relocate the whole series to wherever this month's copy of it
+   * happened to fall.
+   */
+  const storedEventsById = useMemo(() => {
+    const map = new Map<string, CalendarEvent>();
+    for (const ev of events) map.set(ev.id, ev);
+    return map;
+  }, [events]);
 
   const rescheduleMut = useMutation<
     components['schemas']['Task'],
@@ -580,61 +610,54 @@ function CalendarRoute(): ReactElement {
   });
 
   // Event drag-to-move: shifts start/end by whole days (duration
-  // preserved) through the shared events PATCH hook. Recurring masters
-  // never reach this path (their pills are not draggable).
+  // preserved) through the shared events PATCH hook. A repeating row
+  // arrives here only once the scope question below has been answered.
   const updateEventMut = useUpdateEvent();
 
-  const handleDragStart = useCallback((payload: DragPayload) => {
-    dragDataRef.current = payload;
-  }, []);
+  const [pendingMove, setPendingMove] = useState<PendingRecurringMove | null>(null);
 
-  const handleDragEnter = useCallback((e: DragEvent, cellKey: string) => {
-    e.preventDefault();
-    const count = (enterCountRef.current[cellKey] ?? 0) + 1;
-    enterCountRef.current[cellKey] = count;
-    if (count === 1) setDragOverKey(cellKey);
-  }, []);
-
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleDragLeave = useCallback((cellKey: string) => {
-    const count = Math.max(0, (enterCountRef.current[cellKey] ?? 0) - 1);
-    enterCountRef.current[cellKey] = count;
-    if (count === 0) setDragOverKey((prev) => (prev === cellKey ? null : prev));
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: DragEvent, cellKey: string) => {
-      e.preventDefault();
-      setDragOverKey(null);
-      enterCountRef.current = {};
-      const data = dragDataRef.current;
-      dragDataRef.current = null;
-      if (!data || data.fromDate === cellKey) return;
-      if (data.type === 'task') {
-        rescheduleMut.mutate({ taskId: data.taskId, dueOn: cellKey });
-        return;
-      }
-      // Event: shift the whole range by the day delta from its origin
-      // cell to the drop cell, keeping the duration intact.
-      const delta = dayDeltaBetweenKeys(data.fromDate, cellKey);
-      if (delta === 0) return;
-      const shifted = shiftEventDays(data.event, delta);
+  /**
+   * Send the event move.
+   *
+   * The write is pessimistic on purpose: nothing on the grid moves until
+   * the server agrees, so a refusal needs no rollback and cannot leave
+   * the pill somewhere the stored row never went. `scoped` is present
+   * only for a repeating row whose scope has been answered.
+   */
+  const moveEvent = useCallback(
+    (
+      event: CalendarEvent,
+      delta: number,
+      scoped: { scope: RecurrenceScope; occurrenceStart: number } | null,
+    ): void => {
+      const isSeries = scoped !== null && scoped.scope === 'series';
+      const source = isSeries ? (storedEventsById.get(event.id) ?? event) : event;
+      const shifted = shiftEventDays(source, delta);
       if (!shifted) return;
+      const body: PatchEventInput = { startAt: shifted.startAt, endAt: shifted.endAt };
+      if (scoped !== null) {
+        body.scope = scoped.scope;
+        // `series` names no occurrence, so sending one would describe an
+        // instance the write does not act on.
+        if (!isSeries) body.occurrenceStart = scoped.occurrenceStart;
+      }
       updateEventMut.mutate(
         {
-          workspaceId: data.event.workspaceId,
-          calendarId: data.event.calendarId,
-          eventId: data.event.id,
-          body: { startAt: shifted.startAt, endAt: shifted.endAt },
+          workspaceId: event.workspaceId,
+          calendarId: event.calendarId,
+          eventId: event.id,
+          body,
         },
         {
           onSuccess: () => {
+            setPendingMove(null);
             toaster.show({ tone: 'success', message: t('calendar.event_move_success') });
           },
           onError: (err) => {
+            // The pill never left its day, so the refusal only has to be
+            // said — and it is said with what the API refused, not with a
+            // fixed sentence.
+            setPendingMove(null);
             toaster.show({
               tone: 'danger',
               message: formatApiError(err, t, 'calendar.event_move_error'),
@@ -643,8 +666,36 @@ function CalendarRoute(): ReactElement {
         },
       );
     },
-    [rescheduleMut, updateEventMut, t],
+    [storedEventsById, updateEventMut, t],
   );
+
+  const handleDrop = useCallback(
+    (payload: CalendarDragPayload, cellKey: string): void => {
+      if (payload.fromDate === cellKey) return;
+      if (payload.type === 'task') {
+        rescheduleMut.mutate({ taskId: payload.taskId, dueOn: cellKey });
+        return;
+      }
+      // Event: shift the whole range by the day delta from its origin
+      // cell to the drop cell, keeping the duration intact.
+      const delta = dayDeltaBetweenKeys(payload.fromDate, cellKey);
+      if (delta === 0) return;
+      const event = payload.event;
+      // A repeating row asks which occurrences the move reaches before
+      // anything is sent. The occurrence's own start is read here, from
+      // the instance the drag picked up, because the expander rewrites it
+      // per occurrence and no later reader can recover which one it was.
+      if (isRecurring(event) && typeof event.startAt === 'number') {
+        setPendingMove({ event, delta, occurrenceStart: event.startAt });
+        return;
+      }
+      moveEvent(event, delta, null);
+    },
+    [rescheduleMut, moveEvent],
+  );
+
+  const pointerDrag = usePointerDrag<CalendarDragPayload>(handleDrop);
+  const dragOverKey = pointerDrag.drag?.overKey ?? null;
 
   // Projects per workspace, just for the quick-create project picker.
   const projectQueries = useQueries({
@@ -813,6 +864,27 @@ function CalendarRoute(): ReactElement {
     [],
   );
 
+  const dayFormat = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', weekday: 'short' }),
+    [locale],
+  );
+
+  const dragPayload = pointerDrag.drag?.payload ?? null;
+  /**
+   * What the moving copy says about where it would land. A finger covers
+   * part of the grid, so the day the drop would reach is named on the
+   * copy rather than left to the cell highlight alone; over nothing it
+   * says so, which is also how a drag is called off.
+   */
+  const dragTargetLabel =
+    pointerDrag.drag === null
+      ? null
+      : pointerDrag.drag.overKey === null
+        ? t('calendar.drag.no_target')
+        : t('calendar.drag.to_date', {
+            date: dayFormat.format(dateFromKey(pointerDrag.drag.overKey) ?? today),
+          });
+
   const handleEventOpen = useCallback((event: CalendarEvent): void => {
     // The pill carries the instant the expander derived for this
     // instance, so reading it at the click — before the dialog exists,
@@ -941,6 +1013,10 @@ function CalendarRoute(): ReactElement {
               zone={zone}
               stateColor={stateColor}
               scrollToTodaySignal={scrollToTodaySignal}
+              // The same gesture the desktop grid presses, so a move made
+              // on a phone raises the same scope question, sends the same
+              // request, and reports the same refusal.
+              drag={pointerDrag}
               onDayCreate={(key) => handleCellClick(key, false)}
               onEventOpen={handleEventOpen}
               onTaskOpen={handleTaskOpen}
@@ -976,20 +1052,16 @@ function CalendarRoute(): ReactElement {
                     // biome-ignore lint/a11y/noStaticElementInteractions: month grid cells are pointer drag-and-drop targets for moving events; they expose no keyboard interaction of their own.
                     <div
                       key={cell.key}
+                      // Registers the cell as a drop target: the gesture
+                      // hit-tests these rects rather than asking the DOM
+                      // what is under the pointer, which a finger — whose
+                      // events stay aimed at the element it started on —
+                      // would answer wrongly.
+                      ref={pointerDrag.dropCellRef(cell.key)}
                       // data-cell-key exposes the YYYY-MM-DD cell address for
                       // E2E drag-target selection (otherwise CSS-module hashes
                       // make cells un-addressable).
                       data-cell-key={cell.key}
-                      onDragEnter={(e) => {
-                        handleDragEnter(e, cell.key);
-                      }}
-                      onDragOver={handleDragOver}
-                      onDragLeave={() => {
-                        handleDragLeave(cell.key);
-                      }}
-                      onDrop={(e) => {
-                        handleDrop(e, cell.key);
-                      }}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('a, button')) return;
                         if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
@@ -1036,39 +1108,55 @@ function CalendarRoute(): ReactElement {
                         ) : null}
                       </div>
                       <ul className={styles.pillList}>
-                        {dayTasks.slice(0, 3).map((task) => (
-                          <li key={task.id}>
-                            <Link
-                              to="/tasks/$taskId"
-                              params={{ taskId: task.id }}
-                              title={`${task.title} · ${task.workspaceName}`}
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'move';
-                                handleDragStart({
-                                  type: 'task',
-                                  taskId: task.id,
-                                  fromDate: cell.key,
-                                });
-                              }}
-                              className={styles.taskPill}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                              }}
-                            >
-                              <span
-                                aria-hidden
-                                className={styles.taskPill__dot}
-                                style={{
-                                  background:
-                                    STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                                    'var(--nf-color-fg-muted)',
+                        {dayTasks.slice(0, 3).map((task) => {
+                          const sourceKey = `task-${task.id}@${cell.key}`;
+                          const dotColor =
+                            STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                            'var(--nf-color-fg-muted)';
+                          return (
+                            <li key={task.id}>
+                              <Link
+                                to="/tasks/$taskId"
+                                params={{ taskId: task.id }}
+                                title={`${task.title} · ${task.workspaceName}`}
+                                // The browser drags a link's URL of its own
+                                // accord, which would run alongside this
+                                // gesture and drop a hyperlink somewhere.
+                                draggable={false}
+                                onPointerDown={(e) => {
+                                  pointerDrag.pressSource(e, sourceKey, {
+                                    type: 'task',
+                                    taskId: task.id,
+                                    fromDate: cell.key,
+                                    label: task.title,
+                                    dotColor,
+                                  });
                                 }}
-                              />
-                              <span className={styles.taskPill__title}>{task.title}</span>
-                            </Link>
-                          </li>
-                        ))}
+                                className={cx(
+                                  styles.taskPill,
+                                  pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
+                                  pointerDrag.drag?.sourceKey === sourceKey &&
+                                    styles['pill--lifted'],
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // The release that ended a drag becomes a
+                                  // click on the source; navigating on it
+                                  // would take the user off the calendar
+                                  // every time they moved a task.
+                                  if (pointerDrag.wasDragged()) e.preventDefault();
+                                }}
+                              >
+                                <span
+                                  aria-hidden
+                                  className={styles.taskPill__dot}
+                                  style={{ background: dotColor }}
+                                />
+                                <span className={styles.taskPill__title}>{task.title}</span>
+                              </Link>
+                            </li>
+                          );
+                        })}
                         {dayTasks.length > 3 ? (
                           <li className={styles.morePill}>
                             {t('calendar.more', { count: dayTasks.length - 3 })}
@@ -1076,42 +1164,40 @@ function CalendarRoute(): ReactElement {
                         ) : null}
                         {dayEvents.slice(0, 2).map((ev) => {
                           const pill = pillStyleForKind(ev.kind);
-                          const recurring = isRecurring(ev);
-                          // Recurring masters decline the drag (moving the
-                          // master would rewrite every occurrence); they stay
-                          // tap-to-edit with an explanatory tooltip.
-                          const pillTitle = recurring
-                            ? t('calendar.event_recurring_no_drag', {
-                                title: ev.title,
-                                workspace: ev.workspaceName,
-                              })
-                            : `${ev.title} · ${ev.workspaceName}`;
+                          const sourceKey = `ev-${ev.id}@${cell.key}`;
                           return (
                             <li key={`ev-${ev.id}`}>
                               <button
                                 type="button"
-                                title={pillTitle}
+                                title={`${ev.title} · ${ev.workspaceName}`}
                                 aria-label={t('calendar.event_detail.open_label', {
                                   title: ev.title,
                                   workspace: ev.workspaceName,
                                 })}
-                                draggable={!recurring}
-                                onDragStart={(e) => {
-                                  if (recurring) {
-                                    e.preventDefault();
-                                    return;
-                                  }
-                                  e.dataTransfer.effectAllowed = 'move';
-                                  handleDragStart({ type: 'event', event: ev, fromDate: cell.key });
+                                onPointerDown={(e) => {
+                                  pointerDrag.pressSource(e, sourceKey, {
+                                    type: 'event',
+                                    event: ev,
+                                    fromDate: cell.key,
+                                    label: ev.title,
+                                    dotColor: pill.markerColor,
+                                  });
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // A drag ends in a click on the pill it
+                                  // started from; opening the dialog then
+                                  // would bury the move under a form.
+                                  if (pointerDrag.wasDragged()) return;
                                   handleEventOpen(ev);
                                 }}
                                 className={cx(
                                   styles.eventPill,
                                   ev.viewerAttending && styles['eventPill--viewerAttending'],
-                                  !recurring && styles['eventPill--draggable'],
+                                  styles['eventPill--draggable'],
+                                  pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
+                                  pointerDrag.drag?.sourceKey === sourceKey &&
+                                    styles['pill--lifted'],
                                 )}
                                 style={pill}
                               >
@@ -1183,6 +1269,54 @@ function CalendarRoute(): ReactElement {
           onSaved={handleSaved}
         />
       ) : null}
+
+      {/* A repeating event dropped on another day asks the same question
+          the edit dialog asks before it saves. Cancelling sends nothing:
+          the pill never left its day, because nothing here moves until
+          the server has agreed. */}
+      {pendingMove !== null ? (
+        <RecurringScopeDialog
+          open
+          action="save"
+          pending={updateEventMut.isPending}
+          onCancel={() => setPendingMove(null)}
+          onConfirm={(scope) => {
+            moveEvent(pendingMove.event, pendingMove.delta, {
+              scope,
+              occurrenceStart: pendingMove.occurrenceStart,
+            });
+          }}
+        />
+      ) : null}
+
+      {/* The moving copy. It is portalled out of the grid because a cell
+          clips its own overflow, and positioned by the gesture itself so
+          a pointer that moves every frame does not re-render the month
+          every frame. */}
+      {dragPayload !== null
+        ? createPortal(
+            <div ref={pointerDrag.proxyRef} className={styles.dragProxy} aria-hidden>
+              <span
+                className={cx(
+                  styles.dragProxy__marker,
+                  // A task is marked by a dot and an event by a diamond
+                  // on the grid; the copy keeps whichever it came from,
+                  // so what is moving stays recognisable.
+                  dragPayload.type === 'task' && styles['dragProxy__marker--dot'],
+                )}
+                style={{ background: dragPayload.dotColor }}
+              />
+              <span className={styles.dragProxy__title}>{dragPayload.label}</span>
+              {dragTargetLabel !== null ? (
+                <span className={styles.dragProxy__target}>{dragTargetLabel}</span>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
+      <p aria-live="polite" className={styles.srOnly}>
+        {dragTargetLabel ?? ''}
+      </p>
     </section>
   );
 }
