@@ -249,7 +249,11 @@ func TestEmbedQuery_RecordsTheInvocation(t *testing.T) {
 				func(s string) string { return "redacted:" + s },
 			)
 
-			vec, err := client.EmbedQuery(context.Background(), 7, "find me something similar")
+			// What the proposal paths embed here is a task's own title
+			// and description, not a search string.
+			const queryText = "Salary review for the contractor\nRates discussed in the private thread"
+
+			vec, err := client.EmbedQuery(context.Background(), 7, queryText)
 			switch {
 			case tc.providerErr == nil && err != nil:
 				t.Fatalf("EmbedQuery returned error: %v", err)
@@ -281,8 +285,23 @@ func TestEmbedQuery_RecordsTheInvocation(t *testing.T) {
 			if rec.WorkspaceID != 7 || rec.Purpose != "embed_query" || rec.Status != tc.wantStatus {
 				t.Fatalf("unexpected invocation record: %+v", rec)
 			}
-			if rec.PromptRedacted != "redacted:find me something similar" {
-				t.Errorf("prompt was not redacted: %q", rec.PromptRedacted)
+			// ai_invocations is readable by every member of the workspace,
+			// and on the create path the row is written before the task
+			// has a visibility of its own, so the row carries the marker
+			// rather than the text — on the failed call too, since that
+			// row has the same audience.
+			if rec.PromptRedacted != "redacted:"+QueryTextOmitted {
+				t.Errorf("prompt = %q, want the omission marker", rec.PromptRedacted)
+			}
+			if strings.Contains(rec.PromptRedacted, "Salary") || strings.Contains(rec.ErrorCode, "Salary") {
+				t.Errorf("the embedded text reached the invocation row: prompt %q, errorCode %q",
+					rec.PromptRedacted, rec.ErrorCode)
+			}
+			// Omitting the text must not cost the row its accounting: the
+			// estimate follows what the provider was sent.
+			if tc.providerErr == nil && rec.TokensInput != estimateTokens(queryText) {
+				t.Errorf("tokens_input = %d, want %d — the estimate must follow the text the provider saw, not the marker",
+					rec.TokensInput, estimateTokens(queryText))
 			}
 		})
 	}

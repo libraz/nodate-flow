@@ -150,6 +150,21 @@ func (c *Client) WithMetering(guard CostGuard, log InvocationLogger, onInvocatio
 // marker on the response side.
 const TaskTextOmitted = "task text omitted"
 
+// QueryTextOmitted is what an embed_query invocation row carries in
+// place of the text the call embedded.
+//
+// The query side is fed a task's own title and description — the task
+// being created, or the one being decomposed — so recording it would
+// disclose through an embed_query row exactly what [TaskTextOmitted]
+// keeps out of an embed_task one, and on the create path the row is
+// written before any visibility decision about that task exists. The
+// marker names the query rather than the task because that is all the
+// row can honestly claim: [Client.EmbedQuery] embeds whatever text its
+// caller hands it, so what the marker states is that the text is not
+// recorded, whichever caller supplied it. Purpose, model, token
+// estimate and cost stay on the row, which is what it is read for.
+const QueryTextOmitted = "query text omitted"
+
 // EmbedTask generates and upserts the embedding for a task. If the
 // (task_id, model) row already exists with the same content hash the
 // call is a no-op, so repeated PATCHes that don't change title or
@@ -201,11 +216,11 @@ func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, titl
 // required: it scopes the budget the guard enforces and the
 // ai_invocations row the call is accounted for in.
 //
-// A query embedding is the caller's own words rather than a stored
-// task's, so the audit row records it as written — unlike
-// [Client.EmbedTask], see [TaskTextOmitted].
+// The provider sees text; the invocation row does not. Callers embed a
+// task's title and description here, so the row is held to the same
+// rule as [Client.EmbedTask]. See [QueryTextOmitted].
 func (c *Client) EmbedQuery(ctx context.Context, workspaceID uint32, text string) ([]float32, error) {
-	return c.meteredEmbed(ctx, workspaceID, purposeEmbedQuery, text, text)
+	return c.meteredEmbed(ctx, workspaceID, purposeEmbedQuery, text, QueryTextOmitted)
 }
 
 // meteredEmbed is the only place the provider is called. Every embedding
