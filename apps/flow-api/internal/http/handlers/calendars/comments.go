@@ -5,12 +5,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -188,11 +188,18 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentCreated, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"commentId":  commentPublicID.String(),
-		}, "calendars.CreateComment")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventCommentCreated,
+			AuditAction:  "calendar.comment.create",
+			ResourceType: "calendar.comment",
+			ResourceID:   commentPublicID.String(),
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"commentId":  commentPublicID.String(),
+			},
+			CallSite: "calendars.CreateComment",
+		})
 
 		return out, nil
 	}
@@ -234,11 +241,18 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentUpdated, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"commentId":  input.CId,
-		}, "calendars.EditComment")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventCommentUpdated,
+			AuditAction:  "calendar.comment.update",
+			ResourceType: "calendar.comment",
+			ResourceID:   input.CId,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"commentId":  input.CId,
+			},
+			CallSite: "calendars.EditComment",
+		})
 
 		out := &EditCommentOutput{}
 		out.Body.Updated = true
@@ -302,11 +316,18 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		out := &DeleteCommentOutput{}
 		out.Body.Deleted = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCommentDeleted, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"commentId":  input.CId,
-		}, "calendars.DeleteComment")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventCommentDeleted,
+			AuditAction:  "calendar.comment.delete",
+			ResourceType: "calendar.comment",
+			ResourceID:   input.CId,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"commentId":  input.CId,
+			},
+			CallSite: "calendars.DeleteComment",
+		})
 
 		return out, nil
 	}

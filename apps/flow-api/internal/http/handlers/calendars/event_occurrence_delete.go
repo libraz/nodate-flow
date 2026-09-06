@@ -6,13 +6,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -219,8 +219,8 @@ func deleteEventFollowing(
 	return nil
 }
 
-// recordOccurrenceDelete appends the domain event and the audit entry for
-// a delete that reached one occurrence rather than the series.
+// recordOccurrenceDelete records a delete that reached one occurrence
+// rather than the series, in both logs.
 //
 // The kind is the update one because that is what happened to the row
 // named: the master survives with an exception or an earlier end, and a
@@ -236,24 +236,18 @@ func recordOccurrenceDelete(
 	master calendar.FindCalendarEventByPublicIdRow,
 	calID uint32,
 ) {
-	appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, calID, eventbus.CalEventUpdated, &actorID, map[string]any{
-		"eventId":         input.EvtID,
-		"calendarId":      input.CalID,
-		"scope":           string(scope),
-		"occurrenceStart": input.OccurrenceStart,
-	}, "calendars.DeleteEvent")
-
-	deps.Audit.Record(ctx, audit.Entry{
-		Action:       "calendar.event.delete",
-		ActorID:      actorID,
-		WorkspaceID:  wsID,
+	recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+		EventType:    eventbus.CalEventUpdated,
+		AuditAction:  "calendar.event.delete",
 		ResourceType: "calendar.event",
 		ResourceID:   input.EvtID,
-		Metadata: map[string]any{
+		Payload: map[string]any{
+			"eventId":         input.EvtID,
 			"calendarId":      input.CalID,
 			"title":           master.Title,
 			"scope":           string(scope),
 			"occurrenceStart": input.OccurrenceStart,
 		},
+		CallSite: "calendars.DeleteEvent",
 	})
 }

@@ -6,13 +6,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -177,22 +176,17 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoCreated, &actorID, map[string]any{
-			"memoId":     memoPublicID.String(),
-			"calendarId": input.CalID,
-			"title":      input.Body.Title,
-		}, "calendars.CreateMemo")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.memo.create",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemoCreated,
+			AuditAction:  "calendar.memo.create",
 			ResourceType: "calendar.memo",
 			ResourceID:   memoPublicID.String(),
-			Metadata: map[string]any{
+			Payload: map[string]any{
+				"memoId":     memoPublicID.String(),
 				"calendarId": input.CalID,
 				"title":      input.Body.Title,
 			},
+			CallSite: "calendars.CreateMemo",
 		})
 
 		return out, nil
@@ -254,20 +248,16 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		out := &UpdateMemoOutput{}
 		out.Body.Updated = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoUpdated, &actorID, map[string]any{
-			"memoId":     input.MemoID,
-			"calendarId": input.CalID,
-		}, "calendars.UpdateMemo")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.memo.update",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemoUpdated,
+			AuditAction:  "calendar.memo.update",
 			ResourceType: "calendar.memo",
 			ResourceID:   input.MemoID,
-			Metadata: map[string]any{
+			Payload: map[string]any{
+				"memoId":     input.MemoID,
 				"calendarId": input.CalID,
 			},
+			CallSite: "calendars.UpdateMemo",
 		})
 
 		return out, nil
@@ -317,20 +307,16 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		out := &DeleteMemoOutput{}
 		out.Body.Deleted = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemoDeleted, &actorID, map[string]any{
-			"memoId":     input.MemoID,
-			"calendarId": input.CalID,
-		}, "calendars.DeleteMemo")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.memo.delete",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemoDeleted,
+			AuditAction:  "calendar.memo.delete",
 			ResourceType: "calendar.memo",
 			ResourceID:   input.MemoID,
-			Metadata: map[string]any{
+			Payload: map[string]any{
+				"memoId":     input.MemoID,
 				"calendarId": input.CalID,
 			},
+			CallSite: "calendars.DeleteMemo",
 		})
 
 		return out, nil

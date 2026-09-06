@@ -11,13 +11,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
@@ -410,13 +410,22 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentCreated, &actorID, map[string]any{
-			"eventId":      input.EvtID,
-			"calendarId":   input.CalID,
-			"attachmentId": attPub.String(),
-			"filename":     input.Body.Filename,
-			"deduplicated": deduplicated,
-		}, "calendars.PresignAttachment")
+		// Presigning is a write: the attachment row is committed above,
+		// and the URL is only what lets the bytes follow it.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventAttachmentCreated,
+			AuditAction:  "calendar.attachment.create",
+			ResourceType: "calendar.attachment",
+			ResourceID:   attPub.String(),
+			Payload: map[string]any{
+				"eventId":      input.EvtID,
+				"calendarId":   input.CalID,
+				"attachmentId": attPub.String(),
+				"filename":     input.Body.Filename,
+				"deduplicated": deduplicated,
+			},
+			CallSite: "calendars.PresignAttachment",
+		})
 
 		out := &PresignAttachmentOutput{}
 		out.Body.UploadURL = uploadURL
@@ -590,11 +599,18 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		out := &DeleteAttachmentOutput{}
 		out.Body.Deleted = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentDeleted, &actorID, map[string]any{
-			"eventId":      input.EvtID,
-			"calendarId":   input.CalID,
-			"attachmentId": input.AttID,
-		}, "calendars.DeleteAttachment")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventAttachmentDeleted,
+			AuditAction:  "calendar.attachment.delete",
+			ResourceType: "calendar.attachment",
+			ResourceID:   input.AttID,
+			Payload: map[string]any{
+				"eventId":      input.EvtID,
+				"calendarId":   input.CalID,
+				"attachmentId": input.AttID,
+			},
+			CallSite: "calendars.DeleteAttachment",
+		})
 
 		return out, nil
 	}

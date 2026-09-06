@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -197,9 +197,18 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarSubscribed, &actorID, map[string]any{
-			"calendarId": input.CalID,
-		}, "calendars.SelfSubscribe")
+		// The subscription is the caller's own, so the calendar is what
+		// identifies it: the actor column already names whose it is.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalendarSubscribed,
+			AuditAction:  "calendar.subscription.create",
+			ResourceType: "calendar.subscription",
+			ResourceID:   input.CalID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+			},
+			CallSite: "calendars.SelfSubscribe",
+		})
 
 		out := &SelfSubscribeOutput{}
 		out.Body.Subscribed = true
@@ -260,9 +269,16 @@ func PatchOwnSubscription(deps Deps) func(context.Context, *PatchOwnSubscription
 			return nil, httpErr(apierrors.CalendarSubscriptionStoreWriteInterrupted)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarSubscriptionUpdated, &actorID, map[string]any{
-			"calendarId": input.CalID,
-		}, "calendars.PatchOwnSubscription")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalendarSubscriptionUpdated,
+			AuditAction:  "calendar.subscription.update",
+			ResourceType: "calendar.subscription",
+			ResourceID:   input.CalID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+			},
+			CallSite: "calendars.PatchOwnSubscription",
+		})
 
 		out := &PatchOwnSubscriptionOutput{}
 		out.Body.Updated = true

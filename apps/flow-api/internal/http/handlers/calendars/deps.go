@@ -5,12 +5,10 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
@@ -24,12 +22,12 @@ type Deps struct {
 	// *_attendee_*, *_memo_* operation.
 	CalendarQueries *calendar.Queries
 	DB              *sql.DB
-	// Audit appends workspace-scoped audit log entries for calendar
-	// mutations so calendar activity surfaces in v_workspace_activity
-	// alongside the other mutation domains. Nil-safe: a nil recorder
-	// makes every Record call a no-op. Recording is best-effort and
-	// never fails the primary operation.
-	Audit *audit.Recorder
+	// Mutations records every change these handlers make, in both the
+	// event log the timeline reads and the audit log an administrator
+	// queries by action name. It replaces a bare audit recorder so
+	// neither half can be written without the other; mutation_static_test.go
+	// is what keeps a later handler from reaching around it.
+	Mutations *mutationlog.Recorder
 	// EmailSender dispatches transactional emails (e.g. event-invite
 	// magic links). Nil-safe: when unset, handlers fall back to
 	// [email.NoopSender] so the invite row is still created but no
@@ -95,45 +93,80 @@ func nullTimeUnixPtr(t sql.NullTime) *int64 {
 // constant keeps the deliberate exceptions greppable.
 const noOwningCalendar uint32 = 0
 
-// appendCalendarEvent is the adapter that translates the calendar handlers'
-// call shape into flow-api's eventbus.Event API. The callers pass
-// workspaceID + calendarID + eventType + actorUserID + payload directly;
-// flow-api's eventbus.Append takes a structured Event with optional
-// nullable fields.
-//
-// calendarID is a required parameter rather than an optional field
-// because every event these handlers emit happens inside exactly one
-// calendar, and the column that records which one had never been written
-// by anything: events.calendar_id, its index and its foreign key all
-// existed while every INSERT left it NULL, so the per-calendar activity
-// feed the schema was shaped for could not be built. Making it a
-// parameter is what keeps that from being true again — a new emitter
-// cannot compile without deciding which calendar it belongs to.
-//
-// It appends best effort and returns nothing. Every caller runs after the
-// calendar row it describes is already committed on its own connection,
-// so failing the request would report "nothing happened" for work that
-// did, and the client's retry would duplicate it. Returning an error
-// there only offered the caller a choice it never took: all of them
-// discarded it, which left a dropped event with no record of what it
-// would have said. callSite names the operation in that record, e.g.
-// "calendars.CreateEvent".
-func appendCalendarEvent(ctx context.Context, db dbretry.CommitBoundary, workspaceID, calendarID uint32, eventType eventbus.Kind, actorUserID *uint32, payload map[string]any, callSite string) {
-	var actor *int64
-	if actorUserID != nil {
-		v := int64(*actorUserID)
-		actor = &v
+// calendarMutationActor is the [mutationlog.Actor] both halves of a
+// record are stamped with. actorUserID zero means there is no
+// authenticated user behind the change — the unauthenticated magic-link
+// accept — and both rows then carry a NULL actor rather than a
+// fabricated one.
+func calendarMutationActor(workspaceID, actorUserID uint32) mutationlog.Actor {
+	return mutationlog.Actor{UserID: actorUserID, WorkspaceID: workspaceID}
+}
+
+// calendarMutationCalendar maps a calendar id onto the nullable column
+// the event row carries, so [noOwningCalendar] stays the one spelling of
+// "this change belongs to no single calendar".
+func calendarMutationCalendar(calendarID uint32) *int64 {
+	if calendarID == noOwningCalendar {
+		return nil
 	}
-	var cal *int64
-	if calendarID != noOwningCalendar {
-		v := int64(calendarID)
-		cal = &v
-	}
-	eventbus.AppendBestEffort(ctx, db, eventbus.Event{
-		Type:        eventType,
-		WorkspaceID: workspaceID,
-		CalendarID:  cal,
-		ActorUserID: actor,
-		Payload:     payload,
-	}, callSite)
+	v := int64(calendarID)
+	return &v
+}
+
+// recordCalendarChange is the adapter that translates the calendar
+// handlers' call shape into the mutation log's. One call writes both the
+// `events` row the timeline, notifications and SSE feeds read and the
+// `audit_logs` row an administrator queries by action name; neither can
+// be written here without the other.
+//
+// calendarID is a required parameter rather than a field of m because
+// events.calendar_id, its index and its foreign key all existed while
+// every INSERT left the column NULL, so the per-calendar activity feed
+// the schema was shaped for could not be built. A new emitter therefore
+// cannot compile without deciding which calendar its change belongs to,
+// and the deliberate exceptions say so by naming [noOwningCalendar].
+//
+// The rest of what the change is travels in m, written out at the call
+// site. The audit action had the matching hole — membership, checklist,
+// comment, attendee, attachment and subscription changes appended an
+// event and left no audit row at all — and what holds it closed is
+// mutation_static_test.go, which reads every literal handed to this
+// function and fails one that names no action, resource or call site. It
+// is a literal rather than more parameters because the cross-transport
+// trail check reads the action off exactly this shape: behind a string
+// parameter the action becomes unreadable, and the MCP tool performing
+// the same change has nothing left to be compared against.
+//
+// It records best effort and returns nothing. Every caller runs after
+// the calendar row it describes is already committed on its own
+// connection, so failing the request would report "nothing happened" for
+// work that did, and the client's retry would duplicate it.
+func recordCalendarChange(
+	ctx context.Context,
+	deps Deps,
+	workspaceID, calendarID, actorUserID uint32,
+	m mutationlog.Mutation,
+) {
+	m.CalendarID = calendarMutationCalendar(calendarID)
+	deps.Mutations.Record(ctx, calendarMutationActor(workspaceID, actorUserID), m)
+}
+
+// recordCalendarAudit is [recordCalendarChange] for a change whose event
+// row a shared transactional helper already appended inside the same
+// transaction as the write itself. Appending it again here would put the
+// change on the timeline twice, so this records the audit half only —
+// the half those helpers cannot supply, because they are shared across
+// transports and know nothing about which one called them.
+//
+// It takes no calendar id: nothing is appended to `events`, so there is
+// no column for one to reach. Every call site names the helper that owns
+// its event in a comment, so a reader can find the row this one
+// deliberately does not write.
+func recordCalendarAudit(
+	ctx context.Context,
+	deps Deps,
+	workspaceID, actorUserID uint32,
+	m mutationlog.Mutation,
+) {
+	deps.Mutations.RecordTxAudit(ctx, calendarMutationActor(workspaceID, actorUserID), m)
 }

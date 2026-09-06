@@ -7,13 +7,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
@@ -104,12 +104,22 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			return nil, err
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttachmentDeleted, &actorID, map[string]any{
-			"eventId":      input.EvtID,
-			"calendarId":   input.CalID,
-			"attachmentId": input.AttID,
-			"reason":       "size_limit_exceeded",
-		}, "calendars.ConfirmAttachment")
+		// The oversize path deletes the attachment, so it is recorded
+		// under the same action as an explicit delete; the reason is what
+		// tells the two apart.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventAttachmentDeleted,
+			AuditAction:  "calendar.attachment.delete",
+			ResourceType: "calendar.attachment",
+			ResourceID:   input.AttID,
+			Payload: map[string]any{
+				"eventId":      input.EvtID,
+				"calendarId":   input.CalID,
+				"attachmentId": input.AttID,
+				"reason":       "size_limit_exceeded",
+			},
+			CallSite: "calendars.ConfirmAttachment",
+		})
 
 		return nil, httpErr(apierrors.ValidationFileTooLarge)
 	}

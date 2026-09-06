@@ -12,6 +12,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -222,11 +223,21 @@ func CreateCalendar(deps Deps) func(context.Context, *CreateCalendarInput) (*Cre
 			CreatedAt:              handlerutil.NowUnix(),
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, calID32, eventbus.CalendarCreated, &actorID, map[string]any{
-			"calendarId": calPublicID.String(),
-			"name":       input.Body.Name,
-			"kind":       input.Body.Kind,
-		}, "calendars.CreateCalendar")
+		// The calendar itself is a top-level resource, so its action names
+		// stay two-segment (calendar.create) while everything inside one
+		// takes the three-segment calendar.<resource>.<verb> form.
+		recordCalendarChange(ctx, deps, wsID, calID32, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalendarCreated,
+			AuditAction:  "calendar.create",
+			ResourceType: "calendar",
+			ResourceID:   calPublicID.String(),
+			Payload: map[string]any{
+				"calendarId": calPublicID.String(),
+				"name":       input.Body.Name,
+				"kind":       input.Body.Kind,
+			},
+			CallSite: "calendars.CreateCalendar",
+		})
 
 		return out, nil
 	}
@@ -312,9 +323,16 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		out := &PatchCalendarOutput{}
 		out.Body = calendarFromRow(cal, member, findSubscription(ctx, deps.CalendarQueries, cal.ID, actorID))
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarUpdated, &actorID, map[string]any{
-			"calendarId": input.CalID,
-		}, "calendars.PatchCalendar")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalendarUpdated,
+			AuditAction:  "calendar.update",
+			ResourceType: "calendar",
+			ResourceID:   input.CalID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+			},
+			CallSite: "calendars.PatchCalendar",
+		})
 
 		return out, nil
 	}
@@ -385,9 +403,16 @@ func DeleteCalendar(deps Deps) func(context.Context, *DeleteCalendarInput) (*Del
 		out := &DeleteCalendarOutput{}
 		out.Body.Deleted = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalendarDeleted, &actorID, map[string]any{
-			"calendarId": input.CalID,
-		}, "calendars.DeleteCalendar")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalendarDeleted,
+			AuditAction:  "calendar.delete",
+			ResourceType: "calendar",
+			ResourceID:   input.CalID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+			},
+			CallSite: "calendars.DeleteCalendar",
+		})
 
 		return out, nil
 	}

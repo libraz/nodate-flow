@@ -7,12 +7,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -238,11 +238,21 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttendeeAdded, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"count":      len(out.Body.Attendees),
-		}, "calendars.AddAttendees")
+		// The attendee list is part of the event, and one call adds
+		// several names, so the event is the row every operation in this
+		// file is recorded against; who was affected is in the payload.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventAttendeeAdded,
+			AuditAction:  "calendar.attendee.add",
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"count":      len(out.Body.Attendees),
+			},
+			CallSite: "calendars.AddAttendees",
+		})
 
 		return out, nil
 	}
@@ -335,11 +345,18 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventAttendeeRemoved, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"userId":     input.UserID,
-		}, "calendars.RemoveAttendee")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventAttendeeRemoved,
+			AuditAction:  "calendar.attendee.remove",
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"userId":     input.UserID,
+			},
+			CallSite: "calendars.RemoveAttendee",
+		})
 
 		out := &RemoveAttendeeOutput{}
 		out.Body.Removed = true
@@ -392,11 +409,18 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		out := &UpdateRsvpOutput{}
 		out.Body.Updated = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventRsvpUpdated, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"rsvp":       input.Body.Rsvp,
-		}, "calendars.UpdateRsvp")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventRsvpUpdated,
+			AuditAction:  "calendar.attendee.rsvp_update",
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"rsvp":       input.Body.Rsvp,
+			},
+			CallSite: "calendars.UpdateRsvp",
+		})
 
 		return out, nil
 	}
@@ -462,6 +486,27 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 
 		out := &ToggleCanEditOutput{}
 		out.Body.Updated = true
+
+		// Granting or withdrawing edit rights is a change to the event's
+		// attendee list, and there is no attendee-permission kind for a
+		// subscriber to key on, so it goes on the timeline under the
+		// event's own updated kind. The audit action names it precisely,
+		// which is what an administrator asking who handed out edit
+		// rights filters on.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventUpdated,
+			AuditAction:  "calendar.attendee.can_edit_update",
+			ResourceType: "calendar.event",
+			ResourceID:   input.EvtID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"userId":     input.UserID,
+				"canEdit":    input.Body.CanEdit,
+			},
+			CallSite: "calendars.ToggleCanEdit",
+		})
+
 		return out, nil
 	}
 }

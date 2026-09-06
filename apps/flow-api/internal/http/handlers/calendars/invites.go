@@ -10,13 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
@@ -306,24 +305,18 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			eventType = eventbus.CalEventInviteRotated
 			auditAction = "calendar.invite.rotate"
 		}
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventType, &actorID, map[string]any{
-			"eventId":          input.EvtID,
-			"calendarId":       input.CalID,
-			"attendeePublicId": input.AttendeeID,
-			"invitePublicId":   invitePublicID.String(),
-		}, "calendars.CreateEventInvite")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       auditAction,
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventType,
+			AuditAction:  auditAction,
 			ResourceType: "calendar.invite",
 			ResourceID:   invitePublicID.String(),
-			Metadata: map[string]any{
-				"calendarId":       input.CalID,
+			Payload: map[string]any{
 				"eventId":          input.EvtID,
+				"calendarId":       input.CalID,
 				"attendeePublicId": input.AttendeeID,
+				"invitePublicId":   invitePublicID.String(),
 			},
+			CallSite: "calendars.CreateEventInvite",
 		})
 
 		// Dispatch the magic-link email. Best-effort: a delivery
@@ -537,17 +530,25 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 		out.Body.Rsvp = string(rsvp)
 
 		// Unauthenticated magic-link accept: the actor is the anonymous
-		// invite holder, so ActorID stays 0 (recorded as a NULL actor).
-		// The invite row carries its own workspace_id so the entry is
-		// still workspace-scoped and surfaces in v_workspace_activity.
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.invite.accept",
-			WorkspaceID:  invite.WorkspaceID,
+		// invite holder, so the actor id stays 0 (recorded as a NULL
+		// actor). The invite row carries its own workspace_id so the
+		// entry is still workspace-scoped and surfaces in
+		// v_workspace_activity.
+		//
+		// Audit only. The RSVP kind belongs to the authenticated
+		// UpdateRsvp path, which is where a subscriber reads an answer
+		// off the timeline; appending it here would put an anonymous
+		// actor on the feed for a change the attendee list already
+		// shows. This is the one entry point that records the audit half
+		// without an event of its own.
+		recordCalendarAudit(ctx, deps, invite.WorkspaceID, 0, mutationlog.Mutation{
+			AuditAction:  "calendar.invite.accept",
 			ResourceType: "calendar.invite",
 			ResourceID:   invite.PublicID.String(),
-			Metadata: map[string]any{
+			Payload: map[string]any{
 				"rsvp": string(rsvp),
 			},
+			CallSite: "calendars.AcceptEventInvite",
 		})
 
 		slog.InfoContext(ctx, "calendar event invite accepted",
@@ -602,21 +603,17 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventInviteRevoked, &actorID, map[string]any{
-			"eventId":        input.EvtID,
-			"calendarId":     input.CalID,
-			"invitePublicId": input.InviteID,
-		}, "calendars.RevokeEventInvite")
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.invite.revoke",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventInviteRevoked,
+			AuditAction:  "calendar.invite.revoke",
 			ResourceType: "calendar.invite",
 			ResourceID:   input.InviteID,
-			Metadata: map[string]any{
-				"calendarId": input.CalID,
-				"eventId":    input.EvtID,
+			Payload: map[string]any{
+				"eventId":        input.EvtID,
+				"calendarId":     input.CalID,
+				"invitePublicId": input.InviteID,
 			},
+			CallSite: "calendars.RevokeEventInvite",
 		})
 		out := &RevokeEventInviteOutput{}
 		out.Body.Revoked = true

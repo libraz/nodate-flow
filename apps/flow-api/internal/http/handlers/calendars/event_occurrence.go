@@ -7,7 +7,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -15,6 +14,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -506,8 +506,8 @@ func patchEventFollowing(
 	return written, nil
 }
 
-// recordOccurrencePatch appends the domain event and the audit entry for a
-// patch that reached one occurrence rather than the series.
+// recordOccurrencePatch records a patch that reached one occurrence
+// rather than the series, in both logs.
 //
 // The resource is the event the caller addressed, so the trail reads as
 // one entry per request; scope and the resulting row's id say which row
@@ -528,19 +528,12 @@ func recordOccurrencePatch(
 		"occurrenceStart": *input.Body.OccurrenceStart,
 		"writtenEventId":  written.PublicID.String(),
 	}
-	appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, calID, eventbus.CalEventUpdated, &actorID, payload, "calendars.PatchEvent")
-
-	deps.Audit.Record(ctx, audit.Entry{
-		Action:       "calendar.event.update",
-		ActorID:      actorID,
-		WorkspaceID:  wsID,
+	recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+		EventType:    eventbus.CalEventUpdated,
+		AuditAction:  "calendar.event.update",
 		ResourceType: "calendar.event",
 		ResourceID:   input.EvtID,
-		Metadata: map[string]any{
-			"calendarId":      input.CalID,
-			"scope":           string(scope),
-			"occurrenceStart": *input.Body.OccurrenceStart,
-			"writtenEventId":  written.PublicID.String(),
-		},
+		Payload:      payload,
+		CallSite:     "calendars.PatchEvent",
 	})
 }

@@ -6,12 +6,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -160,11 +160,22 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(user.AvatarUrl)
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberAdded, &actorID, map[string]any{
-			"calendarId": input.CalID,
-			"userId":     user.PublicID.String(),
-			"role":       input.Body.Role,
-		}, "calendars.AddMember")
+		// The membership is named by the user it grants, the same way the
+		// two operations that change and withdraw it are, so an
+		// administrator asking what happened to one person's access reads
+		// all three from one resource id.
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemberAdded,
+			AuditAction:  "calendar.member.add",
+			ResourceType: "calendar.member",
+			ResourceID:   user.PublicID.String(),
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+				"userId":     user.PublicID.String(),
+				"role":       input.Body.Role,
+			},
+			CallSite: "calendars.AddMember",
+		})
 
 		return out, nil
 	}
@@ -289,11 +300,18 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 		out := &UpdateMemberRoleOutput{}
 		out.Body.Updated = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberRoleChanged, &actorID, map[string]any{
-			"calendarId": input.CalID,
-			"userId":     input.UserID,
-			"newRole":    input.Body.Role,
-		}, "calendars.UpdateMemberRole")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemberRoleChanged,
+			AuditAction:  "calendar.member.role_change",
+			ResourceType: "calendar.member",
+			ResourceID:   input.UserID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+				"userId":     input.UserID,
+				"newRole":    input.Body.Role,
+			},
+			CallSite: "calendars.UpdateMemberRole",
+		})
 
 		return out, nil
 	}
@@ -374,10 +392,17 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 		out := &RemoveMemberOutput{}
 		out.Body.Removed = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalMemberRemoved, &actorID, map[string]any{
-			"calendarId": input.CalID,
-			"userId":     input.UserID,
-		}, "calendars.RemoveMember")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalMemberRemoved,
+			AuditAction:  "calendar.member.remove",
+			ResourceType: "calendar.member",
+			ResourceID:   input.UserID,
+			Payload: map[string]any{
+				"calendarId": input.CalID,
+				"userId":     input.UserID,
+			},
+			CallSite: "calendars.RemoveMember",
+		})
 
 		return out, nil
 	}

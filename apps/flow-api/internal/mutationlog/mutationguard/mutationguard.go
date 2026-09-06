@@ -378,6 +378,16 @@ type Operation struct {
 	// Handler is the function the registration hands the router, which
 	// is where a call-graph check has to be entered.
 	Handler string
+	// HandlerPkg is the package qualifier the handler was written with
+	// ("calendars"), or empty when the registration named a function in
+	// its own package.
+	//
+	// A package that registers its own routes does not need it. One
+	// whose routes are registered centrally does: the registry then
+	// holds every package's operations, and Handler alone is the bare
+	// function name, so two packages that both declare a SmartCreate
+	// would each answer for the other's operation.
+	HandlerPkg string
 	// File and Line locate the registration.
 	File string
 	Line int
@@ -447,6 +457,7 @@ func (a *Analysis) HumaOperations() []Operation {
 				}
 			}
 			op.Handler = calleeName(call.Args[2])
+			op.HandlerPkg = calleePkg(call.Args[2])
 			out = append(out, op)
 			return true
 		})
@@ -468,6 +479,21 @@ func calleeName(e ast.Expr) string {
 		return v.Sel.Name
 	case *ast.CallExpr:
 		return calleeName(v.Fun)
+	}
+	return ""
+}
+
+// calleePkg returns the package qualifier a call expression is written
+// with — "calendars" for calendars.CreateEvent(deps) — and empty for a
+// call into the registering package's own declarations.
+func calleePkg(e ast.Expr) string {
+	switch v := e.(type) {
+	case *ast.SelectorExpr:
+		if id, ok := v.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	case *ast.CallExpr:
+		return calleePkg(v.Fun)
 	}
 	return ""
 }

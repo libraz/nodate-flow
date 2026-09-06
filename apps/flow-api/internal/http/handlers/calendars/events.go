@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -20,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
@@ -541,29 +541,23 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		out := &CreateEventOutput{}
 		out.Body = eventFromFullRow(created)
 
-		eventBusPayload := map[string]any{
+		payload := map[string]any{
 			"eventId":    eventPublicID.String(),
 			"calendarId": input.CalID,
 			"title":      input.Body.Title,
 			"kind":       input.Body.Kind,
 		}
 		if startAtNT.Valid {
-			eventBusPayload["startAt"] = startAtNT.Time
-			eventBusPayload["endAt"] = endAtNT.Time
+			payload["startAt"] = startAtNT.Time
+			payload["endAt"] = endAtNT.Time
 		}
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventCreated, &actorID, eventBusPayload, "calendars.CreateEvent")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.event.create",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventCreated,
+			AuditAction:  "calendar.event.create",
 			ResourceType: "calendar.event",
 			ResourceID:   eventPublicID.String(),
-			Metadata: map[string]any{
-				"calendarId": input.CalID,
-				"title":      input.Body.Title,
-				"kind":       input.Body.Kind,
-			},
+			Payload:      payload,
+			CallSite:     "calendars.CreateEvent",
 		})
 
 		return out, nil
@@ -990,28 +984,36 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		out := &PatchEventOutput{}
 		out.Body = eventFromFullRow(updated)
 
-		// When itemkit fired item.rescheduled / item.renamed it already
-		// dual-emitted the legacy calendar.event.updated kind, so no
-		// extra append is needed for linked events. For unlinked events
-		// we preserve the existing kind to keep webhook subscribers
-		// working.
-		if !isLinked {
-			appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventUpdated, &actorID, map[string]any{
-				"eventId":    input.EvtID,
-				"calendarId": input.CalID,
-			}, "calendars.PatchEvent")
+		payload := map[string]any{
+			"eventId":    input.EvtID,
+			"calendarId": input.CalID,
 		}
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.event.update",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
-			ResourceType: "calendar.event",
-			ResourceID:   input.EvtID,
-			Metadata: map[string]any{
-				"calendarId": input.CalID,
-			},
-		})
+		if isLinked {
+			// itemkit fired item.rescheduled / item.renamed inside the
+			// transaction above and dual-emitted the legacy
+			// calendar.event.updated kind with it, so the event row is
+			// already there; appending a second one would show the edit
+			// on the timeline twice.
+			recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+				AuditAction:  "calendar.event.update",
+				ResourceType: "calendar.event",
+				ResourceID:   input.EvtID,
+				Payload:      payload,
+				CallSite:     "calendars.PatchEvent",
+			})
+		} else {
+			// An unlinked event has no itemkit write behind it, so the
+			// existing kind is emitted here to keep webhook subscribers
+			// working.
+			recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+				EventType:    eventbus.CalEventUpdated,
+				AuditAction:  "calendar.event.update",
+				ResourceType: "calendar.event",
+				ResourceID:   input.EvtID,
+				Payload:      payload,
+				CallSite:     "calendars.PatchEvent",
+			})
+		}
 
 		return out, nil
 	}
@@ -1162,19 +1164,19 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		out := &DeleteEventOutput{}
 		out.Body.Deleted = true
 
-		// itemkit already emitted item.unscheduled + legacy
-		// calendar.event.deleted. No extra append.
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.event.delete",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		// Audit only: itemkit.DeleteEvent emitted item.unscheduled and
+		// the legacy calendar.event.deleted kind inside the transaction
+		// above, which is what makes the delete and its event atomic. A
+		// second append here would show the deletion twice.
+		recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+			AuditAction:  "calendar.event.delete",
 			ResourceType: "calendar.event",
 			ResourceID:   input.EvtID,
-			Metadata: map[string]any{
+			Payload: map[string]any{
 				"calendarId": input.CalID,
 				"title":      evt.Title,
 			},
+			CallSite: "calendars.DeleteEvent",
 		})
 
 		return out, nil

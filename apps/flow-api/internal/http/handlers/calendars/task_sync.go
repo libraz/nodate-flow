@@ -9,13 +9,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -172,21 +172,21 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		// itemkit already emitted item.scheduled + legacy calendar.event.created.
-		// No extra eventbus append here.
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "calendar.event.create",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		// Audit only: itemkit.ScheduleTask emitted item.scheduled and the
+		// legacy calendar.event.created kind inside the transaction
+		// above, which is what makes the task and its event move
+		// together. A second append here would show the event twice.
+		recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+			AuditAction:  "calendar.event.create",
 			ResourceType: "calendar.event",
 			ResourceID:   eventPublicID.String(),
-			Metadata: map[string]any{
+			Payload: map[string]any{
 				"calendarId": input.CalID,
 				"title":      title,
 				"kind":       string(calendar.CalendarEventsKindEvent),
 				"taskId":     taskPublicID.String(),
 			},
+			CallSite: "calendars.CreateEventFromTask",
 		})
 
 		return out, nil

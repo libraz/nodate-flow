@@ -6,12 +6,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // --- Input/Output types ---
@@ -180,11 +180,18 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventChecklistCreated, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"itemId":     itemPublicID.String(),
-		}, "calendars.CreateChecklistItem")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventChecklistCreated,
+			AuditAction:  "calendar.checklist.create",
+			ResourceType: "calendar.checklist",
+			ResourceID:   itemPublicID.String(),
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"itemId":     itemPublicID.String(),
+			},
+			CallSite: "calendars.CreateChecklistItem",
+		})
 
 		return out, nil
 	}
@@ -235,11 +242,18 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventChecklistUpdated, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"itemId":     input.ItemID,
-		}, "calendars.UpdateChecklistItem")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventChecklistUpdated,
+			AuditAction:  "calendar.checklist.update",
+			ResourceType: "calendar.checklist",
+			ResourceID:   input.ItemID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"itemId":     input.ItemID,
+			},
+			CallSite: "calendars.UpdateChecklistItem",
+		})
 
 		out := &UpdateChecklistItemOutput{}
 		out.Body.Updated = true
@@ -288,11 +302,18 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		out := &DeleteChecklistItemOutput{}
 		out.Body.Deleted = true
 
-		appendCalendarEvent(ctx, dbretry.AutoCommit(deps.DB), wsID, cal.ID, eventbus.CalEventChecklistDeleted, &actorID, map[string]any{
-			"eventId":    input.EvtID,
-			"calendarId": input.CalID,
-			"itemId":     input.ItemID,
-		}, "calendars.DeleteChecklistItem")
+		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventChecklistDeleted,
+			AuditAction:  "calendar.checklist.delete",
+			ResourceType: "calendar.checklist",
+			ResourceID:   input.ItemID,
+			Payload: map[string]any{
+				"eventId":    input.EvtID,
+				"calendarId": input.CalID,
+				"itemId":     input.ItemID,
+			},
+			CallSite: "calendars.DeleteChecklistItem",
+		})
 
 		return out, nil
 	}

@@ -811,7 +811,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			Queries:         deps.Queries,
 			CalendarQueries: deps.CalendarQueries,
 			DB:              deps.DB,
-			Audit:           auditRec,
+			Mutations:       mutationRec,
 			EmailSender:     deps.EmailSender,
 			EmailFrom:       deps.EmailFrom,
 			FlowWebURL:      deps.FlowWebURL,
