@@ -26,7 +26,7 @@ func TestLensCRUD(t *testing.T) {
 	doJSON(t, http.MethodPost, base, tt.AccessToken, map[string]any{
 		"name":      "High Priority",
 		"filter":    json.RawMessage(`{"priority":{"gte":3}}`),
-		"sort":      json.RawMessage(`[{"field":"priority","dir":"desc"}]`),
+		"sort":      json.RawMessage(`[]`),
 		"isDefault": false,
 	}, &created)
 	require.NotEmpty(t, created.ID)

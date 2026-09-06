@@ -121,7 +121,6 @@ func TestPublicLensBodyOmitsTheLensDefinition(t *testing.T) {
 			"search":   map[string]any{"value": searchNeedle},
 		},
 		"sort":      json.RawMessage(`[]`),
-		"groupBy":   "status",
 		"isDefault": false,
 	}, &created)
 	require.NotEmpty(t, created.ID, "fixture: lens create returned no id")

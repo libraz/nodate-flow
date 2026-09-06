@@ -97,10 +97,16 @@ func seedWorkspaceSurface(t *testing.T, db *sql.DB, srv *TestServer, tenant *Tes
 		"endsOn":   "2026-05-14",
 	}, nil)
 
+	// "sort" is a required field on the create body but a non-empty one is
+	// refused (see validateLensSort / validateLensGroupBy in the lenses
+	// handler, since no surface applies a lens ordering), so an empty
+	// array is the only value that both satisfies the schema and is
+	// accepted. This fixture only needs the row to exist for the residue
+	// check, not an ordering.
 	doJSON(t, http.MethodPost, wsBase+"/lenses", tenant.AccessToken, map[string]any{
 		"name":      "Purge Fixture Lens",
 		"filter":    json.RawMessage(`{"priority":{"gte":3}}`),
-		"sort":      json.RawMessage(`[{"field":"priority","dir":"desc"}]`),
+		"sort":      json.RawMessage(`[]`),
 		"isDefault": false,
 	}, nil)
 

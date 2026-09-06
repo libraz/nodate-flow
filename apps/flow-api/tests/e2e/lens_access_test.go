@@ -36,7 +36,7 @@ func TestLensVisibleToAllWorkspaceMembers(t *testing.T) {
 		map[string]any{
 			"name":      "Shared Lens",
 			"filter":    map[string]any{"status": map[string]any{"values": []string{"open"}}},
-			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
+			"sort":      []map[string]any{},
 			"isDefault": false,
 		}, &lens)
 
@@ -78,7 +78,7 @@ func TestLensCrossTenantNotVisible(t *testing.T) {
 		map[string]any{
 			"name":      "T1 Lens",
 			"filter":    map[string]any{"status": map[string]any{"values": []string{"open"}}},
-			"sort":      []map[string]any{{"field": "createdAt", "dir": "desc"}},
+			"sort":      []map[string]any{},
 			"isDefault": false,
 		}, &lens)
 

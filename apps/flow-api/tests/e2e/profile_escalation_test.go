@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -91,10 +92,13 @@ func TestPaginationTotalAccuracy(t *testing.T) {
 
 	base := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/pages"
 
-	// Create 5 pages.
+	// Create 5 pages. Live sibling pages under the same parent must carry
+	// distinct titles, so the loop index — not the random suffix — is what
+	// separates them: two draws of randomHex can repeat, and a repeat would
+	// be refused as a conflict and leave the counts below short.
 	for i := 0; i < 5; i++ {
 		doJSON(t, http.MethodPost, base, tt.AccessToken,
-			map[string]any{"title": "Page " + randomHex(2)}, nil)
+			map[string]any{"title": fmt.Sprintf("Page %d %s", i, randomHex(2))}, nil)
 	}
 
 	// Full list.
