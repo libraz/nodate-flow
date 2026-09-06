@@ -805,6 +805,14 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.SignalApplied:  silent,
 	eventbus.SignalRejected: silent,
 
+	// Inbox triage carries no audience of its own: the queue belongs to
+	// the workspace rather than to a reader, so there is nobody the bell
+	// would name, and the change is read from the inbox the actor is
+	// already looking at. Same reasoning as the intake kinds below, which
+	// are the same two verbs on the other triage surface.
+	eventbus.SignalArchived: silent,
+	eventbus.SignalSnoozed:  silent,
+
 	// AI suggestions and agent runs surface in their own screens, which
 	// the stream keeps fresh.
 	eventbus.AiSuggestionProposed:  silent,
@@ -831,6 +839,8 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.PageDisabled:            silent,
 	eventbus.PageArchived:            silent,
 	eventbus.PageUnarchived:          silent,
+	eventbus.LensCreated:             silent,
+	eventbus.LensUpdated:             silent,
 	eventbus.LensShared:              silent,
 	eventbus.LensUnshared:            silent,
 	eventbus.LensArchived:            silent,

@@ -130,6 +130,24 @@ const (
 	SignalRejected Kind = "signal.rejected"
 )
 
+// Signal triage events — the inbox operations a workspace member
+// performs on a signal that has already been ingested.
+//
+// They are named for the signals table because that is the row the
+// resource id identifies: the inbox is a view over signals, so archiving
+// disables a signal and snoozing moves its received_at. The intake
+// kinds are the same two verbs over intake_items, and a consumer that
+// resolves an id against one table finds nothing for rows of the other,
+// which is why the two surfaces carry separate names.
+const (
+	// SignalArchived is appended when a signal is taken off the inbox
+	// every workspace member reads.
+	SignalArchived Kind = "signal.archived"
+	// SignalSnoozed is appended when a signal is deferred to a later
+	// moment, which hides it from the inbox until then.
+	SignalSnoozed Kind = "signal.snoozed"
+)
+
 // AI suggestion lifecycle events.
 const (
 	AiSuggestionProposed  Kind = "ai.suggestion.proposed"
@@ -196,8 +214,11 @@ const (
 	RelationDismissed Kind = "relation.dismissed"
 )
 
-// Lens sharing events.
+// Lens lifecycle and sharing events. Archival is declared with the
+// other archive kinds.
 const (
+	LensCreated  Kind = "lens.created"
+	LensUpdated  Kind = "lens.updated"
 	LensShared   Kind = "lens.shared"
 	LensUnshared Kind = "lens.unshared"
 )

@@ -85,6 +85,12 @@ const (
 	SignalRejected = sharedbus.SignalRejected
 )
 
+// Signal triage events (inbox archive / snooze on a signal row).
+const (
+	SignalArchived = sharedbus.SignalArchived
+	SignalSnoozed  = sharedbus.SignalSnoozed
+)
+
 // AI suggestion lifecycle events.
 const (
 	AiSuggestionProposed  = sharedbus.AiSuggestionProposed
@@ -133,8 +139,11 @@ const (
 	RelationDismissed = sharedbus.RelationDismissed
 )
 
-// Lens sharing events.
+// Lens lifecycle and sharing events. Archival is re-exported with the
+// other archive kinds.
 const (
+	LensCreated  = sharedbus.LensCreated
+	LensUpdated  = sharedbus.LensUpdated
 	LensShared   = sharedbus.LensShared
 	LensUnshared = sharedbus.LensUnshared
 )

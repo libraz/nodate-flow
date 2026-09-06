@@ -794,13 +794,13 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		prjDeps:              projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
 		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec},
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
-		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries},
+		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
 		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec},
 		signalDeps: signals.Deps{
 			DB:                 deps.DB,
 			Queries:            deps.Queries,
-			Audit:              auditRec,
+			Mutations:          mutationRec,
 			GhWebhookSecret:    deps.GhWebhookSecret,
 			SlackSigningSecret: deps.SlackSigningSecret,
 			GoogleChannelToken: deps.GoogleChannelToken,
@@ -981,11 +981,11 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		}, projects.List(shared.prjDeps))
 		labelDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		labels.RegisterWorkspaceScoped(subAPI, labelDeps)
-		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
 		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		exporthandlers.RegisterWorkspaceScoped(subAPI, exportDeps)
-		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
 		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
@@ -1309,7 +1309,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
 		subAPI := mountGroup(sub, floorWorkspaceMember, &apis)
 		timeline.RegisterWorkspaceScoped(subAPI, shared.tlDeps)
-		eventsDeps := events.Deps{DB: deps.DB, Queries: deps.Queries}
+		eventsDeps := events.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		events.RegisterWorkspaceScoped(subAPI, eventsDeps)
 		activityhandlers.Register(subAPI, activityhandlers.Deps{DB: deps.DB, Queries: deps.Queries})
 	})
@@ -2008,7 +2008,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 		subAPI := newPublicSubAPI(sub)
 		apis = append(apis, subAPI)
 
-		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		lenses.RegisterPublic(subAPI, publicLensDeps)
 
 		// Calendar public share render (relocated from time-api per

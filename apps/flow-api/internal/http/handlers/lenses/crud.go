@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -80,13 +81,19 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "lens.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
+		// The lens row is committed on its own connection, so a failure
+		// here must not answer a request that created one with an error
+		// the client retries into a second lens.
+		deps.Mutations.Record(ctx, lensActor(ws.ID, actorID), mutationlog.Mutation{
+			EventType:    eventbus.LensCreated,
+			AuditAction:  "lens.create",
 			ResourceType: "lens",
 			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"name": in.Body.Name},
+			Payload: map[string]any{
+				"lensId": pub.String(),
+				"name":   in.Body.Name,
+			},
+			CallSite: "lenses.Create",
 		})
 
 		return &CreateLensOutput{Body: SavedLens{
@@ -276,12 +283,17 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "lens.update",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
+		// The UPDATE is committed on its own connection; see Create for
+		// why a lost record must not fail the request.
+		deps.Mutations.Record(ctx, lensActor(ws.ID, actorID), mutationlog.Mutation{
+			EventType:    eventbus.LensUpdated,
+			AuditAction:  "lens.update",
 			ResourceType: "lens",
 			ResourceID:   existing.PublicID.String(),
+			Payload: map[string]any{
+				"lensId": existing.PublicID.String(),
+			},
+			CallSite: "lenses.Update",
 		})
 
 		return &UpdateLensOutput{Body: SavedLens{
@@ -346,12 +358,20 @@ func Delete(deps Deps) func(context.Context, *DeleteLensInput) (*DeleteLensOutpu
 			return nil, httpErr(apierrors.WsLensNotFound)
 		}
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "lens.delete",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
+		// The statement clears `enabled`, so the lens is archived rather
+		// than erased and the kind says so. Recorded only past the
+		// zero-row check: a second DELETE matches nothing and answers
+		// not found, and a record written there would claim an archival
+		// that already happened once.
+		deps.Mutations.Record(ctx, lensActor(ws.ID, actorID), mutationlog.Mutation{
+			EventType:    eventbus.LensArchived,
+			AuditAction:  "lens.delete",
 			ResourceType: "lens",
 			ResourceID:   lid.String(),
+			Payload: map[string]any{
+				"lensId": lid.String(),
+			},
+			CallSite: "lenses.Delete",
 		})
 
 		out := &DeleteLensOutput{}

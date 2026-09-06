@@ -8,12 +8,18 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Deps is the dependency bundle for handlers in this package.
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
+	// Mutations records a change in both the event log the suggestion
+	// list is replayed from and the audit log an administrator queries by
+	// action name, so a reaction cannot land in one and be missing from
+	// the other.
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

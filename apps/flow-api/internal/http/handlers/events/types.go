@@ -10,12 +10,20 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Deps is the dependency bundle for handlers in this package.
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
+	// Mutations records the reversal in the audit log an administrator
+	// queries by action name. Reversing an event is an administrative act
+	// performed on somebody else's record, so "who undid this" has to be
+	// answerable from that table and not only from the compensating event
+	// row; mutation_static_test.go is what keeps a later handler from
+	// recording one half without the other.
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
@@ -145,10 +145,13 @@ func TestLensPublish_LosesTheRace_RefusesAndRecordsNothing(t *testing.T) {
 		})
 	}}
 
+	// Only the handler's own statements go through the decorator: the
+	// recorder reads the plain handle so the competing write is opened
+	// exactly once, against the guarded UPDATE under test.
 	deps := lenses.Deps{
-		DB:      testDB,
-		Queries: generated.New(raceDB),
-		Audit:   audit.New(generated.New(testDB)),
+		DB:        testDB,
+		Queries:   generated.New(raceDB),
+		Mutations: mutationlog.New(testDB, generated.New(testDB)),
 	}
 
 	var out *lenses.PublishLensOutput
@@ -193,9 +196,9 @@ func TestLensPublish_WinsTheRace_MintsAndRecords(t *testing.T) {
 	wsID := internalID(t, "workspaces", tt.WorkspacePublicID)
 
 	deps := lenses.Deps{
-		DB:      testDB,
-		Queries: generated.New(testDB),
-		Audit:   audit.New(generated.New(testDB)),
+		DB:        testDB,
+		Queries:   generated.New(testDB),
+		Mutations: mutationlog.New(testDB, generated.New(testDB)),
 	}
 
 	var out *lenses.PublishLensOutput
@@ -249,10 +252,13 @@ func TestLensUnpublish_LosesTheRace_RefusesAndRecordsNothing(t *testing.T) {
 		})
 	}}
 
+	// Only the handler's own statements go through the decorator: the
+	// recorder reads the plain handle so the competing write is opened
+	// exactly once, against the guarded UPDATE under test.
 	deps := lenses.Deps{
-		DB:      testDB,
-		Queries: generated.New(raceDB),
-		Audit:   audit.New(generated.New(testDB)),
+		DB:        testDB,
+		Queries:   generated.New(raceDB),
+		Mutations: mutationlog.New(testDB, generated.New(testDB)),
 	}
 
 	var handlerErr error
@@ -294,9 +300,9 @@ func TestLensUnpublish_WinsTheRace_RevokesAndRecords(t *testing.T) {
 	doJSON(t, http.MethodPost, base+"/"+lensID+"/publish", tt.AccessToken, nil, &published)
 
 	deps := lenses.Deps{
-		DB:      testDB,
-		Queries: generated.New(testDB),
-		Audit:   audit.New(generated.New(testDB)),
+		DB:        testDB,
+		Queries:   generated.New(testDB),
+		Mutations: mutationlog.New(testDB, generated.New(testDB)),
 	}
 
 	var handlerErr error

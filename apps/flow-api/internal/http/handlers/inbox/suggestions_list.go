@@ -13,11 +13,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // AiSuggestionSummary is the public DTO for one pending AI suggestion.
@@ -134,17 +134,36 @@ func ListAiSuggestions(deps TriageDeps) func(context.Context, *AiSuggestionListI
 	}
 }
 
+// suggestionReaction is one reaction to a suggestion, named in both
+// spellings a reader can look it up by: the event kind the suggestion
+// list is replayed from, and the audit action an administrator filters
+// audit_logs on.
+//
+// The pair is a value rather than two arguments because they describe a
+// single operation. Written separately at each handler they can drift,
+// and a timeline that says a suggestion was dismissed while the audit
+// log calls it something else leaves nobody able to say which is stale.
+type suggestionReaction struct {
+	kind        eventbus.Kind
+	auditAction string
+}
+
+var (
+	suggestionApplied   = suggestionReaction{kind: eventbus.AiSuggestionApplied, auditAction: "ai.suggestion.apply"}
+	suggestionDismissed = suggestionReaction{kind: eventbus.AiSuggestionDismissed, auditAction: "ai.suggestion.dismiss"}
+)
+
 // ApplyAiSuggestion handles POST /workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply.
 func ApplyAiSuggestion(deps TriageDeps) func(context.Context, *AiSuggestionActionInput) (*AiSuggestionActionOutput, error) {
-	return appendSuggestionReaction(deps, eventbus.AiSuggestionApplied)
+	return appendSuggestionReaction(deps, suggestionApplied)
 }
 
 // DismissAiSuggestion handles POST /workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss.
 func DismissAiSuggestion(deps TriageDeps) func(context.Context, *AiSuggestionActionInput) (*AiSuggestionActionOutput, error) {
-	return appendSuggestionReaction(deps, eventbus.AiSuggestionDismissed)
+	return appendSuggestionReaction(deps, suggestionDismissed)
 }
 
-func appendSuggestionReaction(deps TriageDeps, kind eventbus.Kind) func(context.Context, *AiSuggestionActionInput) (*AiSuggestionActionOutput, error) {
+func appendSuggestionReaction(deps TriageDeps, reaction suggestionReaction) func(context.Context, *AiSuggestionActionInput) (*AiSuggestionActionOutput, error) {
 	return func(ctx context.Context, in *AiSuggestionActionInput) (*AiSuggestionActionOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
@@ -157,14 +176,20 @@ func appendSuggestionReaction(deps TriageDeps, kind eventbus.Kind) func(context.
 		if in.InboxItemID == "" {
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
-		actor := int64(actorID)
-		if err := eventbus.Append(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        kind,
-			WorkspaceID: wsID,
-			ActorUserID: &actor,
+		// Strict rather than best effort: the reaction is idempotent, and
+		// the pending list is derived from the event row, so a lost append
+		// has to be reported. The caller's retry then repairs the log
+		// instead of leaving a suggestion that reappears with nothing
+		// recorded about the choice already made.
+		if err := deps.Mutations.RecordStrict(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    reaction.kind,
+			AuditAction:  reaction.auditAction,
+			ResourceType: "inbox_item",
+			ResourceID:   in.InboxItemID,
 			Payload: map[string]any{
 				"inbox_item_id": in.InboxItemID,
 			},
+			CallSite: "inbox.AiSuggestionReaction",
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

@@ -6,21 +6,31 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 const dateLayout = "2006-01-02"
 
-// actorPtr delegates to handlerutil.ActorPtr.
-var actorPtr = handlerutil.ActorPtr
+// timeboxActor is the [mutationlog.Actor] both halves of a record are
+// stamped with, so the event row and the audit row cannot name different
+// people for one change.
+//
+// The actor is read once, here, rather than at each half: a context
+// carrying nobody must not decide that one table gets a row and the
+// other does not. Zero is the recorder's "no authenticated user", and
+// both rows then carry a NULL actor rather than one of them being
+// skipped.
+func timeboxActor(ctx context.Context, workspaceID uint32) mutationlog.Actor {
+	actorID, _ := middleware.ActorFromContext(ctx)
+	return mutationlog.Actor{UserID: actorID, WorkspaceID: workspaceID}
+}
 
 // publicIDOrEmpty delegates to handlerutil.PublicIDOrEmpty.
 var publicIDOrEmpty = handlerutil.PublicIDOrEmpty
@@ -153,23 +163,21 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TimeboxCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
+		// One record for both halves, described by one payload: two
+		// descriptions of one change drift, and a reader comparing the
+		// tables then cannot tell which is stale. The timebox row is
+		// committed on its own connection, so a lost record must not
+		// answer with an error the client retries into a second timebox.
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			EventType:    eventbus.TimeboxCreated,
+			AuditAction:  "timebox.create",
+			ResourceType: "timebox",
+			ResourceID:   pub.String(),
 			Payload: map[string]any{
 				"timeboxId": pub.String(),
 				"name":      in.Body.Name,
 			},
-		}, "timeboxes.Create")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "timebox.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "timebox",
-			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"name": in.Body.Name},
+			CallSite: "timeboxes.Create",
 		})
 
 		// Re-read through the same query Get uses so the created timebox
@@ -315,25 +323,20 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TimeboxUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
+		// The UPDATE is committed on its own connection; see Create for
+		// why one record covers both halves and why a lost one must not
+		// fail the request.
+		deps.Mutations.Record(ctx, timeboxActor(ctx, ws.ID), mutationlog.Mutation{
+			EventType:    eventbus.TimeboxUpdated,
+			AuditAction:  "timebox.update",
+			ResourceType: "timebox",
+			ResourceID:   pub.String(),
 			Payload: map[string]any{
 				"timeboxId": pub.String(),
 				"name":      name,
 			},
-		}, "timeboxes.Update")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "timebox.update",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "timebox",
-				ResourceID:   pub.String(),
-			})
-		}
+			CallSite: "timeboxes.Update",
+		})
 
 		// Re-fetch to return the updated row.
 		updated, err := deps.Queries.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{
@@ -391,26 +394,21 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 		case generated.TimeboxesStatusCompleted:
 			evtType = eventbus.TimeboxCompleted
 		}
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        evtType,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
+		// The transition is on the timeline under the kind the target
+		// status selects and in audit_logs under one action name, so an
+		// administrator can query every transition without knowing which
+		// kinds exist.
+		deps.Mutations.Record(ctx, timeboxActor(ctx, ws.ID), mutationlog.Mutation{
+			EventType:    evtType,
+			AuditAction:  "timebox.status",
+			ResourceType: "timebox",
+			ResourceID:   pub.String(),
 			Payload: map[string]any{
 				"timeboxId": pub.String(),
 				"status":    in.Body.Status,
 			},
-		}, "timeboxes.UpdateStatus")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "timebox.status",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "timebox",
-				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"status": in.Body.Status},
-			})
-		}
+			CallSite: "timeboxes.UpdateStatus",
+		})
 
 		// Re-fetch to return the updated row.
 		updated, err := deps.Queries.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{
@@ -449,15 +447,21 @@ func Delete(deps Deps) func(context.Context, *DeleteTimeboxInput) (*DeleteTimebo
 			return nil, httpErr(apierrors.TimeboxTimeboxNotFound)
 		}
 
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "timebox.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "timebox",
-				ResourceID:   pub.String(),
-			})
-		}
+		// The statement clears `enabled`, so the timebox is archived
+		// rather than erased and the kind says so. Recorded only past
+		// the zero-row check: a second DELETE matches nothing and
+		// answers not found, and a record written there would claim an
+		// archival that already happened once.
+		deps.Mutations.Record(ctx, timeboxActor(ctx, ws.ID), mutationlog.Mutation{
+			EventType:    eventbus.TimeboxArchived,
+			AuditAction:  "timebox.delete",
+			ResourceType: "timebox",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"timeboxId": pub.String(),
+			},
+			CallSite: "timeboxes.Delete",
+		})
 
 		out := &DeleteTimeboxOutput{}
 		out.Body.Ok = true
@@ -525,26 +529,29 @@ func AddTask(deps Deps) func(context.Context, *AddTaskInput) (*AddTaskOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TimeboxTaskAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
+		// The link row is committed and carries a unique key, so a retry
+		// is refused before it could record the change twice. The task
+		// is named in its canonical form, which is the spelling every
+		// other record of this task uses.
+		//
+		// TaskID carries the internal id because events.task_id is a
+		// foreign key, and it is what the task's own timeline selects
+		// on: without it the change is filed against the timebox alone
+		// and never appears on the task it moved. The payload keeps the
+		// public id, which is the only spelling that leaves the service.
+		addedTaskID := int64(taskID)
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			EventType:    eventbus.TimeboxTaskAdded,
+			AuditAction:  "timebox.task.add",
+			ResourceType: "timebox",
+			ResourceID:   tbPub.String(),
+			TaskID:       &addedTaskID,
 			Payload: map[string]any{
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		}, "timeboxes.AddTask")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "timebox.task.add",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "timebox",
-				ResourceID:   tbPub.String(),
-				Metadata:     map[string]any{"taskId": in.Body.TaskID},
-			})
-		}
+			CallSite: "timeboxes.AddTask",
+		})
 
 		out := &AddTaskOutput{}
 		out.Body.Ok = true
@@ -598,26 +605,26 @@ func RemoveTask(deps Deps) func(context.Context, *RemoveTaskInput) (*RemoveTaskO
 			return nil, httpErr(apierrors.TimeboxTaskNotFound)
 		}
 
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TimeboxTaskRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
+		// Recorded only past the zero-row check: removing a task that was
+		// never in the timebox answers not found, and neither table may
+		// carry a removal that did not happen. The task is named in its
+		// canonical form, matching the record written when it was added,
+		// and TaskID links the row the same way so the task's timeline
+		// shows the removal beside the addition rather than only one of
+		// the two.
+		removedTaskID := int64(taskID)
+		deps.Mutations.Record(ctx, timeboxActor(ctx, ws.ID), mutationlog.Mutation{
+			EventType:    eventbus.TimeboxTaskRemoved,
+			AuditAction:  "timebox.task.remove",
+			ResourceType: "timebox",
+			ResourceID:   tbPub.String(),
+			TaskID:       &removedTaskID,
 			Payload: map[string]any{
 				"timeboxId": tbPub.String(),
 				"taskId":    taskPub.String(),
 			},
-		}, "timeboxes.RemoveTask")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "timebox.task.remove",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "timebox",
-				ResourceID:   tbPub.String(),
-				Metadata:     map[string]any{"taskId": in.TaskID},
-			})
-		}
+			CallSite: "timeboxes.RemoveTask",
+		})
 
 		out := &RemoveTaskOutput{}
 		out.Body.Ok = true

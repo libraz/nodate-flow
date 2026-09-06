@@ -39,6 +39,7 @@ var declaredKinds = []Kind{
 	TaskAutoCompleted, TaskRetroDrafted,
 
 	SignalAttached, SignalJudged, SignalApplied, SignalRejected,
+	SignalArchived, SignalSnoozed,
 
 	AiSuggestionProposed, AiSuggestionApplied,
 	AiSuggestionDismissed, AiSuggestionEdited,
@@ -56,7 +57,7 @@ var declaredKinds = []Kind{
 
 	RelationSuggested, RelationAccepted, RelationDismissed,
 
-	LensShared, LensUnshared,
+	LensCreated, LensUpdated, LensShared, LensUnshared,
 
 	PageCreated, PageUpdated, PageDisabled,
 

@@ -5,13 +5,12 @@ import (
 	"database/sql"
 	"log/slog"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
@@ -86,22 +85,21 @@ func Publish(deps Deps) func(context.Context, *PublishLensInput) (*PublishLensOu
 			return nil, httpErr(apierrors.WsLensAlreadyPublic)
 		}
 
-		// Append event for the state change.
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.LensShared,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorInt64Ptr(actorID),
+		// One record for both halves: the share is on the timeline under
+		// the kind and in audit_logs under the action, described by the
+		// same payload so a reader comparing the tables cannot be handed
+		// two versions of one change. The hash is stored and the
+		// plaintext token is already minted, so a lost record must not
+		// fail the request.
+		deps.Mutations.Record(ctx, lensActor(ws.ID, actorID), mutationlog.Mutation{
+			EventType:    eventbus.LensShared,
+			AuditAction:  "lens.publish",
+			ResourceType: "lens",
+			ResourceID:   lensRow.PublicID.String(),
 			Payload: map[string]any{
 				"lensId": lensRow.PublicID.String(),
 			},
-		}, "lenses.Publish")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "lens.publish",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "lens",
-			ResourceID:   lensRow.PublicID.String(),
+			CallSite: "lenses.Publish",
 		})
 
 		return &PublishLensOutput{Body: PublishLensBody{
@@ -159,22 +157,17 @@ func Unpublish(deps Deps) func(context.Context, *UnpublishLensInput) (*Unpublish
 			return nil, httpErr(apierrors.WsLensAlreadyPrivate)
 		}
 
-		// Append event for the state change.
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.LensUnshared,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorInt64Ptr(actorID),
+		// See Publish: one record, one payload, past the zero-row check
+		// so neither table claims a revocation this call did not make.
+		deps.Mutations.Record(ctx, lensActor(ws.ID, actorID), mutationlog.Mutation{
+			EventType:    eventbus.LensUnshared,
+			AuditAction:  "lens.unpublish",
+			ResourceType: "lens",
+			ResourceID:   lensRow.PublicID.String(),
 			Payload: map[string]any{
 				"lensId": lensRow.PublicID.String(),
 			},
-		}, "lenses.Unpublish")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "lens.unpublish",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "lens",
-			ResourceID:   lensRow.PublicID.String(),
+			CallSite: "lenses.Unpublish",
 		})
 
 		out := &UnpublishLensOutput{}
@@ -261,8 +254,13 @@ func GetPublic(deps Deps) func(context.Context, *GetPublicLensInput) (*GetPublic
 	}
 }
 
-// actorInt64Ptr converts a uint32 actor id to a *int64 for eventbus.Event.
-func actorInt64Ptr(id uint32) *int64 {
-	v := int64(id)
-	return &v
+// lensActor is the [mutationlog.Actor] both halves of a record are
+// stamped with, so the event row and the audit row cannot name different
+// people for one change.
+//
+// Every lens write is behind the workspace-member gate, so actorUserID is
+// always a real user here; the recorder's own rule that zero means "no
+// authenticated user" is what would apply if that ever stopped holding.
+func lensActor(workspaceID, actorUserID uint32) mutationlog.Actor {
+	return mutationlog.Actor{UserID: actorUserID, WorkspaceID: workspaceID}
 }

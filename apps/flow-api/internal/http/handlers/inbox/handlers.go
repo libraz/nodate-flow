@@ -7,9 +7,11 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // List handles GET /inbox. When workspaceId is provided it scopes the
@@ -156,6 +158,28 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 		if rows == 0 {
 			return nil, httpErr(apierrors.WsInboxNotFound)
 		}
+
+		// The kind names the signals table because that is the row the id
+		// identifies: the inbox is a view over signals, and a consumer
+		// told the change happened to an intake_items row would resolve
+		// this id against a table it is not in.
+		//
+		// Best effort: the update is committed on its own connection by the
+		// time this runs, so failing the request here would tell the caller
+		// nothing happened while the item has already left every member's
+		// queue — and their retry could not repair the log either, because
+		// the item is no longer in the inbox and the retry answers 404.
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.SignalArchived,
+			AuditAction:  "inbox.archive",
+			ResourceType: "inbox_item",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"inboxItemId": pub.String(),
+			},
+			CallSite: "inbox.Archive",
+		})
+
 		out := &ArchiveInboxOutput{}
 		out.Body.Ok = true
 		return out, nil
@@ -193,6 +217,30 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		// The kind names the signals table for the same reason as
+		// [Archive]: snoozing moves the received_at of a signal row, and
+		// the id in the record is that row's.
+		//
+		// Best effort for the same reason as [Archive]: the update is
+		// committed before this runs, and the endpoint answers ok whether or
+		// not the deadline it was given differs from the one the item
+		// already carried, so a lost log row must not turn that into a
+		// failure. Nothing is derived from the event row — the deadline
+		// lives on the item — so there is no state a strict append would
+		// protect.
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.SignalSnoozed,
+			AuditAction:  "inbox.snooze",
+			ResourceType: "inbox_item",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"inboxItemId": pub.String(),
+				"snoozeUntil": in.Body.SnoozeUntil,
+			},
+			CallSite: "inbox.Snooze",
+		})
+
 		out := &SnoozeInboxOutput{}
 		out.Body.Ok = true
 		return out, nil

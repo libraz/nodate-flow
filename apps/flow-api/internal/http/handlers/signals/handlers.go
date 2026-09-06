@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -16,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
@@ -327,36 +327,36 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			}
 		}
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "signal.create",
-			ActorID:      actorID,
-			WorkspaceID:  wsID,
+		// One call for one change. The timeline row and the audit row now
+		// carry the same payload, so a reader comparing the two tables
+		// cannot find them describing the ingestion differently.
+		//
+		// It is unconditional because signal.attached names the ingestion
+		// itself — an external signal persisted to `signals` — and that
+		// happened whether or not the caller also named a task. task_id is
+		// the link the per-task timeline reads and stays NULL when there
+		// is none.
+		//
+		// A service-token write carries no human actor. Actor.UserID zero
+		// is what says so, and both rows then record no actor rather than
+		// attributing the write to user id 0.
+		var taskPtr *int64
+		if taskLinked {
+			taskPtr = &taskInternal
+		}
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.SignalAttached,
+			AuditAction:  "signal.create",
 			ResourceType: "signal",
 			ResourceID:   pub.String(),
+			TaskID:       taskPtr,
+			Payload: map[string]any{
+				"signalId": pub.String(),
+				"source":   in.Body.Source,
+				"kind":     in.Body.Kind,
+			},
+			CallSite: "signals.Create",
 		})
-
-		if taskLinked {
-			// Service-token writes have no human actor; omit the
-			// ActorUserID pointer so the event row records the write
-			// as system-originated rather than misattributing it to
-			// user id 0.
-			var actorPtr *int64
-			if actorID != 0 {
-				actor := int64(actorID)
-				actorPtr = &actor
-			}
-			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-				Type:        eventbus.SignalAttached,
-				WorkspaceID: wsID,
-				ActorUserID: actorPtr,
-				TaskID:      &taskInternal,
-				Payload: map[string]any{
-					"signalId": pub.String(),
-					"source":   in.Body.Source,
-					"kind":     in.Body.Kind,
-				},
-			}, "signals.Create")
-		}
 
 		// Wake any matching signal_judge agents (ADR 0008 D3). The
 		// enqueuer is best-effort: a non-nil error is logged but does

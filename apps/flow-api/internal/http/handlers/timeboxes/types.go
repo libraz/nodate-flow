@@ -6,16 +6,22 @@ package timeboxes
 import (
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Deps is the dependency bundle passed to each handler in this package.
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
-	Audit   *audit.Recorder
+	// Mutations records every change these handlers make, in both the
+	// event log the timeline reads and the audit log an administrator
+	// queries by action name. It is the only recorder this package
+	// holds, so neither half can be written without the other, and
+	// mutation_static_test.go is what keeps a later handler from
+	// reaching around it.
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -233,6 +234,28 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+
+		// Audit half only: eventbus.AppendReverseEvent above owns the
+		// compensating event, and it has to, because appending it inside
+		// the same transaction as the optional state rollback is what the
+		// UNIQUE (workspace_id, reverses_event_id) index turns into an
+		// atomic pair. Appending a second row here would put one undo on
+		// the timeline twice.
+		//
+		// It runs after the commit for the symmetric reason: an audit row
+		// written before it would outlive a rollback and claim a reversal
+		// that never happened. The lost-race branch above returns without
+		// reaching this line, so a 409 records nothing.
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorInternal, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "event.reverse",
+			ResourceType: "event",
+			ResourceID:   eventPub.String(),
+			Payload: map[string]any{
+				"reversed_event_public_id":     eventPub.String(),
+				"compensating_event_public_id": result.PublicID.String(),
+			},
+			CallSite: "events.Reverse",
+		})
 
 		return &ReverseOutput{
 			Status: 201,

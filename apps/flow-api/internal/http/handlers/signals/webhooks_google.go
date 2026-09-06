@@ -11,7 +11,9 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	goog "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/google"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
@@ -126,6 +128,27 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceGoogle, ext, signalInternalID, "signals.HandleGoogleWebhook") {
 			return
 		}
+
+		// A delivery from outside still changes the workspace, so it is
+		// recorded in both logs like any other ingestion. There is no
+		// authenticated user behind it: Actor.UserID zero is what says so,
+		// and both rows carry no actor rather than a fabricated one.
+		//
+		// It sits after the duplicate check because a retry of the same
+		// notification collides on the dedupe key and writes no signals row,
+		// so there is no ingestion for it to describe.
+		deps.Mutations.Record(ctx, mutationlog.Actor{WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.SignalAttached,
+			AuditAction:  "signal.create",
+			ResourceType: "signal",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"signalId": pub.String(),
+				"source":   "google",
+				"kind":     kind,
+			},
+			CallSite: "signals.HandleGoogleWebhook",
+		})
 
 		// Best-effort signal_judge dispatch (ADR 0008 D3).
 		if deps.JudgeEnqueuer != nil {

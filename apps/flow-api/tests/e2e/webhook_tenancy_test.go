@@ -1,8 +1,6 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -12,9 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/signals"
-	gh "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/github"
 )
 
 // ghSecret is the shared HMAC secret every GitHub delivery in this file
@@ -30,26 +26,12 @@ func randomRepoID() int64 {
 }
 
 // githubDelivery builds a signed GitHub webhook request for the given
-// repository id and body extras.
+// repository id and body extras. Each call carries its own delivery id,
+// so two calls are two distinct deliveries rather than a redelivery of
+// one; a case that needs the redelivery shape names the id itself.
 func githubDelivery(t *testing.T, secret string, repoID int64, issueBody string) *http.Request {
 	t.Helper()
-	payload, err := json.Marshal(map[string]any{
-		"action": "opened",
-		"repository": map[string]any{
-			"id":        repoID,
-			"full_name": fmt.Sprintf("acme/repo-%d", repoID),
-		},
-		"issue": map[string]any{
-			"number": 1,
-			"body":   issueBody,
-		},
-	})
-	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/github", bytes.NewReader(payload))
-	req.Header.Set(gh.EventHeader, "issues")
-	req.Header.Set(gh.SignatureHeader, gh.Sign(payload, secret))
-	req.Header.Set("X-GitHub-Delivery", randomHex(8))
-	return req
+	return githubDeliveryWithID(t, secret, repoID, randomHex(8), issueBody)
 }
 
 // signalWorkspaceFor returns the workspace public id the signal with the
@@ -86,13 +68,11 @@ func TestWebhookDeliveriesRouteToTheMappedWorkspace(t *testing.T) {
 	alice := newTenant(t)
 	bob := newTenant(t)
 
-	handler := signals.HandleGithubWebhook(signals.Deps{
-		DB:      testDB,
-		Queries: generated.New(testDB),
-		// No DefaultWorkspaceID: a multi-tenant instance has no
-		// meaningful default, which is the whole point of the mapping.
-		GhWebhookSecret: ghSecret,
-	})
+	// No DefaultWorkspaceID: a multi-tenant instance has no meaningful
+	// default, which is the whole point of the mapping.
+	deps := webhookDeps()
+	deps.GhWebhookSecret = ghSecret
+	handler := signals.HandleGithubWebhook(deps)
 
 	aliceRepo := randomRepoID()
 	bobRepo := randomRepoID()
@@ -118,11 +98,9 @@ func TestWebhookDeliveryFromUnmappedSourceIsRejected(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
-	handler := signals.HandleGithubWebhook(signals.Deps{
-		DB:              testDB,
-		Queries:         generated.New(testDB),
-		GhWebhookSecret: ghSecret,
-	})
+	deps := webhookDeps()
+	deps.GhWebhookSecret = ghSecret
+	handler := signals.HandleGithubWebhook(deps)
 
 	unmapped := randomRepoID()
 	rec := httptest.NewRecorder()
@@ -155,12 +133,10 @@ func TestWebhookDefaultWorkspaceFallbackIsOffOnMultiTenant(t *testing.T) {
 	// test ever runs alone.
 	_ = newTenant(t)
 
-	handler := signals.HandleGithubWebhook(signals.Deps{
-		DB:                 testDB,
-		Queries:            generated.New(testDB),
-		GhWebhookSecret:    ghSecret,
-		DefaultWorkspaceID: victim.WorkspacePublicID,
-	})
+	deps := webhookDeps()
+	deps.GhWebhookSecret = ghSecret
+	deps.DefaultWorkspaceID = victim.WorkspacePublicID
+	handler := signals.HandleGithubWebhook(deps)
 
 	unmapped := randomRepoID()
 	rec := httptest.NewRecorder()
@@ -176,6 +152,14 @@ func TestWebhookDefaultWorkspaceFallbackIsOffOnMultiTenant(t *testing.T) {
 		   AND source = 'github'`,
 		victim.WorkspacePublicID).Scan(&leaked))
 	require.Zero(t, leaked, "no delivery may be filed under the configured default on a multi-tenant instance")
+
+	// The signals row is only one of the three places a filed delivery
+	// shows up. A refused delivery must also leave no trace in the two
+	// logs, or the configured tenant's timeline and audit trail would
+	// report an ingestion that never belonged to it.
+	events, audits := countIngestionRecords(t, victim.WorkspacePublicID)
+	require.Zero(t, events, "a refused delivery must not appear on the configured tenant's timeline")
+	require.Zero(t, audits, "a refused delivery must not appear in the configured tenant's audit log")
 }
 
 // TestGithubTaskMarkerCannotCrossWorkspaces covers the authorisation half
@@ -191,11 +175,9 @@ func TestGithubTaskMarkerCannotCrossWorkspaces(t *testing.T) {
 
 	victimTask := createTaskForAgent(t, victim, "Victim private task")
 
-	handler := signals.HandleGithubWebhook(signals.Deps{
-		DB:              testDB,
-		Queries:         generated.New(testDB),
-		GhWebhookSecret: ghSecret,
-	})
+	deps := webhookDeps()
+	deps.GhWebhookSecret = ghSecret
+	handler := signals.HandleGithubWebhook(deps)
 
 	attackerRepo := randomRepoID()
 	createMapping(t, attacker.AccessToken, attacker.WorkspacePublicID, "github", fmt.Sprint(attackerRepo), "acme/attacker")
@@ -340,11 +322,9 @@ func TestDisabledIntegrationMappingStopsRouting(t *testing.T) {
 
 	tt := newTenant(t)
 
-	handler := signals.HandleGithubWebhook(signals.Deps{
-		DB:              testDB,
-		Queries:         generated.New(testDB),
-		GhWebhookSecret: ghSecret,
-	})
+	deps := webhookDeps()
+	deps.GhWebhookSecret = ghSecret
+	handler := signals.HandleGithubWebhook(deps)
 
 	repoID := randomRepoID()
 	mapping := createMapping(t, tt.AccessToken, tt.WorkspacePublicID, "github", fmt.Sprint(repoID), "acme/paused")
@@ -352,6 +332,14 @@ func TestDisabledIntegrationMappingStopsRouting(t *testing.T) {
 	status, accepted := callWebhook(t, handler, githubDelivery(t, ghSecret, repoID, "no marker"))
 	require.Equal(t, http.StatusAccepted, status)
 	require.Equal(t, tt.WorkspacePublicID, signalWorkspaceFor(t, accepted.ID))
+
+	// The routed delivery is the control for the refusal below: it fixes
+	// what one accepted delivery records, so the unchanged counts after
+	// the pause mean the second delivery was stopped rather than that the
+	// handler records nothing at all.
+	events, audits := countIngestionRecords(t, tt.WorkspacePublicID)
+	require.Equal(t, 1, events, "a routed delivery appends one event")
+	require.Equal(t, 1, audits, "a routed delivery writes one audit row")
 
 	doJSON(t, http.MethodPatch,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/integration-mappings/"+mapping.ID,
@@ -362,4 +350,8 @@ func TestDisabledIntegrationMappingStopsRouting(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, rec.Code,
 		"a paused mapping must stop routing deliveries")
 	require.True(t, strings.Contains(rec.Body.String(), "INTEGRATION.MAPPING.WORKSPACE_UNRESOLVED"))
+
+	events, audits = countIngestionRecords(t, tt.WorkspacePublicID)
+	require.Equal(t, 1, events, "a delivery a paused mapping refused must reach neither log")
+	require.Equal(t, 1, audits, "a delivery a paused mapping refused must reach neither log")
 }

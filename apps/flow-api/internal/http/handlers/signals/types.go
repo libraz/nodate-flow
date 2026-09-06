@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 	"github.com/libraz/nodate-flow/packages/go-shared/signalwire"
 )
@@ -57,8 +57,13 @@ type JudgeEnqueuer interface {
 type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
-	// Audit records audit log entries. Nil-safe.
-	Audit *audit.Recorder
+	// Mutations records an ingested signal in both places the ingestion
+	// has to appear: the event log the timeline and the judge loop read,
+	// and the audit log an administrator queries by action name. It
+	// replaces a bare audit recorder because the two used to be written
+	// separately, from payloads that could describe the same signal
+	// differently, and a webhook delivery wrote only one of them.
+	Mutations *mutationlog.Recorder
 
 	// GhWebhookSecret is the shared secret used to verify inbound
 	// GitHub webhook signatures.

@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	gh "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/github"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
@@ -177,18 +177,32 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			return
 		}
 
+		// A delivery from outside still changes the workspace, so it is
+		// recorded in both logs like any other ingestion. There is no
+		// authenticated user behind it: Actor.UserID zero is what says so,
+		// and both rows carry no actor rather than a fabricated one.
+		//
+		// Unconditional for the same reason as the manual path —
+		// signal.attached names the ingestion, not the task link — with
+		// task_id set only when the body marker resolved to a task in this
+		// workspace.
+		var taskPtr *int64
 		if taskLinked {
-			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-				Type:        eventbus.SignalAttached,
-				WorkspaceID: wsID,
-				TaskID:      &taskInternal,
-				Payload: map[string]any{
-					"signalId": pub.String(),
-					"source":   "github",
-					"kind":     event,
-				},
-			}, "signals.HandleGithubWebhook")
+			taskPtr = &taskInternal
 		}
+		deps.Mutations.Record(ctx, mutationlog.Actor{WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.SignalAttached,
+			AuditAction:  "signal.create",
+			ResourceType: "signal",
+			ResourceID:   pub.String(),
+			TaskID:       taskPtr,
+			Payload: map[string]any{
+				"signalId": pub.String(),
+				"source":   "github",
+				"kind":     event,
+			},
+			CallSite: "signals.HandleGithubWebhook",
+		})
 
 		// Best-effort signal_judge dispatch (ADR 0008 D3). The
 		// enqueuer logs and swallows errors so a flaky agent_runs
