@@ -33,7 +33,7 @@ import { z } from 'zod';
 
 import { useWorkspaceQuery } from '../features/workspaces/api';
 import WorkspaceDetail, { type WorkspaceDetailTab } from '../features/workspaces/workspace-detail';
-import { apiProbe } from '../lib/api';
+import { authApiProbe } from '../lib/api';
 import { ApiError } from '../lib/api-error';
 
 /**
@@ -343,8 +343,9 @@ export const Route = createFileRoute('/_authenticated/workspaces/$id')({
   },
   loader: async ({ params }) => {
     // The loader only asks whether the workspace is there; the shape of
-    // the answer is the component's business.
-    const status = await apiProbe((client) =>
+    // the answer is the component's business. auth-api owns workspaces,
+    // so the question goes there — flow-api serves no such path.
+    const status = await authApiProbe((client) =>
       client.GET('/workspaces/{wsId}', { params: { path: { wsId: params.id } } }),
     );
     if (status === 404) {
