@@ -17,7 +17,7 @@
  * editing this file, where the reason is written down.
  */
 
-import { toApiError } from './api-error.js';
+import { isTransportFailure, toApiError, toNetworkError } from './api-error.js';
 import type { NodateFlowClient } from './client.js';
 
 /**
@@ -155,8 +155,18 @@ export function createApiRequester(client: NodateFlowClient): ApiRequester {
       result = await send(client);
     } catch (cause) {
       // Transport failures (DNS, CORS, an aborted fetch) never produce
-      // a result at all, so they cannot be read off `response`, and the
-      // original is carried through so callers can still recognise it.
+      // a result at all, so they cannot be read off `response`. They
+      // still leave as an ApiError: a raw `TypeError` reaching the UI
+      // is a message the browser wrote in English, and a caller that
+      // renders `error.message` shows it to a reader who chose
+      // Japanese. The thrown value is kept as `cause`.
+      if (isTransportFailure(cause)) {
+        return { ok: false, error: toNetworkError(cause, fallback), response: undefined };
+      }
+      // Anything else thrown out of the client is not the network — it
+      // is a fault on this side, and calling it one would tell the
+      // reader to check a connection that is fine. It leaves as it
+      // arrived, and the UI decides what to make of it.
       return { ok: false, error: cause, response: undefined };
     }
     if (requestFailed(result) || result.response === undefined) {

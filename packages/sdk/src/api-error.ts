@@ -38,6 +38,74 @@ export class ApiError extends Error {
 }
 
 /**
+ * A request that never became an answer: DNS, TCP, TLS, CORS, an
+ * offline device, a cancelled fetch. It is an {@link ApiError} with no
+ * code and no status, because there was no server on the other end to
+ * supply either.
+ *
+ * It exists as a type so the UI never has to read the browser's own
+ * words to the user. `fetch` rejects with a `TypeError` whose message
+ * is written by the engine — "Failed to fetch" in Chrome,
+ * "NetworkError when attempting to fetch resource" in Firefox, "Load
+ * failed" in Safari — always in English, whatever language the app is
+ * running in. Any layer that falls back to `error.message` prints that
+ * verbatim, so the conversion has to happen here, at the one place
+ * every call leaves through, rather than at the dozens of call sites
+ * that would each have to remember.
+ *
+ * There is deliberately no error code for it. The `errors/*.yaml`
+ * catalogue records what a service decided about a request; a request
+ * that never arrived was never decided on, and inventing a code would
+ * put a client-side condition in a catalogue the server owns.
+ *
+ * The value the browser threw is kept as `cause`, so a log still shows
+ * which transport failure it was, and a caller that needs to tell a
+ * cancellation from a dropped connection still can.
+ */
+export class NetworkError extends ApiError {
+  constructor(message: string, cause?: unknown) {
+    super(undefined, message);
+    this.name = 'NetworkError';
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
+ * Wraps whatever `fetch` threw into a {@link NetworkError}.
+ *
+ * `fallback` becomes the message, so the English text carried by the
+ * error still describes the operation that failed ("Failed to load
+ * tasks") rather than the engine's wording of the transport failure.
+ * The UI translates from the type, not from the message.
+ */
+export function toNetworkError(cause: unknown, fallback: string): NetworkError {
+  return new NetworkError(fallback, cause);
+}
+
+/**
+ * Whether a caught value represents a transport-layer failure rather
+ * than a response.
+ *
+ * Decided from the thrown value alone. `fetch` rejects with a
+ * `TypeError` when the request never reached a server (DNS, TCP, CORS,
+ * offline) and with a `DOMException` named `AbortError` on
+ * cancellation; anything else means we did get an answer, or that
+ * something other than the network went wrong on this side.
+ *
+ * Inferring "network" from a missing HTTP status would be wrong here,
+ * because a status is also missing whenever an error envelope fails to
+ * parse — that would classify a genuine rejection as a blip and keep a
+ * dead session alive.
+ */
+export function isTransportFailure(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  if (typeof DOMException !== 'undefined' && err instanceof DOMException) {
+    return err.name === 'AbortError';
+  }
+  return false;
+}
+
+/**
  * Converts an SDK error response into an ApiError.
  * Extracts `detail`, `title`, and `type` fields from problem+json error
  * envelopes. Pass `httpStatus` when available (e.g. from

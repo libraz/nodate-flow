@@ -9,7 +9,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../../lib/api';
-import { ApiError } from '../../../lib/api-error';
+import { ApiError, NetworkError } from '../../../lib/api-error';
 import styles from './settings.module.css';
 
 /**
@@ -32,6 +32,11 @@ const settingKeys = {
  * nothing better to say than the generic line.
  */
 function formatSettingsSaveError(err: unknown, fallback: string): string {
+  // A request that never arrived is an ApiError as well, and the message
+  // it carries is the English line handed to the requester rather than a
+  // server's wording, so there is nothing here worth showing over the
+  // translated one.
+  if (err instanceof NetworkError) return fallback;
   if (!(err instanceof ApiError)) return fallback;
   if (err.message.length > 0 && err.message !== fallback) return err.message;
   return err.code ? `${fallback} (${err.code})` : fallback;

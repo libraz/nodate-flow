@@ -46,7 +46,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ApiError, formatApiError } from '../../lib/api-error';
+import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   useCreateWebhookMutation,
@@ -336,8 +336,11 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
         },
         onError: (err) => {
           setSubmitting(false);
+          // A transport failure is an ApiError too, but its message is
+          // the English literal the requester was given, not anything a
+          // server said — so it takes the translated line.
           const message =
-            err instanceof ApiError && err.message
+            !isNetworkError(err) && err instanceof ApiError && err.message
               ? err.message
               : t('settings.webhooks.create.error');
           toaster.show({ tone: 'danger', message });

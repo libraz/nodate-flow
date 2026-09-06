@@ -14,13 +14,13 @@
  *      drop-one-locale regression like the zh gap that motivated this).
  */
 
-import { AuthErrors } from '@nodate-flow/sdk';
+import { AuthErrors, createApiRequester, type NodateFlowClient } from '@nodate-flow/sdk';
 import { describe, expect, it } from 'vitest';
 
 import en from '../../../locales/en/auth.json';
 import ja from '../../../locales/ja/auth.json';
 import zh from '../../../locales/zh/auth.json';
-import { mapAuthError } from '../auth-errors';
+import { mapAuthError, mapAuthThrown } from '../auth-errors';
 
 /** Flattens a nested locale object into dotted leaf-key paths. */
 function flattenKeys(obj: Record<string, unknown>, prefix = ''): string[] {
@@ -108,6 +108,82 @@ describe('mapAuthError', () => {
     expect(enKeys).not.toContain('errors.totp_challenge_expired');
     expect(jaKeys).not.toContain('errors.totp_challenge_expired');
     expect(zhKeys).not.toContain('errors.totp_challenge_expired');
+  });
+});
+
+/**
+ * The thrown-value mapper, against the three ways a call actually fails.
+ *
+ * The transport row is the one that moved: the requester now converts a
+ * dropped connection into a `NetworkError` before it reaches here, so a
+ * mapper that only recognised a bare `TypeError` would have started
+ * answering "unknown" for the one failure a reader can do something
+ * about — and the screens this app owns are sign-in and two-factor,
+ * where "an unexpected error occurred" over a flat network is the
+ * difference between waiting and calling for help.
+ */
+describe('mapAuthThrown', () => {
+  /** The requester never touches the client itself; it only passes it on. */
+  const client = {} as NodateFlowClient;
+
+  /** Runs a call through the real requester and hands back what it threw. */
+  async function caught(send: () => Promise<unknown>, fallback: string): Promise<unknown> {
+    const { request } = createApiRequester(client);
+    return request(send as never, fallback).then(
+      () => {
+        throw new Error('expected the call to fail');
+      },
+      (err: unknown) => err,
+    );
+  }
+
+  it('names the network failure when the connection drops', async () => {
+    const err = await caught(
+      () => Promise.reject(new TypeError('Failed to fetch')),
+      'Sign-in failed',
+    );
+    expect(mapAuthThrown(err)).toBe('auth:errors.network');
+  });
+
+  it('still names it for a bare TypeError from a path holding its own fetch', () => {
+    expect(mapAuthThrown(new TypeError('Load failed'))).toBe('auth:errors.network');
+  });
+
+  it('keeps the catalogue code for a refusal that carries one', async () => {
+    const err = await caught(
+      () =>
+        Promise.resolve({
+          error: { type: AuthErrors.AUTH_SESSION_REVOKED.code },
+          response: new Response(null, { status: 401 }),
+        }),
+      'Sign-in failed',
+    );
+    expect(mapAuthThrown(err)).toBe('errors:AUTH.SESSION.REVOKED');
+  });
+
+  it('falls back to a translated sentence when the answer carried no body', async () => {
+    const err = await caught(
+      () => Promise.resolve({ response: new Response(null, { status: 502 }) }),
+      'Sign-in failed',
+    );
+    const key = mapAuthThrown(err);
+    expect(key).toBe('auth:errors.unknown');
+    // Whatever it resolves to, it is not the English literal the call
+    // site handed the requester.
+    expect(key).not.toContain('Sign-in failed');
+  });
+
+  it('emits keys that exist in every locale', async () => {
+    const network = await caught(
+      () => Promise.reject(new TypeError('Failed to fetch')),
+      'Sign-in failed',
+    );
+    for (const key of [mapAuthThrown(network), mapAuthThrown({})]) {
+      const path = key.replace('auth:', '');
+      for (const bundle of [en, ja, zh]) {
+        expect(resolvePath(bundle as Record<string, unknown>, path), key).toBeTypeOf('string');
+      }
+    }
   });
 });
 

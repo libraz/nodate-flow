@@ -16,7 +16,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { ApiError } from '../api-error.js';
+import { ApiError, NetworkError } from '../api-error.js';
 import type { NodateFlowClient } from '../client.js';
 import { createApiRequester, requestFailed } from '../request.js';
 
@@ -119,10 +119,46 @@ describe('apiRequest failure conversion', () => {
     expect((err as ApiError).message).toBe('Unknown outcome');
   });
 
-  it('rethrows a transport failure unchanged so callers can still recognise it', async () => {
+  it('converts a transport failure, keeping the browser wording out of the message', async () => {
     const { request } = createApiRequester(client);
+    // Whatever the engine writes here — "Failed to fetch", "Load failed",
+    // "NetworkError when attempting to fetch resource" — is English, and
+    // a UI that reads `message` shows it to a reader who chose otherwise.
     const cause = new TypeError('Failed to fetch');
-    await expect(request(() => Promise.reject(cause), 'Failed to load')).rejects.toBe(cause);
+    const err = await request(() => Promise.reject(cause), 'Failed to load').catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as NetworkError).message).toBe('Failed to load');
+    expect((err as NetworkError).message).not.toContain('Failed to fetch');
+    // No code and no status: nothing decided this, because nothing answered.
+    expect((err as NetworkError).code).toBeUndefined();
+    expect((err as NetworkError).httpStatus).toBeUndefined();
+    // The original is still readable for a log or a caller that has to
+    // tell a cancellation from a dropped connection.
+    expect((err as NetworkError).cause).toBe(cause);
+  });
+
+  it('converts a cancelled request the same way, with the abort still readable', async () => {
+    const { request } = createApiRequester(client);
+    const cause = new DOMException('cancelled', 'AbortError');
+    const err = await request(() => Promise.reject(cause), 'Failed to load').catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as NetworkError).cause).toBe(cause);
+  });
+
+  it('leaves a throw that is not the network alone, rather than blaming the connection', async () => {
+    const { request } = createApiRequester(client);
+    // A bug on this side reaches the same catch. Calling it a network
+    // failure would tell the reader to check a connection that is fine.
+    const bug = new SyntaxError('Unexpected token < in JSON');
+    await expect(request(() => Promise.reject(bug), 'Failed to load')).rejects.toBe(bug);
+    await expect(
+      request(() => Promise.reject('not an error object'), 'Failed to load'),
+    ).rejects.toBe('not an error object');
   });
 
   it('resolves with the body on success', async () => {
@@ -199,6 +235,18 @@ describe('settle', () => {
     if (outcome.ok) throw new Error('expected a refusal');
     expect(outcome.error).toBeInstanceOf(ApiError);
     expect((outcome.error as ApiError).httpStatus).toBe(403);
+  });
+
+  it('converts the failure that has no response either, rather than passing it through', async () => {
+    const { settle } = createApiRequester(client);
+    const outcome = await settle(
+      () => Promise.reject(new TypeError('Failed to fetch')),
+      'Sign-in failed',
+    );
+    if (outcome.ok) throw new Error('expected a refusal');
+    expect(outcome.response).toBeUndefined();
+    expect(outcome.error).toBeInstanceOf(NetworkError);
+    expect((outcome.error as NetworkError).message).not.toContain('Failed to fetch');
   });
 });
 

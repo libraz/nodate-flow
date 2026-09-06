@@ -6,7 +6,13 @@
 // produced by the errors codegen (scripts/gen-errors).
 
 // Shared API error utilities
-export { ApiError, type ProblemJson, toApiError } from './api-error.js';
+export {
+  ApiError,
+  NetworkError,
+  type ProblemJson,
+  toApiError,
+  toNetworkError,
+} from './api-error.js';
 // Shared auth store (Zustand)
 export {
   type AuthState,

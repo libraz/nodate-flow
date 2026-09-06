@@ -1,9 +1,10 @@
-import { ApiError } from '@nodate-flow/sdk';
+import { ApiError, NetworkError } from '@nodate-flow/sdk';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import { mapAuthThrown } from '../lib/auth-errors';
 import type { RouterContext } from '../router/router';
 import styles from './__root.module.css';
 
@@ -39,6 +40,11 @@ export function FatalFallback({
   let message: string;
   if (error instanceof ApiError && error.code) {
     message = t(error.code, { ns: 'errors', defaultValue: error.message });
+  } else if (error instanceof NetworkError || error instanceof TypeError) {
+    // A transport failure carries the browser's own English wording
+    // ("Failed to fetch"), which is not a sentence to paint into the page
+    // of a reader who chose another language.
+    message = t(mapAuthThrown(error));
   } else if (error instanceof Error) {
     message = error.message;
   } else {

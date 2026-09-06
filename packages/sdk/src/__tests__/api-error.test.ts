@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiError, toApiError } from '../api-error';
+import { ApiError, NetworkError, toApiError, toNetworkError } from '../api-error';
 
 describe('toApiError', () => {
   it('reads x-i18n-key from problem extensions', () => {
@@ -71,5 +71,30 @@ describe('toApiError', () => {
     expect(err.message).toBe('Failed to list tasks');
     expect(err.code).toBeUndefined();
     expect(err.httpStatus).toBe(500);
+  });
+});
+
+describe('toNetworkError', () => {
+  it('describes the operation, not the engine that failed it', () => {
+    const err = toNetworkError(new TypeError('Failed to fetch'), 'Failed to load tasks');
+
+    expect(err.message).toBe('Failed to load tasks');
+    expect(err.message).not.toContain('Failed to fetch');
+  });
+
+  it('is an ApiError with nothing a server decided on it', () => {
+    const err = toNetworkError(new TypeError('Load failed'), 'Failed to load tasks');
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toBeInstanceOf(NetworkError);
+    expect(err.name).toBe('NetworkError');
+    expect(err.code).toBeUndefined();
+    expect(err.httpStatus).toBeUndefined();
+  });
+
+  it('keeps the thrown value, so a log still says which failure it was', () => {
+    const cause = new TypeError('NetworkError when attempting to fetch resource');
+
+    expect(toNetworkError(cause, 'Failed to load tasks').cause).toBe(cause);
   });
 });

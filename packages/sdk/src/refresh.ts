@@ -22,6 +22,8 @@
  *    the request with a fresh token).
  */
 
+import { isTransportFailure } from './api-error.js';
+
 /** Options for creating a token refresh middleware. */
 export interface RefreshMiddlewareOptions {
   /** Base URL of the auth-api service (e.g. http://localhost:8082). */
@@ -130,26 +132,6 @@ export function decodeTokenExp(token: string): number | null {
  * declined. Only the second is grounds for ending the session.
  */
 export type RefreshFailureKind = 'none' | 'network' | 'rejected';
-
-/**
- * Whether a caught value represents a transport-layer failure rather
- * than a response.
- *
- * Deliberately decided from the thrown value alone. `fetch` rejects with
- * a `TypeError` when the request never reached a server (DNS, TCP, CORS,
- * offline) and with a `DOMException` named `AbortError` on cancellation;
- * anything else means we did get an answer. Inferring "network" from a
- * missing HTTP status would be wrong here, because a status is also
- * missing whenever an error envelope fails to parse — that would classify
- * a genuine rejection as a blip and keep a dead session alive.
- */
-function isTransportFailure(err: unknown): boolean {
-  if (err instanceof TypeError) return true;
-  if (typeof DOMException !== 'undefined' && err instanceof DOMException) {
-    return err.name === 'AbortError';
-  }
-  return false;
-}
 
 /** Token refresher handle with helpers for expiry-aware request gating. */
 export interface TokenRefresher {

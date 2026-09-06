@@ -8,7 +8,12 @@
  *   3. Generated `errors:${code}` locale entry.
  */
 
-import { ApiError, lookupErrorDefinition, lookupErrorI18nKey } from '@nodate-flow/sdk';
+import {
+  ApiError,
+  lookupErrorDefinition,
+  lookupErrorI18nKey,
+  NetworkError,
+} from '@nodate-flow/sdk';
 
 import type { ProblemJson } from './api-error';
 
@@ -74,7 +79,12 @@ export function refusalCode(err: unknown): string | undefined {
 
 /** Maps a thrown SDK error / network failure to an i18n key. */
 export function mapAuthThrown(err: unknown): AuthErrorI18nKey {
-  if (err instanceof TypeError) return 'auth:errors.network';
+  // A transport failure arrives as a NetworkError from the requester and
+  // as a bare TypeError from anything holding its own fetch. Both are
+  // decided before the ApiError branch: a NetworkError is an ApiError
+  // with no code, which would otherwise fall through to the generic
+  // "unknown" sentence and hide the one failure a reader can act on.
+  if (err instanceof NetworkError || err instanceof TypeError) return 'auth:errors.network';
   if (err instanceof ApiError) {
     const directKey = normalizeI18nKey(err.i18nKey);
     if (directKey) return directKey;
