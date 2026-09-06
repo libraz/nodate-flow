@@ -64,7 +64,12 @@ func TestEveryDeclaredKindResolvesThroughTheTable(t *testing.T) {
 
 // TestPublishedStreamKindsAreDeclared proves the table only ever routes
 // to a stream kind the wire format defines. A typo would publish a kind
-// the frontend's switch does not handle, which it ignores in silence.
+// the frontend's switch does not handle, and the browser does not ignore
+// that: the switch returns undefined, the SSE reader throws where it
+// iterates the result, and the reconnect loop discards the throw. Every
+// such event costs the connection along with any frame buffered behind
+// it, while the connection stays healthy enough that the polling
+// fallback never engages.
 func TestPublishedStreamKindsAreDeclared(t *testing.T) {
 	t.Parallel()
 
