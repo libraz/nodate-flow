@@ -161,6 +161,8 @@ func TestWithdrawAllowlistEntry_AbsentIsNotFoundAndUnaudited(t *testing.T) {
 			var prob *handlerutil.ProblemDetails
 			require.ErrorAs(t, err, &prob)
 			assert.Equal(t, http.StatusNotFound, prob.Status)
+			assert.Equal(t, "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND", prob.Type,
+				"the refusal must name the allowlist entry, not some other missing resource")
 			assert.Empty(t, sink.actions(), "no audit entry may claim a withdrawal this call did not perform")
 		})
 	}
@@ -178,6 +180,8 @@ func TestWithdrawAllowlistEntry_AbsentIsNotFoundAndUnaudited(t *testing.T) {
 	var prob *handlerutil.ProblemDetails
 	require.ErrorAs(t, err, &prob)
 	assert.Equal(t, http.StatusNotFound, prob.Status)
+	assert.Equal(t, "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND", prob.Type,
+		"an already-withdrawn entry reads as the same missing entry")
 	assert.Len(t, sink.actions(), 1, "the repeated withdrawal must add nothing to the trail")
 
 	live, err := q.ListEnabledOauthSigninAllowlistEntries(ctx)

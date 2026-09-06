@@ -46,11 +46,18 @@ func invalidBodyField(field string) error {
 		apierr.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", field))
 }
 
-// missingBodyField refuses a body that omits a member the request's other
-// values made required.
-func missingBodyField(field string) error {
+// occurrenceRefusal answers one of the scope / row combinations an
+// occurrence-scoped request cannot be carried out on.
+//
+// Each such combination has a code of its own, because the reason is what
+// the caller has to act on: a generic field-level refusal says the request
+// was rejected without saying whether the row repeats, whether it already
+// stands in for an occurrence, or which member is the one that cannot be
+// there. The named member rides along as a detail so a form can still
+// point at it.
+func occurrenceRefusal(spec *apierrors.Spec, field string) error {
 	return handlerutil.HTTPErrFromAPIError(
-		apierr.New(apierrors.ValidationBodyFieldMissing).WithDetail("field", field))
+		apierr.New(spec).WithDetail("field", field))
 }
 
 // decodeOccurrenceScope reads the scope a patch names, defaulting to the
@@ -120,7 +127,7 @@ func requireOccurrenceScope(
 		// match an override directly, and the trigger answers a rule on
 		// such a row with SQLSTATE 45000.
 		if isOverride && touchesRecurrence {
-			return invalidBodyField("recurrenceRule")
+			return occurrenceRefusal(apierrors.CalendarEventRecurrenceOnOccurrenceNotAllowed, "recurrenceRule")
 		}
 		return nil
 	}
@@ -128,7 +135,7 @@ func requireOccurrenceScope(
 	// Which occurrence is singled out is the whole content of a
 	// non-series scope. Without it the request names nothing.
 	if input.Body.OccurrenceStart == nil {
-		return missingBodyField("occurrenceStart")
+		return occurrenceRefusal(apierrors.CalendarEventOccurrenceStartRequired, "occurrenceStart")
 	}
 
 	// A two-level chain. An override of an override inserts happily and
@@ -136,18 +143,18 @@ func requireOccurrenceScope(
 	// first override replaced from the master, and nothing expands an
 	// override, so the second row is written and never read.
 	if isOverride {
-		return invalidBodyField("scope")
+		return occurrenceRefusal(apierrors.CalendarEventAlreadyOccurrenceOverride, "scope")
 	}
 
 	// There is no occurrence to single out on a row that produces one.
 	if !hasRecurrenceRule(evt.RecurrenceRule) {
-		return invalidBodyField("scope")
+		return occurrenceRefusal(apierrors.CalendarEventNotRecurring, "scope")
 	}
 
 	// A single occurrence is a leaf. The rule, the recurrence end and the
 	// exception list describe the series and belong to the master alone.
 	if scope == scopeOccurrence && touchesRecurrence {
-		return invalidBodyField("recurrenceRule")
+		return occurrenceRefusal(apierrors.CalendarEventRecurrenceOnOccurrenceNotAllowed, "recurrenceRule")
 	}
 	return nil
 }

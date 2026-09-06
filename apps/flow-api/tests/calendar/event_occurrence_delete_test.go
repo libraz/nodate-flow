@@ -103,12 +103,24 @@ func deleteEventScoped(
 	calID, evtID, query string,
 ) int {
 	t.Helper()
+	status, _ := deleteEventScopedBody(t, tt, calID, evtID, query)
+	return status
+}
+
+// deleteEventScopedBody is deleteEventScoped with the response body, which
+// a refusal has to be read from: every refusal on this path answers 422, so
+// the status alone cannot say which rule the request tripped.
+func deleteEventScopedBody(
+	t *testing.T,
+	tt *helpers.CalendarTestTenant,
+	calID, evtID, query string,
+) (int, []byte) {
+	t.Helper()
 	url := tt.WsPath("calendars", calID, "events", evtID)
 	if query != "" {
 		url += "?" + query
 	}
-	status, _ := helpers.DoJSONStatus(t, http.MethodDelete, url, tt.AccessToken, nil)
-	return status
+	return helpers.DoJSONStatus(t, http.MethodDelete, url, tt.AccessToken, nil)
 }
 
 // TestDeleteEventSeries_DisablesOverrides covers the delete an omitted
@@ -232,10 +244,11 @@ func TestDeleteEventOccurrence_RefusesWithoutOccurrenceStart(t *testing.T) {
 
 	masterID := weeklySeries(t, tt, calID, time.Date(2028, 5, 8, 11, 0, 0, 0, time.UTC))
 
-	assert.Equal(t, http.StatusUnprocessableEntity,
-		deleteEventScoped(t, tt, calID, masterID, "scope=occurrence"))
-	assert.Equal(t, http.StatusUnprocessableEntity,
-		deleteEventScoped(t, tt, calID, masterID, "scope=thisAndFollowing"))
+	for _, scope := range []string{"occurrence", "thisAndFollowing"} {
+		status, body := deleteEventScopedBody(t, tt, calID, masterID, "scope="+scope)
+		assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+		assert.Contains(t, string(body), "CALENDAR.EVENT.OCCURRENCE_START_REQUIRED", "body=%s", string(body))
+	}
 	assert.True(t, readEventRow(t, masterID).enabled, "a refused delete must change nothing")
 }
 
@@ -252,8 +265,9 @@ func TestDeleteEventOccurrence_RefusesOnNonRecurringEvent(t *testing.T) {
 	evtID := createEventForSoftDelete(t, tt, calID, "One-off", start, start.Add(time.Hour))
 
 	query := fmt.Sprintf("scope=occurrence&occurrenceStart=%d", start.Unix())
-	assert.Equal(t, http.StatusUnprocessableEntity,
-		deleteEventScoped(t, tt, calID, evtID, query))
+	status, body := deleteEventScopedBody(t, tt, calID, evtID, query)
+	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.NOT_RECURRING", "body=%s", string(body))
 	assert.True(t, readEventRow(t, evtID).enabled, "a refused delete must change nothing")
 }
 
@@ -275,8 +289,9 @@ func TestDeleteEventOccurrence_RefusesOnOverrideRow(t *testing.T) {
 	overrideID := seedOccurrenceOverride(t, tt, calID, masterID, second)
 
 	query := fmt.Sprintf("scope=occurrence&occurrenceStart=%d", second.Unix())
-	assert.Equal(t, http.StatusUnprocessableEntity,
-		deleteEventScoped(t, tt, calID, overrideID, query))
+	status, body := deleteEventScopedBody(t, tt, calID, overrideID, query)
+	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE", "body=%s", string(body))
 	assert.True(t, readEventRow(t, overrideID).enabled, "a refused delete must change nothing")
 
 	// The series scope is how an override row is deleted.

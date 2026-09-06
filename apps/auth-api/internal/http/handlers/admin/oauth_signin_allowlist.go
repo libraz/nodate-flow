@@ -15,10 +15,11 @@ import (
 )
 
 // allowlistEntryNotFound is the answer to an entry id that names no live
-// entry. The catalog carries no code for this table, so the closest
-// instance-level not-found stands in; the status and the "the id you named
-// is not there" meaning are what the caller branches on.
-var allowlistEntryNotFound = apierrors.InstanceUserNotFound
+// entry: it was never there, it has already been withdrawn, or it is not a
+// well-formed identifier. The three are one answer on purpose — an
+// administrator acting on a stale list needs to know the id no longer
+// stands, not which of the ways it stopped standing.
+var allowlistEntryNotFound = apierrors.InstanceOauthAllowlistNotFound
 
 // ListOAuthSignInAllowlist handles GET /admin/oauth-signin-allowlist.
 // Returns a paginated list of every entry, withdrawn ones included: a

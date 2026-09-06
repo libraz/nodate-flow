@@ -229,7 +229,7 @@ func TestPatchEventOccurrence_RefusesWithoutOccurrenceStart(t *testing.T) {
 				"title": "Nameless occurrence",
 			})
 			assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
-			assert.Contains(t, string(body), "VALIDATION.BODY.FIELD_MISSING", "body=%s", string(body))
+			assert.Contains(t, string(body), "CALENDAR.EVENT.OCCURRENCE_START_REQUIRED", "body=%s", string(body))
 		})
 	}
 }
@@ -257,7 +257,7 @@ func TestPatchEventOccurrence_RefusesOnNonRecurringEvent(t *testing.T) {
 		"title":           "No such occurrence",
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
-	assert.Contains(t, string(body), "VALIDATION.BODY.FIELD_INVALID", "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.NOT_RECURRING", "body=%s", string(body))
 }
 
 func TestPatchEventOccurrence_RefusesOnOverrideRow(t *testing.T) {
@@ -288,7 +288,7 @@ func TestPatchEventOccurrence_RefusesOnOverrideRow(t *testing.T) {
 		"title":           "Second level",
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
-	assert.Contains(t, string(body), "VALIDATION.BODY.FIELD_INVALID", "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE", "body=%s", string(body))
 }
 
 func TestPatchEventOccurrence_RefusesRecurrenceFields(t *testing.T) {
@@ -319,7 +319,7 @@ func TestPatchEventOccurrence_RefusesRecurrenceFields(t *testing.T) {
 			}
 			status, raw := helpers.DoJSONStatus(t, http.MethodPatch, tt.WsPath("calendars", calID, "events", masterID), tt.AccessToken, body)
 			assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(raw))
-			assert.Contains(t, string(raw), "VALIDATION.BODY.FIELD_INVALID", "body=%s", string(raw))
+			assert.Contains(t, string(raw), "CALENDAR.EVENT.RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED", "body=%s", string(raw))
 		})
 	}
 }
@@ -352,7 +352,7 @@ func TestPatchEvent_RefusesRecurrenceRuleOnOverrideRow(t *testing.T) {
 		"recurrenceRule": map[string]any{"freq": "weekly", "interval": 1},
 	})
 	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
-	assert.Contains(t, string(body), "VALIDATION.BODY.FIELD_INVALID", "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED", "body=%s", string(body))
 
 	// A patch that leaves the recurrence columns alone still works on an
 	// override row.

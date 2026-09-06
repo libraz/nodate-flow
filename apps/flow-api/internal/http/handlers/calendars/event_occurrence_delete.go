@@ -49,19 +49,19 @@ func requireDeleteOccurrenceScope(
 	// Which occurrence is singled out is the whole content of a
 	// non-series scope. Without it the request names nothing.
 	if occurrenceStart == 0 {
-		return invalidQueryField("occurrenceStart")
+		return occurrenceRefusal(apierrors.CalendarEventOccurrenceStartRequired, "occurrenceStart")
 	}
 
 	// An override stands in for exactly one occurrence and produces
 	// none, so it has no occurrence to single out and no series to
 	// truncate. Deleting it is the series scope's job.
 	if parentID.Valid {
-		return invalidQueryField("scope")
+		return occurrenceRefusal(apierrors.CalendarEventAlreadyOccurrenceOverride, "scope")
 	}
 
 	// Nor does a row that repeats not at all.
 	if !hasRecurrenceRule(evt.RecurrenceRule) {
-		return invalidQueryField("scope")
+		return occurrenceRefusal(apierrors.CalendarEventNotRecurring, "scope")
 	}
 	return nil
 }
