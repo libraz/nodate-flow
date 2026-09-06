@@ -23,8 +23,8 @@ import (
 // historical OFFSET path runs unchanged. The keyset queries pass
 // `read_filter = 'all'` (matching the OFFSET behaviour, which exposes
 // no read-state filter).
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, in *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListNotificationsInput) (*ListNotificationsOutput, error) {
+	return func(ctx context.Context, in *ListNotificationsInput) (*ListNotificationsOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -33,7 +33,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if limit <= 0 {
 			limit = 50
 		}
-		out := &ListOutput{}
+		out := &ListNotificationsOutput{}
 		out.Body.Notifications = []NotificationDTO{}
 
 		if in.WorkspaceID != "" {

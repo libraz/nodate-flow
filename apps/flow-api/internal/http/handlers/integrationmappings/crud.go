@@ -13,8 +13,8 @@ import (
 )
 
 // List handles GET /workspaces/{wsId}/integration-mappings.
-func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
-	return func(ctx context.Context, _ *ListInput) (*ListOutput, error) {
+func List(deps Deps) func(context.Context, *ListIntegrationMappingsInput) (*ListIntegrationMappingsOutput, error) {
+	return func(ctx context.Context, _ *ListIntegrationMappingsInput) (*ListIntegrationMappingsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -23,7 +23,7 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		out := &ListOutput{}
+		out := &ListIntegrationMappingsOutput{}
 		out.Body.Mappings = make([]IntegrationMapping, len(rows))
 		for i, r := range rows {
 			out.Body.Mappings[i] = mapListRow(r)
@@ -35,8 +35,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 
 // Create handles POST /workspaces/{wsId}/integration-mappings. It claims
 // an external webhook source for the caller's workspace.
-func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
-	return func(ctx context.Context, in *CreateInput) (*CreateOutput, error) {
+func Create(deps Deps) func(context.Context, *CreateIntegrationMappingInput) (*CreateIntegrationMappingOutput, error) {
+	return func(ctx context.Context, in *CreateIntegrationMappingInput) (*CreateIntegrationMappingOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -89,13 +89,13 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &CreateOutput{Body: mapFindRow(row)}, nil
+		return &CreateIntegrationMappingOutput{Body: mapFindRow(row)}, nil
 	}
 }
 
 // Patch handles PATCH /workspaces/{wsId}/integration-mappings/{id}.
-func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
-	return func(ctx context.Context, in *PatchInput) (*PatchOutput, error) {
+func Patch(deps Deps) func(context.Context, *PatchIntegrationMappingInput) (*PatchIntegrationMappingOutput, error) {
+	return func(ctx context.Context, in *PatchIntegrationMappingInput) (*PatchIntegrationMappingOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -155,7 +155,7 @@ func Patch(deps Deps) func(context.Context, *PatchInput) (*PatchOutput, error) {
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.IntegrationMappingNotFound, apierrors.InternalUnexpected))
 		}
-		return &PatchOutput{Body: mapFindRow(row)}, nil
+		return &PatchIntegrationMappingOutput{Body: mapFindRow(row)}, nil
 	}
 }
 

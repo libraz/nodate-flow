@@ -1900,36 +1900,6 @@
         "required": ["modelId", "name", "systemPrompt"],
         "type": "object"
       },
-      "CreateBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "externalKey": {
-            "description": "github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered.",
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "label": {
-            "description": "Display-only name, e.g. the owner/repo or the Slack workspace name.",
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "provider": {
-            "enum": ["github", "slack", "google"],
-            "type": "string"
-          }
-        },
-        "required": ["provider", "externalKey", "label"],
-        "type": "object"
-      },
       "CreateCalendarInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -2216,33 +2186,6 @@
         "required": ["source"],
         "type": "object"
       },
-      "CreateInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateInputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "description": {
-            "description": "Human-readable description",
-            "maxLength": 255,
-            "type": "string"
-          },
-          "eventTypes": {
-            "description": "JSON array of event type patterns"
-          },
-          "url": {
-            "description": "Target URL for webhook delivery",
-            "maxLength": 2048,
-            "type": "string"
-          }
-        },
-        "required": ["url", "description", "eventTypes"],
-        "type": "object"
-      },
       "CreateIntakeItemBody": {
         "additionalProperties": false,
         "properties": {
@@ -2264,6 +2207,36 @@
           }
         },
         "required": ["title"],
+        "type": "object"
+      },
+      "CreateIntegrationMappingBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateIntegrationMappingBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "externalKey": {
+            "description": "github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "description": "Display-only name, e.g. the owner/repo or the Slack workspace name.",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider": {
+            "enum": ["github", "slack", "google"],
+            "type": "string"
+          }
+        },
+        "required": ["provider", "externalKey", "label"],
         "type": "object"
       },
       "CreateInviteOutputBody": {
@@ -2466,23 +2439,6 @@
           }
         },
         "required": ["title"],
-        "type": "object"
-      },
-      "CreateOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/CreateOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "webhook": {
-            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
-          }
-        },
-        "required": ["webhook"],
         "type": "object"
       },
       "CreatePageBody": {
@@ -2795,6 +2751,50 @@
           }
         },
         "required": ["name", "startsOn", "endsOn"],
+        "type": "object"
+      },
+      "CreateWebhookInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWebhookInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "description": "Human-readable description",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "eventTypes": {
+            "description": "JSON array of event type patterns"
+          },
+          "url": {
+            "description": "Target URL for webhook delivery",
+            "maxLength": 2048,
+            "type": "string"
+          }
+        },
+        "required": ["url", "description", "eventTypes"],
+        "type": "object"
+      },
+      "CreateWebhookOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateWebhookOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
+          }
+        },
+        "required": ["webhook"],
         "type": "object"
       },
       "CreateWidgetBody": {
@@ -4193,23 +4193,6 @@
         "required": ["rules"],
         "type": "object"
       },
-      "GetOutputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/GetOutputBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "webhook": {
-            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
-          }
-        },
-        "required": ["webhook"],
-        "type": "object"
-      },
       "GetPublicShareOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -4231,6 +4214,23 @@
           }
         },
         "required": ["share", "events"],
+        "type": "object"
+      },
+      "GetWebhookOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/GetWebhookOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSubscriptionDetailDTO"
+          }
+        },
+        "required": ["webhook"],
         "type": "object"
       },
       "GrantAdminInputBody": {
@@ -5000,30 +5000,6 @@
         "required": ["total", "actions"],
         "type": "object"
       },
-      "ListBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "mappings": {
-            "items": {
-              "$ref": "#/components/schemas/IntegrationMapping"
-            },
-            "type": ["array", "null"]
-          },
-          "total": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "required": ["total", "mappings"],
-        "type": "object"
-      },
       "ListCalendarEventsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5429,6 +5405,30 @@
         "required": ["total", "items", "nextCursor"],
         "type": "object"
       },
+      "ListIntegrationMappingsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ListIntegrationMappingsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrationMapping"
+            },
+            "type": ["array", "null"]
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["total", "mappings"],
+        "type": "object"
+      },
       "ListIntegrationsOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -5779,12 +5779,12 @@
         "required": ["total", "tasks", "nextCursor"],
         "type": "object"
       },
-      "ListOutputBody": {
+      "ListNotificationsOutputBody": {
         "additionalProperties": false,
         "properties": {
           "$schema": {
             "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/ListOutputBody.json"],
+            "examples": ["https://example.com/schemas/ListNotificationsOutputBody.json"],
             "format": "uri",
             "readOnly": true,
             "type": "string"
@@ -7635,27 +7635,6 @@
         },
         "type": "object"
       },
-      "PatchBody": {
-        "additionalProperties": false,
-        "properties": {
-          "$schema": {
-            "description": "A URL to the JSON Schema for this object.",
-            "examples": ["https://example.com/schemas/PatchBody.json"],
-            "format": "uri",
-            "readOnly": true,
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "label": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "PatchCalendarInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -7795,6 +7774,27 @@
           "visibility": {
             "description": "Visibility",
             "enum": ["default", "public", "private", "confidential"],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PatchIntegrationMappingBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchIntegrationMappingBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 255,
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -15552,7 +15552,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListOutputBody"
+                  "$ref": "#/components/schemas/ListNotificationsOutputBody"
                 }
               }
             },
@@ -26654,7 +26654,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListBody"
+                  "$ref": "#/components/schemas/ListIntegrationMappingsBody"
                 }
               }
             },
@@ -26698,7 +26698,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBody"
+                "$ref": "#/components/schemas/CreateIntegrationMappingBody"
               }
             }
           },
@@ -26820,7 +26820,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchBody"
+                "$ref": "#/components/schemas/PatchIntegrationMappingBody"
               }
             }
           },
@@ -30543,7 +30543,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInputBody"
+                "$ref": "#/components/schemas/CreateWebhookInputBody"
               }
             }
           },
@@ -30554,7 +30554,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateOutputBody"
+                  "$ref": "#/components/schemas/CreateWebhookOutputBody"
                 }
               }
             },
@@ -30666,7 +30666,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetOutputBody"
+                  "$ref": "#/components/schemas/GetWebhookOutputBody"
                 }
               }
             },

@@ -5757,20 +5757,6 @@ export interface components {
              */
             temperature?: number;
         };
-        CreateBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateBody.json
-             */
-            readonly $schema?: string;
-            /** @description github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered. */
-            externalKey: string;
-            /** @description Display-only name, e.g. the owner/repo or the Slack workspace name. */
-            label: string;
-            /** @enum {string} */
-            provider: "github" | "slack" | "google";
-        };
         CreateCalendarInputBody: {
             /**
              * Format: uri
@@ -5941,20 +5927,6 @@ export interface components {
             /** @enum {string} */
             source: "github" | "jira" | "linear" | "csv";
         };
-        CreateInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateInputBody.json
-             */
-            readonly $schema?: string;
-            /** @description Human-readable description */
-            description: string;
-            /** @description JSON array of event type patterns */
-            eventTypes: unknown;
-            /** @description Target URL for webhook delivery */
-            url: string;
-        };
         CreateIntakeItemBody: {
             /**
              * Format: uri
@@ -5964,6 +5936,20 @@ export interface components {
             readonly $schema?: string;
             body?: string;
             title: string;
+        };
+        CreateIntegrationMappingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateIntegrationMappingBody.json
+             */
+            readonly $schema?: string;
+            /** @description github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered. */
+            externalKey: string;
+            /** @description Display-only name, e.g. the owner/repo or the Slack workspace name. */
+            label: string;
+            /** @enum {string} */
+            provider: "github" | "slack" | "google";
         };
         CreateInviteOutputBody: {
             /**
@@ -6062,15 +6048,6 @@ export interface components {
             sortWeight?: number;
             /** @description Memo title */
             title: string;
-        };
-        CreateOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CreateOutputBody.json
-             */
-            readonly $schema?: string;
-            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
         CreatePageBody: {
             /**
@@ -6219,6 +6196,29 @@ export interface components {
             projectId?: string;
             /** @description YYYY-MM-DD */
             startsOn: string;
+        };
+        CreateWebhookInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateWebhookInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Human-readable description */
+            description: string;
+            /** @description JSON array of event type patterns */
+            eventTypes: unknown;
+            /** @description Target URL for webhook delivery */
+            url: string;
+        };
+        CreateWebhookOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateWebhookOutputBody.json
+             */
+            readonly $schema?: string;
+            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
         CreateWidgetBody: {
             /**
@@ -6885,15 +6885,6 @@ export interface components {
             readonly $schema?: string;
             rules: components["schemas"]["AutoActionRuleBody"][] | null;
         };
-        GetOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/GetOutputBody.json
-             */
-            readonly $schema?: string;
-            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
-        };
         GetPublicShareOutputBody: {
             /**
              * Format: uri
@@ -6903,6 +6894,15 @@ export interface components {
             readonly $schema?: string;
             events: components["schemas"]["ShareEventResponse"][] | null;
             share: components["schemas"]["PublicShareResponse"];
+        };
+        GetWebhookOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/GetWebhookOutputBody.json
+             */
+            readonly $schema?: string;
+            webhook: components["schemas"]["WebhookSubscriptionDetailDTO"];
         };
         GrantAdminInputBody: {
             /**
@@ -7257,17 +7257,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        ListBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBody.json
-             */
-            readonly $schema?: string;
-            mappings: components["schemas"]["IntegrationMapping"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
         ListCalendarEventsOutputBody: {
             /**
              * Format: uri
@@ -7458,6 +7447,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListIntegrationMappingsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListIntegrationMappingsBody.json
+             */
+            readonly $schema?: string;
+            mappings: components["schemas"]["IntegrationMapping"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListIntegrationsOutputBody: {
             /**
              * Format: uri
@@ -7619,11 +7619,11 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        ListOutputBody: {
+        ListNotificationsOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListOutputBody.json
+             * @example https://example.com/schemas/ListNotificationsOutputBody.json
              */
             readonly $schema?: string;
             nextCursor: string | null;
@@ -8406,16 +8406,6 @@ export interface components {
             /** Format: double */
             threshold?: number;
         };
-        PatchBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchBody.json
-             */
-            readonly $schema?: string;
-            enabled?: boolean;
-            label?: string;
-        };
         PatchCalendarInputBody: {
             /**
              * Format: uri
@@ -8499,6 +8489,16 @@ export interface components {
              * @enum {string}
              */
             visibility?: "default" | "public" | "private" | "confidential";
+        };
+        PatchIntegrationMappingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchIntegrationMappingBody.json
+             */
+            readonly $schema?: string;
+            enabled?: boolean;
+            label?: string;
         };
         PatchLabelBody: {
             /**
@@ -12513,7 +12513,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListOutputBody"];
+                    "application/json": components["schemas"]["ListNotificationsOutputBody"];
                 };
             };
             /** @description Error */
@@ -18963,7 +18963,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBody"];
+                    "application/json": components["schemas"]["ListIntegrationMappingsBody"];
                 };
             };
             /** @description Error */
@@ -18989,7 +18989,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateBody"];
+                "application/json": components["schemas"]["CreateIntegrationMappingBody"];
             };
         };
         responses: {
@@ -19061,7 +19061,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PatchBody"];
+                "application/json": components["schemas"]["PatchIntegrationMappingBody"];
             };
         };
         responses: {
@@ -21196,7 +21196,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateInputBody"];
+                "application/json": components["schemas"]["CreateWebhookInputBody"];
             };
         };
         responses: {
@@ -21206,7 +21206,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CreateOutputBody"];
+                    "application/json": components["schemas"]["CreateWebhookOutputBody"];
                 };
             };
             /** @description Error */
@@ -21240,7 +21240,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GetOutputBody"];
+                    "application/json": components["schemas"]["GetWebhookOutputBody"];
                 };
             };
             /** @description Error */

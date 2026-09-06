@@ -64,8 +64,8 @@ type WebhookDeliveryDTO struct {
 
 // --- Create ---
 
-// CreateInput is the request for POST /workspaces/{wsId}/webhooks.
-type CreateInput struct {
+// CreateWebhookInput is the request for POST /workspaces/{wsId}/webhooks.
+type CreateWebhookInput struct {
 	WsID string `path:"wsId" doc:"Workspace public id (UUID v7)"`
 	Body struct {
 		URL         string          `json:"url" required:"true" maxLength:"2048" doc:"Target URL for webhook delivery"`
@@ -74,14 +74,14 @@ type CreateInput struct {
 	}
 }
 
-// CreateOutputBody is the response body for POST /workspaces/{wsId}/webhooks.
-type CreateOutputBody struct {
+// CreateWebhookOutputBody is the response body for POST /workspaces/{wsId}/webhooks.
+type CreateWebhookOutputBody struct {
 	Webhook WebhookSubscriptionDetailDTO `json:"webhook"`
 }
 
-// CreateOutput is the response for POST /workspaces/{wsId}/webhooks.
-type CreateOutput struct {
-	Body CreateOutputBody
+// CreateWebhookOutput is the response for POST /workspaces/{wsId}/webhooks.
+type CreateWebhookOutput struct {
+	Body CreateWebhookOutputBody
 }
 
 // --- List ---
@@ -107,20 +107,20 @@ type ListOutput struct {
 
 // --- Get ---
 
-// GetInput is the path for GET /workspaces/{wsId}/webhooks/{webhookId}.
-type GetInput struct {
+// GetWebhookInput is the path for GET /workspaces/{wsId}/webhooks/{webhookId}.
+type GetWebhookInput struct {
 	WsID      string `path:"wsId" doc:"Workspace public id (UUID v7)"`
 	WebhookID string `path:"webhookId" doc:"Webhook subscription public id (UUID v7)"`
 }
 
-// GetOutputBody is the response body for GET /workspaces/{wsId}/webhooks/{webhookId}.
-type GetOutputBody struct {
+// GetWebhookOutputBody is the response body for GET /workspaces/{wsId}/webhooks/{webhookId}.
+type GetWebhookOutputBody struct {
 	Webhook WebhookSubscriptionDetailDTO `json:"webhook"`
 }
 
-// GetOutput is the response for GET /workspaces/{wsId}/webhooks/{webhookId}.
-type GetOutput struct {
-	Body GetOutputBody
+// GetWebhookOutput is the response for GET /workspaces/{wsId}/webhooks/{webhookId}.
+type GetWebhookOutput struct {
+	Body GetWebhookOutputBody
 }
 
 // --- Delete ---

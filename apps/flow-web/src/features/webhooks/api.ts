@@ -48,7 +48,7 @@ export type WebhookDetail = components['schemas']['WebhookSubscriptionDetailDTO'
 export type WebhookDelivery = components['schemas']['WebhookDeliveryDTO'];
 
 /** Body shape for the create endpoint. */
-export type CreateWebhookBody = components['schemas']['CreateInputBody'];
+export type CreateWebhookBody = components['schemas']['CreateWebhookInputBody'];
 
 /** Query key factory for the webhooks feature. */
 export const webhooksKeys = {

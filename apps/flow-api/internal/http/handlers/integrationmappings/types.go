@@ -45,60 +45,60 @@ type IntegrationMapping struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
-// ListInput is the path for GET /workspaces/{wsId}/integration-mappings.
-type ListInput struct {
+// ListIntegrationMappingsInput is the path for GET /workspaces/{wsId}/integration-mappings.
+type ListIntegrationMappingsInput struct {
 	WsID string `path:"wsId" doc:"Workspace public ID"`
 }
 
-// ListBody is the response payload for the list operation.
-type ListBody struct {
+// ListIntegrationMappingsBody is the response payload for the list operation.
+type ListIntegrationMappingsBody struct {
 	Total    int64                `json:"total"`
 	Mappings []IntegrationMapping `json:"mappings"`
 }
 
-// ListOutput is the response for the list operation.
-type ListOutput struct {
-	Body ListBody
+// ListIntegrationMappingsOutput is the response for the list operation.
+type ListIntegrationMappingsOutput struct {
+	Body ListIntegrationMappingsBody
 }
 
-// CreateBody is the JSON body for POST
+// CreateIntegrationMappingBody is the JSON body for POST
 // /workspaces/{wsId}/integration-mappings.
-type CreateBody struct {
+type CreateIntegrationMappingBody struct {
 	Provider    string `json:"provider" required:"true" enum:"github,slack,google"`
 	ExternalKey string `json:"externalKey" required:"true" minLength:"1" maxLength:"255" doc:"github = numeric repository id (decimal digits, from the repository.id field of any webhook delivery), slack = team id (Txxxxxxxx), google = the channel id used when the watch was registered."`
 	Label       string `json:"label" required:"true" minLength:"1" maxLength:"255" doc:"Display-only name, e.g. the owner/repo or the Slack workspace name."`
 }
 
-// CreateInput is the request for the create operation.
-type CreateInput struct {
+// CreateIntegrationMappingInput is the request for the create operation.
+type CreateIntegrationMappingInput struct {
 	WsID string `path:"wsId" doc:"Workspace public ID"`
-	Body CreateBody
+	Body CreateIntegrationMappingBody
 }
 
-// CreateOutput is the response for the create operation.
-type CreateOutput struct {
+// CreateIntegrationMappingOutput is the response for the create operation.
+type CreateIntegrationMappingOutput struct {
 	Body IntegrationMapping
 }
 
-// PatchBody is the JSON body for PATCH
+// PatchIntegrationMappingBody is the JSON body for PATCH
 // /workspaces/{wsId}/integration-mappings/{id}. provider and externalKey
 // are absent by design: repointing a mapping at a different source is a
 // delete plus a create, so the claim on the old source is released
 // explicitly rather than silently.
-type PatchBody struct {
+type PatchIntegrationMappingBody struct {
 	Label   *string `json:"label,omitempty" minLength:"1" maxLength:"255"`
 	Enabled *bool   `json:"enabled,omitempty"`
 }
 
-// PatchInput is the request for the patch operation.
-type PatchInput struct {
+// PatchIntegrationMappingInput is the request for the patch operation.
+type PatchIntegrationMappingInput struct {
 	WsID string `path:"wsId" doc:"Workspace public ID"`
 	ID   string `path:"id" doc:"Mapping public ID"`
-	Body PatchBody
+	Body PatchIntegrationMappingBody
 }
 
-// PatchOutput is the response for the patch operation.
-type PatchOutput struct {
+// PatchIntegrationMappingOutput is the response for the patch operation.
+type PatchIntegrationMappingOutput struct {
 	Body IntegrationMapping
 }
 

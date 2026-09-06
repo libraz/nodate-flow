@@ -18,8 +18,8 @@ import (
 
 // Create handles POST /workspaces/{wsId}/webhooks. It creates a new
 // webhook subscription with an auto-generated HMAC secret.
-func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error) {
-	return func(ctx context.Context, in *CreateInput) (*CreateOutput, error) {
+func Create(deps Deps) func(context.Context, *CreateWebhookInput) (*CreateWebhookOutput, error) {
+	return func(ctx context.Context, in *CreateWebhookInput) (*CreateWebhookOutput, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -66,7 +66,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		})
 
 		now := handlerutil.NowUnix()
-		out := &CreateOutput{}
+		out := &CreateWebhookOutput{}
 		out.Body.Webhook = WebhookSubscriptionDetailDTO{
 			WebhookSubscriptionDTO: WebhookSubscriptionDTO{
 				ID:          pubID.String(),
@@ -122,8 +122,8 @@ func List(deps Deps) func(context.Context, *ListInput) (*ListOutput, error) {
 
 // Get handles GET /workspaces/{wsId}/webhooks/{webhookId}. It returns
 // the subscription detail including the signing secret.
-func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
-	return func(ctx context.Context, in *GetInput) (*GetOutput, error) {
+func Get(deps Deps) func(context.Context, *GetWebhookInput) (*GetWebhookOutput, error) {
+	return func(ctx context.Context, in *GetWebhookInput) (*GetWebhookOutput, error) {
 		_, ok := middleware.ActorFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceAccessDenied)
@@ -146,7 +146,7 @@ func Get(deps Deps) func(context.Context, *GetInput) (*GetOutput, error) {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WebhookSubscriptionNotFound, apierrors.InternalUnexpected))
 		}
 
-		out := &GetOutput{}
+		out := &GetWebhookOutput{}
 		out.Body.Webhook = WebhookSubscriptionDetailDTO{
 			WebhookSubscriptionDTO: WebhookSubscriptionDTO{
 				ID:          row.PublicID.String(),

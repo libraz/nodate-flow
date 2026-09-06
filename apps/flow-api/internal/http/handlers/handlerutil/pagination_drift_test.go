@@ -91,7 +91,7 @@ func TestPaginationDoesNotDriftAboveCanonicalCap(t *testing.T) {
 		intaketypes.ListIntakeItemsInput{},
 		labelstypes.ListLabelsInput{},
 		lensestypes.ListLensesInput{},
-		notificationstypes.ListInput{},
+		notificationstypes.ListNotificationsInput{},
 		pagestypes.ListPagesInput{},
 		projectstypes.ListProjectsInput{},
 		relationstypes.ListForWorkspaceInput{},
