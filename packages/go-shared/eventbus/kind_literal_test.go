@@ -20,14 +20,16 @@ import (
 // it. Weaker than a type error on both counts, and still the difference
 // between finding these and not.
 //
-// kinds.go is exempt: it declares the constants, and the declaration is
-// the one place the string has to be written out.
+// eventbus/kinds.go is exempt: it declares the constants, and the
+// declaration is the one place the string has to be written out. The
+// exemption is spelled as a path so it covers that file and no other file
+// somebody names kinds.go.
 func TestNoEventKindLiterals(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping type-checking scan in -short mode")
 	}
 
-	msgs, err := kindscan.ScanModule(moduleRoot(t), "kinds.go")
+	msgs, err := kindscan.ScanModule(moduleRoot(t), "eventbus/kinds.go")
 	if err != nil {
 		t.Fatalf("scan module: %v", err)
 	}

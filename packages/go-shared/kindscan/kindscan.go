@@ -27,6 +27,12 @@
 // unrelated dotted string for a kind. A text scan would need a list of
 // every function that takes a Kind, and the entry missing from that list
 // is exactly where the next stray literal goes.
+//
+// The third rule leaves Go entirely. A query can spell a kind itself —
+// INSERT INTO events (..., type, ...) VALUES (..., 'agent.task.detached',
+// ...) — and nothing in Go refers to that string, so renaming the
+// constant leaves it stale with every build still green. [ScanSQL] holds
+// those literals to the same registry.
 package kindscan
 
 import (
@@ -37,7 +43,9 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -91,9 +99,32 @@ func (f Finding) String() string {
 type Config struct {
 	// Dir is the package directory to scan.
 	Dir string
-	// AllowFiles names the base filenames exempt from the rule. The file
-	// that declares the constants is the only legitimate place a kind is
-	// written as a literal.
+	// ImportPath is the import path of the package in Dir.
+	//
+	// The external test package beside it imports it by that path, and
+	// what it must resolve to is the package as the test build assembles
+	// it — the source files plus the in-package test files, which is where
+	// a test helper shared with the external package is declared. Export
+	// data holds no such helper, so without the path the external package
+	// does not type-check at all.
+	//
+	// Empty falls back to the package's own name, which is enough for a
+	// directory whose external test package needs nothing from the
+	// in-package tests.
+	ImportPath string
+	// Root is the directory AllowFiles are written relative to. Empty
+	// means they are matched against the path as the scan spells it.
+	// [ScanModule] sets it to the root it walks.
+	Root string
+	// AllowFiles names the files exempt from the rule, each as a slash
+	// path relative to Root. The file that declares the constants is the
+	// only legitimate place a kind is written as a literal.
+	//
+	// The path is what is matched, not the base name. An exemption has to
+	// name one file: the declaring file is called kinds.go, and so is any
+	// other file somebody names that, which would inherit the exemption
+	// without anyone choosing it — and a second kinds.go is the likeliest
+	// place for a stray literal to sit unreported.
 	AllowFiles []string
 	// Cache holds the export-data locations resolved so far, shared by
 	// every package of one module scan. Nil means this scan resolves
@@ -111,7 +142,11 @@ type Config struct {
 //
 // Test files are included: a literal in a test is how a kind that no
 // production code can name gets asserted on, and a test asserting a
-// spelling nothing emits is worse than no test at all.
+// spelling nothing emits is worse than no test at all. That covers both
+// packages a directory can hold — the in-package tests and the external
+// `package foo_test` beside them. The external one is type-checked on
+// its own because its package name differs, and skipping it for that
+// reason would exempt the files whose whole job is to pin a spelling.
 //
 // It also reports the one sanctioned way around the rule being used
 // wrongly. An [Undeclared] argument is typed string, so the literal rule
@@ -122,7 +157,7 @@ type Config struct {
 func Scan(cfg Config) ([]Finding, error) {
 	allow := map[string]bool{}
 	for _, name := range cfg.AllowFiles {
-		allow[name] = true
+		allow[filepath.ToSlash(filepath.Clean(name))] = true
 	}
 
 	bpkg, err := build.ImportDir(cfg.Dir, 0)
@@ -135,28 +170,115 @@ func Scan(cfg Config) ([]Finding, error) {
 		return nil, fmt.Errorf("kindscan: read %s: %w", cfg.Dir, err)
 	}
 
-	names := make([]string, 0, len(bpkg.GoFiles)+len(bpkg.TestGoFiles))
-	names = append(names, bpkg.GoFiles...)
-	names = append(names, bpkg.TestGoFiles...)
-	if len(names) == 0 {
-		return nil, nil
-	}
-
-	fset := token.NewFileSet()
-	files := make([]*ast.File, 0, len(names))
-	for _, name := range names {
-		f, perr := parser.ParseFile(fset, filepath.Join(cfg.Dir, name), nil, 0)
-		if perr != nil {
-			return nil, fmt.Errorf("kindscan: parse %s: %w", name, perr)
-		}
-		files = append(files, f)
-	}
-
 	// A scan given no cache still memoises within itself; see the same
 	// fallback in payloadscan.Scan.
 	cache := cfg.Cache
 	if cache == nil {
 		cache = payloadscan.NewExportCache()
+	}
+
+	fields := cfg.Fields
+	if fields == nil {
+		fields = kindFields
+	}
+
+	// One file set across both units so a position printed by either names
+	// the same file the same way.
+	fset := token.NewFileSet()
+	// One importer too, and for a harder reason: an importer memoises the
+	// packages it has built, so a second one resolves a shared dependency
+	// to a second *types.Package. The package under test then carries
+	// database/sql from the first while the external test package sees the
+	// second, and the checker rejects the pair as unrelated types.
+	base := cache.Importer(fset)
+
+	var (
+		findings []Finding
+		// self is the package under test once it has been checked, handed
+		// to the external test package as its own import.
+		self *types.Package
+	)
+	for _, u := range units(bpkg, cfg.ImportPath) {
+		checked, found, uerr := scanUnit(cfg, u, fset, base, self, fields, allow)
+		if uerr != nil {
+			return nil, uerr
+		}
+		if !u.external {
+			self = checked
+		}
+		findings = append(findings, found...)
+	}
+	sort.Slice(findings, func(i, j int) bool { return findings[i].Pos < findings[j].Pos })
+	return findings, nil
+}
+
+// unit is one package the type checker sees in a directory. A directory
+// holds up to two: the package together with its in-package tests, and
+// the external test package, which declares `package foo_test` and so
+// has to be checked in a pass of its own.
+type unit struct {
+	// path is the import path the checked package is created under. It is
+	// what the external test package's import of the package under test
+	// is matched against, so the two units must not share it.
+	path string
+	// files are the file names within the scanned directory.
+	files []string
+	// external marks the `package foo_test` unit.
+	external bool
+}
+
+// units splits a directory's Go files into the packages the checker can
+// be handed. importPath may be empty; see [Config.ImportPath].
+func units(bpkg *build.Package, importPath string) []unit {
+	if importPath == "" {
+		importPath = bpkg.Name
+	}
+	own := make([]string, 0, len(bpkg.GoFiles)+len(bpkg.TestGoFiles))
+	own = append(own, bpkg.GoFiles...)
+	own = append(own, bpkg.TestGoFiles...)
+
+	out := make([]unit, 0, 2)
+	if len(own) > 0 {
+		out = append(out, unit{path: importPath, files: own})
+	}
+	if len(bpkg.XTestGoFiles) > 0 {
+		out = append(out, unit{path: importPath + "_test", files: bpkg.XTestGoFiles, external: true})
+	}
+	return out
+}
+
+// selfImporter resolves the package under test to the copy already
+// checked in this scan, and everything else through the export data.
+type selfImporter struct {
+	base types.Importer
+	self *types.Package
+}
+
+func (i selfImporter) Import(path string) (*types.Package, error) {
+	if i.self != nil && path == i.self.Path() {
+		return i.self, nil
+	}
+	return i.base.Import(path)
+}
+
+// scanUnit type-checks one package and reports what its files write. It
+// returns the checked package so the external test unit can import it.
+func scanUnit(
+	cfg Config,
+	u unit,
+	fset *token.FileSet,
+	base types.Importer,
+	self *types.Package,
+	fields []KindField,
+	allow map[string]bool,
+) (*types.Package, []Finding, error) {
+	files := make([]*ast.File, 0, len(u.files))
+	for _, name := range u.files {
+		f, perr := parser.ParseFile(fset, filepath.Join(cfg.Dir, name), nil, 0)
+		if perr != nil {
+			return nil, nil, fmt.Errorf("kindscan: parse %s: %w", name, perr)
+		}
+		files = append(files, f)
 	}
 
 	info := &types.Info{
@@ -171,24 +293,24 @@ func Scan(cfg Config) ([]Finding, error) {
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
 	}
 	conf := types.Config{
-		Importer: cache.Importer(fset),
+		Importer: selfImporter{base: base, self: self},
 		// Errors are collected by Check and returned below. A dependency
 		// that will not resolve must not quietly downgrade the scan to
 		// "found nothing", which is what a passing guard looks like.
 		Error: func(error) {},
 	}
-	if _, err := conf.Check(bpkg.Name, fset, files, info); err != nil {
-		return nil, fmt.Errorf("kindscan: type-check %s: %w", cfg.Dir, err)
+	pkg, err := conf.Check(u.path, fset, files, info)
+	if err != nil {
+		return nil, nil, fmt.Errorf("kindscan: type-check %s (%s): %w", cfg.Dir, u.path, err)
 	}
 
-	fields := cfg.Fields
-	if fields == nil {
-		fields = kindFields
+	exempt := func(filename string) bool {
+		return len(allow) > 0 && allow[relSlash(cfg.Root, filename)]
 	}
 
 	var findings []Finding
 	report := func(pos token.Position, value string, viaUndeclared bool) {
-		if allow[filepath.Base(pos.Filename)] {
+		if exempt(pos.Filename) {
 			return
 		}
 		findings = append(findings, Finding{Pos: pos.String(), Value: value, ViaUndeclared: viaUndeclared})
@@ -196,7 +318,7 @@ func Scan(cfg Config) ([]Finding, error) {
 	reportFieldWrites := func(writes []fieldWrite) {
 		for _, w := range writes {
 			pos := fset.Position(w.expr.Pos())
-			if allow[filepath.Base(pos.Filename)] {
+			if exempt(pos.Filename) {
 				continue
 			}
 			findings = append(findings, Finding{
@@ -255,8 +377,19 @@ func Scan(cfg Config) ([]Finding, error) {
 			return true
 		})
 	}
-	sort.Slice(findings, func(i, j int) bool { return findings[i].Pos < findings[j].Pos })
-	return findings, nil
+	return pkg, findings, nil
+}
+
+// relSlash spells filename the way an allowlist entry is written: as a
+// slash path relative to root. A filename outside root, or a scan with no
+// root, is compared as it stands.
+func relSlash(root, filename string) string {
+	if root != "" {
+		if rel, err := filepath.Rel(root, filename); err == nil && !strings.HasPrefix(rel, "..") {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(filepath.Clean(filename))
 }
 
 // badUndeclaredCall reports whether call is [Undeclared] applied to a
@@ -297,6 +430,12 @@ func badUndeclaredCall(fset *token.FileSet, info *types.Info, call *ast.CallExpr
 // ScanModule type-checks every eventbus-referencing package under root
 // and returns one message per literal found, sorted.
 //
+// Each allowFiles entry is a slash path relative to root and must name a
+// file that exists. An exemption pointing at a moved or renamed file
+// exempts nothing, which is invisible — the guard keeps passing, and the
+// file it was meant to cover is now reported or, worse, some other file
+// by the same name is not.
+//
 // The module guards call this rather than each assembling its own walk,
 // so a rule tightened in one module cannot be looser in the next.
 //
@@ -304,12 +443,21 @@ func badUndeclaredCall(fset *token.FileSet, info *types.Info, call *ast.CallExpr
 // its time waiting on the build cache; serially this is slow enough that
 // the guard becomes something people skip.
 func ScanModule(root string, allowFiles ...string) ([]string, error) {
+	for _, name := range allowFiles {
+		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
+			return nil, fmt.Errorf("kindscan: allowlisted %s names no file under %s: %w", name, root, err)
+		}
+	}
 	dirs, err := Packages(root)
 	if err != nil {
 		return nil, err
 	}
 	if len(dirs) == 0 {
 		return nil, fmt.Errorf("kindscan: no package under %s references the eventbus; a scan here would prove nothing", root)
+	}
+	modPath, err := modulePath(root)
+	if err != nil {
+		return nil, err
 	}
 	// One cache for the whole module. Every package here imports much of
 	// what its neighbours import, and each resolved import costs a
@@ -333,7 +481,13 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			findings, serr := Scan(Config{Dir: dir, AllowFiles: allowFiles, Cache: cache})
+			findings, serr := Scan(Config{
+				Dir:        dir,
+				ImportPath: importPathOf(modPath, root, dir),
+				Root:       root,
+				AllowFiles: allowFiles,
+				Cache:      cache,
+			})
 			mu.Lock()
 			defer mu.Unlock()
 			if serr != nil {
@@ -351,6 +505,40 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 	return msgs, nil
 }
 
+// modulePath reads the module path declared by root/go.mod.
+//
+// It is read rather than asked of `go list` because every package's
+// import path is the module path plus its directory, so one file answers
+// for the whole walk and a subprocess per package answers for one.
+func modulePath(root string) (string, error) {
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return "", fmt.Errorf("kindscan: open %s: %w", root, err)
+	}
+	defer func() { _ = dir.Close() }()
+
+	src, err := dir.ReadFile("go.mod")
+	if err != nil {
+		return "", fmt.Errorf("kindscan: read go.mod under %s: %w", root, err)
+	}
+	for _, line := range strings.Split(string(src), "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			return strings.TrimSpace(rest), nil
+		}
+	}
+	return "", fmt.Errorf("kindscan: %s/go.mod declares no module path", root)
+}
+
+// importPathOf spells the import path of a package directory inside the
+// module rooted at root.
+func importPathOf(modPath, root, dir string) string {
+	rel, err := filepath.Rel(root, dir)
+	if err != nil || rel == "." {
+		return modPath
+	}
+	return path.Join(modPath, filepath.ToSlash(rel))
+}
+
 // Packages lists the package directories under root worth type-checking:
 // those whose source mentions the eventbus package, or one of the structs
 // that carry a kind into a row.
@@ -363,30 +551,44 @@ func ScanModule(root string, allowFiles ...string) ([]string, error) {
 // at a file reports the same nothing as one that finds it clean.
 // Discovering the rest by walking means a new package is covered the day
 // it is written rather than the day somebody remembers to list it.
+//
+// Reading goes through an [os.Root], as it does in [ScanSQL]: the walk
+// produces the paths and the read consumes them, and between those two
+// steps a path can stop meaning what it meant. Scoping the reads to the
+// root is what keeps the walk from handing this a file outside the tree
+// the caller named, rather than a comment saying it will not.
 func Packages(root string) ([]string, error) {
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, fmt.Errorf("kindscan: open %s: %w", root, err)
+	}
+	defer func() { _ = dir.Close() }()
+
 	markers := append([]string{"eventbus"}, fieldMarkers(kindFields)...)
 	seen := map[string]struct{}{}
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	err = fs.WalkDir(dir.FS(), ".", func(name string, entry fs.DirEntry, werr error) error {
+		if werr != nil {
+			return werr
 		}
-		if info.IsDir() {
-			switch info.Name() {
+		if entry.IsDir() {
+			switch entry.Name() {
 			case "node_modules", "testdata", "generated":
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") {
+		if !strings.HasSuffix(name, ".go") {
 			return nil
 		}
-		src, rerr := os.ReadFile(filepath.Clean(path)) //#nosec G122 -- the walk root is the repository source tree, fixed by the caller
+		src, rerr := dir.ReadFile(name)
 		if rerr != nil {
 			return rerr
 		}
 		for _, marker := range markers {
 			if strings.Contains(string(src), marker) {
-				seen[filepath.Dir(path)] = struct{}{}
+				// The caller gets the directory as it would open it; the read
+				// that classified it was scoped to the root.
+				seen[filepath.Join(root, path.Dir(name))] = struct{}{}
 				break
 			}
 		}
