@@ -167,6 +167,15 @@ describe('eventSourceTag', () => {
     });
   });
 
+  describe('scheduler-emitted events', () => {
+    it('leaves a calendar reminder in the system lane, with no person or model behind it', () => {
+      expect(eventSourceTag('calendar.reminder', { calendarEventId: 'e1' })).toEqual({
+        label: 'system',
+        color: SYSTEM_COLOR,
+      });
+    });
+  });
+
   describe('unrecognised events', () => {
     it('falls through to the system tag for an unknown prefix', () => {
       expect(eventSourceTag('timebox.activated')).toEqual({

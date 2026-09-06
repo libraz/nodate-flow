@@ -65,6 +65,11 @@ describe('KIND_GROUPS', () => {
     expect(allChips.map((c) => c.key)).not.toContain('comment.added');
   });
 
+  it('offers a chip for the one calendar kind the scheduler emits', () => {
+    const calendar = KIND_GROUPS.find((g) => g.key === 'calendar');
+    expect(calendar?.chips.flatMap((c) => [...c.kinds])).toEqual(['calendar.reminder']);
+  });
+
   it('splits the AI vocabulary by the question a reader is asking', () => {
     const byKey = Object.fromEntries(
       KIND_GROUPS.map((g) => [g.key, g.chips.flatMap((c) => [...c.kinds])]),

@@ -104,6 +104,16 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
     ],
   },
   {
+    // The only calendar kind the backend actually emits: the reminder
+    // the scheduler appends when a calendar event comes due. The rest of
+    // the `calendar.*` vocabulary is declared but unemitted, so it gets
+    // no chip under the rule above. The group is named for the domain
+    // rather than for the reminder so the rest of the family can join
+    // this section once it has a producer, without moving the chip.
+    key: 'calendar',
+    chips: [chip('calendar.reminder')],
+  },
+  {
     // The AI vocabulary splits three ways by what a reader is asking.
     // This group answers "what did the AI want to change?" — proposals
     // and suggestions that land against content.

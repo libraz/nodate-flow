@@ -59,6 +59,6 @@
     "agent_task_handoff_to_agent": "任务已移交给 AI 代理",
     "agent_task_attached": "已为任务分配 AI 代理",
     "agent_task_detached": "已从任务移除 AI 代理",
-    "mention_created": "有人提到了您"
+    "mention_created": "有人提及了您"
   }
 }

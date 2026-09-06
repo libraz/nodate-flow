@@ -111,6 +111,11 @@ export function eventSourceTag(
   // the opposite call and offers no project chip, because a chip is a
   // promise of rows the backend can actually return.
   if (type.startsWith('project.')) return { label: 'project', color: SOURCE_COLOR.task };
+  // `calendar.reminder` reaches the grey `system` tag on purpose. The
+  // scheduler emits it on a tick with no person and no model behind it,
+  // so neither the human lane nor the AI lane describes it, and a lane
+  // of its own for one kind would blur the source coding the rest of
+  // this function exists to keep sharp.
   return { label: 'system', color: 'var(--nf-color-fg-muted)' };
 }
 
