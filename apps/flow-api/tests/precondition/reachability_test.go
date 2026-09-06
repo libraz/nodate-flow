@@ -46,10 +46,12 @@ func TestCalendarWritesReachTheirPreconditions(t *testing.T) {
 				"  Route the write through the shared rule, or say at the entry why this one cannot carry the input: %s",
 				f.Entry.Surface, f.Entry.Name, f.Entry.Symbol, f.Entry.Pos,
 				strings.Join(rule.Columns, " / "), f.Via.Name, f.Via.Location(),
-				strings.Join(rule.Enforcers, " / "), rule.Why, rule.MarkerForm())
+				strings.Join(rule.Enforcers, " / "), rule.Why, rule.MarkerFormFor(f.Via))
 		case StaleMarker:
-			t.Errorf("%s %s (%s) carries a %q exemption that covers nothing — it either writes none of %s or applies the rule anyway. It exempts nothing and reads as though something was reasoned about; drop it",
-				f.Entry.Surface, f.Entry.Name, f.Entry.Symbol, f.Rule, strings.Join(rule.Columns, " / "))
+			t.Errorf("%s %s (%s) carries a %q exemption at line %d that exempts no write: %s. "+
+				"It reads as though the write it stands over was reasoned about; delete it, or "+
+				"write it about the write it is actually about",
+				f.Entry.Surface, f.Entry.Name, f.Entry.Symbol, f.Rule, f.Marker.Line, f.Reason)
 		}
 	}
 

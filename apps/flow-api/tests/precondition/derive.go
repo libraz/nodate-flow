@@ -25,7 +25,8 @@
 //	            calls, or a REST operation's handler, read out of the
 //	            huma.Register calls. Neither is a list anyone maintains:
 //	            a tool added tomorrow is an entry tomorrow.
-//	in scope    an entry from which some sink statement is called.
+//	in scope    every sink an entry reaches, each on its own. An entry
+//	            with two of them answers for two writes.
 //	held to     the entry has to reach the rule's enforcing function.
 //
 // A hand-written list of tool names would have covered exactly the tools
@@ -36,6 +37,16 @@
 // at the entry, in a marker a machine reads, rather than in a sentence
 // somewhere else — see [Rule.MarkerForm]. The reason is mandatory: an
 // exemption with nothing after the marker is not an exemption.
+//
+// A marker exempts one write. That is the granularity the thing being
+// asserted has: a reason is written about a particular write, having
+// looked at it, and it says nothing about a write nobody had seen. So a
+// marker naming no sink is good only while the entry has one — the case
+// where there is nothing for a name to distinguish — and an entry that
+// gains a second sink fails until a marker names it. Without that, adding
+// a write to an entry that already carried a marker would be covered by
+// the reason written for the write beside it, silently, and the check
+// would report a decision nobody made.
 //
 // Call edges are literal. A call through an imported package name is an
 // edge to that package's function and nothing more; a method call on a
@@ -97,9 +108,30 @@ type Rule struct {
 // The rule name is part of the marker: an entry exempt from one rule is
 // not exempt from the others, and a single blanket marker would hide the
 // next rule added rather than the one somebody reasoned about.
+//
+// This is the form for an entry that writes the rule's columns through one
+// sink. Where it reaches more than one, each takes its own marker naming
+// it; see [Rule.MarkerFormFor].
 func (r Rule) MarkerForm() string {
 	return r.Marker + ": " + r.Name +
 		" not-applicable — <why this write cannot carry the input>"
+}
+
+// MarkerFormFor renders the exemption for one sink of this rule.
+//
+// A marker exempts one write, not an entry. An entry that reaches two
+// sinks has made two decisions, and one reason cannot stand for both: the
+// sink added second would inherit an exemption written before it existed,
+// which is the exemption reading as though it had been reasoned about when
+// nobody had seen the write it now covers. Naming the sink is what makes
+// the second write fail until somebody states a reason for it.
+//
+// The unnamed form stays valid for an entry with a single sink, where
+// there is nothing for a name to distinguish — and it stops being valid
+// the moment a second sink appears, which is the case this exists for.
+func (r Rule) MarkerFormFor(sink WriteSink) string {
+	return r.Marker + ": " + r.Name + " not-applicable for " + sink.Key() +
+		" — <why this write cannot carry the input>"
 }
 
 // markerPattern builds the pattern that matches [Rule.MarkerForm] for one
@@ -107,10 +139,22 @@ func (r Rule) MarkerForm() string {
 // a mention of the marker from acting as one, which is the rule the
 // direct-SQL gate and the affected-rows gate use for their own
 // exemptions.
+//
+// It does not match [Rule.MarkerFormFor]: the sink name sits between
+// "not-applicable" and the dash this requires to follow it directly, so a
+// marker written about one sink is never read as the entry's blanket one.
 func markerPattern(rule Rule) *regexp.Regexp {
 	return regexp.MustCompile(
 		regexp.QuoteMeta(rule.Marker) + `:[ \t]*` + regexp.QuoteMeta(rule.Name) +
 			`[ \t]*not-applicable[ \t]*—[ \t]*[A-Za-z][^\n]*[A-Za-z]`)
+}
+
+// sinkMarkerPattern builds the pattern that matches [Rule.MarkerFormFor],
+// capturing the sink the marker names.
+func sinkMarkerPattern(rule Rule) *regexp.Regexp {
+	return regexp.MustCompile(
+		regexp.QuoteMeta(rule.Marker) + `:[ \t]*` + regexp.QuoteMeta(rule.Name) +
+			`[ \t]*not-applicable[ \t]+for[ \t]+(\S+)[ \t]*—[ \t]*[A-Za-z][^\n]*[A-Za-z]`)
 }
 
 // Rules are the preconditions held across both transports.
@@ -753,26 +797,51 @@ func (s *Source) Declares(symbol string) bool {
 	return s.funcs[symbol] != nil
 }
 
-// Marked reports whether the entry carries a marker for the rule, in its
-// doc comment or anywhere in its body.
-func (s *Source) Marked(symbol string, rule Rule) bool {
+// Marker is one exemption written at an entry, together with the sink it
+// was written about.
+type Marker struct {
+	// Sink is the sink the marker names, empty for one that names none.
+	Sink string
+	// Line is where the marker is written, so a failure about it sends the
+	// reader to the comment rather than to the entry.
+	Line int
+}
+
+// Markers returns the entry's exemptions for one rule, in source order,
+// read from its doc comment or anywhere in its body.
+//
+// Both forms are read and kept apart. A marker naming a sink carries that
+// name; a marker naming none carries the empty string and is only good for
+// an entry with a single sink, which is what [pairMarkers] decides.
+func (s *Source) Markers(symbol string, rule Rule) []Marker {
 	fn := s.funcs[symbol]
 	if fn == nil {
-		return false
+		return nil
 	}
-	pattern := markerPattern(rule)
+	bare := markerPattern(rule)
+	named := sinkMarkerPattern(rule)
 	start := fn.decl.Pos()
 	if fn.decl.Doc != nil {
 		start = fn.decl.Doc.Pos()
 	}
+
+	var out []Marker
 	for _, group := range fn.owner.file.Comments {
 		for _, c := range group.List {
-			if c.Pos() >= start && c.End() <= fn.decl.End() && pattern.MatchString(c.Text) {
-				return true
+			if c.Pos() < start || c.End() > fn.decl.End() {
+				continue
+			}
+			if m := named.FindStringSubmatch(c.Text); m != nil {
+				out = append(out, Marker{Sink: m[1], Line: s.fset.Position(c.Pos()).Line})
+				continue
+			}
+			if bare.MatchString(c.Text) {
+				out = append(out, Marker{Line: s.fset.Position(c.Pos()).Line})
 			}
 		}
 	}
-	return false
+	sort.Slice(out, func(i, j int) bool { return out[i].Line < out[j].Line })
+	return out
 }
 
 // Finding is one thing the check has to say about an entry.
@@ -781,10 +850,16 @@ type Finding struct {
 	Entry Entry
 	// Rule is the rule's name.
 	Rule string
-	// Via is the sink that put the entry in scope — a named statement or
-	// a write built as a Go string literal — and is zero for a marker
-	// that covers nothing.
+	// Via is the sink the finding is about — a named statement or a write
+	// built as a Go string literal — and is zero for a marker that covers
+	// nothing.
 	Via WriteSink
+	// Marker is the exemption a StaleMarker finding is about, and is zero
+	// for an Unenforced one.
+	Marker Marker
+	// Reason says how a stale marker failed to exempt anything, so the
+	// failure names the mistake and not only the entry.
+	Reason string
 	// Kind says which of the two failures this is.
 	Kind FindingKind
 }
@@ -794,13 +869,43 @@ type Finding struct {
 type FindingKind int
 
 const (
-	// Unenforced is an entry that writes the rule's columns and reaches
-	// no enforcer, with no marker to account for it.
+	// Unenforced is a write that reaches no enforcer, with no marker to
+	// account for it. It is one finding per write and not per entry: an
+	// entry with two sinks has two of them to answer for.
 	Unenforced FindingKind = iota
-	// StaleMarker is a marker on an entry that either writes none of the
-	// rule's columns or applies the rule anyway. Reporting it is what
-	// stops the exemption table from outliving the code it exempts.
+	// StaleMarker is a marker that exempts none of the entry's writes.
+	// Reporting it is what stops the exemption table from outliving the
+	// code it exempts.
 	StaleMarker
+)
+
+// The ways a marker can exempt nothing. Each reads to a later reader as
+// though the write it stands over was considered, which is the thing the
+// marker exists to make impossible.
+const (
+	// markerCoversNoWrite is a marker on an entry that writes none of the
+	// rule's columns: the write it was about has moved or gone.
+	markerCoversNoWrite = "the entry writes none of the rule's columns"
+	// markerCoversAnEnforcedWrite is a marker on an entry that applies the
+	// rule anyway. Exempting a write that needs no exemption is the same
+	// defect as omitting one that does.
+	markerCoversAnEnforcedWrite = "the entry reaches the rule's enforcement, so there is nothing to exempt"
+	// markerIsAmbiguous is a marker naming no sink on an entry that
+	// reaches more than one. With two writes in reach a reason that does
+	// not say which it is about states nothing a reader can check, and the
+	// write added second would inherit it.
+	markerIsAmbiguous = "the entry writes the rule's columns through more than one sink, " +
+		"so a marker naming none of them does not say which write it is about"
+	// markerNamesNoSink is a marker naming a sink the entry does not
+	// reach.
+	markerNamesNoSink = "the entry reaches no sink by that name"
+	// markerNamesTwoSinks is a marker whose name fits two of the entry's
+	// sinks, so it settles neither.
+	markerNamesTwoSinks = "the name fits more than one of the entry's sinks; name the sink by its key"
+	// markerRepeatsAnExemption is a marker for a sink an earlier marker
+	// already covers. One marker covers one write in both directions, so
+	// the surplus reason stands for no decision.
+	markerRepeatsAnExemption = "the write it names is already exempted by an earlier marker"
 )
 
 // InScope is which entries a rule was actually held against, keyed by
@@ -816,6 +921,11 @@ type InScope map[string]map[string][]Entry
 // derived check is that the derivation stops matching — a renamed column,
 // a registry read that returns nothing — and then it passes because it
 // looked at nothing. The caller asserts on the scope for that reason.
+// Check is per write and not per entry. An entry that writes the rule's
+// columns through two sinks is two decisions, and answering for it once
+// would let the second write ride on whatever was settled for the first —
+// which is what happens when a sink is added to an entry that already
+// carried a marker.
 func Check(src *Source, statements []Statement, rules []Rule) ([]Finding, InScope) {
 	var findings []Finding
 	scope := InScope{}
@@ -825,52 +935,130 @@ func Check(src *Source, statements []Statement, rules []Rule) ([]Finding, InScop
 		scope[rule.Name] = map[string][]Entry{}
 		for _, entry := range src.Entries {
 			qualified, called := src.Reach(entry.Symbol)
-			via, writes := firstSink(qualified, called, sinks)
-			marked := src.Marked(entry.Symbol, rule)
+			reached := reachedSinks(qualified, called, sinks)
+			markers := src.Markers(entry.Symbol, rule)
 
-			if !writes {
-				if marked {
-					findings = append(findings, Finding{Entry: entry, Rule: rule.Name, Kind: StaleMarker})
+			stale := func(reason string) {
+				for _, marker := range markers {
+					findings = append(findings, Finding{
+						Entry:  entry,
+						Rule:   rule.Name,
+						Marker: marker,
+						Reason: reason,
+						Kind:   StaleMarker,
+					})
 				}
+			}
+
+			if len(reached) == 0 {
+				stale(markerCoversNoWrite)
 				continue
 			}
 			scope[rule.Name][entry.Surface] = append(scope[rule.Name][entry.Surface], entry)
 
 			if reachesAny(qualified, rule.Enforcers) {
-				if marked {
-					findings = append(findings, Finding{Entry: entry, Rule: rule.Name, Via: via, Kind: StaleMarker})
+				stale(markerCoversAnEnforcedWrite)
+				continue
+			}
+
+			exempt, unpaired := pairMarkers(reached, markers)
+			for _, marker := range unpaired {
+				findings = append(findings, Finding{
+					Entry:  entry,
+					Rule:   rule.Name,
+					Marker: marker.Marker,
+					Reason: marker.Reason,
+					Kind:   StaleMarker,
+				})
+			}
+			for i, sink := range reached {
+				if exempt[i] {
+					continue
 				}
-				continue
+				findings = append(findings, Finding{
+					Entry: entry, Rule: rule.Name, Via: sink, Kind: Unenforced,
+				})
 			}
-			if marked {
-				continue
-			}
-			findings = append(findings, Finding{Entry: entry, Rule: rule.Name, Via: via, Kind: Unenforced})
 		}
 	}
 	return findings, scope
 }
 
-// firstSink returns the sink an entry reaches, in a stable order so a
-// failure names the same one on every run.
+// reachedSinks returns every sink an entry reaches, in a stable order so a
+// failure names them the same way on every run.
 //
 // The two kinds are matched differently and deliberately so. A statement
 // is performed through a method on a generated querier, which the call
 // graph can only match by name; a write site in the Go tree is matched by
 // its package-qualified symbol, so a same-named method on some other
 // value is never mistaken for it.
-func firstSink(qualified, called map[string]bool, sinks map[string]WriteSink) (WriteSink, bool) {
+func reachedSinks(qualified, called map[string]bool, sinks map[string]WriteSink) []WriteSink {
 	keys := make([]string, 0, len(sinks))
 	for key, sink := range sinks {
 		if sink.reachedBy(qualified, called) {
 			keys = append(keys, key)
 		}
 	}
-	if len(keys) == 0 {
-		return WriteSink{}, false
-	}
 	sort.Strings(keys)
-	return sinks[keys[0]], true
+	out := make([]WriteSink, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, sinks[key])
+	}
+	return out
+}
+
+// unpairedMarker is a marker that exempted no write, with the reason it
+// exempted none.
+type unpairedMarker struct {
+	Marker Marker
+	Reason string
+}
+
+// pairMarkers gives each marker the write it was written about, and
+// reports the ones that were written about nothing.
+//
+// A marker naming a sink takes that sink. A marker naming none takes the
+// entry's only sink, and takes nothing where the entry has more than one:
+// naming no sink is unambiguous exactly while there is one write to be
+// about, so an entry that gains a second one has to say which. Taking
+// rather than merely matching is what keeps one marker to one write in
+// both directions — two markers for one sink leaves the second standing
+// for no decision, and it is reported rather than ignored.
+func pairMarkers(reached []WriteSink, markers []Marker) (exempt []bool, unpaired []unpairedMarker) {
+	exempt = make([]bool, len(reached))
+	for _, marker := range markers {
+		report := func(reason string) {
+			unpaired = append(unpaired, unpairedMarker{Marker: marker, Reason: reason})
+		}
+		if marker.Sink == "" {
+			switch {
+			case len(reached) > 1:
+				report(markerIsAmbiguous)
+			case exempt[0]:
+				report(markerRepeatsAnExemption)
+			default:
+				exempt[0] = true
+			}
+			continue
+		}
+		var hits []int
+		for i, sink := range reached {
+			if sink.Key() == marker.Sink || sink.Name == marker.Sink {
+				hits = append(hits, i)
+			}
+		}
+		switch {
+		case len(hits) == 0:
+			report(markerNamesNoSink)
+		case len(hits) > 1:
+			report(markerNamesTwoSinks)
+		case exempt[hits[0]]:
+			report(markerRepeatsAnExemption)
+		default:
+			exempt[hits[0]] = true
+		}
+	}
+	return exempt, unpaired
 }
 
 // reachesAny reports whether any enforcer is in the reached set.
