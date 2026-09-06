@@ -9,13 +9,22 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { Zone } from '@nodate-flow/ui/time';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/helpers/render';
+import type { i18n as I18nInstance } from 'i18next';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { wallClockToUnix } from '../../../lib/date-utils';
-import EventDialog, { type EventDialogMode, presetToRRule, rruleToPreset } from '../event-dialog';
+import { formatDate } from '../../../lib/format';
+import EventDialog, {
+  type EventDialogMode,
+  occurrenceRange,
+  presetToRRule,
+  rruleToPreset,
+  weekdayName,
+} from '../event-dialog';
 
 type CreateEventInput = components['schemas']['CreateEventInputBody'];
 type PatchEventInput = components['schemas']['PatchEventInputBody'];
@@ -127,10 +136,45 @@ const OCCURRENCE_START = Date.UTC(2030, 6, 6, 9) / 1000;
  * Edit mode as the month grid opens it for a repeating row: the event
  * plus the occurrence that was drawn.
  */
-function recurringEditMode(): EventDialogMode {
-  const base = editMode();
+function recurringEditMode(
+  occurrenceStart: number = OCCURRENCE_START,
+  event: Partial<CalEventLike> = {},
+): EventDialogMode {
+  const base = editMode(event);
   if (base.kind !== 'edit') throw new Error('editMode must produce an edit-mode dialog');
-  return { ...base, occurrence: { originalStartAt: OCCURRENCE_START } };
+  return { ...base, occurrence: { originalStartAt: occurrenceStart } };
+}
+
+/** The text a date control shows for a `YYYY-MM-DD` key. */
+function dayTrigger(dayKey: string): string {
+  return formatDate(dayKey, 'en');
+}
+
+/**
+ * Load real copy for a namespace onto the shared test i18n instance,
+ * returning the undo.
+ *
+ * Every other assertion here reads the key back, which cannot tell a
+ * filled placeholder from an unfilled one — both render as
+ * `recurrence.preset.weekly`. With the actual string loaded, a value the
+ * render site never supplies shows up as the literal braces a user would
+ * see. The caller must run the undo so later tests keep reading keys.
+ */
+function loadCopy(bundle: Record<string, unknown>): () => void {
+  // The render helper keeps its instance module-private, so the only way
+  // in is a component that asks the provider for it.
+  const holder: { instance: I18nInstance | null } = { instance: null };
+  function Probe(): null {
+    holder.instance = useTranslation().i18n;
+    return null;
+  }
+  renderWithProviders(<Probe />).unmount();
+  const instance = holder.instance;
+  if (instance === null) throw new Error('the test i18n instance was not reachable');
+  instance.addResourceBundle('en', 'calendar-events', bundle, true, true);
+  return () => {
+    instance.removeResourceBundle('en', 'calendar-events');
+  };
 }
 
 /** The three-way choice, by the option the caller wants to pick. */
@@ -562,6 +606,133 @@ describe('<EventDialog>', () => {
     expect(args.body.endAt).toBe(endAt);
   });
 
+  /* ── occurrence seeding ─────────────────────────────────────── */
+
+  // A series is stored once, as its first occurrence on 15 June, while
+  // the grid draws a pill per instance the rule produces. The dialog is
+  // opened here from the instance the rule gave 6 July.
+
+  it('opens an occurrence of a series on that occurrence, not on the stored series start', async () => {
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    // The rule is behind the disclosure, which opens itself once the
+    // authoritative row has landed — so awaiting it awaits the seed.
+    await screen.findByRole('combobox', { name: 'field.recurrence' });
+
+    // Both date controls sit on the day the user clicked…
+    expect(screen.getAllByRole('button', { name: dayTrigger('2030-07-06') })).toHaveLength(2);
+    // …and neither still shows the series' own start.
+    expect(screen.queryAllByRole('button', { name: dayTrigger('2030-06-15') })).toHaveLength(0);
+    // The duration is the one part of the range an occurrence does not
+    // state, so it comes from the stored row: 09:00-10:00.
+    const times = screen.getAllByRole('button', { name: /^\d{2}:\d{2}$/ });
+    expect(times.map((el) => el.textContent)).toEqual(['09:00', '10:00']);
+  });
+
+  it('opens an all-day occurrence on its own days, keeping the span', async () => {
+    const startAt = Date.UTC(2030, 5, 15) / 1000;
+    const endAt = Date.UTC(2030, 5, 16) / 1000;
+    withDetail({
+      allDay: true,
+      startAt,
+      endAt,
+      recurrenceRule: { freq: 'weekly' },
+    } as Partial<EventDetail>);
+    renderWithProviders(
+      renderDialog({
+        mode: recurringEditMode(Date.UTC(2030, 6, 6) / 1000, { allDay: true, startAt, endAt }),
+      }),
+    );
+
+    await screen.findByRole('combobox', { name: 'field.recurrence' });
+
+    // A two-day span moved whole: 6-7 July rather than 15-16 June.
+    expect(screen.getByRole('button', { name: dayTrigger('2030-07-06') })).toBeDefined();
+    expect(screen.getByRole('button', { name: dayTrigger('2030-07-07') })).toBeDefined();
+    expect(screen.queryByRole('button', { name: dayTrigger('2030-06-15') })).toBeNull();
+    // An all-day row has no time controls to seed.
+    expect(screen.queryAllByRole('button', { name: /^\d{2}:\d{2}$/ })).toHaveLength(0);
+  });
+
+  it('seeds an occurrence without marking the date controls edited', async () => {
+    const user = userEvent.setup();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode() }));
+
+    const titleInput = screen.getByRole('textbox', { name: 'field.title' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed occurrence');
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+    await user.click(screen.getByRole('button', { name: 'recurrence.scope.save.confirm' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.title).toBe('Renamed occurrence');
+    // A present field is an instruction to set it, and one moved time
+    // control re-sends the whole range. Seeding from the occurrence must
+    // not turn every scoped save into an override that pins dates the
+    // user never touched.
+    expect('startAt' in args.body).toBe(false);
+    expect('endAt' in args.body).toBe(false);
+    expect('allDay' in args.body).toBe(false);
+  });
+
+  it('treats a freshly opened occurrence as unedited when the dialog is dismissed', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode(), onClose }));
+
+    await screen.findByRole('combobox', { name: 'field.recurrence' });
+    await user.click(screen.getByRole('button', { name: 'action.cancel' }));
+
+    // Nothing was moved, so there is nothing to offer to discard.
+    expect(mocks.confirmAction).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('opens the master occurrence exactly where the stored row sits', async () => {
+    withDetail({ recurrenceRule: { freq: 'weekly' } } as Partial<EventDetail>);
+    renderWithProviders(renderDialog({ mode: recurringEditMode(Date.UTC(2030, 5, 15, 9) / 1000) }));
+
+    await screen.findByRole('combobox', { name: 'field.recurrence' });
+
+    expect(screen.getAllByRole('button', { name: dayTrigger('2030-06-15') })).toHaveLength(2);
+    const times = screen.getAllByRole('button', { name: /^\d{2}:\d{2}$/ });
+    expect(times.map((el) => el.textContent)).toEqual(['09:00', '10:00']);
+  });
+
+  it('opens an event that does not repeat on the dates it stores', async () => {
+    withDetail({ memo: 'Vendor quote' });
+    renderWithProviders(renderDialog({ mode: editMode() }));
+
+    await screen.findByRole('textbox', { name: 'field.memo' });
+
+    expect(screen.getAllByRole('button', { name: dayTrigger('2030-06-15') })).toHaveLength(2);
+  });
+
+  /* ── recurrence copy ────────────────────────────────────────── */
+
+  it('names the weekday a weekly repeat falls on instead of showing a placeholder', async () => {
+    const restore = loadCopy({ recurrence: { preset: { weekly: 'Weekly on {day}' } } });
+    try {
+      // 17 June 2030 is a Monday.
+      withDetail({
+        startAt: Date.UTC(2030, 5, 17, 9) / 1000,
+        endAt: Date.UTC(2030, 5, 17, 10) / 1000,
+        recurrenceRule: { freq: 'weekly' },
+      } as Partial<EventDetail>);
+      renderWithProviders(renderDialog({ mode: editMode() }));
+
+      const select = await screen.findByRole('combobox', { name: 'field.recurrence' });
+      const weekly = within(select).getByRole('option', { name: 'Weekly on Monday' });
+      // The braces are what the option read before the day was supplied.
+      expect(weekly.textContent).not.toContain('{');
+    } finally {
+      restore();
+    }
+  });
+
   /* ── recurring scope choice ─────────────────────────────────── */
 
   it('saves a one-off event without asking which occurrences to touch', async () => {
@@ -763,6 +934,48 @@ describe('<EventDialog>', () => {
       tone: 'danger',
       message: 'Calendar slug already exists',
     });
+  });
+});
+
+describe('occurrenceRange', () => {
+  it('leaves a row that was not opened from an occurrence alone', () => {
+    expect(occurrenceRange({ startAt: 100, endAt: 700 }, null)).toEqual({
+      startAt: 100,
+      endAt: 700,
+    });
+  });
+
+  it('moves the stored span onto the occurrence that was opened', () => {
+    expect(occurrenceRange({ startAt: 100, endAt: 700 }, 1_000)).toEqual({
+      startAt: 1_000,
+      endAt: 1_600,
+    });
+  });
+
+  it('has nothing to place an end against when the row has no start', () => {
+    expect(occurrenceRange({ endAt: 700 }, 1_000)).toEqual({ startAt: null, endAt: 700 });
+  });
+
+  it('leaves an absent end absent rather than inventing one', () => {
+    expect(occurrenceRange({ startAt: 100 }, 1_000)).toEqual({ startAt: 1_000, endAt: null });
+  });
+});
+
+describe('weekdayName', () => {
+  it('names the weekday in the language being read', () => {
+    expect(weekdayName('2030-06-17', 'en')).toBe('Monday');
+    expect(weekdayName('2030-06-17', 'ja')).toBe('月曜日');
+    expect(weekdayName('2030-06-17', 'zh')).toBe('星期一');
+  });
+
+  it('tracks the date it is given', () => {
+    expect(weekdayName('2030-06-15', 'en')).toBe('Saturday');
+    expect(weekdayName('2030-06-16', 'en')).toBe('Sunday');
+  });
+
+  it('says nothing rather than guessing when the value is not a date', () => {
+    expect(weekdayName('', 'en')).toBe('');
+    expect(weekdayName('not-a-date', 'en')).toBe('');
   });
 });
 

@@ -79,7 +79,7 @@
       "none": "不重复",
       "daily": "每天",
       "weekdays": "每个工作日",
-      "weekly": "每周{day}",
+      "weekly": "每{day}",
       "monthly": "每月",
       "yearly": "每年",
       "custom": "自定义…"

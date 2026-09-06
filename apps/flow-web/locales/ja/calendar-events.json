@@ -79,7 +79,7 @@
       "none": "繰り返しなし",
       "daily": "毎日",
       "weekdays": "毎平日",
-      "weekly": "毎週 {day}",
+      "weekly": "毎週{day}",
       "monthly": "毎月",
       "yearly": "毎年",
       "custom": "カスタム…"

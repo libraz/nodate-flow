@@ -284,6 +284,59 @@ export function rruleToPreset(rule: RecurrenceRule | null | undefined): Recurren
   }
 }
 
+/**
+ * The instants an edit form should open on.
+ *
+ * A series is stored once, as its first occurrence, while the grid draws
+ * one pill per instance the rule produces. Seeded from the stored row,
+ * every instance therefore opens on the series' own dates: click the
+ * meeting on 14 October and the fields read 16 September, and saving
+ * that range is how an occurrence gets moved back onto the master's day.
+ * The occurrence carries the instant the rule gave it, so the form opens
+ * there and keeps the stored duration — the one part of the range the
+ * occurrence does not itself state.
+ *
+ * The shift is arithmetic on instants rather than on wall clocks so
+ * all-day and timed rows stay on a single path: an all-day span is a
+ * whole number of days in seconds, and moving both ends by the same
+ * amount preserves it either way.
+ *
+ * `occurrenceStartAt` is only ever {@link DialogOccurrence.originalStartAt}
+ * — the start the rule produced, never the start the form is holding.
+ * Passing the latter would shift the range onto itself and call the
+ * result an occurrence.
+ */
+export function occurrenceRange(
+  stored: { startAt?: number | null; endAt?: number | null },
+  occurrenceStartAt: number | null,
+): { startAt: number | null; endAt: number | null } {
+  const startAt = stored.startAt ?? null;
+  const endAt = stored.endAt ?? null;
+  if (occurrenceStartAt === null || startAt === null) return { startAt, endAt };
+  return {
+    startAt: occurrenceStartAt,
+    endAt: endAt === null ? null : occurrenceStartAt + (endAt - startAt),
+  };
+}
+
+/**
+ * The weekday a `YYYY-MM-DD` key falls on, named in `locale`.
+ *
+ * The weekly repeat option names the day it repeats on, and that day is
+ * a property of the event's own start rather than a separate choice.
+ * `Intl` answers it in whichever language is active, so there is no day
+ * table to keep in step across the locale files and no key per weekday.
+ * Read in UTC because the key is already a calendar day: giving it any
+ * other zone lets an offset name the day before.
+ */
+export function weekdayName(dayKey: string, locale: string): string {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(year, month - 1, day)),
+  );
+}
+
 /** Default start/end times for each kind, given the clicked date. */
 function defaultTimes(kind: CalEventKind): { start: string; end: string } {
   switch (kind) {
@@ -295,6 +348,26 @@ function defaultTimes(kind: CalEventKind): { start: string; end: string } {
     case 'milestone':
       return { start: '00:00', end: '00:00' };
   }
+}
+
+/**
+ * The wall-clock times the dialog opens with: the ones the range already
+ * has when editing, the kind's defaults when creating.
+ */
+function initialTimesFor(
+  modeKind: EventDialogMode['kind'],
+  range: { startAt: number | null; endAt: number | null },
+  initialKind: ItemKind,
+  zone: Zone,
+): { start: string; end: string } {
+  if (modeKind === 'edit') {
+    return {
+      start: range.startAt != null ? unixToWallClock(range.startAt, zone).time : '09:00',
+      end: range.endAt != null ? unixToWallClock(range.endAt, zone).time : '10:00',
+    };
+  }
+  const kind: CalEventKind = initialKind === 'task' ? 'event' : initialKind;
+  return defaultTimes(kind);
 }
 
 /**
@@ -534,7 +607,26 @@ export default function EventDialog({
   const initialKind: ItemKind =
     mode.kind === 'create' ? (mode.initialItemKind ?? 'event') : mode.initialKind;
 
-  const initialDate = mode.kind === 'create' ? mode.date : inferEditDate(mode.event, zone);
+  /**
+   * The occurrence the dialog was opened on, as a plain instant.
+   *
+   * Kept as a number rather than as the {@link DialogOccurrence} the mode
+   * carries because the hydration effect below depends on it: the route
+   * builds that object afresh on every render, so an effect keyed on it
+   * would re-run continuously.
+   */
+  const openedOccurrenceStart: number | null =
+    mode.kind === 'edit' && mode.occurrence !== undefined ? mode.occurrence.originalStartAt : null;
+
+  // An edit opens on the occurrence that was clicked when there is one;
+  // a row that does not repeat has only its own range to show.
+  const initialRange =
+    mode.kind === 'edit'
+      ? occurrenceRange(mode.event, openedOccurrenceStart)
+      : { startAt: null, endAt: null };
+
+  const initialDate =
+    mode.kind === 'create' ? mode.date : inferEditDate(initialRange.startAt, zone);
 
   /* ── dirty tracking ─── */
 
@@ -567,20 +659,14 @@ export default function EventDialog({
   // Time/date fields. Tasks use `startOn`/`dueOn`; event kinds use
   // startDate/startTime + endDate/endTime + allDay.
   const [startDate, setStartDate] = useState<string>(initialDate);
-  const [endDate, setEndDate] = useState<string>(initialDate);
+  const [endDate, setEndDate] = useState<string>(
+    initialRange.endAt != null ? unixToWallClock(initialRange.endAt, zone).date : initialDate,
+  );
 
-  const initialTimes = useMemo(() => {
-    if (mode.kind === 'edit') {
-      const s = mode.event.startAt;
-      const e = mode.event.endAt;
-      return {
-        start: s != null ? unixToWallClock(s, zone).time : '09:00',
-        end: e != null ? unixToWallClock(e, zone).time : '10:00',
-      };
-    }
-    const k: CalEventKind = initialKind === 'task' ? 'event' : initialKind;
-    return defaultTimes(k);
-  }, [initialKind, mode, zone]);
+  // Read only on the first render — as the initial value of the two time
+  // controls and of `lastTimeRef` — so it is a plain derivation rather
+  // than a memo.
+  const initialTimes = initialTimesFor(mode.kind, initialRange, initialKind, zone);
 
   const [startTime, setStartTime] = useState<string>(initialTimes.start);
   const [endTime, setEndTime] = useState<string>(initialTimes.end);
@@ -681,13 +767,20 @@ export default function EventDialog({
     if (!dirty.has('blockCustomLabel')) setBlockCustomLabel(detail.blockLabel ?? '');
     if (!TIME_FIELDS.some((f) => dirty.has(f))) {
       setAllDay(detail.allDay);
-      if (detail.startAt != null) {
-        const wall = unixToWallClock(detail.startAt, zone);
+      // The authoritative row is the series' own range, so it lands on
+      // the occurrence that was opened before it reaches the controls.
+      // Seeding, never editing: these setters bypass `markDirty` on
+      // purpose, because one marked time control re-sends the whole
+      // range — a scoped save would then write the dialog's starting
+      // values back over an occurrence the user only looked at.
+      const range = occurrenceRange(detail, openedOccurrenceStart);
+      if (range.startAt != null) {
+        const wall = unixToWallClock(range.startAt, zone);
         setStartDate(wall.date);
         setStartTime(wall.time);
       }
-      if (detail.endAt != null) {
-        const wall = unixToWallClock(detail.endAt, zone);
+      if (range.endAt != null) {
+        const wall = unixToWallClock(range.endAt, zone);
         setEndDate(wall.date);
         setEndTime(wall.time);
       }
@@ -707,7 +800,7 @@ export default function EventDialog({
     // `zone` decides which wall clock the stored instants seed the form
     // with, so it belongs in the dependency list even though it does not
     // change while a dialog is open.
-  }, [detail, open, zone]);
+  }, [detail, open, zone, openedOccurrenceStart]);
 
   /* ── recurring-scope choice ─── */
 
@@ -1517,7 +1610,13 @@ export default function EventDialog({
                         : (['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly'] as const)
                       ).map((v) => (
                         <option key={v} value={v}>
-                          {t(RECURRENCE_PRESET_KEYS[v])}
+                          {/*
+                            The weekly option names the day it repeats
+                            on, which is the start date's weekday — the
+                            other presets carry no placeholder and
+                            ignore the value.
+                          */}
+                          {t(RECURRENCE_PRESET_KEYS[v], { day: weekdayName(startDate, locale) })}
                         </option>
                       ))}
                     </Select>
@@ -1646,7 +1745,7 @@ export default function EventDialog({
 }
 
 /** Best-effort derivation of the initial date for an edit-mode dialog. */
-function inferEditDate(event: CalEventLike, zone: Zone): string {
-  if (typeof event.startAt === 'number') return unixToWallClock(event.startAt, zone).date;
+function inferEditDate(startAt: number | null, zone: Zone): string {
+  if (startAt !== null) return unixToWallClock(startAt, zone).date;
   return todayKey(zone);
 }
