@@ -86,3 +86,37 @@ export function diffLines(before: string, after: string): DiffLine[] {
   }
   return out;
 }
+
+/** A run of consecutive lines that all carry the same {@link DiffOp}. */
+export interface DiffBlock {
+  op: DiffOp;
+  /** The run's lines, rejoined in the form they were stored in. */
+  text: string;
+}
+
+/**
+ * Collapse consecutive lines carrying the same op into one block.
+ *
+ * The drawer renders a block through the same body renderer the task
+ * description uses, so a mention shows the person's name instead of the
+ * notation it is stored as. That renderer reads markdown, and markdown
+ * constructs span lines: a list, a fenced code block, a table. Handing it
+ * one line at a time would cut those apart, so a whole run goes in at
+ * once.
+ *
+ * A run never mixes ops, so the added/removed marking is unchanged by the
+ * grouping — every line inside a block belongs to the same side of the
+ * diff it did before.
+ */
+export function groupDiffLines(lines: DiffLine[]): DiffBlock[] {
+  const out: DiffBlock[] = [];
+  for (const line of lines) {
+    const last = out[out.length - 1];
+    if (last !== undefined && last.op === line.op) {
+      last.text = `${last.text}\n${line.text}`;
+      continue;
+    }
+    out.push({ op: line.op, text: line.text });
+  }
+  return out;
+}

@@ -4,6 +4,38 @@
  * Drawer primitive so we only need internal layout here. Tokens only.
  */
 
+.header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.close {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: minimum pointer target, not a spacing step */
+  inline-size: 2rem;
+  /* nf-token-override: minimum pointer target, not a spacing step */
+  block-size: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition: background var(--nf-duration-fast);
+}
+
+.close:hover {
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+}
+
+.close:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
 .body {
   display: grid;
   grid-template-columns: minmax(11rem, 14rem) 1fr;
@@ -100,37 +132,74 @@
   color: var(--nf-color-fg-muted);
 }
 
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1) var(--nf-space-4);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
 .diff {
   margin: 0;
   padding: var(--nf-space-2);
   border-radius: var(--nf-radius-sm);
   background: var(--nf-color-surface);
   border: 1px solid var(--nf-color-border);
-  font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-xs);
+  font-size: var(--nf-text-sm);
   line-height: var(--nf-leading-snug);
-  white-space: pre-wrap;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-px);
   overflow-x: auto;
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 8rem;
 }
 
-.diffLineEqual {
-  display: block;
+.diffBlock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg-muted);
 }
 
-.diffLineAdded {
-  display: block;
+.diffBlockAdded {
+  background: var(--nf-color-success-subtle);
   color: var(--nf-color-fg);
-  background: transparent;
 }
 
-.diffLineRemoved {
-  display: block;
+.diffBlockRemoved {
+  background: var(--nf-color-danger-subtle);
+  color: var(--nf-color-fg);
+}
+
+.marker {
+  font-family: var(--nf-font-mono);
+  font-weight: var(--nf-weight-semibold);
+  inline-size: 1ch;
+}
+
+.markerAdded {
+  color: var(--nf-color-success-fg);
+}
+
+.markerRemoved {
   color: var(--nf-color-danger-fg);
-  background: transparent;
-  text-decoration: line-through;
+}
+
+.diffContent {
+  min-inline-size: 0;
 }
 
 .empty {

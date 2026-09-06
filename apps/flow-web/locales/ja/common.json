@@ -854,7 +854,15 @@
       "unknown_author": "不明",
       "restore": "この版に戻す",
       "restore_success": "説明文を復元しました",
-      "restore_error": "復元に失敗しました。もう一度お試しください。"
+      "restore_error": "復元に失敗しました。もう一度お試しください。",
+      "close": "説明文の履歴を閉じる",
+      "diff": {
+        "legend_label": "記号の意味",
+        "added": "バージョン {number} にのみある部分 — 復元すると戻ります",
+        "removed": "現在の説明にのみある部分 — 復元すると消えます",
+        "added_side": "バージョン {number} にのみある部分",
+        "removed_side": "現在の説明にのみある部分"
+      }
     },
     "actions": {
       "title": "アクション",

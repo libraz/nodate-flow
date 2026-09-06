@@ -854,7 +854,15 @@
       "unknown_author": "Unknown",
       "restore": "Restore this version",
       "restore_success": "Description restored",
-      "restore_error": "Could not restore the version. Please try again."
+      "restore_error": "Could not restore the version. Please try again.",
+      "close": "Close description history",
+      "diff": {
+        "legend_label": "What the markers mean",
+        "added": "In version {number} only — restoring brings it back",
+        "removed": "In the current description only — restoring drops it",
+        "added_side": "In version {number} only",
+        "removed_side": "In the current description only"
+      }
     },
     "actions": {
       "title": "Actions",

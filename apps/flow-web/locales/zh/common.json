@@ -854,7 +854,15 @@
       "unknown_author": "未知",
       "restore": "恢复此版本",
       "restore_success": "已恢复描述",
-      "restore_error": "恢复失败，请重试。"
+      "restore_error": "恢复失败，请重试。",
+      "close": "关闭描述历史",
+      "diff": {
+        "legend_label": "标记说明",
+        "added": "仅存在于版本 {number} — 恢复后会重新出现",
+        "removed": "仅存在于当前描述 — 恢复后会被删除",
+        "added_side": "仅存在于版本 {number}",
+        "removed_side": "仅存在于当前描述"
+      }
     },
     "actions": {
       "title": "操作",

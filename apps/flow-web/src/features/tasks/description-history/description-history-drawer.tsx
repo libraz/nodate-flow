@@ -9,12 +9,21 @@
  * full body. Restoring invalidates the description history list and
  * the task detail row so the new active description shows up
  * immediately, then closes the drawer.
+ *
+ * The diff is computed against the stored text — an edit that only
+ * changes which person a mention points at is a change, and has to read
+ * as one — but every segment is drawn through the shared body renderer,
+ * so the reader sees the name rather than the notation and the id it
+ * carries.
  */
 
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
+import Markdown from '@nodate-flow/ui/primitives/markdown';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { X } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,7 +36,7 @@ import {
   useRestoreDescriptionVersion,
 } from '../description-history-api';
 import styles from './description-history-drawer.module.css';
-import { type DiffLine, diffLines } from './diff';
+import { type DiffBlock, diffLines, groupDiffLines } from './diff';
 
 export interface DescriptionHistoryDrawerProps {
   taskId: string;
@@ -47,6 +56,16 @@ export default function DescriptionHistoryDrawer({
 
   return (
     <Drawer open={open} onClose={onClose} title={t('tasks.history.title')} side="inline-end">
+      <div className={styles.header}>
+        <button
+          type="button"
+          className={styles.close}
+          aria-label={t('tasks.history.close')}
+          onClick={onClose}
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
@@ -182,8 +201,8 @@ function VersionPreview({
   const { t } = useTranslation('common');
   const { data: version } = useDescriptionVersionQuery(taskId, versionId);
 
-  const lines: DiffLine[] = diffLines(version.body, currentBody);
-  const noChanges = lines.every((line) => line.op === 'equal');
+  const blocks: DiffBlock[] = groupDiffLines(diffLines(version.body, currentBody));
+  const noChanges = blocks.every((block) => block.op === 'equal');
 
   return (
     <>
@@ -204,26 +223,83 @@ function VersionPreview({
       {noChanges ? (
         <p className={styles.previewMeta}>{t('tasks.history.no_changes')}</p>
       ) : (
-        <pre className={styles.diff}>
-          {lines.map((line, idx) => {
-            const cls =
-              line.op === 'added'
-                ? styles.diffLineAdded
-                : line.op === 'removed'
-                  ? styles.diffLineRemoved
-                  : styles.diffLineEqual;
-            const prefix = line.op === 'added' ? '+ ' : line.op === 'removed' ? '- ' : '  ';
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: line position is the natural key
-              <span key={idx} className={cls}>
-                {prefix}
-                {line.text}
-                {'\n'}
-              </span>
-            );
-          })}
-        </pre>
+        <>
+          <DiffLegend versionNumber={version.versionNumber} />
+          <div className={styles.diff}>
+            {blocks.map((block, idx) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: block position is the natural key
+              <DiffBlockRow key={idx} block={block} versionNumber={version.versionNumber} />
+            ))}
+          </div>
+        </>
       )}
     </>
+  );
+}
+
+/**
+ * Says in words which revision each marker stands for. The two sides are
+ * also drawn in different colours, which is the faster read for anyone
+ * who sees the difference — but a marker and a sentence are what carry
+ * the meaning, so nothing depends on telling green from red.
+ */
+function DiffLegend({ versionNumber }: { versionNumber: number }): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <ul className={styles.legend} aria-label={t('tasks.history.diff.legend_label')}>
+      <li className={styles.legendItem}>
+        <span className={`${styles.marker} ${styles.markerAdded}`} aria-hidden="true">
+          +
+        </span>
+        {t('tasks.history.diff.added', { number: versionNumber })}
+      </li>
+      <li className={styles.legendItem}>
+        <span className={`${styles.marker} ${styles.markerRemoved}`} aria-hidden="true">
+          -
+        </span>
+        {t('tasks.history.diff.removed')}
+      </li>
+    </ul>
+  );
+}
+
+interface DiffBlockRowProps {
+  block: DiffBlock;
+  versionNumber: number;
+}
+
+function DiffBlockRow({ block, versionNumber }: DiffBlockRowProps): ReactElement {
+  const { t } = useTranslation('common');
+
+  const rowClass =
+    block.op === 'added'
+      ? `${styles.diffBlock} ${styles.diffBlockAdded}`
+      : block.op === 'removed'
+        ? `${styles.diffBlock} ${styles.diffBlockRemoved}`
+        : styles.diffBlock;
+  const markerClass =
+    block.op === 'added'
+      ? `${styles.marker} ${styles.markerAdded}`
+      : block.op === 'removed'
+        ? `${styles.marker} ${styles.markerRemoved}`
+        : styles.marker;
+  const marker = block.op === 'added' ? '+' : block.op === 'removed' ? '-' : '';
+  const sideLabel =
+    block.op === 'added'
+      ? t('tasks.history.diff.added_side', { number: versionNumber })
+      : block.op === 'removed'
+        ? t('tasks.history.diff.removed_side')
+        : null;
+
+  return (
+    <div className={rowClass}>
+      <span className={markerClass} aria-hidden="true">
+        {marker}
+      </span>
+      <div className={styles.diffContent}>
+        {sideLabel === null ? null : <VisuallyHidden>{sideLabel}</VisuallyHidden>}
+        <Markdown>{block.text}</Markdown>
+      </div>
+    </div>
   );
 }
