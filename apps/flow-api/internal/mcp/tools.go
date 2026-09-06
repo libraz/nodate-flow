@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"sort"
@@ -150,7 +151,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_task",
-		description:   "Create a new task in a project.",
+		description:   "Create a new task in a project. The task is recorded as created by the user whose token made the call, and starts with no assignee.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
@@ -381,7 +382,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "generate_page",
-		description:   "Generate a wiki page using AI based on project or task context.",
+		description:   "Generate a wiki page using AI based on project or task context. Refuses and writes nothing when the workspace has no AI provider or the provider returns no usable draft; a success always means the stored body was drafted, never echoed back from the request.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			// The instruction bound is what the REST page-generation body
@@ -462,7 +463,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "update_calendar_event",
-		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events.",
+		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events. For a recurring event, scope says how much of the series the change reaches; omitting it changes the whole series.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"eventId":     stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
@@ -478,15 +479,23 @@ func registerTools(h *Handler) {
 			"location":    stringSchema("New location.", Constraints{MaxLength: intPtr(500)}),
 			"memo":        stringSchema("New memo/notes.", Constraints{MaxLength: intPtr(10000)}),
 			"blockLabel":  stringSchema("New block label.", Constraints{MaxLength: intPtr(100)}),
+			// The same two arguments the REST patch route takes, under the
+			// same names and with the same closed set of values: a
+			// recurring series is one master row, so without them every
+			// edit rewrites every occurrence.
+			"scope":           stringSchema("Which occurrences of a recurring series this update reaches. Omitted means the whole series.", Constraints{Enum: occurrenceScopes}),
+			"occurrenceStart": intSchema("The occurrence's start under the series rule, unix seconds since epoch (UTC). Required when scope is not series; it identifies the occurrence even after the edit moves it.", Constraints{Min: intPtr(0)}),
 		}, []string{"eventId"}),
 		run: runUpdateCalendarEvent,
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "delete_calendar_event",
-		description:   "Delete a calendar event (soft-delete).",
+		description:   "Delete a calendar event (soft-delete). For a recurring event, scope says how much of the series the delete reaches; omitting it deletes the whole series.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
-			"eventId": stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"eventId":         stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"scope":           stringSchema("Which occurrences of a recurring series this delete reaches. Omitted means the whole series.", Constraints{Enum: occurrenceScopes}),
+			"occurrenceStart": intSchema("The occurrence's start under the series rule, unix seconds since epoch (UTC). Required when scope is not series.", Constraints{Min: intPtr(0)}),
 		}, []string{"eventId"}),
 		run: runDeleteCalendarEvent,
 	})
@@ -1154,6 +1163,19 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		taskID int64
 	)
 	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		// Attributed to the person whose token made the call, and to
+		// nobody as assignee.
+		//
+		// Both halves are about what somebody opening the task later
+		// sees. The creator line names a colleague they can go and ask
+		// what this is for, which is the whole value of the field; the
+		// alternative, a task with no creator at all, reads as something
+		// the system produced and leaves nobody to ask. And the empty
+		// assignee list is the honest answer to "who is doing this": a
+		// tool call is a request for the work to exist, not an agreement
+		// by anyone to carry it out, so filling that line in would put
+		// the caller's name on a queue they never accepted and hide the
+		// task from anyone triaging unassigned work.
 		created, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
@@ -1195,6 +1217,16 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": pub.String()}, nil
 }
 
+// runUpdateTask changes a task's mutable fields.
+//
+// The tool takes dates, not a window. When the task carries a projection
+// event, itemkit mirrors the new date onto it by re-anchoring the event's
+// own duration — the stored end minus the stored start, which the
+// database's own chronology CHECK keeps non-negative — to that date, and
+// shifts both ends together for a working-day snap. So the pair written
+// is ordered by construction and holds nothing the caller sent:
+//
+// calendar-precondition: chronology not-applicable — this tool sends a date and no window, and the pair it mirrors keeps the stored event's own duration
 func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID      string  `json:"taskId"`
@@ -1336,7 +1368,10 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 				}
 			}
 			if titleChanged {
-				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				// The renamed text is discarded here: this tool carries
+				// the task's new title and body already and refreshes the
+				// embedding from them below.
+				if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
 					WorkspaceID: s.workspaceID,
 					ActorUserID: s.userID,
 					TaskID:      taskInternal,
@@ -2159,6 +2194,13 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		EndsOn:      ends,
 	})
 	if err != nil {
+		// A workspace holds one live timebox per name. The refusal is
+		// permanent — the caller has to pick another name — so it is
+		// named the way the REST route names it rather than reported as a
+		// tool fault, which reads as a server problem an agent retries.
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.TimeboxTimeboxNameTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	// The timebox row is committed; a retry would create a second one.
@@ -2221,6 +2263,13 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 		TimeboxID:   tbRow.ID,
 		TaskID:      taskInternal,
 	}); err != nil {
+		// The task is already in this timebox. The state the caller asked
+		// for already holds and no retry changes that, so it is answered
+		// with the code the REST route answers rather than as a tool
+		// fault an agent would retry.
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.TimeboxTaskAlreadyAdded)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	taskID64 := int64(taskInternal)
@@ -2667,6 +2716,19 @@ func runGetPage(ctx context.Context, deps Deps, s *session, raw json.RawMessage)
 }
 
 // runCreatePage creates a new wiki page.
+//
+// Live sibling pages under one parent carry distinct titles —
+// uniq_pages_workspace_id_scope_parent_page_id_title_active, with root
+// pages counted as siblings of each other — so a title already in use
+// there is refused. The refusal is the caller's to resolve, which is why
+// it is named the way the REST route names it instead of being reported
+// as a tool fault an agent retries.
+//
+// The classification reads MySQL's error number and nothing else, and
+// pages carries two further unique keys, both over public_id. A repeated
+// UUID v7 would therefore be reported as a taken title as well. It is not
+// a case this branch can tell apart, and the REST route carries the same
+// imprecision for the same reason.
 func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		Title        string `json:"title"`
@@ -2714,6 +2776,9 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		IsAiGenerated: false,
 	})
 	if err != nil {
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.PagePageTitleTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
@@ -2735,6 +2800,11 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 }
 
 // runUpdatePage updates a wiki page's title or content.
+//
+// Renaming a page onto a title a live sibling already holds is refused
+// under the same key, and with the same code, as creating one there —
+// see [runCreatePage], including why a duplicate key on this table cannot
+// be read as a title conflict with certainty.
 func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		PageID string  `json:"pageId"`
@@ -2790,6 +2860,9 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		WorkspaceID:  s.workspaceID,
 		PublicID:     pub,
 	}); err != nil {
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.PagePageTitleTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
@@ -2832,9 +2905,29 @@ func generatedPageTitle(contextDescription string) string {
 	return stringutil.TruncateBytes("Generated: "+contextDescription, generatedPageTitleMaxLen)
 }
 
-// runGeneratePage generates a wiki page using AI. When no AI provider
-// is configured, it creates a page with the context description as body
-// and marks is_ai_generated=false.
+// runGeneratePage writes a wiki page whose body an LLM drafted from the
+// caller's brief.
+//
+// A generation that did not happen is refused, and nothing is written.
+// The tool used to answer such a call with a page whose body was the
+// brief itself, flagged is_ai_generated=false, and report success — so a
+// caller that asked for a drafted page got its own question back, stored
+// in the workspace's wiki, with an ok. No provider wired on the
+// deployment, a provider call that failed, and a call that came back
+// carrying nothing all landed there. Each is a refusal now, under the
+// code REST answers for the same condition, and every one of them is
+// decided before the insert, so a refusal leaves no page behind.
+//
+// A title the model chose is refused when a live sibling already holds
+// it, under the same key and the same code as a title a caller typed —
+// see [runCreatePage], including why a duplicate key on this table cannot
+// be read as a title conflict with certainty. Repeated briefs in one
+// workspace draft similar titles, so this is a collision the tool meets
+// in ordinary use rather than a theoretical one; reported as a tool fault
+// it would read as a server problem an agent retries, and every retry
+// spends another model call on a page that cannot be stored. The insert
+// is the only write this tool makes, so a refused one leaves the
+// workspace exactly as it was.
 func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		ContextDescription string   `json:"contextDescription"`
@@ -2878,32 +2971,46 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		contextParts = append(contextParts, taskCtx)
 	}
 
-	// Attempt AI generation.
-	title := generatedPageTitle(in.ContextDescription)
-	body := in.ContextDescription
-	isAI := false
+	// A deployment with no provider wired cannot draft anything, which is
+	// the same answer the REST page-generation route gives before it
+	// spends a request on the attempt.
+	if deps.AI == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
 
-	if deps.AI != nil {
-		signal := "Generate a wiki page about the following topic.\n\n"
-		for _, part := range contextParts {
-			signal += part
-		}
-		proposed, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, signal)
-		if err == nil && len(proposed) > 0 {
-			// Use the first proposed task's title and description as page
-			// content. ProposeTasksFrom is reused as the general-purpose
-			// LLM call; the response is repurposed here.
-			//
-			// The model's title gets the same bound as the fallback one.
-			// Nothing constrains what a model returns, so an overlong title
-			// reached pages.title unclipped and the insert failed, losing
-			// the body the call had already paid for. The cut is rune-aware
-			// for the same reason as in generatedPageTitle.
-			title = stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleMaxLen)
-			body = proposed[0].Description
-			isAI = true
-		}
-		// On AI error, fall through to non-AI creation.
+	signal := "Generate a wiki page about the following topic.\n\n"
+	for _, part := range contextParts {
+		signal += part
+	}
+	proposed, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, signal)
+	if err != nil {
+		// mapAiError separates the reasons a caller can act on — no
+		// provider, the workspace's daily budget spent, an answer that
+		// did not parse — from the ones it can only retry, and every AI
+		// tool here reports them the same way.
+		return nil, mapAiError(err)
+	}
+	// The first proposal's title and description are the page. Nothing
+	// obliges a model to return one: an empty list, or an entry with no
+	// description, is an answer with no page in it, which is the
+	// condition PAGE.GENERATION.UPSTREAM_UNAVAILABLE names. Storing the
+	// brief instead would hand the caller its own question back.
+	if len(proposed) == 0 || proposed[0].Description == "" {
+		return nil, apierrors.New(apierrors.PageGenerationUpstreamUnavailable)
+	}
+
+	// The model's title gets the same bound the fallback title carries.
+	// Nothing constrains what a model returns, so an overlong title
+	// reached pages.title unclipped and the insert failed, losing the
+	// body the call had already paid for. The cut is rune-aware for the
+	// same reason as in generatedPageTitle.
+	title := stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleMaxLen)
+	if title == "" {
+		// A page needs a name, and a blank one reaches a NOT NULL column
+		// as an empty string that nothing in a list can be clicked by.
+		// The brief is a fair name for a page drafted from it — unlike a
+		// body, where the brief is the wrong content entirely.
+		title = generatedPageTitle(in.ContextDescription)
 	}
 
 	pub := newPublicID()
@@ -2914,10 +3021,13 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		CreatorID:     s.userID,
 		ParentPageID:  sql.NullInt32{},
 		Title:         title,
-		Body:          body,
-		IsAiGenerated: isAI,
+		Body:          proposed[0].Description,
+		IsAiGenerated: true,
 	})
 	if err != nil {
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.PagePageTitleTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
@@ -2931,15 +3041,19 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		Payload: map[string]any{
 			"pageId":        pub.String(),
 			"title":         title,
-			"isAiGenerated": isAI,
+			"isAiGenerated": true,
 			"via":           "mcp:generate_page",
 		},
 		CallSite: "mcp.generate_page",
 	})
 	_ = pageID // internal id not exposed
+	// isAiGenerated stays in the answer even though this tool can now
+	// only return it true: it is the same field pages carry everywhere
+	// else, and a client reading page metadata by one shape should not
+	// have to special-case where the page came from.
 	return map[string]any{
 		"id":            pub.String(),
-		"isAiGenerated": isAI,
+		"isAiGenerated": true,
 	}, nil
 }
 
@@ -3003,8 +3117,31 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	// to the half of the payload no schema covers. The cut is rune-aware:
 	// a byte-indexed cut can sever a multi-byte character and hand the
 	// utf8mb4 column a fragment it rejects under STRICT_TRANS_TABLES.
+	//
+	// The priority word each subtask carries is resolved here too, through
+	// the mapping every transport applies to a model-proposed priority, so
+	// a word means the same number whether the proposal arrived over REST
+	// or through a tool. It is resolved before the transaction opens
+	// because the resolution reports a model answering outside the
+	// vocabulary it was handed, and a retried transaction would report the
+	// same drift again.
+	subtaskPriorities := make([]int32, len(proposal.Subtasks))
 	for i := range proposal.Subtasks {
 		proposal.Subtasks[i].Title = stringutil.TruncateBytes(proposal.Subtasks[i].Title, taskTitleMaxLen)
+		priority, known := handlerutil.PriorityFromLabel(proposal.Subtasks[i].Priority)
+		if !known {
+			// The batch still goes out — one unrankable subtask is not
+			// worth failing a decomposition over — but the substitution is
+			// recorded. A caller sees a priority and cannot tell it was
+			// chosen by a fallback rather than by the model, so absorbing
+			// this silently makes a malformed answer indistinguishable
+			// from a deliberate one.
+			slog.WarnContext(ctx, "mcp: LLM returned a priority outside the vocabulary",
+				slog.String("tool", "smart_create_task"),
+				slog.String("priority_label", proposal.Subtasks[i].Priority),
+			)
+		}
+		subtaskPriorities[i] = priority
 	}
 
 	// Create the parent and every proposed subtask in one transaction, so a
@@ -3035,7 +3172,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		parentPub = parent.PublicID
 		parentID = parent.ID
 
-		for _, st := range proposal.Subtasks {
+		for i, st := range proposal.Subtasks {
 			// A subtask the model returned without a usable title is
 			// dropped rather than failing the batch: the parent and its
 			// siblings are what the caller asked for, and one unnameable
@@ -3050,7 +3187,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 				ParentTaskID: sql.NullInt32{Int32: int32(parent.ID), Valid: true}, //#nosec G115 -- parent_task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				Title:        childTitle,
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
-				Priority:     smartCreatePriorityToInt(st.Priority),
+				Priority:     subtaskPriorities[i],
 			})
 			if cerr != nil {
 				return cerr
@@ -3143,38 +3280,9 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	}, nil
 }
 
-// smartCreatePriorityToInt maps the LLM priority string to the DB int32
-// value used in the tasks table. Unknown values default to 0 (none).
-func smartCreatePriorityToInt(s string) int32 {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "low":
-		return 1
-	case "medium":
-		return 2
-	case "high":
-		return 3
-	default:
-		return 0
-	}
-}
-
 // ----------------------------------------------------------------------------
 // Calendar tools
 // ----------------------------------------------------------------------------
-
-// calendarRoleFor derives the MCP-exposed role string for a calendar
-// row. calendar_subscriptions.role is gone; we mirror the HTTP handler
-// convention (personal owner -> "owner", system -> "viewer", otherwise
-// "editor" since every ws member has edit access).
-func calendarRoleFor(kind calendar.CalendarsKind, ownerUserID sql.NullInt32, actorUserID uint32) string {
-	if ownerUserID.Valid && uint32(ownerUserID.Int32) == actorUserID { //#nosec G115 -- owner_user_id is users.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		return "owner"
-	}
-	if kind == calendar.CalendarsKindSystem {
-		return "viewer"
-	}
-	return "editor"
-}
 
 func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMessage) (any, error) {
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
@@ -3193,10 +3301,19 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 			"id":   r.PublicID.String(),
 			"kind": string(r.Kind),
 			"name": r.Name,
-			// calendar_subscriptions.role has been dropped. Derive
-			// the role from ownership so existing MCP clients keep a
-			// stable shape.
-			"role":  calendarRoleFor(r.Kind, r.OwnerUserID, s.userID),
+			// calendar_members.role is the grant every calendar decision
+			// is taken on, so it is the role reported here. Deriving one
+			// from calendars.owner_user_id instead reported "editor" for
+			// every member of a calendar that belongs to a group rather
+			// than a person — viewers included — because that column is
+			// NULL whenever a calendar outlives a single member. A caller
+			// that reads this field to decide whether to attempt a write
+			// was told it could, and then correctly refused.
+			//
+			// It is the membership grant and not a verdict on writing:
+			// a system calendar's contents come from a provider feed and
+			// are read-only at every role, which the write rule answers.
+			"role":  string(r.Role),
 			"color": r.Color,
 			// member_color has been dropped from calendar_subscriptions;
 			// fall back to display_color.
@@ -3663,22 +3780,34 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	return out, nil
 }
 
+// updateCalendarEventArgs is what update_calendar_event takes.
+//
+// It is a named type rather than an anonymous struct because the
+// occurrence-scoped paths fold the same arguments over a different base
+// row, so both readings of one call live in one declaration.
+type updateCalendarEventArgs struct {
+	EventID     string  `json:"eventId"`
+	Title       *string `json:"title"`
+	StartAt     *int64  `json:"startAt"`
+	EndAt       *int64  `json:"endAt"`
+	StartDate   *string `json:"startDate"`
+	EndDate     *string `json:"endDate"`
+	Kind        *string `json:"kind"`
+	ShowAs      *string `json:"showAs"`
+	Flexibility *string `json:"flexibility"`
+	Visibility  *string `json:"visibility"`
+	Location    *string `json:"location"`
+	Memo        *string `json:"memo"`
+	BlockLabel  *string `json:"blockLabel"`
+	// Scope and OccurrenceStart say which occurrences of a recurring
+	// series the update reaches, and which one it starts from. An empty
+	// Scope is the whole series.
+	Scope           string `json:"scope"`
+	OccurrenceStart int64  `json:"occurrenceStart"`
+}
+
 func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
-	var in struct {
-		EventID     string  `json:"eventId"`
-		Title       *string `json:"title"`
-		StartAt     *int64  `json:"startAt"`
-		EndAt       *int64  `json:"endAt"`
-		StartDate   *string `json:"startDate"`
-		EndDate     *string `json:"endDate"`
-		Kind        *string `json:"kind"`
-		ShowAs      *string `json:"showAs"`
-		Flexibility *string `json:"flexibility"`
-		Visibility  *string `json:"visibility"`
-		Location    *string `json:"location"`
-		Memo        *string `json:"memo"`
-		BlockLabel  *string `json:"blockLabel"`
-	}
+	var in updateCalendarEventArgs
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
@@ -3726,6 +3855,14 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	if !ok {
 		return nil, apierrors.New(apierrors.CalendarEventEditPermissionRequired)
+	}
+
+	scope, err := decodeOccurrenceScope(in.Scope)
+	if err != nil {
+		return nil, err
+	}
+	if scope != scopeSeries {
+		return updateCalendarEventOccurrences(ctx, deps, s, scope, owner.CalendarID, eventPub, evt, &in)
 	}
 
 	params := calendar.PatchCalendarEventParams{
@@ -3903,19 +4040,25 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	// transaction, so an itemkit invariant is not reported as a generic
 	// tool-execution failure.
 	var answered error
+	// renamed carries the linked task's text out of the transaction so
+	// its search embedding is refreshed once the rename has committed.
+	var renamed itemkit.RenamedTask
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
+		renamed = itemkit.RenamedTask{}
 		qtxCal := deps.CalendarQueries.WithTx(tx.RawTx())
 
 		if titleChanged {
-			if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+			var rerr error
+			renamed, rerr = itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
 				WorkspaceID: s.workspaceID,
 				ActorUserID: s.userID,
 				EventID:     evt.ID,
 				NewTitle:    renameTitle,
-			}); err != nil {
-				answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
-				return err
+			})
+			if rerr != nil {
+				answered = translateItemkitMCPError(rerr, apierrors.CalendarEventNotFound)
+				return rerr
 			}
 		}
 		if timeChanged {
@@ -3943,6 +4086,13 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
+	// A linked event's title is also the task's, so renaming through the
+	// event moves the text search is served from. Past the commit and
+	// ahead of the audit record: the write is no longer revocable, and
+	// the audit call below can leave this function.
+	if renamed.TaskID != 0 {
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, renamed.TaskID, renamed.Title, renamed.Description)
+	}
 	// itemkit appended calendar.event.updated inside the transaction that
 	// just committed, so only the audit half is left to add here.
 	recordTxMutationAudit(ctx, deps, s, mutation{
@@ -3958,9 +4108,30 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	return map[string]any{"success": true}, nil
 }
 
+// runDeleteCalendarEvent soft-deletes a calendar event, or the part of a
+// recurring series a non-series scope names.
+//
+// A scoped delete patches recurrence_exceptions or recurrence_end and
+// leaves every other column to COALESCE, so the tool sends no window and
+// no all-day flag of its own:
+//
+// calendar-precondition: chronology not-applicable — this tool sends no start and no end, so it has no window to order
+// calendar-precondition: all-day-bounds not-applicable — this tool sends no all-day flag and no window, so it has no bounds to pin
+//
+// A series delete reaches itemkit, and the task column itemkit writes is
+// cleared rather than set. A task with no due date has no ordering to
+// break, which is the answer taskrules.DateOrder itself gives a NULL
+// side:
+//
+// task-precondition: date-order not-applicable — this tool only clears due_on, and a task with no due date has no pair to order
 func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		EventID string `json:"eventId"`
+		// Scope and OccurrenceStart say which occurrences of a recurring
+		// series the delete reaches, and which one it starts from. An
+		// empty Scope is the whole series.
+		Scope           string `json:"scope"`
+		OccurrenceStart int64  `json:"occurrenceStart"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -4004,6 +4175,14 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	if !ok {
 		return nil, apierrors.New(apierrors.CalendarEventEditPermissionRequired)
+	}
+
+	scope, err := decodeOccurrenceScope(in.Scope)
+	if err != nil {
+		return nil, err
+	}
+	if scope != scopeSeries {
+		return deleteCalendarEventOccurrences(ctx, deps, s, scope, owner.CalendarID, eventPub, evt, in.OccurrenceStart)
 	}
 
 	var answered error

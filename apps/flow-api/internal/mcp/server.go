@@ -43,6 +43,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // Deps is the dependency bundle needed to construct an MCP [Handler].
@@ -206,7 +207,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate via Authorization: Bearer mcp_...
-	tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
+	tok, ok := authn.BearerFromHeader(r.Header.Get("Authorization"))
 	if !ok || !strings.HasPrefix(tok, auth.PrefixMCP) {
 		writeRPCTransportError(w, req.ID, apierrors.McpTokenUnknown, "missing mcp bearer")
 		return
@@ -591,15 +592,6 @@ func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) 
 		return 0, err
 	}
 	return cents, nil
-}
-
-func bearerFromHeader(h string) (string, bool) {
-	const prefix = "Bearer "
-	if !strings.HasPrefix(h, prefix) {
-		return "", false
-	}
-	tok := strings.TrimSpace(h[len(prefix):])
-	return tok, tok != ""
 }
 
 // maxToolArgBytes is the maximum size of a single MCP tool argument

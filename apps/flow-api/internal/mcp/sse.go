@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // sseConn represents a single SSE client connection. Events are
@@ -267,7 +268,7 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate via Authorization: Bearer mcp_...
-	tok, ok := bearerFromHeader(r.Header.Get("Authorization"))
+	tok, ok := authn.BearerFromHeader(r.Header.Get("Authorization"))
 	if !ok || !strings.HasPrefix(tok, auth.PrefixMCP) {
 		writeRPCTransportError(w, nil, apierrors.McpTokenUnknown, "missing mcp bearer")
 		return

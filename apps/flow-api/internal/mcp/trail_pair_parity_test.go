@@ -363,12 +363,30 @@ func readPackageTrail(dir string, sources map[string]string, kinds map[string]st
 	}
 	sort.Strings(paths)
 
-	out := packageTrail{direct: map[string]trail{}, calls: map[string][]funcRef{}}
+	files := make([]*ast.File, 0, len(paths))
 	for _, path := range paths {
 		file, err := parser.ParseFile(fset, path, sources[path], 0)
 		if err != nil {
 			return packageTrail{}, fmt.Errorf("parse %s: %w", path, err)
 		}
+		files = append(files, file)
+	}
+
+	// The names this package declares are collected before any function is
+	// read, because reading one asks whether a call it makes lands inside
+	// the package: a kind returned by a function declared here is a kind
+	// the walk goes on to read, and one returned by anything else is not.
+	declared := map[string]bool{}
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+				declared[fn.Name.Name] = true
+			}
+		}
+	}
+
+	out := packageTrail{direct: map[string]trail{}, calls: map[string][]funcRef{}}
+	for _, file := range files {
 		imports := importedPackageDirs(file)
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -380,7 +398,7 @@ func readPackageTrail(dir string, sources map[string]string, kinds map[string]st
 			if merged.unread == nil {
 				merged.unread = map[bool][]namedValue{}
 			}
-			read := readTrail(fset, fn, kinds)
+			read := readTrail(fset, fn, kinds, declared)
 			merged.kinds = append(merged.kinds, read.kinds...)
 			merged.actions = append(merged.actions, read.actions...)
 			merged.unread[isKind] = append(merged.unread[isKind], read.unread[isKind]...)
@@ -450,7 +468,10 @@ func calleeRef(fun ast.Expr, dir string, imports map[string]string) (funcRef, bo
 // namings they would give every change the same trail, and read as unread
 // they would make every change unreadable. The value is named where the
 // parameter is supplied, which is the call site the walk already reaches.
-func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string) trail {
+//
+// declared names the functions this package declares, which is what tells a
+// kind chosen at run time out of a kind the walk cannot see at all.
+func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string, declared map[string]bool) trail {
 	out := trail{unread: map[bool][]namedValue{}}
 	params := parameterNames(fn)
 	at := func(n ast.Node) namedValue {
@@ -484,28 +505,21 @@ func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string) t
 			}
 		case *ast.CompositeLit:
 			typ := literalTypeName(node.Type)
-			for _, key := range recordKindKeys[typ] {
-				value, found := literalField(node, key)
-				if !found || forwardsParameter(value, params) {
-					continue
-				}
-				if !namesKnownKind(value, kinds) {
-					unread(isKind, value, "%s.%s is not written as a kind constant", typ, key)
+			kindKey, actionKey := recordFields(node)
+			if value, read := recordValue(node, kindKey, params); read {
+				if !namesKnownKind(value, kinds) && !namesReadableKinds(value, fn.Body, kinds, declared) {
+					unread(isKind, value, "%s.%s is not written as a kind constant", typ, kindKey)
 				}
 			}
-			for _, key := range recordActionKeys[typ] {
-				value, found := literalField(node, key)
-				if !found || forwardsParameter(value, params) {
-					continue
-				}
+			if value, read := recordValue(node, actionKey, params); read {
 				action, ok := stringLiteral(value)
-				if !ok {
-					unread(isAction, value, "%s.%s is not written as a literal", typ, key)
-					continue
+				if ok {
+					v := at(value)
+					v.value = action
+					out.actions = append(out.actions, v)
+				} else {
+					unread(isAction, value, "%s.%s is not written as a literal", typ, actionKey)
 				}
-				v := at(value)
-				v.value = action
-				out.actions = append(out.actions, v)
 			}
 		}
 		return true
@@ -552,18 +566,135 @@ func forwardsParameter(expr ast.Expr, params map[string]bool) bool {
 	}
 }
 
-// recordKindKeys names the records whose field carries the event kind, so a
-// field written some other way is reported rather than passed over.
-var recordKindKeys = map[string][]string{
-	"mutation":        {"EventType"},
-	"eventbus.Event":  {"Type"},
-	"sharedbus.Event": {"Type"},
+// mutationKindField and mutationActionField are the fields a mutation-log
+// record carries the two halves of a trail in.
+const (
+	mutationKindField   = "EventType"
+	mutationActionField = "AuditAction"
+)
+
+// rawRecordFields names the field carrying each half in the two records the
+// mutation log wraps.
+//
+// These stay keyed by the type as it is written, because their fields are
+// named Type and Action — names a mapper, a response body and a domain enum
+// all use. Keyed on the field alone they would collect values no consumer of
+// `events` or `audit_logs` ever sees, and report a blind spot at every one
+// of them.
+var rawRecordFields = map[string]struct{ kind, action string }{
+	"eventbus.Event":  {kind: "Type"},
+	"sharedbus.Event": {kind: "Type"},
+	"audit.Entry":     {action: "Action"},
 }
 
-// recordActionKeys names the records whose field carries the audit action.
-var recordActionKeys = map[string][]string{
-	"mutation":    {"AuditAction"},
-	"audit.Entry": {"Action"},
+// recordFields names the fields a composite literal carries the halves of a
+// trail in, or two empty strings for a literal that carries neither. A field
+// this returns and the literal does not set is a half the literal leaves to
+// something else, which [recordValue] answers.
+//
+// The mutation-log record is recognised by a field it sets rather than by
+// the name of its type. That record is a plain struct and each transport
+// spells it its own way — `mutation` inside this package, mutationlog.Mutation
+// over HTTP, whatever a transport added later declares — so a reading keyed
+// on type names goes blind the moment one of them adopts a new spelling, and
+// reports the transport that did as filing nothing at all. That is not a
+// missed check but an inverted one: it is a failure raised against code
+// recording exactly what it should.
+//
+// AuditAction identifies the shape. It is the field the record exists for,
+// it is set by every record including the ones whose event another writer
+// appends, and nothing else in the trees this walk reads sets a field by
+// that name — an SSE frame carries an EventType and no audit action, a
+// mapper carries an Action and no event kind, and neither is a record.
+func recordFields(lit *ast.CompositeLit) (kindKey, actionKey string) {
+	if _, ok := literalField(lit, mutationActionField); ok {
+		return mutationKindField, mutationActionField
+	}
+	raw := rawRecordFields[literalTypeName(lit.Type)]
+	return raw.kind, raw.action
+}
+
+// recordValue returns the value a record gives one of its fields, and
+// reports whether the walk has to read it here. A half the record does not
+// name is left to another writer, and one filled from the function's own
+// parameters is named at the call site the walk already reaches.
+func recordValue(lit *ast.CompositeLit, key string, params map[string]bool) (ast.Expr, bool) {
+	if key == "" {
+		return nil, false
+	}
+	value, found := literalField(lit, key)
+	if !found || forwardsParameter(value, params) {
+		return nil, false
+	}
+	return value, true
+}
+
+// namesReadableKinds reports whether every kind a record field can carry is
+// somewhere the walk reads it, for a field not written as the constant
+// itself.
+//
+// Two shapes qualify, and both are how a transport writes one decision:
+// a triage status picks one of several kinds. The tool assigns the chosen
+// constant to a local; the request handler returns it from a helper. Either
+// way the constants are named in source this walk covers — the local's
+// assignments are in this same body, the helper is a call the package graph
+// follows — so the set of kinds the site can file is read, and only the
+// choice between them is made at run time. The halves are compared as sets,
+// so a choice the walk cannot predict costs it nothing, and a branch that
+// assigns no kind leaves the zero value, which the recorder refuses rather
+// than files under a name of its own.
+//
+// Anything else keeps the marker: a kind handed in from another package, one
+// read off a struct, one built from a string. There the walk reads no
+// constant at all, and reporting that as silence is how two transports come
+// to file one change under two names with nothing noticing.
+func namesReadableKinds(expr ast.Expr, body *ast.BlockStmt, kinds map[string]string, declared map[string]bool) bool {
+	switch v := expr.(type) {
+	case *ast.Ident:
+		return assignedKindsAreKnown(v.Name, body, kinds)
+	case *ast.CallExpr:
+		id, ok := v.Fun.(*ast.Ident)
+		return ok && declared[id.Name]
+	default:
+		return false
+	}
+}
+
+// assignedKindsAreKnown reports whether every assignment to a local names a
+// declared kind constant, and that there is at least one. A local the
+// function never assigns, or assigns from a call returning several values,
+// is one the walk has not read.
+func assignedKindsAreKnown(name string, body *ast.BlockStmt, kinds map[string]string) bool {
+	assigned, allKnown := false, true
+	consider := func(lhs, rhs []ast.Expr) {
+		if len(lhs) != len(rhs) {
+			return
+		}
+		for i, target := range lhs {
+			id, ok := target.(*ast.Ident)
+			if !ok || id.Name != name {
+				continue
+			}
+			assigned = true
+			if !namesKnownKind(rhs[i], kinds) {
+				allKnown = false
+			}
+		}
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			consider(node.Lhs, node.Rhs)
+		case *ast.ValueSpec:
+			names := make([]ast.Expr, 0, len(node.Names))
+			for _, id := range node.Names {
+				names = append(names, id)
+			}
+			consider(names, node.Values)
+		}
+		return true
+	})
+	return assigned && allKnown
 }
 
 // literalTypeName renders a composite literal's type as it is written.
@@ -1205,6 +1336,152 @@ func Append() {
 	}
 	if source.filedThroughTheSame(alsoDelegating, delegating, isAction) {
 		t.Error("the audit half is reported as settled, and neither sample writes an audit row at all")
+	}
+}
+
+// TestTrailReadingReadsARecordItHasNoTypeNameFor holds the reading against
+// a record type stated nowhere in this file.
+//
+// The audit half has no marker of its own — it is a plain string — so it is
+// read from the record that carries it, and a reading that knew records by
+// their type names would read this one as filing no action at all. That is
+// the inverted finding: the transport recording exactly what it should is
+// the one reported as recording nothing, and the reading's own blind spot is
+// what the failure names. So the record is recognised by the field it is
+// written for, and a type this file has never heard of is read the same as
+// the ones it has.
+func TestTrailReadingReadsARecordItHasNoTypeNameFor(t *testing.T) {
+	t.Parallel()
+
+	kinds := map[string]string{"TaskCommentAdded": "task.comment.added"}
+	const src = `package p
+
+func runAddComment() {
+	file(changelog.Record{
+		EventType:   eventbus.TaskCommentAdded,
+		AuditAction: "comment.add",
+	})
+}
+`
+	source := newSourceTrail(t.TempDir(), kinds)
+	pkg, err := readPackageTrail("sample/unknown-record", map[string]string{"unknown.go": src}, kinds)
+	if err != nil {
+		t.Fatalf("read the sample: %v", err)
+	}
+	source.add("sample/unknown-record", pkg)
+
+	side, declared := source.resolve(funcRef{dir: "sample/unknown-record", name: "runAddComment"})
+	if !declared {
+		t.Fatal("the sample's function was not read")
+	}
+	assertValues(t, "kinds", side.kinds, []namedValue{{value: "task.comment.added", file: "unknown.go", line: 5}})
+	assertValues(t, "actions", side.actions, []namedValue{{value: "comment.add", file: "unknown.go", line: 6}})
+	for _, half := range []bool{isKind, isAction} {
+		if len(side.unread[half]) != 0 {
+			t.Errorf("the sample reads as unresolved (%v); both halves are written out in it", describe(side.unread[half]))
+		}
+	}
+}
+
+// TestTrailReadingReadsTheKindsARunTimeChoiceCanFile holds the reading
+// against the three ways a record's kind is filled.
+//
+// Both transports choose an intake kind from the triage status: the tool
+// assigns the constant to a local, the request handler returns it from a
+// helper. Neither is a value the reading can name, and both are sites whose
+// full set of kinds it can read — the halves are compared as sets, so a
+// choice made at run time between kinds it has read is no gap at all.
+// Demanding a single constant there asks a transport to stop expressing a
+// decision it is right to make.
+//
+// The third shape is the one that stays unresolved: a kind produced by a
+// package the walk does not enter. Nothing was read there, and reading it as
+// silence is what would let the two transports drift apart unnoticed.
+func TestTrailReadingReadsTheKindsARunTimeChoiceCanFile(t *testing.T) {
+	t.Parallel()
+
+	kinds := map[string]string{
+		"IntakeItemAccepted": "intake.item.accepted",
+		"IntakeItemRejected": "intake.item.rejected",
+	}
+	const src = `package p
+
+import "github.com/libraz/nodate-flow/sample/kindsource"
+
+func runTriage(status string) {
+	var kind eventbus.Kind
+	switch status {
+	case "accepted":
+		kind = eventbus.IntakeItemAccepted
+	default:
+		kind = eventbus.IntakeItemRejected
+	}
+	file(changelog.Record{
+		EventType:   kind,
+		AuditAction: "intake.triage",
+	})
+}
+
+func Triage(status string) {
+	file(changelog.Record{
+		EventType:   triageKind(status),
+		AuditAction: "intake.triage",
+	})
+}
+
+func triageKind(status string) eventbus.Kind {
+	if status == "accepted" {
+		return eventbus.IntakeItemAccepted
+	}
+	return eventbus.IntakeItemRejected
+}
+
+func Imported(status string) {
+	file(changelog.Record{
+		EventType:   kindsource.For(status),
+		AuditAction: "intake.import",
+	})
+}
+`
+	source := newSourceTrail(t.TempDir(), kinds)
+	pkg, err := readPackageTrail("sample/runtime-kind", map[string]string{"runtime.go": src}, kinds)
+	if err != nil {
+		t.Fatalf("read the sample: %v", err)
+	}
+	source.add("sample/runtime-kind", pkg)
+
+	both := []string{"intake.item.accepted", "intake.item.rejected"}
+	for _, side := range []struct {
+		label string
+		fn    string
+	}{
+		{"the local a switch assigns", "runTriage"},
+		{"the helper this package declares", "Triage"},
+	} {
+		read, declared := source.resolve(funcRef{dir: "sample/runtime-kind", name: side.fn})
+		if !declared {
+			t.Fatalf("%s: %s was not read", side.label, side.fn)
+		}
+		if len(read.unread[isKind]) != 0 {
+			t.Errorf("%s reads as unresolved (%v); every kind it can file is named in source this walk covers",
+				side.label, describe(read.unread[isKind]))
+		}
+		if !equalValues(read.kindValues(), both) {
+			t.Errorf("%s reads kinds %v, want %v; the set a run-time choice picks from is what the halves are compared as",
+				side.label, read.kindValues(), both)
+		}
+	}
+
+	imported, declared := source.resolve(funcRef{dir: "sample/runtime-kind", name: "Imported"})
+	if !declared {
+		t.Fatal("the sample's imported-kind function was not read")
+	}
+	if len(imported.unread[isKind]) != 1 {
+		t.Errorf("a kind produced by a package this walk does not enter reads as %v; it was not read, and reported as silence it would pass for agreement",
+			describe(imported.unread[isKind]))
+	}
+	if len(imported.kinds) != 0 {
+		t.Errorf("the imported-kind sample was read as naming kinds %v; it names none", imported.kindValues())
 	}
 }
 

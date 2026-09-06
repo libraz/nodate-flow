@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 func runListLabels(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -84,6 +85,13 @@ func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		Color:           in.Color,
 		Description:     sql.NullString{String: in.Description, Valid: in.Description != ""},
 	}); err != nil {
+		// A name already in use within the same scope is a refusal the
+		// caller can act on by choosing another one, and no retry changes
+		// it. It is named the way the REST route names it rather than
+		// reported as a tool fault, which reads as a server problem.
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.WsLabelNameAlreadyTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	// The label row is committed; a retry would create a second one.
@@ -134,6 +142,14 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		TaskID:      taskInternal,
 		LabelID:     label.ID,
 	}); err != nil {
+		// The label is already on this task. The junction carries one live
+		// row per (task, label), so the state the caller asked for already
+		// holds and a retry cannot change it. The code is the one the REST
+		// route answers for the same duplicate, so a client cannot tell
+		// the two transports apart by the refusal.
+		if handlerutil.IsDuplicateEntry(err) {
+			return nil, apierrors.New(apierrors.WsLabelNameAlreadyTaken)
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	taskID64 := int64(taskInternal)

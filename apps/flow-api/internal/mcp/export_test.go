@@ -38,6 +38,16 @@ func ToolFloors() map[string]auth.Floor {
 	return out
 }
 
+// ToolInputSchema returns the input schema a registered tool publishes
+// through tools/list.
+//
+// It is how a test outside this package compares what a tool advertises
+// against another transport's declaration of the same argument, rather
+// than against a literal restating both.
+func ToolInputSchema(name string) map[string]any {
+	return catalogue()[name].inputSchema
+}
+
 // toolEntry returns a registered tool's run function, taken from the
 // registry rather than from the implementation directly.
 //
@@ -76,6 +86,7 @@ var (
 	RunListImportJobs        = toolEntry("list_import_jobs")
 	RunCreateImportJob       = toolEntry("create_import_job")
 	RunCreateCalendarEvent   = toolEntry("create_calendar_event")
+	RunListCalendarEvents    = toolEntry("list_calendar_events")
 	RunUpdateCalendarEvent   = toolEntry("update_calendar_event")
 	RunDeleteCalendarEvent   = toolEntry("delete_calendar_event")
 	RunToggleCalendarMemo    = toolEntry("toggle_calendar_memo")

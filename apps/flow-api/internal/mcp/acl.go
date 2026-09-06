@@ -551,22 +551,26 @@ func resolveCalendarWrite(ctx context.Context, deps Deps, s *session, publicID s
 	return access.cal.ID, nil
 }
 
-// checkCalendarWrite maps the shared decision onto the refusals this
-// transport answers with.
+// checkCalendarWrite applies the shared calendar-write rule and answers
+// with the refusal that rule names.
 //
-// The codes are the ones the REST handlers write for the same two
-// refusals, so a caller cannot tell the transports apart by what they are
-// told: below editor is CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED, and a
-// system calendar is CALENDAR.CALENDAR.ACCESS_DENIED.
+// Both halves come from the calendars package — the decision and the code
+// it is reported as — so this transport cannot come to call the same
+// refusal something else. Naming the codes here instead is how MCP ended
+// up telling a caller below editor that only calendar owners may act,
+// which is not the grant that would have admitted them.
 func checkCalendarWrite(kind calendar.CalendarsKind, role calendar.CalendarMembersRole) error {
-	switch calendars.DecideCalendarWrite(kind, role) {
-	case calendars.CalendarWriteRoleTooLow:
-		return apierrors.New(apierrors.CalendarCalendarOwnerRoleRequired)
-	case calendars.CalendarWriteCalendarReadOnly:
-		return apierrors.New(apierrors.CalendarCalendarAccessDenied)
-	case calendars.CalendarWriteAllowed:
+	return specErr(calendars.CalendarWriteRefusalSpec(calendars.DecideCalendarWrite(kind, role)))
+}
+
+// specErr turns a refusal spec into the error this transport returns, and
+// a nil spec into no error, so the shared "refused / allowed" answer can
+// be propagated without each call site re-deciding what nil means.
+func specErr(spec *apierrors.Spec) error {
+	if spec == nil {
+		return nil
 	}
-	return nil
+	return apierrors.New(spec)
 }
 
 // resolveWorkspaceUser resolves a user public id to its internal id and
@@ -605,8 +609,14 @@ func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID s
 // so there is no public id to resolve; the membership and the calendar's
 // kind are read back from the caller's own calendar list, which is driven
 // by calendar_members and scoped to the session workspace. A calendar
-// absent from that list is one the caller holds no row on, and refusing
-// it as access-denied is the same answer [authorizeCalendar] gives.
+// absent from that list is one the caller holds no row on.
+//
+// Which is why the refusal comes from [calendars.EventPathWriteRefusalSpec]
+// rather than from [checkCalendarWrite]: the caller named an event and
+// never named a calendar, so an answer distinguishable from "no such
+// event" would tell them the id is live on a calendar they cannot see.
+// The REST routes that reach an event the same way answer from the same
+// rule, so the two transports do not have to be kept in step by hand.
 //
 // Membership alone used to be the whole gate here, which let somebody
 // removed from a calendar keep editing the events on it they happen to
@@ -621,12 +631,14 @@ func requireCalendarWritable(ctx context.Context, deps Deps, s *session, calenda
 	if err != nil {
 		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	var standing *calendars.CalendarStanding
 	for _, row := range rows {
 		if row.ID == calendarID {
-			return checkCalendarWrite(row.Kind, row.Role)
+			standing = &calendars.CalendarStanding{Kind: row.Kind, Role: row.Role}
+			break
 		}
 	}
-	return apierrors.New(apierrors.CalendarCalendarAccessDenied)
+	return specErr(calendars.EventPathWriteRefusalSpec(standing))
 }
 
 // canEditCalendarEvent answers the same question the REST handlers ask,
