@@ -701,6 +701,107 @@ func TestRecurringExceptionDoesNotFire(t *testing.T) {
 		"an occurrence excluded by recurrence_exceptions must not fire, got %d", len(signals))
 }
 
+// moveOccurrenceViaAPI replaces a single occurrence of a recurring series
+// with an override row, through the same PATCH scope="occurrence" body the
+// web app sends. occurrenceStart names the occurrence under the series
+// rule; startAt / endAt are where it moves to.
+func moveOccurrenceViaAPI(
+	t *testing.T,
+	tt *helpers.CalendarTestTenant,
+	calID, eventPublicID string,
+	occurrenceStart, startAt, endAt time.Time,
+) {
+	t.Helper()
+	helpers.DoJSON(t, http.MethodPatch,
+		tt.WsPath("calendars", calID, "events", eventPublicID), tt.AccessToken,
+		map[string]any{
+			"scope":           "occurrence",
+			"occurrenceStart": occurrenceStart.Unix(),
+			"startAt":         startAt.Unix(),
+			"endAt":           endAt.Unix(),
+		}, nil)
+}
+
+// resolveOverrideInternalID looks up the single override row standing in
+// for one occurrence of a master series.
+func resolveOverrideInternalID(t *testing.T, db *sql.DB, masterInternalID int64, originalStart time.Time) int64 {
+	t.Helper()
+	var id int64
+	err := db.QueryRowContext(context.Background(),
+		`SELECT id FROM calendar_events
+		  WHERE recurrence_parent_id = ?
+		    AND recurrence_original_start = ?
+		  LIMIT 1`,
+		masterInternalID, originalStart.UTC()).Scan(&id)
+	require.NoError(t, err, "resolve override row for master %d", masterInternalID)
+	return id
+}
+
+// TestOverriddenOccurrenceFiresOnceAtTheOverrideTime proves the meeting a
+// user moved arrives on its day once, not twice.
+//
+// The override is an ordinary non-recurring row, so the scan finds it at
+// its new time on its own. The master must therefore stop producing the
+// occurrence the override replaces: left in, the same standing meeting
+// announces its day under two event ids, and every downstream judge runs
+// twice on one meeting.
+//
+// The occurrence day is one no other test ticks on, and a scanner test
+// that asserts a day does *not* fire needs that whenever its setup takes
+// more than one write. A tick scans every workspace, so a parallel test's
+// tick expands this event too; a row becomes reachable for a day the
+// moment the rule is written, and if the state that makes the day silent
+// is established by a later write, a tick landing between the two emits
+// the signal the test requires to be absent. The tests that suppress a
+// day with an exception or a recurrence end have no such window — one
+// UPDATE makes the row reachable and silent together — but an override is
+// a second row and cannot be written in the same statement, so the gap is
+// closed by picking a day nothing else materialises instead.
+func TestOverriddenOccurrenceFiresOnceAtTheOverrideTime(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.September, 8, 9, 0, 0, 0, time.UTC)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, base.Add(time.Hour), "UTC", "Daily Standup")
+	masterInternalID := resolveEventInternalID(t, h.db, eventPublicID)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, "", nil)
+
+	// Move the 2026-09-11 occurrence later on the same local day, so both
+	// the master's original occurrence and the override land in the day
+	// the tick crosses and a duplicate cannot hide behind a day boundary.
+	const occurrenceDay = "2026-09-11"
+	originalStart := time.Date(2026, time.September, 11, 9, 0, 0, 0, time.UTC)
+	movedStart := time.Date(2026, time.September, 11, 14, 0, 0, 0, time.UTC)
+	moveOccurrenceViaAPI(t, tt, calID, eventPublicID, originalStart, movedStart, movedStart.Add(time.Hour))
+	overrideInternalID := resolveOverrideInternalID(t, h.db, masterInternalID, originalStart)
+
+	job := newJob(t, h.db, h.srv.BaseURL)
+	job.CatchUpWindow = time.Nanosecond
+	tick := time.Date(2026, time.September, 11, 0, 0, 30, 0, time.UTC)
+	require.NoError(t, job.Tick(context.Background(), tick), "tick should succeed")
+
+	masterSignals := signalsForOccurrenceDay(
+		loadSignalsForEvent(t, h.db, tt.WorkspaceID, masterInternalID), occurrenceDay)
+	require.Emptyf(t, masterSignals,
+		"the master must not announce an occurrence an override replaces, got %d", len(masterSignals))
+
+	overrideSignals := signalsForOccurrenceDay(
+		loadSignalsForEvent(t, h.db, tt.WorkspaceID, overrideInternalID), occurrenceDay)
+	require.Lenf(t, overrideSignals, 1,
+		"the override must announce the day exactly once, got %d", len(overrideSignals))
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(overrideSignals[0].PayloadJSON, &payload))
+	startUnix, ok := payload["startAt"].(float64)
+	require.True(t, ok, "payload must carry startAt")
+	require.Equal(t, movedStart.Unix(), int64(startUnix),
+		"the surviving signal must carry the override's start, not the original")
+}
+
 // TestRecurringPastRecurrenceEndDoesNotFire proves an occurrence past the
 // recurrence_end bound is suppressed: recurrence_end falls on 08-03, so the
 // 08-04 occurrence must not fire even though the daily rule would otherwise

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
@@ -121,7 +122,8 @@ func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32)
 		})
 }
 
-// DeleteEvent soft-disables a single calendar_events row. When the
+// DeleteEvent soft-disables a single calendar_events row, along with
+// the occurrence overrides that name it as their series. When the
 // event is task-linked with RoleDue, the task's due_on column is
 // cleared but the task itself survives.
 func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint32) error {
@@ -140,6 +142,32 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE calendar_events SET enabled = FALSE WHERE id = ?`, evt.id); err != nil {
 		return fmt.Errorf("itemkit: soft-disable event: %w", err)
+	}
+	// A series' per-occurrence overrides are separate rows naming this
+	// one in recurrence_parent_id. fk_calendar_events_recurrence_parent
+	// cascades on DELETE, but the product never deletes a row — a delete
+	// is a cleared enabled flag — so the cascade never fires and reaching
+	// the children is the writer's job. An override left enabled carries
+	// no recurrence rule of its own, which is exactly what the
+	// non-recurring range queries select, so the cancelled series comes
+	// back as a scatter of standalone events.
+	//
+	// Rows that are already disabled match nothing, and an event with no
+	// overrides answers zero, so this costs one statement on every
+	// delete and changes nothing outside a series.
+	//
+	// affected-rows: not-applicable — the removal being reported is the
+	// event's; findEventByID resolved it and the disable above is the write
+	// that carries it. This reaches whatever overrides name that event as
+	// their parent, and an event that is not a series has none, so zero is
+	// the ordinary count rather than something nobody found.
+	parentID := sql.NullInt32{Int32: int32(evt.id), Valid: true} //#nosec G115 -- recurrence_parent_id references calendar_events.id (INT UNSIGNED) and holds the same width
+	if _, err := calendar.New(tx.RawTx()).DisableCalendarEventOverridesByParent(ctx,
+		calendar.DisableCalendarEventOverridesByParentParams{
+			WorkspaceID:        workspaceID,
+			RecurrenceParentID: parentID,
+		}); err != nil {
+		return fmt.Errorf("itemkit: disable occurrence overrides: %w", err)
 	}
 	var taskPtr *uint32
 	if evt.taskID.Valid && evt.taskRole.Valid {

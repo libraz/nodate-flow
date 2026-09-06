@@ -109,6 +109,11 @@ type candidateRow struct {
 	recurrenceRule       []byte
 	recurrenceEnd        sql.NullTime
 	recurrenceExceptions []byte
+	// overriddenStarts are the occurrence starts an override row already
+	// stands in for, in the spelling the expander parses. Filled from a
+	// single batch read over the whole scan, so it is empty on a row with
+	// no rule and on a series nobody has edited an occurrence of.
+	overriddenStarts []string
 }
 
 // ListWorkspaces returns every enabled workspace with the data needed to
@@ -228,7 +233,14 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 		ORDER BY ce.start_at ASC
 	`
 
-	var out []EventOnDay
+	// Candidates for every arriving day are read first so the override
+	// lookup below is a single query for the whole scan rather than one per
+	// series.
+	type dayCandidate struct {
+		row candidateRow
+		day arrivingDay
+	}
+	var candidates []dayCandidate
 	for _, d := range days {
 		rows, err := s.DB.QueryContext(ctx, q, workspaceID, d.utcEnd, d.utcStart)
 		if err != nil {
@@ -243,28 +255,116 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 				_ = rows.Close()
 				return nil, fmt.Errorf("scan event row: %w", scanErr)
 			}
-			tuples, expandErr := s.expandCandidate(c, d)
-			if expandErr != nil {
-				// A single malformed rule must not abort the workspace scan.
-				// Log the bad row and keep scanning later events in the same
-				// workspace so one typo cannot permanently block the day.
-				if s.Logger != nil {
-					s.Logger.WarnContext(ctx, "calendar_event_day: expand event failed",
-						slog.Any("err", expandErr),
-						logutil.LogNumber("workspace_internal_id", workspaceID),
-						slog.String("event_public_id", c.event.PublicID.String()),
-						slog.String("event_day", d.day),
-					)
-				}
-				continue
-			}
-			out = append(out, tuples...)
+			candidates = append(candidates, dayCandidate{row: c, day: d})
 		}
 		if rowsErr := rows.Err(); rowsErr != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("iterate event rows: %w", rowsErr)
 		}
 		_ = rows.Close()
+	}
+
+	parentIDs := make([]uint32, 0, len(candidates))
+	seen := make(map[uint32]bool, len(candidates))
+	for _, c := range candidates {
+		// Only a row carrying a rule can be overridden; an override names
+		// its master, never another override.
+		if len(c.row.recurrenceRule) == 0 || seen[c.row.event.ID] {
+			continue
+		}
+		seen[c.row.event.ID] = true
+		parentIDs = append(parentIDs, c.row.event.ID)
+	}
+	overridden, err := s.listOverriddenStarts(ctx, workspaceID, parentIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []EventOnDay
+	for _, c := range candidates {
+		c.row.overriddenStarts = overridden[c.row.event.ID]
+		tuples, expandErr := s.expandCandidate(c.row, c.day)
+		if expandErr != nil {
+			// A single malformed rule must not abort the workspace scan.
+			// Log the bad row and keep scanning later events in the same
+			// workspace so one typo cannot permanently block the day.
+			if s.Logger != nil {
+				s.Logger.WarnContext(ctx, "calendar_event_day: expand event failed",
+					slog.Any("err", expandErr),
+					logutil.LogNumber("workspace_internal_id", workspaceID),
+					slog.String("event_public_id", c.row.event.PublicID.String()),
+					slog.String("event_day", c.day.day),
+				)
+			}
+			continue
+		}
+		out = append(out, tuples...)
+	}
+	return out, nil
+}
+
+// listOverriddenStarts returns, per master id, the occurrence starts a
+// live override row already stands in for, spelled as RFC 3339 UTC so the
+// expander's exception parser resolves them to the same instants it
+// generates.
+//
+// The read is deliberately unfiltered by date: an override may be moved
+// anywhere, including outside the day being scanned, and it still replaces
+// the occurrence it names. Filtering by the override's own start would let
+// the master announce a day for an occurrence that moved away.
+//
+// It is unfiltered by visibility, and must be. This scan decides whether a
+// meeting happens on a day, not what to show a person: a signal is not
+// addressed to anybody, so there is no viewer whose confidential rows to
+// withhold. Scoping the subtraction by visibility would leave the master
+// announcing a day for an occurrence that is not there, and would do it
+// exactly when the replacement is confidential — so it must read every
+// live override of these masters, whoever owns them. The viewer-scoped
+// query on the calendar read paths answers a different question and does
+// not belong here.
+func (s *Scanner) listOverriddenStarts(
+	ctx context.Context,
+	workspaceID uint32,
+	parentIDs []uint32,
+) (map[uint32][]string, error) {
+	if len(parentIDs) == 0 {
+		return nil, nil
+	}
+
+	//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from len(parentIDs); every id travels as a bound argument
+	q := `
+		SELECT ov.recurrence_parent_id, ov.recurrence_original_start
+		FROM calendar_events ov
+		WHERE ov.workspace_id = ?
+		  AND ov.enabled = TRUE
+		  AND ov.recurrence_original_start IS NOT NULL
+		  AND ov.recurrence_parent_id IN (?` + strings.Repeat(",?", len(parentIDs)-1) + `)`
+
+	args := make([]any, 0, len(parentIDs)+1)
+	args = append(args, workspaceID)
+	for _, id := range parentIDs {
+		args = append(args, id)
+	}
+
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query overridden occurrence starts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := map[uint32][]string{}
+	for rows.Next() {
+		var (
+			parentID uint32
+			start    time.Time
+		)
+		if scanErr := rows.Scan(&parentID, &start); scanErr != nil {
+			return nil, fmt.Errorf("scan overridden occurrence start: %w", scanErr)
+		}
+		out[parentID] = append(out[parentID], start.UTC().Format(time.RFC3339))
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return nil, fmt.Errorf("iterate overridden occurrence starts: %w", rowsErr)
 	}
 	return out, nil
 }
@@ -274,8 +374,8 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 // contributes exactly one tuple (its base start already passed the day
 // range filter in SQL). A recurring row contributes one tuple per
 // occurrence whose UTC start lands in the day's range; an occurrence
-// excluded by recurrence_exceptions or falling past recurrence_end / until
-// contributes none.
+// excluded by recurrence_exceptions, replaced by an override row, or
+// falling past recurrence_end / until contributes none.
 func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, error) {
 	rule, err := recurrence.ParseRule(c.recurrenceRule)
 	if err != nil {
@@ -318,12 +418,13 @@ func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, 
 
 	var out []EventOnDay
 	for _, occ := range recurrence.Expand(recurrence.Event{
-		StartAt:       c.event.StartAt.UTC(),
-		EndAt:         endAt.UTC(),
-		Timezone:      c.timezone,
-		Rule:          rule,
-		Exceptions:    exceptions,
-		RecurrenceEnd: seriesEnd,
+		StartAt:          c.event.StartAt.UTC(),
+		EndAt:            endAt.UTC(),
+		Timezone:         c.timezone,
+		Rule:             rule,
+		Exceptions:       exceptions,
+		OverriddenStarts: c.overriddenStarts,
+		RecurrenceEnd:    seriesEnd,
 	}, d.utcStart, d.utcEnd) {
 		// The expander answers "which occurrences meet this window"; a day
 		// arrives for an occurrence that *starts* in it. A meeting that

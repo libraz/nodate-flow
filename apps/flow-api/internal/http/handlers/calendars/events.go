@@ -189,6 +189,15 @@ type PatchEventInput struct {
 		// leaving them on a row that no longer has one keeps state
 		// nothing reads and the next writer has to reason about.
 		Clear []string `json:"clear,omitempty" required:"false" enum:"location,memo,url,blockLabel,recurrenceRule,recurrenceEnd,recurrenceExceptions,notificationOffset" doc:"Nullable fields to clear. Takes precedence over a value sent for the same field in this request."`
+		// Scope says which occurrences of a recurring series the patch
+		// reaches, and OccurrenceStart says which occurrence it starts
+		// from.
+		//
+		// An omitted Scope is the whole series, which is what this route
+		// has always done: a body that carries neither member patches the
+		// master and every occurrence its rule produces.
+		Scope           *string `json:"scope,omitempty" required:"false" enum:"series,occurrence,thisAndFollowing" doc:"Which occurrences of a recurring series this patch reaches. Omitted means the whole series."`
+		OccurrenceStart *int64  `json:"occurrenceStart,omitempty" required:"false" doc:"The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series; identifies the occurrence even after the edit moves it."`
 	}
 }
 
@@ -242,10 +251,24 @@ type PatchEventOutput struct {
 }
 
 // DeleteEventInput is the input for the delete event endpoint.
+//
+// Scope says which occurrences of a recurring series the delete reaches,
+// and OccurrenceStart says which occurrence it starts from. A delete
+// carries no body, so both arrive as query parameters.
+//
+// An omitted Scope is the whole series, which is what this route has
+// always done.
+//
+// OccurrenceStart has no absent value of its own: a query parameter may
+// not be a pointer, so zero stands for omitted. The instant that
+// displaces is 1970-01-01T00:00:00Z, which is not an occurrence any
+// series reachable through this API produces.
 type DeleteEventInput struct {
-	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	CalID string `path:"calId" doc:"Calendar public ID"`
-	EvtID string `path:"evtId" doc:"Event public ID"`
+	WsID            string `path:"wsId" doc:"Workspace public ID"`
+	CalID           string `path:"calId" doc:"Calendar public ID"`
+	EvtID           string `path:"evtId" doc:"Event public ID"`
+	Scope           string `query:"scope" required:"false" enum:"series,occurrence,thisAndFollowing" doc:"Which occurrences of a recurring series this delete reaches. Omitted means the whole series."`
+	OccurrenceStart int64  `query:"occurrenceStart" required:"false" doc:"The occurrence's start under the series rule, as unix seconds (UTC). Required when scope is not series."`
 }
 
 // DeleteEventOutput is the response for the delete event endpoint.
@@ -666,6 +689,60 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			}
 		}
 
+		scope, err := decodeOccurrenceScope(input.Body.Scope)
+		if err != nil {
+			return nil, err
+		}
+		// The parent link is read only when its answer can change the
+		// outcome. A series-scoped patch that leaves the recurrence
+		// columns alone reaches no refusal that depends on it, and asking
+		// anyway would put a query on the common path for a question it
+		// never has.
+		var parentID sql.NullInt32
+		if scope != scopeSeries || patchTouchesRecurrenceFields(input) {
+			link, linkErr := deps.CalendarQueries.FindCalendarEventRecurrenceLink(ctx, calendar.FindCalendarEventRecurrenceLinkParams{
+				WorkspaceID: wsID,
+				PublicID:    evt.PublicID,
+			})
+			if linkErr != nil {
+				return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
+			parentID = link.RecurrenceParentID
+		}
+		if err := requireOccurrenceScope(scope, input, evt, parentID); err != nil {
+			return nil, err
+		}
+
+		if scope != scopeSeries {
+			// The rule a "this and following" edit carries into the
+			// continuing series is checked before any write, so a
+			// malformed one is a validation error rather than a series
+			// truncated for a remainder that could not be created.
+			if spec := validateRecurrenceRule(input.Body.RecurrenceRule); spec != nil {
+				return nil, httpErr(spec)
+			}
+			if spec := validateRecurrenceExceptions(input.Body.RecurrenceExceptions); spec != nil {
+				return nil, httpErr(spec)
+			}
+
+			originalStart := handlerutil.UnixToTime(*input.Body.OccurrenceStart)
+			var written calendar.FindCalendarEventByPublicIdRow
+			var scopeErr error
+			if scope == scopeOccurrence {
+				written, scopeErr = patchEventOccurrence(ctx, deps, wsID, actorID, cal, evt, input, originalStart)
+			} else {
+				written, scopeErr = patchEventFollowing(ctx, deps, wsID, actorID, cal, evt, input, originalStart)
+			}
+			if scopeErr != nil {
+				return nil, scopeErr
+			}
+
+			out := &PatchEventOutput{}
+			out.Body = eventFromFullRow(written)
+			recordOccurrencePatch(ctx, deps, wsID, actorID, input, scope, written, cal.ID)
+			return out, nil
+		}
+
 		isLinked := evt.TaskID.Valid
 		titleChanged := input.Body.Title != nil && *input.Body.Title != evt.Title
 		timeChanged := input.Body.StartAt != nil // pair invariant guarantees EndAt also set
@@ -937,6 +1014,15 @@ func translateItemkitError(ctx context.Context, op string, err error) error {
 // Delegates to itemkit.DeleteEvent which clears the corresponding
 // tasks.due_on column when the event was task-linked
 // (task_role = 'due'), leaving the task itself intact.
+//
+// A non-series scope deletes part of a recurring series instead: the
+// master survives and the occurrences named stop being produced. Those
+// paths patch recurrence_exceptions or recurrence_end and leave every
+// other column to COALESCE, so the route carries no window and no
+// all-day flag of its own:
+//
+// calendar-precondition: chronology not-applicable — this route sends no start and no end, so it has no window to order
+// calendar-precondition: all-day-bounds not-applicable — this route sends no all-day flag and no window, so it has no bounds to pin
 func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEventOutput, error) {
 	return func(ctx context.Context, input *DeleteEventInput) (*DeleteEventOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
@@ -974,6 +1060,49 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		}
 		if !canEditEvent(actorID, evt, sub, attendee) {
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
+		}
+
+		scope, scopeErr := decodeOccurrenceScope(&input.Scope)
+		if scopeErr != nil {
+			// The scope arrives in the query string here, so the refusal
+			// names the parameter the caller actually sent.
+			return nil, invalidQueryField("scope")
+		}
+		// The parent link is read only when its answer can change the
+		// outcome. A series delete reaches no refusal that depends on it,
+		// and asking anyway would put a query on the common path for a
+		// question it never has.
+		var parentID sql.NullInt32
+		if scope != scopeSeries {
+			link, linkErr := deps.CalendarQueries.FindCalendarEventRecurrenceLink(ctx, calendar.FindCalendarEventRecurrenceLinkParams{
+				WorkspaceID: wsID,
+				PublicID:    evt.PublicID,
+			})
+			if linkErr != nil {
+				return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
+			parentID = link.RecurrenceParentID
+		}
+		if err := requireDeleteOccurrenceScope(scope, input.OccurrenceStart, evt, parentID); err != nil {
+			return nil, err
+		}
+
+		if scope != scopeSeries {
+			occurrenceStart := handlerutil.UnixToTime(input.OccurrenceStart)
+			var partErr error
+			if scope == scopeOccurrence {
+				partErr = deleteEventOccurrence(ctx, deps, wsID, cal, evt, occurrenceStart)
+			} else {
+				partErr = deleteEventFollowing(ctx, deps, wsID, actorID, cal, evt, occurrenceStart)
+			}
+			if partErr != nil {
+				return nil, partErr
+			}
+			recordOccurrenceDelete(ctx, deps, wsID, actorID, input, scope, evt, cal.ID)
+
+			out := &DeleteEventOutput{}
+			out.Body.Deleted = true
+			return out, nil
 		}
 
 		var answered error

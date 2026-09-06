@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -254,6 +255,9 @@ const reminderWindow = 24 * time.Hour
 // surfaces use. Reading only the master row is what made "every Monday,
 // 15 minutes before" fire once and go quiet for a year.
 //
+// An occurrence a separate override row replaces is left to that row: the
+// master must not also fire at the start the occurrence no longer has.
+//
 // Times are compared in UTC in Go rather than against NOW() in SQL. The
 // stored values are UTC wall clocks, and NOW() answers in the server's
 // session timezone, so on a deployment whose MySQL is not UTC the two
@@ -280,19 +284,20 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 	}
 	defer rows.Close()
 
-	var out []pendingNotification
+	// Every candidate is read before any is expanded, so the overridden
+	// starts below cost one query for the whole tick rather than one per
+	// series.
+	var candidates []reminderCandidate
 	for rows.Next() {
 		var (
-			n           pendingNotification
-			timezone    string
-			ruleRaw     []byte
-			seriesEnd   sql.NullTime
-			exceptions  []byte
-			claimedRows []pendingNotification
+			c          reminderCandidate
+			ruleRaw    []byte
+			seriesEnd  sql.NullTime
+			exceptions []byte
 		)
 		if err := rows.Scan(
-			&n.ID, &n.PublicID, &n.Title, &n.StartAt, &n.NotificationOffset,
-			&n.OwnerUserID, &n.WorkspaceID, &timezone,
+			&c.n.ID, &c.n.PublicID, &c.n.Title, &c.n.StartAt, &c.n.NotificationOffset,
+			&c.n.OwnerUserID, &c.n.WorkspaceID, &c.timezone,
 			&ruleRaw, &seriesEnd, &exceptions,
 		); err != nil {
 			return nil, err
@@ -301,37 +306,161 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 		rule, perr := recurrence.ParseRule(ruleRaw)
 		if perr != nil {
 			schedLog().Error("notification scheduler: unparseable recurrence rule; skipping",
-				"eventId", n.PublicID.String(), "err", perr)
+				"eventId", c.n.PublicID.String(), "err", perr)
 			continue
 		}
-		if rule == nil {
-			if occ, ok := dueOccurrence(n, n.StartAt, now); ok {
+		c.rule = rule
+		c.exceptions = recurrence.ParseExceptions(exceptions)
+		if seriesEnd.Valid {
+			end := seriesEnd.Time
+			c.seriesEnd = &end
+		}
+		candidates = append(candidates, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	overridden, err := overriddenReminderStarts(ctx, db, candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []pendingNotification
+	for _, c := range candidates {
+		var claimedRows []pendingNotification
+		if c.rule == nil {
+			if occ, ok := dueOccurrence(c.n, c.n.StartAt, now); ok {
 				claimedRows = append(claimedRows, occ)
 			}
 			out = append(out, claimedRows...)
 			continue
 		}
 
-		var end *time.Time
-		if seriesEnd.Valid {
-			end = &seriesEnd.Time
-		}
 		// Expand a little past the horizon so an occurrence whose
 		// reminder is due now but whose start is beyond it is still
 		// found; dueOccurrence applies the exact bounds.
 		for _, inst := range recurrence.Expand(recurrence.Event{
-			StartAt:       n.StartAt,
-			EndAt:         n.StartAt,
-			Timezone:      timezone,
-			Rule:          rule,
-			Exceptions:    recurrence.ParseExceptions(exceptions),
-			RecurrenceEnd: end,
+			StartAt:          c.n.StartAt,
+			EndAt:            c.n.StartAt,
+			Timezone:         c.timezone,
+			Rule:             c.rule,
+			Exceptions:       c.exceptions,
+			OverriddenStarts: overridden[overrideKey{workspaceID: c.n.WorkspaceID, parentID: c.n.ID}],
+			RecurrenceEnd:    c.seriesEnd,
 		}, now, horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute)) {
-			if occ, ok := dueOccurrence(n, inst.StartAt, now); ok {
+			if occ, ok := dueOccurrence(c.n, inst.StartAt, now); ok {
 				claimedRows = append(claimedRows, occ)
 			}
 		}
 		out = append(out, claimedRows...)
+	}
+	return out, nil
+}
+
+// reminderCandidate is one scanned calendar_events row after its
+// recurrence columns are decoded and before it is expanded into the
+// occurrences whose reminders are due.
+type reminderCandidate struct {
+	n          pendingNotification
+	timezone   string
+	rule       *recurrence.Rule
+	exceptions []string
+	seriesEnd  *time.Time
+}
+
+// overrideKey names one master row. The scan spans every workspace, so
+// the workspace id stays part of the key and part of the predicate rather
+// than being left to the parent id alone.
+type overrideKey struct {
+	workspaceID uint32
+	parentID    uint32
+}
+
+// overriddenReminderStarts returns, per master row, the occurrence starts
+// a live override already stands in for, spelled as RFC 3339 UTC so the
+// expander's exception parser resolves them to the instants it generates.
+//
+// The read is not filtered by date: an override may be moved anywhere,
+// including past the reminder horizon, and it still replaces the
+// occurrence it names. A range predicate would let the master fire a
+// reminder for an occurrence that moved away.
+//
+// Nor is it filtered by visibility, and must not be. This read decides
+// whether a meeting happens at an instant, not what to show a person: the
+// recipients are the event's attendees plus its owner, a set, so there is
+// no viewer to scope to. Withholding a confidential override would leave
+// the master firing a reminder at a time nothing is happening, and would
+// do it exactly when the replacement is confidential — so it must read
+// every live override of these masters, whoever owns them. The reminder is
+// not lost: an override carries its own start_at and notification_offset
+// with no rule of its own, so the same scan picks it up through the
+// non-recurring branch and fires at the moved time. The viewer-scoped
+// query on the calendar read paths answers a different question and does
+// not belong here.
+func overriddenReminderStarts(
+	ctx context.Context,
+	db *sql.DB,
+	candidates []reminderCandidate,
+) (map[overrideKey][]string, error) {
+	var (
+		workspaceIDs []any
+		parentIDs    []any
+	)
+	seen := map[overrideKey]bool{}
+	for _, c := range candidates {
+		// Only a row carrying a rule can be overridden; an override names
+		// its master, never another override.
+		if c.rule == nil {
+			continue
+		}
+		key := overrideKey{workspaceID: c.n.WorkspaceID, parentID: c.n.ID}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		workspaceIDs = append(workspaceIDs, key.workspaceID)
+		parentIDs = append(parentIDs, key.parentID)
+	}
+	if len(parentIDs) == 0 {
+		return nil, nil
+	}
+
+	//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from the id slices; every id travels as a bound argument
+	q := `
+		SELECT ov.workspace_id, ov.recurrence_parent_id, ov.recurrence_original_start
+		FROM calendar_events ov
+		WHERE ov.enabled = TRUE
+		  AND ov.recurrence_original_start IS NOT NULL
+		  AND ov.workspace_id IN (?` + strings.Repeat(",?", len(workspaceIDs)-1) + `)
+		  AND ov.recurrence_parent_id IN (?` + strings.Repeat(",?", len(parentIDs)-1) + `)`
+
+	args := make([]any, 0, len(workspaceIDs)+len(parentIDs))
+	args = append(args, workspaceIDs...)
+	args = append(args, parentIDs...)
+
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := map[overrideKey][]string{}
+	for rows.Next() {
+		var (
+			key   overrideKey
+			start time.Time
+		)
+		if err := rows.Scan(&key.workspaceID, &key.parentID, &start); err != nil {
+			return nil, err
+		}
+		// The two IN lists are independent, so a row may pair a scanned
+		// workspace with another workspace's master. Keeping only pairs
+		// the scan actually produced makes the scoping exact.
+		if !seen[key] {
+			continue
+		}
+		out[key] = append(out[key], start.UTC().Format(time.RFC3339))
 	}
 	return out, rows.Err()
 }

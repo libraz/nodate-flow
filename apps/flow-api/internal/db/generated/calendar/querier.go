@@ -155,6 +155,23 @@ type Querier interface {
 	// queries select — the deleted series would reappear as a scatter of
 	// standalone events. This statement is how the delete reaches them.
 	DisableCalendarEventOverridesByParent(ctx context.Context, arg DisableCalendarEventOverridesByParentParams) (int64, error)
+	// Withdraw the overrides at or after a split point when nothing continues
+	// past it. A "this and following" delete truncates the master, and an
+	// override whose recurrence_original_start is at or after the split stands
+	// in for an occurrence the master no longer produces — left enabled it has
+	// no rule of its own and surfaces in the non-recurring range queries as a
+	// standalone event.
+	//
+	// The range bound is the whole statement. Overrides before the split replace
+	// occurrences the truncated master still produces and stay untouched, so
+	// DisableCalendarEventOverridesByParent cannot serve here: it reaches the
+	// whole series and would withdraw occurrences the truncation left valid.
+	//
+	// Unlike ReparentCalendarEventOverridesFromStart, this is confined to
+	// enabled rows. Reparenting has to carry soft-deleted overrides so a revived
+	// one still names a master that can produce it, while withdrawing a row that
+	// is already withdrawn changes nothing and must not be counted.
+	DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error)
 	// Revoke a membership. The row survives so the grant history stays
 	// readable and so a later re-add updates it in place.
 	DisableCalendarMember(ctx context.Context, arg DisableCalendarMemberParams) (sql.Result, error)
@@ -214,11 +231,35 @@ type Querier interface {
 	// occurrence that was overridden, reverted to the series, and then edited
 	// again must revive the row this returns, because inserting a second one
 	// would collide.
+	//
+	// The projection carries every column UpdateCalendarEventOverride writes,
+	// because this row is the occurrence. A caller sending a partial edit has to
+	// fill the fields it did not send from here rather than from the series: the
+	// override exists precisely where the occurrence differs from the master, so
+	// reading a default off the master returns the occurrence to the values the
+	// override was created to leave behind.
 	FindCalendarEventOverride(ctx context.Context, arg FindCalendarEventOverrideParams) (FindCalendarEventOverrideRow, error)
 	// ListAllCalendarEvents was consumed only by the deleted ICS export path;
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
+	// Where one event row sits in a series. The three columns separate the three
+	// shapes a row can have: recurrence_parent_id set means the row is an
+	// override and recurrence_original_start names the occurrence it replaces,
+	// recurrence_rule set means the row is a master, and neither set means an
+	// ordinary event. A row can never be both — an override owns no rule.
+	//
+	// A row with no rule yields the JSON literal null rather than SQL NULL, so a
+	// caller decides "is this a master" by testing for that literal and not by
+	// testing that the column is non-empty.
+	//
+	// The distinction has to be read before writing, because the projection
+	// guard trigger inspects only the row being written and never follows the
+	// parent link: a rule on an override and an override of an override are both
+	// invisible to it, so nothing below this statement can refuse them.
+	//
+	// recurrence_parent_id is an internal id and must not reach an API response.
+	FindCalendarEventRecurrenceLink(ctx context.Context, arg FindCalendarEventRecurrenceLinkParams) (FindCalendarEventRecurrenceLinkRow, error)
 	// Resolve one user's access to a calendar. This is the query every
 	// calendar authorization check runs through; sql.ErrNoRows means no
 	// access, which callers map to a 404 rather than a 403 so the existence
@@ -299,8 +340,23 @@ type Querier interface {
 	// would let the master re-emit the occurrence that was moved away, which is
 	// the duplicate this read exists to prevent.
 	//
+	// Scoped instead to the overrides this viewer can see, on the same row
+	// filter the range queries carry. An override is an ordinary row with its
+	// own visibility, so one the viewer may not know about is not served to them
+	// by any other read either: subtracting its original start would suppress
+	// the master's occurrence while the replacement stayed hidden, and the
+	// meeting would leave that viewer's calendar entirely. An occurrence whose
+	// replacement is invisible to the viewer therefore keeps showing at its
+	// original time.
+	//
 	// Both columns are internal: this result is joined against masters the
 	// caller already holds and never reaches an API response.
+	//
+	// detail-visibility: not-applicable — no title, location, memo or url is selected for attendance to unlock.
+	// The detail rule governs those fields alone, so is_attendee would be a
+	// column on the generated row that no mapper could read. The row filter
+	// above is a separate matter and stays: a confidential occurrence must not
+	// be subtracted from a master the viewer can see.
 	//
 	// The LIMIT is a runaway bound, not a page size. Truncation here would
 	// resurrect duplicates, so it sits far above the number of overrides a
@@ -386,6 +442,12 @@ type Querier interface {
 	ListPublicShares(ctx context.Context, workspaceID uint32) ([]ListPublicSharesRow, error)
 	// Cross-calendar query: list recurring events across multiple calendars
 	// whose recurrence window overlaps the query range.
+	//
+	// ce.id is selected so a master can be grouped against reads keyed on the
+	// internal id, which is the only identifier those results carry; resolving
+	// it per master would be one round trip each. It is an internal surrogate
+	// key and must not reach an API response — sqlc tags it json:"-" via the
+	// *.id override.
 	ListRecurringCalendarEventsAcrossCalendars(ctx context.Context, arg ListRecurringCalendarEventsAcrossCalendarsParams) ([]ListRecurringCalendarEventsAcrossCalendarsRow, error)
 	// List recurring events whose recurrence window overlaps the query range.
 	ListRecurringCalendarEventsByRange(ctx context.Context, arg ListRecurringCalendarEventsByRangeParams) ([]ListRecurringCalendarEventsByRangeRow, error)
