@@ -65,9 +65,73 @@ describe('KIND_GROUPS', () => {
     expect(allChips.map((c) => c.key)).not.toContain('comment.added');
   });
 
-  it('offers a chip for the one calendar kind the scheduler emits', () => {
+  it('covers the calendar vocabulary the backend emits, not only the reminder', () => {
+    const byKey = Object.fromEntries(
+      KIND_GROUPS.map((g) => [g.key, g.chips.flatMap((c) => [...c.kinds])]),
+    );
+    expect(byKey.calendar).toEqual([
+      'calendar.created',
+      'calendar.updated',
+      'calendar.deleted',
+      'calendar.subscribed',
+      'calendar.subscription.updated',
+      'calendar.reminder',
+    ]);
+    expect(byKey.calendar_member).toEqual([
+      'calendar.member.added',
+      'calendar.member.removed',
+      'calendar.member.role_changed',
+    ]);
+    expect(byKey.calendar_event).toEqual([
+      'calendar.event.created',
+      'calendar.event.updated',
+      'calendar.event.deleted',
+    ]);
+    expect(byKey.calendar_event_content).toEqual([
+      'calendar.event.comment.created',
+      'calendar.event.comment.updated',
+      'calendar.event.comment.deleted',
+      'calendar.event.checklist.created',
+      'calendar.event.checklist.updated',
+      'calendar.event.checklist.deleted',
+      'calendar.event.attachment.created',
+      'calendar.event.attachment.deleted',
+    ]);
+    expect(byKey.calendar_attendee).toEqual([
+      'calendar.event.attendee.added',
+      'calendar.event.attendee.removed',
+      'calendar.event.rsvp.updated',
+      'calendar.event.invite.created',
+      'calendar.event.invite.rotated',
+      'calendar.event.invite.revoked',
+    ]);
+    expect(byKey.calendar_memo).toEqual([
+      'calendar.memo.created',
+      'calendar.memo.updated',
+      'calendar.memo.deleted',
+    ]);
+  });
+
+  it('keeps the scheduler reminder selectable where it has always been', () => {
     const calendar = KIND_GROUPS.find((g) => g.key === 'calendar');
-    expect(calendar?.chips.flatMap((c) => [...c.kinds])).toEqual(['calendar.reminder']);
+    expect(calendar?.chips.map((c) => c.key)).toContain('calendar.reminder');
+  });
+
+  it('gives a public share a group of its own, apart from the calendar', () => {
+    const share = KIND_GROUPS.find((g) => g.key === 'public_share');
+    expect(share?.chips.flatMap((c) => [...c.kinds])).toEqual([
+      'public_share.created',
+      'public_share.updated',
+      'public_share.rotated',
+      'public_share.deleted',
+      'public_share.events_attached',
+      'public_share.events_reordered',
+      'public_share.event_detached',
+    ]);
+  });
+
+  it('offers no chip for the memo kind no handler emits', () => {
+    expect(allKinds).not.toContain('calendar.memo.completed');
   });
 
   it('splits the AI vocabulary by the question a reader is asking', () => {

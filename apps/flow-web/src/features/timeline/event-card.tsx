@@ -111,11 +111,25 @@ export function eventSourceTag(
   // the opposite call and offers no project chip, because a chip is a
   // promise of rows the backend can actually return.
   if (type.startsWith('project.')) return { label: 'project', color: SOURCE_COLOR.task };
-  // `calendar.reminder` reaches the grey `system` tag on purpose. The
-  // scheduler emits it on a tick with no person and no model behind it,
-  // so neither the human lane nor the AI lane describes it, and a lane
-  // of its own for one kind would blur the source coding the rest of
-  // this function exists to keep sharp.
+  // `calendar.reminder` is the one kind in its namespace with nobody
+  // behind it: the scheduler emits it on a tick, so neither the human
+  // lane nor the AI lane describes it and it keeps the grey `system`
+  // tag. It is matched exactly, ahead of the family branch below, so
+  // that adding calendar kinds never quietly drags the reminder into
+  // the human lane.
+  if (type === 'calendar.reminder') {
+    return { label: 'system', color: 'var(--nf-color-fg-muted)' };
+  }
+  // Everything else under `calendar.` — the calendar itself, its
+  // members, its events and the comments, checklists, attachments and
+  // attendees hanging off them — is a person working in the product,
+  // the same as the branches above.
+  if (type.startsWith('calendar.')) return { label: 'calendar', color: SOURCE_COLOR.task };
+  // A public share carries its own label rather than riding the
+  // calendar one: these rows record what a person exposed outside the
+  // workspace, which is the row a reader auditing the feed is looking
+  // for, and a shared label would bury it among ordinary edits.
+  if (type.startsWith('public_share.')) return { label: 'share', color: SOURCE_COLOR.task };
   return { label: 'system', color: 'var(--nf-color-fg-muted)' };
 }
 

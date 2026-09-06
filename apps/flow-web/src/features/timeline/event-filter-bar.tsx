@@ -104,14 +104,98 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
     ],
   },
   {
-    // The only calendar kind the backend actually emits: the reminder
-    // the scheduler appends when a calendar event comes due. The rest of
-    // the `calendar.*` vocabulary is declared but unemitted, so it gets
-    // no chip under the rule above. The group is named for the domain
-    // rather than for the reminder so the rest of the family can join
-    // this section once it has a producer, without moving the chip.
+    // The calendar itself: created, renamed, removed, and the
+    // subscription rows that record how one reader chose to see it.
+    // `calendar.reminder` stays in this group — the scheduler appends
+    // it when an occurrence comes due, and it was here before the rest
+    // of the family arrived.
     key: 'calendar',
-    chips: [chip('calendar.reminder')],
+    chips: [
+      chip('calendar.created'),
+      chip('calendar.updated'),
+      chip('calendar.deleted'),
+      chip('calendar.subscribed'),
+      chip('calendar.subscription.updated'),
+      chip('calendar.reminder'),
+    ],
+  },
+  {
+    // Who is on a calendar. A third membership group beside `member`
+    // (who is on a task) and `workspace` (who is in the workspace),
+    // for the same reason those two are apart: the three answer
+    // different questions about different subjects.
+    key: 'calendar_member',
+    chips: [
+      chip('calendar.member.added'),
+      chip('calendar.member.removed'),
+      chip('calendar.member.role_changed'),
+    ],
+  },
+  {
+    // The events themselves, kept clear of the details that hang off
+    // them so "what got scheduled or moved?" stays a one-group answer.
+    key: 'calendar_event',
+    chips: [
+      chip('calendar.event.created'),
+      chip('calendar.event.updated'),
+      chip('calendar.event.deleted'),
+    ],
+  },
+  {
+    // What was written onto an event. These share the calendar.event.*
+    // namespace with the lifecycle group above but are content edits,
+    // and they outnumber the lifecycle kinds badly enough that folding
+    // them together would hide the create/update/delete rows.
+    key: 'calendar_event_content',
+    chips: [
+      chip('calendar.event.comment.created'),
+      chip('calendar.event.comment.updated'),
+      chip('calendar.event.comment.deleted'),
+      chip('calendar.event.checklist.created'),
+      chip('calendar.event.checklist.updated'),
+      chip('calendar.event.checklist.deleted'),
+      chip('calendar.event.attachment.created'),
+      chip('calendar.event.attachment.deleted'),
+    ],
+  },
+  {
+    // Who is coming, and how they were asked. Invites sit with the
+    // attendees rather than with the share group: an invite link admits
+    // someone to one event, it does not publish anything.
+    key: 'calendar_attendee',
+    chips: [
+      chip('calendar.event.attendee.added'),
+      chip('calendar.event.attendee.removed'),
+      chip('calendar.event.rsvp.updated'),
+      chip('calendar.event.invite.created'),
+      chip('calendar.event.invite.rotated'),
+      chip('calendar.event.invite.revoked'),
+    ],
+  },
+  {
+    // `calendar.memo.completed` is declared and carries a label, but no
+    // handler emits it, so it gets no chip under the rule above.
+    key: 'calendar_memo',
+    chips: [
+      chip('calendar.memo.created'),
+      chip('calendar.memo.updated'),
+      chip('calendar.memo.deleted'),
+    ],
+  },
+  {
+    // Its own group rather than a section of `calendar`: every kind
+    // here changes what is readable outside the workspace, which is the
+    // question someone auditing the feed opens the filter to ask.
+    key: 'public_share',
+    chips: [
+      chip('public_share.created'),
+      chip('public_share.updated'),
+      chip('public_share.rotated'),
+      chip('public_share.deleted'),
+      chip('public_share.events_attached'),
+      chip('public_share.events_reordered'),
+      chip('public_share.event_detached'),
+    ],
   },
   {
     // The AI vocabulary splits three ways by what a reader is asking.

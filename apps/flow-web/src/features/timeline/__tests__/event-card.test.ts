@@ -154,6 +154,41 @@ describe('eventSourceTag', () => {
       });
     });
 
+    it('tags a calendar event a person edited as a calendar event', () => {
+      expect(eventSourceTag('calendar.event.updated', { calendarEventId: 'e1' })).toEqual({
+        label: 'calendar',
+        color: SOURCE_COLOR.task,
+      });
+    });
+
+    it('tags the whole calendar family, not just the event lifecycle', () => {
+      const tags = [
+        'calendar.created',
+        'calendar.member.added',
+        'calendar.event.created',
+        'calendar.event.comment.created',
+        'calendar.event.attendee.added',
+        'calendar.memo.created',
+      ].map((type) => eventSourceTag(type));
+      expect(tags).toEqual(tags.map(() => ({ label: 'calendar', color: SOURCE_COLOR.task })));
+    });
+
+    it('gives a public share its own label, so what was published stands out', () => {
+      expect(eventSourceTag('public_share.created')).toEqual({
+        label: 'share',
+        color: SOURCE_COLOR.task,
+      });
+    });
+
+    it('tags every public-share change, not only the share itself', () => {
+      const tags = [
+        'public_share.events_attached',
+        'public_share.event_detached',
+        'public_share.rotated',
+      ].map((type) => eventSourceTag(type));
+      expect(tags).toEqual(tags.map(() => ({ label: 'share', color: SOURCE_COLOR.task })));
+    });
+
     it('keeps every human-lane prefix on one color so only the label differs', () => {
       const colors = [
         'task.created',
@@ -162,6 +197,8 @@ describe('eventSourceTag', () => {
         'page.updated',
         'project.created',
         'workspace.member.added',
+        'calendar.event.created',
+        'public_share.created',
       ].map((type) => eventSourceTag(type).color);
       expect(new Set(colors)).toEqual(new Set([SOURCE_COLOR.task]));
     });
@@ -173,6 +210,12 @@ describe('eventSourceTag', () => {
         label: 'system',
         color: SYSTEM_COLOR,
       });
+    });
+
+    it('does not sweep the reminder into the human lane along with its namesakes', () => {
+      expect(eventSourceTag('calendar.reminder').label).not.toBe(
+        eventSourceTag('calendar.event.created').label,
+      );
     });
   });
 
