@@ -61,11 +61,13 @@ import {
   useDefaultCalendarId,
   useDeleteEvent,
   useEventDetailQuery,
+  useRefreshCalendar,
   useUpdateEvent,
 } from './api';
 import AttendeesSection from './attendees-section';
 import CreatorChip from './creator-chip';
 import styles from './event-dialog.module.css';
+import { useSlowPending } from './lib/use-slow-pending';
 import RecurringScopeDialog from './recurring-scope-dialog';
 
 type FlowProject = components['schemas']['Project'];
@@ -883,6 +885,23 @@ export default function EventDialog({
 
   const isPending =
     createEvent.isPending || updateEvent.isPending || deleteEvent.isPending || createTask.isPending;
+  const slow = useSlowPending(isPending);
+  const refreshCalendar = useRefreshCalendar();
+
+  /**
+   * Leave while a write is still running.
+   *
+   * The request cannot be recalled, so this is not an undo — it is the
+   * exit, and what it owes the user is a grid that is not stale by
+   * construction. The mutation's own success handler re-reads too, when
+   * and if it finishes; this one covers the window in between, where the
+   * outcome is genuinely unknown.
+   */
+  function abandonPendingWrite(): void {
+    setScopePrompt(null);
+    refreshCalendar();
+    onClose();
+  }
 
   /* ── derived labels ─── */
 
@@ -1204,7 +1223,15 @@ export default function EventDialog({
   }
 
   async function handleClose(): Promise<void> {
-    if (isPending) return;
+    // A write in flight used to make this a no-op, which meant the only
+    // way out of the dialog was for the server to answer — and on a dead
+    // connection it never does. Leaving is allowed; the discard prompt is
+    // not raised, because the edits are not being discarded, they are on
+    // their way to the server.
+    if (isPending) {
+      abandonPendingWrite();
+      return;
+    }
     if (isDirty()) {
       const confirmed = await confirmAction({
         message: t('dialog.discard_unsaved'),
@@ -1700,19 +1727,35 @@ export default function EventDialog({
                 {t('action.delete')}
               </Button>
             ) : null}
+            {/*
+             * Same contract as the scope step: a wait long enough to
+             * look like a freeze gets said out loud — but only by the
+             * dialog on top. Both overlays portal into the same host,
+             * which the overlay lock deliberately leaves reachable, so
+             * two live regions on one pending write would announce the
+             * same news twice to a screen reader while only one of them
+             * is visible.
+             */}
+            {slow && scopePrompt === null ? (
+              <p className={styles.pendingNotice} role="status" aria-live="polite">
+                {t('action.submit.slow')}
+              </p>
+            ) : null}
             <div className={styles.footerActions}>
+              {/* Stays live while a write runs — see {@link handleClose}. */}
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => {
                   void handleClose();
                 }}
-                disabled={isPending}
               >
                 {t('action.cancel')}
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
+              <Button type="submit" disabled={isPending} aria-busy={isPending || undefined}>
+                {isPending
+                  ? t(isCreate ? 'action.submit.creating' : 'action.submit.saving')
+                  : t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
               </Button>
             </div>
           </div>
@@ -1731,7 +1774,13 @@ export default function EventDialog({
           action={scopePrompt.action}
           pending={isPending}
           onCancel={() => {
-            setScopePrompt(null);
+            // Before the write goes out, cancelling means "not yet":
+            // back to the form with the edit intact. After it has gone,
+            // the question can no longer be re-answered, so returning to
+            // a form that still offers to save would be a lie — the
+            // whole stack closes and the grid is re-read.
+            if (isPending) abandonPendingWrite();
+            else setScopePrompt(null);
           }}
           onConfirm={(scope) => {
             const scoped = { scope, occurrenceStart: scopePrompt.occurrenceStart };

@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   deleteEvent: vi.fn(),
   createTask: vi.fn(),
   rememberCalendarChoice: vi.fn(),
+  refreshCalendar: vi.fn(),
   toastShow: vi.fn(),
   eventDetail: vi.fn(),
   confirmAction: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock('../api', () => ({
   }),
   useDefaultCalendarId: () => 'cal-1',
   rememberCalendarChoice: mocks.rememberCalendarChoice,
+  useRefreshCalendar: () => mocks.refreshCalendar,
   useCreateEvent: () => ({ mutateAsync: mocks.createEvent, isPending: false }),
   useUpdateEvent: () => ({ mutateAsync: mocks.updateEvent, isPending: false }),
   useDeleteEvent: () => ({ mutateAsync: mocks.deleteEvent, isPending: false }),
@@ -231,6 +233,7 @@ beforeEach(() => {
   mocks.deleteEvent.mockReset().mockResolvedValue(undefined);
   mocks.createTask.mockReset().mockResolvedValue({ id: 'task-new' });
   mocks.rememberCalendarChoice.mockReset();
+  mocks.refreshCalendar.mockReset();
   mocks.toastShow.mockReset();
   mocks.confirmAction.mockReset().mockResolvedValue(true);
   // Create mode never fetches; edit-mode tests opt in via `withDetail`.

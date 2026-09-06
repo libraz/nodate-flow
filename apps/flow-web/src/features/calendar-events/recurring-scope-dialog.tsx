@@ -17,6 +17,13 @@
  * Each option states what it does to the series rather than only naming
  * itself, because "All events" alone does not say that occurrences
  * already in the past go with it.
+ *
+ * While the write it released is in flight the confirm is locked, so the
+ * question cannot be answered twice — but cancel is not. Taking away the
+ * exit at the moment the app stops responding is what turns a slow
+ * request into a trap, and no request here is bounded: neither the SDK
+ * client nor the requester sets a timeout or an `AbortSignal`, so "in
+ * flight" has no end the UI can rely on.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -25,6 +32,7 @@ import Radio from '@nodate-flow/ui/primitives/radio';
 import { type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RecurrenceScope } from './api';
+import { useSlowPending } from './lib/use-slow-pending';
 import styles from './recurring-scope-dialog.module.css';
 
 /** Which commit the choice is being asked for. */
@@ -63,13 +71,20 @@ const ACTION_KEYS = {
     title: 'recurrence.scope.save.title',
     legend: 'recurrence.scope.save.legend',
     confirm: 'recurrence.scope.save.confirm',
+    pending: 'recurrence.scope.save.pending',
+    slow: 'recurrence.scope.save.slow',
   },
   delete: {
     title: 'recurrence.scope.delete.title',
     legend: 'recurrence.scope.delete.legend',
     confirm: 'recurrence.scope.delete.confirm',
+    pending: 'recurrence.scope.delete.pending',
+    slow: 'recurrence.scope.delete.slow',
   },
-} as const satisfies Record<RecurringScopeAction, Record<'title' | 'legend' | 'confirm', string>>;
+} as const satisfies Record<
+  RecurringScopeAction,
+  Record<'title' | 'legend' | 'confirm' | 'pending' | 'slow', string>
+>;
 
 export interface RecurringScopeDialogProps {
   /** Whether the choice is being asked. */
@@ -78,7 +93,14 @@ export interface RecurringScopeDialogProps {
   action: RecurringScopeAction;
   /** True while the write this choice releases is in flight. */
   pending: boolean;
-  /** Dismiss without acting — Escape, the overlay, or the cancel button. */
+  /**
+   * Dismiss — Escape, the overlay, or the cancel button.
+   *
+   * Reachable while {@link pending}, where it means "let me out", not
+   * "undo": the request is already gone and the client cannot recall it.
+   * The owner decides what to do about that; it is the one that knows
+   * whether anything has to be re-read.
+   */
   onCancel: () => void;
   /** Commit with the chosen scope. */
   onConfirm: (scope: RecurrenceScope) => void;
@@ -96,6 +118,7 @@ export default function RecurringScopeDialog({
   // Defaults to the single occurrence: the option that changes the least
   // is the one a mis-click can afford.
   const [scope, setScope] = useState<RecurrenceScope>('occurrence');
+  const slow = useSlowPending(pending);
 
   return (
     <Dialog open={open} onClose={onCancel} title={t(ACTION_KEYS[action].title)} size="sm">
@@ -140,19 +163,39 @@ export default function RecurringScopeDialog({
           })}
         </fieldset>
 
+        {/*
+         * Mounted only once the wait is long enough to be worth
+         * explaining, so the region is empty until there is news and the
+         * announcement is the sentence itself rather than a layout that
+         * was always there. Polite: it interrupts nothing, and the user
+         * is not being asked to do anything about it.
+         */}
+        {slow ? (
+          <p className={styles.slowNotice} role="status" aria-live="polite">
+            {t(ACTION_KEYS[action].slow)}
+          </p>
+        ) : null}
+
         <div className={styles.actions}>
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
+          {/*
+           * Never disabled. The confirm is locked because the question
+           * has been answered and answering it twice would write twice;
+           * cancel is the way out, and a way out that closes exactly
+           * when things go wrong is not one.
+           */}
+          <Button type="button" variant="ghost" onClick={onCancel}>
             {t('recurrence.scope.cancel')}
           </Button>
           <Button
             type="button"
             variant={action === 'delete' ? 'danger' : 'primary'}
             disabled={pending}
+            aria-busy={pending || undefined}
             onClick={() => {
               onConfirm(scope);
             }}
           >
-            {t(ACTION_KEYS[action].confirm)}
+            {t(ACTION_KEYS[action][pending ? 'pending' : 'confirm'])}
           </Button>
         </div>
       </div>

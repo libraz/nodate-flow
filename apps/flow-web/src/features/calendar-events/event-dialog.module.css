@@ -109,6 +109,20 @@
   padding-block-start: var(--nf-space-4);
 }
 
+/*
+ * The "still waiting" line, between the destructive action and the
+ * commit actions. Centred against the buttons rather than baseline-
+ * aligned so a wrapped sentence stays visually tied to the row.
+ */
+.pendingNotice {
+  margin: 0;
+  align-self: center;
+  min-inline-size: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
 .footerActions {
   display: flex;
   gap: var(--nf-space-2);

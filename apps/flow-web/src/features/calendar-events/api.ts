@@ -190,6 +190,25 @@ function invalidateCalendarAggregates(qc: ReturnType<typeof useQueryClient>): vo
   void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
 }
 
+/**
+ * useRefreshCalendar — re-read the calendar aggregates on demand.
+ *
+ * The mutations above already do this when they succeed. This exists for
+ * the case they cannot cover: a dialog dismissed while its write is
+ * still in flight. Nothing recalls a request that has left, so at that
+ * moment the client genuinely does not know whether the write landed —
+ * and a scoped write against a series is not something the user can
+ * settle by looking at one row. Re-reading is the only answer available,
+ * and it is worth taking twice: once when the user walks away, once more
+ * when the request eventually settles.
+ */
+export function useRefreshCalendar(): () => void {
+  const qc = useQueryClient();
+  return () => {
+    invalidateCalendarAggregates(qc);
+  };
+}
+
 export interface CreateEventArgs {
   workspaceId: string;
   calendarId: string;

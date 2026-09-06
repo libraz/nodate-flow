@@ -72,6 +72,19 @@
   color: var(--nf-color-fg-muted);
 }
 
+/*
+ * The "still waiting" line. Sits between the options and the actions so
+ * it reads as a note about the button below it rather than as a fourth
+ * choice, and carries no tone colour — nothing has failed yet, and
+ * painting it as a warning would say otherwise.
+ */
+.slowNotice {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

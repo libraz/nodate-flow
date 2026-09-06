@@ -88,12 +88,16 @@
       "save": {
         "title": "Save repeating event",
         "legend": "Which events should this change apply to?",
-        "confirm": "Save"
+        "confirm": "Save",
+        "pending": "Saving…",
+        "slow": "Still waiting for the server. You can cancel — the change may still go through, so check the calendar afterwards."
       },
       "delete": {
         "title": "Delete repeating event",
         "legend": "Which events should be deleted?",
-        "confirm": "Delete"
+        "confirm": "Delete",
+        "pending": "Deleting…",
+        "slow": "Still waiting for the server. You can cancel — the deletion may still go through, so check the calendar afterwards."
       },
       "cancel": "Cancel",
       "option": {
@@ -136,7 +140,10 @@
   "action": {
     "submit": {
       "create": "Create",
-      "edit": "Save changes"
+      "edit": "Save changes",
+      "creating": "Creating…",
+      "saving": "Saving…",
+      "slow": "Still waiting for the server. You can cancel — the change may still go through, so check the calendar afterwards."
     },
     "cancel": "Cancel",
     "delete": "Delete",
