@@ -1,0 +1,26 @@
+# Packages `ncu -u` must not raise, and why. Drop an entry once its blocker is
+# gone so the next run picks the package up again.
+#
+# A reject only stops ncu from rewriting the range; it does not stop semver
+# resolution. Anything held back below a published minor is pinned exactly in
+# the package.json that declares it.
+reject:
+  # v9 rewrites the table API around feature maps: `Row` and `Table` no longer
+  # carry the selection/sorting methods unless the feature is declared, and the
+  # generic parameter now means something else. The data-grid primitive and
+  # every view built on it have to move together.
+  - "@tanstack/react-table"
+
+  # v8 depends on @babel/types v8 while @babel/core stays on 7.x, so the tree
+  # ends up with two copies of the AST types and a parsed Program no longer
+  # matches the Node the traversal helpers expect.
+  - "@babel/parser"
+
+  # 20.14.0 sends a CORS preflight for cross-origin fetch. The unhandled OPTIONS
+  # request trips the `onUnhandledRequest: 'error'` strategy the API mocks run
+  # under, so component queries fail before any handler is consulted.
+  - "happy-dom"
+
+  # 1.4.x renders an option's value placeholder from the camelCase destination
+  # instead of the flag name, so help output reads `--workspace-id <workspaceId>`.
+  - "@libraz/node-cli"

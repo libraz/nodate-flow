@@ -81,9 +81,9 @@
   "dependencies": {
     "@floating-ui/react": "0.27.20",
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.14.9",
+    "@tanstack/react-virtual": "^3.14.10",
     "clsx": "2.1.1",
-    "lucide-react": "1.28.0",
+    "lucide-react": "1.41.0",
     "luxon": "^3.7.2"
   },
   "peerDependencies": {
@@ -114,20 +114,20 @@
   },
   "devDependencies": {
     "@babel/parser": "^7.29.2",
-    "@hookform/resolvers": "5.7.1",
-    "@testing-library/react": "16.3.2",
-    "@testing-library/user-event": "14.6.3",
-    "@types/luxon": "^3.7.3",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
-    "happy-dom": "^20.11.1",
+    "@hookform/resolvers": "5.9.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/luxon": "^3.7.5",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "happy-dom": "20.11.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-hook-form": "7.84.0",
-    "tsx": "4.23.6",
+    "react-hook-form": "7.87.0",
+    "tsx": "4.23.13",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.0",
     "vitest-axe": "0.1.0",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   }
 }
