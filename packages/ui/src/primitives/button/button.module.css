@@ -76,3 +76,22 @@
   padding-block: var(--nf-space-3);
   font-size: var(--nf-text-base);
 }
+
+/*
+ * Touch hit area.
+ *
+ * Below `md` the pointer is a fingertip, and the `sm` size resolves to a
+ * 26px-tall box — its padding and type scale are sized for a cursor. The
+ * floor here is a minimum, not a size: padding, type and the painted
+ * border are untouched, so a button that already clears 32px keeps the
+ * exact geometry it has on a wide viewport and the compact size simply
+ * stops being smaller than a finger. `--nf-space-8` is 2rem, the one
+ * step on the scale that lands on the 32px bar.
+ */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .root {
+    min-inline-size: var(--nf-space-8);
+    min-block-size: var(--nf-space-8);
+  }
+}

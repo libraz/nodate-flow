@@ -364,3 +364,27 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* ---------------------------------------------------------------------------
+ * Touch hit areas.
+ *
+ * Below `md` the rail is reached through the drawer on the calendar
+ * route, so every control in it is pressed with a fingertip. The
+ * 1.5rem icon squares are sized for a cursor and stay under the 32px
+ * bar on both axes; `--nf-space-8` is the step that lands on it. The
+ * row grows with them — nothing else in the list is interactive, so
+ * the extra height reads as breathing room rather than a second
+ * rhythm, and the wide layout is untouched.
+ * ------------------------------------------------------------------------- */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .iconButton,
+  .backButton {
+    inline-size: var(--nf-space-8);
+    block-size: var(--nf-space-8);
+  }
+
+  .sectionHeaderDiscover {
+    min-block-size: var(--nf-space-8);
+  }
+}

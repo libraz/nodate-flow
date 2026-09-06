@@ -387,3 +387,35 @@
     transform: none;
   }
 }
+
+/* ───── touch hit areas ───── */
+
+/*
+ * This view only renders below `md`, so every press here is a fingertip
+ * and the 1.5rem date square is under the 32px bar on both axes.
+ * `--nf-space-8` is the step that lands on it.
+ *
+ * Widening the hit area past the painted square was the alternative and
+ * it does not work in this column: the square sits one pixel from the
+ * column's block-start and inline-start edges, and `.dayCol` clips, so a
+ * symmetric overlay loses its outer edges and never reaches 32px. The
+ * square itself has to grow.
+ *
+ * `.barOverlay` follows it. That offset is the head's height plus the
+ * gap under it — left where it was, the multi-day bars would start
+ * inside the enlarged square. The column's `min-block-size` does not
+ * follow: it is a floor for an empty day, not a cap, so a day with
+ * content is sized by its content and simply becomes 8px taller.
+ */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .dayHead {
+    min-inline-size: var(--nf-space-8);
+    block-size: var(--nf-space-8);
+  }
+
+  .barOverlay {
+    /* nf-token-override: tracks the head's height plus the gap under it, not the spacing scale */
+    inset-block-start: 2.375rem;
+  }
+}
