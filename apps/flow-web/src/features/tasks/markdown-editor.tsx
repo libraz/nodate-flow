@@ -1,18 +1,24 @@
 /**
  * MarkdownEditor — textarea with a formatting toolbar and live preview
- * toggle for Markdown content. Used in task description editing.
+ * toggle for Markdown content. Used everywhere a body is written: task
+ * descriptions, task comments, wiki pages.
  *
  * This is NOT a WYSIWYG editor. It manipulates raw Markdown text via
  * toolbar buttons that insert syntax around the current selection.
  * Preview mode renders the Markdown using the shared `<Markdown>`
  * component (react-markdown + remark-gfm).
+ *
+ * Given a `workspaceId` the textarea also offers the workspace's people
+ * when the author types `@`. Every body that goes through this component
+ * gets the picker from the one place, which is why the comment box uses
+ * the editor rather than a bare textarea of its own.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
-import Textarea from '@nodate-flow/ui/primitives/textarea';
-import { type ChangeEvent, type ReactElement, type RefObject, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, type RefObject, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import MentionTextarea from '../mentions/mention-textarea';
 
 interface MarkdownEditorProps {
   /** Current Markdown source text. */
@@ -25,6 +31,17 @@ interface MarkdownEditorProps {
   'aria-label'?: string;
   /** Whether to auto-focus the textarea on mount. */
   autoFocus?: boolean;
+  /**
+   * Workspace whose members can be named with `@`. Omit where there is
+   * no workspace in scope and the mention picker stays off.
+   */
+  workspaceId?: string | undefined;
+  /** Id for the textarea, so a `<FormField>` label can point at it. */
+  id?: string | undefined;
+  /** Already-translated placeholder for the textarea. */
+  placeholder?: string | undefined;
+  /** Runs for every key the mention picker did not consume. */
+  onKeyDown?: ((event: KeyboardEvent<HTMLTextAreaElement>) => void) | undefined;
 }
 
 /** Wrap the selected text (or insert at cursor) with `before` / `after`. */
@@ -86,14 +103,14 @@ export default function MarkdownEditor({
   rows = 6,
   'aria-label': ariaLabel,
   autoFocus,
+  workspaceId,
+  id,
+  placeholder,
+  onKeyDown,
 }: MarkdownEditorProps): ReactElement {
   const { t } = useTranslation('common');
   const [previewing, setPreviewing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const handleChange = (e: ChangeEvent<HTMLTextAreaElement>): void => {
-    onChange(e.target.value);
-  };
 
   const handleBold = (): void => {
     wrapSelection(textareaRef, value, '**', '**', onChange);
@@ -259,13 +276,17 @@ export default function MarkdownEditor({
           )}
         </div>
       ) : (
-        <Textarea
-          ref={textareaRef}
+        <MentionTextarea
+          textareaRef={textareaRef}
           value={value}
-          onChange={handleChange}
+          onChange={onChange}
+          workspaceId={workspaceId}
+          id={id}
           rows={rows}
           autoFocus={autoFocus}
+          placeholder={placeholder}
           aria-label={ariaLabel}
+          onKeyDown={onKeyDown}
         />
       )}
     </div>

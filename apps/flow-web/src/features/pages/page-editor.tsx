@@ -207,6 +207,12 @@ export default function PageEditor({
         {/* Body (Markdown editor) */}
         <div className={styles.formField}>
           <span className={styles.formLabel}>{t('page_body_label')}</span>
+          {/*
+           * No `workspaceId`, so no mention picker. Only a task
+           * description and a task comment are scanned for mentions on
+           * save; offering the affordance on a page body would write a
+           * chip for a notification nobody receives.
+           */}
           <MarkdownEditor
             value={body}
             onChange={setBody}

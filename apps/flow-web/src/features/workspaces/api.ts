@@ -73,19 +73,30 @@ export function useWorkspaceQuery(id: string): UseSuspenseQueryResult<Workspace>
   });
 }
 
+/**
+ * Fetch the member list for one workspace.
+ *
+ * Shared by the suspense hook below and by any caller that needs the same
+ * rows without suspending — the mention picker reads them while the
+ * author is mid-sentence, where a suspense boundary would replace the
+ * editor being typed into. Both go through `workspacesKeys.members`, so
+ * whichever runs first fills the cache for the other.
+ */
+export async function fetchWorkspaceMembers(id: string): Promise<WorkspaceMember[]> {
+  const data = await authApiRequest(
+    (client) =>
+      client.GET('/workspaces/{wsId}/members', {
+        params: { path: { wsId: id } },
+      }),
+    'Failed to load workspace members',
+  );
+  return data.members ?? [];
+}
+
 export function useWorkspaceMembersQuery(id: string): UseSuspenseQueryResult<WorkspaceMember[]> {
   return useSuspenseQuery({
     queryKey: workspacesKeys.members(id),
-    queryFn: async (): Promise<WorkspaceMember[]> => {
-      const data = await authApiRequest(
-        (client) =>
-          client.GET('/workspaces/{wsId}/members', {
-            params: { path: { wsId: id } },
-          }),
-        'Failed to load workspace members',
-      );
-      return data.members ?? [];
-    },
+    queryFn: () => fetchWorkspaceMembers(id),
   });
 }
 

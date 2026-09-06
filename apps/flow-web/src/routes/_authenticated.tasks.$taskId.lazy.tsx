@@ -24,7 +24,6 @@ import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
-import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
@@ -345,7 +344,15 @@ function TitleEditor({
   );
 }
 
-function DescriptionEditor({ id, initial }: { id: string; initial: string }): ReactElement {
+function DescriptionEditor({
+  id,
+  initial,
+  workspaceId,
+}: {
+  id: string;
+  initial: string;
+  workspaceId: string;
+}): ReactElement {
   const { t } = useTranslation('common');
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initial);
@@ -422,6 +429,7 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
         onChange={setValue}
         rows={6}
         autoFocus
+        workspaceId={workspaceId}
         aria-label={t('tasks.detail.description_edit')}
       />
       <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
@@ -454,7 +462,15 @@ function DescriptionEditor({ id, initial }: { id: string; initial: string }): Re
  * stays unmounted until the user opens it for the first time, after
  * which the standard react-query cache governs revisits.
  */
-function DescriptionSection({ id, initial }: { id: string; initial: string }): ReactElement {
+function DescriptionSection({
+  id,
+  initial,
+  workspaceId,
+}: {
+  id: string;
+  initial: string;
+  workspaceId: string;
+}): ReactElement {
   const { t } = useTranslation('common');
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
@@ -478,7 +494,7 @@ function DescriptionSection({ id, initial }: { id: string; initial: string }): R
           {t('tasks.history.open')}
         </Button>
       </div>
-      <DescriptionEditor id={id} initial={initial} />
+      <DescriptionEditor id={id} initial={initial} workspaceId={workspaceId} />
       {historyOpen ? (
         <DescriptionHistoryDrawer
           taskId={id}
@@ -541,7 +557,13 @@ function TaskActionsCard({
   );
 }
 
-function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
+function CommentsFeed({
+  taskId,
+  workspaceId,
+}: {
+  taskId: string;
+  workspaceId: string;
+}): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: comments } = useTaskCommentsQuery(taskId);
   const add = useAddTaskComment();
@@ -584,6 +606,7 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
             <li key={c.id}>
               <CommentRow
                 taskId={taskId}
+                workspaceId={workspaceId}
                 comment={c}
                 currentUserId={currentUser?.id}
                 locale={locale}
@@ -598,15 +621,21 @@ function CommentsFeed({ taskId }: { taskId: string }): ReactElement {
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
       >
+        {/*
+         * The comment box is the same editor the description uses rather
+         * than a textarea of its own: a comment is markdown, is scanned
+         * for mentions on save exactly like a description, and one editor
+         * means the `@` picker exists in one place instead of two.
+         */}
         <FormField label={t('tasks.comments.title')}>
           {(control) => (
-            <Textarea
-              {...control}
+            <MarkdownEditor
+              id={control.id}
               value={body}
-              onChange={(e) => {
-                setBody(e.target.value);
-              }}
+              onChange={setBody}
+              workspaceId={workspaceId}
               placeholder={t('tasks.comments.add_placeholder')}
+              aria-label={t('tasks.comments.title')}
               rows={3}
             />
           )}
@@ -1382,7 +1411,11 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         {task.agentContext?.agent ? (
           <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
         ) : null}
-        <DescriptionSection id={id} initial={task.description ?? ''} />
+        <DescriptionSection
+          id={id}
+          initial={task.description ?? ''}
+          workspaceId={task.workspaceId}
+        />
         {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
           <ReactionsSection taskId={id} />
@@ -1409,7 +1442,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Separator />
         {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
-          <CommentsFeed taskId={id} />
+          <CommentsFeed taskId={id} workspaceId={task.workspaceId} />
         </Suspense>
       </div>
       <Sidebar

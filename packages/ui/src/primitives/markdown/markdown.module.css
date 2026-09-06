@@ -58,6 +58,21 @@
   text-decoration-thickness: 2px;
 }
 
+/*
+ * A mention. Not a link and not interactive — it names a person, and
+ * there is no page for a person. The tint is the accent's subtle step so
+ * it reads as a distinct object in the sentence without competing with
+ * the links around it.
+ */
+.md .mention {
+  padding: 0.05em 0.4em;
+  border-radius: 0.75em;
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+  font-weight: var(--nf-weight-medium);
+  white-space: nowrap;
+}
+
 .md code {
   font-family: var(--nf-font-mono);
   font-size: 0.9em;

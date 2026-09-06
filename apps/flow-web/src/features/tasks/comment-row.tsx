@@ -18,7 +18,6 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
 import Popover from '@nodate-flow/ui/primitives/popover';
-import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { MoreHorizontal } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
@@ -28,10 +27,13 @@ import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { type TaskComment, useDeleteTaskComment, useEditTaskComment } from './api';
 import styles from './comment-row.module.css';
+import MarkdownEditor from './markdown-editor';
 
 export interface CommentRowProps {
   /** Task public id this comment belongs to. */
   taskId: string;
+  /** Workspace whose members can be named with `@` while editing. */
+  workspaceId: string;
   /** The comment to render. */
   comment: TaskComment;
   /** Signed-in viewer's public id, or `undefined` when unknown. */
@@ -56,6 +58,7 @@ function isEdited(comment: TaskComment): boolean {
  */
 export default function CommentRow({
   taskId,
+  workspaceId,
   comment,
   currentUserId,
   locale,
@@ -168,11 +171,16 @@ export default function CommentRow({
 
       {editing ? (
         <div className={styles.editor}>
-          <Textarea
+          {/*
+           * Same editor as the new-comment box, so editing a comment can
+           * name a person the same way writing one can. The Escape handler
+           * only sees keys the mention picker did not take, so dismissing
+           * the picker no longer throws away the edit behind it.
+           */}
+          <MarkdownEditor
             value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-            }}
+            onChange={setDraft}
+            workspaceId={workspaceId}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();

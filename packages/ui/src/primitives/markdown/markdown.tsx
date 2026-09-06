@@ -7,6 +7,10 @@
  *
  * External links open in a new tab with `rel="noreferrer noopener"`.
  *
+ * A mention — `@[Name](user:<id>)` — renders as a chip naming the person
+ * rather than as a link. There is no page for a person to link to, and a
+ * link that goes nowhere is worse than no link, so the chip is inert.
+ *
  * @example
  * ```tsx
  * import Markdown from '@nodate-flow/ui/primitives/markdown';
@@ -15,11 +19,12 @@
  */
 
 import { memo, type ReactElement } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { cx } from '../../lib/cx';
 import styles from './markdown.module.css';
+import { MENTION_SCHEME, remarkMention } from './remark-mention';
 
 export interface MarkdownProps {
   /** Raw markdown source. */
@@ -32,13 +37,28 @@ function MarkdownImpl({ children, className }: MarkdownProps): ReactElement {
   return (
     <div className={cx(styles.md, className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMention]}
+        // The default transform drops every scheme it does not know,
+        // which would erase the marker `remarkMention` just wrote.
+        urlTransform={(url) => (url.startsWith(MENTION_SCHEME) ? url : defaultUrlTransform(url))}
         components={{
-          a: ({ href, children: body, ...rest }) => (
-            <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
-              {body}
-            </a>
-          ),
+          a: ({ href, children: body, ...rest }) => {
+            if (href?.startsWith(MENTION_SCHEME)) {
+              return (
+                <span
+                  className={styles.mention}
+                  data-nf-mention={href.slice(MENTION_SCHEME.length)}
+                >
+                  @{body}
+                </span>
+              );
+            }
+            return (
+              <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
+                {body}
+              </a>
+            );
+          },
         }}
       >
         {children}

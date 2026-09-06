@@ -1,0 +1,71 @@
+/*
+ * Mention picker popup.
+ *
+ * Positioned in viewport coordinates by the component (the caret it
+ * follows is inside a textarea, which has no element to anchor to), so
+ * the only geometry here is the size it may grow to.
+ */
+
+.list {
+  position: fixed;
+  z-index: var(--nf-z-dropdown);
+  list-style: none;
+  margin: 0;
+  padding: var(--nf-space-1);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  box-shadow: var(--nf-shadow-lg);
+  /* nf-token-override: popup dimensions, not spacing steps */
+  max-block-size: 15rem;
+  /* nf-token-override: popup dimensions, not spacing steps */
+  min-inline-size: 14rem;
+  /* nf-token-override: popup dimensions, not spacing steps */
+  max-inline-size: 22rem;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+}
+
+.optionActive {
+  background: var(--nf-color-surface-hover);
+}
+
+.names {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.displayName {
+  font-weight: var(--nf-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusRow {
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: default;
+}
