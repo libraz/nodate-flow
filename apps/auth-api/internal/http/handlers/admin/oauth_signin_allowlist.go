@@ -173,12 +173,14 @@ func parseAllowlistEntryKind(raw string) (generated.OauthSigninAllowlistEntryKin
 // works.
 //
 // The shape rules follow from how the value is matched. A domain entry is
-// compared against the part after an address's final "@" and so contains
-// no "@" of its own -- the leading one is already stripped, and another
-// means an address was entered where a domain belongs. An email entry is
-// compared against a whole address and so needs a local part and a domain
-// part around its final "@". Either mistake is worth reporting now rather
-// than leaving as a sign-in that silently never succeeds.
+// compared for equality against the part after an address's final "@", so
+// it has to be something that part could be: a host name, by the rule in
+// [isAllowlistDomain]. That already rules out the "@" of an address
+// entered where a domain belongs. An email entry is compared against a
+// whole address, so it needs a local part and a domain part around its
+// final "@", each holding to the same rule. Any of these mistakes is
+// worth reporting now rather than leaving as a sign-in that silently
+// never succeeds.
 func normalizeAllowlistEntryValue(raw string, kind generated.OauthSigninAllowlistEntryKind) (string, error) {
 	value := authhandlers.NormalizeSignInAllowlistEntry(raw, kind == generated.OauthSigninAllowlistEntryKindDomain)
 	if value == "" {
@@ -194,16 +196,85 @@ func normalizeAllowlistEntryValue(raw string, kind generated.OauthSigninAllowlis
 	}
 	switch kind {
 	case generated.OauthSigninAllowlistEntryKindDomain:
-		if strings.Contains(value, "@") {
+		if !isAllowlistDomain(value) {
 			return "", httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 	case generated.OauthSigninAllowlistEntryKindEmail:
+		// The final "@" is the split the check itself uses. at <= 0 covers
+		// both an address with no "@" and one with no local part.
 		at := strings.LastIndex(value, "@")
-		if at <= 0 || at == len(value)-1 {
+		if at <= 0 || !isAllowlistLocalPart(value[:at]) || !isAllowlistDomain(value[at+1:]) {
 			return "", httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 	default:
 		return "", httpErr(apierrors.ValidationBodyFieldInvalid)
 	}
 	return value, nil
+}
+
+// isAllowlistDomain reports whether value could be the domain part of an
+// address that reaches the sign-in check.
+//
+// The rule is the host name one: dot-separated labels of ASCII letters,
+// digits and hyphens, no label empty, and no label opening or closing on a
+// hyphen. Two labels are required, so a bare host name like "localhost" is
+// refused -- the addresses this list is matched against come from an
+// OAuth/OIDC provider and their domain part is always a registered name.
+//
+// Letters means ASCII letters, which by this point in normalization means
+// lower-case ones. An internationalized domain reaches an address in its
+// "xn--" form, so that is the form an entry has to be written in for the
+// comparison to ever come out equal.
+//
+// No length ceiling is imposed here: entry_value is a VARCHAR(255) and the
+// column reports anything longer. What this answers is whether the value
+// has the shape of a domain at all.
+func isAllowlistDomain(value string) bool {
+	labels := strings.Split(value, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if label == "" || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		// Indexing by byte is enough to reject every non-ASCII rune: each
+		// of its bytes is >= 0x80 and so falls to the default.
+		for i := 0; i < len(label); i++ {
+			switch c := label[i]; {
+			case c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-':
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// localPartPunctuation is the punctuation an address's local part may
+// carry unquoted, per the dot-atom form: these characters plus letters and
+// digits, with "." separating non-empty pieces.
+//
+// A quoted local part -- the form that would let an address hold a space
+// -- is not accepted. Nothing produces one here: the value has already
+// been lower-cased, which a quoted local part does not survive, and no
+// OAuth/OIDC provider issues one.
+const localPartPunctuation = "!#$%&'*+-/=?^_`{|}~"
+
+// isAllowlistLocalPart reports whether value could be the part before an
+// address's final "@".
+func isAllowlistLocalPart(value string) bool {
+	if value == "" || strings.HasPrefix(value, ".") || strings.HasSuffix(value, ".") ||
+		strings.Contains(value, "..") {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		switch c := value[i]; {
+		case c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '.':
+		case strings.IndexByte(localPartPunctuation, c) >= 0:
+		default:
+			return false
+		}
+	}
+	return true
 }

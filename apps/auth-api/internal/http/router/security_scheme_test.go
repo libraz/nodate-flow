@@ -133,6 +133,7 @@ func splitKey(key string) (method, path string, ok bool) {
 func resolvePath(t *testing.T, p string) string {
 	t.Helper()
 	placeholders := map[string]string{
+		"entryId":   "01HX000000000000000000000F",
 		"id":        "01HX000000000000000000000E",
 		"inviteId":  "01HX000000000000000000000D",
 		"provider":  "github",

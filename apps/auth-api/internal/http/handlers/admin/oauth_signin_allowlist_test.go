@@ -213,6 +213,30 @@ func TestAddAllowlistEntry_MalformedValueIsRefused(t *testing.T) {
 		{"a value that is only whitespace", "domain", "   "},
 		{"a value the latin1 column cannot hold", "domain", "例え.example"},
 		{"a kind the column does not define", "ip", "203.0.113.7"},
+
+		// A domain has to have the shape of one. None of these can equal
+		// the part after a real address's final "@", so each would be an
+		// entry that admits nobody.
+		{"a domain carrying a space", "domain", "not a domain"},
+		{"a domain carrying punctuation no host name has", "domain", "example!.com"},
+		{"a domain carrying an underscore", "domain", "mail_server.example.com"},
+		{"a bare host name with no dot", "domain", "localhost"},
+		{"a domain opening on a dot", "domain", ".example.com"},
+		{"a domain closing on a dot", "domain", "example.com."},
+		{"a domain with an empty label", "domain", "mail..example.com"},
+		{"a label opening on a hyphen", "domain", "-example.com"},
+		{"a label closing on a hyphen", "domain", "example-.com"},
+		{"a domain written as a bracketed address literal", "domain", "[203.0.113.7]"},
+
+		// The domain part of an address is held to the same rule, and its
+		// local part to the unquoted form an address is written in.
+		{"an address whose domain part is not a domain", "email", "a b@c d"},
+		{"an address whose domain part has no dot", "email", "someone@localhost"},
+		{"an address whose local part carries a space", "email", "some one@example.com"},
+		{"an address whose local part opens on a dot", "email", ".someone@example.com"},
+		{"an address whose local part has an empty piece", "email", "some..one@example.com"},
+		{"an address whose local part is quoted", "email", `"some one"@example.com`},
+		{"an address with a second at-sign in its local part", "email", "some@one@example.com"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -224,6 +248,39 @@ func TestAddAllowlistEntry_MalformedValueIsRefused(t *testing.T) {
 		})
 	}
 	assert.Empty(t, sink.actions(), "a refused add must leave no audit entry")
+}
+
+// TestNormalizeAllowlistEntryValue_AcceptsTheFormsAnAddressCarries pins
+// the other side of the shape rules. Refusing a value an administrator
+// legitimately wants is the same defect in the other direction: the entry
+// they meant to add is simply not there.
+func TestNormalizeAllowlistEntryValue_AcceptsTheFormsAnAddressCarries(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		kind  generated.OauthSigninAllowlistEntryKind
+		value string
+		want  string
+	}{
+		{"a plain domain", generated.OauthSigninAllowlistEntryKindDomain, "example.com", "example.com"},
+		{"a subdomain", generated.OauthSigninAllowlistEntryKindDomain, "mail.example.com", "mail.example.com"},
+		{"a hyphenated label", generated.OauthSigninAllowlistEntryKindDomain, "my-company.example.com", "my-company.example.com"},
+		{"a label carrying digits", generated.OauthSigninAllowlistEntryKindDomain, "eu2.example.com", "eu2.example.com"},
+		{"an internationalized domain in its punycode form", generated.OauthSigninAllowlistEntryKindDomain, "xn--r8jz45g.example", "xn--r8jz45g.example"},
+		{"a domain written with its leading at-sign", generated.OauthSigninAllowlistEntryKindDomain, "@Example.COM", "example.com"},
+		{"a plain address", generated.OauthSigninAllowlistEntryKindEmail, "someone@example.com", "someone@example.com"},
+		{"an address at a subdomain", generated.OauthSigninAllowlistEntryKindEmail, "someone@mail.example.com", "someone@mail.example.com"},
+		{"a local part carrying a dot", generated.OauthSigninAllowlistEntryKindEmail, "first.last@example.com", "first.last@example.com"},
+		{"a local part carrying the punctuation an address may hold", generated.OauthSigninAllowlistEntryKindEmail, "first+tag_1'x@example.com", "first+tag_1'x@example.com"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := normalizeAllowlistEntryValue(tc.value, tc.kind)
+			require.NoError(t, err, "an entry an address could match must be accepted")
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 // TestAllowlistRoutes_RefuseANonAdmin pins that the three operations are
