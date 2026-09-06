@@ -209,10 +209,13 @@ WHERE id = sqlc.arg(id)
 -- attachment the presign created alongside it, and removing that
 -- attachment is not what decrements the count, so a ref_count = 0 guard
 -- here matches nothing and no reservation is ever reclaimed. Nor is
--- ref_count the right question — an unconfirmed row is not offered to
--- dedup, so nobody new can be pointing at it. The only thing that can
--- still rescue the row is a confirm landing in this instant, and that
--- is exactly what uploaded_at IS NULL loses to.
+-- ref_count the right question. A later presign for the same content
+-- does dedup onto this row and does bump the count before the handler
+-- decides the bytes are not there yet, so a count above zero says only
+-- that more than one attachment is waiting on an upload that never
+-- came -- which is why they are all removed alongside it here. The only
+-- thing that can still rescue the row is a confirm landing in this
+-- instant, and that is exactly what uploaded_at IS NULL loses to.
 DELETE FROM storage_objects
 WHERE id = sqlc.arg(id)
   AND uploaded_at IS NULL;
