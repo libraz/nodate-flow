@@ -1330,7 +1330,11 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 				return err
 			}
 			if descChanged {
-				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
+				version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
+				if err != nil {
+					return err
+				}
+				if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
 					return err
 				}
 				// Alongside the snapshot, not inside it: a body edited down to
@@ -1357,10 +1361,15 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 				return err
 			}
-			// Same reason as the branch above: the snapshot and the mention
-			// sync share the transaction that writes the description.
+			// Same reason as the branch above: the snapshot, the event naming
+			// it and the mention sync share the transaction that writes the
+			// description.
 			if descChanged {
-				if _, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String); err != nil {
+				version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
+				if err != nil {
+					return err
+				}
+				if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
 					return err
 				}
 				if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {

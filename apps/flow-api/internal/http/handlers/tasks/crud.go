@@ -929,7 +929,11 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				// that commits without its snapshot is one no restore can
 				// return to.
 				if descChanged {
-					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
+					version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
+					if err != nil {
+						return err
+					}
+					if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
 						return err
 					}
 					// Alongside the snapshot, not inside it: a body edited down
@@ -955,11 +959,15 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
 					return err
 				}
-				// Same reason as the branch above: the snapshot and the
-				// mention sync share the transaction that writes the
-				// description.
+				// Same reason as the branch above: the snapshot, the event
+				// naming it and the mention sync share the transaction that
+				// writes the description.
 				if descChanged {
-					if _, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String); err != nil {
+					version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
+					if err != nil {
+						return err
+					}
+					if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
 						return err
 					}
 					if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {

@@ -18,6 +18,21 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 )
 
+// announceTaskDescriptionVersion appends the event naming a version a tool
+// just snapshotted, on the boundary that version commits through.
+//
+// The session supplies the workspace and the actor, so a tool states only
+// the task whose body moved and the version the snapshot returned.
+func announceTaskDescriptionVersion(ctx context.Context, db dbretry.CommitBoundary, s *session, taskID uint32, taskPub types.PublicID, version taskdesc.Version) error {
+	return taskdesc.Announce(ctx, db, taskdesc.Announcement{
+		WorkspaceID:  s.workspaceID,
+		TaskID:       taskID,
+		TaskPublicID: taskPub,
+		Author:       sessionActor(s),
+		Version:      version,
+	})
+}
+
 func runListDescriptionVersions(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err

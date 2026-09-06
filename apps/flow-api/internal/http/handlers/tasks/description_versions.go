@@ -17,6 +17,22 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
+// announceDescriptionVersion appends the event naming a version a write
+// just snapshotted, on the boundary that version commits through.
+//
+// The task arrives as the middleware resolved it, so the internal id the
+// event row carries and the public id its payload names come from the same
+// row the handler was authorized against.
+func announceDescriptionVersion(ctx context.Context, db dbretry.CommitBoundary, workspaceID uint32, task middleware.TaskContext, actor *int64, version taskdesc.Version) error {
+	return taskdesc.Announce(ctx, db, taskdesc.Announcement{
+		WorkspaceID:  workspaceID,
+		TaskID:       task.ID,
+		TaskPublicID: types.FromUUID(task.PublicID),
+		Author:       actor,
+		Version:      version,
+	})
+}
+
 // mapDescriptionVersionRow converts a ListDescriptionVersionsRow to the DTO.
 func mapDescriptionVersionRow(r generated.ListDescriptionVersionsRow) DescriptionVersion {
 	return DescriptionVersion{

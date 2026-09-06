@@ -155,6 +155,14 @@ type stubDriver struct {
 	// rowsFor decides how many rows a given scan's page returns, which
 	// is what makes "full page" and "short page" testable.
 	rowsFor func(sql string) int
+	// healRows is what the date-drift UPDATE reports as affected. Zero is
+	// the drift having closed between the scan and the write, which is the
+	// case the heal's own guard answers.
+	healRows int64
+	// driftDates makes the date-drift page disagree with itself, so the
+	// scan finds drift to heal. Left false, every page it serves is
+	// consistent and no heal runs.
+	driftDates bool
 }
 
 func (d *stubDriver) Open(string) (driver.Conn, error) { return &stubConn{d: d}, nil }
@@ -202,12 +210,32 @@ func (c *stubConn) Begin() (driver.Tx, error)           { return nil, driver.Err
 
 func (c *stubConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	c.d.record(recordedQuery{sql: query, args: values(args)})
-	return driver.RowsAffected(0), nil
+	return c.d.answer(query), nil
 }
 
 func (c *stubConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.d.record(recordedQuery{sql: query, args: values(args)})
-	return newStubRows(query, c.d.rowsFor(query)), nil
+	return newStubRows(query, c.d.rowsFor(query), c.d.driftDates), nil
+}
+
+// stubResult reports both halves of a statement's outcome: the affected
+// row count a heal reads to decide whether it healed anything, and the
+// insert id the event append reads to name the row it wrote.
+type stubResult struct{ rows, lastID int64 }
+
+func (r stubResult) LastInsertId() (int64, error) { return r.lastID, nil }
+func (r stubResult) RowsAffected() (int64, error) { return r.rows, nil }
+
+// answer decides what a statement reports. Only the date-drift heal's
+// count is under a test's control; every other statement answers as a
+// write that landed, so an event appended after one carries an id.
+func (d *stubDriver) answer(query string) driver.Result {
+	if strings.Contains(query, "UPDATE tasks SET due_on") {
+		return stubResult{rows: d.healRows}
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return stubResult{rows: 1, lastID: int64(len(d.queries))}
 }
 
 func values(args []driver.NamedValue) []driver.Value {
@@ -228,15 +256,30 @@ type stubRows struct {
 // newStubRows shapes its page to whichever scan asked for it. The ids
 // count up from 1 so the last row of a full page is maxScanRowsPerPass,
 // which is what the resume assertions read.
-func newStubRows(query string, n int) *stubRows {
+//
+// drift shifts the date-drift page's event away from its task's stored
+// due date, which is the disagreement that scan exists to find.
+func newStubRows(query string, n int, drift bool) *stubRows {
 	day := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	switch {
 	case strings.Contains(query, "ce.timezone"):
+		start := day
+		if drift {
+			start = day.AddDate(0, 0, 2)
+		}
 		return &stubRows{
-			cols: []string{"task_id", "event_id", "due_on", "start_at", "timezone"},
-			n:    n,
+			cols: []string{
+				"task_id", "task_public_id", "workspace_id",
+				"event_id", "event_public_id",
+				"due_on", "start_at", "timezone",
+			},
+			n: n,
 			row: func(i int) []driver.Value {
-				return []driver.Value{int64(i), int64(i), day, day, "UTC"}
+				return []driver.Value{
+					int64(i), driftTaskPublicID[:], int64(driftWorkspaceID),
+					int64(i), driftEventPublicID[:],
+					day, start, "UTC",
+				}
 			},
 		}
 	case strings.Contains(query, "task_role"):

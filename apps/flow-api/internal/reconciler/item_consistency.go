@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
@@ -151,7 +153,13 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 	const role = "due"
 	// The JOIN uses the (task_id, task_role, enabled) index; the keyset
 	// on ce.id keeps each page a bounded forward scan.
-	const q = `SELECT t.id, ce.id, t.due_on, ce.start_at, ce.timezone
+	// The public ids and the workspace come back with the drift because a
+	// heal is a change somebody has to be able to read about: the event it
+	// appends names the pair the way the log names everything, and a second
+	// lookup per drifted row to fetch them would read the same two rows
+	// again.
+	const q = `SELECT t.id, t.public_id, t.workspace_id, ce.id, ce.public_id,
+	             t.due_on, ce.start_at, ce.timezone
 	      FROM tasks t
 	      JOIN calendar_events ce ON ce.task_id = t.id AND ce.enabled
 	      WHERE t.enabled
@@ -170,10 +178,13 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 
 	const kind = "date_drift_due"
 	type drift struct {
-		taskID    uint32
-		eventID   uint32
-		taskDate  sql.NullTime
-		eventDate sql.NullTime
+		taskID      uint32
+		taskPubID   types.PublicID
+		workspaceID uint32
+		eventID     uint32
+		eventPubID  types.PublicID
+		taskDate    sql.NullTime
+		eventDate   sql.NullTime
 	}
 	var drifts []drift
 	var scanned int
@@ -182,7 +193,8 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		var d drift
 		var startAt sql.NullTime
 		var tz string
-		if err := rows.Scan(&d.taskID, &d.eventID, &d.taskDate, &startAt, &tz); err != nil {
+		if err := rows.Scan(&d.taskID, &d.taskPubID, &d.workspaceID, &d.eventID, &d.eventPubID,
+			&d.taskDate, &startAt, &tz); err != nil {
 			r.logError("scan row failed", err, "role", role)
 			continue
 		}
@@ -261,6 +273,35 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		if r.Metrics != nil {
 			r.Metrics.IncHeal(kind)
 		}
+		// The same count gates the timeline entry, for the same reason it
+		// gates the counter: this row says the task's deadline moved, and a
+		// pass that moved nothing would put that on the task's timeline
+		// again every five minutes.
+		//
+		// The heal is one auto-commit statement, so there is no transaction
+		// for the event to join; it is appended after the write it
+		// describes, which is already durable. Best effort because a lost
+		// event must not fail the pass: this loop's caller answers a failed
+		// pass by running it again, and the heal it would re-run has
+		// already happened. Nothing is derived from this kind — derived
+		// state is built from the task.transition.* kinds and no others —
+		// so a dropped row costs the entry and its notification, not a
+		// wrong state.
+		//
+		// No actor: a background loop is not a person, and naming one would
+		// put a user's name on a change they did not make.
+		taskID := int64(d.taskID)
+		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(r.DB), eventbus.Event{
+			Type:        eventbus.ItemReconciled,
+			WorkspaceID: d.workspaceID,
+			TaskID:      &taskID,
+			Payload: map[string]any{
+				"taskPublicId":  d.taskPubID.String(),
+				"eventPublicId": d.eventPubID.String(),
+				"kind":          kind,
+				"healedTo":      nullTimeString(d.eventDate),
+			},
+		}, "reconciler.dateDrift")
 	}
 }
 

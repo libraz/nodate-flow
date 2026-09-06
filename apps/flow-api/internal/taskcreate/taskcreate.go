@@ -27,9 +27,14 @@
 // by omission.
 //
 // taskcreate does NOT authorize the actor and does NOT append
-// task.created; callers own both. Event emission is deliberately left
-// out because call sites differ on whether they publish before commit,
-// after commit, or from a commit hook.
+// task.created; callers own both. That event is left to them because call
+// sites differ on whether they publish before commit, after commit, or
+// from a commit hook.
+//
+// The event naming the first description version is the exception, and it
+// is one for the same reason the version row is written here: it describes
+// a row this function writes, on the transaction this function was handed,
+// so there is no call site left with a choice to make about it.
 package taskcreate
 
 import (
@@ -255,7 +260,22 @@ func New(ctx context.Context, tx *dbretry.Tx, attr Attribution, args Args) (Resu
 	// number is — every creating path reaches this function, and a path
 	// that skipped the snapshot would produce a task whose history is
 	// missing its own starting point with nothing to signal it.
-	if _, err := taskdesc.Snapshot(ctx, q, args.WorkspaceID, uint32(id), attr.createdBy, args.Description.String); err != nil { //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	version, err := taskdesc.Snapshot(ctx, q, args.WorkspaceID, uint32(id), attr.createdBy, args.Description.String) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	if err != nil {
+		return Result{}, err
+	}
+	// The event naming that version is appended here for the same reason
+	// the version is written here: every creating path reaches this
+	// function, and every one of them would otherwise be a place the
+	// append could be left out. It shares the caller's transaction, so the
+	// row and the entry naming it become durable together.
+	if err := taskdesc.Announce(ctx, tx, taskdesc.Announcement{
+		WorkspaceID:  args.WorkspaceID,
+		TaskID:       uint32(id), //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		TaskPublicID: pub,
+		Author:       actorRef(attr.createdBy),
+		Version:      version,
+	}); err != nil {
 		return Result{}, err
 	}
 	// Alongside the snapshot rather than inside it: the snapshot skips an
