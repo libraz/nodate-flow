@@ -145,7 +145,13 @@ func (w *WorkspaceProvider) WithMetering(guard CostGuard, log InvocationLogger, 
 
 // logSuccess records the redacted invocation + cost metric after a
 // successful provider call.
-func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, prompt string, resp *providers.Response, kind string, elapsed time.Duration) {
+//
+// promptRedacted is stored as it arrives. ai_invocations is served to
+// every member of the workspace, so the combined system + user prompt is
+// scrubbed by logutil.Redact where it is built, once: redacting again
+// here would nest a marker inside the replacement text of the first pass
+// ("sk-" inside "[REDACTED:sk-]" matches the scanner again).
+func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, promptRedacted string, resp *providers.Response, kind string, elapsed time.Duration) {
 	if w.OnInvocation != nil {
 		w.OnInvocation(kind, model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), elapsed, nil)
 	}
@@ -158,7 +164,7 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 			WorkspaceID:      wsID,
 			Purpose:          "resolve_command",
 			Model:            loggedModel,
-			PromptRedacted:   prompt,
+			PromptRedacted:   promptRedacted,
 			ResponseRedacted: logutil.Redact(resp.Text),
 			TokensInput:      resp.InputTokens,
 			TokensOutput:     resp.OutputTokens,
@@ -170,8 +176,10 @@ func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, 
 }
 
 // logFailure records the redacted invocation + zero-cost metric after a
-// failed provider call.
-func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, prompt string, callErr error, kind string, elapsed time.Duration) {
+// failed provider call. This row has the same workspace-wide audience as
+// the successful one, so promptRedacted arrives already scrubbed here
+// too; see [WorkspaceProvider.logSuccess].
+func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, promptRedacted string, callErr error, kind string, elapsed time.Duration) {
 	if w.OnInvocation != nil {
 		w.OnInvocation(kind, model, 0, 0, 0, elapsed, callErr)
 	}
@@ -180,7 +188,7 @@ func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, 
 			WorkspaceID:    wsID,
 			Purpose:        "resolve_command",
 			Model:          model,
-			PromptRedacted: prompt,
+			PromptRedacted: promptRedacted,
 			Status:         "error",
 			ErrorCode:      logutil.Redact(callErr.Error()),
 		})
