@@ -52,7 +52,7 @@ func (d Deps) isSignInEmailAllowed(ctx context.Context, email string) (bool, err
 // signInAllowlistUnion merges the configured entries with the enabled
 // rows into the two lists the match runs over.
 //
-// Both sources go through normalizeSignInAllowlistEntry. entry_value is
+// Both sources go through NormalizeSignInAllowlistEntry. entry_value is
 // stored latin1_bin, i.e. byte-exact, so a row written as "Example.COM"
 // or "@example.com" through any path is only comparable to an address
 // after Go normalizes it; the environment entries are normalized at load
@@ -70,23 +70,23 @@ func signInAllowlistUnion(
 	domains = make([]string, 0, len(envDomains)+len(rows))
 	emails = make([]string, 0, len(envEmails)+len(rows))
 	for _, raw := range envDomains {
-		if v := normalizeSignInAllowlistEntry(raw, true); v != "" {
+		if v := NormalizeSignInAllowlistEntry(raw, true); v != "" {
 			domains = append(domains, v)
 		}
 	}
 	for _, raw := range envEmails {
-		if v := normalizeSignInAllowlistEntry(raw, false); v != "" {
+		if v := NormalizeSignInAllowlistEntry(raw, false); v != "" {
 			emails = append(emails, v)
 		}
 	}
 	for _, row := range rows {
 		switch row.EntryKind {
 		case generated.OauthSigninAllowlistEntryKindDomain:
-			if v := normalizeSignInAllowlistEntry(row.EntryValue, true); v != "" {
+			if v := NormalizeSignInAllowlistEntry(row.EntryValue, true); v != "" {
 				domains = append(domains, v)
 			}
 		case generated.OauthSigninAllowlistEntryKindEmail:
-			if v := normalizeSignInAllowlistEntry(row.EntryValue, false); v != "" {
+			if v := NormalizeSignInAllowlistEntry(row.EntryValue, false); v != "" {
 				emails = append(emails, v)
 			}
 		default:
@@ -95,12 +95,18 @@ func signInAllowlistUnion(
 	return domains, emails
 }
 
-// normalizeSignInAllowlistEntry lower-cases and trims one allowlist entry
+// NormalizeSignInAllowlistEntry lower-cases and trims one allowlist entry
 // and, for a domain, strips a single leading "@" so "example.com" and
 // "@example.com" are the same entry. An entry carrying no value comes
 // back empty and the caller drops it: kept in the list it would count as
 // an active allowlist while matching only a malformed address.
-func normalizeSignInAllowlistEntry(raw string, isDomain bool) string {
+//
+// It is exported because the administrator's write path must normalize an
+// entry exactly the way this check does. entry_value is stored byte-exact,
+// so a row written under any other rule is a row this check can never
+// match, and the divergence would surface only as a sign-in that never
+// works. One definition is what keeps the two sides in step.
+func NormalizeSignInAllowlistEntry(raw string, isDomain bool) string {
 	v := strings.ToLower(strings.TrimSpace(raw))
 	if isDomain {
 		v = strings.TrimPrefix(v, "@")

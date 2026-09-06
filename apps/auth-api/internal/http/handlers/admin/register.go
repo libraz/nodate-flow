@@ -130,6 +130,34 @@ func Register(api huma.API, deps Deps) {
 		Tags:        []string{"Admin"},
 	}, RevokeAdmin(deps))
 
+	// --- OAuth Sign-In Allowlist ---
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-list-oauth-signin-allowlist",
+		Method:      http.MethodGet,
+		Path:        "/admin/oauth-signin-allowlist",
+		Summary:     "List OAuth sign-in allowlist entries",
+		Description: "Lists every entry of the instance-level OAuth/OIDC sign-in allowlist, withdrawn entries included: a withdrawn entry keeps its claim on its (kind, value) pair and can be brought back, so it stays visible with enabled=false. With no enabled entry and nothing configured in the environment, every verified address may sign in.",
+		Tags:        []string{"Admin"},
+	}, ListOAuthSignInAllowlist(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-add-oauth-signin-allowlist-entry",
+		Method:      http.MethodPost,
+		Path:        "/admin/oauth-signin-allowlist",
+		Summary:     "Add an OAuth sign-in allowlist entry",
+		Description: "Adds a domain or address to the sign-in allowlist, or revives the withdrawn entry that already holds that pair, restating its notes and adder. The value is normalized (lower-cased, trimmed, and for a domain stripped of a leading '@') before it is stored, so the returned entry may differ from what was sent. A domain carrying an '@', or an address without one, is refused with 422 VALIDATION.BODY.FIELD_INVALID. Logged to the audit trail.",
+		Tags:        []string{"Admin"},
+	}, AddOAuthSignInAllowlistEntry(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-withdraw-oauth-signin-allowlist-entry",
+		Method:      http.MethodDelete,
+		Path:        "/admin/oauth-signin-allowlist/{entryId}",
+		Summary:     "Withdraw an OAuth sign-in allowlist entry",
+		Description: "Stops the named entry admitting sign-ins from the next attempt on. The row is kept so the same domain or address can be added back later. An entry that is already withdrawn, or an id that names nothing, is reported as not found and leaves no audit entry.",
+		Tags:        []string{"Admin"},
+	}, WithdrawOAuthSignInAllowlistEntry(deps))
+
 	// --- Audit Logs ---
 	huma.Register(api, huma.Operation{
 		OperationID: "admin-list-audit-logs",

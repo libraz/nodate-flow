@@ -256,6 +256,75 @@ type RevokeAdminOutput struct {
 	}
 }
 
+// --- OAuth Sign-In Allowlist ---
+
+// OAuthSignInAllowlistEntry is the public DTO for one entry of the
+// instance-level OAuth/OIDC sign-in allowlist.
+//
+// Enabled is part of the DTO because a withdrawn entry stays listed: it
+// keeps its claim on its (kind, value) pair and can be brought back.
+type OAuthSignInAllowlistEntry struct {
+	ID                 string  `json:"id"`
+	Kind               string  `json:"kind" enum:"domain,email"`
+	Value              string  `json:"value"`
+	Notes              *string `json:"notes,omitempty"`
+	Enabled            bool    `json:"enabled"`
+	AddedByID          *string `json:"addedById,omitempty"`
+	AddedByDisplayName *string `json:"addedByDisplayName,omitempty"`
+	CreatedAt          int64   `json:"createdAt"`
+	UpdatedAt          *int64  `json:"updatedAt,omitempty"`
+}
+
+// ListOAuthSignInAllowlistInput binds query parameters for
+// GET /admin/oauth-signin-allowlist.
+type ListOAuthSignInAllowlistInput struct {
+	PaginatedInput
+}
+
+// ListOAuthSignInAllowlistOutput is the response for
+// GET /admin/oauth-signin-allowlist.
+type ListOAuthSignInAllowlistOutput struct {
+	Body struct {
+		Total int64                       `json:"total"`
+		Items []OAuthSignInAllowlistEntry `json:"items"`
+	}
+}
+
+// AddOAuthSignInAllowlistEntryInput binds the body for
+// POST /admin/oauth-signin-allowlist.
+//
+// Value is bounded by the column behind it; it is normalized (lower-cased,
+// trimmed, and for a domain stripped of a leading "@") before it is
+// written, so what comes back may differ from what was sent.
+type AddOAuthSignInAllowlistEntryInput struct {
+	Body struct {
+		Kind  string  `json:"kind" enum:"domain,email" doc:"What the value names: a domain matches the part after an address's final '@', an email matches the whole address"`
+		Value string  `json:"value" minLength:"1" maxLength:"255" doc:"The domain or address this entry admits"`
+		Notes *string `json:"notes,omitempty" required:"false" maxLength:"10000" doc:"Administrator notes"`
+	}
+}
+
+// AddOAuthSignInAllowlistEntryOutput is the response for
+// POST /admin/oauth-signin-allowlist. It carries the entry as it stands
+// after the write, including the values a revived entry now holds.
+type AddOAuthSignInAllowlistEntryOutput struct {
+	Body OAuthSignInAllowlistEntry
+}
+
+// WithdrawOAuthSignInAllowlistEntryInput binds the path parameter for
+// DELETE /admin/oauth-signin-allowlist/{entryId}.
+type WithdrawOAuthSignInAllowlistEntryInput struct {
+	EntryID string `path:"entryId" doc:"Allowlist entry public id (UUID v7)"`
+}
+
+// WithdrawOAuthSignInAllowlistEntryOutput is the response for
+// DELETE /admin/oauth-signin-allowlist/{entryId}.
+type WithdrawOAuthSignInAllowlistEntryOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
 // --- Audit Logs ---
 
 // AuditEntry is the public DTO for an instance audit log entry.

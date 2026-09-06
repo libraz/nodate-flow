@@ -133,6 +133,42 @@ func rowToInstanceAdmin(r generated.AdminListInstanceAdminsRow) InstanceAdmin {
 	}
 }
 
+// rowToOAuthSignInAllowlistEntry maps one allowlist entry. added_by is
+// exposed as the adder's public id, and comes back nil once that account
+// is gone: the FK is ON DELETE SET NULL, and the LEFT JOIN then scans the
+// zero UUID.
+func rowToOAuthSignInAllowlistEntry(r generated.FindOauthSigninAllowlistEntryRow) OAuthSignInAllowlistEntry {
+	return OAuthSignInAllowlistEntry{
+		ID:                 r.PublicID.String(),
+		Kind:               string(r.EntryKind),
+		Value:              r.EntryValue,
+		Notes:              nullStr(r.Notes),
+		Enabled:            r.Enabled,
+		AddedByID:          nullPubID(r.AddedByPublicID),
+		AddedByDisplayName: nullStr(r.AddedByDisplayName),
+		CreatedAt:          r.CreatedAt.Unix(),
+		UpdatedAt:          nullTimeUnix(r.UpdatedAt),
+	}
+}
+
+// listRowToOAuthSignInAllowlistEntry maps a list row through the single
+// mapping above. The two statements select the same columns, so one
+// mapping serves both and the list and the write response can never
+// describe the same entry differently.
+func listRowToOAuthSignInAllowlistEntry(r generated.ListOauthSigninAllowlistEntriesRow) OAuthSignInAllowlistEntry {
+	return rowToOAuthSignInAllowlistEntry(generated.FindOauthSigninAllowlistEntryRow{
+		PublicID:           r.PublicID,
+		EntryKind:          r.EntryKind,
+		EntryValue:         r.EntryValue,
+		Notes:              r.Notes,
+		Enabled:            r.Enabled,
+		AddedByPublicID:    r.AddedByPublicID,
+		AddedByDisplayName: r.AddedByDisplayName,
+		UpdatedAt:          r.UpdatedAt,
+		CreatedAt:          r.CreatedAt,
+	})
+}
+
 func rowToAuditEntry(r generated.AdminListInstanceAuditLogsRow) AuditEntry {
 	var payload json.RawMessage
 	if len(r.PayloadJson) > 0 {
