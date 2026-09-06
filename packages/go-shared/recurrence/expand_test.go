@@ -257,6 +257,91 @@ func TestExpandExceptionsAcceptBareDates(t *testing.T) {
 	})
 }
 
+// TestExpandSkipsOverriddenOccurrences covers the second way an
+// occurrence departs from its series: a separate row replaces it and
+// draws it at its own time, so the master must not emit it as well.
+func TestExpandSkipsOverriddenOccurrences(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	occ := Expand(Event{
+		StartAt:          start,
+		EndAt:            start.Add(time.Hour),
+		Rule:             &Rule{Freq: FreqDaily},
+		OverriddenStarts: []string{"2027-03-03T09:00:00Z"},
+	}, start, time.Date(2027, 3, 5, 0, 0, 0, 0, loc))
+
+	requireStarts(t, occ, loc, []string{
+		"2027-03-01T09:00:00Z",
+		"2027-03-02T09:00:00Z",
+		"2027-03-04T09:00:00Z",
+	})
+}
+
+// TestExpandOverriddenStartsAcceptBareDates covers the second shape an
+// overridden start can take, read the same way an exception is.
+func TestExpandOverriddenStartsAcceptBareDates(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	occ := Expand(Event{
+		StartAt:          start,
+		EndAt:            start.Add(time.Hour),
+		Rule:             &Rule{Freq: FreqDaily},
+		OverriddenStarts: []string{"2027-03-02"},
+	}, start, time.Date(2027, 3, 4, 0, 0, 0, 0, loc))
+
+	requireStarts(t, occ, loc, []string{
+		"2027-03-01T09:00:00Z",
+		"2027-03-03T09:00:00Z",
+	})
+}
+
+// TestExpandOverriddenStartsCountTowardsCount states the interaction
+// with COUNT, and that it is the same one cancellation has. A replaced
+// occurrence still happens — it was moved, not cancelled — so it is one
+// of the ten and consumes a count exactly as an ordinary occurrence
+// does. Neither kind of departure lengthens the series at the far end.
+func TestExpandOverriddenStartsCountTowardsCount(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	occ := Expand(Event{
+		StartAt:          start,
+		EndAt:            start.Add(time.Hour),
+		Rule:             &Rule{Freq: FreqDaily, Count: intPtr(3)},
+		Exceptions:       []string{"2027-03-02T09:00:00Z"},
+		OverriddenStarts: []string{"2027-03-03T09:00:00Z"},
+	}, start, time.Date(2027, 4, 1, 0, 0, 0, 0, loc))
+
+	requireStarts(t, occ, loc, []string{"2027-03-01T09:00:00Z"})
+}
+
+// TestExpandOverriddenStartsIgnoreTheWindow pins that the list is read
+// whole. An override may be moved anywhere, including out of the window
+// being expanded, so the starts it replaces arrive unfiltered: the ones
+// inside the window suppress, and the ones outside it are inert rather
+// than something to trim before calling.
+func TestExpandOverriddenStartsIgnoreTheWindow(t *testing.T) {
+	t.Parallel()
+	loc := time.UTC
+	start := time.Date(2027, 3, 1, 9, 0, 0, 0, loc)
+	occ := Expand(Event{
+		StartAt: start,
+		EndAt:   start.Add(time.Hour),
+		Rule:    &Rule{Freq: FreqDaily},
+		OverriddenStarts: []string{
+			"2027-03-03T09:00:00Z",
+			"2027-03-20T09:00:00Z",
+		},
+	}, time.Date(2027, 3, 2, 0, 0, 0, 0, loc), time.Date(2027, 3, 5, 0, 0, 0, 0, loc))
+
+	requireStarts(t, occ, loc, []string{
+		"2027-03-02T09:00:00Z",
+		"2027-03-04T09:00:00Z",
+	})
+}
+
 // TestExpandRangeFiltersByOverlap pins the range semantics: an
 // occurrence counts when it overlaps the window, so a meeting that
 // started before the window opened and is still running is returned.

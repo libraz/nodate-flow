@@ -4,7 +4,7 @@ import path from 'node:path';
 import { DateTime, Settings } from 'luxon';
 import { describe, expect, it } from 'vitest';
 
-import { expandRecurrence } from '../recurrence';
+import { expandAllRecurrences, expandRecurrence } from '../recurrence';
 
 interface RecurrenceGoldenFixture {
   name: string;
@@ -385,6 +385,129 @@ describe('expandRecurrence — empty filters', () => {
     expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
       '2026-07-01',
       '2026-07-02',
+    ]);
+  });
+});
+
+describe('expandRecurrence — overridden starts', () => {
+  // The second way an occurrence departs from its series: a separate row
+  // replaces it and renders at its own, possibly moved, time. The master
+  // emitting it as well is the same occurrence drawn twice.
+  it('does not emit an occurrence a separate override row replaces', () => {
+    const instances = expandRecurrence(
+      {
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1 },
+        overriddenStarts: ['2027-03-03T09:00:00Z'],
+      },
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-03-05T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2027-03-01',
+      '2027-03-02',
+      '2027-03-04',
+    ]);
+  });
+
+  it('accepts a bare date as an overridden start', () => {
+    const instances = expandRecurrence(
+      {
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1 },
+        overriddenStarts: ['2027-03-02'],
+      },
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-03-04T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2027-03-01',
+      '2027-03-03',
+    ]);
+  });
+
+  // A replaced occurrence still happens — it was moved, not cancelled —
+  // so it consumes a count exactly as an ordinary occurrence does, which
+  // is the same treatment cancellation gets. Neither kind of departure
+  // lengthens the series at the far end.
+  it('counts a replaced occurrence against COUNT, as a cancelled one is', () => {
+    const instances = expandRecurrence(
+      {
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1, count: 3 },
+        recurrenceExceptions: ['2027-03-02T09:00:00Z'],
+        overriddenStarts: ['2027-03-03T09:00:00Z'],
+      },
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-04-01T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual(['2027-03-01']);
+  });
+
+  // An override may be moved anywhere, including out of the window being
+  // expanded, so the starts it replaces arrive unfiltered: the ones inside
+  // the window suppress, and the ones outside it are inert rather than
+  // something to trim before calling.
+  it('suppresses within the window while ignoring starts outside it', () => {
+    const instances = expandRecurrence(
+      {
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1 },
+        overriddenStarts: ['2027-03-03T09:00:00Z', '2027-03-20T09:00:00Z'],
+      },
+      DateTime.fromISO('2027-03-02T00:00:00Z'),
+      DateTime.fromISO('2027-03-05T00:00:00Z'),
+    );
+    expect(instances.map((i) => i.startAt.toUTC().toFormat('yyyy-MM-dd'))).toEqual([
+      '2027-03-02',
+      '2027-03-04',
+    ]);
+  });
+});
+
+describe('expandAllRecurrences — overridden starts', () => {
+  // An override row has no rule of its own, so it flows through as an
+  // ordinary event and renders at its moved time. Both halves have to hold
+  // at once: the master drops the replaced occurrence, the override row
+  // supplies it.
+  it('passes an override row through while its master drops the occurrence', () => {
+    const events = [
+      {
+        id: 'master',
+        startAt: '2027-03-01T09:00:00Z',
+        endAt: '2027-03-01T10:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: { freq: 'daily' as const, interval: 1 },
+        overriddenStarts: ['2027-03-03T09:00:00Z'],
+      },
+      {
+        id: 'override',
+        startAt: '2027-03-03T14:00:00Z',
+        endAt: '2027-03-03T15:00:00Z',
+        timezone: 'UTC',
+        recurrenceRule: null,
+      },
+    ];
+
+    const expanded = expandAllRecurrences(
+      events,
+      DateTime.fromISO('2027-03-01T00:00:00Z'),
+      DateTime.fromISO('2027-03-05T00:00:00Z'),
+    );
+
+    expect(expanded.map((e) => `${e.id} ${DateTime.fromISO(e.startAt).toUTC().toISO()}`)).toEqual([
+      'master 2027-03-01T09:00:00.000Z',
+      'master 2027-03-02T09:00:00.000Z',
+      'master 2027-03-04T09:00:00.000Z',
+      'override 2027-03-03T14:00:00.000Z',
     ]);
   });
 });

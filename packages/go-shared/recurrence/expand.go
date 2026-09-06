@@ -89,6 +89,20 @@ type Event struct {
 	// full timestamps naming one occurrence, or bare YYYY-MM-DD dates
 	// naming a local day.
 	Exceptions []string
+	// OverriddenStarts are the occurrences a separate override row
+	// already stands in for: the recurrence_original_start of every row
+	// naming this event in recurrence_parent_id. Same two shapes as
+	// Exceptions.
+	//
+	// A second input rather than more entries in Exceptions, because
+	// the two say different things about the same occurrence: an
+	// exception says it does not happen, an overridden start says it
+	// happens elsewhere and the override row draws it. Merged into one
+	// list the expander could no longer tell a consumer which, and the
+	// master would still have to suppress both. Left unread the master
+	// emits the original occurrence while the override row renders at
+	// its moved time, so the same occurrence appears twice.
+	OverriddenStarts []string
 	// RecurrenceEnd is the calendar_events.recurrence_end column: an
 	// inclusive last instant for the series, stored alongside the rule
 	// rather than inside it.
@@ -194,6 +208,7 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	byMonthDay := evt.Rule.ByMonthDay
 
 	exactSkips, daySkips := buildExceptions(evt.Exceptions, loc)
+	overriddenExact, overriddenDays := buildExceptions(evt.OverriddenStarts, loc)
 
 	// RFC 5545 BYDAY expands a WEEKLY rule: WEEKLY;BYDAY=MO,WE yields an
 	// occurrence on each listed weekday of every included week, not just
@@ -237,9 +252,18 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 
 		// A cancelled occurrence still counts against COUNT: the series
 		// is "ten meetings", and cancelling one does not conjure an
-		// eleventh at the end.
+		// eleventh at the end. A replaced one counts for the stronger
+		// reason that it still happens — it was moved, not cancelled —
+		// so it consumes a count exactly as an ordinary occurrence
+		// does, and the ten meetings are still ten.
 		emitted++
 		if exactSkips[candidate.UTC().Unix()] || daySkips[candidate.Format("2006-01-02")] {
+			continue
+		}
+		// Suppressed by an override row, which renders this occurrence
+		// at its own time. A separate check from the exception one, so
+		// which of the two applies stays readable here.
+		if overriddenExact[candidate.UTC().Unix()] || overriddenDays[candidate.Format("2006-01-02")] {
 			continue
 		}
 		end := candidate.Add(duration)
@@ -428,9 +452,12 @@ func parseUntil(raw string, loc *time.Location) *time.Time {
 	return nil
 }
 
-// buildExceptions splits the stored exception list into the two kinds it
-// mixes: exact instants naming one occurrence, and bare dates naming a
-// local day.
+// buildExceptions splits a stored list of occurrence starts into the two
+// kinds it mixes: exact instants naming one occurrence, and bare dates
+// naming a local day.
+//
+// Exceptions and overridden starts are both read through here, so a
+// start written in either list matches the same candidate.
 func buildExceptions(values []string, loc *time.Location) (map[int64]bool, map[string]bool) {
 	exact := map[int64]bool{}
 	days := map[string]bool{}

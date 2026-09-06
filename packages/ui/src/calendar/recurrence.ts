@@ -10,6 +10,21 @@ interface RecurrenceEvent {
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[] | undefined;
   /**
+   * The occurrences a separate override row already stands in for: the
+   * `recurrence_original_start` of every row naming this event in
+   * `recurrence_parent_id`. Same two shapes as `recurrenceExceptions`.
+   *
+   * A second input rather than more entries in `recurrenceExceptions`,
+   * because the two say different things about the same occurrence: an
+   * exception says it does not happen, an overridden start says it
+   * happens elsewhere and the override row draws it. Merged into one
+   * list the expander could no longer tell a consumer which, and the
+   * master would still have to suppress both. Left unread the master
+   * emits the original occurrence while the override row renders at its
+   * moved time, so the same occurrence appears twice.
+   */
+  overriddenStarts?: string[] | undefined;
+  /**
    * The `recurrence_end` column: an inclusive last instant for the
    * series, stored beside the rule rather than inside it.
    *
@@ -139,6 +154,13 @@ function hasExplicitOffset(value: string): boolean {
   return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
 }
 
+/**
+ * Split a stored list of occurrence starts into the two kinds it mixes:
+ * exact instants naming one occurrence, and bare dates naming a local day.
+ *
+ * Exceptions and overridden starts are both read through here, so a start
+ * written in either list matches the same candidate.
+ */
 function buildRecurrenceExceptionSets(
   values: string[] | undefined,
   zone: Zone,
@@ -203,6 +225,7 @@ export function expandRecurrence(
       : (ruleUntil ?? (seriesEnd?.isValid ? seriesEnd : null));
   const maxCount = rule.count ?? Number.POSITIVE_INFINITY;
   const exceptions = buildRecurrenceExceptionSets(event.recurrenceExceptions, zone);
+  const overridden = buildRecurrenceExceptionSets(event.overriddenStarts, zone);
 
   const byDay = rule.byDay && rule.byDay.length > 0 ? rule.byDay : null;
   const byMonthDay = rule.byMonthDay && rule.byMonthDay.length > 0 ? rule.byMonthDay : null;
@@ -236,11 +259,23 @@ export function expandRecurrence(
         (!byMonthDay || matchesByMonthDay(candidate, byMonthDay));
 
     if (passes) {
+      // A cancelled occurrence still counts against COUNT: the series is
+      // "ten meetings", and cancelling one does not conjure an eleventh at
+      // the end. A replaced one counts for the stronger reason that it
+      // still happens — it was moved, not cancelled — so it consumes a
+      // count exactly as an ordinary occurrence does, and the ten meetings
+      // are still ten.
       emitted++;
       const excluded =
         exceptions.instants.has(candidate.toMillis()) ||
         exceptions.localDayKeys.has(candidate.toFormat('yyyy-MM-dd'));
-      if (!excluded) {
+      // Suppressed by an override row, which renders this occurrence at its
+      // own time. A separate check from the exception one, so which of the
+      // two applies stays readable here.
+      const replaced =
+        overridden.instants.has(candidate.toMillis()) ||
+        overridden.localDayKeys.has(candidate.toFormat('yyyy-MM-dd'));
+      if (!excluded && !replaced) {
         const instanceEnd = candidate.plus(duration);
         if (instanceEnd > rangeStart) {
           results.push({ startAt: candidate, endAt: instanceEnd });
@@ -252,7 +287,15 @@ export function expandRecurrence(
   return results;
 }
 
-/** Expand all recurring events in a list, merging with non-recurring events. */
+/**
+ * Expand all recurring events in a list, merging with non-recurring events.
+ *
+ * An override row has no `recurrenceRule` of its own, so it passes through
+ * as an ordinary event and renders at its moved time. That is the half of
+ * the model this function is responsible for; the master suppressing the
+ * occurrence it replaced needs `overriddenStarts` on the master, which the
+ * caller carries in alongside it.
+ */
 export function expandAllRecurrences<
   T extends {
     startAt: string;
@@ -260,6 +303,7 @@ export function expandAllRecurrences<
     timezone?: string;
     recurrenceRule?: RecurrenceRule | null;
     recurrenceExceptions?: string[];
+    overriddenStarts?: string[];
     recurrenceEnd?: string;
   },
 >(events: T[], rangeStart: DateTime, rangeEnd: DateTime): T[] {
@@ -278,6 +322,7 @@ export function expandAllRecurrences<
         timezone: event.timezone,
         recurrenceRule: event.recurrenceRule,
         recurrenceExceptions: event.recurrenceExceptions,
+        overriddenStarts: event.overriddenStarts,
         recurrenceEnd: event.recurrenceEnd,
       },
       rangeStart,
