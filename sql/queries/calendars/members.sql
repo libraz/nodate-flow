@@ -90,6 +90,10 @@ WHERE calendar_id = ?
 -- name: DisableCalendarMember :execresult
 -- Revoke a membership. The row survives so the grant history stays
 -- readable and so a later re-add updates it in place.
+-- This is one of two writers that retire a grant. The other is in
+-- memberkit, which retires every grant a user holds in a workspace when
+-- they leave the workspace rather than one calendar. A change to how a
+-- revoked grant is represented has to reach both.
 UPDATE calendar_members
 SET enabled = FALSE
 WHERE calendar_id = ?

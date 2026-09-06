@@ -130,6 +130,53 @@ describe('buildMonthGrid', () => {
       '2024-03-06',
     ]);
   });
+
+  // An override published beside its master is a second row drawn at its
+  // own time. Without overriddenStarts the master keeps emitting the
+  // occurrence the override replaced, so the same meeting appears twice on
+  // the one surface people outside the workspace read.
+  it('drops the occurrence an override published on the same share stands in for', () => {
+    const master = evt({
+      id: 'master',
+      startAt: utc(2024, 3, 5, 9),
+      endAt: utc(2024, 3, 5, 10),
+      recurrenceRule: { freq: 'daily', interval: 1, count: 3 },
+      overriddenStarts: ['2024-03-06T09:00:00Z'],
+    });
+    const override = evt({
+      id: 'override',
+      startAt: utc(2024, 3, 6, 14),
+      endAt: utc(2024, 3, 6, 15),
+    });
+
+    const expanded = expandShareEventsForMonth('2024-03-01', [master, override], 'UTC', 'sun');
+
+    expect(expanded.map((event) => [event.id, eventStartKey(event, 'UTC')])).toEqual([
+      ['master', '2024-03-05'],
+      ['master', '2024-03-07'],
+      ['override', '2024-03-06'],
+    ]);
+  });
+
+  // The server withholds the field for an override the share does not
+  // publish, and the page must then render the occurrence it was given
+  // rather than a hole.
+  it('keeps every occurrence when no overridden start is named', () => {
+    const master = evt({
+      id: 'master',
+      startAt: utc(2024, 3, 5, 9),
+      endAt: utc(2024, 3, 5, 10),
+      recurrenceRule: { freq: 'daily', interval: 1, count: 3 },
+    });
+
+    const expanded = expandShareEventsForMonth('2024-03-01', [master], 'UTC', 'sun');
+
+    expect(expanded.map((event) => eventStartKey(event, 'UTC'))).toEqual([
+      '2024-03-05',
+      '2024-03-06',
+      '2024-03-07',
+    ]);
+  });
 });
 
 describe('shiftMonthAnchor', () => {

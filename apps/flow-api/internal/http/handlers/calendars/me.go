@@ -125,6 +125,11 @@ type ListMyCalendarEventsInput struct {
 // /me/calendar-events response. It carries workspace context per row so
 // the caller can group/filter client-side without a second round-trip
 // per workspace.
+//
+// OverriddenStarts carries ISO-8601 instants rather than the unix seconds
+// the rest of this DTO uses for time, for the reason spelled out on
+// [CrossCalendarEventResponse]: the same client-side parser reads it and
+// RecurrenceExceptions.
 type MyCalendarEventResponse struct {
 	ID                   string           `json:"id"`
 	CalendarID           string           `json:"calendarId"`
@@ -150,6 +155,7 @@ type MyCalendarEventResponse struct {
 	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty"`
 	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
+	OverriddenStarts     []string         `json:"overriddenStarts,omitempty" doc:"Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only."`
 	UpdatedAt            *int64           `json:"updatedAt,omitempty"`
 	CreatedAt            int64            `json:"createdAt"`
 }
@@ -202,6 +208,20 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			StartAt:       sql.NullTime{Time: endTime, Valid: true},
 			RecurrenceEnd: sql.NullTime{Time: startTime, Valid: true},
 		})
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
+		}
+
+		// One batched read per workspace represented in the page, not one
+		// per row. Only a row carrying a rule can be overridden — an
+		// override names its master, never another override — so the ids
+		// come from the recurring result alone and the non-recurring rows
+		// below never carry the field.
+		mastersByWorkspace := make(map[uint32][]uint32, 1)
+		for _, r := range recurringRows {
+			mastersByWorkspace[r.WorkspaceID] = append(mastersByWorkspace[r.WorkspaceID], r.ID)
+		}
+		overridden, err := overriddenStartsByWorkspaceMaster(ctx, deps.CalendarQueries, actorID, mastersByWorkspace)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
@@ -267,6 +287,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			if r.RecurrenceRule != nil {
 				raw := json.RawMessage(r.RecurrenceRule)
 				resp.RecurrenceRule = &raw
+				resp.OverriddenStarts = overridden[r.WorkspaceID][r.ID]
 			}
 			resp.RecurrenceEnd = dbtype.UnixSecondsFromNullTime(r.RecurrenceEnd)
 			if r.RecurrenceExceptions != nil {

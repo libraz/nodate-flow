@@ -174,6 +174,10 @@ type Querier interface {
 	DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error)
 	// Revoke a membership. The row survives so the grant history stays
 	// readable and so a later re-add updates it in place.
+	// This is one of two writers that retire a grant. The other is in
+	// memberkit, which retires every grant a user holds in a workspace when
+	// they leave the workspace rather than one calendar. A change to how a
+	// revoked grant is represented has to reach both.
 	DisableCalendarMember(ctx context.Context, arg DisableCalendarMemberParams) (sql.Result, error)
 	// Soft-delete a memo.
 	DisableCalendarMemo(ctx context.Context, arg DisableCalendarMemoParams) (int64, error)
@@ -419,6 +423,12 @@ type Querier interface {
 	// non-recurring query. Clients expand RRULE instances client-side via
 	// the shared recurrence expander. The owner is LEFT JOINed for the same
 	// reason as in the non-recurring query.
+	//
+	// ce.id is selected for the same reason as in the cross-calendar variant:
+	// a master has to be grouped against reads keyed on the internal id, and
+	// ListCalendarEventOverriddenStarts names its masters by that key alone.
+	// It is an internal surrogate key and must not reach an API response —
+	// sqlc tags it json:"-" via the *.id override.
 	ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error)
 	// Unauthenticated public-render query. Final safety gate on event
 	// visibility and start_at IS NOT NULL. expires_at is checked in the
@@ -430,6 +440,14 @@ type Querier interface {
 	// events on the world-readable page while removing them from the editor
 	// that would have been used to take them down — the one state with no
 	// way out short of deleting the whole share.
+	//
+	// id, recurrence_parent_id and recurrence_original_start are selected so
+	// the handler can tell, from this result alone, which occurrence of a
+	// master an override row published on the same share already draws. Both
+	// ends of that link have to be attached for it to matter, so reading it
+	// off the rows the page is built from is also what scopes it: an override
+	// the share does not publish is not in this result and subtracts nothing.
+	// All three are internal and none reaches the response.
 	ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error)
 	// List events published on a share for the workspace-authenticated
 	// editor UI. Returns full event metadata so the editor can show what is

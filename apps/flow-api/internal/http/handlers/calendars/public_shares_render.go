@@ -28,6 +28,12 @@ import (
 // authenticated API arrived as two different types, and the client grew
 // two recurrence parsers that had already drifted apart. One wire shape
 // is what lets one parser serve both.
+//
+// OverriddenStarts is spelled the same way it is on EventResponse and
+// CrossCalendarEventResponse — a list of RFC 3339 UTC instants — for the
+// same reason: the expander reads it and RecurrenceExceptions through one
+// parser, and the public page runs the same expander the app does. What
+// differs is its scope, not its shape: see overriddenStartsByShareEvent.
 type PublicShareRenderEvent struct {
 	ID             string           `json:"id"`
 	Title          string           `json:"title"`
@@ -46,6 +52,7 @@ type PublicShareRenderEvent struct {
 	RecurrenceEnd  *int64           `json:"recurrenceEnd,omitempty"`
 	// Array of ISO 8601 dates/times to exclude from recurrence.
 	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
+	OverriddenStarts     []string         `json:"overriddenStarts,omitempty" doc:"Occurrence starts an override row published on this same share already stands in for (RFC 3339 UTC). Recurring masters only."`
 }
 
 // PublicShareRenderPage is the workspace-facing metadata exposed on the
@@ -113,6 +120,8 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 			WorkspaceName:       page.WorkspaceName,
 			CreatedAt:           handlerutil.TimeToUnix(page.CreatedAt),
 		}
+		overridden := overriddenStartsByShareEvent(events)
+
 		out.Body.Events = make([]PublicShareRenderEvent, len(events))
 		for i, e := range events {
 			ev := PublicShareRenderEvent{
@@ -134,6 +143,7 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				RecurrenceExceptions: rawMessagePtr(
 					e.RecurrenceExceptions,
 				),
+				OverriddenStarts: overridden[e.EventID],
 			}
 			// `private`-visibility events honour a "time only" contract on
 			// the public, unauthenticated page: the time block stays visible

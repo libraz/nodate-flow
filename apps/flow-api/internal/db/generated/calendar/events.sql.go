@@ -1179,6 +1179,7 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 
 const listMyRecurringCalendarEventsAcrossWorkspaces = `-- name: ListMyRecurringCalendarEventsAcrossWorkspaces :many
 SELECT
+  ce.id,
   ce.public_id,
   ce.calendar_id,
   c.public_id AS calendar_public_id,
@@ -1263,6 +1264,7 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesParams struct {
 }
 
 type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
+	ID                        uint32                          `json:"-"`
 	PublicID                  types.PublicID                  `json:"publicId"`
 	CalendarID                uint32                          `json:"-"`
 	CalendarPublicID          types.PublicID                  `json:"calendarPublicId"`
@@ -1301,6 +1303,12 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 // non-recurring query. Clients expand RRULE instances client-side via
 // the shared recurrence expander. The owner is LEFT JOINed for the same
 // reason as in the non-recurring query.
+//
+// ce.id is selected for the same reason as in the cross-calendar variant:
+// a master has to be grouped against reads keyed on the internal id, and
+// ListCalendarEventOverriddenStarts names its masters by that key alone.
+// It is an internal surrogate key and must not reach an API response —
+// sqlc tags it json:"-" via the *.id override.
 func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Context, arg ListMyRecurringCalendarEventsAcrossWorkspacesParams) ([]ListMyRecurringCalendarEventsAcrossWorkspacesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMyRecurringCalendarEventsAcrossWorkspaces,
 		arg.ViewerUserID,
@@ -1317,6 +1325,7 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 	for rows.Next() {
 		var i ListMyRecurringCalendarEventsAcrossWorkspacesRow
 		if err := rows.Scan(
+			&i.ID,
 			&i.PublicID,
 			&i.CalendarID,
 			&i.CalendarPublicID,

@@ -90,6 +90,7 @@ type RecurrenceExpansionInput<T> = {
   timezone: string;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[];
+  overriddenStarts?: string[];
   recurrenceEnd?: string;
 };
 type WeekStart = 'mon' | 'sun' | 'sat';
@@ -257,7 +258,16 @@ function recurrenceRule(value: unknown): RecurrenceRule | null {
   return value as RecurrenceRule;
 }
 
-function recurrenceExceptions(value: unknown): string[] | undefined {
+/**
+ * Read a list of occurrence starts off an event row.
+ *
+ * `recurrenceExceptions` and `overriddenStarts` are the same wire shape —
+ * an array of RFC 3339 instants or bare `YYYY-MM-DD` days — and the
+ * expander reads both through one parser, so they are narrowed here by
+ * one function too. `recurrenceExceptions` is typed `unknown` by the
+ * generated SDK, hence the runtime check rather than a cast.
+ */
+function occurrenceStarts(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const strings = value.filter((v): v is string => typeof v === 'string');
   return strings.length > 0 ? strings : undefined;
@@ -273,14 +283,21 @@ function isoToSeconds(iso: string): number | undefined {
   return Math.floor(millis / 1000);
 }
 
-function expandCalendarEvents(
+/**
+ * Turn the stored rows from `/me/calendar-events` into the occurrences the
+ * grid draws: recurring masters expand into instances, everything else —
+ * including an override row, which carries no rule of its own — passes
+ * through unchanged.
+ */
+export function expandCalendarEvents(
   events: CalendarEvent[],
   rangeStart: Date,
   rangeEnd: Date,
 ): CalendarEvent[] {
   const recurrenceInput: RecurrenceExpansionInput<CalendarEvent>[] = events.map((event) => {
     const rule = recurrenceRule(event.recurrenceRule);
-    const exceptions = recurrenceExceptions(event.recurrenceExceptions);
+    const exceptions = occurrenceStarts(event.recurrenceExceptions);
+    const overridden = occurrenceStarts(event.overriddenStarts);
     const input: RecurrenceExpansionInput<CalendarEvent> = {
       event,
       startAt: typeof event.startAt === 'number' ? secondsToIso(event.startAt) : '',
@@ -294,6 +311,10 @@ function expandCalendarEvents(
       recurrenceRule: rule,
     };
     if (exceptions) input.recurrenceExceptions = exceptions;
+    // The occurrences an override row already stands in for. Dropped here
+    // the master keeps emitting the original occurrence while the override
+    // row draws its moved copy, so one occurrence appears twice.
+    if (overridden) input.overriddenStarts = overridden;
     // recurrence_end is the second upper bound on a series; without it a
     // series the API was told to stop keeps being drawn.
     if (typeof event.recurrenceEnd === 'number') {

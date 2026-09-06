@@ -28,6 +28,7 @@ type RecurrenceExpansionInput<T> = {
   timezone: string;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[];
+  overriddenStarts?: string[];
 };
 
 /**
@@ -309,7 +310,18 @@ function recurrenceRule(value: unknown): RecurrenceRule | null {
   return parsed as RecurrenceRule;
 }
 
-function recurrenceExceptions(value: unknown): string[] | undefined {
+/**
+ * Read a list of occurrence starts off a share event row.
+ *
+ * `recurrenceExceptions` and `overriddenStarts` are the same wire shape —
+ * an array of RFC 3339 instants or bare `YYYY-MM-DD` days — and the
+ * expander reads both through one parser, so they are narrowed here by one
+ * function too. `recurrenceExceptions` arrives as the stored JSON and is
+ * typed `unknown` by the generated SDK, hence `parseJsonMaybe` ahead of the
+ * runtime check; `overriddenStarts` is already an array and passes through
+ * it untouched.
+ */
+function occurrenceStarts(value: unknown): string[] | undefined {
   const parsed = parseJsonMaybe(value);
   if (!Array.isArray(parsed)) return undefined;
   const strings = parsed.filter((v): v is string => typeof v === 'string');
@@ -336,7 +348,8 @@ export function expandShareEventsForMonth(
   const { gridStart, gridEndExclusive } = monthGridBounds(monthAnchorKey, weekStart);
   const recurrenceInput: RecurrenceExpansionInput<ShareEvent>[] = events.map((event) => {
     const rule = recurrenceRule(event.recurrenceRule);
-    const exceptions = recurrenceExceptions(event.recurrenceExceptions);
+    const exceptions = occurrenceStarts(event.recurrenceExceptions);
+    const overridden = occurrenceStarts(event.overriddenStarts);
     const input: RecurrenceExpansionInput<ShareEvent> = {
       event,
       startAt: typeof event.startAt === 'number' ? secondsToIso(event.startAt) : '',
@@ -350,6 +363,12 @@ export function expandShareEventsForMonth(
       recurrenceRule: rule,
     };
     if (exceptions) input.recurrenceExceptions = exceptions;
+    // The occurrences an override row published on this same share already
+    // draws. Dropped here the master keeps emitting the original occurrence
+    // while the override draws its own copy, so an outsider sees one meeting
+    // twice — on the surface where a wrong time is what people outside the
+    // workspace act on.
+    if (overridden) input.overriddenStarts = overridden;
     return input;
   });
 

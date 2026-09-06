@@ -2995,6 +2995,13 @@
           "location": {
             "type": "string"
           },
+          "overriddenStarts": {
+            "description": "Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only.",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
           "recurrenceEnd": {
             "format": "int64",
             "type": "integer"
@@ -7131,6 +7138,13 @@
           "location": {
             "type": "string"
           },
+          "overriddenStarts": {
+            "description": "Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only.",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
           "ownerUserId": {
             "type": "string"
           },
@@ -9034,6 +9048,13 @@
           },
           "memo": {
             "type": "string"
+          },
+          "overriddenStarts": {
+            "description": "Occurrence starts an override row published on this same share already stands in for (RFC 3339 UTC). Recurring masters only.",
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
           },
           "recurrenceEnd": {
             "format": "int64",

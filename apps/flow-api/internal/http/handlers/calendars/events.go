@@ -287,6 +287,15 @@ type ListCalendarEventsInput struct {
 
 // CrossCalendarEventResponse is the JSON representation of a cross-calendar event.
 // StartAt / EndAt are nullable (see EventResponse).
+//
+// OverriddenStarts carries ISO-8601 instants rather than the unix seconds
+// the rest of this DTO uses for time. It is read by the same client-side
+// parser as RecurrenceExceptions, which is the stored ISO-8601 list served
+// through verbatim, and the two say different things about the same
+// occurrence: an exception says it does not happen, an overridden start
+// says a separate override row draws it instead. Spelling one of them in
+// seconds would need a second parser for a list the expander already reads
+// through one.
 type CrossCalendarEventResponse struct {
 	ID                   string           `json:"id"`
 	CalendarID           string           `json:"calendarId"`
@@ -304,6 +313,7 @@ type CrossCalendarEventResponse struct {
 	RecurrenceRule       *json.RawMessage `json:"recurrenceRule,omitempty"`
 	RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty"`
 	RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty"`
+	OverriddenStarts     []string         `json:"overriddenStarts,omitempty" doc:"Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only."`
 	UpdatedAt            *int64           `json:"updatedAt,omitempty"`
 	CreatedAt            int64            `json:"createdAt"`
 }
@@ -1190,6 +1200,19 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
 		}
 
+		// One batched read for the whole page. Only a row carrying a rule
+		// can be overridden — an override names its master, never another
+		// override — so the ids come from the recurring result alone and
+		// the non-recurring rows below never carry the field.
+		masterIDs := make([]uint32, 0, len(recurringRows))
+		for _, r := range recurringRows {
+			masterIDs = append(masterIDs, r.ID)
+		}
+		overridden, err := overriddenStartsByMaster(ctx, deps.CalendarQueries, wsID, actorID, masterIDs)
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventListQueryInterrupted)
+		}
+
 		out := &ListCalendarEventsOutput{}
 		out.Body.Events = make([]CrossCalendarEventResponse, 0, len(rows)+len(recurringRows))
 
@@ -1235,6 +1258,7 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			if r.RecurrenceRule != nil {
 				raw := json.RawMessage(r.RecurrenceRule)
 				resp.RecurrenceRule = &raw
+				resp.OverriddenStarts = overridden[r.ID]
 			}
 			resp.RecurrenceEnd = dbtype.UnixSecondsFromNullTime(r.RecurrenceEnd)
 			if r.RecurrenceExceptions != nil {

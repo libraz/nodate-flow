@@ -404,7 +404,14 @@ LIMIT 2000;
 -- non-recurring query. Clients expand RRULE instances client-side via
 -- the shared recurrence expander. The owner is LEFT JOINed for the same
 -- reason as in the non-recurring query.
+--
+-- ce.id is selected for the same reason as in the cross-calendar variant:
+-- a master has to be grouped against reads keyed on the internal id, and
+-- ListCalendarEventOverriddenStarts names its masters by that key alone.
+-- It is an internal surrogate key and must not reach an API response —
+-- sqlc tags it json:"-" via the *.id override.
 SELECT
+  ce.id,
   ce.public_id,
   ce.calendar_id,
   c.public_id AS calendar_public_id,

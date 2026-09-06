@@ -386,6 +386,7 @@ func (q *Queries) FindPublicShareByTokenHash(ctx context.Context, tokenHash stri
 
 const listPublicShareEventsByTokenHash = `-- name: ListPublicShareEventsByTokenHash :many
 SELECT
+  ce.id AS event_id,
   ce.public_id AS event_public_id,
   ce.title,
   ce.start_at,
@@ -404,6 +405,8 @@ SELECT
   COALESCE(ce.recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
   ce.recurrence_end,
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
+  ce.recurrence_parent_id,
+  ce.recurrence_original_start,
   cpse.sort_weight AS link_sort_weight
 FROM calendar_public_shares cps
 INNER JOIN calendar_public_share_events cpse ON cpse.share_id = cps.id AND cpse.enabled = TRUE
@@ -418,6 +421,7 @@ LIMIT 2000
 `
 
 type ListPublicShareEventsByTokenHashRow struct {
+	EventID                   uint32                          `json:"-"`
 	EventPublicID             types.PublicID                  `json:"eventPublicId"`
 	Title                     string                          `json:"title"`
 	StartAt                   sql.NullTime                    `json:"startAt"`
@@ -436,6 +440,8 @@ type ListPublicShareEventsByTokenHashRow struct {
 	RecurrenceRule            json.RawMessage                 `json:"recurrenceRule"`
 	RecurrenceEnd             sql.NullTime                    `json:"recurrenceEnd"`
 	RecurrenceExceptions      json.RawMessage                 `json:"recurrenceExceptions"`
+	RecurrenceParentID        sql.NullInt32                   `json:"-"`
+	RecurrenceOriginalStart   sql.NullTime                    `json:"recurrenceOriginalStart"`
 	LinkSortWeight            int32                           `json:"linkSortWeight"`
 }
 
@@ -449,6 +455,14 @@ type ListPublicShareEventsByTokenHashRow struct {
 // events on the world-readable page while removing them from the editor
 // that would have been used to take them down — the one state with no
 // way out short of deleting the whole share.
+//
+// id, recurrence_parent_id and recurrence_original_start are selected so
+// the handler can tell, from this result alone, which occurrence of a
+// master an override row published on the same share already draws. Both
+// ends of that link have to be attached for it to matter, so reading it
+// off the rows the page is built from is also what scopes it: an override
+// the share does not publish is not in this result and subtracts nothing.
+// All three are internal and none reaches the response.
 func (q *Queries) ListPublicShareEventsByTokenHash(ctx context.Context, tokenHash string) ([]ListPublicShareEventsByTokenHashRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPublicShareEventsByTokenHash, tokenHash)
 	if err != nil {
@@ -459,6 +473,7 @@ func (q *Queries) ListPublicShareEventsByTokenHash(ctx context.Context, tokenHas
 	for rows.Next() {
 		var i ListPublicShareEventsByTokenHashRow
 		if err := rows.Scan(
+			&i.EventID,
 			&i.EventPublicID,
 			&i.Title,
 			&i.StartAt,
@@ -477,6 +492,8 @@ func (q *Queries) ListPublicShareEventsByTokenHash(ctx context.Context, tokenHas
 			&i.RecurrenceRule,
 			&i.RecurrenceEnd,
 			&i.RecurrenceExceptions,
+			&i.RecurrenceParentID,
+			&i.RecurrenceOriginalStart,
 			&i.LinkSortWeight,
 		); err != nil {
 			return nil, err

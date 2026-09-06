@@ -6351,6 +6351,8 @@ export interface components {
             id: string;
             kind: string;
             location?: string;
+            /** @description Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only. */
+            overriddenStarts?: string[] | null;
             /** Format: int64 */
             recurrenceEnd?: number;
             recurrenceExceptions?: unknown;
@@ -8262,6 +8264,8 @@ export interface components {
             id: string;
             kind: string;
             location?: string;
+            /** @description Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only. */
+            overriddenStarts?: string[] | null;
             ownerUserId: string;
             /** Format: int64 */
             recurrenceEnd?: number;
@@ -9119,6 +9123,8 @@ export interface components {
             kind: string;
             location?: string;
             memo?: string;
+            /** @description Occurrence starts an override row published on this same share already stands in for (RFC 3339 UTC). Recurring masters only. */
+            overriddenStarts?: string[] | null;
             /** Format: int64 */
             recurrenceEnd?: number;
             recurrenceExceptions?: unknown;
