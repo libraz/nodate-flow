@@ -91,7 +91,12 @@ func main() {
 	// Same contract as scripts/gen-signal-kinds.go --check: rebuild every
 	// output in memory, compare against what is committed, write nothing,
 	// exit 1 on any disagreement.
-	if len(os.Args) > 1 && os.Args[1] == "--check" {
+	check, err := parseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gen-errors:", err)
+		os.Exit(2)
+	}
+	if check {
 		res, err := run(true)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -105,6 +110,32 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Fprintln(os.Stdout, "gen-errors: ok")
+}
+
+const argUsage = `usage: gen-errors [--check]
+  (no argument)  regenerate every output from errors/*.yaml
+  --check        rebuild every output in memory and compare it against what
+                 is committed; write nothing, exit 1 on any disagreement`
+
+// parseArgs reports whether the caller asked for --check, and refuses
+// anything else. Generating is the destructive mode, so an argument the
+// generator does not understand must not fall through to it: a caller
+// asking for a verification would get its working tree rewritten and be
+// told the run succeeded, which turns a check into a mutation that
+// reports as clean.
+//
+// Kept identical to the function of the same name in
+// scripts/gen-signal-kinds.go.
+func parseArgs(args []string) (bool, error) {
+	check := false
+	for _, a := range args {
+		if a == "--check" {
+			check = true
+			continue
+		}
+		return false, fmt.Errorf("unknown argument %q\n%s", a, argUsage)
+	}
+	return check, nil
 }
 
 // run builds every output from the YAML catalog. With check set it

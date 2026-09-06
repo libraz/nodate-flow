@@ -26,6 +26,7 @@
 //
 //	0 — every selector matches at least one column
 //	1 — a selector matches nothing
+//	2 — the command line was not understood
 //
 //go:build ignore
 
@@ -40,7 +41,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const argUsage = `usage: check-sqlc-overrides
+  The check takes no arguments. It always compares the override selectors in
+  sql/sqlc.yaml against sql/schema.sql and sql/queries/**.`
+
 func main() {
+	// Accepting an argument and ignoring it would answer a question that was
+	// never asked: a caller passing a flag this command does not have would
+	// read the success line as a verdict on the flag it named.
+	if len(os.Args) > 1 {
+		fmt.Fprintf(os.Stderr, "check-sqlc-overrides: unknown argument %q\n%s\n", os.Args[1], argUsage)
+		os.Exit(2)
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

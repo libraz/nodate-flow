@@ -30,6 +30,39 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getOrCreateProvider } from '@nodate-flow/holidays';
 
+const ARG_USAGE = `usage: bun run scripts/gen-holidays.ts [--check]
+  (no argument)  regenerate the dataset from the holiday provider
+  --check        rebuild the dataset in memory and compare it against what
+                 is committed; write nothing, exit 1 on any disagreement`;
+
+/**
+ * Reports whether the caller asked for `--check`, and refuses anything else.
+ *
+ * Regenerating is the destructive mode, so an argument the generator does not
+ * understand must not fall through to it: a caller asking for a verification
+ * would get its working tree rewritten and be told the run succeeded, which
+ * turns a check into a mutation that reports as clean.
+ *
+ * Every argument is examined rather than only looking for a recognised flag
+ * somewhere in the list, so an unexplained positional cannot ride along with
+ * `--check`. Same handling as the Go generators.
+ */
+function parseArgs(args: string[]): boolean {
+  let check = false;
+  for (const arg of args) {
+    if (arg === '--check') {
+      check = true;
+      continue;
+    }
+    console.error(`gen-holidays: unknown argument ${JSON.stringify(arg)}\n${ARG_USAGE}`);
+    process.exit(2);
+  }
+  return check;
+}
+
+/** Parsed before any provider work, so a bad argument fails immediately. */
+const CHECK = parseArgs(process.argv.slice(2));
+
 /**
  * Inclusive year range baked into the dataset. Fixed absolute years rather
  * than an offset from "today" so that regenerating produces a byte-identical
@@ -149,7 +182,7 @@ function firstDifference(committed: string, fresh: string): string {
 
 const total = Object.values(countries).reduce((n, d) => n + d.length, 0);
 
-if (process.argv.slice(2).includes('--check')) {
+if (CHECK) {
   let committed: string | null = null;
   try {
     committed = readFileSync(outPath, 'utf8');
