@@ -11,13 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.0"
-  BUN_VERSION: "1.4.1"
+  GO_VERSION: "1.26.8"
+  BUN_VERSION: "1.4.2"
   # Pinned for the same reason the Go and bun versions are: a linter
   # release that adds a check would otherwise turn main red on its own
   # schedule, and it would disagree with the version a contributor has
   # installed locally.
-  GOLANGCI_LINT_VERSION: "v2.11.4"
+  GOLANGCI_LINT_VERSION: "v2.13.2"
 
 jobs:
   web:
@@ -192,14 +192,14 @@ jobs:
 
       # Public repo: codecov runs tokenless. Uploads never gate CI.
       - name: Upload coverage (flow-web)
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: apps/flow-web/coverage/lcov.info
           flags: flow-web
           fail_ci_if_error: false
 
       - name: Upload coverage (accounts-web)
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: apps/accounts-web/coverage/lcov.info
           flags: accounts-web
@@ -218,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           # The two services are dumped, then the tool module merges the
@@ -268,7 +268,7 @@ jobs:
       # nothing else in the pipeline can tell them apart: a field the
       # generator never emitted simply does not exist, so the build succeeds
       # and the tests pass while the column is unreachable.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
@@ -333,7 +333,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -409,14 +409,14 @@ jobs:
 
       # Public repo: codecov runs tokenless. Uploads never gate CI.
       - name: Upload coverage (flow-api)
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: apps/flow-api/coverage.out
           flags: flow-api
           fail_ci_if_error: false
 
       - name: Upload coverage (auth-api)
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: apps/auth-api/coverage.out
           flags: auth-api

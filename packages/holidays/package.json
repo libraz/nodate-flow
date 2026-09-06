@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "date-holidays": "^3.36.0"
+    "date-holidays": "^3.36.1"
   },
   "devDependencies": {
     "bun-types": "^1.4.2",

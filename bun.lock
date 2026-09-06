@@ -134,7 +134,7 @@
       "name": "@nodate-flow/holidays",
       "version": "0.0.1",
       "dependencies": {
-        "date-holidays": "^3.36.0",
+        "date-holidays": "^3.36.1",
       },
       "devDependencies": {
         "bun-types": "^1.4.2",
@@ -812,7 +812,7 @@
 
     "date-easter": ["date-easter@1.0.3", "", {}, "sha512-aOViyIgpM4W0OWUiLqivznwTtuMlD/rdUWhc5IatYnplhPiWrLv75cnifaKYhmQwUBLAMWLNG4/9mlLIbXoGBQ=="],
 
-    "date-holidays": ["date-holidays@3.36.0", "", { "dependencies": { "date-holidays-parser": "^3.4.7", "js-yaml": "^5.3.0", "lodash": "^4.18.1", "prepin": "^1.0.3" }, "bin": { "holidays2json": "scripts/holidays2json.cjs" } }, "sha512-uKcRwVgaIC5jEbm2Z4LQzXmTDulWcO+6kQie3GLoAiS1sYfpWmq1qrlrDHmo2BXGyIxT5o7IO0Z/jVQUZgJsCg=="],
+    "date-holidays": ["date-holidays@3.36.1", "", { "dependencies": { "date-holidays-parser": "^3.4.7", "js-yaml": "^5.3.0", "lodash": "^4.18.1", "prepin": "^1.0.3" }, "bin": { "holidays2json": "scripts/holidays2json.cjs" } }, "sha512-bdLF4I824OWcaEbYoTAWAn50DDfnAW0x4hn+66qRXi6YeFjF0NhbuXys/b0uMdGfcdCuetG3btbIEo/J1w2JFg=="],
 
     "date-holidays-parser": ["date-holidays-parser@3.4.7", "", { "dependencies": { "astronomia": "^4.1.1", "caldate": "^2.0.5", "date-bengali-revised": "^2.0.2", "date-chinese": "^2.1.4", "date-easter": "^1.0.3", "deepmerge": "^4.3.1", "jalaali-js": "^1.2.7", "moment-timezone": "^0.5.47" } }, "sha512-h09ZEtM6u5cYM6m1bX+1Ny9f+nLO9KVZUKNPEnH7lhbXYTfqZogaGTnhONswGeIJFF91UImIftS3CdM9HLW5oQ=="],
 

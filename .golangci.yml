@@ -124,6 +124,14 @@ linters:
       - path: ^packages/go-shared/logutil/
         linters:
           - forbidigo
+      # Cookies these tests build are inbound ones — what a browser sends
+      # back on a request. Secure, HttpOnly and SameSite are Set-Cookie
+      # attributes; a cookie arriving on a request carries a name and a
+      # value and nothing else, so there is no attribute here to omit.
+      - path: ^apps/auth-api/internal/http/handlers/auth/.*_test\.go$
+        text: G124
+        linters:
+          - gosec
     paths:
       - ^apps/flow-api/internal/db/generated/
       - ^apps/flow-api/internal/errors/
