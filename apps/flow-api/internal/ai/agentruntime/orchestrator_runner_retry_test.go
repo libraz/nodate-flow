@@ -79,13 +79,13 @@ func (f *flakyQuerier) InsertHandoffToUserEvent(ctx context.Context, arg generat
 	return f.fakeRunnerQuerier.InsertHandoffToUserEvent(ctx, arg)
 }
 
-func (f *flakyQuerier) UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) error {
+func (f *flakyQuerier) UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error) {
 	f.fmu.Lock()
 	f.memoAttempts++
 	if f.failMemo > 0 {
 		f.failMemo--
 		f.fmu.Unlock()
-		return f.injected
+		return 0, f.injected
 	}
 	f.fmu.Unlock()
 	return f.fakeRunnerQuerier.UpdateTaskAgentMemo(ctx, arg)

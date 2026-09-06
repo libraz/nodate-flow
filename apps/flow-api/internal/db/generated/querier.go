@@ -2247,7 +2247,14 @@ type Querier interface {
 	// patch remove keys. COALESCE with JSON_OBJECT() handles the initial NULL
 	// case so the first write does not need a separate INSERT path. workspace_id
 	// is required as a defence-in-depth tenant scope.
-	UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) error
+	// The enabled = TRUE guard means this statement can succeed and still match
+	// nothing, so the affected-row count is part of the result and callers must
+	// read it. Zero rows means the task is gone or disabled: the merge patch was
+	// not applied, and any counter the caller believed it had just advanced --
+	// the attempt count, the handoff count, the handoff status -- still holds its
+	// old value. Treating zero as success leaves the agent loop budget frozen and
+	// the same handoff eligible for retry on the next pass.
+	UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) (int64, error)
 	// Update only the sort_weight for a single task within a workspace.
 	// Used by the bulk reorder endpoint inside a transaction.
 	// updated_by_user_id is appended so reorder edits are attributed to the

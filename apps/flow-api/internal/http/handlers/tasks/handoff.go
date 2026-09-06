@@ -202,6 +202,9 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 // emits an agent.task.handoff_to_user event tagged with the prior agent
 // as actor. Wrapped in a single transaction so observers see either the
 // full handoff or none of it.
+//
+// A task that stops being live between the ACL that resolved it and the
+// memo write answers WS_TASK_NOT_FOUND: see [recordHandoffToUser].
 func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*HandoffToUserOutput, error) {
 	return func(ctx context.Context, in *HandoffToUserInput) (*HandoffToUserOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -327,24 +330,16 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 			}
 		}
 
-		if err := qtx.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
-			Column1:     memoJSON,
-			WorkspaceID: ws.ID,
-			ID:          task.ID,
+		if err := recordHandoffToUser(ctx, qtx, handoffToUserWrites{
+			workspaceID:   ws.ID,
+			taskID:        task.ID,
+			priorAgentID:  priorAgent.ID,
+			eventPublicID: eventPub,
+			memoPatch:     memoJSON,
+			payload:       payloadJSON,
+			occurredAt:    now,
 		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true} //#nosec G115 -- tasks.id is BIGINT UNSIGNED, fits int32 within realistic deployments
-		if _, err := qtx.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
-			PublicID:     eventPub,
-			WorkspaceID:  ws.ID,
-			TaskID:       taskID,
-			ActorAgentID: sql.NullInt32{Int32: int32(priorAgent.ID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
-			PayloadJson:  payloadJSON,
-			OccurredAt:   now,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, err
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -374,6 +369,61 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 		}
 		return &HandoffToUserOutput{Body: rowToTaskFromFind(row)}, nil
 	}
+}
+
+// handoffToUserWrites are the two rows that record a hand-back: the
+// state the task carries afterwards, and the event that announces it.
+type handoffToUserWrites struct {
+	workspaceID   uint32
+	taskID        uint32
+	priorAgentID  uint32
+	eventPublicID types.PublicID
+	memoPatch     json.RawMessage
+	payload       json.RawMessage
+	occurredAt    time.Time
+}
+
+// recordHandoffToUser writes the hand-back state and then the event that
+// announces it, and answers with the error the request fails on.
+//
+// The memo statement matches an enabled task only, so it can succeed and
+// change nothing. The task was resolved through the task ACL before this
+// request opened its transaction, so a zero count is that task having been
+// disabled or removed since — the same condition the handler answers with
+// WS.TASK.NOT_FOUND when it cannot resolve a task at all, seen a moment
+// later.
+//
+// The order is what makes that answer worth giving. The event is the
+// visible half of a hand-back and the memo patch is the state behind it,
+// so writing the event first would leave a request that under-recorded
+// looking, to every reader, exactly like one that succeeded: an
+// announcement on the timeline with a handoff_status that never changed.
+// Refusing here instead rolls the whole transaction back and records
+// neither.
+func recordHandoffToUser(ctx context.Context, q *generated.Queries, w handoffToUserWrites) error {
+	memoRows, err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
+		Column1:     w.memoPatch,
+		WorkspaceID: w.workspaceID,
+		ID:          w.taskID,
+	})
+	if err != nil {
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	if memoRows == 0 {
+		return httpErr(apierrors.WsTaskNotFound)
+	}
+
+	if _, err := q.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
+		PublicID:     w.eventPublicID,
+		WorkspaceID:  w.workspaceID,
+		TaskID:       sql.NullInt32{Int32: int32(w.taskID), Valid: true},       //#nosec G115 -- tasks.id is BIGINT UNSIGNED, fits int32 within realistic deployments
+		ActorAgentID: sql.NullInt32{Int32: int32(w.priorAgentID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
+		PayloadJson:  w.payload,
+		OccurredAt:   w.occurredAt,
+	}); err != nil {
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	return nil
 }
 
 // ListAgentRuns handles GET /tasks/{id}/agent-runs. Returns recent

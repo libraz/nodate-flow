@@ -62,7 +62,7 @@ type wsAutoActionConfig struct {
 type HandoffQuerier interface {
 	InsertHandoffToUserEvent(ctx context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error)
 	GetTaskAgentMemo(ctx context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error)
-	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) error
+	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error)
 }
 
 // ActorDisabler disables a single (workspace_id, task_id, agent_id)
@@ -753,12 +753,27 @@ func (e *Executor) applyHandoffToUser(
 	if err != nil {
 		return false, fmt.Errorf("marshal memo patch: %w", err)
 	}
-	if err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
+	// The querier and the disabler run on one transaction, so this is the
+	// last write of the three and the one that can still take the other two
+	// back out.
+	//
+	// The statement matches an enabled task only, so a zero count is the
+	// task having been disabled or removed since the scan chose it. The
+	// event inserted above announces a hand-back and the assignee row is
+	// already off the task, while the counter that caps the loop never
+	// moved — so the next pass reads the same budget and hands the same
+	// task back again. Failing here is what rolls all of it back, and it is
+	// why the caller may not be told a handoff was applied.
+	memoRows, err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
 		Column1:     patchRaw,
 		WorkspaceID: r.workspaceID,
 		ID:          r.id,
-	}); err != nil {
+	})
+	if err != nil {
 		return false, fmt.Errorf("update agent_memo: %w", err)
+	}
+	if memoRows == 0 {
+		return false, fmt.Errorf("agent_memo unchanged for task %d: absent or disabled", r.id)
 	}
 	return true, nil
 }

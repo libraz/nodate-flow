@@ -46,7 +46,7 @@ func (q *Queries) GetTaskAgentMemo(ctx context.Context, arg GetTaskAgentMemoPara
 	return agent_memo, err
 }
 
-const updateTaskAgentMemo = `-- name: UpdateTaskAgentMemo :exec
+const updateTaskAgentMemo = `-- name: UpdateTaskAgentMemo :execrows
 UPDATE tasks
 SET agent_memo = JSON_MERGE_PATCH(COALESCE(agent_memo, JSON_OBJECT()), CAST(? AS JSON))
 WHERE workspace_id = ?
@@ -66,7 +66,17 @@ type UpdateTaskAgentMemoParams struct {
 // patch remove keys. COALESCE with JSON_OBJECT() handles the initial NULL
 // case so the first write does not need a separate INSERT path. workspace_id
 // is required as a defence-in-depth tenant scope.
-func (q *Queries) UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) error {
-	_, err := q.db.ExecContext(ctx, updateTaskAgentMemo, arg.Column1, arg.WorkspaceID, arg.ID)
-	return err
+// The enabled = TRUE guard means this statement can succeed and still match
+// nothing, so the affected-row count is part of the result and callers must
+// read it. Zero rows means the task is gone or disabled: the merge patch was
+// not applied, and any counter the caller believed it had just advanced --
+// the attempt count, the handoff count, the handoff status -- still holds its
+// old value. Treating zero as success leaves the agent loop budget frozen and
+// the same handoff eligible for retry on the next pass.
+func (q *Queries) UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateTaskAgentMemo, arg.Column1, arg.WorkspaceID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

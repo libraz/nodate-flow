@@ -1,10 +1,17 @@
--- name: UpdateTaskAgentMemo :exec
+-- name: UpdateTaskAgentMemo :execrows
 -- Merge the supplied JSON patch into the task's agent_memo column.
 -- JSON_MERGE_PATCH applies RFC 7396 semantics: keys present in the patch
 -- overwrite (or recursively merge object values), and explicit nulls in the
 -- patch remove keys. COALESCE with JSON_OBJECT() handles the initial NULL
 -- case so the first write does not need a separate INSERT path. workspace_id
 -- is required as a defence-in-depth tenant scope.
+-- The enabled = TRUE guard means this statement can succeed and still match
+-- nothing, so the affected-row count is part of the result and callers must
+-- read it. Zero rows means the task is gone or disabled: the merge patch was
+-- not applied, and any counter the caller believed it had just advanced --
+-- the attempt count, the handoff count, the handoff status -- still holds its
+-- old value. Treating zero as success leaves the agent loop budget frozen and
+-- the same handoff eligible for retry on the next pass.
 UPDATE tasks
 SET agent_memo = JSON_MERGE_PATCH(COALESCE(agent_memo, JSON_OBJECT()), CAST(? AS JSON))
 WHERE workspace_id = ?

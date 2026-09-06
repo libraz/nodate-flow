@@ -22,10 +22,26 @@ type fakeRunnerQuerier struct {
 	handoffEvents []generated.InsertHandoffToUserEventParams
 	memoState     map[uint32]map[string]any
 	memoUpdates   []generated.UpdateTaskAgentMemoParams
+	// missedTasks are the tasks whose memo write matches no row. The
+	// statement is guarded on enabled = TRUE, so a task disabled or
+	// removed between the read that chose it and the write is answered
+	// with a zero count rather than an error, and the stored memo keeps
+	// the values a later read will see.
+	missedTasks map[uint32]bool
 }
 
 func newFakeQuerier() *fakeRunnerQuerier {
-	return &fakeRunnerQuerier{memoState: make(map[uint32]map[string]any)}
+	return &fakeRunnerQuerier{
+		memoState:   make(map[uint32]map[string]any),
+		missedTasks: make(map[uint32]bool),
+	}
+}
+
+// memoWriteMisses makes the memo write for a task match no row.
+func (f *fakeRunnerQuerier) memoWriteMisses(taskID uint32) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.missedTasks[taskID] = true
 }
 
 func (f *fakeRunnerQuerier) AppendAgentEvent(_ context.Context, arg generated.AppendAgentEventParams) (int64, error) {
@@ -52,13 +68,18 @@ func (f *fakeRunnerQuerier) GetTaskAgentMemo(_ context.Context, arg generated.Ge
 	return json.Marshal(memo)
 }
 
-func (f *fakeRunnerQuerier) UpdateTaskAgentMemo(_ context.Context, arg generated.UpdateTaskAgentMemoParams) error {
+func (f *fakeRunnerQuerier) UpdateTaskAgentMemo(_ context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.memoUpdates = append(f.memoUpdates, arg)
+	if f.missedTasks[arg.ID] {
+		// The statement ran and matched nothing, so the memo is left
+		// holding whatever it held before.
+		return 0, nil
+	}
 	patch := map[string]any{}
 	if err := json.Unmarshal(arg.Column1, &patch); err != nil {
-		return err
+		return 0, err
 	}
 	cur := f.memoState[arg.ID]
 	if cur == nil {
@@ -73,7 +94,7 @@ func (f *fakeRunnerQuerier) UpdateTaskAgentMemo(_ context.Context, arg generated
 		cur[k] = v
 	}
 	f.memoState[arg.ID] = cur
-	return nil
+	return 1, nil
 }
 
 // snapshotMemo returns a deep copy of the current memo state for a task.

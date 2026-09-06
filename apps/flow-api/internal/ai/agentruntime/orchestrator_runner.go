@@ -126,7 +126,7 @@ type RunnerQuerier interface {
 	AppendAgentEvent(ctx context.Context, arg generated.AppendAgentEventParams) (int64, error)
 	InsertHandoffToUserEvent(ctx context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error)
 	GetTaskAgentMemo(ctx context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error)
-	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) error
+	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error)
 }
 
 // OrchestratorRunner is a [Runner] that delegates the LLM call to an
@@ -453,6 +453,17 @@ func (r *OrchestratorRunner) readMemo(ctx context.Context, workspaceID, taskID u
 
 // mergeMemo applies a JSON_MERGE_PATCH update against tasks.agent_memo.
 // A nil Queries (single-binary smoke path) or zero task_id is a no-op.
+//
+// The write has three outcomes — the patch landed, the statement matched
+// no task, the write failed — and all three are reported to the log
+// rather than to the caller. Nothing above this can act on them: every
+// memo write stands on its own with no transaction to undo, handleHandoff
+// has already appended the handoff event by the time it patches the memo,
+// and the run belongs to the agent rather than to this task (ExecuteAgent
+// is handed a workspace and an agent), so a task that stopped accepting
+// memo writes is no reason to abandon the run. Run's contract is that
+// bookkeeping never wedges the agent loop, which leaves the log as the
+// only place a zero count can be answered.
 func (r *OrchestratorRunner) mergeMemo(ctx context.Context, workspaceID, taskID uint32, patch map[string]any) {
 	q := r.queries()
 	if q == nil || taskID == 0 || len(patch) == 0 {
@@ -470,12 +481,30 @@ func (r *OrchestratorRunner) mergeMemo(ctx context.Context, workspaceID, taskID 
 	}
 	// The patch is a JSON_MERGE_PATCH, so re-applying it after a rolled
 	// back attempt produces the same memo as applying it once.
+	var applied int64
 	if err := dbretry.Do(ctx, "agentruntime.UpdateTaskAgentMemo", func(ctx context.Context) error {
-		return q.UpdateTaskAgentMemo(ctx, params)
+		var err error
+		applied, err = q.UpdateTaskAgentMemo(ctx, params)
+		return err
 	}); err != nil {
 		slog.ErrorContext(ctx, "agentruntime: agent_memo update lost",
 			slog.Uint64("task_id", uint64(taskID)), slog.Any("err", err))
+		return
 	}
+	if applied == 0 {
+		// The statement matches an enabled task only, so it can succeed
+		// and change nothing when the task is disabled or removed while
+		// the run is under way. Nothing failed, and nothing landed either:
+		// the counters this patch carries — the attempt count, the handoff
+		// count, the handoff status — still hold the values the run read,
+		// so the next pass sees the same loop budget and the same handoff
+		// is eligible again.
+		slog.WarnContext(ctx, "agentruntime: agent_memo update matched no task",
+			slog.Uint64("workspace_id", uint64(workspaceID)), slog.Uint64("task_id", uint64(taskID)))
+		return
+	}
+	slog.DebugContext(ctx, "agentruntime: agent_memo updated",
+		slog.Uint64("workspace_id", uint64(workspaceID)), slog.Uint64("task_id", uint64(taskID)))
 }
 
 // bumpAttempts is the run-start memo write — increments attempts and
