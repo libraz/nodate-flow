@@ -4,9 +4,11 @@
 //   - two users (one owner "admin" with instance-admin + one member
 //     "alice"), each with a local password identity;
 //   - one workspace, with both users as workspace_members;
-//   - a personal calendar + subscription for each user;
-//   - a JP-holidays system calendar with a sample holiday and a
-//     subscription for the owner;
+//   - a personal calendar for each user, with the owner membership that
+//     grants access to it and a subscription holding its display
+//     preferences;
+//   - a JP-holidays system calendar with a sample holiday, and a viewer
+//     membership + subscription for the owner;
 //   - one dated event on the owner's calendar with the second user as
 //     an attendee (RSVP pending);
 //   - one undated event (start_at NULL) demonstrating date-free items;
@@ -223,6 +225,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("ensure owner calendar: %w", err)
 	}
+	if err := ensureCalendarMember(ctx, db, uint32(wsID), ownerCalID, uint32(ownerID), "owner", logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
+		return fmt.Errorf("ensure owner calendar membership: %w", err)
+	}
 	if err := ensureSubscription(ctx, db, uint32(wsID), ownerCalID, uint32(ownerID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure owner subscription: %w", err)
 	}
@@ -248,6 +253,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("ensure second calendar: %w", err)
 	}
+	if err := ensureCalendarMember(ctx, db, uint32(wsID), secondCalID, uint32(secondID), "owner", logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
+		return fmt.Errorf("ensure second calendar membership: %w", err)
+	}
 	if err := ensureSubscription(ctx, db, uint32(wsID), secondCalID, uint32(secondID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure second subscription: %w", err)
 	}
@@ -256,6 +264,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	holidayCalID, err := ensureHolidayCalendar(ctx, db, uint32(wsID), l.HolidaysCalendarName, logger) //#nosec G115 -- LastInsertId for workspaces.id (BIGINT UNSIGNED), fits uint32 in dev seed
 	if err != nil {
 		return fmt.Errorf("ensure holiday calendar: %w", err)
+	}
+	// The holiday feed is read-only content nobody edits, so the owner
+	// joins it as a viewer: enough to reach it, no grant to write.
+	if err := ensureCalendarMember(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), "viewer", logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
+		return fmt.Errorf("ensure holiday calendar membership: %w", err)
 	}
 	if err := ensureSubscription(ctx, db, uint32(wsID), holidayCalID, uint32(ownerID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id (BIGINT UNSIGNED), fit uint32 in dev seed
 		return fmt.Errorf("ensure holiday subscription: %w", err)
@@ -632,6 +645,36 @@ func ensureSubscription(ctx context.Context, db *sql.DB, wsID, calID, userID uin
 	return nil
 }
 
+// ensureCalendarMember grants a user access to a calendar. This is the
+// row calendar listing is driven from — a subscription holds display
+// preferences and grants nothing, so a seeded calendar without a
+// membership row is invisible to the very user it was seeded for.
+// Idempotent on (calendar_id, user_id) via the table's unique key.
+func ensureCalendarMember(ctx context.Context, db *sql.DB, wsID, calID, userID uint32, role string, logger *slog.Logger) error {
+	var existing uint32
+	err := db.QueryRowContext(ctx,
+		"SELECT id FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND workspace_id = ?",
+		calID, userID, wsID,
+	).Scan(&existing)
+	if err == nil {
+		logger.Info("calendar membership exists", "calendar_id", calID, "user_id", userID)
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	pub := types.New()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO calendar_members (public_id, calendar_id, user_id, workspace_id, role, member_color)
+		 VALUES (?, ?, ?, ?, ?, '#4285F4')`,
+		pub, calID, userID, wsID, role,
+	); err != nil {
+		return err
+	}
+	logger.Info("created calendar membership", "calendar_id", calID, "user_id", userID, "role", role)
+	return nil
+}
+
 // ensureProjectMember upserts a project_members row for the given user
 // on the given project. Idempotent on (project_id, user_id): a re-run
 // updates role/enabled to match the requested values without raising a
@@ -735,6 +778,7 @@ func ensureSampleEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, ws
 		Kind:            calendar.CalendarEventsKindEvent,
 		Visibility:      calendar.CalendarEventsVisibilityPublic,
 		ShowAs:          calendar.CalendarEventsShowAsBusy,
+		Flexibility:     calendar.CalendarEventsFlexibilityFixed,
 		Title:           title,
 		AllDay:          false,
 		StartAt:         sql.NullTime{Time: start, Valid: true},
@@ -792,6 +836,7 @@ func ensureUndatedEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, w
 		Kind:            calendar.CalendarEventsKindEvent,
 		Visibility:      calendar.CalendarEventsVisibilityPrivate,
 		ShowAs:          calendar.CalendarEventsShowAsFree,
+		Flexibility:     calendar.CalendarEventsFlexibilityFixed,
 		Title:           title,
 		AllDay:          false,
 		StartAt:         sql.NullTime{},
@@ -824,6 +869,7 @@ func ensureHolidayEvent(ctx context.Context, db *sql.DB, cq *calendar.Queries, w
 		Kind:            calendar.CalendarEventsKindBlock,
 		Visibility:      calendar.CalendarEventsVisibilityPublic,
 		ShowAs:          calendar.CalendarEventsShowAsFree,
+		Flexibility:     calendar.CalendarEventsFlexibilityFixed,
 		Title:           title,
 		AllDay:          true,
 		StartAt:         sql.NullTime{Time: start, Valid: true},
