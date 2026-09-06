@@ -359,13 +359,16 @@ func main() {
 					})
 				},
 				Applier: judgeApplier,
-				// Wire the three PromptDeps lookups so the runner
+				// Wire the four PromptDeps lookups so the runner
 				// renders the full context window (recent tasks +
-				// linked tasks + judge_instructions) instead of falling
-				// back to the composeJudgePrompt JSON snapshot.
-				// WorkspaceNow is left nil, so the "Now" timestamp the
-				// judge reasons against is UTC and not the workspace's
-				// own timezone.
+				// linked tasks + judge_instructions + the workspace's
+				// own clock) instead of falling back to the
+				// composeJudgePrompt JSON snapshot. The clock matters
+				// because the judge reasons about "overdue" and "just
+				// happened": left unwired it silently reads UTC, which
+				// is a defensible timestamp for a workspace that is not
+				// on it and a wrong frame of reference for every
+				// due-date verdict.
 				//
 				// The lookups are narrow raw-SQL adapters that
 				// apps/flow-api/tests/signaljudge/prompt_render_test.go
@@ -380,6 +383,7 @@ func main() {
 					RecentTasks:       &signaljudge.SQLRecentTasksLookup{DB: db},
 					LinkedTasks:       &signaljudge.SQLLinkedTasksLookup{DB: db},
 					JudgeInstructions: &signaljudge.SQLJudgeInstructionsLookup{DB: db},
+					WorkspaceNow:      signaljudge.NewSQLWorkspaceNow(queries),
 				},
 			}
 			logger.Info("agent executor: workspace resolver")

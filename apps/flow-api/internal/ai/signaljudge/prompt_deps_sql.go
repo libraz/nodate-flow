@@ -1,16 +1,27 @@
-// Package signaljudge — SQL-backed adapters for the three
-// [PromptDeps] lookups the runner uses to build a judge's per-run
-// context window. These bind [RecentTasksLookup],
-// [LinkedTasksLookup], and [JudgeInstructionsLookup] to the production
-// database via narrow SELECTs against the live schema.
+// Package signaljudge — SQL-backed adapters for the [PromptDeps]
+// lookups the runner uses to build a judge's per-run context window.
+// These bind [RecentTasksLookup], [LinkedTasksLookup],
+// [JudgeInstructionsLookup], and [PromptDeps.WorkspaceNow] to the
+// production database.
 //
-// The adapters intentionally avoid going through the sqlc-generated
-// surface for the same reason the sibling adapters in
+// The three content adapters intentionally avoid going through the
+// sqlc-generated surface for the same reason the sibling adapters in
 // signal_updater_sql.go do: each lookup is a single small SELECT and
 // the matching sqlc queries either project a much wider row than the
 // [TaskSummary] shape needs (ListTasksForWorkspace) or do not exist
 // (calendar-event linked tasks). Raw SQL keeps the audit surface
 // minimal.
+//
+// [NewSQLWorkspaceNow] is the one adapter here that reads through the
+// generated queries instead, because that criterion does not hold for
+// it: FindWorkspaceTimezoneCountryById projects exactly the columns a
+// zone lookup reads, and it is already the statement the AI budget
+// window resolves a workspace's local midnight from. A hand-written
+// SELECT of workspaces.timezone would be a second definition of "the
+// workspace's timezone" that can drift from the budget window's — over
+// the `enabled = TRUE` bound the generated query carries, among other
+// things — and the two would then disagree about which day a workspace
+// is in, with each answer defensible on its own.
 //
 // The integration test in
 // apps/flow-api/tests/signaljudge/prompt_render_test.go constructs these
@@ -22,7 +33,9 @@
 // Internal ids stay internal. The [TaskSummary] rows these adapters
 // produce expose only public_id, title, derived_state, and due_on;
 // the joins against internal id columns happen entirely server-side
-// and never escape the SQL boundary.
+// and never escape the SQL boundary. The clock adapter takes the
+// internal workspace id the same way and hands back a formatted
+// timestamp, so nothing identifying leaves it either.
 package signaljudge
 
 import (
@@ -30,6 +43,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // publicOnly is the audience bound both task lookups in this file carry,
@@ -279,4 +296,65 @@ func (l *SQLJudgeInstructionsLookup) LoadInstructions(ctx context.Context, works
 		return "", nil
 	}
 	return raw.String, nil
+}
+
+// WorkspaceTimezoneLoader is the narrow surface [NewSQLWorkspaceNow]
+// needs from the sqlc-generated Queries struct. *generated.Queries
+// satisfies it; a test can supply a fake without a database.
+type WorkspaceTimezoneLoader interface {
+	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (generated.FindWorkspaceTimezoneCountryByIdRow, error)
+}
+
+// errNoWorkspaceTimezoneLoader is what a wired-but-empty clock reports.
+// It is an error rather than an empty answer because a nil loader is a
+// mis-wiring, and the caller only distinguishes "answered" from "did
+// not"; see [NewSQLWorkspaceNow].
+var errNoWorkspaceTimezoneLoader = errors.New("signaljudge: workspace clock has no timezone loader")
+
+// NewSQLWorkspaceNow builds the [PromptDeps.WorkspaceNow] clock: the
+// current instant read in the workspace's own IANA timezone, formatted
+// the way the builder's own fallback formats it, so the two differ only
+// in the offset they carry.
+//
+// That offset is the whole point. The judge reasons about "overdue" and
+// "just happened" against this timestamp, and a workspace nine hours
+// ahead of UTC judged against a UTC clock gets a coherent-looking answer
+// to a question nobody asked. An operator reading
+// ai_invocations.prompt_redacted afterwards can tell which frame of
+// reference a verdict was formed in only if the offset is in the string.
+//
+// It returns a function rather than a struct with a method because
+// [PromptDeps.WorkspaceNow] is a function field; the three lookups
+// beside it are structs because their fields are interfaces.
+//
+// Every path either yields a timestamp or reports an error, and never
+// the empty string with a nil error: [BuildPromptContext] reads an empty
+// answer as the same failure as an error, so returning one for a case
+// this function considers successful would record a gap that is not one.
+// The failures it does report are a workspace row that could not be read
+// (including a disabled or missing workspace, which the generated query
+// answers with sql.ErrNoRows) and a stored zone name the zoneinfo
+// database does not know. Neither is papered over with UTC here: the
+// builder already has one named UTC fallback, and a second, silent one
+// underneath it would make a workspace with a broken timezone column
+// indistinguishable from one that chose UTC.
+//
+// A workspace that chose UTC is not a gap and gets a real timestamp; so
+// does one whose column is empty, which [region.Resolve] answers with
+// the same UTC default the schema states for the column.
+func NewSQLWorkspaceNow(loader WorkspaceTimezoneLoader) func(ctx context.Context, workspaceID uint32) (string, error) {
+	return func(ctx context.Context, workspaceID uint32) (string, error) {
+		if loader == nil {
+			return "", errNoWorkspaceTimezoneLoader
+		}
+		row, err := loader.FindWorkspaceTimezoneCountryById(ctx, workspaceID)
+		if err != nil {
+			return "", fmt.Errorf("signaljudge: load workspace timezone: %w", err)
+		}
+		zone, err := region.Resolve(row.Timezone)
+		if err != nil {
+			return "", fmt.Errorf("signaljudge: resolve workspace timezone %q: %w", row.Timezone, err)
+		}
+		return time.Now().In(zone.Location()).Format(time.RFC3339), nil
+	}
 }
