@@ -28,11 +28,26 @@ export interface EventCardProps {
  */
 const SOURCE_COLOR = INTEGRATION_SOURCE_COLORS;
 
+/** True when an event payload declares the resource it describes was
+ * produced by the model. Only the AI generation path sets the flag; the
+ * hand-authored path omits the key entirely. */
+function isAiGeneratedPayload(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  if (!('isAiGenerated' in payload)) return false;
+  return (payload as { isAiGenerated?: unknown }).isAiGenerated === true;
+}
+
 /**
- * eventSourceTag returns a short category label derived from the event
- * type prefix. It powers the 4.WEB-1 timeline source-mix color coding
- * so every event source lives in the same feed but stays
- * distinguishable at a glance.
+ * eventSourceTag returns the label and color a timeline row wears,
+ * derived from the event type prefix and — where the type alone is
+ * ambiguous — from the payload.
+ *
+ * The color carries the *source lane*: which kind of actor produced the
+ * event (an external feed, the AI, or a person working in the product).
+ * The label carries the category within that lane. Every source shares
+ * one feed, so the lane color is what keeps a webhook, an agent run,
+ * and a human edit apart at a glance, while `system` grey is reserved
+ * for events with no identifiable origin.
  */
 export function eventSourceTag(
   type: string,
@@ -54,12 +69,48 @@ export function eventSourceTag(
       return { label: 'google', color: SOURCE_COLOR.google };
     return { label: 'signal', color: SOURCE_COLOR.signal };
   }
-  if (type.startsWith('ai.') || type.startsWith('mcp.')) {
+  // `agent.task.*` is an agent attaching to a task, recording its
+  // reasoning, and handing work back; it is machine output and belongs
+  // in the AI lane rather than the grey fallback it used to reach.
+  //
+  // `mcp.` is carried for the same reason as `project.` below: no event
+  // kind uses that prefix today (the `mcp.*` strings in the backend name
+  // transaction call sites, not events), but a tool-invocation event
+  // would belong here if one ever reached the feed.
+  if (type.startsWith('ai.') || type.startsWith('agent.') || type.startsWith('mcp.')) {
     return { label: 'ai', color: SOURCE_COLOR.ai };
   }
-  if (type.startsWith('task.')) {
+  // A page written by the model reaches the timeline as an ordinary
+  // `page.created`; only `isAiGenerated` in the payload separates it
+  // from a page a person typed. Read the payload rather than the type,
+  // the same way `signal.*` does, so the generated page sits in the AI
+  // lane where a reader looking for machine output will find it.
+  if (type.startsWith('page.') && isAiGeneratedPayload(payload)) {
+    return { label: 'ai', color: SOURCE_COLOR.ai };
+  }
+  // The branches below are all a person acting inside the product, so
+  // they share one lane color; only the label says which surface was
+  // touched. Sending them to the `system` grey instead made ordinary
+  // human activity read as machine noise next to the real agent rows.
+  //
+  // A mention is emitted alongside the task edit or comment that
+  // carries it, so it takes that edit's label too — the pair then reads
+  // as one action rather than a change followed by an unrelated event.
+  if (type.startsWith('task.') || type.startsWith('mention.')) {
     return { label: 'task', color: SOURCE_COLOR.task };
   }
+  if (type.startsWith('comment.')) return { label: 'comment', color: SOURCE_COLOR.task };
+  if (type.startsWith('page.')) return { label: 'page', color: SOURCE_COLOR.task };
+  if (type.startsWith('workspace.')) return { label: 'workspace', color: SOURCE_COLOR.task };
+  // `project.*` has no producer in the backend event vocabulary yet —
+  // only audit actions carry that prefix today. The branch stays because
+  // tagging is tolerant where filtering is exact: this function reads
+  // whatever string the API hands it, and a project event arriving later
+  // should join the human lane rather than silently fall back to the
+  // grey `system` tag this change exists to stop. The filter bar makes
+  // the opposite call and offers no project chip, because a chip is a
+  // promise of rows the backend can actually return.
+  if (type.startsWith('project.')) return { label: 'project', color: SOURCE_COLOR.task };
   return { label: 'system', color: 'var(--nf-color-fg-muted)' };
 }
 

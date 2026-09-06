@@ -14,30 +14,134 @@ import { useTranslation } from 'react-i18next';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import type { TimelineFilters } from './api';
 
-/** Grouped kinds — drives the sectioned chip filter UI. */
-const KIND_GROUPS: readonly { key: string; kinds: readonly string[] }[] = [
-  { key: 'task', kinds: ['task.created', 'task.updated', 'task.disabled'] },
+/**
+ * One filter chip. `kinds` lists every event kind the chip selects — more
+ * than one where a single user-facing action is encoded under both a
+ * current and a historical kind, which a reader must not have to know
+ * about. `key` is the kind whose `event_kind.*` label the chip wears.
+ */
+interface KindChip {
+  key: string;
+  kinds: readonly string[];
+}
+
+/** Build a chip for one kind, optionally selecting older encodings of
+ * the same action alongside it. */
+function chip(key: string, ...alsoSelects: readonly string[]): KindChip {
+  return { key, kinds: [key, ...alsoSelects] };
+}
+
+/**
+ * Grouped chips — drives the sectioned chip filter UI.
+ *
+ * Every kind listed here has a producer in the backend event vocabulary.
+ * A chip that can never match would be a filter promising rows it cannot
+ * return, so kinds the API has no way to emit are deliberately absent
+ * even where this feature carries a label for them.
+ */
+export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[] = [
+  { key: 'task', chips: [chip('task.created'), chip('task.updated'), chip('task.disabled')] },
   {
+    // `comment.added` is the historical encoding of `task.comment.added`
+    // and still round-trips on old rows, so it rides the same chip
+    // rather than sitting beside it under a second identical label.
     key: 'comment',
-    kinds: ['task.comment.added', 'task.comment.edited', 'task.comment.removed'],
-  },
-  { key: 'attachment', kinds: ['task.attachment.added', 'task.attachment.removed'] },
-  { key: 'member', kinds: ['task.actor.added', 'task.actor.removed'] },
-  { key: 'dependency', kinds: ['task.dependency.added', 'task.dependency.removed'] },
-  { key: 'constraint', kinds: ['task.constraint.added', 'task.constraint.removed'] },
-  {
-    key: 'transition',
-    kinds: [
-      'task.transition.start',
-      'task.transition.block',
-      'task.transition.unblock',
-      'task.transition.submit',
-      'task.transition.complete',
-      'task.transition.reopen',
-      'task.transition.cancel',
+    chips: [
+      chip('task.comment.added', 'comment.added'),
+      chip('task.comment.edited'),
+      chip('task.comment.removed'),
     ],
   },
-  { key: 'signal', kinds: ['signal.attached'] },
+  {
+    key: 'attachment',
+    chips: [chip('task.attachment.added'), chip('task.attachment.removed')],
+  },
+  { key: 'member', chips: [chip('task.actor.added'), chip('task.actor.removed')] },
+  {
+    key: 'dependency',
+    chips: [chip('task.dependency.added'), chip('task.dependency.removed')],
+  },
+  {
+    key: 'constraint',
+    chips: [chip('task.constraint.added'), chip('task.constraint.removed')],
+  },
+  {
+    key: 'transition',
+    chips: [
+      chip('task.transition.start'),
+      chip('task.transition.block'),
+      chip('task.transition.unblock'),
+      chip('task.transition.submit'),
+      chip('task.transition.complete'),
+      chip('task.transition.reopen'),
+      chip('task.transition.cancel'),
+    ],
+  },
+  // A mention is its own group rather than a chip under `comment`: the
+  // backend emits it from a description edit as well as from a comment,
+  // so folding it into `comment` would make the chip claim a scope it
+  // does not have. Like `signal`, a one-chip group is enough — the
+  // groups are cut by what a reader wants to isolate, not by count.
+  { key: 'mention', chips: [chip('mention.created')] },
+  {
+    key: 'page',
+    chips: [
+      chip('page.created'),
+      chip('page.updated'),
+      chip('page.disabled'),
+      chip('page.archived'),
+      chip('page.unarchived'),
+    ],
+  },
+  {
+    // Workspace membership, kept apart from the `member` group above:
+    // that one is who is on a task, this one is who is in the workspace.
+    key: 'workspace',
+    chips: [
+      chip('workspace.member.added'),
+      chip('workspace.member.removed'),
+      chip('workspace.member.role_changed'),
+    ],
+  },
+  {
+    // The AI vocabulary splits three ways by what a reader is asking.
+    // This group answers "what did the AI want to change?" — proposals
+    // and suggestions that land against content.
+    key: 'ai',
+    chips: [
+      chip('ai.suggestion.proposed'),
+      chip('ai.suggestion.applied'),
+      chip('ai.suggestion.dismissed'),
+      chip('ai.suggestion.edited'),
+      chip('ai.auto_action.proposed'),
+    ],
+  },
+  {
+    // "What did an agent do on this task?" — scoped to one (agent, task)
+    // pair, which is what a task timeline reader wants.
+    key: 'agent',
+    chips: [
+      chip('agent.task.attached'),
+      chip('agent.task.detached'),
+      chip('agent.task.thought'),
+      chip('agent.task.handoff_to_user'),
+      chip('agent.task.handoff_to_agent'),
+    ],
+  },
+  {
+    // "Was the agent even running?" — workspace-level operation, the
+    // kill switch and run outcomes. Separate because it answers an
+    // operational question, not a question about the work.
+    key: 'agent_runtime',
+    chips: [
+      chip('ai.agent.paused'),
+      chip('ai.agent.resumed'),
+      chip('ai.agent.run.started'),
+      chip('ai.agent.run.completed'),
+      chip('ai.agent.run.failed'),
+    ],
+  },
+  { key: 'signal', chips: [chip('signal.attached')] },
 ];
 
 export interface EventFilterBarProps {
@@ -100,10 +204,15 @@ export default function EventFilterBar({
   const { t } = useTranslation('timeline');
 
   const selectedKinds = new Set(filters.kind ?? []);
-  const toggleKind = (kind: string): void => {
+  const isChipActive = (c: KindChip): boolean => c.kinds.every((k) => selectedKinds.has(k));
+
+  const toggleChip = (c: KindChip): void => {
     const next = new Set(selectedKinds);
-    if (next.has(kind)) next.delete(kind);
-    else next.add(kind);
+    const active = isChipActive(c);
+    for (const k of c.kinds) {
+      if (active) next.delete(k);
+      else next.add(k);
+    }
     const { kind: Omit, ...rest } = filters;
     onChange(next.size > 0 ? { ...rest, kind: [...next] } : rest);
   };
@@ -125,15 +234,24 @@ export default function EventFilterBar({
   const labelFor = (kind: string): string =>
     t(`event_kind.${kind.replace(/\./g, '_')}`, { defaultValue: kind });
 
-  const renderChip = (kind: string): ReactElement => {
-    const active = selectedKinds.has(kind);
+  // A chip may select more than one kind, so the badge counts chips
+  // rather than kinds — one click must not read as two active filters.
+  // Kinds no chip covers can only arrive from restored state; they are
+  // counted one by one so the badge never understates what is filtering.
+  const chipKinds = new Set(KIND_GROUPS.flatMap((g) => g.chips.flatMap((c) => [...c.kinds])));
+  const activeChipCount = KIND_GROUPS.reduce((n, g) => n + g.chips.filter(isChipActive).length, 0);
+  const looseKindCount = [...selectedKinds].filter((k) => !chipKinds.has(k)).length;
+  const activeFilterCount = activeChipCount + looseKindCount + (filters.actor?.length ?? 0);
+
+  const renderChip = (c: KindChip): ReactElement => {
+    const active = isChipActive(c);
     return (
       <button
-        key={kind}
+        key={c.key}
         type="button"
         aria-pressed={active}
         onClick={() => {
-          toggleKind(kind);
+          toggleChip(c);
         }}
         style={{
           padding: 'var(--nf-space-1) var(--nf-space-2-5)',
@@ -145,7 +263,7 @@ export default function EventFilterBar({
           cursor: 'pointer',
         }}
       >
-        {labelFor(kind)}
+        {labelFor(c.key)}
       </button>
     );
   };
@@ -170,7 +288,7 @@ export default function EventFilterBar({
         }}
       >
         {t('filter.kind_label')}
-        {selectedKinds.size > 0 || (filters.actor?.length ?? 0) > 0 ? (
+        {activeFilterCount > 0 ? (
           <span
             style={{
               padding: '0 var(--nf-space-2)',
@@ -180,7 +298,7 @@ export default function EventFilterBar({
               fontSize: 'var(--nf-text-micro)',
             }}
           >
-            {selectedKinds.size + (filters.actor?.length ?? 0)}
+            {activeFilterCount}
           </span>
         ) : null}
       </summary>
@@ -217,7 +335,7 @@ export default function EventFilterBar({
               {t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
             </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-1-5)' }}>
-              {group.kinds.map((k) => renderChip(k))}
+              {group.chips.map((c) => renderChip(c))}
             </div>
           </div>
         ))}
