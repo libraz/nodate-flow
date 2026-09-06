@@ -43,6 +43,10 @@ package precondition
 //	           field has said the nil state is one it handles, whichever
 //	           branch the test guards.
 //	required   reached, silent, settable, and not guarded.
+//	enforcing  reached, settable, not guarded, able to hold nil, and not
+//	           silent — a collaborator that faults the first time anything
+//	           reaches it. Omitting one is not a defect; it is a statement
+//	           that the literal was never meant to reach that far.
 //
 // A literal is then answerable for the required fields it does not name,
 // and for a required field it names as nil — the same misconfiguration
@@ -91,6 +95,9 @@ type bundleSource struct {
 	// with a pointer method that answers for a nil receiver instead of
 	// panicking on one.
 	tolerant map[string]bool
+	// interfaces holds "importPath.TypeName" for every interface the tree
+	// declares, which is one of the shapes a field can hold nil in.
+	interfaces map[string]bool
 }
 
 // bundleStruct is one struct declaration, kept with the file it was
@@ -140,15 +147,22 @@ type BundleType struct {
 	Name string
 	// Required are the fields a literal has to set, sorted by name.
 	Required []BundleField
+	// Enforcing are the collaborators that fault the first time the
+	// package reaches them, sorted by name. They are what a literal's
+	// completeness is read from: whoever leaves one out cannot have
+	// meant the code past it to run, because it would not have run.
+	Enforcing []BundleField
 }
 
-// BundleLiteral is one composite literal the check answers for, together
-// with whatever it leaves nil.
+// BundleLiteral is every composite literal of a bundle the walk finds,
+// together with whatever it leaves nil and whether the rule holds it to
+// that.
 //
-// Clean literals are kept rather than dropped. A derived check fails by
-// matching nothing, and an empty finding list is what that looks like
-// from the outside; holding the scope is what lets a caller tell the two
-// apart.
+// Clean literals and unanswerable ones are kept rather than dropped. A
+// derived check fails by matching nothing, and an empty finding list is
+// what that looks like from the outside; holding the whole set is what
+// lets a caller tell a literal the rule read and let past from one that
+// is no longer being read at all.
 type BundleLiteral struct {
 	// Type is the bundle the literal builds.
 	Type BundleType
@@ -157,14 +171,24 @@ type BundleLiteral struct {
 	// ExplicitNil are the required fields the literal names as nil, which
 	// is the same configuration stated rather than forgotten.
 	ExplicitNil []BundleField
+	// Answerable is whether the literal has to be complete. False means
+	// the rule read it and let it past, which is a different fact from
+	// the literal not being here.
+	Answerable bool
 	// File and Line are where the literal is written.
 	File string
 	Line int
 }
 
-// Incomplete reports whether the literal leaves a required field nil.
+// Incomplete reports whether the literal leaves a required field nil,
+// whether or not it is answerable for that.
 func (l BundleLiteral) Incomplete() bool {
 	return len(l.Omitted) > 0 || len(l.ExplicitNil) > 0
+}
+
+// Reportable reports whether the literal is one the rule fails on.
+func (l BundleLiteral) Reportable() bool {
+	return l.Answerable && l.Incomplete()
 }
 
 // Location renders the literal's position for a failure message.
@@ -192,10 +216,11 @@ func (l BundleLiteral) Names() string {
 // row structs are built by generated code alone.
 func parseBundleSource(root string) (*bundleSource, error) {
 	src := &bundleSource{
-		fset:     token.NewFileSet(),
-		root:     root,
-		structs:  map[string]*bundleStruct{},
-		tolerant: map[string]bool{},
+		fset:       token.NewFileSet(),
+		root:       root,
+		structs:    map[string]*bundleStruct{},
+		tolerant:   map[string]bool{},
+		interfaces: map[string]bool{},
 	}
 	base := filepath.Join(root, "apps", "flow-api")
 
@@ -255,8 +280,10 @@ func parseBundleSource(root string) (*bundleSource, error) {
 	return src, nil
 }
 
-// indexTypes records every struct the tree declares outside its tests. A
-// bundle is production wiring, so a type only a test declares is not one.
+// indexTypes records every struct and every interface the tree declares
+// outside its tests. A bundle is production wiring, so a type only a
+// test declares is not one; the interfaces are indexed alongside because
+// a field naming one holds nil until a caller fills it.
 func (s *bundleSource) indexTypes() {
 	for _, f := range s.files {
 		if f.test {
@@ -270,6 +297,10 @@ func (s *bundleSource) indexTypes() {
 			for _, spec := range gen.Specs {
 				ts, ok := spec.(*ast.TypeSpec)
 				if !ok || ts.Assign.IsValid() {
+					continue
+				}
+				if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+					s.interfaces[f.importPath+"."+ts.Name.Name] = true
 					continue
 				}
 				typ, ok := ts.Type.(*ast.StructType)
@@ -500,22 +531,34 @@ func (s *bundleSource) Bundles() []BundleType {
 		if st == nil || !st.input || st.method {
 			continue
 		}
-		var required []BundleField
+		var required, enforcing []BundleField
 		for _, decl := range st.fields {
 			at, reached := fields[decl.name]
 			if !reached || guarded[key][decl.name] {
 				continue
 			}
-			if !ast.IsExported(decl.name) || !s.silentlyNil(decl.typ, st.owner) {
+			if !ast.IsExported(decl.name) {
 				continue
 			}
-			required = append(required, BundleField{Name: decl.name, UseFile: at.file, UseLine: at.line})
+			field := BundleField{Name: decl.name, UseFile: at.file, UseLine: at.line}
+			switch {
+			case s.silentlyNil(decl.typ, st.owner):
+				required = append(required, field)
+			case s.nilable(decl.typ, st.owner):
+				enforcing = append(enforcing, field)
+			}
 		}
 		// A bundle with nothing required is kept. It is in scope and it
 		// owes nothing, which is a different statement from not having
 		// been looked at, and the controls rest on the difference.
 		sort.Slice(required, func(i, j int) bool { return required[i].Name < required[j].Name })
-		out = append(out, BundleType{Key: key, Name: shortTypeName(key), Required: required})
+		sort.Slice(enforcing, func(i, j int) bool { return enforcing[i].Name < enforcing[j].Name })
+		out = append(out, BundleType{
+			Key:       key,
+			Name:      shortTypeName(key),
+			Required:  required,
+			Enforcing: enforcing,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
@@ -544,6 +587,35 @@ func (s *bundleSource) silentlyNil(expr ast.Expr, owner *bundleFile) bool {
 		}
 		path, imported := owner.imports[qualifier.Name]
 		return imported && s.tolerant[path+"."+typ.Sel.Name]
+	}
+	return false
+}
+
+// nilable reports whether an omitted field of this type arrives as nil
+// rather than as a usable zero value.
+//
+// It decides which reached fields count as enforcing, and that set only
+// ever takes literals out of scope, so an uncertain type is answered
+// generously — a pointer, a func, a map, a slice, a channel, and any
+// interface this tree declares. A named type from another module is
+// answered no: it cannot be read, and calling it nil-able would let a
+// literal that omits an ordinary value field claim it was never meant to
+// run.
+func (s *bundleSource) nilable(expr ast.Expr, owner *bundleFile) bool {
+	switch typ := expr.(type) {
+	case *ast.StarExpr, *ast.FuncType, *ast.MapType, *ast.ChanType, *ast.InterfaceType:
+		return true
+	case *ast.ArrayType:
+		return typ.Len == nil
+	case *ast.Ident:
+		return s.interfaces[owner.importPath+"."+typ.Name]
+	case *ast.SelectorExpr:
+		qualifier, isIdent := typ.X.(*ast.Ident)
+		if !isIdent {
+			return false
+		}
+		path, imported := owner.imports[qualifier.Name]
+		return imported && s.interfaces[path+"."+typ.Sel.Name]
 	}
 	return false
 }
@@ -627,12 +699,10 @@ func shortTypeName(key string) string {
 	return path[strings.LastIndex(path, "/")+1:] + key[dot:]
 }
 
-// Literals returns every composite literal the check answers for,
-// whether or not it leaves anything nil.
+// Literals returns every composite literal of a bundle in the tree,
+// each marked with whether it has to be complete.
 //
-// Completeness is demanded where the literal's consumer is not visible
-// beside it, because that is where the author cannot have decided the
-// omission:
+// Completeness is demanded of three shapes:
 //
 //   - a literal in a file that is not a _test.go — the deployed wiring
 //     and the shared test harness alike. Neither gets to pick which path
@@ -640,46 +710,79 @@ func shortTypeName(key string) string {
 //   - a literal inside a function that hands the bundle back, whatever
 //     the file. A helper that builds a bundle for its callers cannot know
 //     what any of them will drive, so leaving a field for them to fill is
-//     leaving it to whoever forgets. This is the shape a suite's shared
-//     bundle helper has, and it is where the requirement bites hardest.
+//     leaving it to whoever forgets;
+//   - a literal that names every enforcing field of its bundle. Whoever
+//     wired all of them has already paid for the whole path: nothing left
+//     in the bundle can turn the run back, so the code that reaches the
+//     silent collaborator is code this literal is asking to run. This is
+//     the one that reaches a test which builds its own bundle inline and
+//     drives the real path with it.
 //
-// A literal written inline in a test and passed straight to one call is
-// deliberately out of scope. There the author chose one path and can see
-// it, and a handler package holds many: a test that asserts on a rejected
-// signature, a missing workspace or a protocol handshake returns before
-// the field is reached, and leaving it out is the right literal for that
-// case. Which of a handler's paths a caller drives is a run-time fact, so
-// no reading of the syntax separates those from the case this exists for.
-// Holding them anyway would report every such test, and a check that
-// reports correct code is one that gets switched off.
+// The last is what an incomplete literal in a test is measured against,
+// and the measurement is the literal's own contents rather than a guess
+// at which branch runs. A test that asserts on a rejected signature, a
+// missing workspace or a protocol handshake leaves the querier and the
+// handle out too — it has to, since wiring them for a path that returns
+// first is work with no purpose — and that omission is the author saying
+// where the request stops. A bundle with no enforcing field offers no
+// such statement, so an inline literal of one is never answerable; that
+// loses findings rather than inventing them, and inventing them on
+// correct code is how a check gets switched off.
 //
 // What it does not look at, so a green run is read for what it is:
+//
+//   - Which branch of the handler the caller actually drives. Nothing
+//     here is control flow or reachability from the call the literal
+//     feeds: a fully wired literal handed to the one operation in the
+//     package that records nothing is answerable all the same, and an
+//     early-return test that wires every enforcing field for reasons of
+//     its own is reported.
+//
+//   - What a field is worth once the package hands it on instead of
+//     calling through it. Such a field is neither required nor
+//     enforcing, so a literal can leave out a database handle the
+//     package only passes to a helper and still be read as fully wired.
+//
+//   - Whether a value given to an enforcing field is usable. Any
+//     expression other than the literal nil counts as wired, so a stub,
+//     a zero-value struct pointer or a handle to a closed database all
+//     say the same thing here.
+//
+//   - A named type from outside this module in a non-pointer field. It
+//     cannot be read for whether it holds nil, so it is never enforcing,
+//     and a literal that omits one still reads as fully wired.
 //
 //   - A bundle that is not written as a composite literal: a zero value
 //     declared and then filled in by assignment, or a bundle a caller
 //     received, copied and mutated.
+//
 //   - A literal whose type the source does not spell: an element of a
 //     slice, array or map literal written as {...} without repeating the
 //     element type, and any literal reached through a type alias.
+//
 //   - A required field set to something that is nil at run time. Only the
 //     literal nil is read, so a nil-valued variable, a constructor that
 //     can return nil, and a typed nil placed in an interface field all
 //     pass.
+//
 //   - Calls the declaring package makes through anything other than a
 //     parameter of the bundle type: through a local copy, through a field
 //     of another struct the bundle was stored in, or inside a function
 //     the field's value was passed to. Each of those leaves a genuinely
 //     required field reading as optional.
+//
 //   - Whether a nil check the package writes actually guards the call.
 //     One comparison anywhere in the package makes the field optional for
 //     the whole package. That is deliberate: a package that tests a field
 //     has said nil is a state it handles, and a rule that argued
 //     otherwise from control flow would start firing on the optional
 //     configuration every router bundle carries.
+//
 //   - Unexported fields, fields whose type cannot hold nil, and every
 //     value-typed piece of configuration — secrets, URLs, flags, budgets.
 //     An omitted string is a zero value too, but what a correct one is
 //     cannot be read off the code.
+//
 //   - Any collaborator that faults on a nil receiver. Those enforce
 //     themselves: a test that reaches one and finds it missing goes red
 //     on the panic, which is the whole reason the silent ones are what
@@ -711,9 +814,6 @@ func (s *bundleSource) Literals(bundles []BundleType) []BundleLiteral {
 			if !isBundle {
 				return true
 			}
-			if f.test && !f.produces(bundle.Key, ancestors) {
-				return true
-			}
 			omitted, explicit, readable := missingRequired(lit, bundle)
 			if !readable {
 				return true
@@ -723,6 +823,7 @@ func (s *bundleSource) Literals(bundles []BundleType) []BundleLiteral {
 				Type:        bundle,
 				Omitted:     omitted,
 				ExplicitNil: explicit,
+				Answerable:  !f.test || f.produces(bundle.Key, ancestors) || fullyWired(lit, bundle),
 				File:        file,
 				Line:        line,
 			})
@@ -764,6 +865,38 @@ func missingRequired(lit *ast.CompositeLit, bundle BundleType) (omitted, explici
 		}
 	}
 	return omitted, explicit, true
+}
+
+// fullyWired reports whether the literal names every enforcing field of
+// its bundle with something other than nil.
+//
+// That is the evidence a literal gives about how far it meant to get.
+// The enforcing fields are the collaborators that fault on first use, so
+// a literal missing one stops at the first line that reaches it, and a
+// literal holding all of them has nothing left in the bundle to stop it.
+// A bundle with no enforcing field gives no evidence either way, and no
+// evidence is answered as not answerable.
+func fullyWired(lit *ast.CompositeLit, bundle BundleType) bool {
+	if len(bundle.Enforcing) == 0 {
+		return false
+	}
+	named := map[string]ast.Expr{}
+	for _, elt := range lit.Elts {
+		kv, isKV := elt.(*ast.KeyValueExpr)
+		if !isKV {
+			return false
+		}
+		if key, isIdent := kv.Key.(*ast.Ident); isIdent {
+			named[key.Name] = kv.Value
+		}
+	}
+	for _, field := range bundle.Enforcing {
+		value, set := named[field.Name]
+		if !set || isNilIdent(value) {
+			return false
+		}
+	}
+	return true
 }
 
 // produces reports whether any enclosing function hands the bundle back

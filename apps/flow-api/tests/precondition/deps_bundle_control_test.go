@@ -29,9 +29,13 @@ import (
 //   - an unexported field is not, because no outside literal can set it;
 //   - a struct carrying its own methods is not a bundle at all, since a
 //     half-filled literal of one is how a caller reaches a single method;
-//   - and a literal written inline in a test and handed straight to one
-//     call is out of scope, because which of a handler's paths that call
-//     drives is not in the syntax.
+//   - a literal written inline in a test that leaves out a collaborator
+//     which faults on first use is out of scope, because it stops at the
+//     first line reaching that collaborator and the author said so by
+//     not wiring it;
+//   - and the same literal with every such collaborator wired is in
+//     scope, because nothing left in the bundle can turn the run back
+//     before the silent one.
 
 // TestBundleRuleCountsTheSilentDependencyAndNothingElse drives the
 // fixture tree and pins the derived requirement, field by field.
@@ -54,6 +58,19 @@ func TestBundleRuleCountsTheSilentDependencyAndNothingElse(t *testing.T) {
 		t.Fatal("fixture.Deps was not derived as a bundle; the fixture is holding nothing")
 	}
 
+	// The other half of the same reading: which collaborator's absence
+	// says a literal was never meant to run the whole path. Without it
+	// every inline test literal would be answerable, and the rule would
+	// report the tests that assert on an early return.
+	enforcing := enforcingNames(bundles, depsKey)
+	sort.Strings(enforcing)
+	if strings.Join(enforcing, ",") != "Store" {
+		t.Errorf("fixture.Deps enforcing = %v; want exactly [Store].\n"+
+			"  Recorder answers for a nil receiver so it stops nothing, Optional is nil-tested, "+
+			"Secret cannot hold nil, and Forwarded is only handed on.",
+			enforcing)
+	}
+
 	const objectKey = modulePath + "/internal/http/handlers/fixture.Object"
 	if derived(bundles, objectKey) {
 		t.Errorf("fixture.Object is derived as a bundle, but it declares its own method: "+
@@ -63,25 +80,38 @@ func TestBundleRuleCountsTheSilentDependencyAndNothingElse(t *testing.T) {
 	}
 }
 
-// TestBundleRuleReportsOnlyLiteralsWithNoVisibleConsumer pins the scope:
-// which literals of a bundle have to be complete.
-func TestBundleRuleReportsOnlyLiteralsWithNoVisibleConsumer(t *testing.T) {
+// TestBundleRuleReportsOnlyLiteralsThatAskForTheWholePath pins the
+// scope: which literals of a bundle have to be complete.
+//
+// The fixture writes the two inline test literals side by side. They
+// leave the same silent collaborator out and differ only in whether the
+// collaborator that faults is wired, which is the whole of the reading —
+// so a change that collapses the two shows up here as one of them
+// swapping sides rather than as a quiet drift in what the rule covers.
+func TestBundleRuleReportsOnlyLiteralsThatAskForTheWholePath(t *testing.T) {
 	t.Parallel()
 
 	src := parseControlTree(t)
 	literals := src.Literals(src.Bundles())
 
 	reported := map[string]string{}
-	inScope := map[string]bool{}
+	seen := map[string]bool{}
+	letPast := map[string]bool{}
 	for _, lit := range literals {
-		inScope[filepath.Base(lit.File)] = true
-		if lit.Incomplete() {
+		seen[filepath.Base(lit.File)] = true
+		switch {
+		case lit.Reportable():
 			reported[lit.Location()] = lit.Names()
+		case lit.Incomplete():
+			// Read, incomplete, and deliberately not held to it. Kept
+			// apart from the complete literals so the control below can
+			// tell "let past" from "never looked at".
+			letPast[lit.Location()] = true
 		}
 	}
 
-	if !inScope["wire.go"] || !inScope["wire_test.go"] {
-		t.Fatalf("the fixture's literals were not read (in scope: %v); the walk is matching nothing", inScope)
+	if !seen["wire.go"] || !seen["wire_test.go"] {
+		t.Fatalf("the fixture's literals were not read (files seen: %v); the walk is matching nothing", seen)
 	}
 
 	var flagged []string
@@ -90,12 +120,14 @@ func TestBundleRuleReportsOnlyLiteralsWithNoVisibleConsumer(t *testing.T) {
 	}
 	sort.Strings(flagged)
 
-	// Two files, four literals that leave Recorder nil, and only three of
-	// them answerable: the wiring, the helper that hands a bundle back,
-	// and the helper that names the field as nil. The fourth is written
-	// inline in a test beside the call it feeds.
-	if len(flagged) != 3 {
-		t.Errorf("the rule reported %d literals; want 3.\n  reported:\n    %s",
+	// Two files, five literals that leave Recorder nil, and four of them
+	// answerable: the deployed wiring, the helper that hands a bundle
+	// back, the helper that names the field as nil, and the inline test
+	// literal that wires the faulting collaborator and so is asking for
+	// the path the recorder sits on. The fifth leaves that collaborator
+	// out and stops before it.
+	if len(flagged) != 4 {
+		t.Errorf("the rule reported %d literals; want 4.\n  reported:\n    %s",
 			len(flagged), strings.Join(flagged, "\n    "))
 	}
 	for _, want := range []string{"wire.go", "wire_test.go"} {
@@ -106,18 +138,26 @@ func TestBundleRuleReportsOnlyLiteralsWithNoVisibleConsumer(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("nothing in %s was reported; a bundle assembled where its consumer is not visible has to be complete", want)
+			t.Errorf("nothing in %s was reported; a bundle assembled where nothing can turn the run back has to be complete", want)
 		}
 	}
 	for _, line := range flagged {
-		if strings.Contains(line, "inline") {
-			t.Errorf("an inline test literal was reported: %s.\n"+
-				"  Which path the call beside it drives is a run-time fact, so reporting it would "+
-				"flag every handler test that asserts on an early return", line)
+		if strings.Contains(line, "unwired") {
+			t.Errorf("an inline test literal that leaves the faulting collaborator out was reported: %s.\n"+
+				"  It cannot reach the recorder without going red first, so reporting it would flag "+
+				"every handler test that asserts on an early return", line)
 		}
 		if !strings.Contains(line, "Recorder") {
 			t.Errorf("a literal was reported for something other than the silent collaborator: %s", line)
 		}
+	}
+
+	// The inline literal that stops early has to be read and let past,
+	// not missing. A walk that stopped matching it would leave this test
+	// green for the wrong reason.
+	if len(letPast) != 1 {
+		t.Errorf("%d incomplete literals were read and let past; want exactly the one that leaves the faulting collaborator out.\n"+
+			"  let past: %v", len(letPast), letPast)
 	}
 }
 
@@ -238,9 +278,14 @@ func nilDeps() *fixture.Deps {
 }
 
 func TestHandlerRejectsEmptySecret(t *testing.T) {
-	// An inline literal beside the one call it feeds: this test asserts
-	// on a path that returns before the recorder is reached.
-	_ = fixture.Handle(fixture.Deps{Store: &rec.Store{}, Secret: "inline"})
+	// An inline literal with no store: the first line that reaches one
+	// faults, so this case asserts on what happens before that and says
+	// so by leaving the store out.
+	_ = fixture.Handle(fixture.Deps{Secret: "unwired"})
+	// An inline literal with the store wired: nothing left in the bundle
+	// can turn the run back, so it is asking for the path the recorder
+	// sits on and answers for the recorder.
+	_ = fixture.Handle(fixture.Deps{Store: &rec.Store{}, Secret: "wired"})
 	_ = helperDeps()
 	_ = nilDeps()
 }

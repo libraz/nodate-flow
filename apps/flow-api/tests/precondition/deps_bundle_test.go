@@ -24,23 +24,28 @@ import (
 // than loud are all read out of the tree, so a handler package added next
 // month is covered the day its first exported handler takes a bundle.
 //
-// [bundleSource.Literals] states the limits, and the one worth knowing
-// here is the scope: a literal written inline in a test and handed
-// straight to one call is not held to this. Which of a handler's paths a
-// caller drives is a run-time fact — a test that asserts on a rejected
-// signature or a missing workspace returns before the field is reached —
-// and no reading of the syntax separates that from a caller who drives
-// the whole path. So the requirement lands where the consumer is not
-// visible beside the literal: the deployed wiring, the shared test
-// harness, and any helper that hands a bundle back to callers it cannot
-// see.
+// [bundleSource.Literals] states the limits. The scope is the deployed
+// wiring, any helper that hands a bundle back to callers it cannot see,
+// and any literal that names every collaborator of its bundle that
+// faults on first use — including one written inline in a test, which is
+// the shape the failure took. Whoever wires all of those has nothing
+// left in the bundle that can turn the run back, so the code reaching
+// the silent collaborator is code that literal is asking to run.
+//
+// What it does not look at is which branch the request takes. Nothing
+// here is control flow: a test that asserts on a rejected signature or a
+// missing workspace is out only because it leaves the querier and the
+// handle out too, not because the rule can see where it returns. Wire
+// those into an early-return case and it is reported; hand a fully wired
+// bundle to the one operation in a package that records nothing and it
+// is reported as well.
 func TestBundleWiringSetsEverySilentDependency(t *testing.T) {
 	t.Parallel()
 
 	src, bundles, literals := bundleScope(t)
 
 	for _, lit := range literals {
-		if !lit.Incomplete() {
+		if !lit.Reportable() {
 			continue
 		}
 		t.Errorf("%s builds %s and leaves %s.\n"+
@@ -52,14 +57,26 @@ func TestBundleWiringSetsEverySilentDependency(t *testing.T) {
 
 	// A derived check reports nothing when its derivation stops matching,
 	// and nothing is also what a clean tree looks like. The scope is
-	// asserted so the two cannot be confused.
+	// asserted so the two cannot be confused, at each of the three points
+	// it can quietly empty out: the bundles, the literals read, and the
+	// literals actually held to the requirement.
 	if len(bundles) < 10 {
 		t.Errorf("only %d dependency bundles were derived from the tree; the derivation has stopped matching rather than the bundles having gone away",
 			len(bundles))
 	}
 	if len(literals) < 10 {
-		t.Errorf("only %d bundle literals were in scope; the literal walk has stopped matching",
+		t.Errorf("only %d bundle literals were read; the literal walk has stopped matching",
 			len(literals))
+	}
+	answerable := 0
+	for _, lit := range literals {
+		if lit.Answerable {
+			answerable++
+		}
+	}
+	if answerable < 10 {
+		t.Errorf("only %d of %d bundle literals are answerable for what they leave nil; the scope has collapsed and the rule is holding almost nothing",
+			answerable, len(literals))
 	}
 
 	// The bundle that motivated this, checked by name against the source
@@ -72,6 +89,18 @@ func TestBundleWiringSetsEverySilentDependency(t *testing.T) {
 	if !contains(required, "Mutations") {
 		t.Errorf("signals.Deps.Mutations is not derived as required (required: %v); the inbound webhook path records a change through it and nothing tests it for nil",
 			required)
+	}
+
+	// The inbound webhook path also holds a querier that faults on nil,
+	// which is what lets a bundle assembled inside a test case be judged
+	// at all: a case that wires it has wired everything that could stop
+	// the request short of the recorder. Derive nothing enforcing here
+	// and every literal written inside a test function is let past, which
+	// is the shape the failure this rule exists for takes.
+	enforcing := enforcingNames(bundles, signalsDeps)
+	if !contains(enforcing, "Queries") {
+		t.Errorf("signals.Deps.Queries is not derived as enforcing (enforcing: %v); a bundle built inside a test case can no longer be judged, and the inbound webhook path is where that matters",
+			enforcing)
 	}
 }
 
@@ -127,6 +156,11 @@ func TestOptionalWiringIsNotHeldToTheRule(t *testing.T) {
 				continue
 			}
 			seen = true
+			if !lit.Answerable {
+				t.Errorf("%s builds %s and is not answerable; this file is the control for a rule that fires on legitimate wiring, and a literal it no longer holds proves nothing",
+					lit.Location(), lit.Type.Name)
+				continue
+			}
 			if lit.Incomplete() {
 				t.Errorf("%s builds %s and is reported for %s; this literal wires what its package reaches and the rule is wrong to flag it",
 					lit.Location(), lit.Type.Name, lit.Names())
@@ -135,6 +169,63 @@ func TestOptionalWiringIsNotHeldToTheRule(t *testing.T) {
 		if !seen {
 			t.Errorf("no bundle literal in %s was in scope; this file is the control for a rule that fires on legitimate wiring, and it is holding nothing",
 				want)
+		}
+	}
+}
+
+// TestPartialTestLiteralsAreReadAndLetPast is the control for the other
+// way this rule could go wrong: firing on a test that builds the bundle
+// it needs and no more.
+//
+// Each file below drives a path that returns before the silent
+// collaborator — a Slack URL-verification handshake, a request with no
+// workspace on the context, an invite accept measured against a stub
+// driver — and each leaves out a collaborator that would fault if the
+// request went further. That omission is the author saying where the
+// request stops, and it is the whole of what keeps these out.
+//
+// So the assertion is three-part, because two of the three can hold
+// while the rule protects nothing. The literal has to still be read as a
+// bundle literal, it has to still leave a required field nil, and only
+// then does it have to be let past. A file whose literal has vanished, or
+// whose type is no longer derived as a bundle, fails here rather than
+// passing quietly.
+func TestPartialTestLiteralsAreReadAndLetPast(t *testing.T) {
+	t.Parallel()
+
+	_, _, literals := bundleScope(t)
+
+	for _, file := range []string{
+		"apps/flow-api/internal/http/handlers/signals/webhooks_slack_test.go",
+		"apps/flow-api/internal/http/handlers/export/handler_test.go",
+		"apps/flow-api/internal/http/handlers/calendars/invite_accept_roundtrips_test.go",
+	} {
+		read, partial := 0, 0
+		for _, lit := range literals {
+			if lit.File != file {
+				continue
+			}
+			read++
+			if !lit.Incomplete() {
+				continue
+			}
+			partial++
+			if lit.Answerable {
+				t.Errorf("%s builds %s and is reported for %s.\n"+
+					"  This case asserts on a path that returns before the field is reached, and it "+
+					"leaves out a collaborator that would fault if the request went further. Reporting "+
+					"it means the rule now fires on correct code.",
+					lit.Location(), lit.Type.Name, lit.Names())
+			}
+		}
+		if read == 0 {
+			t.Errorf("no bundle literal in %s was read at all; this file is the control for a rule that fires on a test wiring only what it drives, and it is holding nothing",
+				file)
+			continue
+		}
+		if partial == 0 {
+			t.Errorf("every bundle literal in %s now sets each required field; this control passes without exercising the reading it exists for",
+				file)
 		}
 	}
 }
@@ -171,6 +262,22 @@ func requiredNames(bundles []BundleType, key string) []string {
 		}
 		out := make([]string, 0, len(bundle.Required))
 		for _, field := range bundle.Required {
+			out = append(out, field.Name)
+		}
+		return out
+	}
+	return nil
+}
+
+// enforcingNames returns the names of the collaborators one bundle
+// carries that fault the first time the package reaches them.
+func enforcingNames(bundles []BundleType, key string) []string {
+	for _, bundle := range bundles {
+		if bundle.Key != key {
+			continue
+		}
+		out := make([]string, 0, len(bundle.Enforcing))
+		for _, field := range bundle.Enforcing {
 			out = append(out, field.Name)
 		}
 		return out
