@@ -276,6 +276,146 @@ func TestRedact_NewSecretPrefixes(t *testing.T) {
 	}
 }
 
+// TestRedact_PrefixOnlyMatchesAtAWordStart covers both directions of the
+// boundary rule: a prefix that begins a word is a secret, a prefix that
+// continues one is ordinary prose.
+//
+// The must-redact half enumerates the byte that realistically precedes a
+// credential in the wild — header, JSON, env dump, bracketed, newline,
+// start of string — because the boundary rule is the only thing standing
+// between those shapes and a leak.
+func TestRedact_PrefixOnlyMatchesAtAWordStart(t *testing.T) {
+	t.Parallel()
+
+	const antBody = "sk-ant-" + "api03exampletokenbody01" //#nosec G101 -- synthetic test fixture, never a real key
+
+	cases := []struct {
+		name       string
+		input      string
+		wantMarker string // "" means nothing may be redacted
+		wantExact  string // asserted when wantMarker is empty
+	}{
+		// A prefix that starts a word is a secret.
+		{
+			name:       "bearer header",
+			input:      "Authorization: Bearer " + antBody,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "json string value",
+			input:      `{"apiKeyHint":"` + antBody + `"}`,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "env style assignment",
+			input:      "ANTHROPIC_KEY=" + antBody,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "parenthesised",
+			input:      "(" + antBody + ")",
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "bracketed",
+			input:      "[" + antBody + "]",
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "after a newline",
+			input:      "upstream said:\n" + antBody,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "start of string",
+			input:      antBody,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "after a hyphen",
+			input:      "x-api-key:" + antBody,
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "adjacent to non-ascii prose",
+			input:      "キーは" + antBody + "です",
+			wantMarker: "[REDACTED:sk-ant-]",
+		},
+		{
+			name:       "pat_ at a word start",
+			input:      "token=pat_abcdef0123456789",
+			wantMarker: "[REDACTED:pat_]",
+		},
+		{
+			name:       "SG. at a word start",
+			input:      "key SG.abc123def456.ghi789jkl012mno345",
+			wantMarker: "[REDACTED:SG.]",
+		},
+
+		// A prefix in the middle of a word is prose, not a secret.
+		{
+			name:      "sk- inside task-filter",
+			input:     "You are a task-filter compiler for nodate-flow.",
+			wantExact: "You are a task-filter compiler for nodate-flow.",
+		},
+		{
+			name:      "sk- inside risk-adjusted",
+			input:     "risk-adjusted estimate",
+			wantExact: "risk-adjusted estimate",
+		},
+		{
+			name:      "sk- inside disk-usage",
+			input:     "disk-usage report",
+			wantExact: "disk-usage report",
+		},
+		{
+			name:      "pat_ inside compat_",
+			input:     "compat_mode enabled",
+			wantExact: "compat_mode enabled",
+		},
+		{
+			name:      "SG. inside MSG.",
+			input:     "MSG.Body was empty",
+			wantExact: "MSG.Body was empty",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := Redact(tc.input)
+			if tc.wantMarker == "" {
+				if got != tc.wantExact {
+					t.Fatalf("Redact(%q) = %q, want it left alone as %q", tc.input, got, tc.wantExact)
+				}
+				return
+			}
+			if !strings.Contains(got, tc.wantMarker) {
+				t.Fatalf("Redact(%q) = %q, want it to contain %q", tc.input, got, tc.wantMarker)
+			}
+			if strings.Contains(got, antBody[len("sk-ant-"):]) {
+				t.Fatalf("raw secret body survived: %q", got)
+			}
+		})
+	}
+}
+
+// TestRedact_SecondPassNestsMarkers pins that Redact is not idempotent.
+// Callers redact exactly once, where the string is built; a marker's own
+// prefix sits after a colon, which is a word start, so a second pass
+// wraps it again. A boundary rule that swallowed that case would also be
+// swallowing a genuine secret written after a colon.
+func TestRedact_SecondPassNestsMarkers(t *testing.T) {
+	t.Parallel()
+
+	once := Redact("key " + "sk-ant-" + "api03body01") //#nosec G101 -- synthetic test fixture, never a real key
+	twice := Redact(once)
+	if !strings.Contains(twice, "[REDACTED:[REDACTED:sk-ant-]") {
+		t.Fatalf("second pass did not nest: first %q, second %q", once, twice)
+	}
+}
+
 func TestRedactJSONFields_OAuthKeys(t *testing.T) {
 	t.Parallel()
 

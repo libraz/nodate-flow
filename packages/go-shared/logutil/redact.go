@@ -88,6 +88,19 @@ func RegisterPrefix(p string) {
 // with "[REDACTED:<prefix>]". The scanner is greedy on the secret token: a
 // match runs until the first non-token character (whitespace, quote, comma,
 // brace, bracket, semicolon, or newline).
+//
+// A prefix only counts where a word starts (see startsWord). Short
+// prefixes otherwise match inside ordinary English — "sk-" sits inside
+// task-filter, risk-adjusted and disk-usage, "pat_" inside compat_mode,
+// "SG." inside MSG. — and the marker is an assertion that a credential
+// was found at that spot. One planted in prose costs twice: the words it
+// swallows are gone from the stored string, and an operator who reads it
+// investigates a leak that never happened.
+//
+// The rule belongs here rather than in SecretPrefixes: dropping or
+// lengthening a colliding prefix narrows what the scanner catches, while
+// the boundary rule keeps every prefix and only rejects the positions
+// where a secret cannot begin.
 func Redact(s string) string {
 	if s == "" {
 		return s
@@ -101,9 +114,11 @@ func Redact(s string) string {
 	i := 0
 	for i < len(s) {
 		best := ""
-		for _, p := range local {
-			if len(p) > len(best) && strings.HasPrefix(s[i:], p) {
-				best = p
+		if startsWord(s, i) {
+			for _, p := range local {
+				if len(p) > len(best) && strings.HasPrefix(s[i:], p) {
+					best = p
+				}
 			}
 		}
 		if best == "" {
@@ -121,6 +136,35 @@ func Redact(s string) string {
 		i = j
 	}
 	return b.String()
+}
+
+// startsWord reports whether offset i in s may begin a secret token: a
+// credential never continues an alphanumeric run, so a prefix found there
+// is part of a longer word rather than a key.
+//
+// Only ASCII letters and digits block a match. Every separator a
+// credential actually arrives after stays open — space, ':', '=', '"',
+// '(', '[', ',', newline, '-' and '_' — so header, JSON, env-dump and
+// bracketed forms all still redact. A non-ASCII byte is treated as open
+// too, so a key butted against CJK prose is caught.
+//
+// This is a different question from isTokenByte, which decides where a
+// matched token ends; '=' for instance ends nothing but may precede a key.
+func startsWord(s string, i int) bool {
+	if i == 0 {
+		return true
+	}
+	prev := s[i-1]
+	switch {
+	case prev >= '0' && prev <= '9':
+		return false
+	case prev >= 'A' && prev <= 'Z':
+		return false
+	case prev >= 'a' && prev <= 'z':
+		return false
+	default:
+		return true
+	}
 }
 
 // isTokenByte reports whether b is part of a contiguous secret token.
