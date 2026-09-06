@@ -24,3 +24,9 @@ reject:
   # 1.4.x renders an option's value placeholder from the camelCase destination
   # instead of the flag name, so help output reads `--workspace-id <workspaceId>`.
   - "@libraz/node-cli"
+
+  # An alias for the TypeScript copy the SDK generator runs on. openapi-typescript
+  # emits its output through `ts.factory`, which only the JavaScript implementation
+  # of the compiler exposes, so this edge has to stay on a 5.x release even as the
+  # workspaces move their own `typescript` forward.
+  - "typescript-5x"

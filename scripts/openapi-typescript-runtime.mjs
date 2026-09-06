@@ -10,8 +10,15 @@
 // bun hoists `openapi-typescript` to the root `node_modules`, so it picks
 // up the root TypeScript no matter which version a workspace pins, and
 // neither `overrides` nor `resolutions` redirect a peer edge. This shim
-// therefore resolves the bare `typescript` specifier to the 5.x copy that
-// `packages/sdk` pins, and leaves every other specifier alone.
+// therefore resolves the bare `typescript` specifier to a dedicated 5.x
+// copy, and leaves every other specifier alone.
+//
+// That copy is installed under an alias — `packages/sdk` declares
+// `typescript-5x: npm:typescript@5.9.3` — rather than as the workspace's
+// plain `typescript`. A dependency sweep that raises `typescript` across
+// every workspace at once would otherwise carry the generator's compiler
+// with it and break code generation; the alias keeps that edge separate,
+// so the sdk can typecheck on the same TypeScript as everything else.
 //
 // Used by `make gen-sdk`:
 //
@@ -28,19 +35,21 @@ const require = createRequire(import.meta.url);
 
 let entry;
 try {
-  entry = require.resolve('typescript', { paths: [sdkDir] });
+  entry = require.resolve('typescript-5x', { paths: [sdkDir] });
 } catch {
   throw new Error(
-    `openapi-typescript needs a TypeScript 5.x install under ${sdkDir}. Run 'bun install'.`,
+    `openapi-typescript needs a TypeScript 5.x install under ${sdkDir}. Add it to ` +
+      "packages/sdk's devDependencies as 'typescript-5x': 'npm:typescript@5.x', " +
+      "then run 'bun install'.",
   );
 }
 
-const { version } = require(require.resolve('typescript/package.json', { paths: [sdkDir] }));
+const { version } = require(require.resolve('typescript-5x/package.json', { paths: [sdkDir] }));
 if (!version.startsWith('5.')) {
   throw new Error(
     `openapi-typescript needs typescript 5.x, but ${entry} is ${version}. ` +
-      "Pin a 5.x release in packages/sdk's devDependencies; the generator " +
-      'uses compiler APIs that later majors no longer ship.',
+      "Pin a 5.x release as 'typescript-5x' in packages/sdk's devDependencies; " +
+      'the generator uses compiler APIs that later majors no longer ship.',
   );
 }
 
