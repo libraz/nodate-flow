@@ -181,6 +181,77 @@ func TestReadLensFilterNamesWhatStoppedIt(t *testing.T) {
 	}
 }
 
+// A lens and the authenticated list read the same column, so they have
+// to agree on which priorities exist. A named value outside the range
+// is dropped the way the list drops it; a set left naming none of them
+// is a filter that would save cleanly and match nothing.
+func TestParseLensFilterHoldsPrioritiesToTheColumnsRange(t *testing.T) {
+	kept := parseLensFilter(json.RawMessage(`{"priority":{"values":[1,99]}}`))
+	if kept.Impossible {
+		t.Fatal("a set naming one real priority still names it")
+	}
+	if len(kept.Priorities) != 1 || kept.Priorities[0] != 1 {
+		t.Fatalf("only the priorities a task can carry may be bound; got %v", kept.Priorities)
+	}
+
+	for name, raw := range map[string]string{
+		"a set of values no task can carry": `{"priority":{"values":[-1,99]}}`,
+		"a single value outside the range":  `{"priority":{"eq":9}}`,
+		"a negative value":                  `{"priority":{"in":[-3]}}`,
+	} {
+		if !parseLensFilter(json.RawMessage(raw)).Impossible {
+			t.Fatalf("%s: a filter naming no real priority must select nothing", name)
+		}
+		if _, unread := readLensFilter(json.RawMessage(raw)); unread != "filter.priority" {
+			t.Fatalf("%s: the refusal must name the key that stopped it; got %q", name, unread)
+		}
+	}
+
+	// A comparison is not a named value: an inequality outside the range
+	// still denotes a well-defined set of real priorities, so it is read
+	// as written rather than refused.
+	if bounded := parseLensFilter(json.RawMessage(`{"priority":{"lte":9}}`)); bounded.Impossible {
+		t.Fatal("a bound wider than the range still names every priority under it")
+	}
+}
+
+// An ordering and a grouping are refused on the way in because no
+// surface reads them. Storing one would answer its author with a lens
+// that behaves as though they had saved nothing.
+func TestLensDefinitionRefusesWhatNothingApplies(t *testing.T) {
+	for name, raw := range map[string]string{
+		"an ordering":                         `[{"field":"priority","dir":"desc"}]`,
+		"an ordering that is not a list":      `{"field":"priority"}`,
+		"an ordering that is not JSON at all": `nope`,
+	} {
+		if err := validateLensSort(json.RawMessage(raw)); err == nil {
+			t.Fatalf("%s: must be refused", name)
+		}
+	}
+	for name, raw := range map[string]string{
+		"no ordering at all":                ``,
+		"a null ordering":                   `null`,
+		"an empty ordering":                 `[]`,
+		"an empty ordering with whitespace": `[ ]`,
+	} {
+		if err := validateLensSort(json.RawMessage(raw)); err != nil {
+			t.Fatalf("%s: names no ordering and must still be accepted; got %v", name, err)
+		}
+	}
+
+	grouping := "status"
+	if err := validateLensGroupBy(&grouping); err == nil {
+		t.Fatal("a grouping must be refused")
+	}
+	empty := ""
+	if err := validateLensGroupBy(&empty); err != nil {
+		t.Fatalf("an empty grouping names none and must be accepted; got %v", err)
+	}
+	if err := validateLensGroupBy(nil); err != nil {
+		t.Fatalf("an absent grouping must be accepted; got %v", err)
+	}
+}
+
 // publicLensFilter reads the stored envelope, so a lens_json that cannot
 // be decoded at all must reach the resolver as the excluding predicate
 // rather than as no filter.

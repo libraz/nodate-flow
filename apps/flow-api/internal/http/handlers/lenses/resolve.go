@@ -25,15 +25,14 @@ import (
 // workspace as a free data dump.
 const publicLensTaskCap int32 = 200
 
-// allowedDerivedStates gate-keeps the status values a lens may name, so
-// a filter carrying something outside the enum cannot be dropped on the
-// floor and silently widen the shared set.
-var allowedDerivedStates = map[string]struct{}{
-	"open":      {},
-	"waiting":   {},
-	"review":    {},
-	"done":      {},
-	"cancelled": {},
+// inPriorityRange reports whether p is a value the tasks.priority column
+// can hold. The bounds live in handlerutil next to the rest of the
+// priority scale, so the authenticated task list and this reader agree
+// on which priorities exist: a lens naming one that does not is a lens
+// that saves cleanly and then matches nothing, and its author has no way
+// to see why.
+func inPriorityRange(p int32) bool {
+	return p >= handlerutil.PriorityNone && p <= handlerutil.PriorityMax
 }
 
 // lensFilter is the canonical reading of the lens_json `filter` map: the
@@ -186,10 +185,63 @@ func parseLensFilter(raw json.RawMessage) lensFilter {
 // defend against.
 func validateLensFilter(raw json.RawMessage) error {
 	if _, unread := readLensFilter(raw); unread != "" {
-		return handlerutil.HTTPErrFromAPIError(
-			apierr.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", unread))
+		return invalidLensField(unread)
 	}
 	return nil
+}
+
+// invalidLensField renders the refusal every lens write answers with,
+// naming the JSON path of what stopped it.
+func invalidLensField(path string) error {
+	return handlerutil.HTTPErrFromAPIError(
+		apierr.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", path))
+}
+
+// namesNoOrdering reports whether a submitted sort names no ordering:
+// absent, JSON null, or an empty array. Anything else — including a
+// value that is not an array at all — names one.
+func namesNoOrdering(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var specs []json.RawMessage
+	if err := json.Unmarshal(raw, &specs); err != nil {
+		return false
+	}
+	return len(specs) == 0
+}
+
+// validateLensSort refuses a lens write that names an ordering, because
+// no surface applies one.
+//
+// The share page cannot honour it alone. It is capped and unpaginated,
+// so its order decides which rows a link holder is shown at all, and the
+// authenticated list it has to agree with takes no ordering from the
+// lens — a sort applied here and nowhere else would publish a different
+// leading set than the one its author sees, which is the failure the
+// shared ordering exists to prevent. Storing the field while honouring
+// it nowhere is worse than refusing it: the author gets no error and no
+// effect, and cannot tell the difference.
+//
+// Only what the request carries is checked. A lens stored before this
+// refusal keeps its saved ordering and keeps rendering; a patch that
+// leaves the field alone is not a write of it.
+func validateLensSort(raw json.RawMessage) error {
+	if namesNoOrdering(raw) {
+		return nil
+	}
+	return invalidLensField("sort")
+}
+
+// validateLensGroupBy refuses a lens write that names a grouping, for
+// the reason [validateLensSort] refuses an ordering: nothing reads it.
+// The share page renders one flat list, and the authenticated list has
+// no grouping to take from a lens either.
+func validateLensGroupBy(groupBy *string) error {
+	if groupBy == nil || *groupBy == "" {
+		return nil
+	}
+	return invalidLensField("groupBy")
 }
 
 // readStatus reads the status key into States. Exactly one operator may
@@ -218,7 +270,7 @@ func (f *lensFilter) readStatus(ops map[string]any) bool {
 		return false
 	}
 	for _, s := range named {
-		if _, ok := allowedDerivedStates[s]; ok {
+		if handlerutil.IsTaskDerivedState(s) {
 			f.States = append(f.States, s)
 		}
 	}
@@ -230,6 +282,13 @@ func (f *lensFilter) readStatus(ops map[string]any) bool {
 // different predicates and the renderer emits one reading of the column,
 // so a filter mixing them, or naming the same bound twice, is not
 // rendered in full.
+//
+// A set member outside the column's range is dropped, exactly as the
+// authenticated list drops it, and a set left naming no priority at all
+// is not read. The comparison forms are left as written: an inequality
+// outside the range still denotes a well-defined set of real priorities
+// (`lte 9` is every priority there is), whereas a named value outside it
+// denotes nothing.
 func (f *lensFilter) readPriority(ops map[string]any) bool {
 	_, hasValues := ops["values"]
 	_, hasIn := ops["in"]
@@ -238,17 +297,23 @@ func (f *lensFilter) readPriority(ops map[string]any) bool {
 		if len(ops) != 1 {
 			return false
 		}
+		var named []int32
 		switch {
 		case hasValues:
-			f.Priorities = int32sInArray(ops["values"])
+			named = int32sInArray(ops["values"])
 		case hasIn:
-			f.Priorities = int32sInArray(ops["in"])
+			named = int32sInArray(ops["in"])
 		default:
 			n, ok := numberToInt32(ops["eq"])
 			if !ok {
 				return false
 			}
-			f.Priorities = []int32{n}
+			named = []int32{n}
+		}
+		for _, p := range named {
+			if inPriorityRange(p) {
+				f.Priorities = append(f.Priorities, p)
+			}
 		}
 		return len(f.Priorities) > 0
 	}
@@ -508,6 +573,26 @@ const publicLensTaskColumns = `v.public_id,
 // a share URL has no reader identity to check anything else against.
 // The result is hard-capped at publicLensTaskCap rows.
 //
+// The order is the authenticated task list's order, sort_weight first,
+// and has to stay that way. The cap is not pagination: a lens matching
+// more rows than the cap publishes only the leading ones, so the order
+// is what decides which rows a link holder is shown. Ordering differently
+// here would publish a different set than the author's own list shows
+// them, and the rows left out would be ones they never saw omitted.
+// sort_weight is the manual ordering the author arranged, so it also
+// leads for the reason it leads everywhere else.
+//
+// task-visibility: not-applicable — the share page is unauthenticated, so
+// there is no actor to compare a task against. The projection is narrowed
+// to visibility = 'public' instead, which is strictly inside what the
+// actor rule would allow for any reader. Splicing the actor rule in here
+// would widen the set rather than narrow it: against a zero actor its
+// public branch still matches everything this already returns, and for a
+// caller the middleware never resolved a role for it degrades to the
+// elevated case, which applies no predicate at all. The same reasoning
+// and the same wording carry the sqlc twin of this statement,
+// ListPublicLensTasks in sql/queries/lenses/public.sql.
+//
 // Errors propagate to the caller as opaque internals; the
 // FindLensByPublicTokenHash call already validated the token, so a failure
 // here means the database is unhappy.
@@ -531,7 +616,7 @@ func resolvePublicLensTasks(
   %s
 FROM v_task_list v
 WHERE %s
-ORDER BY v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
+ORDER BY v.sort_weight ASC, v.priority DESC, v.due_on ASC, v.created_at DESC, v.public_id DESC
 LIMIT ?`, publicLensTaskColumns, strings.Join(where, " AND "))
 	args = append(args, publicLensTaskCap)
 

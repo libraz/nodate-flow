@@ -31,6 +31,15 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 		if err := validateLensFilter(in.Body.Filter); err != nil {
 			return nil, err
 		}
+		// An ordering and a grouping are refused for the opposite reason:
+		// no surface reads them, so storing one would answer the author
+		// with a saved lens that behaves as though they had saved nothing.
+		if err := validateLensSort(in.Body.Sort); err != nil {
+			return nil, err
+		}
+		if err := validateLensGroupBy(in.Body.GroupBy); err != nil {
+			return nil, err
+		}
 
 		// Resolve optional project public_id → internal id.
 		var projectID sql.NullInt32
@@ -187,6 +196,19 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 		// the same reason a create is: the lens may already be published.
 		if in.Body.Filter != nil {
 			if err := validateLensFilter(*in.Body.Filter); err != nil {
+				return nil, err
+			}
+		}
+		// Only what this patch carries is checked. A lens stored with an
+		// ordering before the refusal existed keeps it, and a patch of its
+		// name is not a write of the field it did not send.
+		if in.Body.Sort != nil {
+			if err := validateLensSort(*in.Body.Sort); err != nil {
+				return nil, err
+			}
+		}
+		if in.Body.GroupBy != nil {
+			if err := validateLensGroupBy(in.Body.GroupBy); err != nil {
 				return nil, err
 			}
 		}
