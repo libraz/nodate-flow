@@ -94,6 +94,28 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+
+			// Audit only: calendars.PresignAttachment appended
+			// CalEventAttachmentCreated when it committed the attachment
+			// row, so the attachment is already on the timeline and
+			// confirming it completes that same act rather than being a
+			// second change anyone would want to see twice. The measured
+			// size travels with the record because establishing it is what
+			// this endpoint is for — the declared one was a claim.
+			attPubID := att.PublicID.String()
+			recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+				AuditAction:  "calendar.attachment.confirm",
+				ResourceType: "calendar.attachment",
+				ResourceID:   attPubID,
+				Payload: map[string]any{
+					"eventId":      input.EvtID,
+					"calendarId":   input.CalID,
+					"attachmentId": attPubID,
+					"byteSize":     size,
+				},
+				CallSite: "calendars.ConfirmAttachment",
+			})
+
 			out := &ConfirmAttachmentOutput{}
 			out.Body.Ok = true
 			out.Body.ByteSize = size

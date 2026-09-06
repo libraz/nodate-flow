@@ -589,6 +589,17 @@ func DeletePublicShare(deps Deps) func(context.Context, *DeletePublicShareInput)
 	}
 }
 
+// attachRefusedEveryCandidate reports whether a publish batch had
+// candidates and published none of them.
+//
+// It is the complement of the attached > 0 test, and the two are
+// disjoint on purpose: one batch leaves one record, and which of the two
+// it is says whether anything reached the public URL. A request naming no
+// events asked for nothing and leaves neither.
+func attachRefusedEveryCandidate(attached, skipped int) bool {
+	return attached == 0 && skipped > 0
+}
+
 // AttachEventsToShare bulk-publishes events on a share.
 //
 // Publishing is per-event rather than per-share, so the authorization is
@@ -708,6 +719,28 @@ func AttachEventsToShare(deps Deps) func(context.Context, *AttachEventsToShareIn
 					"shareId":  input.ShareID,
 					"attached": attached,
 					"skipped":  skipped,
+				},
+				CallSite: "calendars.AttachEventsToShare",
+			})
+		}
+
+		// A batch that published nothing still happened. Every candidate
+		// was refused — confidential, or drawn from a calendar the actor
+		// holds less than editor on — and this endpoint's output is a URL
+		// anyone on the internet can open, so the attempt is precisely
+		// what an administrator investigating an exposure looks for.
+		//
+		// Audit only, and no writer owns an event for it: nothing was
+		// published, so nothing belongs on the timeline.
+		if attachRefusedEveryCandidate(attached, skipped) {
+			recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+				AuditAction:  "calendar.share.events_attach_refused",
+				ResourceType: "calendar.share",
+				ResourceID:   input.ShareID,
+				Payload: map[string]any{
+					"shareId":   input.ShareID,
+					"skipped":   skipped,
+					"requested": len(input.Body.EventIDs),
 				},
 				CallSite: "calendars.AttachEventsToShare",
 			})

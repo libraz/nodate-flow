@@ -82,11 +82,12 @@ var writeOperationsWithoutMutationLog = map[string]string{
 // extraction of workspace data is precisely what an administrator
 // investigating a leak needs to find.
 //
-// Empty here on purpose. The one calendar read that hands out more than
-// it shows — attachments-download, which mints a presigned object URL —
-// is a candidate, but nothing records it today and adding the record is
-// a change to that handler rather than to this list.
-var readOperationsRequiringMutationLog = map[string]string{}
+// An entry here is a read that hands out more than it shows, so the
+// operation is held to the same reachability rule as a write even though
+// its method exempts it.
+var readOperationsRequiringMutationLog = map[string]string{
+	"attachments-download": "mints a presigned URL carrying the stored bytes to whoever holds it; the audit row is the only trace that the file left the workspace",
+}
 
 func loadCalendarPackage(t *testing.T) *mutationguard.Analysis {
 	t.Helper()

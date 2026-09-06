@@ -478,6 +478,26 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
+		// Audit only, and there is no writer that owns an event for this
+		// one: a download changes nothing about the workspace, and a
+		// timeline row per file open would bury the changes that do. The
+		// audit row is still required, because the URL carries the stored
+		// bytes to whoever holds it — an administrator investigating an
+		// exposure is asking exactly which files left, and only this row
+		// answers.
+		attPubID := att.PublicID.String()
+		recordCalendarAudit(ctx, deps, wsID, actorID, mutationlog.Mutation{
+			AuditAction:  "calendar.attachment.download",
+			ResourceType: "calendar.attachment",
+			ResourceID:   attPubID,
+			Payload: map[string]any{
+				"eventId":      input.EvtID,
+				"calendarId":   input.CalID,
+				"attachmentId": attPubID,
+			},
+			CallSite: "calendars.DownloadAttachment",
+		})
+
 		out := &DownloadAttachmentOutput{}
 		out.Body.DownloadURL = downloadURL
 		return out, nil

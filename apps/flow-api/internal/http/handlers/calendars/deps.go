@@ -151,17 +151,31 @@ func recordCalendarChange(
 	deps.Mutations.Record(ctx, calendarMutationActor(workspaceID, actorUserID), m)
 }
 
-// recordCalendarAudit is [recordCalendarChange] for a change whose event
-// row a shared transactional helper already appended inside the same
-// transaction as the write itself. Appending it again here would put the
-// change on the timeline twice, so this records the audit half only —
-// the half those helpers cannot supply, because they are shared across
-// transports and know nothing about which one called them.
+// recordCalendarAudit is [recordCalendarChange] for something that has
+// to be traceable without putting a row on the timeline. It writes the
+// audit half alone, and the rule it enforces is that `events` stays a
+// record of workspace changes: reaching this adapter is a statement that
+// either another writer owns the event, or there is no event to write.
+//
+// Three shapes reach it. A change whose event a shared transactional
+// helper already appended inside the same transaction as the write —
+// appending it again would show the change twice, and the audit row is
+// exactly the half those helpers cannot supply, because they are shared
+// across transports and know nothing about which one called them. The
+// unauthenticated magic-link accept, whose kind belongs to the
+// authenticated path, so appending it here would put an anonymous actor
+// on the feed for a change the attendee list already shows. And an
+// operation that changes nothing at all yet must still leave a trace —
+// handing out a presigned URL that carries a stored object, confirming
+// the measured size of an upload that is already on the timeline — where
+// a timeline row per request would bury the changes that matter while an
+// administrator still needs to find that it happened.
 //
 // It takes no calendar id: nothing is appended to `events`, so there is
-// no column for one to reach. Every call site names the helper that owns
-// its event in a comment, so a reader can find the row this one
-// deliberately does not write.
+// no column for one to reach. Every call site says in a comment which of
+// the three it is, and names the writer that owns its event where one
+// exists, so a reader can find the row this one deliberately does not
+// write.
 func recordCalendarAudit(
 	ctx context.Context,
 	deps Deps,
