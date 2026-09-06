@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
@@ -68,6 +69,7 @@ type taskRow struct {
 	publicID    dbtype.PublicID
 	workspaceID uint32
 	title       string
+	description sql.NullString
 	dueOn       sql.NullTime
 	updatedAt   time.Time
 }
@@ -91,13 +93,32 @@ type eventRow struct {
 
 // findTaskByID reads the minimal task row under the given workspace.
 // Returns sql.ErrNoRows when the task is missing or disabled.
+//
+// description is read even though itemkit never writes it: a title change
+// invalidates the task's search embedding, and the embedding is composed
+// from the title and the description together, so the caller that
+// refreshes it after the commit needs the body the task already carries.
+//
+// task-visibility: not-applicable — neither content column this reads is
+// returned to a reader. title is only a fallback for the title of the
+// calendar event projecting this same task, and description only reaches
+// embed.RefreshTaskAfterCommit, which recomputes this same task's own
+// search vector; RenamedTask.Title carries the caller's new title rather
+// than the stored one. This is the write path's read of the row its
+// caller is already mutating, and it takes an internal id no API surface
+// hands out, so whether that caller may act on the task is settled at the
+// entry point that resolved the id — not here. Applying the rule at this
+// depth would also have to invent an actor: the signature carries none,
+// and against a zero actor the predicate answers nothing for every
+// project and private task, turning a legitimate write into a silent
+// no-op.
 func findTaskByID(ctx context.Context, tx TX, workspaceID, taskID uint32) (taskRow, error) {
-	const q = `SELECT id, public_id, workspace_id, title, due_on, updated_at
+	const q = `SELECT id, public_id, workspace_id, title, description, due_on, updated_at
 	           FROM tasks
 	           WHERE id = ? AND workspace_id = ? AND enabled = TRUE`
 	var t taskRow
 	err := tx.QueryRowContext(ctx, q, taskID, workspaceID).Scan(
-		&t.id, &t.publicID, &t.workspaceID, &t.title, &t.dueOn, &t.updatedAt,
+		&t.id, &t.publicID, &t.workspaceID, &t.title, &t.description, &t.dueOn, &t.updatedAt,
 	)
 	return t, err
 }
@@ -159,6 +180,54 @@ func eventDate(t time.Time, tz string) (region.Day, error) {
 			fmt.Sprintf("event timezone %q is not a known IANA zone", tz))
 	}
 	return region.DayOf(t, z), nil
+}
+
+// projectionDate is the calendar date a projection event stands on, which
+// is the date its task's due_on carries.
+//
+// An all-day row's stored instant is midnight UTC on the author's date —
+// that is what [allDayWindow] pins it to — so its date is the UTC one.
+// Reading such a row in the event's own zone answers the day before west
+// of Greenwich, which would set the task and the event it projects to
+// different days and leave the drift reconciler to pick a winner.
+//
+// A timed row is an instant, and its date is the one the people in the
+// meeting keep: an 08:00 stand-up in Asia/Tokyo is on the 11th for all of
+// them even though the stored UTC instant falls on the 10th.
+func projectionDate(t time.Time, tz string, allDay bool) (region.Day, error) {
+	if allDay {
+		return region.DayOf(t, region.UTC()), nil
+	}
+	return eventDate(t, tz)
+}
+
+// allDayWindow pins an all-day projection's window to the canonical
+// instants, and leaves a timed one alone.
+//
+// The rule itself is [calendarrules.NormalizeAllDayBounds], shared with
+// the transports that write calendar_events directly; what this adds is
+// the shape itemkit carries a window in. A zero instant means that end of
+// the window is absent, which the nullable form the rule takes says
+// directly.
+func allDayWindow(allDay bool, start, end time.Time) (time.Time, time.Time) {
+	normStart, normEnd := calendarrules.NormalizeAllDayBounds(allDay,
+		nullableInstant(start), nullableInstant(end))
+	return normStart.Time, normEnd.Time
+}
+
+// nullableInstant renders an instant in the nullable form the shared
+// calendar rules take, reading a zero value as absent rather than as year
+// one.
+func nullableInstant(t time.Time) sql.NullTime {
+	return sql.NullTime{Time: t, Valid: !t.IsZero()}
+}
+
+// taskIDParam binds an internal task id to the nullable calendar_events
+// .task_id parameter the generated queries take. The column is nullable
+// because an event need not project a task; a statement keyed on it is
+// always naming one, so the value is always present.
+func taskIDParam(taskID uint32) sql.NullInt32 {
+	return sql.NullInt32{Int32: int32(taskID), Valid: true} //#nosec G115 -- calendar_events.task_id references tasks.id (INT UNSIGNED) and holds the same width
 }
 
 // roleNullString wraps a DateRole as sql.NullString for nullable

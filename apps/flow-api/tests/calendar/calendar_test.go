@@ -113,7 +113,10 @@ func TestPatchCalendar(t *testing.T) {
 	assert.Equal(t, "After", patched.Name)
 }
 
-func TestPatchCalendar_NonOwnerForbidden(t *testing.T) {
+// Renaming the calendar is administration rather than use, so the floor
+// is manager and the refusal names it: the member here is an editor, and
+// an editor grant is not what would admit them.
+func TestPatchCalendar_BelowManagerForbidden(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -133,10 +136,11 @@ func TestPatchCalendar_NonOwnerForbidden(t *testing.T) {
 		"name": "Renamed By Member",
 	})
 	assert.Equal(t, http.StatusForbidden, status)
-	assert.Contains(t, string(body), "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED")
+	assert.Contains(t, string(body), "CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED")
 }
 
-func TestAddMember_NonOwnerForbidden(t *testing.T) {
+// Who may reach the calendar is the other half of the manager floor.
+func TestAddMember_BelowManagerForbidden(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -158,7 +162,7 @@ func TestAddMember_NonOwnerForbidden(t *testing.T) {
 		"role":  "editor",
 	})
 	assert.Equal(t, http.StatusForbidden, status)
-	assert.Contains(t, string(body), "CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED")
+	assert.Contains(t, string(body), "CALENDAR.CALENDAR.MANAGER_ROLE_REQUIRED")
 }
 
 func TestDeleteCalendar(t *testing.T) {

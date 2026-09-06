@@ -40,6 +40,11 @@ type fixtures struct {
 func seed(ctx context.Context, t *testing.T, db *sql.DB) fixtures {
 	t.Helper()
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	// workspaces.slug is globally unique and the slug below is cut to ten
+	// characters, so it has to come off the low-order end: the leading
+	// digits of a nanosecond timestamp only change once a second, and a
+	// test that seeds two tenants would get the same slug twice.
+	slugPart := suffix[len(suffix)-10:]
 
 	exec := func(q string, args ...any) int64 {
 		res, err := db.ExecContext(ctx, q, args...)
@@ -55,7 +60,7 @@ func seed(ctx context.Context, t *testing.T, db *sql.DB) fixtures {
 
 	wsID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO workspaces (public_id, slug, name, timezone) VALUES (?, ?, ?, 'UTC')`,
-		dbtype.New(), "ws-"+suffix[:10], "ItemKit Test "+suffix,
+		dbtype.New(), "ws-"+slugPart, "ItemKit Test "+suffix,
 	))
 	userID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO users (public_id, email, display_name, locale, timezone)
@@ -70,7 +75,7 @@ func seed(ctx context.Context, t *testing.T, db *sql.DB) fixtures {
 	projectID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO projects (public_id, workspace_id, name, slug, identifier)
 		 VALUES (?, ?, ?, ?, ?)`,
-		dbtype.New(), wsID, "ItemKit Test Project", "pj-"+suffix[:10], "IKT",
+		dbtype.New(), wsID, "ItemKit Test Project", "pj-"+slugPart, "IKT",
 	))
 	calendarID := uint32(exec( //#nosec G115 -- LastInsertId in test seed, fits uint32
 		`INSERT INTO calendars (public_id, workspace_id, kind, name, owner_user_id)
@@ -342,7 +347,7 @@ func TestRenameFromTaskPropagatesToEvent(t *testing.T) {
 		t.Fatalf("NewTitle: %v", err)
 	}
 	withTx(t, db, func(tx TX) {
-		if err := RenameItem(context.Background(), tx, RenameItemArgs{
+		if _, err := RenameItem(context.Background(), tx, RenameItemArgs{
 			WorkspaceID: fx.wsID, ActorUserID: fx.userID, TaskID: fx.taskID, NewTitle: newTitle,
 		}); err != nil {
 			t.Fatalf("RenameItem: %v", err)

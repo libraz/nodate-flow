@@ -2,11 +2,13 @@ package calendars
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -68,13 +70,37 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		// Raw query: this handler only needs id, title, due_on for the
 		// projection, so a small SELECT keeps the dependency surface
 		// narrow and avoids pulling the full task sqlc row type.
+		//
+		// The task is named in the request body, not in the path, so no
+		// RequireTaskAccess ran for it and workspace membership alone is
+		// what got the caller here. Layer 4 therefore has to be applied
+		// in this statement: without it a member could name any task id
+		// in the workspace and read its title back, and the title would
+		// also be copied into a calendar event the whole workspace can
+		// see. The read goes through v_task_list_all rather than tasks
+		// so the shared fragment — spliced, never retyped — anchors on
+		// the column names it is written against; the view keeps the
+		// enabled-row scope this statement already had and, unlike
+		// v_task_list, still admits an archived task.
+		wsRole, roleErr := workspaceRoleOf(ctx, deps.Queries, wsID, actorID)
+		if roleErr != nil {
+			return nil, roleErr
+		}
+		where := []string{"v.workspace_id = ?", "v.public_id = ?"}
+		args := []any{wsID, taskPublicID}
+		if visFrag, visArgs := acl.TaskVisibilityFilter(actorID, wsRole); visFrag != "" {
+			where = append(where, visFrag)
+			args = append(args, visArgs...)
+		}
+		//#nosec G201 -- the only interpolated text is acl.TaskVisibilityFilter's own constant fragment; every value is bound.
+		taskQuery := fmt.Sprintf(
+			`SELECT v.task_internal_id, v.title, v.due_on FROM v_task_list_all v WHERE %s`,
+			strings.Join(where, " AND "))
+
 		var taskID uint32
 		var title string
 		var dueOn *time.Time
-		err = deps.DB.QueryRowContext(ctx,
-			`SELECT id, title, due_on FROM tasks WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE`,
-			taskPublicID, wsID,
-		).Scan(&taskID, &title, &dueOn)
+		err = deps.DB.QueryRowContext(ctx, taskQuery, args...).Scan(&taskID, &title, &dueOn)
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarTaskSyncTaskNotFound, apierrors.CalendarTaskSyncTaskLookupInterrupted))
 		}

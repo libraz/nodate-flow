@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -54,15 +56,47 @@ type ShiftProposal struct {
 	ConflictTasks []ShiftCandidate
 }
 
+// ProposeShiftArgs names the umbrella event to analyse and the actor the
+// analysis is answered to.
+//
+// The actor is part of the request rather than the caller's business
+// because the proposal returns task titles: the set of tasks linked to an
+// event and the set the actor may read are different sets, and only the
+// second may be described back to them.
+type ProposeShiftArgs struct {
+	WorkspaceID uint32
+	EventID     uint32
+	NewStartAt  time.Time
+	// ActorUserID is the internal id of the user the proposal is
+	// answered to, and ActorRole their role in this workspace. Both feed
+	// acl.TaskVisibilityFilter; neither may be zero.
+	ActorUserID uint32
+	ActorRole   acl.WorkspaceRole
+}
+
 // ProposeShiftEventAndChildren computes what shifting the umbrella
 // event would do to its contributes_to-linked tasks. It does NOT
 // mutate anything — purely a read-only analysis. The caller can
 // present the breakdown (safe vs. conflict) and commit via
 // ApplyShiftEventAndChildren once the user confirms which tasks to
 // move along with the event.
-func ProposeShiftEventAndChildren(ctx context.Context, tx TX, workspaceID, eventID uint32, newStartAt time.Time) (ShiftProposal, error) {
+func ProposeShiftEventAndChildren(ctx context.Context, tx TX, args ProposeShiftArgs) (ShiftProposal, error) {
+	workspaceID, eventID, newStartAt := args.WorkspaceID, args.EventID, args.NewStartAt
 	if workspaceID == 0 || eventID == 0 {
 		return ShiftProposal{}, wrapInvariant("shift_ids_required", "workspaceID and eventID must be non-zero")
+	}
+	// The proposal names tasks reached by traversing task_event_links
+	// from the event, so being allowed to shift the event says nothing
+	// about being allowed to read the tasks hanging off it. Without an
+	// actor there is no rule to apply and the titles would go out
+	// unfiltered, so a missing one is refused rather than defaulted to
+	// zero — a zero actor matches no membership row, which would answer
+	// an empty proposal and read as "this event has no linked tasks".
+	if args.ActorUserID == 0 {
+		return ShiftProposal{}, wrapInvariant("shift_actor_required", "actor is required to resolve task visibility")
+	}
+	if !args.ActorRole.IsValid() {
+		return ShiftProposal{}, wrapInvariant("shift_actor_role_required", "actor workspace role is required to resolve task visibility")
 	}
 	if newStartAt.IsZero() {
 		return ShiftProposal{}, wrapInvariant("shift_target_required", "newStartAt must be non-zero")
@@ -87,16 +121,36 @@ func ProposeShiftEventAndChildren(ctx context.Context, tx TX, workspaceID, event
 		Delta:         newStartAt.Sub(evt.startAt.Time),
 	}
 
-	const candidatesSQL = `
-	  SELECT tel.id, t.id, t.public_id, t.title
+	// The candidate list carries task titles into the response body, so
+	// it is held to the Layer 4 rule the same way a task list is. The
+	// join reads v_task_list_all rather than tasks so the shared
+	// fragment can be spliced against the column names it is written
+	// against instead of retyped for this alias; the view keeps the
+	// enabled-row scope the tasks join had, and unlike v_task_list it
+	// still admits an archived task, which can be linked to an event.
+	//
+	// A task filtered out here is also absent from the proposal the
+	// caller confirms back, so a shift never moves a task its author
+	// could not be shown.
+	candidateWhere := []string{
+		"tel.workspace_id = ?",
+		"tel.event_id = ?",
+		"tel.relation = 'contributes_to'",
+		"tel.enabled = TRUE",
+	}
+	candidateArgs := []any{workspaceID, evt.id}
+	if visFrag, visArgs := acl.TaskVisibilityFilter(args.ActorUserID, args.ActorRole); visFrag != "" {
+		candidateWhere = append(candidateWhere, visFrag)
+		candidateArgs = append(candidateArgs, visArgs...)
+	}
+	//#nosec G201 -- the only interpolated text is acl.TaskVisibilityFilter's own constant fragment; every value is bound.
+	candidatesSQL := fmt.Sprintf(`
+	  SELECT tel.id, v.task_internal_id, v.public_id, v.title
 	    FROM task_event_links tel
-	    INNER JOIN tasks t ON t.id = tel.task_id AND t.enabled = TRUE
-	   WHERE tel.workspace_id = ?
-	     AND tel.event_id = ?
-	     AND tel.relation = 'contributes_to'
-	     AND tel.enabled = TRUE
-	   ORDER BY tel.sort_weight ASC, tel.id ASC`
-	rows, err := tx.QueryContext(ctx, candidatesSQL, workspaceID, evt.id)
+	    INNER JOIN v_task_list_all v ON v.task_internal_id = tel.task_id
+	   WHERE %s
+	   ORDER BY tel.sort_weight ASC, tel.id ASC`, strings.Join(candidateWhere, " AND "))
+	rows, err := tx.QueryContext(ctx, candidatesSQL, candidateArgs...)
 	if err != nil {
 		return ShiftProposal{}, fmt.Errorf("itemkit: list candidates: %w", err)
 	}

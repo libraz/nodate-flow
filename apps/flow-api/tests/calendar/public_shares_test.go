@@ -206,10 +206,11 @@ func TestRenderPublicShare_Expired(t *testing.T) {
 		"title": "Soon Expired",
 	}, &share)
 
-	past := time.Now().Add(-1 * time.Hour).Unix()
-	helpers.DoJSON(t, http.MethodPatch, tt.WsPath("public-shares", share.ID), tt.AccessToken, map[string]any{
-		"expiresAt": past,
-	}, nil)
+	// Written straight to the column because the write path refuses an
+	// expiry that is not in the future: a share can only reach this state
+	// by outliving an expiry that was valid when it was set, and the
+	// render refusal still has to be exercised.
+	expirePublicShare(t, share.ID, time.Now().Add(-1*time.Hour))
 
 	status, _ := helpers.DoJSONStatus(t, http.MethodGet, tt.BaseURL+"/share/cal/"+share.Token, "", nil)
 	assert.Equal(t, http.StatusGone, status)

@@ -72,7 +72,7 @@ func TestGuestIsReadOnlyOnWorkspaceResources(t *testing.T) {
 	doJSON(t, http.MethodPost, wsBase+"/lenses", owner.AccessToken, map[string]any{
 		"name":      "Guest Floor Lens",
 		"filter":    json.RawMessage(`{"priority":{"gte":3}}`),
-		"sort":      json.RawMessage(`[{"field":"priority","dir":"desc"}]`),
+		"sort":      json.RawMessage(`[]`),
 		"isDefault": false,
 	}, &lens)
 	require.NotEmpty(t, lens.ID)
@@ -196,7 +196,7 @@ func TestLensPublishRequiresCreatorOrWorkspaceAdmin(t *testing.T) {
 	doJSON(t, http.MethodPost, wsBase+"/lenses", owner.AccessToken, map[string]any{
 		"name":      "Owner Lens " + randomHex(4),
 		"filter":    json.RawMessage(`{"priority":{"gte":3}}`),
-		"sort":      json.RawMessage(`[{"field":"priority","dir":"desc"}]`),
+		"sort":      json.RawMessage(`[]`),
 		"isDefault": false,
 	}, &lens)
 	require.NotEmpty(t, lens.ID)

@@ -190,3 +190,95 @@ func TestDeleteLinkedEventClearsTaskColumn(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, evtEnabled)
 }
+
+// seedPrivateTaskOfOwner inserts a private task in a fresh project,
+// created by the workspace owner and with no task actors, so a second
+// member of the same workspace is outside every branch of the Layer 4
+// rule for it. Returns the task's public id and its title.
+func seedPrivateTaskOfOwner(t *testing.T, owner *helpers.CalendarTestTenant) (string, string) {
+	t.Helper()
+	ctx := context.Background()
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	projectPub := dbtype.New()
+	res, err := testDB.ExecContext(ctx,
+		`INSERT INTO projects (public_id, workspace_id, name, slug, identifier)
+		 VALUES (?, ?, ?, ?, ?)`,
+		projectPub, owner.WorkspaceID,
+		"TaskSync Private "+suffix, "pv-"+suffix[:10], "PVT",
+	)
+	require.NoError(t, err, "insert project")
+	id64, err := res.LastInsertId()
+	require.NoError(t, err)
+	projectID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
+
+	title := "private task title " + suffix
+	taskPub := dbtype.New()
+	_, err = testDB.ExecContext(ctx,
+		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, created_by_user_id)
+		 VALUES (?, ?, ?, 1, ?, 'private', ?)`,
+		taskPub, owner.WorkspaceID, projectID, title, owner.UserInternalID,
+	)
+	require.NoError(t, err, "insert private task")
+	return taskPub.String(), title
+}
+
+// TestCreateEventFromTaskRefusesTaskTheCallerCannotSee holds the
+// task-to-calendar sync to the Layer 4 rule.
+//
+// The task is named in the request body rather than the path, so no
+// RequireTaskAccess runs for it and workspace membership alone gets the
+// caller to the handler. Without the rule in the lookup, naming another
+// member's private task answers with its title and copies that title
+// into a calendar event, which is a second and durable disclosure.
+//
+// The caller is the extra member rather than the owner on purpose: a
+// workspace admin or owner bypasses the predicate, so the same request
+// made as the owner would succeed whether the rule were applied or not.
+func TestCreateEventFromTaskRefusesTaskTheCallerCannotSee(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "editor")
+
+	taskPubStr, title := seedPrivateTaskOfOwner(t, owner)
+
+	status, body := helpers.DoJSONStatus(t, http.MethodPost,
+		member.WsPath("calendars", calID, "events", "from-task"),
+		member.AccessToken,
+		map[string]any{"taskId": taskPubStr, "timezone": "UTC"},
+	)
+	// The refusal is the not-found code, not a distinct "forbidden": a
+	// caller who may not see the task may not learn that it exists.
+	assert.Equal(t, http.StatusNotFound, status)
+	assert.Contains(t, string(body), "CALENDAR.TASK_SYNC.TASK_NOT_FOUND")
+	assert.NotContains(t, string(body), title,
+		"the refusal must not carry the title it refused to disclose")
+
+	// The title must not have reached a calendar event either. The
+	// response alone is not the whole disclosure: a row written here is
+	// readable by everyone on the calendar afterwards.
+	var leaked int
+	err := testDB.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM calendar_events WHERE workspace_id = ? AND title = ?`,
+		owner.WorkspaceID, title,
+	).Scan(&leaked)
+	require.NoError(t, err)
+	assert.Zero(t, leaked, "no calendar event may carry the private task's title")
+
+	// The owner may still sync their own private task, so the rule is
+	// what refused the member rather than the lookup having broken.
+	var resp struct {
+		ID string `json:"id"`
+	}
+	helpers.DoJSON(t, http.MethodPost,
+		owner.WsPath("calendars", calID, "events", "from-task"),
+		owner.AccessToken,
+		map[string]any{"taskId": taskPubStr, "timezone": "UTC"},
+		&resp,
+	)
+	assert.NotEmpty(t, resp.ID, "the task's own creator must still be able to sync it")
+}

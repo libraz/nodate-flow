@@ -261,7 +261,9 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		// Editing the calendar itself — its name, colour, cover — is
 		// administration rather than use, so an editor who may add events
 		// still may not rename the calendar out from under everyone.
-		cal, member, err := resolveCalendarAdmin(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		// The resolved row is discarded: the calendar is re-read after the
+		// patch so the response carries the updated values.
+		_, member, err := resolveCalendarAdmin(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +302,7 @@ func PatchCalendar(deps Deps) func(context.Context, *PatchCalendarInput) (*Patch
 		}
 
 		// Re-read the updated calendar.
-		cal, err = deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
+		cal, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 			PublicID:    types.FromUUID(calUID),
 			WorkspaceID: wsID,
 		})

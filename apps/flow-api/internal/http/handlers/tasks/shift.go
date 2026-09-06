@@ -6,35 +6,65 @@ import (
 	"errors"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
-	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
-// resolveEventInWorkspace looks up the internal id of a calendar
-// event by its public id, scoped to the given workspace. Returns
-// apierrors.CalendarEventNotFound on miss.
-func resolveEventInWorkspace(ctx context.Context, deps Deps, workspaceID uint32, publicID string) (uint32, error) {
-	pub, err := types.Parse(publicID)
-	if err != nil {
-		return 0, httpErr(apierrors.CalendarEventNotFound)
+// shiftRefusal answers which refusal shifting an event on a calendar of
+// the given standing earns, or nil when the shift may proceed.
+//
+// A shift moves the event's start time — and, on apply, the dates of the
+// tasks linked to it — so it is a write to the calendar's contents rather
+// than a read of the workspace, reached by naming the event rather than
+// the calendar. That is exactly the question
+// [calendars.EventPathWriteRefusalSpec] answers, so the rule is reached
+// here rather than restated: an editor floor because a calendar's
+// contents are visible to all of its members, a refusal at every role for
+// a system calendar whose rows come from a provider feed, and the
+// not-found an unknown event id gets for a caller who holds no membership
+// at all. A shift route deciding for itself is how one calendar comes to
+// answer differently depending on which surface asked — including which
+// role it tells the caller to go and ask for.
+//
+// Only the standing crosses the boundary, converted here. Widening either
+// type so the two could meet would put this package's resolver and the
+// calendar package's rule in one shape, and the point of the split is
+// that the rule does not depend on how the standing was resolved.
+func shiftRefusal(standing *calendarStanding) *apierrors.Spec {
+	if standing == nil {
+		return calendars.EventPathWriteRefusalSpec(nil)
 	}
-	var id uint32
-	err = deps.DB.QueryRowContext(ctx,
-		`SELECT id FROM calendar_events
-		 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE
-		 LIMIT 1`,
-		workspaceID, pub,
-	).Scan(&id)
+	return calendars.EventPathWriteRefusalSpec(&calendars.CalendarStanding{
+		Kind: standing.kind,
+		Role: standing.role,
+	})
+}
+
+// resolveShiftableEvent looks up the internal id of a calendar event by
+// its public id within the workspace, and refuses unless the actor may
+// move it.
+//
+// The lookup and the standing behind it come from
+// [resolveEventStanding], shared with the read side so the two routes
+// cannot come to disagree about which calendar an event lives on or what
+// the actor holds there. What stays here is the decision: this route
+// applies the write floor.
+func resolveShiftableEvent(ctx context.Context, deps Deps, workspaceID, actorID uint32, publicID string) (uint32, error) {
+	eventID, _, standing, err := resolveEventStanding(ctx, deps, workspaceID, actorID, publicID)
 	if err != nil {
-		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarEventNotFound, apierrors.InternalUnexpected))
+		return 0, err
 	}
-	return id, nil
+	if spec := shiftRefusal(standing); spec != nil {
+		return 0, httpErr(spec)
+	}
+	return eventID, nil
 }
 
 // ProposeShift handles POST /workspaces/{wsId}/calendar-events/{evtId}/propose-shift.
@@ -47,7 +77,14 @@ func ProposeShift(deps Deps) func(context.Context, *ProposeShiftInput) (*Propose
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		eventID, err := resolveEventInWorkspace(ctx, deps, ws.ID, in.EventID)
+		// The proposal names the tasks linked to the event and the other
+		// events they contribute to, so it is answered only to someone who
+		// may perform the shift it describes.
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.CalendarEventNotFound)
+		}
+		eventID, err := resolveShiftableEvent(ctx, deps, ws.ID, actorID, in.EventID)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +94,13 @@ func ProposeShift(deps Deps) func(context.Context, *ProposeShiftInput) (*Propose
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.ProposeShift", &sql.TxOptions{ReadOnly: true},
 			func(ctx context.Context, tx *dbretry.Tx) error {
 				var err error
-				proposal, err = itemkit.ProposeShiftEventAndChildren(ctx, tx, ws.ID, eventID, newStart)
+				proposal, err = itemkit.ProposeShiftEventAndChildren(ctx, tx, itemkit.ProposeShiftArgs{
+					WorkspaceID: ws.ID,
+					EventID:     eventID,
+					NewStartAt:  newStart,
+					ActorUserID: actorID,
+					ActorRole:   acl.WorkspaceRole(ws.Role),
+				})
 				return err
 			}); err != nil {
 			return nil, translateItemkitTaskError(err)
@@ -84,8 +127,11 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		actorID, _ := middleware.ActorFromContext(ctx)
-		eventID, err := resolveEventInWorkspace(ctx, deps, ws.ID, in.EventID)
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.CalendarEventNotFound)
+		}
+		eventID, err := resolveShiftableEvent(ctx, deps, ws.ID, actorID, in.EventID)
 		if err != nil {
 			return nil, err
 		}

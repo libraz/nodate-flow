@@ -9,6 +9,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
@@ -36,6 +37,12 @@ type Deps struct {
 	// Audit records audit log entries for task mutations.
 	// Optional: nil disables audit logging.
 	Audit *audit.Recorder
+	// CalendarQueries answers the calendar-domain queries the endpoints
+	// that move a calendar event need: an event's calendar is a
+	// permission boundary of its own, and the actor's standing on it is
+	// read through the same statement the calendar surfaces use.
+	// Required by those endpoints; they refuse when it is absent.
+	CalendarQueries *calendar.Queries
 }
 
 // nullStr delegates to handlerutil.NullStr.
@@ -1149,6 +1156,14 @@ type TaskEventLink struct {
 	EventTimezone string `json:"eventTimezone,omitempty"`
 	CalendarID    string `json:"calendarId,omitempty"`
 	CalendarName  string `json:"calendarName,omitempty"`
+
+	// EventHidden marks a link whose event sits on a calendar the caller
+	// holds no membership on. The link is still theirs to see — it hangs
+	// off their task — but the event's title, times, timezone and the
+	// calendar's name are withheld, and this flag is what separates a
+	// withheld title from an event that has none. It appears only when
+	// true; on the task side of the DTO it is never set.
+	EventHidden bool `json:"eventHidden,omitempty" doc:"The event is on a calendar the caller cannot see; its title, times and calendar name are withheld"`
 
 	// Task side — populated by GET /calendar-events/{evtId}/linked-tasks.
 	TaskID           string `json:"taskId,omitempty"`

@@ -293,8 +293,11 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 	}
 }
 
-// RemoveAttendee removes an attendee from an event. Only the event owner or
-// calendar managers can remove attendees.
+// RemoveAttendee removes an attendee from an event. Only the event owner
+// can remove attendees, even though a calendar manager passes the
+// resolveCalendarWrite floor above and can delete the whole event outright:
+// pruning one name off the guest list is the owner's call, not something
+// the calendar role grants on its own.
 func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*RemoveAttendeeOutput, error) {
 	return func(ctx context.Context, input *RemoveAttendeeInput) (*RemoveAttendeeOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)

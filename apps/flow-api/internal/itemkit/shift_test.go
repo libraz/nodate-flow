@@ -3,9 +3,11 @@ package itemkit
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -53,6 +55,148 @@ func linkContributesTo(ctx context.Context, t *testing.T, db *sql.DB, f fixtures
 	})
 }
 
+// proposeArgs names the fixture's own user as the actor the proposal is
+// answered to, at the lowest role the visibility rule actually evaluates
+// for. A workspace admin bypasses the predicate entirely, so a test
+// running as one would pass whether the rule were applied or not.
+func proposeArgs(f fixtures, eventID uint32, newStartAt time.Time) ProposeShiftArgs {
+	return ProposeShiftArgs{
+		WorkspaceID: f.wsID,
+		EventID:     eventID,
+		NewStartAt:  newStartAt,
+		ActorUserID: f.userID,
+		ActorRole:   acl.WorkspaceRoleMember,
+	}
+}
+
+// seedPrivateTaskOfAnotherUser inserts a private task created by a
+// second user, with no task_actors row for the fixture user — so the
+// fixture user is outside every branch of the visibility rule for it.
+// Returns the task's internal id and its title.
+func seedPrivateTaskOfAnotherUser(ctx context.Context, t *testing.T, db *sql.DB, f fixtures, dueOn time.Time) (uint32, string) {
+	t.Helper()
+	suffix := time.Now().UnixNano()
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO users (public_id, email, display_name, locale, timezone)
+		 VALUES (?, ?, ?, 'en', 'UTC')`,
+		dbtype.New(), fmt.Sprintf("itemkit+other%d@example.test", suffix), "Other Owner")
+	if err != nil {
+		t.Fatalf("seed other user: %v", err)
+	}
+	otherID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed other user id: %v", err)
+	}
+
+	title := "private task of another user"
+	pub := dbtype.New()
+	num := int32(suffix % 1_000_000)
+	res, err = db.ExecContext(ctx,
+		`INSERT INTO tasks (public_id, workspace_id, project_id, task_number, title, visibility, created_by_user_id, due_on)
+		 VALUES (?, ?, ?, ?, ?, 'private', ?, ?)`,
+		pub, f.wsID, f.projectID, num, title, otherID, dueOn.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("seed private task: %v", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("seed private task id: %v", err)
+	}
+	return uint32(id), title //#nosec G115 -- LastInsertId in test seed, fits uint32
+}
+
+// TestProposeShiftEventAndChildren_OmitsTasksTheActorCannotSee holds the
+// proposal to the Layer 4 rule.
+//
+// Being allowed to shift the event is not being allowed to read what
+// hangs off it: the candidates are reached by traversing
+// task_event_links, and a private task belonging to someone else is
+// linked exactly like a public one. The title is the thing that must not
+// come back, so the assertion is on the title and not only on the count
+// — a candidate returned with an empty title would still be a leak of
+// which tasks exist.
+func TestProposeShiftEventAndChildren_OmitsTasksTheActorCannotSee(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	f := seed(ctx, t, db)
+	defer purge(t, db, f.wsID)
+
+	umbrella, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
+	dueOn := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	visibleID, _ := seedExtraTask(ctx, t, db, f, "visible task", dueOn)
+	hiddenID, hiddenTitle := seedPrivateTaskOfAnotherUser(ctx, t, db, f, dueOn)
+	linkContributesTo(ctx, t, db, f, visibleID, umbrella)
+	linkContributesTo(ctx, t, db, f, hiddenID, umbrella)
+
+	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
+	var p ShiftProposal
+	withTx(t, db, func(tx TX) {
+		var err error
+		p, err = ProposeShiftEventAndChildren(ctx, tx, proposeArgs(f, umbrella, newStart))
+		if err != nil {
+			t.Fatalf("propose: %v", err)
+		}
+	})
+
+	got := append(append([]ShiftCandidate{}, p.SafeTasks...), p.ConflictTasks...)
+	sawVisible := false
+	for _, c := range got {
+		if c.TaskID == hiddenID {
+			t.Errorf("proposal names a task the actor may not see (id=%d, title=%q)", c.TaskID, c.TaskTitle)
+		}
+		if c.TaskTitle == hiddenTitle {
+			t.Errorf("proposal carries the title of a task the actor may not see: %q", c.TaskTitle)
+		}
+		if c.TaskID == visibleID {
+			sawVisible = true
+		}
+	}
+	// The rule has to remove the hidden task without removing the rest:
+	// a predicate that answered nothing would pass every assertion above
+	// while breaking the endpoint.
+	if !sawVisible {
+		t.Errorf("proposal dropped the task the actor may see; candidates=%d", len(got))
+	}
+}
+
+// TestProposeShiftEventAndChildren_RefusesWithoutActor holds the refusal
+// that keeps the rule from being applied against nobody. A zero actor
+// matches no membership row, so the predicate would answer an empty
+// proposal — indistinguishable from an event with no linked tasks.
+func TestProposeShiftEventAndChildren_RefusesWithoutActor(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	f := seed(ctx, t, db)
+	defer purge(t, db, f.wsID)
+	evtID, _ := seedEvent(ctx, t, db, f, time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC))
+	newStart := time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)
+
+	for _, tc := range []struct {
+		name string
+		args ProposeShiftArgs
+	}{
+		{"no actor", ProposeShiftArgs{
+			WorkspaceID: f.wsID, EventID: evtID, NewStartAt: newStart,
+			ActorRole: acl.WorkspaceRoleMember,
+		}},
+		{"no role", ProposeShiftArgs{
+			WorkspaceID: f.wsID, EventID: evtID, NewStartAt: newStart,
+			ActorUserID: f.userID,
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := inTxErr(ctx, db, func(tx TX) error {
+				_, perr := ProposeShiftEventAndChildren(ctx, tx, tc.args)
+				return perr
+			})
+			if err == nil {
+				t.Fatal("expected an invariant error, got nil")
+			}
+		})
+	}
+}
+
 func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 	db := startDB(t)
 	ctx := context.Background()
@@ -64,7 +208,7 @@ func TestProposeShiftEventAndChildren_NoLinks(t *testing.T) {
 	var p ShiftProposal
 	withTx(t, db, func(tx TX) {
 		var err error
-		p, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID, newStart)
+		p, err = ProposeShiftEventAndChildren(ctx, tx, proposeArgs(f, evtID, newStart))
 		if err != nil {
 			t.Fatalf("propose: %v", err)
 		}
@@ -98,7 +242,7 @@ func TestProposeShiftEventAndChildren_PartitionsSafeAndConflict(t *testing.T) {
 	var p ShiftProposal
 	withTx(t, db, func(tx TX) {
 		var err error
-		p, err = ProposeShiftEventAndChildren(ctx, tx, f.wsID, umbrella, newStart)
+		p, err = ProposeShiftEventAndChildren(ctx, tx, proposeArgs(f, umbrella, newStart))
 		if err != nil {
 			t.Fatalf("propose: %v", err)
 		}
@@ -151,8 +295,8 @@ func TestProposeShiftEventAndChildren_RejectsUndated(t *testing.T) {
 	evtID := uint32(id64) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
 	err = inTxErr(ctx, db, func(tx TX) error {
-		_, perr := ProposeShiftEventAndChildren(ctx, tx, f.wsID, evtID,
-			time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC))
+		_, perr := ProposeShiftEventAndChildren(ctx, tx,
+			proposeArgs(f, evtID, time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC)))
 		return perr
 	})
 	if err == nil {

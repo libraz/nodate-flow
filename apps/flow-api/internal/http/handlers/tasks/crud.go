@@ -26,22 +26,6 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
-// allowedDerivedStates gate-keeps the `state` query parameter so that
-// callers can only filter by known derived_state enum values.
-var allowedDerivedStates = map[string]struct{}{
-	"open":      {},
-	"waiting":   {},
-	"review":    {},
-	"done":      {},
-	"cancelled": {},
-}
-
-// maxTaskPriority is the inclusive ceiling of tasks.priority as the
-// OpenAPI schema declares it on both the create body and the list
-// filter. Values outside the range cannot match a stored row, so the
-// list filter drops them instead of binding them into the IN list.
-const maxTaskPriority = 4
-
 // errCreateValidation is the sentinel returned from the dbretry.InTx
 // callback inside Create when a validation failure (unparseable id,
 // unknown member, invalid role) is encountered. It is non-transient so
@@ -200,8 +184,13 @@ func listTasksFiltered(
 	}
 	if len(in.State) > 0 {
 		placeholders := make([]string, 0, len(in.State))
+		// The enum is spelled once, in the schema, and reached here through
+		// the sqlc-generated constants. A list of state names kept beside
+		// the filter is a copy that no longer fails to compile when the
+		// column changes, and a filter that recognises a different set of
+		// states than the column stores silently drops rows.
 		for _, s := range in.State {
-			if _, ok := allowedDerivedStates[s]; !ok {
+			if !handlerutil.IsTaskDerivedState(s) {
 				continue
 			}
 			placeholders = append(placeholders, "?")
@@ -213,8 +202,13 @@ func listTasksFiltered(
 	}
 	if len(in.Priority) > 0 {
 		placeholders := make([]string, 0, len(in.Priority))
+		// The bounds are the ones the priority scale is defined with, not a
+		// pair restated next to the filter: a value outside them cannot
+		// match a stored row, so it is dropped rather than bound into the
+		// IN list. Two surfaces holding their own copy of the ceiling is
+		// how a filter comes to reject a priority the create body accepts.
 		for _, p := range in.Priority {
-			if p < 0 || p > maxTaskPriority {
+			if p < handlerutil.PriorityNone || p > handlerutil.PriorityMax {
 				continue
 			}
 			placeholders = append(placeholders, "?")
@@ -796,6 +790,15 @@ func Get(deps Deps) func(context.Context, *GetTaskInput) (*GetTaskOutput, error)
 
 // Patch handles PATCH /tasks/{id}. derived_state is intentionally not
 // writable here; the constraint engine and event bus mutate it.
+//
+// The route takes a date, not a window. When the task carries a
+// projection event, itemkit mirrors the new date onto it by re-anchoring
+// the event's own duration — the stored end minus the stored start, which
+// the database's own chronology CHECK keeps non-negative — to that date,
+// and shifts both ends together for a working-day snap. So the pair
+// written is ordered by construction and holds nothing the caller sent:
+//
+// calendar-precondition: chronology not-applicable — this route sends a date and no window, and the pair it mirrors keeps the stored event's own duration
 func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, error) {
 	return func(ctx context.Context, in *PatchTaskInput) (*PatchTaskOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -964,7 +967,10 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					}
 				}
 				if titleChanged {
-					if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+					// The renamed text is discarded here: this handler
+					// carries the task's new title and body already and
+					// refreshes the embedding from them below.
+					if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
 						WorkspaceID: ws.ID,
 						ActorUserID: actorID,
 						TaskID:      task.ID,

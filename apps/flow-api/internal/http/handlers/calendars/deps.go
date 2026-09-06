@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -47,6 +48,11 @@ type Deps struct {
 	// attachment uploads / downloads. Optional: nil makes the
 	// presign / download endpoints return INTERNAL.STORAGE.NOT_CONFIGURED.
 	Storage *storage.Client
+	// Embedder refreshes the search embedding of a task whose title moved
+	// because the event projecting it was renamed. Nil-safe: a deployment
+	// with no embedding provider writes no embeddings, and the rename is
+	// still a complete rename.
+	Embedder *embed.Client
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

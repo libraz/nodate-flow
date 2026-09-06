@@ -220,7 +220,7 @@ func TestCreateInvite_RotatesExistingOnResend(t *testing.T) {
 	assert.Equal(t, http.StatusOK, newStatus, "freshly rotated token must still accept")
 }
 
-func TestCreateInvite_NonOwnerForbidden(t *testing.T) {
+func TestCreateInvite_NonEventOwnerForbidden(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -238,12 +238,48 @@ func TestCreateInvite_NonOwnerForbidden(t *testing.T) {
 		member.AccessToken,
 		map[string]any{},
 	)
-	assert.Equal(t, http.StatusForbidden, status, "non-owner must be forbidden from minting invites; body=%s", string(body))
+	assert.Equal(t, http.StatusForbidden, status, "a calendar editor who does not own the event must be forbidden from minting invites; body=%s", string(body))
 	assert.Contains(
 		t,
 		string(body),
-		"CALENDAR.CALENDAR.OWNER_ROLE_REQUIRED",
-		"error body must carry the owner-gate error code",
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code",
+	)
+}
+
+// TestCreateInvite_CalendarOwnerWhoDoesNotOwnEventForbidden pins the gate
+// as event-level rather than a calendar-members role floor. The calendar
+// owner clears every role floor the calendar has, and is still refused on
+// an event somebody else owns. That is why the refusal names the event
+// owner: telling this caller to ask a calendar owner would send them to
+// themselves, and telling a member to ask one would send them to someone
+// equally unable to mint the invite.
+func TestCreateInvite_CalendarOwnerWhoDoesNotOwnEventForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	calOwner := newTenant(t)
+	calID := createCalendar(t, calOwner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	// The editor files the event, so the event owner and the calendar
+	// owner are two different people.
+	eventOwner := helpers.CreateExtraCalendarMember(t, testSrv, calOwner, calInternalID, "editor")
+	evtID := createEventForTenant(t, eventOwner, calID, "Calendar Owner Invite")
+	attendeeID := addAttendee(t, eventOwner, calID, evtID, calOwner.UserPublicID.String())
+
+	status, body := helpers.DoJSONStatus(
+		t,
+		http.MethodPost,
+		calOwner.WsPath("calendars", calID, "events", evtID, "attendees", attendeeID, "invite"),
+		calOwner.AccessToken,
+		map[string]any{},
+	)
+	assert.Equal(t, http.StatusForbidden, status, "the calendar owner must still be forbidden on an event they do not own; body=%s", string(body))
+	assert.Contains(
+		t,
+		string(body),
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code, not a calendar role floor",
 	)
 }
 
@@ -367,6 +403,167 @@ func TestRevokeInvite_RemovesFromList(t *testing.T) {
 
 	status, _ := acceptInviteStatus(t, created.Token, "accepted")
 	assert.Equal(t, http.StatusNotFound, status, "revoked token must no longer accept")
+}
+
+func TestRevokeInvite_NonEventOwnerForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
+	evtID := createEventForTenant(t, owner, calID, "Non-Owner Revoke")
+	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
+
+	created := createInvite(t, owner, calID, evtID, attendeeID)
+
+	status, body := helpers.DoJSONStatus(
+		t,
+		http.MethodDelete,
+		owner.WsPath("calendars", calID, "events", evtID, "invites", created.ID),
+		member.AccessToken,
+		nil,
+	)
+	assert.Equal(t, http.StatusForbidden, status, "a calendar editor who does not own the event must be forbidden from revoking invites; body=%s", string(body))
+	assert.Contains(
+		t,
+		string(body),
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code",
+	)
+
+	invites := listEventInvites(t, owner, calID, evtID)
+	require.Len(t, invites, 1, "the refused revoke must leave the invite in place")
+	assert.Equal(t, created.ID, invites[0].ID)
+}
+
+// TestRevokeInvite_CalendarOwnerWhoDoesNotOwnEventForbidden pins the gate
+// as event-level rather than a calendar-members role floor. The calendar
+// owner clears every role floor the calendar has, and is still refused on
+// an event somebody else owns, so the refusal has to name the event owner
+// rather than send this caller to themselves.
+func TestRevokeInvite_CalendarOwnerWhoDoesNotOwnEventForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	calOwner := newTenant(t)
+	calID := createCalendar(t, calOwner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	// The editor files the event, so the event owner and the calendar
+	// owner are two different people.
+	eventOwner := helpers.CreateExtraCalendarMember(t, testSrv, calOwner, calInternalID, "editor")
+	evtID := createEventForTenant(t, eventOwner, calID, "Calendar Owner Revoke")
+	attendeeID := addAttendee(t, eventOwner, calID, evtID, calOwner.UserPublicID.String())
+
+	created := createInvite(t, eventOwner, calID, evtID, attendeeID)
+
+	status, body := helpers.DoJSONStatus(
+		t,
+		http.MethodDelete,
+		calOwner.WsPath("calendars", calID, "events", evtID, "invites", created.ID),
+		calOwner.AccessToken,
+		nil,
+	)
+	assert.Equal(t, http.StatusForbidden, status, "the calendar owner must still be forbidden on an event they do not own; body=%s", string(body))
+	assert.Contains(
+		t,
+		string(body),
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code, not a calendar role floor",
+	)
+
+	invites := listEventInvites(t, eventOwner, calID, evtID)
+	require.Len(t, invites, 1, "the refused revoke must leave the invite in place")
+	assert.Equal(t, created.ID, invites[0].ID)
+}
+
+// TestListInvites_NonEventOwnerForbidden pins the invite list to the event
+// owner against a calendar editor who is not one. The positive control runs
+// first and against the same URL: the owner reads the row, so the invite id
+// and the invited address are known to be reachable through this endpoint.
+// Only then does the editor's refusal say something about who asked rather
+// than about a response that never carries those values at all.
+func TestListInvites_NonEventOwnerForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	calID := createCalendar(t, owner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	member := helpers.CreateExtraCalendarMember(t, testSrv, owner, calInternalID, "")
+	evtID := createEventForTenant(t, owner, calID, "Non-Owner List")
+	attendeeID := addAttendee(t, owner, calID, evtID, member.UserPublicID.String())
+
+	created := createInvite(t, owner, calID, evtID, attendeeID)
+
+	visible := listEventInvites(t, owner, calID, evtID)
+	require.Len(t, visible, 1, "the event owner must be served the invite this endpoint holds")
+	require.Equal(t, created.ID, visible[0].ID, "this listing is where the invite id is discoverable")
+	require.Equal(t, member.Email, visible[0].Email, "this listing is where the invited address is discoverable")
+	require.Equal(t, attendeeID, visible[0].AttendeePublicID)
+
+	status, body := helpers.DoJSONStatus(
+		t,
+		http.MethodGet,
+		owner.WsPath("calendars", calID, "events", evtID, "invites"),
+		member.AccessToken,
+		nil,
+	)
+	assert.Equal(t, http.StatusForbidden, status, "a calendar editor who does not own the event must not read the invite list; body=%s", string(body))
+	assert.Contains(
+		t,
+		string(body),
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code",
+	)
+	assert.NotContains(t, string(body), created.ID, "a refused list must not leak the invite id the owner is served")
+	assert.NotContains(t, string(body), member.Email, "a refused list must not leak the invited address the owner is served")
+}
+
+// TestListInvites_CalendarOwnerWhoDoesNotOwnEventForbidden pins the gate as
+// event-level rather than a calendar-members role floor, which is the part
+// its non-owner-editor sibling cannot show: an editor is refused under
+// either rule, so only the calendar owner separates them. Here the lower
+// calendar role is served the list because they own the event, and the
+// higher one is refused on the same URL a moment later — the invite id is
+// demonstrably reachable through this endpoint, and rank is not what
+// reaches it.
+func TestListInvites_CalendarOwnerWhoDoesNotOwnEventForbidden(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	calOwner := newTenant(t)
+	calID := createCalendar(t, calOwner)
+	calInternalID := helpers.ResolveCalendarInternalID(t, testDB, calID)
+	// The editor files the event, so the event owner and the calendar
+	// owner are two different people.
+	eventOwner := helpers.CreateExtraCalendarMember(t, testSrv, calOwner, calInternalID, "editor")
+	evtID := createEventForTenant(t, eventOwner, calID, "Calendar Owner List")
+	attendeeID := addAttendee(t, eventOwner, calID, evtID, calOwner.UserPublicID.String())
+
+	created := createInvite(t, eventOwner, calID, evtID, attendeeID)
+
+	visible := listEventInvites(t, eventOwner, calID, evtID)
+	require.Len(t, visible, 1, "the event owner must be served the invite this endpoint holds, editor role and all")
+	require.Equal(t, created.ID, visible[0].ID, "this listing is where the invite id is discoverable")
+	require.Equal(t, attendeeID, visible[0].AttendeePublicID)
+
+	status, body := helpers.DoJSONStatus(
+		t,
+		http.MethodGet,
+		calOwner.WsPath("calendars", calID, "events", evtID, "invites"),
+		calOwner.AccessToken,
+		nil,
+	)
+	assert.Equal(t, http.StatusForbidden, status, "the calendar owner must still be forbidden on an event they do not own; body=%s", string(body))
+	assert.Contains(
+		t,
+		string(body),
+		"CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
+		"error body must carry the event-authority error code, not a calendar role floor",
+	)
+	assert.NotContains(t, string(body), created.ID, "a refused list must not leak the invite id the event owner is served")
 }
 
 func TestListMyInvites_ScopedToCallerEmail(t *testing.T) {

@@ -170,10 +170,13 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			return nil, err
 		}
 
-		// Owner gate. Attendee edit rights are irrelevant here: invite
-		// lifecycle is owner-only.
+		// Event-owner gate, not a calendar-members role floor: a calendar
+		// owner or manager is refused here too, so the refusal has to name
+		// the event owner as the person who can act. Pointing at a calendar
+		// owner would send the caller to someone who is equally unable to
+		// mint the invite.
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
 		// Resolve the attendee row by its public ID. We don't have a
@@ -555,8 +558,9 @@ func AcceptEventInvite(deps Deps) func(context.Context, *AcceptEventInviteInput)
 	}
 }
 
-// RevokeEventInvite soft-disables a single invite row. Owner-only, same
-// ACL as create. Once disabled, the magic link returns NOT_FOUND.
+// RevokeEventInvite soft-disables a single invite row. Event-owner only,
+// the same gate as create. Once disabled, the magic link returns
+// NOT_FOUND.
 func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput) (*RevokeEventInviteOutput, error) {
 	return func(ctx context.Context, input *RevokeEventInviteInput) (*RevokeEventInviteOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
@@ -571,8 +575,14 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err != nil {
 			return nil, err
 		}
+		// Event-owner gate, not a calendar-members role floor: a calendar
+		// owner or manager is refused here too, so the refusal has to name
+		// the event owner as the person who can act. Revoking invalidates a
+		// link already sitting in someone's inbox, which is the event
+		// owner's call — pointing at a calendar owner would send the caller
+		// to someone equally unable to make it.
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 		invitePID, err := parsePublicID(input.InviteID)
 		if err != nil {
@@ -614,8 +624,8 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 	}
 }
 
-// ListEventInvites returns every active invite for an event. Owner-only
-// so non-owners can't discover who was invited before they accept.
+// ListEventInvites returns every active invite for an event. Event-owner
+// only so non-owners can't discover who was invited before they accept.
 func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (*ListEventInvitesOutput, error) {
 	return func(ctx context.Context, input *ListEventInvitesInput) (*ListEventInvitesOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
@@ -630,8 +640,14 @@ func ListEventInvites(deps Deps) func(context.Context, *ListEventInvitesInput) (
 		if err != nil {
 			return nil, err
 		}
+		// Event-owner gate, not a calendar-members role floor: a calendar
+		// owner or manager is refused here too, so the refusal has to name
+		// the event owner as the person who can act. The list names every
+		// person invited and whether they have answered yet, so it stays
+		// with the event owner rather than following the calendar role that
+		// lets someone read the event itself.
 		if evt.OwnerUserID != actorID {
-			return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 		page := handlerutil.Bind(input.Limit, input.Offset, handlerutil.DefaultListLimit, handlerutil.MaxListLimit)
 		rows, err := deps.CalendarQueries.ListCalendarEventInvitesForEvent(ctx, calendar.ListCalendarEventInvitesForEventParams{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -913,20 +914,27 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// transaction, so an itemkit invariant is not reported as a
 		// generic write failure.
 		var answered error
+		// renamed carries the linked task's text out of the transaction
+		// so its search embedding is refreshed once the rename has
+		// committed.
+		var renamed itemkit.RenamedTask
 		txErr := dbretry.InTx(ctx, deps.DB, "calendars.PatchEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
+			renamed = itemkit.RenamedTask{}
 			cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
 
 			// Linked title change → itemkit.RenameItem (propagates to task + siblings)
 			if isLinked && titleChanged {
-				if err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				var renameErr error
+				renamed, renameErr = itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
 					WorkspaceID: wsID,
 					ActorUserID: actorID,
 					NewTitle:    renameTitle,
 					EventID:     evt.ID,
-				}); err != nil {
-					answered = translateItemkitError(ctx, "itemkit.RenameItem", err)
-					return err
+				})
+				if renameErr != nil {
+					answered = translateItemkitError(ctx, "itemkit.RenameItem", renameErr)
+					return renameErr
 				}
 			}
 			// Linked time change → itemkit.RescheduleEvent (propagates to task date)
@@ -968,6 +976,15 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 		if txErr != nil {
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+		}
+
+		// A linked event's title is also the task's, so renaming through
+		// the event moves the text search is served from. Past the commit:
+		// the write is no longer revocable, which is the only point a
+		// best-effort refresh can run without a failure here costing a
+		// write the caller has already been told about.
+		if renamed.TaskID != 0 {
+			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, wsID, renamed.TaskID, renamed.Title, renamed.Description)
 		}
 
 		out := &PatchEventOutput{}
@@ -1033,6 +1050,12 @@ func translateItemkitError(ctx context.Context, op string, err error) error {
 //
 // calendar-precondition: chronology not-applicable — this route sends no start and no end, so it has no window to order
 // calendar-precondition: all-day-bounds not-applicable — this route sends no all-day flag and no window, so it has no bounds to pin
+//
+// The task column it does write is cleared rather than set. A task with
+// no due date has no ordering to break, which is the answer
+// taskrules.DateOrder itself gives a NULL side:
+//
+// task-precondition: date-order not-applicable — this route only clears due_on, and a task with no due date has no pair to order
 func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEventOutput, error) {
 	return func(ctx context.Context, input *DeleteEventInput) (*DeleteEventOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)

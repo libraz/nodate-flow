@@ -152,8 +152,10 @@ type GetPublicShareOutput struct {
 }
 
 // PatchPublicShareInput updates mutable share fields. Setting
-// clearExpiresAt=true drops expires_at to NULL; combine with expiresAt to
-// set a new value. clearShowHolidaysCountry=true drops the country; set
+// clearExpiresAt=true drops expires_at to NULL, and it wins over
+// expiresAt in the same body: the clear is applied after the field
+// update, so a body carrying both leaves the share with no expiry.
+// clearShowHolidaysCountry=true drops the country; set
 // showHolidaysCountry explicitly to change it.
 type PatchPublicShareInput struct {
 	WsID    string `path:"wsId" doc:"Workspace public ID"`
@@ -260,6 +262,10 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 	return func(ctx context.Context, input *CreatePublicShareInput) (*CreatePublicShareOutput, error) {
 		wsID, actorID, err := resolveWorkspaceNonGuest(ctx, deps.Queries, input.WsID)
 		if err != nil {
+			return nil, err
+		}
+
+		if err := requireFutureShareExpiry(input.Body.ExpiresAt); err != nil {
 			return nil, err
 		}
 
@@ -413,6 +419,17 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 
 		if input.Body.Timezone != nil && *input.Body.Timezone != "" {
 			if err := requireValidTimezone("timezone", *input.Body.Timezone); err != nil {
+				return nil, err
+			}
+		}
+
+		// clearExpiresAt is applied after the field update below, so a body
+		// carrying both leaves the share with no expiry at all: there is no
+		// value left to be in the past, and refusing the request would block
+		// a caller from clearing a stale expiry. Only an expiresAt that will
+		// actually land on the row is checked.
+		if !input.Body.ClearExpiresAt {
+			if err := requireFutureShareExpiry(input.Body.ExpiresAt); err != nil {
 				return nil, err
 			}
 		}
@@ -965,6 +982,33 @@ func nullStringFromPtr(p *string) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: *p, Valid: true}
+}
+
+// requireFutureShareExpiry refuses an expires_at that is not later than
+// the instant the request is handled. Such a share is already expired
+// when it is returned: the write reports success and hands back a URL,
+// while every reader of it is refused by the render path.
+//
+// A nil pointer is the caller omitting the field, which means "no
+// expiry" on create and "leave the stored value alone" on patch — both
+// are allowed, so only a supplied value is checked. That keeps a patch
+// of some other field on an already-expired share working: the caller
+// is not the one setting the expiry.
+//
+// The refusal is distinct from SHARE.SHARE.EXPIRED, which refuses a
+// reader whose share has since run out; this one refuses a writer
+// setting an expiry that is already past.
+func requireFutureShareExpiry(p *int64) error {
+	if p == nil {
+		return nil
+	}
+	// Unix seconds on both sides: an expiry landing in the current second
+	// has already elapsed by the time the row is written, so equality is
+	// refused along with the past.
+	if *p <= handlerutil.NowUnix() {
+		return httpErr(apierrors.ShareShareExpiresAtNotInFuture)
+	}
+	return nil
 }
 
 func nullTimeFromUnixPtr(p *int64) sql.NullTime {
