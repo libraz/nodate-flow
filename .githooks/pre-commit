@@ -15,9 +15,9 @@ set -e
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 
 # Format and lint only what is staged. Everything here is deliberately
-# sub-second: a hook that runs a test suite is a hook people learn to pass
-# --no-verify to, and then it protects nothing. Whole-repository checks
-# belong in CI, which is where they run.
+# sub-second, and everything below is scoped to what was staged for the
+# same reason: a hook that makes you wait on work you did not touch is a
+# hook people learn to route around, and then it protects nothing.
 if ! (cd "$toplevel" && bunx --bun lint-staged); then
   echo "" >&2
   echo "✖ pre-commit hook: staged files failed lint or formatting (see above)." >&2
@@ -35,6 +35,21 @@ if ! bash "$toplevel/scripts/check-codegen-drift.sh" --staged; then
   echo "  A schema change and the code generated from it belong in the same commit." >&2
   echo "  Bypass only when you know why: git commit --no-verify" >&2
   exit 1
+fi
+
+# An override selector that matches nothing produces exactly the output no
+# override would, so the comparison above has no diff to find: a renamed
+# column or a typo turns the rule off in silence. It reads the same inputs
+# the drift check does and costs a fraction of a second, so it is gated on
+# the same paths rather than on its own.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^sql/'; then
+  if ! (cd "$toplevel" && go -C scripts run check-sqlc-overrides.go); then
+    echo "" >&2
+    echo "✖ pre-commit hook: a sqlc override selector names nothing in the schema (see above)." >&2
+    echo "  The JSON tag or Go type that override exists to enforce is not being applied." >&2
+    echo "  Fix the selector in sql/sqlc.yaml, or drop it if the column is gone." >&2
+    exit 1
+  fi
 fi
 
 # The error catalog is generated from errors/*.yaml the way the data layer
@@ -90,4 +105,45 @@ if git diff --cached --name-only --diff-filter=ACMR |
     echo "  Bypass only when you know why: git commit --no-verify" >&2
     exit 1
   fi
+fi
+
+# The last generator behind `make verify-codegen`. The api cannot call the
+# TypeScript holiday provider, so the dates it needs are projected into an
+# embedded dataset; a provider change that never reached the projection
+# leaves the server and the browser disagreeing about which days are
+# working days, and nothing else compares them. It is the slowest of these
+# checks by an order of magnitude and its inputs change a few times a year,
+# which is exactly the shape a path gate is for.
+if git diff --cached --name-only --diff-filter=ACMR |
+  grep -qE '^(packages/holidays/|packages/go-shared/holidays/data\.json$|scripts/gen-holidays\.ts$)'; then
+  if ! (cd "$toplevel" && bun run scripts/gen-holidays.ts --check); then
+    echo "" >&2
+    echo "✖ pre-commit hook: the embedded holiday dataset no longer matches the provider (see above)." >&2
+    echo "  Run 'make gen-holidays' and stage the result." >&2
+    exit 1
+  fi
+fi
+
+# The suites for what is being committed. Everything above reads the
+# sources; nothing above runs the code, which is how a commit whose unit
+# tests fail reaches the branch with every local gate reporting green.
+# Work here lands straight on the working branch, so a failure CI finds is
+# a failure already in the history.
+#
+# --staged keeps the cost proportional: only the modules and workspaces a
+# staged file can break, and the Go test cache means a package a change did
+# not reach is not re-run. Container-backed suites and the whole-module
+# source scanners stay out; those are minutes, and CI runs them.
+#
+# One limitation, stated because it cannot be fixed here: this exercises
+# the working tree, not the staged content. A partially staged file is
+# tested as it sits on disk. Hiding the unstaged half would mean stashing,
+# which can discard work outright, and that is a worse failure than a test
+# run that saw one file too many.
+if ! node "$toplevel/scripts/run-unit-tests.mjs" --staged; then
+  echo "" >&2
+  echo "✖ pre-commit hook: a test suite covering the staged changes failed (see above)." >&2
+  echo "  Run 'make test-unit' to see the whole picture without the staging filter." >&2
+  echo "  A failing test is the one thing here that is never a false alarm." >&2
+  exit 1
 fi
