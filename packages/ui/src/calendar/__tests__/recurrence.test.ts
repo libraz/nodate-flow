@@ -503,7 +503,11 @@ describe('expandAllRecurrences — overridden starts', () => {
       DateTime.fromISO('2027-03-05T00:00:00Z'),
     );
 
-    expect(expanded.map((e) => `${e.id} ${DateTime.fromISO(e.startAt).toUTC().toISO()}`)).toEqual([
+    expect(
+      expanded.map(
+        (e) => `${e.id} ${DateTime.fromISO(e.startAt, { zone: 'utc' }).toUTC().toISO()}`,
+      ),
+    ).toEqual([
       'master 2027-03-01T09:00:00.000Z',
       'master 2027-03-02T09:00:00.000Z',
       'master 2027-03-04T09:00:00.000Z',
