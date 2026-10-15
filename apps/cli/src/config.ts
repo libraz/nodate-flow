@@ -28,15 +28,21 @@ export function loadCredentials(): Credentials | undefined {
   try {
     const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+
+    const values = parsed as Record<string, unknown>;
     if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      'accessToken' in parsed &&
-      'apiBaseUrl' in parsed
+      typeof values.accessToken !== 'string' ||
+      values.accessToken.length === 0 ||
+      typeof values.refreshToken !== 'string' ||
+      typeof values.apiBaseUrl !== 'string' ||
+      values.apiBaseUrl.length === 0 ||
+      (values.authApiBaseUrl !== undefined &&
+        (typeof values.authApiBaseUrl !== 'string' || values.authApiBaseUrl.length === 0))
     ) {
-      return parsed as Credentials;
+      return undefined;
     }
-    return undefined;
+    return values as unknown as Credentials;
   } catch {
     return undefined;
   }
