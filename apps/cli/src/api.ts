@@ -104,16 +104,33 @@ async function refreshAccessToken(options: AuthenticatedFetchOptions): Promise<s
  */
 export function createAuthenticatedFetch(options: AuthenticatedFetchOptions): typeof fetch {
   const fetchImpl = options.fetchImpl ?? fetch;
+  let inFlightRefresh: Promise<string | null> | undefined;
+
+  const refreshOnce = (): Promise<string | null> => {
+    if (!inFlightRefresh) {
+      inFlightRefresh = refreshAccessToken(options).finally(() => {
+        inFlightRefresh = undefined;
+      });
+    }
+    return inFlightRefresh;
+  };
 
   return async (input, init) => {
     const request = new Request(input, init);
     const retryRequest = request.clone();
-    request.headers.set('Authorization', `Bearer ${options.getAccessToken()}`);
+    const requestAccessToken = options.getAccessToken();
+    request.headers.set('Authorization', `Bearer ${requestAccessToken}`);
 
     const response = await fetchImpl(request);
     if (response.status !== 401) return response;
 
-    const refreshed = await refreshAccessToken(options);
+    const currentAccessToken = options.getAccessToken();
+    if (currentAccessToken !== requestAccessToken) {
+      retryRequest.headers.set('Authorization', `Bearer ${currentAccessToken}`);
+      return fetchImpl(retryRequest);
+    }
+
+    const refreshed = await refreshOnce();
     if (!refreshed) return response;
 
     retryRequest.headers.set('Authorization', `Bearer ${refreshed}`);
