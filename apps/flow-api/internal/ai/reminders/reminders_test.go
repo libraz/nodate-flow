@@ -3,6 +3,8 @@ package reminders
 import (
 	"testing"
 	"time"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 func TestEvaluate(t *testing.T) {
@@ -74,5 +76,26 @@ func TestEvaluate(t *testing.T) {
 				t.Errorf("message should not be empty")
 			}
 		})
+	}
+}
+
+// TestEvaluateReadsTodayInTheUsersZone pins that "today" is the calendar
+// date in the user's zone, not in UTC: at 20:00 UTC it is already the
+// next day in Tokyo, so a task due that next day is due today there.
+func TestEvaluateReadsTodayInTheUsersZone(t *testing.T) {
+	tokyo, err := region.Resolve("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	due := time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 10, 22, 20, 0, 0, 0, time.UTC)
+
+	got := Evaluate(Signals{State: StateOpen, HasDueOn: true, DueOn: due, Now: now, Zone: tokyo})
+	if got == nil || got.Kind != KindDueToday {
+		t.Fatalf("Asia/Tokyo at 2026-10-23T05:00+09:00: got %+v, want due_today", got)
+	}
+	got = Evaluate(Signals{State: StateOpen, HasDueOn: true, DueOn: due, Now: now, Zone: region.UTC()})
+	if got == nil || got.Kind != KindDueSoon || got.DaysUntilDue != 1 {
+		t.Fatalf("UTC at 2026-10-22T20:00Z: got %+v, want due_soon in 1 day", got)
 	}
 }

@@ -1,0 +1,223 @@
+{
+  "description": "Every value a user can store that claims to change behaviour, mapped to the code that reads it. apps/flow-api/tests/e2e/settings_reachability_test.go enumerates the columns of each table below, the constraint DSL ops and the accepted instance setting keys, and fails when one is neither mapped to a consumer whose symbol still appears in the named file nor listed under notSettings with the reason it changes no behaviour.",
+  "tables": {
+    "ai_settings": {
+      "consumers": {
+        "auto_action_enabled": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "wsAutoActionQuery"
+        },
+        "auto_action_interval_minutes": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "wsAutoActionQuery"
+        },
+        "auto_action_threshold": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "processWorkspaceWithThreshold"
+        },
+        "embed_budget_cents_day": {
+          "file": "apps/flow-api/internal/http/router/router.go",
+          "symbol": "embedBudgetGuard"
+        },
+        "duplicate_threshold_high": {
+          "file": "apps/flow-api/internal/ai/relations/pipeline.go",
+          "symbol": "DuplicateThresholdHigh"
+        },
+        "duplicate_threshold_low": {
+          "file": "apps/flow-api/internal/ai/relations/pipeline.go",
+          "symbol": "DuplicateThresholdLow"
+        },
+        "judge_instructions": {
+          "file": "apps/flow-api/internal/ai/signaljudge/prompt.go",
+          "symbol": "JudgeInstructions"
+        }
+      },
+      "notSettings": {
+        "id": "internal key",
+        "workspace_id": "owner",
+        "modified_by_user_id": "audit field",
+        "embed_model": "no API writes it; the deployment's NF_FLOW_EMBED_MODEL selects the model",
+        "enabled": "soft-delete flag",
+        "updated_at": "bookkeeping",
+        "created_at": "bookkeeping"
+      }
+    },
+    "ai_agents": {
+      "consumers": {
+        "model_id": {
+          "file": "apps/flow-api/internal/ai/airequest/airequest.go",
+          "symbol": "FromExecRow"
+        },
+        "kind": {
+          "file": "apps/flow-api/internal/ai/signaljudge/enqueuer.go",
+          "symbol": "a.kind = 'signal_judge'"
+        },
+        "system_prompt": {
+          "file": "apps/flow-api/internal/ai/agent_executor.go",
+          "symbol": "row.SystemPrompt"
+        },
+        "temperature": {
+          "file": "apps/flow-api/internal/ai/airequest/airequest.go",
+          "symbol": "FromExecRow"
+        },
+        "max_output_tokens": {
+          "file": "apps/flow-api/internal/ai/airequest/airequest.go",
+          "symbol": "FromExecRow"
+        },
+        "allowed_scopes_json": {
+          "file": "apps/flow-api/internal/mcp/server.go",
+          "symbol": "loadAgentGuardSnapshot"
+        },
+        "monthly_cost_cap_cents": {
+          "file": "apps/flow-api/internal/ai/agent_cost_cap.go",
+          "symbol": "CheckAgentCostCap"
+        },
+        "schedule_kind": {
+          "file": "apps/flow-api/internal/ai/agentruntime/db_source.go",
+          "symbol": "schedule_kind = 'interval'"
+        },
+        "event_trigger_types": {
+          "file": "apps/flow-api/internal/ai/agentruntime/event_source.go",
+          "symbol": "event_trigger_types"
+        },
+        "schedule_scope": {
+          "file": "apps/flow-api/internal/ai/agentruntime/event_source.go",
+          "symbol": "NewSqlcOnEventQuerier"
+        },
+        "paused": {
+          "file": "apps/flow-api/internal/ai/agent_executor.go",
+          "symbol": "ErrAgentPaused"
+        }
+      },
+      "notSettings": {
+        "id": "internal key",
+        "public_id": "identifier",
+        "workspace_id": "owner",
+        "name": "label",
+        "description": "label",
+        "tools_json": "no API writes it; create stores null",
+        "sort_weight": "display order",
+        "notes": "admin notes",
+        "enabled": "soft-delete flag",
+        "updated_at": "bookkeeping",
+        "created_at": "bookkeeping"
+      }
+    },
+    "notification_preferences": {
+      "consumers": {
+        "event_category": {
+          "file": "apps/flow-api/internal/notification/prefs/prefs.go",
+          "symbol": "ResolveChannels"
+        },
+        "channel": {
+          "file": "apps/flow-api/internal/http/handlers/notifications/preferences.go",
+          "symbol": "deliverableChannels"
+        },
+        "is_muted": {
+          "file": "apps/flow-api/internal/notification/prefs/prefs.go",
+          "symbol": "ChannelMuted"
+        }
+      },
+      "notSettings": {
+        "id": "internal key",
+        "public_id": "identifier",
+        "workspace_id": "owner",
+        "user_id": "owner",
+        "sort_weight": "display order",
+        "notes": "admin notes",
+        "enabled": "soft-delete flag",
+        "updated_at": "bookkeeping",
+        "created_at": "bookkeeping"
+      }
+    },
+    "webhook_subscriptions": {
+      "consumers": {
+        "url": { "file": "apps/flow-api/internal/webhook/worker.go", "symbol": "row.Url" },
+        "secret": { "file": "apps/flow-api/internal/webhook/worker.go", "symbol": "row.Secret" },
+        "event_types": {
+          "file": "apps/flow-api/internal/webhook/worker.go",
+          "symbol": "matchesEventType"
+        },
+        "is_active": { "file": "apps/flow-api/internal/webhook/worker.go", "symbol": "is_active" }
+      },
+      "notSettings": {
+        "id": "internal key",
+        "public_id": "identifier",
+        "workspace_id": "owner",
+        "creator_id": "audit field",
+        "description": "label",
+        "sort_weight": "display order",
+        "notes": "admin notes",
+        "enabled": "soft-delete flag",
+        "updated_at": "bookkeeping",
+        "created_at": "bookkeeping"
+      }
+    },
+    "auto_action_rules": {
+      "consumers": {
+        "kind": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "loadRuleConfigs"
+        },
+        "signal_kind": {
+          "file": "apps/flow-api/internal/ai/signaljudge/autonomy.go",
+          "symbol": "NewRuleBackedResolver"
+        },
+        "enabled": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "loadRuleConfigs"
+        },
+        "confidence": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "loadRuleConfigs"
+        },
+        "idle_hours": {
+          "file": "apps/flow-api/internal/ai/autoactions/executor.go",
+          "symbol": "loadRuleConfigs"
+        },
+        "autonomy_level": {
+          "file": "apps/flow-api/internal/ai/signaljudge/autonomy.go",
+          "symbol": "AutonomyLevel"
+        }
+      },
+      "notSettings": {
+        "id": "internal key",
+        "public_id": "identifier",
+        "workspace_id": "owner",
+        "signal_kind_match": "generated column for the unique key",
+        "updated_at": "bookkeeping",
+        "created_at": "bookkeeping"
+      }
+    }
+  },
+  "constraintOps": {
+    "and": { "file": "apps/flow-api/internal/constraint/eval.go", "symbol": "case OpAnd" },
+    "or": { "file": "apps/flow-api/internal/constraint/eval.go", "symbol": "case OpOr" },
+    "not": { "file": "apps/flow-api/internal/constraint/eval.go", "symbol": "case OpNot" },
+    "time.due_before": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "GetTaskDueOnForEngine"
+    },
+    "time.due_after": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "GetTaskDueOnForEngine"
+    },
+    "dependency.all_done": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "ListDependencyStatesForEngine"
+    },
+    "dependency.open_at_most": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "ListDependencyStatesForEngine"
+    },
+    "actor.has_role": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "ListTaskActorRolesForEngine"
+    },
+    "signal.received": {
+      "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
+      "symbol": "ListSignalKindsForTaskForEngine"
+    }
+  },
+  "instanceSettings": {}
+}

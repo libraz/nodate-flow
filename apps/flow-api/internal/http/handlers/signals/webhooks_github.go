@@ -203,6 +203,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			},
 			CallSite: "signals.HandleGithubWebhook",
 		})
+		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
 
 		// Best-effort signal_judge dispatch (ADR 0008 D3). The
 		// enqueuer logs and swallows errors so a flaky agent_runs

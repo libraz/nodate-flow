@@ -1,9 +1,5 @@
 import { QueryCache, QueryClient } from '@tanstack/react-query';
 
-interface MaybeCodedError {
-  code?: string;
-}
-
 interface MaybeStatusError {
   /** HTTP status on {@link ApiError} and related error types. */
   httpStatus?: number;
@@ -13,10 +9,6 @@ interface MaybeStatusError {
    * `AiProvidersQueryError`). Treated as an alias of `httpStatus`.
    */
   status?: number;
-}
-
-function hasCode(err: unknown): err is MaybeCodedError {
-  return typeof err === 'object' && err !== null && 'code' in err;
 }
 
 function httpStatusOf(err: unknown): number | undefined {
@@ -100,7 +92,6 @@ export function createQueryClient(): QueryClient {
         refetchOnWindowFocus: false,
         throwOnError: true,
         retry: (failureCount, error) => {
-          if (hasCode(error) && error.code === 'AUTH.TOKEN.EXPIRED') return false;
           if (httpStatusOf(error) === 401) return false;
           return failureCount < 1;
         },

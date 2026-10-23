@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -533,6 +535,7 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 	defer rows.Close()
 
 	now := time.Now().UTC()
+	zone := duedate.WorkspaceZone(ctx, generated.New(e.DB), wsID)
 	for rows.Next() {
 		var (
 			r              taskRow
@@ -566,6 +569,7 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 			HasAssignee:      r.hasAssignee,
 			HasAgentAssignee: r.hasAgentAssignee,
 			Now:              now,
+			Zone:             zone,
 		}
 		if r.updatedAt.Valid {
 			sig.UpdatedAt = r.updatedAt.Time
@@ -1083,4 +1087,10 @@ func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Act
 		"from", string(result.FromState),
 		"to", string(result.ToState),
 	)
+	// The task's own constraints and its dependents' dependency.* facts
+	// read the state just committed.
+	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: r.workspaceID, Queries: generated.New(e.DB)}}
+	if err := eng.EvaluateTaskAndDependents(ctx, r.id); err != nil {
+		e.Logger.Warn("auto-action executor: constraint re-evaluation failed", "task", r.publicID.String(), "err", err)
+	}
 }

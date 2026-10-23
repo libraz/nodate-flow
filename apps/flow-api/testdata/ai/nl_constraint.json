@@ -3,19 +3,16 @@
     "op": "time.due_before",
     "arg": "2026-04-13"
   },
-  "all dependencies done and reviewer approved": {
+  "all dependencies done and a reviewer assigned": {
     "op": "and",
     "terms": [
       { "op": "dependency.all_done", "taskIds": ["*"] },
-      { "op": "approval.granted", "arg": "reviewer" }
+      { "op": "actor.has_role", "arg": "reviewer" }
     ]
   },
-  "ci green and pr merged": {
-    "op": "and",
-    "terms": [
-      { "op": "ci.status_is", "arg": "success" },
-      { "op": "signal.received", "arg": "github.pr.merged" }
-    ]
+  "pr merged": {
+    "op": "signal.received",
+    "arg": "pull_request.merged"
   },
   "at most one open dependency": {
     "op": "dependency.open_at_most",

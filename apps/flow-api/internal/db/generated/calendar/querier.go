@@ -696,6 +696,13 @@ type Querier interface {
 	ReviveCalendarEventInvite(ctx context.Context, arg ReviveCalendarEventInviteParams) error
 	// Regenerate the token hash; invalidates any previously issued URL.
 	RotatePublicShareToken(ctx context.Context, arg RotatePublicShareTokenParams) (int64, error)
+	// Write one master's exception list, keyed by the internal id the series
+	// lock read it under.
+	//
+	// An override row deleted on its own names its master only by that id, and
+	// the cancellation it leaves behind belongs on the master: without it the
+	// master produces the occurrence again at its original slot.
+	SetCalendarEventSeriesExceptions(ctx context.Context, arg SetCalendarEventSeriesExceptionsParams) error
 	// Grant or revoke edit permission on an attendee (by event owner).
 	//
 	// Same scope, same open outcome, but about the target rather than the actor:

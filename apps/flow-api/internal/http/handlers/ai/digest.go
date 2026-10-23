@@ -2,15 +2,15 @@ package ai
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/digest"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // digestLimit caps how many tasks the weekly digest ingests.
@@ -86,6 +86,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 		}
 
 		now := time.Now().UTC()
+		zone := duedate.UserZone(ctx, deps.Queries, ws.ID, actorID)
 		snaps := make([]digest.TaskSnapshot, 0, len(rows))
 		for _, r := range rows {
 			s := digest.TaskSnapshot{
@@ -103,7 +104,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 			}
 			snaps = append(snaps, s)
 		}
-		d := digest.Build(snaps, now)
+		d := digest.Build(snaps, now, zone)
 
 		out := &WeeklyDigestOutput{}
 		out.Body.Counts = WeeklyDigestCounts{
@@ -118,7 +119,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 			out.Body.CompletedThisWeek = append(out.Body.CompletedThisWeek, WeeklyDigestTask{
 				TaskID: t.TaskID,
 				Title:  t.Title,
-				Date:   handlerutil.NullTimeDateStr(sql.NullTime{Time: t.CompletedAt, Valid: true}),
+				Date:   region.DayOf(t.CompletedAt, zone).String(),
 			})
 		}
 		out.Body.OverdueOpen = make([]WeeklyDigestTask, 0, len(d.OverdueOpen))
@@ -126,7 +127,7 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 			out.Body.OverdueOpen = append(out.Body.OverdueOpen, WeeklyDigestTask{
 				TaskID: t.TaskID,
 				Title:  t.Title,
-				Date:   handlerutil.NullTimeDateStr(sql.NullTime{Time: t.DueOn, Valid: true}),
+				Date:   region.DayFromDateColumn(t.DueOn).String(),
 			})
 		}
 		out.Body.Markdown = d.Markdown

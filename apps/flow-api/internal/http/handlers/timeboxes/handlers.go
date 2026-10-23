@@ -49,6 +49,44 @@ func resolveTaskInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types
 	return id, nil
 }
 
+// checkProjectFloor holds a write to a project-scoped timebox to the
+// project editor floor; a timebox outside any project needs no project role.
+func checkProjectFloor(ctx context.Context, deps Deps, wsID uint32, projectPub types.PublicID) error {
+	if handlerutil.PublicIDOrEmpty(projectPub) == "" {
+		return nil
+	}
+	prj, err := deps.Queries.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{
+		WorkspaceID: wsID,
+		PublicID:    projectPub,
+	})
+	if err != nil {
+		return httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
+	}
+	actorID, _ := middleware.ActorFromContext(ctx)
+	if spec := handlerutil.RequireProjectRole(ctx, deps.DB, wsID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
+		return httpErr(spec)
+	}
+	return nil
+}
+
+// unchangedOrCompleted answers an UPDATE that matched no row. Both
+// statements skip a completed timebox, so a zero count is either a write
+// that changed nothing, a timebox completed since it was read, or one
+// that is gone; the re-read tells them apart.
+func unchangedOrCompleted(ctx context.Context, deps Deps, wsID uint32, pub types.PublicID) error {
+	row, err := deps.Queries.GetTimeboxByPublicId(ctx, generated.GetTimeboxByPublicIdParams{
+		WorkspaceID: wsID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		return httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
+	}
+	if row.Status == generated.TimeboxesStatusCompleted {
+		return httpErr(apierrors.TimeboxTimeboxAlreadyCompleted)
+	}
+	return nil
+}
+
 // mapGetRow converts a GetTimeboxByPublicIdRow to a TimeboxDTO.
 func mapGetRow(r generated.GetTimeboxByPublicIdRow) TimeboxDTO {
 	return TimeboxDTO{
@@ -141,6 +179,9 @@ func Create(deps Deps) func(context.Context, *CreateTimeboxInput) (*CreateTimebo
 			})
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
+			}
+			if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, row.ID, actorID, acl.ProjectRoleEditor); spec != nil {
+				return nil, httpErr(spec)
 			}
 			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
@@ -274,9 +315,14 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.TimeboxTimeboxNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Block updates on completed timeboxes.
+		// Block updates on completed timeboxes. A fast answer only: the
+		// UPDATE itself skips a completed row, which is what holds the rule
+		// against a completion that lands after this read.
 		if existing.Status == generated.TimeboxesStatusCompleted {
 			return nil, httpErr(apierrors.TimeboxTimeboxAlreadyCompleted)
+		}
+		if err := checkProjectFloor(ctx, deps, ws.ID, existing.ProjectPublicID); err != nil {
+			return nil, err
 		}
 
 		// Merge fields.
@@ -306,21 +352,24 @@ func Update(deps Deps) func(context.Context, *UpdateTimeboxInput) (*UpdateTimebo
 			return nil, httpErr(apierrors.TimeboxTimeboxInvalidDates)
 		}
 
-		// Not an existence check: a PATCH re-sending the timebox's current
-		// name and dates changes nothing and MySQL counts zero. The re-read
-		// below is what fails if the timebox is gone.
-		if _, err := deps.Queries.UpdateTimebox(ctx, generated.UpdateTimeboxParams{
+		rows, err := deps.Queries.UpdateTimebox(ctx, generated.UpdateTimeboxParams{
 			Name:        name,
 			Description: description,
 			StartsOn:    startsOn,
 			EndsOn:      endsOn,
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.TimeboxTimeboxNameTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			if err := unchangedOrCompleted(ctx, deps, ws.ID, pub); err != nil {
+				return nil, err
+			}
 		}
 
 		// The UPDATE is committed on its own connection; see Create for
@@ -373,17 +422,23 @@ func UpdateStatus(deps Deps) func(context.Context, *UpdateTimeboxStatusInput) (*
 		if existing.Status == generated.TimeboxesStatusCompleted {
 			return nil, httpErr(apierrors.TimeboxTimeboxAlreadyCompleted)
 		}
+		if err := checkProjectFloor(ctx, deps, ws.ID, existing.ProjectPublicID); err != nil {
+			return nil, err
+		}
 
 		targetStatus := generated.TimeboxesStatus(in.Body.Status)
-		// Not an existence check: setting the status the timebox already
-		// holds changes nothing and MySQL counts zero. The re-read below is
-		// what fails if the timebox is gone.
-		if _, err := deps.Queries.UpdateTimeboxStatus(ctx, generated.UpdateTimeboxStatusParams{
+		rows, err := deps.Queries.UpdateTimeboxStatus(ctx, generated.UpdateTimeboxStatusParams{
 			Status:      targetStatus,
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if rows == 0 {
+			if err := unchangedOrCompleted(ctx, deps, ws.ID, pub); err != nil {
+				return nil, err
+			}
 		}
 
 		// Emit the appropriate event.

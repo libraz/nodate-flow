@@ -74,24 +74,40 @@ func TestNotifyingKindsCarryResourceAndSeverity(t *testing.T) {
 	}
 }
 
-// TestClassifyEventReadsTheTable pins the lookup itself, including the
-// runtime-minted transition kinds that are not constants and therefore
+// TestClassificationLookupReadsTheTable pins the lookup itself, including
+// the runtime-minted transition kinds that are not constants and therefore
 // have no entry to find.
-func TestClassifyEventReadsTheTable(t *testing.T) {
+func TestClassificationLookupReadsTheTable(t *testing.T) {
 	t.Parallel()
 
-	title, resource, severity := classifyEvent(string(eventbus.TaskCommentAdded))
-	if title == "" || resource != "comment" || severity == "" {
-		t.Errorf("task.comment.added classified as (%q, %q, %q); want a comment notification", title, resource, severity)
+	// A comment notification links the task the comment is on: the event
+	// row supplies the task's public id, so naming the row a comment would
+	// pair a comment type with a task id.
+	c := classifications[eventbus.TaskCommentAdded]
+	if c.Title == "" || c.ResourceType != "task" || c.Severity == "" {
+		t.Errorf("task.comment.added classified as (%q, %q, %q); want a task-linked notification", c.Title, c.ResourceType, c.Severity)
 	}
 
-	if title, _, _ := classifyEvent(string(eventbus.AgentTaskThought)); title != "" {
-		t.Errorf("agent.task.thought is private agent reasoning; got title %q", title)
+	if c := classifications[eventbus.AgentTaskThought]; c.Title != "" {
+		t.Errorf("agent.task.thought is private agent reasoning; got title %q", c.Title)
 	}
 
 	// A transition name the product invented at runtime. It has no copy,
 	// and asking for it must not panic or invent one.
-	if title, _, _ := classifyEvent(string(eventbus.TaskTransition("bespoke"))); title != "" {
-		t.Errorf("a runtime-minted transition kind has no copy; got title %q", title)
+	if c := classifications[eventbus.TaskTransition("bespoke")]; c.Title != "" {
+		t.Errorf("a runtime-minted transition kind has no copy; got title %q", c.Title)
+	}
+}
+
+// TestEveryNotifyingResourceIsTheEventTask holds the table to the one
+// public id the fan-out can attach: the event's task. A notifying kind
+// naming any other resource type would pair that type with a task id.
+func TestEveryNotifyingResourceIsTheEventTask(t *testing.T) {
+	t.Parallel()
+
+	for kind, c := range classifications {
+		if c.Title != "" && c.ResourceType != "task" {
+			t.Errorf("%q links resource type %q, but resource_public_id is always the event's task", kind, c.ResourceType)
+		}
 	}
 }

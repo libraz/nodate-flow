@@ -95,3 +95,16 @@ SET s.task_id = (
 WHERE s.workspace_id = ?
   AND s.public_id = ?
   AND s.enabled = TRUE;
+
+-- name: ListSignalKindsForTaskForEngine :many
+-- Distinct kinds of the enabled signals attached to a task, through the
+-- legacy task_id fast path or subject_type = 'task'. The constraint
+-- engine's signal.received fact.
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = sqlc.arg(workspace_id)
+  AND enabled = TRUE
+  AND (
+    task_id = sqlc.arg(task_id)
+    OR (subject_type = 'task' AND subject_id = sqlc.arg(task_id))
+  );

@@ -91,7 +91,20 @@ func microsoftAllowlistCallback(t *testing.T, deps Deps, email string) error {
 	return err
 }
 
+func googleAllowlistCallback(t *testing.T, deps Deps, email string) error {
+	t.Helper()
+	deps.OIDC = &fakeGoogleExchanger{
+		claims: &internauth.GoogleClaims{Sub: "g-" + types.New().String(), Email: email, Name: "U", EmailVerified: true},
+	}
+	state, stateCookie := signedGoogleState(t, &deps)
+	_, err := OIDCGoogleCallback(deps)(context.Background(), &OIDCCallbackInput{
+		Code: "auth-code", State: state, StateCookie: stateCookie,
+	})
+	return err
+}
+
 var allowlistCallbacks = map[string]allowlistCallback{
+	"google":    googleAllowlistCallback,
 	"github":    githubAllowlistCallback,
 	"microsoft": microsoftAllowlistCallback,
 }

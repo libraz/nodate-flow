@@ -71,15 +71,21 @@ func (q *Queries) ClaimReminderOccurrence(ctx context.Context, arg ClaimReminder
 
 const countUnreadNotifications = `-- name: CountUnreadNotifications :one
 SELECT COUNT(*) AS unread_count
-FROM notifications
-WHERE recipient_user_id = ?
-  AND read_at IS NULL
-  AND archived_at IS NULL
-  AND enabled = TRUE
+FROM notifications n
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
+WHERE n.recipient_user_id = ?
+  AND n.read_at IS NULL
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE
 `
 
 // Count unread notifications for a user across all workspaces.
 // Used by the global notification badge when no workspace is selected.
+// Same membership join as the lists, so the badge never counts a row
+// the list would not show.
 func (q *Queries) CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countUnreadNotifications, recipientUserID)
 	var unread_count int64
@@ -89,12 +95,16 @@ func (q *Queries) CountUnreadNotifications(ctx context.Context, recipientUserID 
 
 const countUnreadNotificationsForWorkspace = `-- name: CountUnreadNotificationsForWorkspace :one
 SELECT COUNT(*) AS unread_count
-FROM notifications
-WHERE workspace_id = ?
-  AND recipient_user_id = ?
-  AND read_at IS NULL
-  AND archived_at IS NULL
-  AND enabled = TRUE
+FROM notifications n
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
+WHERE n.workspace_id = ?
+  AND n.recipient_user_id = ?
+  AND n.read_at IS NULL
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE
 `
 
 type CountUnreadNotificationsForWorkspaceParams struct {
@@ -166,6 +176,35 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const findReminderEventForOccurrence = `-- name: FindReminderEventForOccurrence :one
+SELECT e.id
+FROM events e
+WHERE e.workspace_id = ?
+  AND e.type = 'calendar.reminder'
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.calendarEventId')) = CAST(? AS CHAR)
+  AND CAST(JSON_EXTRACT(e.payload_json, '$.occurrenceStartAt') AS SIGNED) = CAST(? AS SIGNED)
+ORDER BY e.id
+LIMIT 1
+`
+
+type FindReminderEventForOccurrenceParams struct {
+	WorkspaceID       uint32      `json:"-"`
+	CalendarEventID   interface{} `json:"calendarEventId"`
+	OccurrenceStartAt int64       `json:"occurrenceStartAt"`
+}
+
+// The calendar.reminder event already appended for one occurrence of an
+// event, if a previous attempt got that far. A retried delivery reuses
+// it, so its notifications carry the same source_event_id as the first
+// attempt's and the (recipient, source_event, channel) unique key keeps a
+// recipient who already got the reminder from getting it twice.
+func (q *Queries) FindReminderEventForOccurrence(ctx context.Context, arg FindReminderEventForOccurrenceParams) (uint64, error) {
+	row := q.db.QueryRowContext(ctx, findReminderEventForOccurrence, arg.WorkspaceID, arg.CalendarEventID, arg.OccurrenceStartAt)
+	var id uint64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getNotificationPreferencesForRecipients = `-- name: GetNotificationPreferencesForRecipients :many
@@ -258,6 +297,10 @@ SELECT
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -293,7 +336,9 @@ type ListNotificationsForUserRow struct {
 }
 
 // List notifications for a user across all their workspaces, ordered newest first.
-// Excludes archived and disabled notifications.
+// Excludes archived and disabled notifications. The workspace_members join
+// is what "their workspaces" means: rows from a workspace the user has
+// left stop being listed, on this and every sibling list and count.
 func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNotificationsForUser, arg.RecipientUserID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -355,6 +400,10 @@ SELECT
   n.created_at
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -483,6 +532,10 @@ SELECT
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
@@ -586,6 +639,10 @@ SELECT
   n.created_at
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?

@@ -7,9 +7,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // MaxPageDepth is the maximum nesting depth allowed for page hierarchies.
@@ -33,7 +33,7 @@ type PageGenerator interface {
 type Deps struct {
 	DB        *sql.DB
 	Queries   *generated.Queries
-	Audit     *audit.Recorder
+	Mutations *mutationlog.Recorder
 	Generator PageGenerator
 }
 

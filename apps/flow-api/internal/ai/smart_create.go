@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -173,7 +174,9 @@ func (o *Orchestrator) ProposeSmartCreate(
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	// ---- cache check ----
-	cacheKey := ProposalCacheKey(workspaceID, "smart_create", title, description)
+	// The proposal quotes the similar tasks the actor may read, so it is
+	// cached per visibility scope rather than per workspace.
+	cacheKey := ProposalCacheKey(workspaceID, "smart_create", VisibilityCacheScope(vis), title, description)
 	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
 		if sp, _ := cached.(*SmartProposal); sp != nil {
 			return sp, nil
@@ -278,6 +281,19 @@ func (o *Orchestrator) ProposeSmartCreate(
 	}
 	o.ProposalCache.Put(cacheKey, &proposal)
 	return &proposal, nil
+}
+
+// VisibilityCacheScope names the set of tasks a proposal built for vis
+// may have drawn on, as a cache-key part. Elevated callers read every
+// task and share one scope; anyone else's readable set is their own.
+// Every proposal whose prompt embeds task content keys on it, so a
+// cached answer is never served to someone who could not have read what
+// it was built from.
+func VisibilityCacheScope(vis acl.VisibilityArgs) string {
+	if vis.IsElevated == 1 {
+		return "vis:elevated"
+	}
+	return "vis:actor:" + strconv.FormatInt(vis.ActorUserID, 10)
 }
 
 // composeText joins title and description with a newline separator,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/autoactions"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -88,6 +89,7 @@ func ListAutoActions(deps Deps) func(context.Context, *ListAutoActionsInput) (*L
 		}
 
 		now := time.Now().UTC()
+		zone := duedate.UserZone(ctx, deps.Queries, ws.ID, actorID)
 		out := &ListAutoActionsOutput{}
 		out.Body.Total = len(rows)
 		out.Body.Actions = []TaskAutoAction{}
@@ -107,6 +109,7 @@ func ListAutoActions(deps Deps) func(context.Context, *ListAutoActionsInput) (*L
 				// typed, in the same row.
 				HasAssignee: r.AssigneeCount > 0,
 				Now:         now,
+				Zone:        zone,
 			}
 			if r.UpdatedAt.Valid {
 				sig.UpdatedAt = r.UpdatedAt.Time

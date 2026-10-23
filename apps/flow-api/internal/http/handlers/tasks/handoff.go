@@ -22,12 +22,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -36,9 +39,8 @@ import (
 //
 // Atomicity: the disable-prior + upsert-new pair and the corresponding
 // event row are committed in a single transaction so external observers
-// never see a partial handoff. The event INSERT runs through the same
-// qtx so the deadlock retry contract matches every other write path in
-// this package.
+// never see a partial handoff. The event goes through the shared recorder,
+// so its notification, webhook and stream fan-out follow the commit.
 func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*HandoffToAgentOutput, error) {
 	return func(ctx context.Context, in *HandoffToAgentInput) (*HandoffToAgentOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
@@ -87,9 +89,9 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 		}
 
 		newActorPub := types.New()
-		eventPub := types.New()
 		payload := map[string]any{
 			"taskId":         task.PublicID.String(),
+			"agentId":        agentPub.String(),
 			"agentPublicId":  agentPub.String(),
 			"actorPublicId":  newActorPub.String(),
 			"priorAgentKind": nil,
@@ -98,89 +100,70 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 			payload["priorAgentPublicId"] = priorAgentPublicID
 			payload["priorAgentKind"] = "agent"
 		}
-		payloadJSON, err := json.Marshal(payload)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
-
-		// Disable any prior agent assignee rows on the task. Soft-disable
-		// is sufficient — task_actors.public_id is preserved so audit
-		// history remains queryable.
-		//
-		// The rows were listed before the transaction opened, and the
-		// UPDATE runs the same predicate the listing did, so a zero count
-		// is that row having been disabled in between. The count is
-		// summed rather than checked per row: displacing some of the
-		// priors is still a handoff, and it is only when this request
-		// displaced none of the ones it read that its picture of the
-		// task's assignment is stale — and the event below already names
-		// one of them as the agent this handoff took over from.
-		displaced := int64(0)
-		for _, a := range existing {
-			res, err := tx.ExecContext(ctx,
-				`UPDATE task_actors SET enabled = FALSE
-				 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
-				ws.ID, task.ID, a.ID,
-			)
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+		actorID, _ := middleware.ActorFromContext(ctx)
+		taskInternal := int64(task.ID)
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.HandoffToAgent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			// Disable any prior agent assignee rows on the task. Soft-disable
+			// is sufficient — task_actors.public_id is preserved so audit
+			// history remains queryable.
+			//
+			// The rows were listed before the transaction opened, and the
+			// UPDATE runs the same predicate the listing did, so a zero count
+			// is that row having been disabled in between. The count is
+			// summed rather than checked per row: displacing some of the
+			// priors is still a handoff, and it is only when this request
+			// displaced none of the ones it read that its picture of the
+			// task's assignment is stale — and the event below already names
+			// one of them as the agent this handoff took over from.
+			displaced := int64(0)
+			for _, a := range existing {
+				res, err := tx.ExecContext(ctx,
+					`UPDATE task_actors SET enabled = FALSE
+					 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
+					ws.ID, task.ID, a.ID,
+				)
+				if err != nil {
+					return err
+				}
+				n, err := res.RowsAffected()
+				if err != nil {
+					return err
+				}
+				displaced += n
 			}
-			n, err := res.RowsAffected()
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+			if len(existing) > 0 && displaced == 0 {
+				answered = httpErr(apierrors.WsTaskUpdateConflict)
+				return errAnswered
 			}
-			displaced += n
-		}
-		if len(existing) > 0 && displaced == 0 {
-			return nil, httpErr(apierrors.WsTaskUpdateConflict)
-		}
 
-		if _, err := qtx.AddAgentActor(ctx, generated.AddAgentActorParams{
-			PublicID:    newActorPub,
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			AgentID:     sql.NullInt32{Int32: int32(agentInternalID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
-			Role:        generated.TaskActorsRoleAssignee,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+			if _, err := generated.New(tx).AddAgentActor(ctx, generated.AddAgentActorParams{
+				PublicID:    newActorPub,
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				AgentID:     sql.NullInt32{Int32: int32(agentInternalID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
+				Role:        generated.TaskActorsRoleAssignee,
+			}); err != nil {
+				return err
+			}
 
-		taskID := sql.NullInt32{Int32: int32(task.ID), Valid: true} //#nosec G115 -- tasks.id is BIGINT UNSIGNED, fits int32 within realistic deployments
-		actorUserID := sql.NullInt32{}
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			actorUserID = sql.NullInt32{Int32: int32(aID), Valid: true} //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-		}
-		if _, err := qtx.InsertHandoffToAgentEvent(ctx, generated.InsertHandoffToAgentEventParams{
-			PublicID:    eventPub,
-			WorkspaceID: ws.ID,
-			TaskID:      taskID,
-			ActorUserID: actorUserID,
-			PayloadJson: payloadJSON,
-			OccurredAt:  time.Now().UTC(),
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.handoff.to_agent",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.AgentTaskHandoffToAgent,
+				AuditAction:  "task.handoff.to_agent",
 				ResourceType: "task",
 				ResourceID:   task.PublicID.String(),
-				Metadata:     map[string]any{"agentId": agentPub.String()},
+				TaskID:       &taskInternal,
+				Payload:      payload,
+				CallSite:     "tasks.HandoffToAgent",
 			})
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -255,7 +238,6 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 		}
 
 		now := time.Now().UTC()
-		eventPub := types.New()
 		payload := map[string]any{
 			"taskId":             task.PublicID.String(),
 			"reason":             in.Body.Reason,
@@ -263,10 +245,6 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 		}
 		if hasTargetUser {
 			payload["targetUserPublicId"] = targetUserPub.String()
-		}
-		payloadJSON, err := json.Marshal(payload)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		memoPatch := map[string]any{
@@ -279,85 +257,75 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
-
-		// Disable every current agent assignee row so the task no
-		// longer routes new events to an agent.
-		//
-		// Taking the agent off the task is what this endpoint does, so a
-		// run that disabled nothing handed nothing back: the rows were
-		// listed before the transaction opened and the UPDATE runs the
-		// same predicate, so zero across all of them means another
-		// handoff got there first. Refused with the same code the empty
-		// listing above answers with, because it is the same state seen a
-		// moment later — and the rollback drops the handoff event and the
-		// memo patch that would otherwise record a second hand-back.
-		handedBack := int64(0)
-		for _, a := range existing {
-			res, err := tx.ExecContext(ctx,
-				`UPDATE task_actors SET enabled = FALSE
-				 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
-				ws.ID, task.ID, a.ID,
-			)
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+		actorID, _ := middleware.ActorFromContext(ctx)
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.HandoffToUser", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			// Disable every current agent assignee row so the task no
+			// longer routes new events to an agent.
+			//
+			// Taking the agent off the task is what this endpoint does, so a
+			// run that disabled nothing handed nothing back: the rows were
+			// listed before the transaction opened and the UPDATE runs the
+			// same predicate, so zero across all of them means another
+			// handoff got there first. Refused with the same code the empty
+			// listing above answers with, because it is the same state seen a
+			// moment later — and the rollback drops the handoff event and the
+			// memo patch that would otherwise record a second hand-back.
+			handedBack := int64(0)
+			for _, a := range existing {
+				res, err := tx.ExecContext(ctx,
+					`UPDATE task_actors SET enabled = FALSE
+					 WHERE workspace_id = ? AND task_id = ? AND agent_id = ? AND kind = 'agent' AND enabled = TRUE`,
+					ws.ID, task.ID, a.ID,
+				)
+				if err != nil {
+					return err
+				}
+				n, err := res.RowsAffected()
+				if err != nil {
+					return err
+				}
+				handedBack += n
 			}
-			n, err := res.RowsAffected()
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+			if handedBack == 0 {
+				answered = httpErr(apierrors.WsTaskAgentNotAssigned)
+				return errAnswered
 			}
-			handedBack += n
-		}
-		if handedBack == 0 {
-			return nil, httpErr(apierrors.WsTaskAgentNotAssigned)
-		}
 
-		if hasTargetUser {
-			actorPub := types.New()
-			if _, err := qtx.AddActor(ctx, generated.AddActorParams{
-				PublicID:    actorPub,
-				WorkspaceID: ws.ID,
-				TaskID:      task.ID,
-				UserID:      sql.NullInt32{Int32: int32(targetUserID), Valid: true}, //#nosec G115 -- users.id is BIGINT UNSIGNED, fits int32 within realistic deployments
-				Role:        generated.TaskActorsRoleAssignee,
+			if hasTargetUser {
+				if _, err := generated.New(tx).AddActor(ctx, generated.AddActorParams{
+					PublicID:    types.New(),
+					WorkspaceID: ws.ID,
+					TaskID:      task.ID,
+					UserID:      sql.NullInt32{Int32: int32(targetUserID), Valid: true}, //#nosec G115 -- users.id is BIGINT UNSIGNED, fits int32 within realistic deployments
+					Role:        generated.TaskActorsRoleAssignee,
+				}); err != nil {
+					return err
+				}
+			}
+
+			if err := recordHandoffToUser(ctx, tx, deps.Mutations, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, handoffToUserWrites{
+				taskID:       task.ID,
+				taskPublicID: task.PublicID.String(),
+				priorAgentID: priorAgent.ID,
+				memoPatch:    memoJSON,
+				payload:      payload,
 			}); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				var pd *handlerutil.ProblemDetails
+				if errors.As(err, &pd) {
+					answered = err
+					return errAnswered
+				}
+				return err
 			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
 		}
-
-		if err := recordHandoffToUser(ctx, qtx, handoffToUserWrites{
-			workspaceID:   ws.ID,
-			taskID:        task.ID,
-			priorAgentID:  priorAgent.ID,
-			eventPublicID: eventPub,
-			memoPatch:     memoJSON,
-			payload:       payloadJSON,
-			occurredAt:    now,
-		}); err != nil {
-			return nil, err
-		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.handoff.to_user",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task",
-				ResourceID:   task.PublicID.String(),
-				Metadata: map[string]any{
-					"reason":             in.Body.Reason,
-					"priorAgentPublicId": priorAgent.PublicID.String(),
-				},
-			})
 		}
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -374,13 +342,11 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 // handoffToUserWrites are the two rows that record a hand-back: the
 // state the task carries afterwards, and the event that announces it.
 type handoffToUserWrites struct {
-	workspaceID   uint32
-	taskID        uint32
-	priorAgentID  uint32
-	eventPublicID types.PublicID
-	memoPatch     json.RawMessage
-	payload       json.RawMessage
-	occurredAt    time.Time
+	taskID       uint32
+	taskPublicID string
+	priorAgentID uint32
+	memoPatch    json.RawMessage
+	payload      map[string]any
 }
 
 // recordHandoffToUser writes the hand-back state and then the event that
@@ -400,10 +366,13 @@ type handoffToUserWrites struct {
 // announcement on the timeline with a handoff_status that never changed.
 // Refusing here instead rolls the whole transaction back and records
 // neither.
-func recordHandoffToUser(ctx context.Context, q *generated.Queries, w handoffToUserWrites) error {
-	memoRows, err := q.UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
+//
+// The event is the prior agent's act, so it is attributed to the agent;
+// the user who drove the request is named by the audit row.
+func recordHandoffToUser(ctx context.Context, tx *dbretry.Tx, rec *mutationlog.Recorder, actor mutationlog.Actor, w handoffToUserWrites) error {
+	memoRows, err := generated.New(tx).UpdateTaskAgentMemo(ctx, generated.UpdateTaskAgentMemoParams{
 		Column1:     w.memoPatch,
-		WorkspaceID: w.workspaceID,
+		WorkspaceID: actor.WorkspaceID,
 		ID:          w.taskID,
 	})
 	if err != nil {
@@ -413,17 +382,18 @@ func recordHandoffToUser(ctx context.Context, q *generated.Queries, w handoffToU
 		return httpErr(apierrors.WsTaskNotFound)
 	}
 
-	if _, err := q.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
-		PublicID:     w.eventPublicID,
-		WorkspaceID:  w.workspaceID,
-		TaskID:       sql.NullInt32{Int32: int32(w.taskID), Valid: true},       //#nosec G115 -- tasks.id is BIGINT UNSIGNED, fits int32 within realistic deployments
-		ActorAgentID: sql.NullInt32{Int32: int32(w.priorAgentID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
-		PayloadJson:  w.payload,
-		OccurredAt:   w.occurredAt,
-	}); err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-	return nil
+	taskInternal := int64(w.taskID)
+	priorAgent := int64(w.priorAgentID)
+	return rec.RecordInTx(ctx, tx, actor, mutationlog.Mutation{
+		EventType:    eventbus.AgentTaskHandoffToUser,
+		AuditAction:  "task.handoff.to_user",
+		ResourceType: "task",
+		ResourceID:   w.taskPublicID,
+		TaskID:       &taskInternal,
+		ActorAgentID: &priorAgent,
+		Payload:      w.payload,
+		CallSite:     "tasks.HandoffToUser",
+	})
 }
 
 // ListAgentRuns handles GET /tasks/{id}/agent-runs. Returns recent

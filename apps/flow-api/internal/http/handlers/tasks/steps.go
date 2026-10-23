@@ -258,12 +258,17 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 			stepTitles = append(stepTitles, title)
 		}
 
-		// Resolve parent's project_id.
+		// Resolve the parent's project and audience. A step is a task
+		// derived from the parent, so it carries the parent's visibility
+		// rather than the create-path default: a public child of a
+		// private parent would put the private task's plan in front of
+		// the whole workspace.
 		var parentProjectID uint32
+		var parentVisibility generated.TasksVisibility
 		if err := deps.DB.QueryRowContext(ctx,
-			`SELECT project_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
+			`SELECT project_id, visibility FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
 			task.ID, ws.ID,
-		).Scan(&parentProjectID); err != nil {
+		).Scan(&parentProjectID, &parentVisibility); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -285,6 +290,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 					Title:        stepTitles[i],
 					Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 					Priority:     st.Priority,
+					Visibility:   parentVisibility,
 				})
 				if err != nil {
 					return err

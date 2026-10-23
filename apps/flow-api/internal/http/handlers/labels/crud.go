@@ -4,15 +4,24 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
+
+// checkProjectFloor holds a write to a project-scoped label to the
+// project editor floor.
+func checkProjectFloor(ctx context.Context, deps Deps, wsID, projectID uint32) *apierrors.Spec {
+	actorID, _ := middleware.ActorFromContext(ctx)
+	return handlerutil.RequireProjectRole(ctx, deps.DB, wsID, projectID, actorID, acl.ProjectRoleEditor)
+}
 
 // Create handles POST /workspaces/{wsId}/labels.
 func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOutput, error) {
@@ -41,6 +50,9 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
+			if spec := checkProjectFloor(ctx, deps, ws.ID, proj.ID); spec != nil {
+				return nil, httpErr(spec)
+			}
 			projectID = sql.NullInt32{Int32: int32(proj.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
@@ -65,46 +77,39 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent_label_id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
+		actorID, _ := middleware.ActorFromContext(ctx)
 		var createdByUserID sql.NullInt32
-		if uid, ok := middleware.ActorFromContext(ctx); ok {
-			createdByUserID = sql.NullInt32{Int32: int32(uid), Valid: true} //#nosec G115 -- actor user id from session, bounded by realistic deployments
+		if actorID != 0 {
+			createdByUserID = sql.NullInt32{Int32: int32(actorID), Valid: true} //#nosec G115 -- actor user id from session, bounded by realistic deployments
 		}
 
-		if _, err := deps.Queries.CreateLabel(ctx, generated.CreateLabelParams{
-			PublicID:        pub,
-			WorkspaceID:     ws.ID,
-			ProjectID:       projectID,
-			ParentLabelID:   parentLabelID,
-			CreatedByUserID: createdByUserID,
-			Name:            in.Body.Name,
-			Color:           color,
-			Description:     sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
-			SortWeight:      0,
+		if err := dbretry.InTx(ctx, deps.DB, "labels.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreateLabel(ctx, generated.CreateLabelParams{
+				PublicID:        pub,
+				WorkspaceID:     ws.ID,
+				ProjectID:       projectID,
+				ParentLabelID:   parentLabelID,
+				CreatedByUserID: createdByUserID,
+				Name:            in.Body.Name,
+				Color:           color,
+				Description:     sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
+				SortWeight:      0,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.LabelCreated,
+				AuditAction:  "label.create",
+				ResourceType: "label",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"labelId": pub.String(), "name": in.Body.Name},
+				CallSite:     "labels.Create",
+			})
 		}); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.WsLabelNameAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.LabelCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"labelId": pub.String()},
-		}, "labels.Create")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "label.create",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "label",
-					ResourceID:   pub.String(),
-					Metadata:     map[string]any{"name": in.Body.Name},
-				})
-			}
 		}
 
 		row, err := deps.Queries.FindLabelByPublicId(ctx, generated.FindLabelByPublicIdParams{
@@ -230,6 +235,11 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
+		if row.ProjectID.Valid {
+			if spec := checkProjectFloor(ctx, deps, ws.ID, uint32(row.ProjectID.Int32)); spec != nil { //#nosec G115 -- projects.id, positive by construction
+				return nil, httpErr(spec)
+			}
+		}
 
 		name := row.Name
 		if in.Body.Name != nil {
@@ -275,38 +285,32 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 		// Not an existence check: a PATCH re-sending the label's current
 		// name / colour changes nothing and MySQL counts zero. The re-read
 		// below is what fails if the label is gone.
-		if _, err := deps.Queries.UpdateLabel(ctx, generated.UpdateLabelParams{
-			Name:          name,
-			Color:         color,
-			Description:   desc,
-			ParentLabelID: parentID,
-			SortWeight:    sw,
-			WorkspaceID:   ws.ID,
-			PublicID:      pub,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		if err := dbretry.InTx(ctx, deps.DB, "labels.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).UpdateLabel(ctx, generated.UpdateLabelParams{
+				Name:          name,
+				Color:         color,
+				Description:   desc,
+				ParentLabelID: parentID,
+				SortWeight:    sw,
+				WorkspaceID:   ws.ID,
+				PublicID:      pub,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.LabelUpdated,
+				AuditAction:  "label.update",
+				ResourceType: "label",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"labelId": pub.String()},
+				CallSite:     "labels.Patch",
+			})
 		}); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.WsLabelNameAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.LabelUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"labelId": pub.String()},
-		}, "labels.Patch")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "label.update",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "label",
-					ResourceID:   pub.String(),
-				})
-			}
 		}
 
 		updated, err := deps.Queries.FindLabelByPublicId(ctx, generated.FindLabelByPublicIdParams{
@@ -336,34 +340,32 @@ func Disable(deps Deps) func(context.Context, *DisableLabelInput) (*DisableLabel
 
 		// Scoped to the workspace and to live labels, so a zero count means
 		// there is no such label to delete here.
-		rows, err := deps.Queries.DisableLabel(ctx, generated.DisableLabelParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
-		})
-		if err != nil {
+		actorID, _ := middleware.ActorFromContext(ctx)
+		var missing bool
+		if err := dbretry.InTx(ctx, deps.DB, "labels.Disable", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).DisableLabel(ctx, generated.DisableLabelParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			if err != nil {
+				return err
+			}
+			if missing = rows == 0; missing {
+				return nil
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.LabelDisabled,
+				AuditAction:  "label.disable",
+				ResourceType: "label",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"labelId": pub.String()},
+				CallSite:     "labels.Disable",
+			})
+		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if rows == 0 {
+		if missing {
 			return nil, httpErr(apierrors.WsLabelNotFound)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.LabelDisabled,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"labelId": pub.String()},
-		}, "labels.Disable")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "label.disable",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "label",
-					ResourceID:   pub.String(),
-				})
-			}
 		}
 
 		out := &DisableLabelOutput{}
@@ -409,38 +411,32 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 		}
 
 		pub := types.New()
-		if _, err := deps.Queries.CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			LabelID:     label.ID,
-			SortWeight:  0,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		taskID := int64(task.ID)
+		if err := dbretry.InTx(ctx, deps.DB, "labels.AddTaskLabel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				LabelID:     label.ID,
+				SortWeight:  0,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskLabelAdded,
+				AuditAction:  "task.label.add",
+				ResourceType: "task_label",
+				ResourceID:   labelPub.String(),
+				TaskID:       &taskID,
+				Payload:      map[string]any{"labelId": labelPub.String()},
+				CallSite:     "labels.AddTaskLabel",
+			})
 		}); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.WsLabelAlreadyAttached)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskID := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskLabelAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskID,
-			Payload:     map[string]any{"labelId": labelPub.String()},
-		}, "labels.AddTaskLabel")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "task.label.add",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "task_label",
-					ResourceID:   labelPub.String(),
-				})
-			}
 		}
 
 		return &AddTaskLabelOutput{Body: TaskLabel{
@@ -508,33 +504,27 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
-		if err := deps.Queries.DisableTaskLabel(ctx, generated.DisableTaskLabelParams{
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			LabelID:     label.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		taskID := int64(task.ID)
+		if err := dbretry.InTx(ctx, deps.DB, "labels.RemoveTaskLabel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if err := generated.New(tx).DisableTaskLabel(ctx, generated.DisableTaskLabelParams{
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				LabelID:     label.ID,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskLabelRemoved,
+				AuditAction:  "task.label.remove",
+				ResourceType: "task_label",
+				ResourceID:   labelPub.String(),
+				TaskID:       &taskID,
+				Payload:      map[string]any{"labelId": labelPub.String()},
+				CallSite:     "labels.RemoveTaskLabel",
+			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskID := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskLabelRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskID,
-			Payload:     map[string]any{"labelId": labelPub.String()},
-		}, "labels.RemoveTaskLabel")
-
-		if deps.Audit != nil {
-			if actorID, ok := middleware.ActorFromContext(ctx); ok {
-				deps.Audit.Record(ctx, audit.Entry{
-					Action:       "task.label.remove",
-					ActorID:      actorID,
-					WorkspaceID:  ws.ID,
-					ResourceType: "task_label",
-					ResourceID:   labelPub.String(),
-				})
-			}
 		}
 
 		out := &RemoveTaskLabelOutput{}

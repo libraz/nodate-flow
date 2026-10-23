@@ -86,7 +86,12 @@ type Event struct {
 	// Timezone is the IANA name the event's wall clock is expressed in.
 	// Empty means UTC.
 	Timezone string
-	Rule     *Rule
+	// AllDay marks a series of whole days. Its occurrences are UTC
+	// midnights whatever Timezone says: stepped in the event's zone, the
+	// stored midnight is a local evening whose wall clock DST then moves
+	// off midnight, and the day renders one day early.
+	AllDay bool
+	Rule   *Rule
 	// Exceptions are the stored recurrence_exceptions entries: either
 	// full timestamps naming one occurrence, or bare YYYY-MM-DD dates
 	// naming a local day.
@@ -180,7 +185,7 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
 		return nil
 	}
-	loc := zoneFor(evt.Timezone).Location()
+	loc := zoneFor(evt.zone()).Location()
 	duration := evt.EndAt.Sub(evt.StartAt)
 	exactSkips, daySkips := buildExceptions(evt.Exceptions, loc)
 	overriddenExact, overriddenDays := buildExceptions(evt.OverriddenStarts, loc)
@@ -265,9 +270,25 @@ func Starts(evt Event, from time.Time, n int, limit time.Time) []time.Time {
 // can name.
 var startsHorizon = time.Date(9999, time.January, 1, 0, 0, 0, 0, time.UTC)
 
+// ZoneName is the timezone a series' occurrences are laid out in: the
+// event's own, or UTC for an all-day series. Stored entries are read in
+// the same zone, so a bare date names the UTC day of an all-day
+// occurrence.
+func ZoneName(timezone string, allDay bool) string {
+	if allDay {
+		return region.DefaultTimezone
+	}
+	return timezone
+}
+
+// zone is [ZoneName] for this event.
+func (e Event) zone() string {
+	return ZoneName(e.Timezone, e.AllDay)
+}
+
 // EntryNames reports whether one stored exception or overridden-start
-// entry names the occurrence starting at candidate, read in the event's
-// timezone the way [Expand] reads it.
+// entry names the occurrence starting at candidate, read in timezone —
+// the series' [ZoneName] — the way [Expand] reads it.
 func EntryNames(entry, timezone string, candidate time.Time) bool {
 	loc := zoneFor(timezone).Location()
 	e, ok := parseExceptionEntry(entry, loc)
@@ -305,13 +326,13 @@ func ProducesEntry(evt Event, entry string) bool {
 	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
 		return false
 	}
-	latest, ok := EntryLatest(entry, evt.Timezone)
+	latest, ok := EntryLatest(entry, evt.zone())
 	if !ok {
 		return false
 	}
 	found := false
 	walk(evt, latest.Add(time.Nanosecond), func(candidate time.Time) bool {
-		if EntryNames(entry, evt.Timezone, candidate) {
+		if EntryNames(entry, evt.zone(), candidate) {
 			found = true
 			return false
 		}
@@ -325,7 +346,7 @@ func ProducesEntry(evt Event, entry string) bool {
 // stops when visit returns false, when the series' own bounds end it, or
 // at the first candidate at or after limit.
 func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
-	loc := zoneFor(evt.Timezone).Location()
+	loc := zoneFor(evt.zone()).Location()
 	anchor := evt.StartAt.In(loc)
 
 	interval := 1

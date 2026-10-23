@@ -7,11 +7,13 @@ import (
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
@@ -67,6 +69,9 @@ const (
 // audit row is a claim that something changed.
 type stateRollback struct {
 	applied bool
+	// taskID is the transitioned task's internal id, for the constraint
+	// re-evaluation that follows the commit.
+	taskID uint32
 	// taskPublicID names the task the transition targeted. The
 	// transition is a change to the task, not to the event that
 	// triggered it, so this is what an audit query filters on.
@@ -167,6 +172,10 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 		// /tasks/{id} route. The admin bypass lives inside it; deciding
 		// "is this actor elevated" here would be a second copy of a rule
 		// that only has to be written too generously once.
+		//
+		// Visibility is not authority: undoing agent activity on a task
+		// is a task write, so a reader of the task still needs the
+		// project editor floor every other task write holds.
 		if err := checkReverseTargetVisible(ctx, deps.DB, ws.ID, eventPub, actorInternal); err != nil {
 			return nil, err
 		}
@@ -340,6 +349,11 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 				},
 				CallSite: "events.Reverse (taskstate.ApplyTransitionTx appended the event)",
 			})
+			// Dependents read this task's state in their dependency facts,
+			// so their markers move with it. Best effort: the reversal has
+			// committed and the next evaluation recovers a failure.
+			eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: ws.ID, Queries: deps.Queries}}
+			_ = eng.EvaluateTaskAndDependents(ctx, rollback.taskID)
 		}
 
 		return &ReverseOutput{
@@ -384,7 +398,8 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 		return httpErr(apierrors.InternalUnexpected)
 	}
 
-	if _, err := acl.AuthorizeTaskAccess(ctx, db, taskPub.UUID(), actorInternal, apierrors.WsTaskAccessDenied); err != nil {
+	access, err := acl.AuthorizeTaskAccess(ctx, db, taskPub.UUID(), actorInternal, apierrors.WsTaskAccessDenied)
+	if err != nil {
 		var apiErr *apierr.APIError
 		if stderrors.As(err, &apiErr) {
 			return httpErr(apierrors.AiReverseTargetNotFound)
@@ -394,6 +409,9 @@ func checkReverseTargetVisible(ctx context.Context, db *sql.DB, wsID uint32, eve
 			logutil.LogEntityPID("event", eventPublicID),
 		)
 		return httpErr(apierrors.InternalUnexpected)
+	}
+	if spec := handlerutil.RequireProjectRole(ctx, db, wsID, access.Task.ProjectID, actorInternal, acl.ProjectRoleEditor); spec != nil {
+		return httpErr(spec)
 	}
 	return nil
 }
@@ -483,6 +501,7 @@ func applyStateRollback(ctx context.Context, tx *dbretry.Tx, wsID uint32, eventP
 	}
 	return stateRollback{
 		applied:      true,
+		taskID:       uint32(taskID.Int32), //#nosec G115 -- tasks.id fits uint32 within realistic deployments
 		taskPublicID: taskPubID.String(),
 		transition:   transition,
 		fromState:    string(result.FromState),

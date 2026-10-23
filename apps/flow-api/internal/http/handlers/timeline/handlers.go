@@ -11,9 +11,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
 
@@ -62,54 +64,39 @@ func queryTimeline(
 	where := append([]string{}, baseWhere...)
 	args := append([]any{}, baseArgs...)
 
-	// 4-layer ACL visibility predicate (defense-in-depth). This mirrors
-	// CheckTaskVisibility for timeline rows: public tasks are visible to
-	// workspace members, project tasks require project membership, private
-	// tasks require creator/actor access, and workspace owner/admin bypass.
-	// Events with no associated task remain workspace-root events. The
-	// owner/admin bypass is decided from the role the request context
-	// already carries, so no per-row membership lookup is needed.
-	if !wsRole.AtLeast(middleware.WorkspaceRoleAdmin) {
-		where = append(where, `(
-  v.task_public_id IS NULL
-  OR EXISTS (
-    SELECT 1
-    FROM tasks tv
-    WHERE tv.workspace_id = v.workspace_id
-      AND tv.public_id = v.task_public_id
-      AND tv.enabled = TRUE
-      AND (
-        tv.visibility = 'public'
-        OR (
-          tv.visibility = 'project'
-          AND EXISTS (
-            SELECT 1
-            FROM project_members pm
-            WHERE pm.workspace_id = tv.workspace_id
-              AND pm.project_id = tv.project_id
-              AND pm.user_id = ?
-              AND pm.enabled = TRUE
-          )
-        )
-        OR (
-          tv.visibility = 'private'
-          AND (
-            tv.created_by_user_id = ?
-            OR EXISTS (
-              SELECT 1
-              FROM task_actors ta
-              WHERE ta.workspace_id = tv.workspace_id
-                AND ta.task_id = tv.id
-                AND ta.user_id = ?
-                AND ta.enabled = TRUE
-            )
-          )
-        )
-      )
+	// A row is shown only when its owning resource would be readable
+	// through its own endpoint. The task half reads events.task_id rather
+	// than the view's task_public_id, which the view NULLs for a deleted
+	// task and which would otherwise pass as a workspace-root event.
+	if taskFrag, taskArgs := acl.TaskVisibilityPredicate("v.task_internal_id = ev.task_id", callerUserID, wsRole); taskFrag != "" {
+		where = append(where, "(ev.task_id IS NULL OR "+taskFrag+")")
+		args = append(args, taskArgs...)
+	}
+	// Calendar rows follow the calendar endpoints, which have no admin
+	// bypass: membership of an enabled calendar, then the event row's own
+	// visibility when the payload names a calendar event.
+	rowFrag, rowArgs := eventacl.RowVisibilityFilter(callerUserID)
+	where = append(where, `(
+  ev.calendar_id IS NULL
+  OR (
+    EXISTS (
+      SELECT 1 FROM calendar_members cm_tl
+      INNER JOIN calendars c_tl ON c_tl.id = cm_tl.calendar_id AND c_tl.enabled = TRUE
+      WHERE cm_tl.calendar_id = ev.calendar_id
+        AND cm_tl.user_id = ?
+        AND cm_tl.enabled = TRUE
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM calendar_events ce
+      WHERE ce.workspace_id = ev.workspace_id
+        AND ce.public_id = CASE WHEN IS_UUID(ev.payload_json->>'$.eventId')
+          THEN UUID_TO_BIN(ev.payload_json->>'$.eventId', 0) END
+        AND NOT `+rowFrag+`
+    )
   )
 )`)
-		args = append(args, callerUserID, callerUserID, callerUserID)
-	}
+	args = append(args, callerUserID)
+	args = append(args, rowArgs...)
 
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))
@@ -140,6 +127,7 @@ func queryTimeline(
   v.payload_json,
   v.occurred_at
 FROM v_task_timeline v
+INNER JOIN events ev ON ev.id = v.event_id
 WHERE %s
 ORDER BY v.occurred_at DESC, v.event_id DESC
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
@@ -178,7 +166,7 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	}
 
 	//#nosec G201 -- WHERE fragments are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
-	countQ := fmt.Sprintf(`SELECT COUNT(*) FROM v_task_timeline v WHERE %s`, strings.Join(where, " AND "))
+	countQ := fmt.Sprintf(`SELECT COUNT(*) FROM v_task_timeline v INNER JOIN events ev ON ev.id = v.event_id WHERE %s`, strings.Join(where, " AND "))
 	var total int64
 	if err := db.QueryRowContext(ctx, countQ, args...).Scan(&total); err != nil {
 		return nil, 0, err

@@ -3,7 +3,11 @@ package lenses
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -55,6 +59,9 @@ func Create(deps Deps) func(context.Context, *CreateLensInput) (*CreateLensOutpu
 			})
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
+			}
+			if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, row.ID, actorID, acl.ProjectRoleEditor); spec != nil {
+				return nil, httpErr(spec)
 			}
 			projectID = sql.NullInt32{Int32: int32(row.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
@@ -232,55 +239,77 @@ func Update(deps Deps) func(context.Context, *UpdateLensInput) (*UpdateLensOutpu
 			return nil, err
 		}
 
-		// Parse existing lens_json for merge.
-		existFilter, existSort, existGroupBy := parseLensJSON(existing.LensJson)
+		// The merge reads the stored definition under a row lock inside the
+		// transaction that writes it, so a concurrent patch of another field
+		// is merged rather than overwritten with this request's stale copy.
+		var (
+			name        string
+			description sql.NullString
+			filter      json.RawMessage
+			sort        json.RawMessage
+			groupBy     *string
+			isDefault   bool
+			missing     bool
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "lenses.Update", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			const lockQ = `SELECT name, description, lens_json, is_default FROM lenses
+WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
+			var stored json.RawMessage
+			err := tx.QueryRowContext(ctx, lockQ, ws.ID, lid).Scan(&name, &description, &stored, &isDefault)
+			if errors.Is(err, sql.ErrNoRows) {
+				missing = true
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			missing = false
+			filter, sort, groupBy = parseLensJSON(stored)
 
-		name := existing.Name
-		if in.Body.Name != nil {
-			name = *in.Body.Name
-		}
-		// Description is a *string in the patch body so we cannot tell
-		// "unset" apart from "explicit null" once decoded; treat nil as
-		// "leave alone" (PATCH merge semantics) and any non-nil value as
-		// the new description (empty string clears).
-		description := existing.Description
-		if in.Body.Description != nil {
-			description = optionalNullString(in.Body.Description)
-		}
-		filter := existFilter
-		if in.Body.Filter != nil {
-			filter = *in.Body.Filter
-		}
-		sort := existSort
-		if in.Body.Sort != nil {
-			sort = *in.Body.Sort
-		}
-		groupBy := existGroupBy
-		if in.Body.GroupBy != nil {
-			groupBy = in.Body.GroupBy
-		}
-		isDefault := existing.IsDefault
-		if in.Body.IsDefault != nil {
-			isDefault = *in.Body.IsDefault
-		}
+			if in.Body.Name != nil {
+				name = *in.Body.Name
+			}
+			// Description is a *string in the patch body so we cannot tell
+			// "unset" apart from "explicit null" once decoded; treat nil as
+			// "leave alone" (PATCH merge semantics) and any non-nil value as
+			// the new description (empty string clears).
+			if in.Body.Description != nil {
+				description = optionalNullString(in.Body.Description)
+			}
+			if in.Body.Filter != nil {
+				filter = *in.Body.Filter
+			}
+			if in.Body.Sort != nil {
+				sort = *in.Body.Sort
+			}
+			if in.Body.GroupBy != nil {
+				groupBy = in.Body.GroupBy
+			}
+			if in.Body.IsDefault != nil {
+				isDefault = *in.Body.IsDefault
+			}
 
-		lensBlob := buildLensJSON(filter, sort, groupBy)
-
-		// Not an existence check: a PATCH that re-sends the view's current
-		// definition changes nothing and MySQL counts zero. The re-read below
-		// is what fails if the view is gone.
-		if _, err := deps.Queries.UpdateLens(ctx, generated.UpdateLensParams{
-			Name:        name,
-			Description: description,
-			LensJson:    lensBlob,
-			IsDefault:   isDefault,
-			WorkspaceID: ws.ID,
-			PublicID:    lid,
-		}); err != nil {
-			if isDuplicateEntry(err) {
+			// Not an existence check: a PATCH that re-sends the view's
+			// current definition changes nothing and MySQL counts zero. The
+			// locking read above is what establishes the view exists.
+			_, err = generated.New(tx).UpdateLens(ctx, generated.UpdateLensParams{
+				Name:        name,
+				Description: description,
+				LensJson:    buildLensJSON(filter, sort, groupBy),
+				IsDefault:   isDefault,
+				WorkspaceID: ws.ID,
+				PublicID:    lid,
+			})
+			return err
+		})
+		if txErr != nil {
+			if isDuplicateEntry(txErr) {
 				return nil, httpErr(apierrors.WsLensNameAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if missing {
+			return nil, httpErr(apierrors.WsLensNotFound)
 		}
 
 		// The UPDATE is committed on its own connection; see Create for

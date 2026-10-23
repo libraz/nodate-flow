@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -15,13 +15,11 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
-
-// actorPtr delegates to handlerutil.ActorPtr.
-var actorPtr = handlerutil.ActorPtr
 
 // isDuplicateEntry delegates to handlerutil.IsDuplicateEntry.
 var isDuplicateEntry = handlerutil.IsDuplicateEntry
@@ -36,14 +34,15 @@ func resolvePageInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types
 	return id, nil
 }
 
-// currentPageLinks returns the stored project_id and parent_page_id of a
-// page so an update that does not name them writes them back unchanged.
-func currentPageLinks(ctx context.Context, db *sql.DB, wsID, pageID uint32) (project, parent sql.NullInt32, err error) {
-	const q = `SELECT project_id, parent_page_id FROM pages WHERE workspace_id = ? AND id = ? LIMIT 1`
-	if err := db.QueryRowContext(ctx, q, wsID, pageID).Scan(&project, &parent); err != nil {
-		return project, parent, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
+// lockPageLinks locks a live page row and returns its stored project_id and
+// parent_page_id, so an update that does not name them writes back the
+// committed values and a concurrent reparent waits for this one.
+func lockPageLinks(ctx context.Context, tx *dbretry.Tx, wsID uint32, pub types.PublicID) (id uint32, project, parent sql.NullInt32, err error) {
+	const q = `SELECT id, project_id, parent_page_id FROM pages WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
+	if err := tx.QueryRowContext(ctx, q, wsID, pub).Scan(&id, &project, &parent); err != nil {
+		return 0, project, parent, err
 	}
-	return project, parent, nil
+	return id, project, parent, nil
 }
 
 // checkAncestorDepthAndCircular walks up the ancestor chain from the
@@ -52,24 +51,26 @@ func currentPageLinks(ctx context.Context, db *sql.DB, wsID, pageID uint32) (pro
 //  2. The target page (selfID) is not an ancestor (circular reference).
 //
 // selfID may be 0 for create operations (no circularity check needed).
-func checkAncestorDepthAndCircular(ctx context.Context, db *sql.DB, wsID uint32, parentInternalID uint32, selfID uint32) error {
-	const q = `SELECT id, parent_page_id FROM pages WHERE workspace_id = ? AND id = ? AND enabled = TRUE LIMIT 1`
+// Each ancestor is read with a row lock inside the caller's transaction,
+// so two opposite reparents cannot both pass the walk and form a cycle.
+func checkAncestorDepthAndCircular(ctx context.Context, tx *dbretry.Tx, wsID uint32, parentInternalID uint32, selfID uint32) (*apierr.Spec, error) {
+	const q = `SELECT id, parent_page_id FROM pages WHERE workspace_id = ? AND id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
 	currentID := parentInternalID
 	depth := 1 // starting at depth 1 since we will be a child of parentInternalID
 
 	for depth <= MaxPageDepth {
 		if selfID != 0 && currentID == selfID {
-			return httpErr(apierrors.PagePageCircularParent)
+			return apierrors.PagePageCircularParent, nil
 		}
 		var id uint32
 		var parentID sql.NullInt32
-		err := db.QueryRowContext(ctx, q, wsID, currentID).Scan(&id, &parentID)
+		err := tx.QueryRowContext(ctx, q, wsID, currentID).Scan(&id, &parentID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				// Reached a page that doesn't exist or is disabled; treat as root.
 				break
 			}
-			return httpErr(apierrors.InternalUnexpected)
+			return nil, err
 		}
 		if !parentID.Valid {
 			// Reached root.
@@ -79,27 +80,44 @@ func checkAncestorDepthAndCircular(ctx context.Context, db *sql.DB, wsID uint32,
 		depth++
 	}
 	if depth > MaxPageDepth {
-		return httpErr(apierrors.PagePageMaxDepth)
+		return apierrors.PagePageMaxDepth, nil
 	}
-	return nil
+	return nil, nil
 }
 
-// resolveProjectInternal resolves a project public id to its internal id
-// within the given workspace.
-func resolveProjectInternal(ctx context.Context, q *generated.Queries, wsID uint32, projectPublicID string) (sql.NullInt32, error) {
+// resolveProjectForWrite resolves a project public id within the workspace
+// for a write that places a page in it, holding the actor to the project
+// editor floor.
+func resolveProjectForWrite(ctx context.Context, deps Deps, wsID, actorID uint32, projectPublicID string) (sql.NullInt32, error) {
 	pid, err := types.Parse(projectPublicID)
 	if err != nil {
 		return sql.NullInt32{}, httpErr(apierrors.ValidationPathParamInvalid)
 	}
-	row, err := q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{
+	row, err := deps.Queries.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{
 		WorkspaceID: wsID,
 		PublicID:    pid,
 	})
 	if err != nil {
 		return sql.NullInt32{}, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 	}
-	return sql.NullInt32{Int32: int32(row.ID), Valid: true}, nil //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	if spec := handlerutil.RequireProjectRole(ctx, deps.DB, wsID, row.ID, actorID, acl.ProjectRoleEditor); spec != nil {
+		return sql.NullInt32{}, httpErr(spec)
+	}
+	return sql.NullInt32{Int32: int32(row.ID), Valid: true}, nil //#nosec G115 -- projects.id fits int32 within realistic deployments
 }
+
+// checkStoredProjectFloor applies the editor floor to the project a page
+// already belongs to; a page outside any project needs no project role.
+func checkStoredProjectFloor(ctx context.Context, tx *dbretry.Tx, wsID, actorID uint32, project sql.NullInt32) *apierr.Spec {
+	if !project.Valid {
+		return nil
+	}
+	return handlerutil.RequireProjectRole(ctx, tx, wsID, uint32(project.Int32), actorID, acl.ProjectRoleEditor) //#nosec G115 -- projects.id, positive by construction
+}
+
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("pages: answered")
 
 // Create handles POST /workspaces/{wsId}/pages.
 func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutput, error) {
@@ -117,66 +135,72 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 		var projectID sql.NullInt32
 		if in.Body.ProjectID != nil && *in.Body.ProjectID != "" {
 			var err error
-			projectID, err = resolveProjectInternal(ctx, deps.Queries, ws.ID, *in.Body.ProjectID)
+			projectID, err = resolveProjectForWrite(ctx, deps, ws.ID, actorID, *in.Body.ProjectID)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		// Resolve optional parent page and validate depth.
-		var parentPageID sql.NullInt32
+		// Resolve optional parent page.
+		var parentInternal uint32
 		if in.Body.ParentPageID != nil && *in.Body.ParentPageID != "" {
 			parentPub, err := types.Parse(*in.Body.ParentPageID)
 			if err != nil {
 				return nil, httpErr(apierrors.ValidationPathParamInvalid)
 			}
-			parentInternal, err := resolvePageInternal(ctx, deps.DB, ws.ID, parentPub)
+			parentInternal, err = resolvePageInternal(ctx, deps.DB, ws.ID, parentPub)
 			if err != nil {
 				return nil, err
 			}
-			// Validate depth (selfID=0 for create, no circularity check needed).
-			if err := checkAncestorDepthAndCircular(ctx, deps.DB, ws.ID, parentInternal, 0); err != nil {
-				return nil, err
-			}
-			parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
 		pub := types.New()
-		_, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
-			PublicID:      pub,
-			WorkspaceID:   ws.ID,
-			ProjectID:     projectID,
-			CreatorID:     actorID,
-			ParentPageID:  parentPageID,
-			Title:         in.Body.Title,
-			Body:          in.Body.Body,
-			IsAiGenerated: false,
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "pages.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			var parentPageID sql.NullInt32
+			if parentInternal != 0 {
+				// Validate depth (selfID=0 for create, no circularity check needed).
+				spec, err := checkAncestorDepthAndCircular(ctx, tx, ws.ID, parentInternal, 0)
+				if err != nil {
+					return err
+				}
+				if spec != nil {
+					answered = httpErr(spec)
+					return errAnswered
+				}
+				parentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			}
+			if _, err := generated.New(tx).CreatePage(ctx, generated.CreatePageParams{
+				PublicID:      pub,
+				WorkspaceID:   ws.ID,
+				ProjectID:     projectID,
+				CreatorID:     actorID,
+				ParentPageID:  parentPageID,
+				Title:         in.Body.Title,
+				Body:          in.Body.Body,
+				IsAiGenerated: false,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.PageCreated,
+				AuditAction:  "page.create",
+				ResourceType: "page",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"pageId": pub.String(), "title": in.Body.Title},
+				CallSite:     "pages.Create",
+			})
 		})
-		if err != nil {
-			if isDuplicateEntry(err) {
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			if isDuplicateEntry(txErr) {
 				return nil, httpErr(apierrors.PagePageTitleTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.PageCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"pageId": pub.String(),
-				"title":  in.Body.Title,
-			},
-		}, "pages.Create")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "page.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "page",
-			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"title": in.Body.Title},
-		})
 
 		// Re-fetch to return the full DTO with joined fields.
 		row, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
@@ -302,105 +326,107 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 
-		// Fetch existing page to get internal ID and current state.
-		existing, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
-		})
-		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// UpdatePage writes project_id and parent_page_id verbatim, so start
-		// from the stored values and overwrite only what the body names.
-		curProject, curParent, err := currentPageLinks(ctx, deps.DB, ws.ID, existing.ID)
-		if err != nil {
-			return nil, err
+		// A named project is resolved, and held to the editor floor, before
+		// the transaction; a named parent is resolved to its id.
+		var namedProject sql.NullInt32
+		if in.Body.ProjectID != nil && *in.Body.ProjectID != "" {
+			namedProject, err = resolveProjectForWrite(ctx, deps, ws.ID, actorID, *in.Body.ProjectID)
+			if err != nil {
+				return nil, err
+			}
 		}
-		updateParams := generated.UpdatePageParams{
-			WorkspaceID:  ws.ID,
-			PublicID:     pub,
-			ProjectID:    curProject,
-			ParentPageID: curParent,
-		}
-
-		// Title: send non-null to update, null to keep existing (COALESCE).
-		if in.Body.Title != nil {
-			updateParams.Title = sql.NullString{String: *in.Body.Title, Valid: true}
-		}
-
-		// Body: send non-null to update, null to keep existing (COALESCE).
-		if in.Body.Body != nil {
-			updateParams.Body = sql.NullString{String: *in.Body.Body, Valid: true}
-		}
-
-		// Project: resolve if provided.
-		if in.Body.ProjectID != nil {
-			if *in.Body.ProjectID == "" {
-				// Explicitly unset project.
-				updateParams.ProjectID = sql.NullInt32{}
-			} else {
-				projectID, err := resolveProjectInternal(ctx, deps.Queries, ws.ID, *in.Body.ProjectID)
-				if err != nil {
-					return nil, err
-				}
-				updateParams.ProjectID = projectID
+		var namedParent uint32
+		if in.Body.ParentPageID != nil && *in.Body.ParentPageID != "" {
+			parentPub, err := types.Parse(*in.Body.ParentPageID)
+			if err != nil {
+				return nil, httpErr(apierrors.ValidationPathParamInvalid)
+			}
+			namedParent, err = resolvePageInternal(ctx, deps.DB, ws.ID, parentPub)
+			if err != nil {
+				return nil, err
 			}
 		}
 
-		// Parent page: resolve and validate depth + circularity if provided.
-		if in.Body.ParentPageID != nil {
-			if *in.Body.ParentPageID == "" {
-				// Explicitly unset parent (make it a root page).
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "pages.Update", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			// UpdatePage writes project_id and parent_page_id verbatim, so
+			// start from the values committed under the row lock and
+			// overwrite only what the body names.
+			pageID, curProject, curParent, err := lockPageLinks(ctx, tx, ws.ID, pub)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.PagePageNotFound)
+					return errAnswered
+				}
+				return err
+			}
+			if spec := checkStoredProjectFloor(ctx, tx, ws.ID, actorID, curProject); spec != nil {
+				answered = httpErr(spec)
+				return errAnswered
+			}
+			updateParams := generated.UpdatePageParams{
+				WorkspaceID:  ws.ID,
+				PublicID:     pub,
+				ProjectID:    curProject,
+				ParentPageID: curParent,
+			}
+			// Title and body: non-null updates, null keeps existing (COALESCE).
+			if in.Body.Title != nil {
+				updateParams.Title = sql.NullString{String: *in.Body.Title, Valid: true}
+			}
+			if in.Body.Body != nil {
+				updateParams.Body = sql.NullString{String: *in.Body.Body, Valid: true}
+			}
+			// Project: an empty string unsets it.
+			if in.Body.ProjectID != nil {
+				updateParams.ProjectID = namedProject
+			}
+			// Parent page: an empty string makes it a root page; any other
+			// value is checked for depth and circularity under row locks.
+			if in.Body.ParentPageID != nil {
 				updateParams.ParentPageID = sql.NullInt32{}
-			} else {
-				parentPub, err := types.Parse(*in.Body.ParentPageID)
-				if err != nil {
-					return nil, httpErr(apierrors.ValidationPathParamInvalid)
+				if namedParent != 0 {
+					if namedParent == pageID {
+						answered = httpErr(apierrors.PagePageCircularParent)
+						return errAnswered
+					}
+					spec, err := checkAncestorDepthAndCircular(ctx, tx, ws.ID, namedParent, pageID)
+					if err != nil {
+						return err
+					}
+					if spec != nil {
+						answered = httpErr(spec)
+						return errAnswered
+					}
+					updateParams.ParentPageID = sql.NullInt32{Int32: int32(namedParent), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				}
-				parentInternal, err := resolvePageInternal(ctx, deps.DB, ws.ID, parentPub)
-				if err != nil {
-					return nil, err
-				}
-				// Cannot set parent to self.
-				if parentInternal == existing.ID {
-					return nil, httpErr(apierrors.PagePageCircularParent)
-				}
-				// Check that the proposed parent is not a descendant and depth is valid.
-				if err := checkAncestorDepthAndCircular(ctx, deps.DB, ws.ID, parentInternal, existing.ID); err != nil {
-					return nil, err
-				}
-				updateParams.ParentPageID = sql.NullInt32{Int32: int32(parentInternal), Valid: true} //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			}
+			// Not an existence check: re-submitting a page's current title
+			// and body changes nothing and MySQL counts zero. The row lock
+			// above is what established the page exists.
+			if _, err := generated.New(tx).UpdatePage(ctx, updateParams); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.PageUpdated,
+				AuditAction:  "page.update",
+				ResourceType: "page",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"pageId": pub.String()},
+				CallSite:     "pages.Update",
+			})
+		})
+		if answered != nil {
+			return nil, answered
 		}
-
-		// Not an existence check: re-submitting a page's current title and
-		// body changes nothing and MySQL counts zero. The re-read below is
-		// what fails if the page is gone.
-		if _, err := deps.Queries.UpdatePage(ctx, updateParams); err != nil {
-			if isDuplicateEntry(err) {
+		if txErr != nil {
+			if isDuplicateEntry(txErr) {
 				return nil, httpErr(apierrors.PagePageTitleTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.PageUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"pageId": pub.String(),
-			},
-		}, "pages.Update")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "page.update",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "page",
-				ResourceID:   pub.String(),
-			})
 		}
 
 		// Re-fetch to return the updated row.
@@ -428,36 +454,49 @@ func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		// Scoped to the workspace and to live pages, so a zero count means
-		// there is no such page to delete here.
-		rows, err := deps.Queries.DisablePage(ctx, generated.DisablePageParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.PagePageNotFound)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.PageDisabled,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"pageId": pub.String(),
-			},
-		}, "pages.Delete")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "page.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "pages.Delete", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			_, curProject, _, err := lockPageLinks(ctx, tx, ws.ID, pub)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.PagePageNotFound)
+					return errAnswered
+				}
+				return err
+			}
+			if spec := checkStoredProjectFloor(ctx, tx, ws.ID, actorID, curProject); spec != nil {
+				answered = httpErr(spec)
+				return errAnswered
+			}
+			// Scoped to the workspace and to live pages; the row lock makes
+			// a zero count unreachable, but the claim is still checked.
+			rows, err := generated.New(tx).DisablePage(ctx, generated.DisablePageParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			if err != nil {
+				return err
+			}
+			if rows == 0 {
+				answered = httpErr(apierrors.PagePageNotFound)
+				return errAnswered
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.PageDisabled,
+				AuditAction:  "page.delete",
 				ResourceType: "page",
 				ResourceID:   pub.String(),
+				Payload:      map[string]any{"pageId": pub.String()},
+				CallSite:     "pages.Delete",
 			})
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &DeletePageOutput{}
@@ -537,7 +576,7 @@ func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*Gener
 		var projectID sql.NullInt32
 		if in.Body.ProjectID != nil && *in.Body.ProjectID != "" {
 			var resolveErr error
-			projectID, resolveErr = resolveProjectInternal(ctx, deps.Queries, ws.ID, *in.Body.ProjectID)
+			projectID, resolveErr = resolveProjectForWrite(ctx, deps, ws.ID, actorID, *in.Body.ProjectID)
 			if resolveErr != nil {
 				return nil, resolveErr
 			}
@@ -558,41 +597,39 @@ func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*Gener
 		}
 
 		pub := types.New()
-		if _, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
-			PublicID:      pub,
-			WorkspaceID:   ws.ID,
-			ProjectID:     projectID,
-			CreatorID:     actorID,
-			ParentPageID:  sql.NullInt32{},
-			Title:         in.Body.Title,
-			Body:          body,
-			IsAiGenerated: true,
-		}); err != nil {
-			if isDuplicateEntry(err) {
+		txErr := dbretry.InTx(ctx, deps.DB, "pages.GenerateWithAI", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreatePage(ctx, generated.CreatePageParams{
+				PublicID:      pub,
+				WorkspaceID:   ws.ID,
+				ProjectID:     projectID,
+				CreatorID:     actorID,
+				ParentPageID:  sql.NullInt32{},
+				Title:         in.Body.Title,
+				Body:          body,
+				IsAiGenerated: true,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.PageCreated,
+				AuditAction:  "page.generate",
+				ResourceType: "page",
+				ResourceID:   pub.String(),
+				Payload: map[string]any{
+					"pageId":        pub.String(),
+					"title":         in.Body.Title,
+					"isAiGenerated": true,
+					"promptLen":     len(in.Body.Prompt),
+				},
+				CallSite: "pages.GenerateWithAI",
+			})
+		})
+		if txErr != nil {
+			if isDuplicateEntry(txErr) {
 				return nil, httpErr(apierrors.PagePageTitleTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.PageCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"pageId":        pub.String(),
-				"title":         in.Body.Title,
-				"isAiGenerated": true,
-			},
-		}, "pages.GenerateWithAI")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "page.generate",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "page",
-			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"title": in.Body.Title, "promptLen": len(in.Body.Prompt)},
-		})
 
 		row, err := deps.Queries.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{
 			WorkspaceID: ws.ID,

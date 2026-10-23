@@ -58,7 +58,8 @@ type Querier interface {
 	AdminBootstrapFirstInstanceAdmin(ctx context.Context, arg AdminBootstrapFirstInstanceAdminParams) (int64, error)
 	// Check if any active instance admin exists (for bootstrap guard).
 	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
-	// Count active instance admins (for last-admin guard).
+	// Count active instance admins. The last-admin guard does not use this: it
+	// locks the admin set in the revoking transaction instead.
 	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
 	// Re-enable a previously suspended user account.
 	AdminEnableUser(ctx context.Context, publicID types.PublicID) (int64, error)
@@ -387,6 +388,8 @@ type Querier interface {
 	CountTasksForWorkspace(ctx context.Context, arg CountTasksForWorkspaceParams) (int64, error)
 	// Count unread notifications for a user across all workspaces.
 	// Used by the global notification badge when no workspace is selected.
+	// Same membership join as the lists, so the badge never counts a row
+	// the list would not show.
 	CountUnreadNotifications(ctx context.Context, recipientUserID uint32) (int64, error)
 	// Count unread notifications for a user within a specific workspace.
 	CountUnreadNotificationsForWorkspace(ctx context.Context, arg CountUnreadNotificationsForWorkspaceParams) (int64, error)
@@ -855,6 +858,12 @@ type Querier interface {
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
 	// Find a single reaction by public id.
 	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
+	// The calendar.reminder event already appended for one occurrence of an
+	// event, if a previous attempt got that far. A retried delivery reuses
+	// it, so its notifications carry the same source_event_id as the first
+	// attempt's and the (recipient, source_event, channel) unique key keeps a
+	// recipient who already got the reminder from getting it twice.
+	FindReminderEventForOccurrence(ctx context.Context, arg FindReminderEventForOccurrenceParams) (uint64, error)
 	// Resolve the AI agent behind each of a page of retro draft tasks, by
 	// looking up the TaskRetroDrafted event (type='task.retro.drafted')
 	// joined to ai_agents. Returns the internal task_id alongside the
@@ -1048,6 +1057,10 @@ type Querier interface {
 	// event time set by the eventbus producer; created_at is just the row
 	// insertion time and could drift from the event's true occurrence.
 	GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEventPublicIDAndOccurredAtParams) (GetEventPublicIDAndOccurredAtRow, error)
+	// Resolve one inbox item in a workspace and whether the reader may read
+	// the task it points at. No row means the id names no inbox item here,
+	// which is what an AI suggestion reaction has to refuse.
+	GetInboxItemTaskVisible(ctx context.Context, arg GetInboxItemTaskVisibleParams) (sql.NullBool, error)
 	// Return the most recent succeeded run time for a given agent.
 	// Used by the agent pre-flight check to determine if new events have
 	// occurred since the last run.
@@ -1160,9 +1173,6 @@ type Querier interface {
 	// (ai.agent.run.*) and events the agent itself authored never count, so an
 	// idle workspace lets the pre-flight skip the next tick.
 	HasNewActivityForAgent(ctx context.Context, arg HasNewActivityForAgentParams) (bool, error)
-	// Check if any events have occurred in the workspace since the given timestamp.
-	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
-	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
 	// Atomically bump the use counter, but only while the invite still has
 	// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
 	// the check-and-increment a single statement so concurrent redemptions
@@ -1174,14 +1184,6 @@ type Querier interface {
 	// same transaction as the referencing INSERT so the count cannot drift
 	// if the INSERT fails.
 	IncrementStorageObjectRefCount(ctx context.Context, id uint32) error
-	// Append an agent.task.handoff_to_agent event. The caller is a human (or a
-	// system actor) transferring a task to an AI agent, so actor_user_id is
-	// populated and actor_agent_id stays NULL. Payload is caller-shaped: the
-	// handler embeds the target agent's public_id, the reason string, and any
-	// delegation chain context. Mutual exclusion of actor_user_id and
-	// actor_agent_id is preserved by this query's column list rather than a
-	// CHECK constraint (see sql/core/tables/events.sql).
-	InsertHandoffToAgentEvent(ctx context.Context, arg InsertHandoffToAgentEventParams) (int64, error)
 	// Append an agent.task.handoff_to_user event. The caller is an AI agent
 	// handing the task back to a human, so actor_agent_id is populated and
 	// actor_user_id stays NULL. Payload is caller-shaped: the handler embeds
@@ -1258,6 +1260,12 @@ type Querier interface {
 	// Recent redacted LLM call records for a workspace, newest first. Used
 	// by the AI activity panel. All columns here are already redacted at
 	// write time by the orchestrator; safe to surface at the API boundary.
+	//
+	// Redaction removes secrets, not task content: a prompt carries the
+	// titles and descriptions it was built from. So a row about a task is
+	// returned only when the reader may read that task (a deleted one reads
+	// as unreadable), and a row with no task — a prompt that may embed
+	// several — only to the user who made the call. Elevated roles see all.
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List archived tasks via v_task_list_archived. See ListTasksForProject
 	// for why the total is a separate query.
@@ -1489,9 +1497,12 @@ type Querier interface {
 	ListInboxForUser(ctx context.Context, arg ListInboxForUserParams) ([]ListInboxForUserRow, error)
 	// List incoming dependencies of a task (edges that point AT this task).
 	ListIncomingDependenciesForTask(ctx context.Context, arg ListIncomingDependenciesForTaskParams) ([]ListIncomingDependenciesForTaskRow, error)
-	// List intake items for a workspace, filtered by status.
+	// List intake items for a workspace, filtered by status. A snooze whose
+	// deadline has passed is pending again: it never lists under snoozed, and
+	// include_expired_snoozes (1 when the filter is pending) lists it there.
 	ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntakeItemsForWorkspaceParams) ([]ListIntakeItemsForWorkspaceRow, error)
-	// Cursor-paginated intake items for a workspace, filtered by status.
+	// Cursor-paginated intake items for a workspace, filtered by status, with
+	// expired snoozes listed under pending as in ListIntakeItemsForWorkspace.
 	ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg ListIntakeItemsForWorkspaceKeysetParams) ([]ListIntakeItemsForWorkspaceKeysetRow, error)
 	// List every mapping owned by a workspace, newest provider group first.
 	// Disabled rows are included: they still hold the claim on the source,
@@ -1623,7 +1634,9 @@ type Querier interface {
 	// List all notification preferences for a user in a workspace.
 	ListNotificationPreferencesForUser(ctx context.Context, arg ListNotificationPreferencesForUserParams) ([]ListNotificationPreferencesForUserRow, error)
 	// List notifications for a user across all their workspaces, ordered newest first.
-	// Excludes archived and disabled notifications.
+	// Excludes archived and disabled notifications. The workspace_members join
+	// is what "their workspaces" means: rows from a workspace the user has
+	// left stop being listed, on this and every sibling list and count.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error)
 	// Keyset-paginated variant of ListNotificationsForUser.
 	//
@@ -1700,6 +1713,12 @@ type Querier interface {
 	// ai.suggestion.applied / ai.suggestion.dismissed event for the same
 	// inbox_item_id (compared via JSON_EXTRACT on payload_json).
 	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
+	// Pending AI triage suggestions a reader may see. A suggestion is pending
+	// while no later applied / dismissed event names the same inbox item; it
+	// is the reader's only while that item is still in the inbox and the task
+	// it points at is one they may read, because the stored reasoning is the
+	// model talking about that task.
+	ListPendingAiSuggestionsForReader(ctx context.Context, arg ListPendingAiSuggestionsForReaderParams) ([]ListPendingAiSuggestionsForReaderRow, error)
 	// The worker's claim candidates, oldest first. Claiming is a separate
 	// conditional UPDATE, so this read takes no locks: a row listed here may
 	// already have been taken by another replica by the time it is claimed.
@@ -1770,6 +1789,10 @@ type Querier interface {
 	ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetroDraftsForWorkspaceParams) ([]ListRetroDraftsForWorkspaceRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
+	// Distinct kinds of the enabled signals attached to a task, through the
+	// legacy task_id fast path or subject_type = 'task'. The constraint
+	// engine's signal.received fact.
+	ListSignalKindsForTaskForEngine(ctx context.Context, arg ListSignalKindsForTaskForEngineParams) ([]string, error)
 	// List signals attached to a task via v_inbox.
 	ListSignalsForTask(ctx context.Context, arg ListSignalsForTaskParams) ([]ListSignalsForTaskRow, error)
 	// List tasks whose embedding is missing or older than tasks.updated_at for
@@ -2132,9 +2155,9 @@ type Querier interface {
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
-	// Set AI score and reasoning for an intake item.
-	SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) (int64, error)
-	// Link an intake item to a converted task.
+	// Link an intake item to a converted task. Matches only an item not yet
+	// converted, so a losing concurrent conversion counts zero rows and rolls
+	// its task back.
 	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error)
 	// Revoke public sharing on a lens. Clears the token hash so the URL
 	// stops resolving and re-publishing has to mint a fresh token.
@@ -2212,7 +2235,9 @@ type Querier interface {
 	UpdateImportJobProgress(ctx context.Context, arg UpdateImportJobProgressParams) error
 	// Update the status and timing fields of an import job.
 	UpdateImportJobStatus(ctx context.Context, arg UpdateImportJobStatusParams) error
-	// Update the triage status of an intake item.
+	// Triage an intake item out of pending. The predicate is the claim: only an
+	// unconverted item that is pending, or snoozed past its deadline, matches,
+	// so of two racing triages exactly one counts a row.
 	UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) (int64, error)
 	// Patch the mutable fields of a mapping. NULL leaves a field unchanged.
 	// provider and external_key are immutable: changing them would move the
@@ -2261,9 +2286,11 @@ type Querier interface {
 	// updated_by_user_id is appended so reorder edits are attributed to the
 	// acting user (NULL for system writers).
 	UpdateTaskSortWeight(ctx context.Context, arg UpdateTaskSortWeightParams) error
-	// Update mutable timebox fields.
+	// Update mutable timebox fields. A completed timebox is never changed, so
+	// the rule holds against a completion committed after the caller's read.
 	UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) (int64, error)
-	// Transition timebox lifecycle status.
+	// Transition timebox lifecycle status. Completed is terminal, so a
+	// completed timebox matches no row.
 	UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) (int64, error)
 	// Stamp last successful login time on a user account.
 	UpdateUserLastLoginAt(ctx context.Context, id uint32) error

@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
@@ -29,7 +30,8 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		// fold or trim, and folding would mean an uppercase slug landed on
 		// a row the caller never named.
 		slug := in.Body.Slug
-		// Conflict check.
+		// Conflict check. A fast answer only: uniq_workspaces_slug decides
+		// a race, and its loser is answered the same way below.
 		if _, err := deps.Queries.FindWorkspaceBySlug(ctx, slug); err == nil {
 			return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)
 		} else if !errors.Is(err, sql.ErrNoRows) {
@@ -57,8 +59,12 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 		// touches enough shared parents to lose a lock race under load —
 		// and this is the first thing a new user does. A transient 1213
 		// must not surface as a permanent 500 on the onboarding step.
-		var wsID int64
+		var (
+			wsID      int64
+			slugTaken bool
+		)
 		txErr := dbretry.InTx(ctx, deps.DB, "workspace.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			slugTaken = false
 			id, err := deps.Queries.WithTx(tx.RawTx()).CreateWorkspace(ctx, generated.CreateWorkspaceParams{
 				PublicID:    pub,
 				Slug:        slug,
@@ -69,6 +75,7 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 				Country:     sql.NullString{String: country, Valid: country != ""},
 			})
 			if err != nil {
+				slugTaken = handlerutil.IsDuplicateEntry(err)
 				return err
 			}
 			wsID = id
@@ -85,6 +92,9 @@ func Create(deps Deps) func(context.Context, *CreateWorkspaceInput) (*CreateWork
 			return nil
 		})
 		if txErr != nil {
+			if slugTaken {
+				return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

@@ -6,24 +6,36 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("imports: answered")
+
 // Create handles POST /workspaces/{wsId}/imports.
+//
+// A job targeting a project needs the project editor floor direct task
+// creation holds, and the one-live-job-per-project rule is decided under
+// the project row lock so two concurrent creates cannot both pass it.
 func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportOutput, error) {
 	return func(ctx context.Context, in *CreateImportInput) (*CreateImportOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 
 		// Resolve optional project public_id to internal id.
 		var projectID sql.NullInt32
@@ -39,23 +51,11 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
+			if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
+				return nil, httpErr(spec)
+			}
 			projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true} //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-
-			// Check for existing running import for this project.
-			_, err = deps.Queries.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
-				WorkspaceID: ws.ID,
-				ProjectID:   projectID,
-			})
-			if err == nil {
-				// A running import exists.
-				return nil, httpErr(apierrors.WsImportAlreadyRunning)
-			}
-			if !errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
 		}
-
-		actorID, _ := middleware.ActorFromContext(ctx)
 
 		// Validate before marshalling: config_json is stored as typed,
 		// so a credential that reaches this point has already been
@@ -72,33 +72,52 @@ func Create(deps Deps) func(context.Context, *CreateImportInput) (*CreateImportO
 		}
 
 		pub := types.New()
-		if _, err := deps.Queries.CreateImportJob(ctx, generated.CreateImportJobParams{
-			PublicID:          pub,
-			WorkspaceID:       ws.ID,
-			ProjectID:         projectID,
-			InitiatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			Source:            generated.ImportJobsSource(in.Body.Source),
-			ConfigJson:        configJSON,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.ImportJobCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"importJobId": pub.String(), "source": in.Body.Source},
-		}, "imports.Create")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "import.create",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "imports.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			q := generated.New(tx)
+			if projectID.Valid {
+				// The lock comes before any plain read so the running-job
+				// check below sees whatever the previous holder committed.
+				if err := taskcreate.LockProject(ctx, tx, ws.ID, uint32(projectID.Int32)); err != nil { //#nosec G115 -- projects.id, positive by construction
+					return err
+				}
+				_, err := q.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
+					WorkspaceID: ws.ID,
+					ProjectID:   projectID,
+				})
+				if err == nil {
+					answered = httpErr(apierrors.WsImportAlreadyRunning)
+					return errAnswered
+				}
+				if !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+			}
+			if _, err := q.CreateImportJob(ctx, generated.CreateImportJobParams{
+				PublicID:          pub,
+				WorkspaceID:       ws.ID,
+				ProjectID:         projectID,
+				InitiatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				Source:            generated.ImportJobsSource(in.Body.Source),
+				ConfigJson:        configJSON,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.ImportJobCreated,
+				AuditAction:  "import.create",
 				ResourceType: "import_job",
 				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"source": in.Body.Source},
+				Payload:      map[string]any{"importJobId": pub.String(), "source": in.Body.Source},
+				CallSite:     "imports.Create",
 			})
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		row, err := deps.Queries.FindImportJobByPublicId(ctx, generated.FindImportJobByPublicIdParams{
@@ -198,29 +217,24 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 			return nil, httpErr(apierrors.WsImportCannotCancel)
 		}
 
-		if err := deps.Queries.CancelImportJob(ctx, generated.CancelImportJobParams{
-			WorkspaceID: ws.ID,
-			ID:          row.ID,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.ImportJobCancelled,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload:     map[string]any{"importJobId": pub.String()},
-		}, "imports.Cancel")
-
-		if deps.Audit != nil {
-			actorID, _ := middleware.ActorFromContext(ctx)
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "import.cancel",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		if err := dbretry.InTx(ctx, deps.DB, "imports.Cancel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if err := generated.New(tx).CancelImportJob(ctx, generated.CancelImportJobParams{
+				WorkspaceID: ws.ID,
+				ID:          row.ID,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.ImportJobCancelled,
+				AuditAction:  "import.cancel",
 				ResourceType: "import_job",
 				ResourceID:   pub.String(),
+				Payload:      map[string]any{"importJobId": pub.String()},
+				CallSite:     "imports.Cancel",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &CancelImportOutput{}
@@ -229,15 +243,6 @@ func Cancel(deps Deps) func(context.Context, *CancelImportInput) (*CancelImportO
 	}
 }
 
-// checkCSVPayloadSize rejects a csv job whose payload is over the
-// importer's ceiling, before the row is written.
-//
-// The check belongs here rather than in the worker because the payload
-// travels in config_json: accepting the request stores the whole body in
-// the queue row, and telling the user it was too big only after that
-// costs a round trip and leaves a megabyte of rejected data in the
-// table. The worker enforces the row-count ceiling, which needs a parse
-// and cannot be answered from the request alone.
 // checkImportConfig refuses a configuration that names a credential or
 // a setting the source does not have, and maps the two apart so the
 // caller is told which one it hit.
@@ -253,6 +258,15 @@ func checkImportConfig(body CreateImportBody) error {
 	}
 }
 
+// checkCSVPayloadSize rejects a csv job whose payload is over the
+// importer's ceiling, before the row is written.
+//
+// The check belongs here rather than in the worker because the payload
+// travels in config_json: accepting the request stores the whole body in
+// the queue row, and telling the user it was too big only after that
+// costs a round trip and leaves a megabyte of rejected data in the
+// table. The worker enforces the row-count ceiling, which needs a parse
+// and cannot be answered from the request alone.
 func checkCSVPayloadSize(body CreateImportBody) error {
 	if body.Source != string(generated.ImportJobsSourceCsv) || body.ConfigJSON == nil {
 		return nil

@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
@@ -37,6 +38,9 @@ type Deps struct {
 	// Audit records audit log entries for task mutations.
 	// Optional: nil disables audit logging.
 	Audit *audit.Recorder
+	// Mutations records a task change on both the timeline and the audit
+	// log; RecordInTx commits the event with the change.
+	Mutations *mutationlog.Recorder
 	// CalendarQueries answers the calendar-domain queries the endpoints
 	// that move a calendar event need: an event's calendar is a
 	// permission boundary of its own, and the actor's standing on it is

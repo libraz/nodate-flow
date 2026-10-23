@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -15,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdeps"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -168,6 +168,8 @@ func Resolve(deps Deps) func(context.Context, *ResolveInput) (*ResolveOutput, er
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))
 		}
 
+		// A fast answer only: the conditional UPDATE inside each resolve
+		// path is what decides which of two racing requests wins.
 		if suggestion.Status != generated.RelationSuggestionsStatusPending {
 			return nil, httpErr(apierrors.RelationSuggestionAlreadyResolved)
 		}
@@ -176,6 +178,11 @@ func Resolve(deps Deps) func(context.Context, *ResolveInput) (*ResolveOutput, er
 		case "accept":
 			return resolveAccept(ctx, deps, suggestion, wsID, actorID)
 		case "dismiss":
+			// Dismissing changes what every member sees in the queue, so it
+			// takes the same member floor accepting does.
+			if !wsRole.AtLeast(acl.WorkspaceRoleMember) {
+				return nil, httpErr(apierrors.WsMemberRoleDenied)
+			}
 			return resolveDismiss(ctx, deps, suggestion, wsID, actorID)
 		default:
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
@@ -259,7 +266,21 @@ func resolveAccept(
 	}
 
 	actor := int64(actorID)
+	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "relations.Accept", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		// Claim the suggestion first: the UPDATE matches only a pending
+		// row, so the request that loses a race writes no edge, event or
+		// audit row.
+		claimed, e := claimSuggestion(ctx, tx, wsID, suggestion.PublicID, generated.RelationSuggestionsStatusAccepted, actorID)
+		if e != nil {
+			return e
+		}
+		if !claimed {
+			answered = httpErr(apierrors.RelationSuggestionAlreadyResolved)
+			return errAnswered
+		}
+
 		if _, e := taskdeps.Add(ctx, tx, taskdeps.Args{
 			WorkspaceID:      wsID,
 			FromTaskID:       suggestion.SourceTaskID,
@@ -277,57 +298,28 @@ func resolveAccept(
 			}
 		}
 
-		// Mark the suggestion as accepted in the same transaction as the
-		// edge, so a failure cannot leave a suggestion claiming an edge
-		// that was never written.
-		// The count is not the existence check: the suggestion was read
-		// before this call, and re-accepting one already accepted changes
-		// no column, which MySQL counts as zero.
-		if _, e := deps.Queries.WithTx(tx.RawTx()).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
-			Status:      generated.RelationSuggestionsStatusAccepted,
-			ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			WorkspaceID: wsID,
-			PublicID:    suggestion.PublicID,
-		}); e != nil {
-			return e
-		}
-
-		// The event goes in with the edge and the status, not after them.
-		// Everything it says is known before the transaction opens, so
-		// nothing here needs a row that does not exist yet — the boundary
-		// sat outside only because that is where the append happened to
-		// be written. Inside, a failed append rolls the accept back
-		// instead of leaving an accepted suggestion nothing was told
-		// about, and the fan-out still waits for the commit because the
-		// transaction is the boundary it defers to.
+		// The event goes in with the edge and the status, so a failed
+		// append rolls the accept back; the audit row waits for commit.
 		srcTaskID := int64(suggestion.SourceTaskID)
-		return eventbus.Append(ctx, tx, eventbus.Event{
-			Type:        eventbus.RelationAccepted,
-			WorkspaceID: wsID,
-			ActorUserID: &actor,
-			TaskID:      &srcTaskID,
-			Payload: map[string]any{
-				"suggestionId":  suggestion.PublicID.String(),
-				"suggestedKind": string(suggestion.SuggestedKind),
-				"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
-				"targetTaskId":  suggestion.TargetTaskPublicID.String(),
-			},
+		return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.RelationAccepted,
+			AuditAction:  "relation.suggestion.accept",
+			ResourceType: "relation_suggestion",
+			ResourceID:   suggestion.PublicID.String(),
+			TaskID:       &srcTaskID,
+			Payload:      suggestionPayload(suggestion),
+			CallSite:     "relations.resolveAccept",
 		})
 	})
+	if answered != nil {
+		return nil, answered
+	}
 	if txErr != nil {
 		if stderrors.Is(txErr, taskdeps.ErrCycle) {
 			return nil, httpErr(apierrors.WsTaskDependencyCycle)
 		}
 		return nil, httpErr(apierrors.InternalUnexpected)
 	}
-
-	deps.Audit.Record(ctx, audit.Entry{
-		Action:       "relation.suggestion.accept",
-		ActorID:      actorID,
-		WorkspaceID:  wsID,
-		ResourceType: "relation_suggestion",
-		ResourceID:   suggestion.PublicID.String(),
-	})
 
 	out := &ResolveOutput{}
 	out.Body.Ok = true
@@ -342,44 +334,69 @@ func resolveDismiss(
 	wsID uint32,
 	actorID uint32,
 ) (*ResolveOutput, error) {
-	// Not an existence check: resolving a suggestion that already holds
-	// the target status changes nothing and MySQL counts zero.
-	if _, err := deps.Queries.ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
-		Status:      generated.RelationSuggestionsStatusDismissed,
-		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-		WorkspaceID: wsID,
-		PublicID:    suggestion.PublicID,
-	}); err != nil {
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "relations.Dismiss", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		claimed, err := claimSuggestion(ctx, tx, wsID, suggestion.PublicID, generated.RelationSuggestionsStatusDismissed, actorID)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			answered = httpErr(apierrors.RelationSuggestionAlreadyResolved)
+			return errAnswered
+		}
+		srcTaskID := int64(suggestion.SourceTaskID)
+		return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.RelationDismissed,
+			AuditAction:  "relation.suggestion.dismiss",
+			ResourceType: "relation_suggestion",
+			ResourceID:   suggestion.PublicID.String(),
+			TaskID:       &srcTaskID,
+			Payload:      suggestionPayload(suggestion),
+			CallSite:     "relations.resolveDismiss",
+		})
+	})
+	if answered != nil {
+		return nil, answered
+	}
+	if txErr != nil {
 		return nil, httpErr(apierrors.InternalUnexpected)
 	}
-
-	// Emit event.
-	actor := int64(actorID)
-	srcTaskID := int64(suggestion.SourceTaskID)
-	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-		Type:        eventbus.RelationDismissed,
-		WorkspaceID: wsID,
-		ActorUserID: &actor,
-		TaskID:      &srcTaskID,
-		Payload: map[string]any{
-			"suggestionId":  suggestion.PublicID.String(),
-			"suggestedKind": string(suggestion.SuggestedKind),
-			"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
-			"targetTaskId":  suggestion.TargetTaskPublicID.String(),
-		},
-	}, "relations.resolveDismiss")
-
-	deps.Audit.Record(ctx, audit.Entry{
-		Action:       "relation.suggestion.dismiss",
-		ActorID:      actorID,
-		WorkspaceID:  wsID,
-		ResourceType: "relation_suggestion",
-		ResourceID:   suggestion.PublicID.String(),
-	})
 
 	out := &ResolveOutput{}
 	out.Body.Ok = true
 	return out, nil
+}
+
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = stderrors.New("relations: answered")
+
+// claimSuggestion moves a pending suggestion to status and reports whether
+// this call was the one that moved it. ResolveSuggestion matches only a
+// pending row, so of two racing resolutions exactly one claims it.
+func claimSuggestion(ctx context.Context, tx *dbretry.Tx, wsID uint32, pub types.PublicID, status generated.RelationSuggestionsStatus, actorID uint32) (bool, error) {
+	rows, err := generated.New(tx).ResolveSuggestion(ctx, generated.ResolveSuggestionParams{
+		Status:      status,
+		ResolvedBy:  sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+		WorkspaceID: wsID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}
+
+// suggestionPayload describes a resolved suggestion by public ids, on the
+// timeline and in the audit metadata alike.
+func suggestionPayload(suggestion generated.GetSuggestionByPublicIdRow) map[string]any {
+	return map[string]any{
+		"suggestionId":  suggestion.PublicID.String(),
+		"suggestedKind": string(suggestion.SuggestedKind),
+		"sourceTaskId":  suggestion.SourceTaskPublicID.String(),
+		"targetTaskId":  suggestion.TargetTaskPublicID.String(),
+	}
 }
 
 // authorizeEndpoint resolves one endpoint task of a suggestion and
@@ -396,8 +413,8 @@ func authorizeEndpoint(ctx context.Context, deps Deps, taskPub types.PublicID, a
 	if err != nil {
 		return acl.TaskAccess{}, err
 	}
-	if access.ProjectRole != acl.ProjectRoleElevated && !access.ProjectRole.AtLeast(acl.ProjectRoleEditor) {
-		return acl.TaskAccess{}, httpErr(apierrors.WsProjectAccessDenied)
+	if spec := handlerutil.RequireProjectRole(ctx, deps.DB, access.Task.WorkspaceID, access.Task.ProjectID, actorID, acl.ProjectRoleEditor); spec != nil {
+		return acl.TaskAccess{}, httpErr(spec)
 	}
 	return access, nil
 }

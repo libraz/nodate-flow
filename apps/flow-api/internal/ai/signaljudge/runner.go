@@ -78,6 +78,9 @@ type InvocationMetricsHook func(provider, model string, inputTokens, outputToken
 // adapter is a one-liner).
 type AgentLookup interface {
 	Load(ctx context.Context, workspaceID, agentID uint32) (AgentSnapshot, error)
+	// CheckCostCap returns [ai.ErrAgentCostCapExceeded] once the agent's
+	// month-to-date spend reaches its monthly cap.
+	CheckCostCap(ctx context.Context, agentID uint32) error
 }
 
 // AgentSnapshot is the minimal projection of an ai_agents row the
@@ -226,6 +229,10 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	// itself.
 	if capHit, err := ai.CheckBudget(ctx, r.Guard, workspaceID); err != nil {
 		result.CostCapHit = capHit
+		return result, err
+	}
+	if err := r.Agents.CheckCostCap(ctx, agentID); err != nil {
+		result.CostCapHit = errors.Is(err, ai.ErrAgentCostCapExceeded)
 		return result, err
 	}
 
@@ -577,6 +584,12 @@ func (l *SQLAgentLookup) Load(ctx context.Context, workspaceID, agentID uint32) 
 
 		ProviderPublicID: row.ProviderPublicID,
 	}, nil
+}
+
+// CheckCostCap implements AgentLookup through the same
+// [ai.CheckAgentCostCap] the task-agent executor and the MCP guard share.
+func (l *SQLAgentLookup) CheckCostCap(ctx context.Context, agentID uint32) error {
+	return ai.CheckAgentCostCap(ctx, generated.New(l.DB), agentID, time.Now())
 }
 
 // SQLSignalLookup is the default production SignalLookup. One SELECT

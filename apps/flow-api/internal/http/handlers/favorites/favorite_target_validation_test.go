@@ -15,7 +15,7 @@ func TestCreateValidatesFavoriteTargetBeforeInsert(t *testing.T) {
 	if !containsInOrder(body,
 		"ensureFavoriteTargetExists(ctx, deps, wsID, actorID, targetType, targetPub)",
 		"deps.Queries.FindFavoriteByTarget",
-		"deps.Queries.CreateFavorite",
+		"generated.New(tx).CreateFavorite",
 	) {
 		t.Fatal("Create must validate the target exists before duplicate lookup and insert")
 	}

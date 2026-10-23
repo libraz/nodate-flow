@@ -20,12 +20,14 @@ var bridgeHandle *int
 // Two appenders write the same `events` table: flow-api's own handlers
 // go through [Append], while cross-service kits (itemkit, memberkit)
 // go through eventlog because they cannot depend on flow-api's
-// generated types. Only the first had subscribers, so item and member
-// events — a task scheduled onto a calendar, someone joining a
-// workspace — were written to the log and then reached nobody: no
-// realtime refresh, no notification row, no webhook delivery. The
-// subscribers existed, were tested, and had configuration exposed;
-// nothing ever called them for half the events in the system.
+// generated types. Without this bridge an eventlog append — a task
+// scheduled onto a calendar — reaches no subscriber: no realtime
+// refresh, no notification row, no webhook delivery.
+//
+// The bridge is in-process: it reaches appends eventlog makes inside this
+// binary. Member events memberkit appends from auth-api are written by
+// another process, so no hook registered here fires for them; only the
+// realtime stream, which tails the table, sees those rows.
 //
 // Forwarding rather than registering each subscriber twice is the
 // point: subscribers are added over time (the webhook worker and the

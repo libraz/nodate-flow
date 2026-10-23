@@ -1185,7 +1185,7 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 			occurrenceStart := handlerutil.UnixToTime(input.OccurrenceStart)
 			var partErr error
 			if scope == scopeOccurrence {
-				partErr = deleteEventOccurrence(ctx, deps, wsID, cal, evt, occurrenceStart)
+				partErr = deleteEventOccurrence(ctx, deps, wsID, evt, occurrenceStart)
 			} else {
 				partErr = deleteEventFollowing(ctx, deps, wsID, actorID, cal, evt, occurrenceStart)
 			}
@@ -1202,6 +1202,11 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		var answered error
 		txErr := dbretry.InTx(ctx, deps.DB, "calendars.DeleteEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
+			// A deleted override takes its occurrence with it rather than
+			// handing the slot back to the master.
+			if err := calendaroccurrence.CancelOverride(ctx, seriesQueries(deps, tx), wsID, evt); err != nil {
+				return err
+			}
 			if err := itemkit.DeleteEvent(ctx, tx, wsID, evt.ID, actorID); err != nil {
 				// Mirror the unwrapped pattern used by the other itemkit
 				// call sites (RenameItem / RescheduleEvent above): the

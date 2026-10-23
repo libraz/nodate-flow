@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/reminders"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -85,6 +86,7 @@ func ListReminders(deps Deps) func(context.Context, *ListRemindersInput) (*ListR
 		}
 
 		now := time.Now().UTC()
+		zone := duedate.UserZone(ctx, deps.Queries, ws.ID, actorID)
 		out := &ListRemindersOutput{}
 		out.Body.Total = len(rows)
 		out.Body.Reminders = []TaskReminder{}
@@ -92,6 +94,7 @@ func ListReminders(deps Deps) func(context.Context, *ListRemindersInput) (*ListR
 			sig := reminders.Signals{
 				State: reminders.State(r.DerivedState),
 				Now:   now,
+				Zone:  zone,
 			}
 			if r.DueOn.Valid {
 				sig.HasDueOn = true

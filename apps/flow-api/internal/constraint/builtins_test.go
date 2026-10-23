@@ -1,6 +1,9 @@
 package constraint
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func intPtr(i int) *int { return &i }
 
@@ -57,26 +60,18 @@ func TestEvaluate_Signal(t *testing.T) {
 	}
 }
 
-func TestEvaluate_Approval(t *testing.T) {
-	c := mustParse(t, `{"op":"approval.granted","arg":"reviewer"}`)
-	ok, _ := Evaluate(c, Facts{Approvals: map[string]bool{"reviewer": true}})
-	if !ok {
-		t.Fatal("expected true")
-	}
-}
-
-func TestEvaluate_CIStatus(t *testing.T) {
-	c := mustParse(t, `{"op":"ci.status_is","arg":"success"}`)
-	ok, _ := Evaluate(c, Facts{CIStatus: "success"})
-	if !ok {
-		t.Fatal("expected true")
-	}
-	ok, _ = Evaluate(c, Facts{CIStatus: "failure"})
-	if ok {
-		t.Fatal("expected false")
-	}
-	ok, _ = Evaluate(c, Facts{})
-	if ok {
-		t.Fatal("expected false on empty")
+// TestParse_RefusesOpsWithNoFactSource pins that approval and CI-status
+// constraints are refused at create: nothing records the fact either
+// would read, so a stored one could only ever evaluate false.
+func TestParse_RefusesOpsWithNoFactSource(t *testing.T) {
+	for _, raw := range []string{
+		`{"op":"approval.granted","arg":"reviewer"}`,
+		`{"op":"ci.status_is","arg":"success"}`,
+	} {
+		_, err := Parse([]byte(raw))
+		var pe *ParseError
+		if !errors.As(err, &pe) || pe.Code != CodeUnsupportedOperator {
+			t.Fatalf("Parse(%s) err = %v, want %s", raw, err, CodeUnsupportedOperator)
+		}
 	}
 }

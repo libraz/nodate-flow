@@ -12,8 +12,8 @@ type modelPrice struct {
 // prefix so "claude-3-5-sonnet" matches "claude-3-5-sonnet-20241022" and
 // similar versioned variants. Order matters: longer prefixes first. Public
 // provider prices are volatile; reconcile these estimates against provider
-// invoice exports before treating them as billing-grade amounts. Unknown
-// models gracefully return 0.
+// invoice exports before treating them as billing-grade amounts. A model
+// matching no prefix is priced at conservativePrice.
 //
 // Values are millionths of a USD per million tokens (input / output).
 var knownPrices = []struct {

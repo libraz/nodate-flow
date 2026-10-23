@@ -11,14 +11,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // The memo write that records a hand-back carries `enabled = TRUE`, so it
@@ -42,7 +42,7 @@ func TestHandoffWritesTheEventBehindAMemoThatLanded(t *testing.T) {
 	stub := &handoffWriteStub{memoRows: 1}
 	db := openHandoffStubDB(t, stub)
 
-	err := recordHandoffToUser(context.Background(), generated.New(db), handoffWrites())
+	err := runHandoffWrites(t, db)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, stub.issued("SET agent_memo"), "the hand-back state must be written")
@@ -60,7 +60,7 @@ func TestHandoffRefusesARequestWhoseMemoWriteMatchedNoTask(t *testing.T) {
 	stub := &handoffWriteStub{memoRows: 0}
 	db := openHandoffStubDB(t, stub)
 
-	err := recordHandoffToUser(context.Background(), generated.New(db), handoffWrites())
+	err := runHandoffWrites(t, db)
 	require.Error(t, err, "a memo write that matched no row must fail the request")
 
 	var problem *handlerutil.ProblemDetails
@@ -74,17 +74,19 @@ func TestHandoffRefusesARequestWhoseMemoWriteMatchedNoTask(t *testing.T) {
 		"an event written here announces a hand-back whose state was never recorded")
 }
 
-// handoffWrites is the pair of rows both cases write.
-func handoffWrites() handoffToUserWrites {
-	return handoffToUserWrites{
-		workspaceID:   7,
-		taskID:        42,
-		priorAgentID:  99,
-		eventPublicID: types.New(),
-		memoPatch:     []byte(`{"handoff_status":"handed_back"}`),
-		payload:       []byte(`{"reason":"done for now"}`),
-		occurredAt:    time.Unix(1_700_000_000, 0).UTC(),
-	}
+// runHandoffWrites writes the pair of rows both cases write, inside the
+// transaction the handler opens, through a recorder with no audit half.
+func runHandoffWrites(t *testing.T, db *sql.DB) error {
+	t.Helper()
+	return dbretry.InTx(context.Background(), db, "test.handoff", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		return recordHandoffToUser(ctx, tx, mutationlog.New(db, nil), mutationlog.Actor{UserID: 5, WorkspaceID: 7}, handoffToUserWrites{
+			taskID:       42,
+			taskPublicID: types.New().String(),
+			priorAgentID: 99,
+			memoPatch:    []byte(`{"handoff_status":"handed_back"}`),
+			payload:      map[string]any{"reason": "done for now"},
+		})
+	})
 }
 
 // --- stub driver ------------------------------------------------------

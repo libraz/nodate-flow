@@ -33,8 +33,8 @@ func TestTimelineAggregation(t *testing.T) {
 	// Add a constraint.
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task.ID+"/constraints",
 		tt.AccessToken, map[string]any{
-			"kind":       "approval",
-			"expression": `{"op":"approval.granted","arg":"lead"}`,
+			"kind":       "signal",
+			"expression": `{"op":"signal.received","arg":"pull_request.merged"}`,
 		}, nil)
 
 	// Task-scoped timeline must include all three events.

@@ -56,6 +56,9 @@ type Override struct {
 // A refusal the caller can act on comes back as the APIError; any other
 // error is a store failure.
 func WriteOverride(ctx context.Context, q Queries, in Override) (Written, *apierrors.APIError, error) {
+	if refusal := occurrenceRefusal(SeriesStateOf(in.Master), in.OriginalStart); refusal != nil {
+		return Written{}, refusal, nil
+	}
 	parentID := nullID(in.Master.ID)
 	originalStart := sql.NullTime{Time: in.OriginalStart, Valid: true}
 
@@ -203,17 +206,13 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 	if err != nil {
 		return Written{}, nil, err
 	}
-	before := SeriesState{
-		StartAt:    in.Master.StartAt,
-		EndAt:      in.Master.EndAt,
-		Timezone:   in.Master.Timezone,
-		Rule:       locked.RecurrenceRule,
-		End:        locked.RecurrenceEnd,
-		Exceptions: locked.RecurrenceExceptions,
+	before := lockedState(in.Master, locked)
+	if refusal := occurrenceRefusal(before, in.SplitStart); refusal != nil {
+		return Written{}, refusal, nil
 	}
 	oldEvt, oldOK := before.event()
 
-	next := SeriesState{StartAt: fields.StartAt, EndAt: fields.EndAt, Timezone: fields.Timezone}
+	next := SeriesState{StartAt: fields.StartAt, EndAt: fields.EndAt, Timezone: fields.Timezone, AllDay: fields.AllDay}
 	if !in.Series.ClearRule {
 		next.Rule = in.Series.Rule
 		if next.Rule == nil {
@@ -251,7 +250,7 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 		if oldOK {
 			old = &oldEvt
 		}
-		m = newSeriesMap(old, in.SplitStart, nextEvt, reachOf(in.Master.Timezone, oldExceptions, overrides))
+		m = newSeriesMap(old, in.SplitStart, nextEvt, reachOf(before.zone(), oldExceptions, overrides))
 	}
 	if !in.Series.ClearRule && !in.Series.ClearExceptions {
 		switch {
@@ -276,7 +275,7 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 		CalendarID:    in.CalendarID,
 		WorkspaceID:   in.WorkspaceID,
 	}
-	if kept, changed := keepExceptionsBefore(oldExceptions, in.Master.Timezone, in.SplitStart); changed {
+	if kept, changed := keepExceptionsBefore(oldExceptions, before.zone(), in.SplitStart); changed {
 		if truncate.RecurrenceExceptions, err = encodeExceptions(kept); err != nil {
 			return Written{}, nil, err
 		}
@@ -366,6 +365,9 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 // it outlives the part of the series it belongs to. The withdrawal is
 // scoped to the overrides viewerID can see — see
 // DisableCalendarEventOverridesFromStart.
+//
+// A splitStart that names no occurrence comes back as an
+// *apierrors.APIError, with nothing written, for the caller to unwrap.
 func EndSeries(
 	ctx context.Context,
 	q Queries,
@@ -380,6 +382,9 @@ func EndSeries(
 	if err != nil {
 		return err
 	}
+	if refusal := occurrenceRefusal(lockedState(master, locked), splitStart); refusal != nil {
+		return refusal
+	}
 	truncate := calendar.PatchCalendarEventParams{
 		RecurrenceEnd: sql.NullTime{Time: truncationPoint(locked.RecurrenceEnd, splitStart), Valid: true},
 		PublicID:      master.PublicID,
@@ -387,7 +392,7 @@ func EndSeries(
 		WorkspaceID:   workspaceID,
 	}
 	exceptions := recurrence.ParseExceptions(locked.RecurrenceExceptions)
-	if kept, changed := keepExceptionsBefore(exceptions, master.Timezone, splitStart); changed {
+	if kept, changed := keepExceptionsBefore(exceptions, SeriesStateOf(master).zone(), splitStart); changed {
 		if truncate.RecurrenceExceptions, err = encodeExceptions(kept); err != nil {
 			return err
 		}
@@ -413,6 +418,7 @@ type SeriesState struct {
 	StartAt    sql.NullTime
 	EndAt      sql.NullTime
 	Timezone   string
+	AllDay     bool
 	Rule       json.RawMessage
 	End        sql.NullTime
 	Exceptions json.RawMessage
@@ -424,10 +430,161 @@ func SeriesStateOf(row calendar.FindCalendarEventByPublicIdRow) SeriesState {
 		StartAt:    row.StartAt,
 		EndAt:      row.EndAt,
 		Timezone:   row.Timezone,
+		AllDay:     row.AllDay,
 		Rule:       row.RecurrenceRule,
 		End:        row.RecurrenceEnd,
 		Exceptions: row.RecurrenceExceptions,
 	}
+}
+
+// lockedState is a master's series columns as the series lock read them,
+// over the window and zone of the master row.
+func lockedState(master calendar.FindCalendarEventByPublicIdRow, locked calendar.LockCalendarEventSeriesRow) SeriesState {
+	s := SeriesStateOf(master)
+	s.Rule = locked.RecurrenceRule
+	s.End = locked.RecurrenceEnd
+	s.Exceptions = locked.RecurrenceExceptions
+	return s
+}
+
+// ValidateOccurrence is the one answer to whether at names an occurrence
+// of the series: an instant the rule produces within its bounds that no
+// exception has cancelled. A nil spec means it does.
+//
+// An occurrence an override stands in for is still addressed by its
+// original start and passes; the instant the override was moved to does
+// not.
+func ValidateOccurrence(state SeriesState, at time.Time) *apierrors.Spec {
+	evt, ok := state.event()
+	if !ok {
+		return apierrors.CalendarEventNotRecurring
+	}
+	if !recurrence.Produces(evt, at) {
+		return apierrors.CalendarEventOccurrenceStartNotInSeries
+	}
+	for _, raw := range recurrence.ParseExceptions(state.Exceptions) {
+		if recurrence.EntryNames(raw, state.zone(), at) {
+			return apierrors.CalendarEventOccurrenceStartNotInSeries
+		}
+	}
+	return nil
+}
+
+// occurrenceRefusal is [ValidateOccurrence] as the refusal a transform
+// answers with, naming the member it is about.
+func occurrenceRefusal(state SeriesState, at time.Time) *apierrors.APIError {
+	spec := ValidateOccurrence(state, at)
+	if spec == nil {
+		return nil
+	}
+	field := "occurrenceStart"
+	if spec == apierrors.CalendarEventNotRecurring {
+		field = "scope"
+	}
+	return apierrors.New(spec).WithDetail("field", field)
+}
+
+// CancelOccurrence deletes one occurrence of a series: an exception entry
+// on the master, so the rule stops producing it, and the override standing
+// in for it, if any, disabled in the same transaction — the override is a
+// row the non-recurring range queries select on their own.
+func CancelOccurrence(
+	ctx context.Context,
+	q Queries,
+	workspaceID uint32,
+	master calendar.FindCalendarEventByPublicIdRow,
+	at time.Time,
+) (*apierrors.APIError, error) {
+	locked, err := q.Calendar.LockCalendarEventSeries(ctx, calendar.LockCalendarEventSeriesParams{
+		ID:          master.ID,
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if refusal := occurrenceRefusal(lockedState(master, locked), at); refusal != nil {
+		return refusal, nil
+	}
+	if err := tombstone(ctx, q, workspaceID, master.ID, locked.RecurrenceExceptions, at); err != nil {
+		return nil, err
+	}
+
+	override, err := q.Calendar.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
+		WorkspaceID:             workspaceID,
+		RecurrenceParentID:      nullID(master.ID),
+		RecurrenceOriginalStart: sql.NullTime{Time: at, Valid: true},
+	})
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+	if !override.Enabled {
+		return nil, nil
+	}
+	// affected-rows: not-applicable — the override was read live in this
+	// transaction, and the occurrence is cancelled by the exception whether
+	// or not an override stood in for it.
+	_, err = q.Calendar.DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
+		PublicID:    override.PublicID,
+		CalendarID:  override.CalendarID,
+		WorkspaceID: workspaceID,
+	})
+	return nil, err
+}
+
+// CancelOverride records, on the master, the cancellation an override row
+// deleted on its own leaves behind, and must run in the transaction that
+// disables the row. Without it the master produces the occurrence again at
+// its original slot. A row that is not an override, or whose master is
+// gone, has nothing to record.
+func CancelOverride(ctx context.Context, q Queries, workspaceID uint32, row calendar.FindCalendarEventByPublicIdRow) error {
+	if !row.RecurrenceParentID.Valid {
+		return nil
+	}
+	link, err := q.Calendar.FindCalendarEventRecurrenceLink(ctx, calendar.FindCalendarEventRecurrenceLinkParams{
+		WorkspaceID: workspaceID,
+		PublicID:    row.PublicID,
+	})
+	if err != nil {
+		return err
+	}
+	if !link.RecurrenceParentID.Valid || !link.RecurrenceOriginalStart.Valid {
+		return nil
+	}
+	masterID := uint32(link.RecurrenceParentID.Int32) //#nosec G115 -- internal row id read back from an INT UNSIGNED column
+	locked, err := q.Calendar.LockCalendarEventSeries(ctx, calendar.LockCalendarEventSeriesParams{
+		ID:          masterID,
+		WorkspaceID: workspaceID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return tombstone(ctx, q, workspaceID, masterID, locked.RecurrenceExceptions, link.RecurrenceOriginalStart.Time)
+}
+
+// tombstone appends one occurrence's original start to a locked master's
+// exception list.
+func tombstone(ctx context.Context, q Queries, workspaceID, masterID uint32, stored json.RawMessage, at time.Time) error {
+	exceptions, changed, err := AppendException(stored, at)
+	if err != nil || !changed {
+		return err
+	}
+	return q.Calendar.SetCalendarEventSeriesExceptions(ctx, calendar.SetCalendarEventSeriesExceptionsParams{
+		RecurrenceExceptions: exceptions,
+		ID:                   masterID,
+		WorkspaceID:          workspaceID,
+	})
+}
+
+// zone is the timezone the state's occurrences and stored entries are
+// read in.
+func (s SeriesState) zone() string {
+	return recurrence.ZoneName(s.Timezone, s.AllDay)
 }
 
 // event projects the state onto what the expander reads, without the
@@ -445,6 +602,7 @@ func (s SeriesState) event() (recurrence.Event, bool) {
 		StartAt:  s.StartAt.Time,
 		EndAt:    s.StartAt.Time,
 		Timezone: s.Timezone,
+		AllDay:   s.AllDay,
 		Rule:     rule,
 	}
 	if s.EndAt.Valid {
@@ -512,7 +670,7 @@ func RealignSeries(
 	if oldOK {
 		old = &oldEvt
 	}
-	m := newSeriesMap(old, from, nextEvt, reachOf(nextEvt.Timezone, exceptions, overrides))
+	m := newSeriesMap(old, from, nextEvt, reachOf(SeriesStateOf(after).zone(), exceptions, overrides))
 	if err := realignOverrides(ctx, q, workspaceID, overrides, m); err != nil {
 		return nil, err
 	}
@@ -580,11 +738,11 @@ type seriesMap struct {
 // newSeriesMap builds the map for occurrences of old at or after from,
 // up to reach. A nil old maps nothing by position.
 func newSeriesMap(old *recurrence.Event, from time.Time, next recurrence.Event, reach time.Time) seriesMap {
-	m := seriesMap{next: next, timezone: next.Timezone}
+	m := seriesMap{next: next, timezone: recurrence.ZoneName(next.Timezone, next.AllDay)}
 	if old == nil {
 		return m
 	}
-	m.timezone = old.Timezone
+	m.timezone = recurrence.ZoneName(old.Timezone, old.AllDay)
 	if !samePattern(old.Rule, next.Rule) {
 		return m
 	}

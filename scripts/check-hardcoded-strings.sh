@@ -19,9 +19,12 @@
 #   changes. An attribute is the easiest place to forget, because it reads
 #   as markup rather than as copy.
 #
+# Scanned: both apps and packages/ui, whose primitives render inside them.
+#
 # Excluded:
 #   - test / spec / fixture files (literal copy is sometimes required for
 #     equality assertions)
+#   - Storybook stories (development fixtures, never shipped)
 #   - node_modules, dist, .git
 #   - generated SDK output
 #
@@ -46,14 +49,16 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Detects: attr="Word ...", attr='Word ...' where the value contains at
-# least one alphabetic run of length >= 4. Both quote forms are matched,
-# each against a value that may not contain its own delimiter. Bound the
-# inner pattern so we don't match expression-bound attrs like attr={t('x')}.
-ATTR_PATTERN="(placeholder|aria-label|aria-description|title|alt)=(\"[^\"{}<>][^\"{}<>]*[A-Za-z]{4,}[^\"{}<>]*\"|'[^'{}<>][^'{}<>]*[A-Za-z]{4,}[^'{}<>]*')"
+# least one alphabetic run of length >= 4, which may start at the first
+# character (aria-label="Time"). Both quote forms are matched, each
+# against a value that may not contain its own delimiter. Bound the inner
+# pattern so we don't match expression-bound attrs like attr={t('x')}.
+ATTR_PATTERN="(placeholder|aria-label|aria-description|title|alt)=(\"[^\"{}<>]*[A-Za-z]{4,}[^\"{}<>]*\"|'[^'{}<>]*[A-Za-z]{4,}[^'{}<>]*')"
 
 SCAN_DIRS=(
   "$ROOT/apps/flow-web/src"
   "$ROOT/apps/accounts-web/src"
+  "$ROOT/packages/ui/src"
 )
 
 EXCLUDES=(
@@ -63,6 +68,7 @@ EXCLUDES=(
   --exclude-dir=__tests__
   --exclude='*.test.*'
   --exclude='*.spec.*'
+  --exclude='*.stories.*'
   --exclude='*.d.ts'
 )
 
@@ -70,8 +76,12 @@ EXCLUDES=(
 # when it matches nothing, which under `set -e` with pipefail would end the
 # caller with no message; a clean tree is not an error here, so that status
 # is absorbed.
+#
+# --include comes before the excludes: GNU and BSD grep both let the last
+# matching rule win, so an --include after them re-admits every excluded
+# test file.
 scan_root() {
-  grep -rnE "$ATTR_PATTERN" "$1" "${EXCLUDES[@]}" --include='*.tsx' 2>/dev/null || true
+  grep -rnE "$ATTR_PATTERN" "$1" --include='*.tsx' "${EXCLUDES[@]}" 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -82,6 +92,16 @@ CONTROL_DIR="$(mktemp -d)"
 trap 'rm -rf "$CONTROL_DIR"' EXIT
 
 cat >"$CONTROL_DIR/literal.tsx" <<'TSX'
+export const Search = () => <input placeholder="Search tasks" />;
+TSX
+
+# A single four-letter word is copy too.
+cat >"$CONTROL_DIR/short.tsx" <<'TSX'
+export const List = () => <div role="listbox" aria-label="Time" />;
+TSX
+
+# A co-located test file is excluded however its literals read.
+cat >"$CONTROL_DIR/literal.test.tsx" <<'TSX'
 export const Search = () => <input placeholder="Search tasks" />;
 TSX
 
@@ -109,6 +129,10 @@ control_out="$(scan_root "$CONTROL_DIR")"
 
 grep -q 'literal\.tsx:1:' <<<"$control_out" \
   || fail_case "a quoted English literal in a placeholder attribute must be reported"
+grep -q 'short\.tsx:1:' <<<"$control_out" \
+  || fail_case "a single four-letter word in an aria-label must be reported"
+! grep -q 'literal\.test\.tsx' <<<"$control_out" \
+  || fail_case "a test file must not be scanned"
 ! grep -q 'translated\.tsx' <<<"$control_out" \
   || fail_case "an attribute bound to t('key') must not be reported"
 ! grep -q 'untargeted\.tsx' <<<"$control_out" \
@@ -132,7 +156,7 @@ found_files=""
 for dir in "${SCAN_DIRS[@]}"; do
   # `grep -c ''` reports a count for every file it opens, empty ones
   # included, so this is the file set the scan below actually sees.
-  scanned=$({ grep -rc '' "$dir" "${EXCLUDES[@]}" --include='*.tsx' 2>/dev/null || true; } | wc -l | tr -d ' ')
+  scanned=$({ grep -rc '' "$dir" --include='*.tsx' "${EXCLUDES[@]}" 2>/dev/null || true; } | wc -l | tr -d ' ')
   if [[ "$scanned" -eq 0 ]]; then
     echo "check-hardcoded-strings: scan root reached 0 .tsx files: $dir" >&2
     echo "The scan cannot report a violation it never read. Fix the path" >&2

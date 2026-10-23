@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -291,7 +292,7 @@ func TestTaskRescheduleThroughToolAndRequestStoreTheSameRow(t *testing.T) {
 
 	t.Run("request", func(t *testing.T) {
 		reqCtx := snapParityRequestContext(t, db, fx.userID, fx.restTaskPub)
-		handler := tasks.Patch(tasks.Deps{DB: db, Queries: queries, Audit: audit.New(queries)})
+		handler := tasks.Patch(tasks.Deps{DB: db, Queries: queries, Audit: audit.New(queries), Mutations: mutationlog.New(db, queries)})
 		due := requested
 		_, err := handler(reqCtx, &tasks.PatchTaskInput{
 			ID:   fx.restTaskPub.String(),

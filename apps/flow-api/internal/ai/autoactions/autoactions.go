@@ -16,6 +16,9 @@ package autoactions
 import (
 	"fmt"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // State mirrors tasks.derived_state for the subset auto actions care
@@ -81,6 +84,9 @@ type Signals struct {
 	HasAssignee   bool
 	AssigneeCount int64
 	Now           time.Time
+	// Zone is the zone whose calendar day "today" is; the zero value
+	// reads the day in UTC.
+	Zone region.Zone
 
 	// Agent-assignee signals, populated when the task has at least one
 	// enabled task_actors row with kind='agent' and role='assignee'.
@@ -149,7 +155,7 @@ func EvaluateWithConfig(s Signals, rules []RuleConfig) *Action {
 		s.Now = time.Now().UTC()
 	}
 	idle := s.Now.Sub(s.UpdatedAt)
-	overdue := s.HasDueOn && s.Now.After(s.DueOn)
+	overdue := s.HasDueOn && duedate.Overdue(s.DueOn, s.Now, s.Zone)
 
 	// Build a lookup so iteration order is controlled by the
 	// urgency sequence below, not by the caller's slice order.

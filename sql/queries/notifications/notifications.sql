@@ -21,7 +21,9 @@ INSERT IGNORE INTO notifications (
 
 -- name: ListNotificationsForUser :many
 -- List notifications for a user across all their workspaces, ordered newest first.
--- Excludes archived and disabled notifications.
+-- Excludes archived and disabled notifications. The workspace_members join
+-- is what "their workspaces" means: rows from a workspace the user has
+-- left stop being listed, on this and every sibling list and count.
 SELECT
   n.public_id,
   n.workspace_id,
@@ -42,6 +44,10 @@ SELECT
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -84,6 +90,10 @@ SELECT
   n.created_at
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -120,6 +130,10 @@ SELECT
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
@@ -160,6 +174,10 @@ SELECT
   n.created_at
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
@@ -178,22 +196,32 @@ LIMIT ?;
 -- name: CountUnreadNotifications :one
 -- Count unread notifications for a user across all workspaces.
 -- Used by the global notification badge when no workspace is selected.
+-- Same membership join as the lists, so the badge never counts a row
+-- the list would not show.
 SELECT COUNT(*) AS unread_count
-FROM notifications
-WHERE recipient_user_id = ?
-  AND read_at IS NULL
-  AND archived_at IS NULL
-  AND enabled = TRUE;
+FROM notifications n
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
+WHERE n.recipient_user_id = ?
+  AND n.read_at IS NULL
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE;
 
 -- name: CountUnreadNotificationsForWorkspace :one
 -- Count unread notifications for a user within a specific workspace.
 SELECT COUNT(*) AS unread_count
-FROM notifications
-WHERE workspace_id = ?
-  AND recipient_user_id = ?
-  AND read_at IS NULL
-  AND archived_at IS NULL
-  AND enabled = TRUE;
+FROM notifications n
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = n.workspace_id
+ AND wm.user_id = n.recipient_user_id
+ AND wm.enabled = TRUE
+WHERE n.workspace_id = ?
+  AND n.recipient_user_id = ?
+  AND n.read_at IS NULL
+  AND n.archived_at IS NULL
+  AND n.enabled = TRUE;
 
 -- name: MarkNotificationRead :execrows
 -- Mark a single notification as read.
@@ -285,3 +313,18 @@ VALUES (?, ?, ?);
 DELETE FROM calendar_event_reminders
 WHERE event_id = ?
   AND occurrence_start = ?;
+
+-- name: FindReminderEventForOccurrence :one
+-- The calendar.reminder event already appended for one occurrence of an
+-- event, if a previous attempt got that far. A retried delivery reuses
+-- it, so its notifications carry the same source_event_id as the first
+-- attempt's and the (recipient, source_event, channel) unique key keeps a
+-- recipient who already got the reminder from getting it twice.
+SELECT e.id
+FROM events e
+WHERE e.workspace_id = sqlc.arg('workspace_id')
+  AND e.type = 'calendar.reminder'
+  AND JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.calendarEventId')) = CAST(sqlc.arg('calendar_event_id') AS CHAR)
+  AND CAST(JSON_EXTRACT(e.payload_json, '$.occurrenceStartAt') AS SIGNED) = CAST(sqlc.arg('occurrence_start_at') AS SIGNED)
+ORDER BY e.id
+LIMIT 1;

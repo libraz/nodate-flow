@@ -63,7 +63,8 @@ FROM instance_admins
 WHERE enabled = TRUE AND revoked_at IS NULL
 `
 
-// Count active instance admins (for last-admin guard).
+// Count active instance admins. The last-admin guard does not use this: it
+// locks the admin set in the revoking transaction instead.
 func (q *Queries) AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error) {
 	row := q.db.QueryRowContext(ctx, adminCountActiveInstanceAdmins)
 	var admin_count int64

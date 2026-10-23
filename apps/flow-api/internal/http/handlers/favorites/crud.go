@@ -6,15 +6,14 @@ import (
 	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -60,40 +59,34 @@ func Create(deps Deps) func(context.Context, *CreateFavoriteInput) (*CreateFavor
 			folderName = sql.NullString{String: in.Body.FolderName, Valid: true}
 		}
 
-		if _, err := deps.Queries.CreateFavorite(ctx, generated.CreateFavoriteParams{
-			PublicID:       pub,
-			WorkspaceID:    wsID,
-			UserID:         actorID,
-			TargetType:     targetType,
-			TargetPublicID: targetPub,
-			FolderName:     folderName,
+		if err := dbretry.InTx(ctx, deps.DB, "favorites.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreateFavorite(ctx, generated.CreateFavoriteParams{
+				PublicID:       pub,
+				WorkspaceID:    wsID,
+				UserID:         actorID,
+				TargetType:     targetType,
+				TargetPublicID: targetPub,
+				FolderName:     folderName,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+				EventType:    eventbus.FavoriteAdded,
+				AuditAction:  "favorite.create",
+				ResourceType: "favorite",
+				ResourceID:   pub.String(),
+				Payload: map[string]any{
+					"favoriteId": pub.String(),
+					"targetType": in.Body.TargetType,
+					"targetId":   in.Body.TargetID,
+				},
+				CallSite: "favorites.Create",
+			})
 		}); err != nil {
 			if isDuplicateEntry(err) {
 				return nil, httpErr(apierrors.WsFavoriteAlreadyExists)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.FavoriteAdded,
-			WorkspaceID: wsID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"favoriteId": pub.String(),
-				"targetType": in.Body.TargetType,
-				"targetId":   in.Body.TargetID,
-			},
-		}, "favorites.Create")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "favorite.create",
-				ActorID:      actorID,
-				WorkspaceID:  wsID,
-				ResourceType: "favorite",
-				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"targetType": in.Body.TargetType, "targetId": in.Body.TargetID},
-			})
 		}
 
 		row, err := deps.Queries.FindFavoriteByPublicId(ctx, generated.FindFavoriteByPublicIdParams{
@@ -225,37 +218,36 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 
 		// Scoped to this user's live favorites, so a zero count means there
 		// is nothing here to un-favorite.
-		rows, err := deps.Queries.DisableFavorite(ctx, generated.DisableFavoriteParams{
-			WorkspaceID: wsID,
-			PublicID:    pub,
-			UserID:      actorID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.WsFavoriteNotFound)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.FavoriteRemoved,
-			WorkspaceID: row.WorkspaceID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"favoriteId": pub.String(),
-				"targetType": string(row.TargetType),
-				"targetId":   row.TargetPublicID.String(),
-			},
-		}, "favorites.Delete")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "favorite.delete",
-				ActorID:      actorID,
-				WorkspaceID:  row.WorkspaceID,
+		var missing bool
+		if err := dbretry.InTx(ctx, deps.DB, "favorites.Delete", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).DisableFavorite(ctx, generated.DisableFavoriteParams{
+				WorkspaceID: wsID,
+				PublicID:    pub,
+				UserID:      actorID,
+			})
+			if err != nil {
+				return err
+			}
+			if missing = rows == 0; missing {
+				return nil
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: row.WorkspaceID}, mutationlog.Mutation{
+				EventType:    eventbus.FavoriteRemoved,
+				AuditAction:  "favorite.delete",
 				ResourceType: "favorite",
 				ResourceID:   pub.String(),
+				Payload: map[string]any{
+					"favoriteId": pub.String(),
+					"targetType": string(row.TargetType),
+					"targetId":   row.TargetPublicID.String(),
+				},
+				CallSite: "favorites.Delete",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if missing {
+			return nil, httpErr(apierrors.WsFavoriteNotFound)
 		}
 
 		out := &DeleteFavoriteOutput{}
@@ -263,6 +255,3 @@ func Delete(deps Deps) func(context.Context, *DeleteFavoriteInput) (*DeleteFavor
 		return out, nil
 	}
 }
-
-// actorPtr delegates to handlerutil.ActorPtr.
-var actorPtr = handlerutil.ActorPtr

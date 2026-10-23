@@ -12,7 +12,7 @@ import (
 func TestCapabilities_AllEnabled(t *testing.T) {
 	t.Parallel()
 	deps := Deps{
-		OIDC:             &internauth.OIDCClient{},
+		OIDC:             &internauth.GoogleOIDCClient{},
 		OIDCGithub:       &internauth.GithubOAuthClient{},
 		OIDCMicrosoft:    &internauth.MicrosoftOIDCClient{},
 		EmailSender:      &email.MemorySender{},
@@ -88,7 +88,7 @@ func TestCapabilities_AllDisabled(t *testing.T) {
 func TestCapabilities_Mixed(t *testing.T) {
 	t.Parallel()
 	deps := Deps{
-		OIDC:        &internauth.OIDCClient{},
+		OIDC:        &internauth.GoogleOIDCClient{},
 		EmailSender: &email.MemorySender{},
 	}
 	handler := Capabilities(deps)

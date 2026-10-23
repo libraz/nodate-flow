@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,7 +15,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
@@ -49,6 +47,13 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
 )
+
+// eventHookConcurrency is how many event-hook jobs run at once across
+// the notification fan-out, webhook delivery rows and relation
+// suggestions. Each holds a pool connection; at a quarter of the default
+// NF_DB_MAX_OPEN_CONNS a burst of events queues here instead of starving
+// request handlers of the pool.
+const eventHookConcurrency = 8
 
 func main() {
 	logger := nflog.New(nflog.Config{})
@@ -94,7 +99,9 @@ func main() {
 	// Pin the session timezone before opening: every stored DATETIME is a
 	// UTC wall clock, and a session that answers NOW() in the host's zone
 	// makes every comparison against them wrong by the offset, silently.
-	db, err := sql.Open("mysql", dbtz.NormalizeDSN(cfg.DbDsn))
+	// The pool is instrumented so every statement is recorded under its
+	// sqlc operation name, which is what the DB dashboard charts.
+	db, err := obs.OpenInstrumentedMySQL(dbtz.NormalizeDSN(cfg.DbDsn))
 	if err != nil {
 		logger.Error("db open failed", "err", err)
 		os.Exit(1)
@@ -461,6 +468,12 @@ func main() {
 		logger.Warn("smtp email disabled: NF_FLOW_SMTP_HOST is not set")
 	}
 
+	// The event hooks that write rows off the append path — notification
+	// fan-out, webhook deliveries, relation suggestions — share one
+	// runner: one bound on how many hold pool connections at once, and
+	// one drain at shutdown.
+	hookRunner := bgloop.NewHookRunner("eventbus.hooks", eventHookConcurrency, cfg.NotificationFanoutTimeout)
+
 	// Notification fan-out: creates per-user notification rows whenever
 	// the eventbus fires a relevant event (task.created, task.comment.added,
 	// etc.). Email delivery is attempted when the SMTP sender is configured.
@@ -469,11 +482,13 @@ func main() {
 	notifFanout := notification.NewFanout(db, queries, emailSender)
 	notifFanout.SetTimeout(cfg.NotificationFanoutTimeout)
 	notifFanout.SetNotificationPublisher(notificationPublisher)
+	notifFanout.SetRunner(hookRunner)
 	eventbus.AddNotifyHook(notifFanout.Hook())
 
 	// Webhook delivery worker: creates delivery rows for matching
 	// subscriptions and periodically POSTs payloads with HMAC signatures.
 	webhookWorker := webhook.NewWorker(db, queries)
+	webhookWorker.SetRunner(hookRunner)
 	eventbus.AddNotifyHook(webhookWorker.Hook())
 
 	// Appends made through the cross-service eventlog (itemkit,
@@ -532,6 +547,7 @@ func main() {
 		EmbedBaseURL:          cfg.EmbedBaseURL,
 		DisableRateLimit:      cfg.DisableRateLimit,
 		TrustedProxyHops:      cfg.TrustedProxyHops,
+		HookRunner:            hookRunner,
 	})
 
 	// Wrap the router with the request logger so the prod binary keeps
@@ -753,11 +769,12 @@ func main() {
 		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)
 	}
-	// Drain in-flight notification fan-out goroutines. The shutdown
+	// Drain the event-hook jobs (notification fan-out, webhook delivery
+	// rows, relation suggestions), queued ones included. The shutdown
 	// context already has a 20s budget shared with the HTTP server
 	// drain above; if it expires we log and move on.
-	if err := notifFanout.Shutdown(shutdownCtx); err != nil {
-		logger.Warn("notification fanout shutdown timed out", "err", err)
+	if err := hookRunner.Shutdown(shutdownCtx); err != nil {
+		logger.Warn("event hook shutdown timed out", "err", err)
 	}
 	// Same for the on_event agent dispatches, which detach from the
 	// request that triggered them for the same reason.

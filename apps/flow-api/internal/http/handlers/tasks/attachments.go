@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -16,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -84,84 +84,105 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer func() { _ = tx.Rollback() }()
-		qtx := deps.Queries.WithTx(tx)
+		actorID, _ := middleware.ActorFromContext(ctx)
+		taskInternal := int64(task.ID)
+		var (
+			answered           error
+			storageKeyToRemove string
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.DeleteAttachment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			storageKeyToRemove = ""
+			qtx := generated.New(tx)
 
-		// Resolve the storage_object_id BEFORE the soft-delete so we
-		// can decrement its ref count in the same transaction. The
-		// lookup is scoped to the task whose ACL the caller already
-		// cleared (task_id predicate), so an attachment on a different
-		// (or unauthorized) task returns no row. A missing row - whether
-		// the attachment never existed under this task, belongs to
-		// another task, or was already deleted - is reported as 404 via
-		// WS.TASK.NOT_FOUND so cross-task existence stays hidden.
-		soRow, err := qtx.GetAttachmentStorageObjectIDForDelete(ctx, generated.GetAttachmentStorageObjectIDForDeleteParams{
-			WorkspaceID: ws.ID,
-			TaskID:      handlerutil.NullInt32From(task.ID),
-			PublicID:    aid,
-		})
-		if err != nil {
-			if stderrors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.WsTaskNotFound)
+			// Resolve the storage_object_id BEFORE the soft-delete so we
+			// can decrement its ref count in the same transaction. The
+			// lookup is scoped to the task whose ACL the caller already
+			// cleared (task_id predicate), so an attachment on a different
+			// (or unauthorized) task returns no row. A missing row - whether
+			// the attachment never existed under this task, belongs to
+			// another task, or was already deleted - is reported as 404 via
+			// WS.TASK.NOT_FOUND so cross-task existence stays hidden.
+			soRow, err := qtx.GetAttachmentStorageObjectIDForDelete(ctx, generated.GetAttachmentStorageObjectIDForDeleteParams{
+				WorkspaceID: ws.ID,
+				TaskID:      handlerutil.NullInt32From(task.ID),
+				PublicID:    aid,
+			})
+			if err != nil {
+				if stderrors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.WsTaskNotFound)
+					return errAnswered
+				}
+				return err
 			}
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
 
-		deleted, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
-			WorkspaceID: ws.ID,
-			TaskID:      handlerutil.NullInt32From(task.ID),
-			PublicID:    aid,
+			deleted, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
+				WorkspaceID: ws.ID,
+				TaskID:      handlerutil.NullInt32From(task.ID),
+				PublicID:    aid,
+			})
+			if err != nil {
+				return err
+			}
+			// Nothing was deleted, so the ref count below must not be
+			// decremented -- doing that on a delete that did not happen is how
+			// a blob still in use becomes eligible for collection.
+			if deleted == 0 {
+				answered = httpErr(apierrors.WsTaskNotFound)
+				return errAnswered
+			}
+
+			decResult, err := qtx.DecrementStorageObjectRefCount(ctx, soRow.StorageObjectID)
+			if err != nil {
+				return err
+			}
+			if affected, _ := decResult.RowsAffected(); affected != 1 {
+				// Underflow guard tripped: the row was already at 0.
+				// Programmer error somewhere upstream; log and continue
+				// so the attachment delete still completes.
+				nflog.LoggerFromContext(ctx).WarnContext(ctx, "storage object ref_count underflow",
+					logutil.LogEntityPID("attachment", aid),
+					slog.String("handler", "tasks.DeleteAttachment"),
+				)
+			}
+
+			// Pre-read the storage key BEFORE attempting the GC delete so
+			// we still have the row data on a successful unreferenced
+			// drop (the row is gone after the DELETE). FindStorageObjectByID
+			// runs against the same transaction so we observe the
+			// post-decrement ref_count consistently.
+			fullRow, err := qtx.FindStorageObjectByID(ctx, soRow.StorageObjectID)
+			if err != nil {
+				return err
+			}
+
+			// Attempt a GC delete; if no row was deleted there are still
+			// other referencing rows and we must NOT touch MinIO.
+			gcResult, err := qtx.DeleteStorageObjectIfUnreferenced(ctx, soRow.StorageObjectID)
+			if err != nil {
+				return err
+			}
+			if affected, _ := gcResult.RowsAffected(); affected == 1 {
+				storageKeyToRemove = fullRow.StorageKey
+			}
+
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskAttachmentRemoved,
+				AuditAction:  "attachment.delete",
+				ResourceType: "attachment",
+				ResourceID:   aid.String(),
+				TaskID:       &taskInternal,
+				Payload: map[string]any{
+					"taskId":       task.PublicID.String(),
+					"attachmentId": aid.String(),
+				},
+				CallSite: "tasks.DeleteAttachment",
+			})
 		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if answered != nil {
+			return nil, answered
 		}
-		// Nothing was deleted, so the ref count below must not be
-		// decremented -- doing that on a delete that did not happen is how
-		// a blob still in use becomes eligible for collection.
-		if deleted == 0 {
-			return nil, httpErr(apierrors.WsTaskNotFound)
-		}
-
-		decResult, err := qtx.DecrementStorageObjectRefCount(ctx, soRow.StorageObjectID)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if affected, _ := decResult.RowsAffected(); affected != 1 {
-			// Underflow guard tripped: the row was already at 0.
-			// Programmer error somewhere upstream; log and continue
-			// so the attachment delete still completes.
-			nflog.LoggerFromContext(ctx).WarnContext(ctx, "storage object ref_count underflow",
-				logutil.LogEntityPID("attachment", aid),
-				slog.String("handler", "tasks.DeleteAttachment"),
-			)
-		}
-
-		// Pre-read the storage key BEFORE attempting the GC delete so
-		// we still have the row data on a successful unreferenced
-		// drop (the row is gone after the DELETE). FindStorageObjectByID
-		// runs against the same transaction so we observe the
-		// post-decrement ref_count consistently.
-		fullRow, lookupErr := qtx.FindStorageObjectByID(ctx, soRow.StorageObjectID)
-		if lookupErr != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Attempt a GC delete; if no row was deleted there are still
-		// other referencing rows and we must NOT touch MinIO.
-		var storageKeyToRemove string
-		gcResult, err := qtx.DeleteStorageObjectIfUnreferenced(ctx, soRow.StorageObjectID)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if affected, _ := gcResult.RowsAffected(); affected == 1 {
-			storageKeyToRemove = fullRow.StorageKey
-		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -176,26 +197,6 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			cleanupCancel()
 		}
 
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskAttachmentRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"attachmentId": aid.String(),
-			},
-		}, "tasks.DeleteAttachment")
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "attachment.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "attachment",
-				ResourceID:   aid.String(),
-			})
-		}
 		out := &DeleteTaskAttachmentOutput{}
 		out.Body.Ok = true
 		return out, nil

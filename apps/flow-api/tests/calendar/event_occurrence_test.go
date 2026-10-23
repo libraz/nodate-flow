@@ -134,7 +134,8 @@ func TestPatchEventOccurrence_RevivesRevertedOverride(t *testing.T) {
 	}, &firstEdit)
 	require.NotEmpty(t, firstEdit.ID)
 
-	// Reverting the occurrence to the series soft-deletes the override.
+	// Deleting the override soft-deletes it and cancels its occurrence;
+	// clearing the series' exceptions brings the occurrence back.
 	// uniq_calendar_events_recurrence_override counts the disabled row, so
 	// the next edit of the same occurrence has to revive it.
 	var deleted struct {
@@ -143,6 +144,9 @@ func TestPatchEventOccurrence_RevivesRevertedOverride(t *testing.T) {
 	helpers.DoJSON(t, http.MethodDelete, tt.WsPath("calendars", calID, "events", firstEdit.ID), tt.AccessToken, nil, &deleted)
 	require.True(t, deleted.Deleted)
 	require.False(t, readEventRow(t, firstEdit.ID).enabled)
+	helpers.DoJSON(t, http.MethodPatch, tt.WsPath("calendars", calID, "events", masterID), tt.AccessToken, map[string]any{
+		"clear": []string{"recurrenceExceptions"},
+	}, nil)
 
 	var secondEdit eventView
 	helpers.DoJSON(t, http.MethodPatch, tt.WsPath("calendars", calID, "events", masterID), tt.AccessToken, map[string]any{

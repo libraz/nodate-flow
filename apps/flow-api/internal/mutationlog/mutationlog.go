@@ -84,6 +84,11 @@ type Mutation struct {
 	// TaskID is the internal task id when the change targets a task, so
 	// events.task_id carries the link the task timeline reads.
 	TaskID *int64
+	// ActorAgentID attributes the event row to an agent instead of
+	// Actor.UserID, for a change made on an agent's behalf such as a
+	// hand-back. The events row admits one actor, so the user is then
+	// named by the audit row alone.
+	ActorAgentID *int64
 	// CalendarID is the internal calendar id when the change happened
 	// inside a calendar, so events.calendar_id carries the link a
 	// per-calendar activity feed reads. Nil for changes with no
@@ -251,17 +256,18 @@ func (r *Recorder) ready(ctx context.Context, a Actor, m Mutation, needEvent boo
 // event builds the row appended to `events`.
 func (r *Recorder) event(a Actor, m Mutation) eventbus.Event {
 	var actor *int64
-	if a.UserID != 0 {
+	if a.UserID != 0 && m.ActorAgentID == nil {
 		v := int64(a.UserID)
 		actor = &v
 	}
 	return eventbus.Event{
-		Type:        m.EventType,
-		WorkspaceID: a.WorkspaceID,
-		ActorUserID: actor,
-		TaskID:      m.TaskID,
-		CalendarID:  m.CalendarID,
-		Payload:     m.Payload,
+		Type:         m.EventType,
+		WorkspaceID:  a.WorkspaceID,
+		ActorUserID:  actor,
+		ActorAgentID: m.ActorAgentID,
+		TaskID:       m.TaskID,
+		CalendarID:   m.CalendarID,
+		Payload:      m.Payload,
 	}
 }
 

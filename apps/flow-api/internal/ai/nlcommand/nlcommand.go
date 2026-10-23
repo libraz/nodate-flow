@@ -15,8 +15,8 @@ import (
 )
 
 // ErrUnresolvable is the sentinel returned whenever the LLM output
-// cannot be mapped to an allowed tool invocation. Callers map this to
-// the public AI.NL_COMMAND.UNRESOLVABLE error code.
+// cannot be mapped to an allowed tool invocation. The HTTP handler maps
+// it to AI.RESPONSE.INVALID_JSON.
 var ErrUnresolvable = errors.New("nlcommand: unresolvable")
 
 // allowedTools is the closed set of MCP tools that may be invoked via

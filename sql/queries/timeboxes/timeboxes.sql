@@ -62,7 +62,8 @@ WHERE tb.workspace_id = ?
 LIMIT 1;
 
 -- name: UpdateTimebox :execrows
--- Update mutable timebox fields.
+-- Update mutable timebox fields. A completed timebox is never changed, so
+-- the rule holds against a completion committed after the caller's read.
 UPDATE timeboxes
 SET name = ?,
     description = ?,
@@ -70,15 +71,18 @@ SET name = ?,
     ends_on = ?
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND status <> 'completed';
 
 -- name: UpdateTimeboxStatus :execrows
--- Transition timebox lifecycle status.
+-- Transition timebox lifecycle status. Completed is terminal, so a
+-- completed timebox matches no row.
 UPDATE timeboxes
 SET status = ?
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND status <> 'completed';
 
 -- name: DisableTimebox :execrows
 -- Soft-delete a timebox.

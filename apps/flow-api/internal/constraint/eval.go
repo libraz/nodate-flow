@@ -50,14 +50,9 @@ type Facts struct {
 	// turn on the caller's own role belongs in the ACL layer, which does
 	// know who is asking.
 	ActorRoles map[string]bool
-	// SignalsReceived is the set of inbound signal kinds that have
-	// fired on this task (e.g. "github.pr.merged").
+	// SignalsReceived is the set of kinds of the signals attached to
+	// this task (e.g. "pull_request.merged").
 	SignalsReceived map[string]bool
-	// Approvals is the set of approval roles that have been granted.
-	Approvals map[string]bool
-	// CIStatus is the most recent CI outcome string
-	// ("success" / "failure" / "pending" / ""). Empty means unknown.
-	CIStatus string
 }
 
 // ErrEval is returned by Evaluate when a well-parsed constraint
@@ -152,10 +147,6 @@ func Evaluate(c Constraint, f Facts) (bool, error) {
 		return f.ActorRoles[c.Arg], nil
 	case OpSignalReceived:
 		return f.SignalsReceived[c.Arg], nil
-	case OpApprovalGranted:
-		return f.Approvals[c.Arg], nil
-	case OpCIStatusIs:
-		return f.CIStatus == c.Arg, nil
 	}
 	return false, fmt.Errorf("%w: unreachable op %q", ErrEval, c.Op)
 }

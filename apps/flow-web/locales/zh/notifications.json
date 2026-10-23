@@ -31,7 +31,6 @@
   "event": {
     "task_created": "创建了新任务",
     "task_updated": "任务已更新",
-    "task_disabled": "任务已删除",
     "task_comment_added": "添加了新评论",
     "task_comment_edited": "评论已编辑",
     "task_comment_removed": "评论已删除",

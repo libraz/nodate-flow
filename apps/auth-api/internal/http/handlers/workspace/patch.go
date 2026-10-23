@@ -9,6 +9,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
@@ -73,6 +74,11 @@ func Patch(deps Deps) func(context.Context, *PatchWorkspaceInput) (*PatchWorkspa
 		// the workspace middleware before this runs, and the re-read
 		// below would fail if the row had vanished in between.
 		if _, err := deps.Queries.PatchWorkspace(ctx, params); err != nil {
+			// The slug pre-check above can be passed by two renames at
+			// once; uniq_workspaces_slug rejects the loser.
+			if params.Slug.Valid && handlerutil.IsDuplicateEntry(err) {
+				return nil, httpErr(apierrors.WsWorkspaceSlugAlreadyTaken)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

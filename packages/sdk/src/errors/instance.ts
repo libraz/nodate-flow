@@ -4,7 +4,7 @@ export const InstanceErrors = {
   INSTANCE_ADMIN_LAST_ADMIN: {
     code: "INSTANCE.ADMIN.LAST_ADMIN",
     status: 409,
-    message: "Cannot revoke the last remaining administrator",
+    message: "Cannot remove the last remaining administrator",
   },
   INSTANCE_ADMIN_NOT_FOUND: {
     code: "INSTANCE.ADMIN.NOT_FOUND",
@@ -55,6 +55,11 @@ export const InstanceErrors = {
     code: "INSTANCE.USER.NOT_FOUND",
     status: 404,
     message: "User not found",
+  },
+  INSTANCE_USER_SELF_SUSPEND: {
+    code: "INSTANCE.USER.SELF_SUSPEND",
+    status: 409,
+    message: "Cannot suspend your own account",
   },
   INSTANCE_WORKSPACE_NOT_FOUND: {
     code: "INSTANCE.WORKSPACE.NOT_FOUND",

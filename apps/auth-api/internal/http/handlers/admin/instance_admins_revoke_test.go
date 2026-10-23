@@ -42,24 +42,25 @@ func (s *recordingSink) actions() []string {
 	return out
 }
 
-// revokeRaceDB is a generated.DBTX decorator that opens the check-then-act
-// window the revoke handler races against: the first time the revoke
-// UPDATE is executed, a competing revocation runs to completion first, so
-// the handler's own statement matches no row. Embedding *sql.DB leaves
-// every other DBTX method untouched.
+// revokeRaceDB is a generated.DBTX decorator that opens the window between
+// the revoke handler's existence check and its transaction: right after the
+// check reads the grant as active, a competing revocation runs to
+// completion, so the handler's own statement matches no row. Embedding
+// *sql.DB leaves every other DBTX method untouched.
 type revokeRaceDB struct {
 	*sql.DB
 	once    sync.Once
 	compete func(ctx context.Context)
 }
 
-// ExecContext fires the competing revocation once, immediately before the
-// handler's revoke statement reaches the server.
-func (d *revokeRaceDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	if strings.Contains(query, "UPDATE instance_admins") && strings.Contains(query, "revoked_at = NOW()") {
+// QueryRowContext fires the competing revocation once, immediately after
+// the handler's existence check has been answered.
+func (d *revokeRaceDB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	row := d.DB.QueryRowContext(ctx, query, args...)
+	if strings.Contains(query, "FROM instance_admins") && strings.Contains(query, "WHERE user_id = ?") {
 		d.once.Do(func() { d.compete(ctx) })
 	}
-	return d.DB.ExecContext(ctx, query, args...)
+	return row
 }
 
 // revokeFixture resets instance_admins and grants admin to two fresh
@@ -141,4 +142,158 @@ func TestRevokeAdmin_RevokesAndAudits(t *testing.T) {
 
 	_, err = q.AdminFindInstanceAdminByUserId(ctx, targetID)
 	assert.ErrorIs(t, err, sql.ErrNoRows, "the grant must no longer be active after a successful revoke")
+}
+
+// grantAdmin gives uid an active instance admin grant.
+func grantAdmin(t *testing.T, q *generated.Queries, uid uint32) {
+	t.Helper()
+	_, err := q.AdminGrantInstanceAdmin(context.Background(), generated.AdminGrantInstanceAdminParams{
+		PublicID:        types.New(),
+		UserID:          uid,
+		GrantedByUserID: sql.NullInt32{},
+	})
+	require.NoError(t, err)
+}
+
+// userPublicID reads the public id of uid.
+func userPublicID(t *testing.T, db *sql.DB, uid uint32) types.PublicID {
+	t.Helper()
+	var pub types.PublicID
+	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT public_id FROM users WHERE id = ?", uid).Scan(&pub))
+	return pub
+}
+
+// enabledAdmins counts active grants whose user is enabled.
+func enabledAdmins(t *testing.T, db *sql.DB) int {
+	t.Helper()
+	var n int
+	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM instance_admins ia
+		INNER JOIN users u ON u.id = ia.user_id AND u.enabled = TRUE
+		WHERE ia.enabled = TRUE AND ia.revoked_at IS NULL`).Scan(&n))
+	return n
+}
+
+// TestRevokeAdmin_SuspendedAdminsDoNotCount holds the last-admin guard to
+// admins who can sign in: a grant held by a suspended user is no admin at
+// all, so revoking the only enabled one is refused even though two grants
+// are active.
+func TestRevokeAdmin_SuspendedAdminsDoNotCount(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, "DELETE FROM instance_admins")
+	require.NoError(t, err)
+	actorID := setupNewUser(t, q)
+	target := setupNewUser(t, q)
+	suspended := setupNewUser(t, q)
+	grantAdmin(t, q, target)
+	grantAdmin(t, q, suspended)
+	_, err = db.ExecContext(ctx, "UPDATE users SET enabled = FALSE WHERE id = ?", suspended)
+	require.NoError(t, err)
+
+	sink := &recordingSink{}
+	deps := Deps{DB: db, Queries: q, Audit: sink}
+	_, err = RevokeAdmin(deps)(authn.WithActor(ctx, actorID), &RevokeAdminInput{UserID: userPublicID(t, db, target).String()})
+
+	var prob *handlerutil.ProblemDetails
+	require.ErrorAs(t, err, &prob)
+	assert.Equal(t, "INSTANCE.ADMIN.LAST_ADMIN", prob.Type)
+	assert.Empty(t, sink.actions())
+	assert.Equal(t, 1, enabledAdmins(t, db), "the only enabled admin must keep the grant")
+}
+
+// TestRevokeAdmin_CrossRevokeKeepsOneAdmin races the only two admins
+// revoking each other. Whatever the interleaving, the instance must end
+// with one enabled admin and exactly one of the two calls must succeed.
+func TestRevokeAdmin_CrossRevokeKeepsOneAdmin(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	for round := 0; round < 10; round++ {
+		a, b, bPub := revokeFixture(t, db, q)
+		aPub := userPublicID(t, db, a)
+		deps := Deps{DB: db, Queries: q, Audit: &recordingSink{}}
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		start := make(chan struct{})
+		for i, call := range []struct {
+			actor  uint32
+			target types.PublicID
+		}{{a, bPub}, {b, aPub}} {
+			wg.Add(1)
+			go func(i int, actor uint32, target types.PublicID) {
+				defer wg.Done()
+				<-start
+				_, errs[i] = RevokeAdmin(deps)(authn.WithActor(ctx, actor), &RevokeAdminInput{UserID: target.String()})
+			}(i, call.actor, call.target)
+		}
+		close(start)
+		wg.Wait()
+
+		succeeded := 0
+		for _, err := range errs {
+			if err == nil {
+				succeeded++
+				continue
+			}
+			var prob *handlerutil.ProblemDetails
+			require.ErrorAs(t, err, &prob)
+			assert.Equal(t, "INSTANCE.ADMIN.LAST_ADMIN", prob.Type, "round %d", round)
+		}
+		require.Equal(t, 1, succeeded, "round %d: exactly one cross-revoke may win", round)
+		require.Equal(t, 1, enabledAdmins(t, db), "round %d: one enabled admin must remain", round)
+	}
+}
+
+// TestPatchUser_RefusesSelfSuspend holds the suspend path to the rule the
+// revoke and delete paths already keep: an admin cannot act on their own
+// account through it.
+func TestPatchUser_RefusesSelfSuspend(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	actorID, _, _ := revokeFixture(t, db, q)
+	sink := &recordingSink{}
+	deps := Deps{DB: db, Queries: q, Audit: sink}
+	disabled := false
+	in := &PatchUserInput{UserID: userPublicID(t, db, actorID).String()}
+	in.Body.Enabled = &disabled
+	_, err := PatchUser(deps)(authn.WithActor(ctx, actorID), in)
+
+	var prob *handlerutil.ProblemDetails
+	require.ErrorAs(t, err, &prob)
+	assert.Equal(t, "INSTANCE.USER.SELF_SUSPEND", prob.Type)
+	assert.Empty(t, sink.actions())
+}
+
+// TestPatchUser_RefusesSuspendingTheLastEnabledAdmin keeps the instance
+// from losing its last usable admin to a suspension, which a revoke of the
+// same admin would have been refused for.
+func TestPatchUser_RefusesSuspendingTheLastEnabledAdmin(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, "DELETE FROM instance_admins")
+	require.NoError(t, err)
+	actorID := setupNewUser(t, q)
+	onlyAdmin := setupNewUser(t, q)
+	grantAdmin(t, q, onlyAdmin)
+
+	sink := &recordingSink{}
+	deps := Deps{DB: db, Queries: q, Audit: sink}
+	disabled := false
+	in := &PatchUserInput{UserID: userPublicID(t, db, onlyAdmin).String()}
+	in.Body.Enabled = &disabled
+	_, err = PatchUser(deps)(authn.WithActor(ctx, actorID), in)
+
+	var prob *handlerutil.ProblemDetails
+	require.ErrorAs(t, err, &prob)
+	assert.Equal(t, "INSTANCE.ADMIN.LAST_ADMIN", prob.Type)
+	assert.Empty(t, sink.actions())
+	assert.Equal(t, 1, enabledAdmins(t, db), "the admin must still be enabled")
 }

@@ -219,8 +219,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
-        condition: service_healthy
       minio:
         condition: service_healthy
       mailpit:
@@ -237,7 +235,6 @@ services:
       NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
       NF_AUTH_CORS: ${NF_AUTH_CORS:-http://localhost:5173,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5175}
       NF_AUTH_SESSION_STORE: ${NF_AUTH_SESSION_STORE:-mysql}
-      NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
       NF_AUTH_PUBLIC_URL: ${NF_AUTH_PUBLIC_URL:-http://localhost:8082}
       NF_AUTH_WEB_URL: ${NF_AUTH_WEB_URL:-http://localhost:5175}
       NF_AUTH_FLOW_WEB_URL: ${NF_AUTH_FLOW_WEB_URL:-http://localhost:5173}

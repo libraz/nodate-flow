@@ -129,7 +129,9 @@ func TestFanOutWritesOneStatementPerChunk(t *testing.T) {
 	f := &Fanout{db: db}
 
 	resetExecCalls(100)
-	f.insertNotifications(context.Background(), batchOf(100))
+	if err := f.insertNotifications(context.Background(), batchOf(100)); err != nil {
+		t.Fatalf("insertNotifications: %v", err)
+	}
 
 	calls := execSnapshot()
 	if len(calls) != 1 {
@@ -151,7 +153,9 @@ func TestFanOutChunksLargeBatches(t *testing.T) {
 	f := &Fanout{db: db}
 
 	resetExecCalls(insertChunkSize)
-	f.insertNotifications(context.Background(), batchOf(insertChunkSize*2+1))
+	if err := f.insertNotifications(context.Background(), batchOf(insertChunkSize*2+1)); err != nil {
+		t.Fatalf("insertNotifications: %v", err)
+	}
 
 	calls := execSnapshot()
 	if len(calls) != 3 {
@@ -170,9 +174,42 @@ func TestFanOutSendsNothingForEmptyBatch(t *testing.T) {
 	f := &Fanout{db: db}
 
 	resetExecCalls(0)
-	f.insertNotifications(context.Background(), batchOf(0))
+	if err := f.insertNotifications(context.Background(), batchOf(0)); err != nil {
+		t.Fatalf("insertNotifications: %v", err)
+	}
 
 	if calls := execSnapshot(); len(calls) != 0 {
 		t.Fatalf("an empty batch must send nothing, sent %d statements", len(calls))
 	}
+}
+
+// TestReminderDeliveryIsBatched holds calendar reminders to the hook
+// fan-out's write path: a reminder for many recipients is a bounded
+// number of INSERT IGNORE statements, not one per recipient.
+func TestReminderDeliveryIsBatched(t *testing.T) {
+	db := countingDB(t)
+	f := &Fanout{db: db}
+
+	resetExecCalls(150)
+	if err := f.DeliverCalendarReminder(context.Background(), 1, types.New(), "Standup", recipientsOf(150), 42); err != nil {
+		t.Fatalf("DeliverCalendarReminder: %v", err)
+	}
+
+	calls := execSnapshot()
+	if len(calls) != 2 {
+		t.Fatalf("150 recipients at chunk size %d must be 2 statements, sent %d", insertChunkSize, len(calls))
+	}
+	for _, c := range calls {
+		if !strings.HasPrefix(strings.TrimSpace(c), "INSERT IGNORE") {
+			t.Fatalf("reminder rows must be INSERT IGNORE so a retry dedupes: %s", c)
+		}
+	}
+}
+
+func recipientsOf(n int) []uint32 {
+	out := make([]uint32, 0, n)
+	for i := range n {
+		out = append(out, uint32(i+1)) //#nosec G115 -- test fixture indices
+	}
+	return out
 }

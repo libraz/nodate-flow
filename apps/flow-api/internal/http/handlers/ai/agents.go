@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	aicore "github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
@@ -469,7 +470,8 @@ type TriggerAgentOutput struct {
 }
 
 // TriggerAgent enqueues (or synchronously dispatches) one run for
-// the given agent. Honors the paused kill switch and refuses when
+// the given agent. Honors the paused kill switch and the agent's monthly
+// cost cap, and refuses when
 // neither a Queue nor a synchronous Runner is wired.
 func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runner) func(context.Context, *TriggerAgentInput) (*TriggerAgentOutput, error) {
 	return func(ctx context.Context, in *TriggerAgentInput) (*TriggerAgentOutput, error) {
@@ -500,6 +502,12 @@ func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runne
 			return nil, httpErr(apierrors.AiAgentPaused)
 		}
 		now := time.Now().UTC()
+		if err := aicore.CheckAgentCostCap(ctx, deps.Queries, agentID, now); err != nil {
+			if errors.Is(err, aicore.ErrAgentCostCapExceeded) {
+				return nil, httpErr(apierrors.WsTaskAgentCostCapExceeded)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		dedupeKey := fmt.Sprintf("%d:manual:%d", agentID, now.UnixNano())
 		job := agentruntime.Job{AgentID: agentID, WsID: ws.ID}
 		if queue != nil {
@@ -512,6 +520,9 @@ func TriggerAgent(deps Deps, queue agentruntime.Queue, runner agentruntime.Runne
 			}
 		} else {
 			if err := runner.Run(ctx, job, now); err != nil {
+				if errors.Is(err, aicore.ErrAgentCostCapExceeded) {
+					return nil, httpErr(apierrors.WsTaskAgentCostCapExceeded)
+				}
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 		}

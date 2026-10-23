@@ -33,7 +33,7 @@ func RegisterProviders(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/ai/providers/{providerId}",
 		Summary:     "Rotate an LLM provider API key",
-		Description: "Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.",
+		Description: "Encrypts and stores a new API key for the provider. The old key is overwritten in place; nothing else about the provider changes.",
 		Tags:        []string{"AI"},
 	}, PatchProvider(deps))
 

@@ -1,6 +1,6 @@
 // Command worker is the entry point for the nodate-flow scheduled job
-// runner. It hosts cron-like jobs (the calendar_event_day materialiser
-// today) that previously lived inline in flow-api.
+// runner. It hosts cron-like jobs (the calendar_event_day materialiser,
+// the business gauges, the signal retention sweep).
 //
 // Wiring mirrors apps/flow-api/cmd/api/main.go: config → logger → tracer →
 // MySQL → metrics server → job runner → signal-driven graceful shutdown.
@@ -25,6 +25,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/business_metrics"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/calendar_event_day"
+	"github.com/libraz/nodate-flow/apps/flow-worker/internal/jobs/signal_retention"
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/lifecycle"
 )
 
@@ -41,6 +42,7 @@ import (
 func registerProductionJobs(cfg *config.Config, logger *slog.Logger) func(*jobs.Runner, *sql.DB) {
 	return func(runner *jobs.Runner, db *sql.DB) {
 		registerBusinessMetrics(cfg, logger, runner, db)
+		registerSignalRetention(logger, runner, db)
 
 		if strings.TrimSpace(cfg.ServiceToken) == "" {
 			// Error, not warn: this deployment will never emit a single
@@ -90,6 +92,19 @@ func registerBusinessMetrics(cfg *config.Config, logger *slog.Logger, runner *jo
 	logger.Info("flow-worker: business_metrics registered",
 		"refresh_interval", cfg.BusinessMetricsInterval,
 	)
+}
+
+// registerSignalRetention wires the expired-signal sweep. Like the gauge
+// refresh it needs only the database, so it runs whether or not the
+// flow-api service token is set.
+func registerSignalRetention(logger *slog.Logger, runner *jobs.Runner, db *sql.DB) {
+	job, err := signal_retention.New(db, logger)
+	if err != nil {
+		logger.Error("flow-worker: signal_retention construction failed", "err", err)
+		return
+	}
+	runner.Register(job)
+	logger.Info("flow-worker: signal_retention registered")
 }
 
 func main() {

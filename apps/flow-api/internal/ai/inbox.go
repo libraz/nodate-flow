@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -36,7 +37,11 @@ const proposeInboxTriageSystem = `You are an inbox triage assistant for nodate-f
 // workspace, asks the wired Provider to score them, appends one
 // ai.suggestion.proposed event per returned suggestion, and returns the
 // list. It enforces the cost guard before any LLM call.
-func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint32, limit int) ([]InboxTriageSuggestion, error) {
+//
+// vis is the requesting actor's: a task title enters the prompt only
+// when that actor may read the task, so neither the provider nor the
+// cached proposal served back carries a title they could not open.
+func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint32, vis acl.VisibilityArgs, limit int) ([]InboxTriageSuggestion, error) {
 	if o == nil || o.Resolver == nil {
 		return nil, ErrNoProvider
 	}
@@ -65,9 +70,13 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 	var prompt string
 	if o.Queries != nil {
 		rows, qerr := o.Queries.ListInbox(ctx, generated.ListInboxParams{
-			WorkspaceID: workspaceID,
-			Limit:       int32(limit),
-			Offset:      0,
+			WorkspaceID:   workspaceID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         int32(limit),
+			Offset:        0,
 		})
 		if qerr != nil {
 			return nil, fmt.Errorf("ai: list inbox: %w", qerr)
@@ -76,7 +85,7 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 	}
 
 	// ---- cache check (keyed on the prompt which includes item IDs) ----
-	cacheKey := ProposalCacheKey(workspaceID, "inbox_triage", prompt)
+	cacheKey := ProposalCacheKey(workspaceID, "inbox_triage", VisibilityCacheScope(vis), prompt)
 	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
 		if s, _ := cached.([]InboxTriageSuggestion); s != nil {
 			return s, nil
@@ -126,9 +135,10 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 }
 
 // buildInboxTriagePrompt renders a compact, redacted summary of the
-// inbox rows. Only the public id, source, kind and (truncated) task
-// title travel into the prompt; raw payload_json is intentionally
-// excluded so secrets in webhook bodies never reach the LLM.
+// inbox rows. Only the public id, source, kind and task title travel
+// into the prompt, and the title only when the row says the reader may
+// follow it; raw payload_json is intentionally excluded so secrets in
+// webhook bodies never reach the LLM.
 func buildInboxTriagePrompt(rows []generated.ListInboxRow) string {
 	if len(rows) == 0 {
 		return "[]"
@@ -146,7 +156,7 @@ func buildInboxTriagePrompt(rows []generated.ListInboxRow) string {
 			Source:      string(r.Source),
 			Kind:        r.Kind,
 		}
-		if r.TaskTitle.Valid {
+		if r.TaskTitle.Valid && r.TaskVisible.Valid && r.TaskVisible.Bool {
 			entry.TaskTitle = r.TaskTitle.String
 		}
 		out = append(out, entry)

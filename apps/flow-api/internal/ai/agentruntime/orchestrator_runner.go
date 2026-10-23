@@ -190,7 +190,8 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 	ctx = eventbus.WithActorAgentID(ctx, j.AgentID)
 
 	agentPubID := r.resolveAgentPublicID(ctx, j.AgentID)
-	taskInternalID, taskPubID := r.resolveSourceTask(ctx, j)
+	taskInternalID, taskPubID, trigger := r.resolveSourceTask(ctx, j)
+	ctx = WithTrigger(ctx, trigger)
 
 	started := r.Now().UTC()
 	r.bumpAttempts(ctx, j.WsID, taskInternalID, started)
@@ -367,37 +368,41 @@ func (r *OrchestratorRunner) queries() RunnerQuerier {
 }
 
 // resolveSourceTask looks up the source event's task_id when the run
-// was triggered by an on_event fan-out. Returns (0, "") for interval
-// or manual runs that carry no source event id.
-func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint32, string) {
+// was triggered by an on_event fan-out, together with the [Trigger] the
+// executor builds its prompt from. Returns zero values for interval or
+// manual runs that carry no source event id.
+func (r *OrchestratorRunner) resolveSourceTask(ctx context.Context, j Job) (uint32, string, Trigger) {
 	if r.DB == nil || j.SourceEventID == 0 {
-		return 0, ""
+		return 0, "", Trigger{}
 	}
-	const q = `SELECT e.task_id, t.public_id FROM events e
+	const q = `SELECT e.type, e.task_id, t.public_id FROM events e
 		LEFT JOIN tasks t ON t.id = e.task_id
 		WHERE e.id = ? AND e.workspace_id = ? LIMIT 1`
 	var (
-		taskID sql.NullInt32
-		pubRaw []byte
-		pubID  types.PublicID
+		eventType string
+		taskID    sql.NullInt32
+		pubRaw    []byte
+		pubID     types.PublicID
 	)
 	// Losing this lookup detaches every event this run emits from its
 	// task, which is what the timeline is keyed by.
 	if err := dbretry.Do(ctx, "agentruntime.resolveSourceTask", func(ctx context.Context) error {
-		return r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID).Scan(&taskID, &pubRaw)
+		return r.DB.QueryRowContext(ctx, q, j.SourceEventID, j.WsID).Scan(&eventType, &taskID, &pubRaw)
 	}); err != nil {
 		slog.WarnContext(ctx, "agentruntime: source-task lookup failed",
 			slog.Uint64("event_id", j.SourceEventID), slog.Any("err", err))
-		return 0, ""
+		return 0, "", Trigger{}
 	}
+	trigger := Trigger{EventType: eventType}
 	if !taskID.Valid {
-		return 0, ""
+		return 0, "", trigger
 	}
 	if len(pubRaw) == 16 {
 		_ = pubID.Scan(pubRaw)
 	}
+	trigger.TaskPublicID = pubID.String()
 	//#nosec G115 -- tasks.id is INT UNSIGNED, fits uint32
-	return uint32(taskID.Int32), pubID.String()
+	return uint32(taskID.Int32), pubID.String(), trigger
 }
 
 // resolveAgentPublicID fetches the public_id (UUID v7) for the given

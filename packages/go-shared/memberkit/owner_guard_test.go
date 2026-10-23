@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -153,5 +154,108 @@ func TestUpdateMemberRole_AdminMayStillManageMembers(t *testing.T) {
 
 	if got := memberRole(ctx, t, db, ws.wsID, target); got != "guest" {
 		t.Errorf("expected role=guest after the admin's change, got %q", got)
+	}
+}
+
+// ownerCount reads the enabled owners of a workspace outside any
+// transaction.
+func ownerCount(ctx context.Context, t *testing.T, db *sql.DB, wsID uint32) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM workspace_members WHERE workspace_id = ? AND role = 'owner' AND enabled = TRUE`,
+		wsID).Scan(&n); err != nil {
+		t.Fatalf("count owners: %v", err)
+	}
+	return n
+}
+
+// runCrossOwnerRace has the two owners of a workspace act on each other
+// at once: the first transaction applies its change and holds its commit
+// until the second has started its own, so a guard that counts owners
+// from a snapshot lets both through.
+func runCrossOwnerRace(t *testing.T, db *sql.DB, first, second func(ctx context.Context, tx *dbretry.Tx) error) (firstErr, secondErr error) {
+	t.Helper()
+	ctx := context.Background()
+	secondStarted := make(chan struct{})
+	secondDone := make(chan error, 1)
+
+	firstErr = dbretry.InTx(ctx, db, "memberkit.test.first", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if err := first(ctx, tx); err != nil {
+			return err
+		}
+		go func() {
+			secondDone <- dbretry.InTx(context.Background(), db, "memberkit.test.second", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+				close(secondStarted)
+				return second(ctx, tx)
+			})
+		}()
+		<-secondStarted
+		// Long enough for the second transaction to reach the owner
+		// rows before this one commits.
+		time.Sleep(300 * time.Millisecond)
+		return nil
+	})
+	return firstErr, <-secondDone
+}
+
+// TestUpdateMemberRole_CrossDemoteLeavesOneOwner holds the last-owner
+// guard under concurrency: two owners demoting each other at once must
+// not both succeed, because the workspace would be left with no owner.
+func TestUpdateMemberRole_CrossDemoteLeavesOneOwner(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+	ownerA := ws.actorID
+	ownerB := addOwner(ctx, t, db, ws.wsID)
+
+	firstErr, secondErr := runCrossOwnerRace(t, db,
+		func(ctx context.Context, tx *dbretry.Tx) error {
+			return UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{WorkspaceID: ws.wsID, UserID: ownerB, NewRole: RoleAdmin, ActorUserID: ownerA})
+		},
+		func(ctx context.Context, tx *dbretry.Tx) error {
+			return UpdateMemberRole(ctx, tx, UpdateMemberRoleArgs{WorkspaceID: ws.wsID, UserID: ownerA, NewRole: RoleAdmin, ActorUserID: ownerB})
+		})
+
+	if firstErr != nil {
+		t.Fatalf("first demote: %v", firstErr)
+	}
+	if !errors.Is(secondErr, ErrLastOwner) {
+		t.Fatalf("second demote: want ErrLastOwner, got %v", secondErr)
+	}
+	if n := ownerCount(ctx, t, db, ws.wsID); n != 1 {
+		t.Fatalf("owners after the race: want 1, got %d", n)
+	}
+}
+
+// TestRemoveWorkspaceMember_CrossRemoveLeavesOneOwner is the removal
+// counterpart.
+func TestRemoveWorkspaceMember_CrossRemoveLeavesOneOwner(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	ws := seedWorkspace(ctx, t, db, "")
+	t.Cleanup(func() { purgeWorkspace(t, db, ws.wsID) })
+	ownerA := ws.actorID
+	ownerB := addOwner(ctx, t, db, ws.wsID)
+
+	firstErr, secondErr := runCrossOwnerRace(t, db,
+		func(ctx context.Context, tx *dbretry.Tx) error {
+			_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{WorkspaceID: ws.wsID, UserID: ownerB, ActorUserID: ownerA})
+			return err
+		},
+		func(ctx context.Context, tx *dbretry.Tx) error {
+			_, err := RemoveWorkspaceMember(ctx, tx, RemoveWorkspaceMemberArgs{WorkspaceID: ws.wsID, UserID: ownerA, ActorUserID: ownerB})
+			return err
+		})
+
+	if firstErr != nil {
+		t.Fatalf("first remove: %v", firstErr)
+	}
+	if !errors.Is(secondErr, ErrLastOwner) {
+		t.Fatalf("second remove: want ErrLastOwner, got %v", secondErr)
+	}
+	if n := ownerCount(ctx, t, db, ws.wsID); n != 1 {
+		t.Fatalf("owners after the race: want 1, got %d", n)
 	}
 }

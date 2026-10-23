@@ -6,16 +6,16 @@ package relations
 import (
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Deps is the dependency bundle for handlers in this package.
 type Deps struct {
-	DB      *sql.DB
-	Queries *generated.Queries
-	Audit   *audit.Recorder
+	DB        *sql.DB
+	Queries   *generated.Queries
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

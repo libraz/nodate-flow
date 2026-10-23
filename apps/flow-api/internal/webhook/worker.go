@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
@@ -42,6 +43,14 @@ var retryDelays = []time.Duration{
 	10 * time.Minute,
 	1 * time.Hour,
 }
+
+// defaultHookTimeout is each hook job's deadline. defaultHookConcurrency
+// bounds the private runner used when no shared one is installed: each
+// job holds a pool connection while it writes delivery rows.
+const (
+	defaultHookConcurrency = 8
+	defaultHookTimeout     = 30 * time.Second
+)
 
 // pollInterval is the ticker period for the delivery loop.
 const pollInterval = 5 * time.Second
@@ -88,11 +97,17 @@ type Worker struct {
 	// so the reaper is observable; production leaves it zero.
 	StrandedAfter time.Duration
 
-	// run is the function executed inside each Hook goroutine. Tests
-	// override it to exercise the goroutine plumbing (detached cancel,
-	// panic recovery) without a live database. Production code leaves
+	// run is the function each hook job executes. Tests override it to
+	// exercise the runner plumbing (detached cancel, panic recovery,
+	// shutdown drain) without a live database. Production code leaves
 	// this nil and the hook routes to [Worker.createDeliveries].
 	run func(ctx context.Context, workspaceID uint32, eventType string)
+
+	// runner is where Hook submits its jobs; see [Worker.SetRunner].
+	// Read through [Worker.hooks], which supplies a private one when
+	// none was installed.
+	runner     *bgloop.HookRunner
+	runnerOnce sync.Once
 
 	// deliverFn is the per-row delivery step. Tests override it to
 	// exercise the batching — which rows may run at once, which must
@@ -113,8 +128,9 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 
 // Hook returns an eventbus.NotifyHook that creates webhook delivery
 // rows for every active subscription whose event_types list matches the
-// fired event. The returned function is non-blocking: it spawns a
-// goroutine so the eventbus append path is never delayed.
+// fired event. The returned function is non-blocking: it submits the work
+// to the hook runner so the eventbus append path is never delayed, and
+// the runner bounds, times out, recovers and drains it.
 //
 // eventInternalID is the events.id of the row that triggered this
 // fan-out; the worker resolves it to events.public_id and the row's
@@ -123,31 +139,38 @@ func NewWorker(db *sql.DB, q *generated.Queries) *Worker {
 // per subscription via the (subscription_id, event_public_id) unique
 // key, and the payload's OccurredAt reflects the event's logical time
 // rather than the dispatch instant.
-//
-// The spawned goroutine inherits the parent context's values via
-// [context.WithoutCancel] so trace span / logger attributes survive
-// request cancellation while DB inserts still get to finish. A
-// recover() guards the goroutine: a panic inside createDeliveries
-// would otherwise crash the whole flow-api process.
 func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
-		detached := context.WithoutCancel(ctx)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.ErrorContext(detached, "webhook hook panic",
-						slog.Any("recover", r),
-						slog.Uint64("workspace_id", uint64(workspaceID)),
-						slog.String("event_type", eventType))
-				}
-			}()
+		w.hooks().Go(ctx, defaultHookTimeout, func(runCtx context.Context) {
 			if w.run != nil {
-				w.run(detached, workspaceID, eventType)
+				w.run(runCtx, workspaceID, eventType)
 				return
 			}
-			w.createDeliveries(detached, workspaceID, eventType, eventInternalID)
-		}()
+			w.createDeliveries(runCtx, workspaceID, eventType, eventInternalID)
+		})
 	}
+}
+
+// SetRunner makes Hook submit to r, the runner the other event hooks
+// share. Safe to call once at start-up before any hook fires.
+func (w *Worker) SetRunner(r *bgloop.HookRunner) {
+	w.runnerOnce.Do(func() { w.runner = r })
+}
+
+// hooks returns the installed runner, or a private one when none was.
+func (w *Worker) hooks() *bgloop.HookRunner {
+	w.runnerOnce.Do(func() {
+		w.runner = bgloop.NewHookRunner("webhook.hook", defaultHookConcurrency, defaultHookTimeout)
+	})
+	return w.runner
+}
+
+// Shutdown stops accepting hook jobs and waits for the accepted ones, or
+// until ctx is done. It is separate from [Worker.Stop], which ends the
+// delivery loop: the rows the hooks are still writing are what that loop
+// would deliver next.
+func (w *Worker) Shutdown(ctx context.Context) error {
+	return w.hooks().Shutdown(ctx)
 }
 
 // createDeliveries finds active subscriptions for the workspace, filters
@@ -156,7 +179,15 @@ func (w *Worker) Hook() func(ctx context.Context, workspaceID uint32, eventType 
 // every delivery row in this fan-out shares the same dedupe key and the
 // payload's OccurredAt is the event's logical time, not the dispatch time.
 func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
-	subs, err := w.queries.ListActiveSubscriptionsForEvent(ctx, workspaceID)
+	// Delivery is at-least-once by contract, so a lock conflict on any
+	// of these statements is retried rather than costing the event its
+	// deliveries.
+	var subs []generated.ListActiveSubscriptionsForEventRow
+	err := dbretry.Do(ctx, "webhook.ListActiveSubscriptionsForEvent", func(ctx context.Context) error {
+		var lerr error
+		subs, lerr = w.queries.ListActiveSubscriptionsForEvent(ctx, workspaceID)
+		return lerr
+	})
 	if err != nil {
 		slog.Warn("webhook: failed to list active subscriptions",
 			slog.Uint64("workspace_id", uint64(workspaceID)),
@@ -165,9 +196,14 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 		return
 	}
 
-	eventRow, err := w.queries.GetEventPublicIDAndOccurredAt(ctx, generated.GetEventPublicIDAndOccurredAtParams{
-		WorkspaceID: workspaceID,
-		ID:          eventInternalID,
+	var eventRow generated.GetEventPublicIDAndOccurredAtRow
+	err = dbretry.Do(ctx, "webhook.GetEventPublicIDAndOccurredAt", func(ctx context.Context) error {
+		var gerr error
+		eventRow, gerr = w.queries.GetEventPublicIDAndOccurredAt(ctx, generated.GetEventPublicIDAndOccurredAtParams{
+			WorkspaceID: workspaceID,
+			ID:          eventInternalID,
+		})
+		return gerr
 	})
 	if err != nil {
 		slog.Warn("webhook: failed to resolve event public id",
@@ -190,14 +226,17 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 		pubID := types.New()
 		now := time.Now().UTC()
 		payload := buildPayload(pubID, eventPubID, eventType, occurredAt, ectx)
-		if _, err := w.queries.CreateWebhookDelivery(ctx, generated.CreateWebhookDeliveryParams{
-			PublicID:       pubID,
-			WorkspaceID:    workspaceID,
-			SubscriptionID: sub.ID,
-			EventType:      eventType,
-			EventPublicID:  &eventPubID,
-			PayloadJson:    payload,
-			NextRetryAt:    sql.NullTime{Time: now, Valid: true},
+		if err := dbretry.Do(ctx, "webhook.CreateWebhookDelivery", func(ctx context.Context) error {
+			_, cerr := w.queries.CreateWebhookDelivery(ctx, generated.CreateWebhookDeliveryParams{
+				PublicID:       pubID,
+				WorkspaceID:    workspaceID,
+				SubscriptionID: sub.ID,
+				EventType:      eventType,
+				EventPublicID:  &eventPubID,
+				PayloadJson:    payload,
+				NextRetryAt:    sql.NullTime{Time: now, Valid: true},
+			})
+			return cerr
 		}); err != nil {
 			slog.Warn("webhook: failed to create delivery",
 				slog.Uint64("workspace_id", uint64(workspaceID)),

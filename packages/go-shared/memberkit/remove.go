@@ -96,12 +96,8 @@ func RemoveWorkspaceMember(ctx context.Context, tx *dbretry.Tx, args RemoveWorks
 	// owner remains. Only an enabled owner counts toward the total, so
 	// an already-disabled owner row cannot be the "last" one.
 	if enabled && targetRole == string(RoleOwner) {
-		owners, err := countWorkspaceOwners(ctx, tx, args.WorkspaceID)
-		if err != nil {
+		if err := EnsureOwnerRemains(ctx, tx, workspaceOwners(args.WorkspaceID), args.UserID); err != nil {
 			return res, err
-		}
-		if owners <= 1 {
-			return res, ErrLastOwner
 		}
 	}
 

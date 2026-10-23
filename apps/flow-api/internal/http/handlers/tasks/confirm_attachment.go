@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 )
@@ -105,22 +106,9 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 
 		// Oversize upload: purge the attachment row and (if it drops to
 		// zero references) the underlying storage object before rejecting.
-		if err := rejectOversizeTaskAttachment(ctx, deps, ws.ID, task.ID, aid, row.StorageObjectID); err != nil {
+		if err := rejectOversizeTaskAttachment(ctx, deps, ws.ID, task, aid, row.StorageObjectID); err != nil {
 			return nil, err
 		}
-
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskAttachmentRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"attachmentId": aid.String(),
-				"reason":       "size_limit_exceeded",
-			},
-		}, "tasks.ConfirmUpload")
 
 		return nil, httpErr(apierrors.ValidationFileTooLarge)
 	}
@@ -130,47 +118,60 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 // ref count on its storage object, GCs the blob if now unreferenced, and
 // removes it from object storage. It mirrors DeleteAttachment's
 // transactional ordering so the ref count cannot drift.
-func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, taskID uint32, aid types.PublicID, storageObjectID uint32) error {
-	tx, err := deps.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-	defer func() { _ = tx.Rollback() }()
-	qtx := deps.Queries.WithTx(tx)
-
-	// This is the cleanup path for a blob this request has just rejected,
-	// not an endpoint answering about a resource the caller named, so a
-	// zero count has no 404 to map onto.
-	//
-	// affected-rows: not-applicable — the row was read a moment ago in this
-	// same request, and the reject path needs it gone rather than counted.
-	if _, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
-		WorkspaceID: wsID,
-		TaskID:      handlerutil.NullInt32From(taskID),
-		PublicID:    aid,
-	}); err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-
-	if _, err := qtx.DecrementStorageObjectRefCount(ctx, storageObjectID); err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-
-	fullRow, err := qtx.FindStorageObjectByID(ctx, storageObjectID)
-	if err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-
+func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, task middleware.TaskContext, aid types.PublicID, storageObjectID uint32) error {
+	actorID, _ := middleware.ActorFromContext(ctx)
+	taskInternal := int64(task.ID)
 	var storageKeyToRemove string
-	gcResult, err := qtx.DeleteStorageObjectIfUnreferenced(ctx, storageObjectID)
-	if err != nil {
-		return httpErr(apierrors.InternalUnexpected)
-	}
-	if affected, _ := gcResult.RowsAffected(); affected == 1 {
-		storageKeyToRemove = fullRow.StorageKey
-	}
+	err := dbretry.InTx(ctx, deps.DB, "tasks.ConfirmUpload", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		storageKeyToRemove = ""
+		qtx := generated.New(tx)
 
-	if err := tx.Commit(); err != nil {
+		// This is the cleanup path for a blob this request has just rejected,
+		// not an endpoint answering about a resource the caller named, so a
+		// zero count has no 404 to map onto.
+		//
+		// affected-rows: not-applicable — the row was read a moment ago in this
+		// same request, and the reject path needs it gone rather than counted.
+		if _, err := qtx.DeleteAttachment(ctx, generated.DeleteAttachmentParams{
+			WorkspaceID: wsID,
+			TaskID:      handlerutil.NullInt32From(task.ID),
+			PublicID:    aid,
+		}); err != nil {
+			return err
+		}
+
+		if _, err := qtx.DecrementStorageObjectRefCount(ctx, storageObjectID); err != nil {
+			return err
+		}
+
+		fullRow, err := qtx.FindStorageObjectByID(ctx, storageObjectID)
+		if err != nil {
+			return err
+		}
+
+		gcResult, err := qtx.DeleteStorageObjectIfUnreferenced(ctx, storageObjectID)
+		if err != nil {
+			return err
+		}
+		if affected, _ := gcResult.RowsAffected(); affected == 1 {
+			storageKeyToRemove = fullRow.StorageKey
+		}
+
+		return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+			EventType:    eventbus.TaskAttachmentRemoved,
+			AuditAction:  "attachment.delete",
+			ResourceType: "attachment",
+			ResourceID:   aid.String(),
+			TaskID:       &taskInternal,
+			Payload: map[string]any{
+				"taskId":       task.PublicID.String(),
+				"attachmentId": aid.String(),
+				"reason":       "size_limit_exceeded",
+			},
+			CallSite: "tasks.ConfirmUpload",
+		})
+	})
+	if err != nil {
 		return httpErr(apierrors.InternalUnexpected)
 	}
 

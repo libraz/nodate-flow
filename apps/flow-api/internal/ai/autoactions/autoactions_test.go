@@ -205,3 +205,23 @@ func TestEvaluate(t *testing.T) {
 		})
 	}
 }
+
+// TestEvaluateDueTodayIsNotOverdue pins escalate_overdue to calendar
+// days: a task due 2026-10-23 is not escalated at 15:00 UTC that day, and
+// is from midnight on.
+func TestEvaluateDueTodayIsNotOverdue(t *testing.T) {
+	t.Parallel()
+	sig := Signals{
+		State: StateOpen, HasAssignee: true, AssigneeCount: 1,
+		HasDueOn: true, DueOn: time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC),
+	}
+	sig.Now = time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
+	sig.UpdatedAt = sig.Now
+	if got := Evaluate(sig); got != nil && got.Kind == KindEscalateOverdue {
+		t.Fatalf("due today at 15:00Z: got %+v, want no escalation", got)
+	}
+	sig.Now = time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	if got := Evaluate(sig); got == nil || got.Kind != KindEscalateOverdue {
+		t.Fatalf("the next day at 00:00Z: got %+v, want escalate_overdue", got)
+	}
+}

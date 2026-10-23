@@ -36,6 +36,61 @@ func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemPara
 	return result.RowsAffected()
 }
 
+const getInboxItemTaskVisible = `-- name: GetInboxItemTaskVisible :one
+SELECT
+  (
+    CAST(? AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  ) AS task_visible
+FROM v_inbox v
+WHERE v.workspace_id = ?
+  AND v.public_id = ?
+LIMIT 1
+`
+
+type GetInboxItemTaskVisibleParams struct {
+	IsElevated    int64          `json:"isElevated"`
+	ActorUserID   int64          `json:"actorUserId"`
+	ActorUserID_2 int64          `json:"actorUserId2"`
+	ActorUserID_3 int64          `json:"actorUserId3"`
+	WorkspaceID   uint32         `json:"-"`
+	PublicID      types.PublicID `json:"publicId"`
+}
+
+// Resolve one inbox item in a workspace and whether the reader may read
+// the task it points at. No row means the id names no inbox item here,
+// which is what an AI suggestion reaction has to refuse.
+func (q *Queries) GetInboxItemTaskVisible(ctx context.Context, arg GetInboxItemTaskVisibleParams) (sql.NullBool, error) {
+	row := q.db.QueryRowContext(ctx, getInboxItemTaskVisible,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.WorkspaceID,
+		arg.PublicID,
+	)
+	var task_visible sql.NullBool
+	err := row.Scan(&task_visible)
+	return task_visible, err
+}
+
 const listInbox = `-- name: ListInbox :many
 SELECT
   v.workspace_id,
@@ -277,6 +332,100 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 			&i.CreatedAt,
 			&i.Total,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingAiSuggestionsForReader = `-- name: ListPendingAiSuggestionsForReader :many
+SELECT
+  e.public_id,
+  e.occurred_at,
+  e.payload_json
+FROM events e
+INNER JOIN v_inbox v
+  ON v.workspace_id = e.workspace_id
+ AND v.public_id = CASE
+       WHEN IS_UUID(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')))
+       THEN UUID_TO_BIN(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')), 0)
+     END
+WHERE e.workspace_id = ?
+  AND e.type = 'ai.suggestion.proposed'
+  AND NOT EXISTS (
+    SELECT 1 FROM events e2
+    WHERE e2.workspace_id = e.workspace_id
+      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
+      AND e2.id > e.id
+      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
+  )
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
+ORDER BY e.occurred_at DESC
+LIMIT 100
+`
+
+type ListPendingAiSuggestionsForReaderParams struct {
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+}
+
+type ListPendingAiSuggestionsForReaderRow struct {
+	PublicID    types.PublicID  `json:"publicId"`
+	OccurredAt  time.Time       `json:"occurredAt"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+}
+
+// Pending AI triage suggestions a reader may see. A suggestion is pending
+// while no later applied / dismissed event names the same inbox item; it
+// is the reader's only while that item is still in the inbox and the task
+// it points at is one they may read, because the stored reasoning is the
+// model talking about that task.
+func (q *Queries) ListPendingAiSuggestionsForReader(ctx context.Context, arg ListPendingAiSuggestionsForReaderParams) ([]ListPendingAiSuggestionsForReaderRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingAiSuggestionsForReader,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingAiSuggestionsForReaderRow{}
+	for rows.Next() {
+		var i ListPendingAiSuggestionsForReaderRow
+		if err := rows.Scan(&i.PublicID, &i.OccurredAt, &i.PayloadJson); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

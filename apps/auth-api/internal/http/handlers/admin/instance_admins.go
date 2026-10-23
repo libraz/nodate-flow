@@ -11,7 +11,35 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
+	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
+
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("admin: answered")
+
+// instanceAdmins is the owner set of the instance: active grants whose user
+// is enabled. A suspended admin cannot sign in, so it does not count toward
+// the admins that remain.
+func instanceAdmins() memberkit.OwnerSet {
+	return memberkit.OwnerSet{
+		Query: `SELECT ia.user_id FROM instance_admins ia
+		        INNER JOIN users u ON u.id = ia.user_id AND u.enabled = TRUE
+		        WHERE ia.enabled = TRUE AND ia.revoked_at IS NULL`,
+	}
+}
+
+// ensureAdminRemains answers INSTANCE.ADMIN.LAST_ADMIN unless an enabled
+// admin other than leaving remains. It locks the admin set, so it must run
+// in the transaction that then revokes or suspends leaving.
+func ensureAdminRemains(ctx context.Context, tx *dbretry.Tx, leaving uint32) (*apierr.Spec, error) {
+	err := memberkit.EnsureOwnerRemains(ctx, tx, instanceAdmins(), leaving)
+	if errors.Is(err, memberkit.ErrLastOwner) {
+		return apierrors.InstanceAdminLastAdmin, nil
+	}
+	return nil, err
+}
 
 // ListAdmins handles GET /admin/instance-admins. Returns a paginated list of
 // all active instance administrator grants.
@@ -122,25 +150,37 @@ func RevokeAdmin(deps Deps) func(context.Context, *RevokeAdminInput) (*RevokeAdm
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceAdminNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Guard against removing the last admin.
-		count, err := deps.Queries.AdminCountActiveInstanceAdmins(ctx)
-		if err != nil {
+		// The last-admin guard and the revoke share a transaction that locks
+		// the admin set, so two admins revoking each other at once cannot
+		// both pass it. Another path may also have revoked the grant since
+		// the check above, in which case the statement matches nothing: that
+		// answers as if the grant were never there and records no audit
+		// entry, so the trail never claims a revocation that did not happen.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "admin.RevokeAdmin", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			if spec, err := ensureAdminRemains(ctx, tx, targetID); err != nil || spec != nil {
+				if spec != nil {
+					answered = httpErr(spec)
+					return errAnswered
+				}
+				return err
+			}
+			affected, err := generated.New(tx).AdminRevokeInstanceAdmin(ctx, targetID)
+			if err != nil {
+				return err
+			}
+			if affected == 0 {
+				answered = httpErr(apierrors.InstanceAdminNotFound)
+				return errAnswered
+			}
+			return nil
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if count <= 1 {
-			return nil, httpErr(apierrors.InstanceAdminLastAdmin)
-		}
-
-		affected, err := deps.Queries.AdminRevokeInstanceAdmin(ctx, targetID)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		// Another path may have revoked the grant since the check above, in
-		// which case this statement matched nothing. Answer as if the grant
-		// were never there and record no audit entry, so the trail never
-		// claims a revocation that did not happen.
-		if affected == 0 {
-			return nil, httpErr(apierrors.InstanceAdminNotFound)
 		}
 
 		deps.Audit.Record(ctx, audit.Entry{

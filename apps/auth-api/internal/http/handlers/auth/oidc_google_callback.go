@@ -31,25 +31,15 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		if err != nil {
 			return nil, err
 		}
-		idTok, err := deps.OIDC.Exchange(ctx, in.Code, nonce)
+		claims, err := deps.OIDC.Exchange(ctx, in.Code, nonce)
 		if err != nil {
-			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
-		}
-		var claims struct {
-			Email    string `json:"email"`
-			Sub      string `json:"sub"`
-			Name     string `json:"name"`
-			Locale   string `json:"locale"`
-			Verified bool   `json:"email_verified"`
-		}
-		if err := idTok.Claims(&claims); err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		}
 		// Reject unverified emails. Google OIDC normally returns
 		// email_verified=true, but compromised or misconfigured IdPs
 		// might not; this check prevents account creation with an
 		// unverified email address.
-		if !claims.Verified {
+		if !claims.EmailVerified {
 			return nil, httpErr(apierrors.AuthOidcEmailNotVerified)
 		}
 		// Enforce the opt-in sign-in allowlist on the verified email

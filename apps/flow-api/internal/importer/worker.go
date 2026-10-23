@@ -26,10 +26,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
@@ -277,6 +279,11 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 		return errors.New("importer: a csv import needs a target project; create the job with projectId set")
 	}
 
+	projectID := uint32(job.ProjectID.Int32) //#nosec G115 -- projects.id, positive by construction
+	if err := w.checkInitiatorFloor(ctx, job.WorkspaceID, projectID, job.InitiatedByUserID); err != nil {
+		return err
+	}
+
 	payload, err := csvPayload(job.ConfigJson)
 	if err != nil {
 		return err
@@ -292,7 +299,6 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 		out.note("%s", re.Error())
 	}
 
-	projectID := uint32(job.ProjectID.Int32) //#nosec G115 -- projects.id, positive by construction
 	for i, row := range rows {
 		if i%progressEvery == 0 {
 			if err := w.checkStillRunning(ctx, job.ID); err != nil {
@@ -306,6 +312,21 @@ func (w *Worker) execute(ctx context.Context, job generated.ListPendingImportJob
 			continue
 		}
 		out.processed++
+	}
+	return nil
+}
+
+// checkInitiatorFloor re-applies the project editor floor the API held
+// the job to, against the user it names: the job may have waited in the
+// queue while that user lost the role. A job with no recorded initiator
+// has nobody the floor can be applied to and creates nothing.
+func (w *Worker) checkInitiatorFloor(ctx context.Context, workspaceID, projectID uint32, initiatedBy sql.NullInt32) error {
+	if !initiatedBy.Valid {
+		return errors.New("importer: the job names no initiating user, so no project role can authorise it")
+	}
+	initiator := uint32(initiatedBy.Int32) //#nosec G115 -- import_jobs.initiated_by_user_id references users.id, positive by construction
+	if spec := handlerutil.RequireProjectRole(ctx, w.DB, workspaceID, projectID, initiator, acl.ProjectRoleEditor); spec != nil {
+		return fmt.Errorf("importer: the initiating user may not create tasks in the target project (%s)", spec.Code)
 	}
 	return nil
 }

@@ -1,7 +1,6 @@
 {
   "task.created": "event.task_created",
   "task.updated": "event.task_updated",
-  "task.disabled": "event.task_disabled",
   "task.comment.added": "event.task_comment_added",
   "task.comment.edited": "event.task_comment_edited",
   "task.comment.removed": "event.task_comment_removed",

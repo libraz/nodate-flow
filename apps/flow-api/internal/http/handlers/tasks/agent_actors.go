@@ -9,13 +9,13 @@ import (
 
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -47,37 +47,35 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 			return nil, translateActorRoleError(perr)
 		}
 		pub := types.New()
-		if _, err := deps.Queries.AddAgentActor(ctx, generated.AddAgentActorParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Role:        role,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskActorAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":  task.PublicID.String(),
-				"actorId": pub.String(),
-				"agentId": agentPub.String(),
-				"kind":    "agent",
-				"role":    in.Body.Role,
-			},
-		}, "tasks.AddAgentActor")
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.agent_actor.add",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddAgentActor", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).AddAgentActor(ctx, generated.AddAgentActorParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				AgentID:     sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				Role:        role,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskActorAdded,
+				AuditAction:  "task.agent_actor.add",
 				ResourceType: "task_actor",
 				ResourceID:   pub.String(),
+				TaskID:       &taskInternal,
+				Payload: map[string]any{
+					"taskId":  task.PublicID.String(),
+					"actorId": pub.String(),
+					"agentId": agentPub.String(),
+					"kind":    "agent",
+					"role":    in.Body.Role,
+				},
+				CallSite: "tasks.AddAgentActor",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &AddTaskAgentActorOutput{Body: TaskAgentActor{
 			ID:      pub.String(),

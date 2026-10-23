@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/stateinfer"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -79,6 +80,7 @@ func ListStateSuggestions(deps Deps) func(context.Context, *ListStateSuggestions
 		}
 
 		now := time.Now().UTC()
+		zone := duedate.UserZone(ctx, deps.Queries, ws.ID, actorID)
 		out := &ListStateSuggestionsOutput{}
 		out.Body.Total = len(rows)
 		out.Body.Suggestions = []StateSuggestion{}
@@ -91,6 +93,7 @@ func ListStateSuggestions(deps Deps) func(context.Context, *ListStateSuggestions
 				State:     stateinfer.State(r.DerivedState),
 				UpdatedAt: updated,
 				Now:       now,
+				Zone:      zone,
 			}
 			if r.DueOn.Valid {
 				sig.HasDueOn = true

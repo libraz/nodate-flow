@@ -404,12 +404,12 @@ var roleFloorExemptOps = map[string]aclExemption{
 	// once the body has been resolved.
 	"tasks-create": {
 		via:    auth.EnforcedByHandlerCall,
-		checks: []string{"tasks.requireProjectEditor"},
+		checks: []string{"handlerutil.RequireProjectRole"},
 		note:   "project taken from the request body, so the role comparison happens after it resolves",
 	},
 	"tasks-reorder": {
 		via:    auth.EnforcedByHandlerCall,
-		checks: []string{"tasks.requireProjectEditor"},
+		checks: []string{"handlerutil.RequireProjectRole"},
 		note:   "project taken from the request body, so the role comparison happens after it resolves",
 	},
 

@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
@@ -33,6 +34,10 @@ import (
 // captured validation closure to translate the failure into the right
 // problem+json envelope.
 var errCreateValidation = errors.New("tasks.Create: validation failed")
+
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("tasks: answered")
 
 // translateTaskRuleError renders a [taskrules] refusal as the
 // problem+json envelope the REST contract answers for it. The rules
@@ -371,7 +376,7 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		}
 		// Project editor check (handler-level since /tasks has no workspace
 		// path parameter to attach RequireProjectRole to).
-		if spec := requireProjectEditor(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID); spec != nil {
+		if spec := handlerutil.RequireProjectRole(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
 			return nil, httpErr(spec)
 		}
 
@@ -821,216 +826,205 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		if !ok {
 			return nil, httpErr(apierrors.AuthTokenMissingOrMalformed)
 		}
-		current, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-		})
-		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
-		}
-
-		newTitle, err := taskrules.PatchTitle(current.Title, in.Body.Title)
-		if err != nil {
-			return nil, translateTaskRuleError(err)
-		}
-		newDesc := current.Description
-		if in.Body.Description != nil {
-			newDesc = sql.NullString{String: *in.Body.Description, Valid: *in.Body.Description != ""}
-		}
-		newPriority := current.Priority
-		if in.Body.Priority != nil {
-			newPriority = *in.Body.Priority
-		}
-		newDue := current.DueOn
+		// Dates in the body are parsed before the transaction; everything
+		// merged against the stored row happens inside it.
+		var bodyDue, bodyStart sql.NullTime
 		if in.Body.DueOn != nil {
 			parsed, err := parseDateOrNullTime(*in.Body.DueOn)
 			if err != nil {
 				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
-			newDue = parsed
+			bodyDue = parsed
 		}
-		newStart := current.StartedOn
 		if in.Body.StartOn != nil {
 			parsed, err := parseDateOrNullTime(*in.Body.StartOn)
 			if err != nil {
 				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
-			newStart = parsed
-		}
-		// The merged pair, not the body: a patch that moves only one
-		// side still has to face the other side's stored value.
-		if err := taskrules.DateOrder(newDue, newStart); err != nil {
-			return nil, translateTaskRuleError(err)
-		}
-		newSortWeight := current.SortWeight
-		if in.Body.SortWeight != nil {
-			newSortWeight = *in.Body.SortWeight
-		}
-		newVisibility := current.Visibility
-		if in.Body.Visibility != nil {
-			newVisibility = generated.TasksVisibility(*in.Body.Visibility)
-		}
-
-		titleChanged := in.Body.Title != nil && newTitle.String() != current.Title
-		dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
-		// Against the stored value, not the presence of the field: a client
-		// that round-trips the whole task re-sends a description it never
-		// edited, and a version is a body the task has held rather than a
-		// record of who sent what.
-		descChanged := in.Body.Description != nil && newDesc != current.Description
-
-		needsItemkit := false
-		if titleChanged || dueOnChanged {
-			linkedCount, err := deps.Queries.CountActiveCalendarEventsByTaskId(ctx,
-				sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			)
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			needsItemkit = linkedCount > 0
-		}
-
-		updateParams := generated.UpdateTaskParams{
-			Title:           newTitle.String(),
-			Description:     newDesc,
-			Priority:        newPriority,
-			DueOn:           newDue,
-			StartedOn:       newStart,
-			SortWeight:      newSortWeight,
-			Visibility:      newVisibility,
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			WorkspaceID:     ws.ID,
-			PublicID:        types.FromUUID(task.PublicID),
+			bodyStart = parsed
 		}
 
 		taskInternal := int64(task.ID)
-		updateEvent := eventbus.Event{
-			Type:        eventbus.TaskUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId": task.PublicID.String(),
-			},
-		}
-
-		// Not an existence check on either branch: a PATCH that re-sends
-		// the task's current values changes nothing and MySQL counts zero.
-		// The task was resolved by the task middleware before this runs.
-		if !needsItemkit {
-			// Same transaction boundary as the itemkit branch below. The
-			// UPDATE and the timeline row have to commit together: this
-			// path used to append after the write with no transaction in
-			// scope, so a crash in between left a task whose change had
-			// landed and whose timeline never recorded it — and the
-			// append error was only logged, which made the loss silent.
-			if err := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-				qtx := deps.Queries.WithTx(tx.RawTx())
-				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
-					return err
-				}
-				// Inside the transaction that writes the description: a body
-				// that commits without its snapshot is one no restore can
-				// return to.
-				if descChanged {
-					version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
-					if err != nil {
-						return err
-					}
-					if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
-						return err
-					}
-					// Alongside the snapshot, not inside it: a body edited down
-					// to nothing writes no version and still has to stop naming
-					// the people it used to.
-					if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
-						return err
-					}
-				}
-				return eventbus.Append(ctx, tx, updateEvent)
+		var (
+			newTitle     taskrules.Title
+			newDesc      sql.NullString
+			titleChanged bool
+			descChanged  bool
+			answered     error
+		)
+		// One transaction for the merge and the write. The row is locked
+		// before it is read, so the merge starts from what the previous
+		// writer committed and a concurrent PATCH of another field is kept
+		// rather than overwritten with a value read before it landed.
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+				ID:          task.ID,
+				WorkspaceID: ws.ID,
 			}); err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.WsTaskNotFound)
+					return errAnswered
+				}
+				return err
 			}
-		} else {
-			// dbretry.InTx rather than a hand-rolled transaction: the
-			// lifecycle event is appended inside it, and the eventbus
-			// only has a commit boundary to defer its fan-out to when
-			// the transaction came from here.
-			var answered error
-			txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-				answered = nil
-				qtx := deps.Queries.WithTx(tx.RawTx())
-				if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
+			current, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
+			})
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.WsTaskNotFound)
+					return errAnswered
+				}
+				return err
+			}
+
+			newTitle, err = taskrules.PatchTitle(current.Title, in.Body.Title)
+			if err != nil {
+				answered = translateTaskRuleError(err)
+				return errAnswered
+			}
+			newDesc = current.Description
+			if in.Body.Description != nil {
+				newDesc = sql.NullString{String: *in.Body.Description, Valid: *in.Body.Description != ""}
+			}
+			newPriority := current.Priority
+			if in.Body.Priority != nil {
+				newPriority = *in.Body.Priority
+			}
+			newDue := current.DueOn
+			if in.Body.DueOn != nil {
+				newDue = bodyDue
+			}
+			newStart := current.StartedOn
+			if in.Body.StartOn != nil {
+				newStart = bodyStart
+			}
+			// The merged pair, not the body: a patch that moves only one
+			// side still has to face the other side's stored value.
+			if err := taskrules.DateOrder(newDue, newStart); err != nil {
+				answered = translateTaskRuleError(err)
+				return errAnswered
+			}
+			newSortWeight := current.SortWeight
+			if in.Body.SortWeight != nil {
+				newSortWeight = *in.Body.SortWeight
+			}
+			newVisibility := current.Visibility
+			if in.Body.Visibility != nil {
+				newVisibility = generated.TasksVisibility(*in.Body.Visibility)
+			}
+
+			titleChanged = in.Body.Title != nil && newTitle.String() != current.Title
+			dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
+			// Against the stored value, not the presence of the field: a
+			// client that round-trips the whole task re-sends a description
+			// it never edited, and a version is a body the task has held
+			// rather than a record of who sent what.
+			descChanged = in.Body.Description != nil && newDesc != current.Description
+
+			needsItemkit := false
+			if titleChanged || dueOnChanged {
+				linkedCount, err := qtx.CountActiveCalendarEventsByTaskId(ctx,
+					sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+				)
+				if err != nil {
 					return err
 				}
-				// Same reason as the branch above: the snapshot, the event
-				// naming it and the mention sync share the transaction that
-				// writes the description.
-				if descChanged {
-					version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
-					if err != nil {
-						return err
-					}
-					if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
-						return err
-					}
-					if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
-						return err
-					}
+				needsItemkit = linkedCount > 0
+			}
+
+			updateParams := generated.UpdateTaskParams{
+				Title:           newTitle.String(),
+				Description:     newDesc,
+				Priority:        newPriority,
+				DueOn:           newDue,
+				StartedOn:       newStart,
+				SortWeight:      newSortWeight,
+				Visibility:      newVisibility,
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				WorkspaceID:     ws.ID,
+				PublicID:        types.FromUUID(task.PublicID),
+			}
+			// Not an existence check: a PATCH that re-sends the task's
+			// current values changes nothing and MySQL counts zero. The row
+			// lock above is what established the task exists.
+			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
+				return err
+			}
+			// Inside the transaction that writes the description: a body
+			// that commits without its snapshot is one no restore can
+			// return to.
+			if descChanged {
+				version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
+				if err != nil {
+					return err
 				}
-				if titleChanged {
-					// The renamed text is discarded here: this handler
-					// carries the task's new title and body already and
-					// refreshes the embedding from them below.
-					if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-						WorkspaceID: ws.ID,
-						ActorUserID: actorID,
-						TaskID:      task.ID,
-						NewTitle:    newTitle,
-					}); err != nil {
-						answered = translateItemkitTaskError(err)
-						return err
-					}
+				if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
+					return err
 				}
-				if dueOnChanged {
-					snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
-					if err != nil {
-						return err
-					}
-					var t time.Time
-					if newDue.Valid {
-						t = newDue.Time
-					}
-					if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-						WorkspaceID: ws.ID,
-						TaskID:      task.ID,
-						ActorUserID: actorID,
-						SetDueOn:    true,
-						DueOn:       t,
-						Snap:        snap,
-					}); err != nil {
-						answered = translateItemkitTaskError(err)
-						return err
-					}
+				// Alongside the snapshot, not inside it: a body edited down
+				// to nothing writes no version and still has to stop naming
+				// the people it used to.
+				if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
+					return err
 				}
-				// Append the lifecycle event inside the tx so a crash between
-				// commit and a post-commit append cannot lose the timeline row.
-				return eventbus.Append(ctx, tx, updateEvent)
+			}
+			if needsItemkit && titleChanged {
+				// The renamed text is discarded here: this handler carries
+				// the task's new title and body already and refreshes the
+				// embedding from them below.
+				if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+					WorkspaceID: ws.ID,
+					ActorUserID: actorID,
+					TaskID:      task.ID,
+					NewTitle:    newTitle,
+				}); err != nil {
+					answered = translateItemkitTaskError(err)
+					return err
+				}
+			}
+			if needsItemkit && dueOnChanged {
+				snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
+				if err != nil {
+					return err
+				}
+				var t time.Time
+				if newDue.Valid {
+					t = newDue.Time
+				}
+				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+					WorkspaceID: ws.ID,
+					TaskID:      task.ID,
+					ActorUserID: actorID,
+					SetDueOn:    true,
+					DueOn:       t,
+					Snap:        snap,
+				}); err != nil {
+					answered = translateItemkitTaskError(err)
+					return err
+				}
+			}
+			// The lifecycle event commits with the change; the audit row
+			// waits for the commit.
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskUpdated,
+				AuditAction:  "task.update",
+				ResourceType: "task",
+				ResourceID:   task.PublicID.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String()},
+				CallSite:     "tasks.Patch",
 			})
-			if answered != nil {
-				return nil, answered
-			}
-			if txErr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-		}
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "task.update",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "task",
-			ResourceID:   task.PublicID.String(),
 		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		// Only text that actually moved invalidates the vector: a refresh
 		// costs a provider call the workspace pays for.
 		textChanged := titleChanged || descChanged
@@ -1082,10 +1076,15 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 		// the transient mysql code; only after the retry budget is
 		// exhausted (or the error is non-transient) do we translate
 		// the result into a problem+json envelope.
-		var rawErr error
+		var (
+			rawErr  error
+			deleted bool
+		)
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Disable", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			rawErr = nil
-			if err := itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID); err != nil {
+			var err error
+			deleted, err = itemkit.DeleteTask(ctx, tx, ws.ID, task.ID, actorID)
+			if err != nil {
 				rawErr = err
 				return err
 			}
@@ -1097,17 +1096,18 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		if actorID != 0 {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		// A repeat or losing concurrent delete changed nothing, so it
+		// records nothing and still answers ok.
+		if deleted {
+			deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				AuditAction:  "task.delete",
 				ResourceType: "task",
 				ResourceID:   task.PublicID.String(),
+				CallSite:     "tasks.Disable (itemkit.DeleteTask appended the event)",
 			})
+			// A deleted blocker drops out of its dependents' facts.
+			autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		}
-		// A deleted blocker drops out of its dependents' facts.
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		// No task.disabled append here: itemkit.DeleteTask already emits
 		// item.deleted plus its legacy task.disabled dual-emit inside the
 		// tx above (see itemkit.legacyKindFor). A second post-commit append

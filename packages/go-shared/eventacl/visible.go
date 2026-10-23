@@ -47,6 +47,8 @@
 // the setting.
 package eventacl
 
+import "strings"
+
 // Visibility mirrors the calendar_events.visibility ENUM string.
 type Visibility string
 
@@ -156,6 +158,13 @@ func CanSeeDetails(evt Event, actor Actor) bool {
 // them. It deliberately joins nothing, so a query that does not already
 // have `calendars` can still apply it.
 const RowVisibilitySQL = `(ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))`
+
+// RowVisibilityFilter is [RowVisibilitySQL] for a statement assembled at
+// runtime: the same fragment with the named argument as a positional
+// bind, so a hand-written query cannot spell the rule differently.
+func RowVisibilityFilter(viewerUserID uint32) (fragment string, args []any) {
+	return strings.ReplaceAll(RowVisibilitySQL, "sqlc.arg(viewer_user_id)", "?"), []any{viewerUserID}
+}
 
 // AttendeeExistsSQL is the SELECT fragment that tells a list query
 // whether the viewer is on the event's attendee list, which decides

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -12,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -31,7 +31,9 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		pub := types.New()
-		// One commit boundary for the body and the mentions it names: a
+		taskInternal := int64(task.ID)
+		// One commit boundary for the body, the mentions it names and the
+		// event describing it: a
 		// mention row that lands without its comment, or a comment that
 		// lands without its mentions, is a thread that says one thing and
 		// notifies another.
@@ -51,28 +53,21 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			if e != nil {
 				return e
 			}
-			return syncCommentMentions(ctx, tx, ws.ID, task, uint32(id), pub, actorPtr(ctx), in.Body.Body) //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
+			if e := syncCommentMentions(ctx, tx, ws.ID, task, uint32(id), pub, actorPtr(ctx), in.Body.Body); e != nil { //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
+				return e
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskCommentAdded,
+				AuditAction:  "comment.create",
+				ResourceType: "comment",
+				ResourceID:   pub.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String(), "commentId": pub.String()},
+				CallSite:     "tasks.AddComment",
+			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskCommentAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":    task.PublicID.String(),
-				"commentId": pub.String(),
-			},
-		}, "tasks.AddComment")
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "comment.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "comment",
-			ResourceID:   pub.String(),
-		})
 		return &AddTaskCommentOutput{Body: TaskComment{
 			ID:        pub.String(),
 			Body:      in.Body.Body,
@@ -225,9 +220,10 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		if author != actorID {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
-		// The body and the mentions it names share a commit boundary: a
-		// clear that committed without its re-insert would drop every
-		// mention the edited comment still makes.
+		// The body, the mentions it names and the event share a commit
+		// boundary: a clear that committed without its re-insert would drop
+		// every mention the edited comment still makes.
+		taskInternal := int64(task.ID)
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.EditComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			qtx := deps.Queries.WithTx(tx.RawTx())
 			// Not an existence check: re-submitting the current body changes
@@ -241,28 +237,21 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 			}); e != nil {
 				return e
 			}
-			return syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), in.Body.Body)
+			if e := syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), in.Body.Body); e != nil {
+				return e
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskCommentEdited,
+				AuditAction:  "comment.update",
+				ResourceType: "comment",
+				ResourceID:   cid.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String(), "commentId": cid.String()},
+				CallSite:     "tasks.EditComment",
+			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskCommentEdited,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":    task.PublicID.String(),
-				"commentId": cid.String(),
-			},
-		}, "tasks.EditComment")
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "comment.update",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "comment",
-			ResourceID:   cid.String(),
-		})
 		return &EditTaskCommentOutput{Body: TaskComment{
 			ID:       cid.String(),
 			Body:     in.Body.Body,
@@ -299,6 +288,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		var gone bool
+		taskInternal := int64(task.ID)
 		// The delete is a soft one, so no foreign key cascade reaches the
 		// mention rows. Clearing them here, on the same commit boundary, is
 		// what stops a comment nobody can read from going on naming people.
@@ -318,31 +308,24 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 				gone = true
 				return nil
 			}
-			return syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), "")
+			if e := syncCommentMentions(ctx, tx, ws.ID, task, commentID, cid, actorPtr(ctx), ""); e != nil {
+				return e
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskCommentRemoved,
+				AuditAction:  "comment.delete",
+				ResourceType: "comment",
+				ResourceID:   cid.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String(), "commentId": cid.String()},
+				CallSite:     "tasks.DeleteComment",
+			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if gone {
 			return nil, httpErr(apierrors.WsCommentNotFound)
 		}
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskCommentRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":    task.PublicID.String(),
-				"commentId": cid.String(),
-			},
-		}, "tasks.DeleteComment")
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "comment.delete",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "comment",
-			ResourceID:   cid.String(),
-		})
 		out := &DeleteTaskCommentOutput{}
 		out.Body.Ok = true
 		return out, nil

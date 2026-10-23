@@ -70,7 +70,7 @@ type CreateWebhookInput struct {
 	Body struct {
 		URL         string          `json:"url" required:"true" maxLength:"2048" doc:"Target URL for webhook delivery"`
 		Description string          `json:"description" maxLength:"255" doc:"Human-readable description"`
-		EventTypes  json.RawMessage `json:"eventTypes" required:"true" doc:"JSON array of event type patterns"`
+		EventTypes  json.RawMessage `json:"eventTypes" required:"true" doc:"JSON array of event kinds matched exactly (for example task.transition.complete), or [\"*\"] for every kind"`
 	}
 }
 

@@ -463,6 +463,7 @@ SET name = ?,
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND status <> 'completed'
 `
 
 type UpdateTimeboxParams struct {
@@ -474,7 +475,8 @@ type UpdateTimeboxParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Update mutable timebox fields.
+// Update mutable timebox fields. A completed timebox is never changed, so
+// the rule holds against a completion committed after the caller's read.
 func (q *Queries) UpdateTimebox(ctx context.Context, arg UpdateTimeboxParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateTimebox,
 		arg.Name,
@@ -496,6 +498,7 @@ SET status = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND status <> 'completed'
 `
 
 type UpdateTimeboxStatusParams struct {
@@ -504,7 +507,8 @@ type UpdateTimeboxStatusParams struct {
 	PublicID    types.PublicID  `json:"publicId"`
 }
 
-// Transition timebox lifecycle status.
+// Transition timebox lifecycle status. Completed is terminal, so a
+// completed timebox matches no row.
 func (q *Queries) UpdateTimeboxStatus(ctx context.Context, arg UpdateTimeboxStatusParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateTimeboxStatus, arg.Status, arg.WorkspaceID, arg.PublicID)
 	if err != nil {

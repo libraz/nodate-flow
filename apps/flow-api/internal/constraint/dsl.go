@@ -31,18 +31,20 @@ type Op string
 // the task, by anyone — it does not test the role of whoever triggered
 // the evaluation, and the keyword's phrasing invites that misreading.
 // See [Facts.ActorRoles] for why the fact cannot be per-caller.
+//
+// Every op reads a fact the engine store loads from stored state. An
+// approval or CI-status op would need a source nothing records yet, so
+// none is offered: a constraint on it could only ever evaluate false.
 const (
-	OpAnd             Op = "and"
-	OpOr              Op = "or"
-	OpNot             Op = "not"
-	OpTimeDueBefore   Op = "time.due_before"
-	OpTimeDueAfter    Op = "time.due_after"
-	OpDepAllDone      Op = "dependency.all_done"
-	OpDepOpenAtMost   Op = "dependency.open_at_most"
-	OpActorHasRole    Op = "actor.has_role"
-	OpSignalReceived  Op = "signal.received"
-	OpApprovalGranted Op = "approval.granted"
-	OpCIStatusIs      Op = "ci.status_is"
+	OpAnd            Op = "and"
+	OpOr             Op = "or"
+	OpNot            Op = "not"
+	OpTimeDueBefore  Op = "time.due_before"
+	OpTimeDueAfter   Op = "time.due_after"
+	OpDepAllDone     Op = "dependency.all_done"
+	OpDepOpenAtMost  Op = "dependency.open_at_most"
+	OpActorHasRole   Op = "actor.has_role"
+	OpSignalReceived Op = "signal.received"
 )
 
 // Constraint is the parsed DSL AST. It is a single struct with
@@ -144,7 +146,7 @@ func validate(c *Constraint) error {
 		if c.Max == nil || *c.Max < 0 {
 			return parseErr(CodeMissingArg, "dependency.open_at_most requires non-negative max")
 		}
-	case OpActorHasRole, OpSignalReceived, OpApprovalGranted, OpCIStatusIs:
+	case OpActorHasRole, OpSignalReceived:
 		if c.Arg == "" {
 			return parseErr(CodeMissingArg, "%s requires arg", c.Op)
 		}

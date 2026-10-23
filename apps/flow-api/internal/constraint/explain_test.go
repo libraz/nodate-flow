@@ -10,7 +10,7 @@ func TestExplain_Basic(t *testing.T) {
 		{`{"op":"time.due_before","arg":"2026-05-01"}`, "due_before(2026-05-01)"},
 		{`{"op":"dependency.all_done","taskIds":["a","b"]}`, "all_done(a,b)"},
 		{`{"op":"actor.has_role","arg":"reviewer"}`, "actor_has_role(reviewer)"},
-		{`{"op":"ci.status_is","arg":"success"}`, "ci_status_is(success)"},
+		{`{"op":"signal.received","arg":"pull_request.merged"}`, "signal_received(pull_request.merged)"},
 	}
 	for _, tc := range cases {
 		c, err := Parse([]byte(tc.in))
@@ -26,12 +26,12 @@ func TestExplain_Basic(t *testing.T) {
 func TestExplain_Composite(t *testing.T) {
 	c, _ := Parse([]byte(`{
 		"op":"and","terms":[
-			{"op":"ci.status_is","arg":"success"},
+			{"op":"actor.has_role","arg":"reviewer"},
 			{"op":"not","term":{"op":"signal.received","arg":"github.pr.closed"}}
 		]
 	}`))
 	got := Explain(c)
-	want := "(ci_status_is(success) AND NOT signal_received(github.pr.closed))"
+	want := "(actor_has_role(reviewer) AND NOT signal_received(github.pr.closed))"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -40,7 +40,7 @@ func TestExplain_Composite(t *testing.T) {
 func TestExplain_Deterministic(t *testing.T) {
 	c, _ := Parse([]byte(`{"op":"or","terms":[
 		{"op":"actor.has_role","arg":"reviewer"},
-		{"op":"approval.granted","arg":"owner"}
+		{"op":"signal.received","arg":"pull_request.merged"}
 	]}`))
 	a := Explain(c)
 	b := Explain(c)

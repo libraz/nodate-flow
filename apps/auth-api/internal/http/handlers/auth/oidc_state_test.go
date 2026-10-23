@@ -45,7 +45,7 @@ func oidcProviders() []oidcProvider {
 				// the not-configured check before reaching that gate.
 				return Deps{
 					JWT:   testJWTIssuer(t),
-					OIDC:  internauth.NewOIDCClient(internauth.OIDCConfig{}),
+					OIDC:  internauth.NewGoogleOIDC(internauth.OIDCConfig{}),
 					Audit: audit.NoopSink{},
 				}
 			},

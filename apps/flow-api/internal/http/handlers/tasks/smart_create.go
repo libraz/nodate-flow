@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
@@ -182,7 +183,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		// Same project-editor gate as POST /tasks: the project comes from the
 		// request body, so workspace membership alone does not say whether the
 		// caller may create tasks in it.
-		if spec := requireProjectEditor(ctx, deps.DB, ws.ID, prj.ID, actorID); spec != nil {
+		if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
 			return nil, httpErr(spec)
 		}
 

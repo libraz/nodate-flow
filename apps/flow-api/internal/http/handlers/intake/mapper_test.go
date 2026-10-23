@@ -3,6 +3,7 @@ package intake
 import (
 	"database/sql"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,8 +36,6 @@ func TestEveryRecordFieldIsFilledFromAFullRow(t *testing.T) {
 			Body:                 str("body"),
 			TriageStatus:         generated.IntakeItemsTriageStatusPending,
 			SnoozeUntil:          sql.NullTime{Time: now, Valid: true},
-			AiScore:              str("0.5"),
-			AiReasoning:          str("reasoning"),
 			TriagedByPublicID:    pub,
 			TriagedByDisplayName: str("Someone"),
 			CreatedAt:            now,
@@ -47,8 +46,6 @@ func TestEveryRecordFieldIsFilledFromAFullRow(t *testing.T) {
 			Body:                 str("body"),
 			TriageStatus:         generated.IntakeItemsTriageStatusPending,
 			SnoozeUntil:          sql.NullTime{Time: now, Valid: true},
-			AiScore:              str("0.5"),
-			AiReasoning:          str("reasoning"),
 			TriagedByPublicID:    pub,
 			TriagedByDisplayName: str("Someone"),
 			CreatedAt:            now,
@@ -82,8 +79,6 @@ func TestFindRowFillsWhatTheQuerySelects(t *testing.T) {
 		Body:         str("body"),
 		TriageStatus: generated.IntakeItemsTriageStatusPending,
 		SnoozeUntil:  sql.NullTime{Time: now, Valid: true},
-		AiScore:      str("0.5"),
-		AiReasoning:  str("reasoning"),
 		CreatedAt:    now,
 	})
 
@@ -100,6 +95,21 @@ func TestFindRowFillsWhatTheQuerySelects(t *testing.T) {
 		}
 		if v.Field(i).IsZero() {
 			t.Errorf("mapFindRow left Record.%s empty — either fill it or drop it from the DTO", name)
+		}
+	}
+}
+
+// TestRecordExposesNoUnscoredFields keeps the AI score off the contract
+// until something produces one: nothing writes ai_score, so a field for it
+// would be NULL on every item.
+func TestRecordExposesNoUnscoredFields(t *testing.T) {
+	t.Parallel()
+
+	typ := reflect.TypeOf(Record{})
+	for i := 0; i < typ.NumField(); i++ {
+		switch tag := typ.Field(i).Tag.Get("json"); {
+		case strings.HasPrefix(tag, "aiScore"), strings.HasPrefix(tag, "aiReasoning"):
+			t.Errorf("Record.%s exposes %q, which no code path ever populates", typ.Field(i).Name, tag)
 		}
 	}
 }

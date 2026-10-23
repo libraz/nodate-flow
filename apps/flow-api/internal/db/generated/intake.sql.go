@@ -127,16 +127,21 @@ FROM intake_items ii
 LEFT JOIN users tu ON tu.id = ii.triaged_by_user_id
 WHERE ii.workspace_id = ?
   AND ii.enabled = TRUE
-  AND (? = '' OR ii.triage_status = ?)
+  AND (? = ''
+       OR (ii.triage_status = ?
+           AND NOT (ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
+       OR (CAST(? AS SIGNED) = 1
+           AND ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
 ORDER BY ii.created_at DESC
 LIMIT ? OFFSET ?
 `
 
 type ListIntakeItemsForWorkspaceParams struct {
-	WorkspaceID  uint32                  `json:"-"`
-	StatusFilter IntakeItemsTriageStatus `json:"statusFilter"`
-	Limit        int32                   `json:"limit"`
-	Offset       int32                   `json:"offset"`
+	WorkspaceID           uint32                  `json:"-"`
+	StatusFilter          IntakeItemsTriageStatus `json:"statusFilter"`
+	IncludeExpiredSnoozes int64                   `json:"includeExpiredSnoozes"`
+	Limit                 int32                   `json:"limit"`
+	Offset                int32                   `json:"offset"`
 }
 
 type ListIntakeItemsForWorkspaceRow struct {
@@ -157,12 +162,15 @@ type ListIntakeItemsForWorkspaceRow struct {
 	Total                interface{}             `json:"total"`
 }
 
-// List intake items for a workspace, filtered by status.
+// List intake items for a workspace, filtered by status. A snooze whose
+// deadline has passed is pending again: it never lists under snoozed, and
+// include_expired_snoozes (1 when the filter is pending) lists it there.
 func (q *Queries) ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntakeItemsForWorkspaceParams) ([]ListIntakeItemsForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listIntakeItemsForWorkspace,
 		arg.WorkspaceID,
 		arg.StatusFilter,
 		arg.StatusFilter,
+		arg.IncludeExpiredSnoozes,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -223,7 +231,11 @@ FROM intake_items ii
 LEFT JOIN users tu ON tu.id = ii.triaged_by_user_id
 WHERE ii.workspace_id = ?
   AND ii.enabled = TRUE
-  AND (? = '' OR ii.triage_status = ?)
+  AND (? = ''
+       OR (ii.triage_status = ?
+           AND NOT (ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
+       OR (CAST(? AS SIGNED) = 1
+           AND ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
   AND (
     ? IS NULL
     OR ii.created_at < ?
@@ -234,11 +246,12 @@ LIMIT ?
 `
 
 type ListIntakeItemsForWorkspaceKeysetParams struct {
-	WorkspaceID     uint32                  `json:"-"`
-	StatusFilter    IntakeItemsTriageStatus `json:"statusFilter"`
-	CursorCreatedAt sql.NullTime            `json:"cursorCreatedAt"`
-	CursorPublicID  types.PublicID          `json:"cursorPublicId"`
-	Limit           int32                   `json:"limit"`
+	WorkspaceID           uint32                  `json:"-"`
+	StatusFilter          IntakeItemsTriageStatus `json:"statusFilter"`
+	IncludeExpiredSnoozes int64                   `json:"includeExpiredSnoozes"`
+	CursorCreatedAt       sql.NullTime            `json:"cursorCreatedAt"`
+	CursorPublicID        types.PublicID          `json:"cursorPublicId"`
+	Limit                 int32                   `json:"limit"`
 }
 
 type ListIntakeItemsForWorkspaceKeysetRow struct {
@@ -258,12 +271,14 @@ type ListIntakeItemsForWorkspaceKeysetRow struct {
 	CreatedAt            time.Time               `json:"createdAt"`
 }
 
-// Cursor-paginated intake items for a workspace, filtered by status.
+// Cursor-paginated intake items for a workspace, filtered by status, with
+// expired snoozes listed under pending as in ListIntakeItemsForWorkspace.
 func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg ListIntakeItemsForWorkspaceKeysetParams) ([]ListIntakeItemsForWorkspaceKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listIntakeItemsForWorkspaceKeyset,
 		arg.WorkspaceID,
 		arg.StatusFilter,
 		arg.StatusFilter,
+		arg.IncludeExpiredSnoozes,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
 		arg.CursorCreatedAt,
@@ -306,37 +321,6 @@ func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg Lis
 	return items, nil
 }
 
-const setIntakeItemAIScore = `-- name: SetIntakeItemAIScore :execrows
-UPDATE intake_items
-SET ai_score     = ?,
-    ai_reasoning = ?,
-    scored_at    = NOW()
-WHERE workspace_id = ?
-  AND public_id = ?
-  AND enabled = TRUE
-`
-
-type SetIntakeItemAIScoreParams struct {
-	AiScore     sql.NullString `json:"aiScore"`
-	AiReasoning sql.NullString `json:"aiReasoning"`
-	WorkspaceID uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-}
-
-// Set AI score and reasoning for an intake item.
-func (q *Queries) SetIntakeItemAIScore(ctx context.Context, arg SetIntakeItemAIScoreParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, setIntakeItemAIScore,
-		arg.AiScore,
-		arg.AiReasoning,
-		arg.WorkspaceID,
-		arg.PublicID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const setIntakeItemTask = `-- name: SetIntakeItemTask :execrows
 UPDATE intake_items
 SET task_id        = ?,
@@ -344,6 +328,7 @@ SET task_id        = ?,
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND task_id IS NULL
 `
 
 type SetIntakeItemTaskParams struct {
@@ -352,7 +337,9 @@ type SetIntakeItemTaskParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Link an intake item to a converted task.
+// Link an intake item to a converted task. Matches only an item not yet
+// converted, so a losing concurrent conversion counts zero rows and rolls
+// its task back.
 func (q *Queries) SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, setIntakeItemTask, arg.TaskID, arg.WorkspaceID, arg.PublicID)
 	if err != nil {
@@ -369,6 +356,9 @@ SET triage_status      = ?,
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND task_id IS NULL
+  AND (triage_status = 'pending'
+       OR (triage_status = 'snoozed' AND snooze_until <= NOW(3)))
 `
 
 type UpdateIntakeItemTriageParams struct {
@@ -379,7 +369,9 @@ type UpdateIntakeItemTriageParams struct {
 	PublicID        types.PublicID          `json:"publicId"`
 }
 
-// Update the triage status of an intake item.
+// Triage an intake item out of pending. The predicate is the claim: only an
+// unconverted item that is pending, or snoozed past its deadline, matches,
+// so of two racing triages exactly one counts a row.
 func (q *Queries) UpdateIntakeItemTriage(ctx context.Context, arg UpdateIntakeItemTriageParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateIntakeItemTriage,
 		arg.TriageStatus,

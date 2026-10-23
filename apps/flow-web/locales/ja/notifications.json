@@ -31,7 +31,6 @@
   "event": {
     "task_created": "新しいタスクが作成されました",
     "task_updated": "タスクが更新されました",
-    "task_disabled": "タスクが削除されました",
     "task_comment_added": "新しいコメントが追加されました",
     "task_comment_edited": "コメントが編集されました",
     "task_comment_removed": "コメントが削除されました",

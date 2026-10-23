@@ -11,17 +11,16 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
-// allowedSettingKeys defines the set of instance setting keys that may be
-// created or updated via the admin API. Unknown keys are rejected with 400.
-var allowedSettingKeys = map[string]bool{
-	"registration_open":         true,
-	"mfa_enforcement":           true,
-	"max_workspaces_per_user":   true,
-	"max_members_per_workspace": true,
-}
+// settingValidators maps every instance setting key the admin API accepts
+// to its value check. A key is added here only together with the code path
+// that reads it: registration, MFA policy and workspace/member limits are
+// governed by deployment config, so no key is accepted yet. Unknown keys
+// are rejected with 400.
+var settingValidators = map[string]func(value string) bool{}
 
-// ListSettings handles GET /admin/settings. Returns all active instance
-// settings as a flat list.
+// ListSettings handles GET /admin/settings. Returns the active instance
+// settings whose key is accepted by settingValidators; a stored row no code
+// path reads is not shown as if it took effect.
 func ListSettings(deps Deps) func(context.Context, *struct{}) (*ListSettingsOutput, error) {
 	return func(ctx context.Context, _ *struct{}) (*ListSettingsOutput, error) {
 		rows, err := deps.Queries.AdminListInstanceSettings(ctx)
@@ -30,9 +29,12 @@ func ListSettings(deps Deps) func(context.Context, *struct{}) (*ListSettingsOutp
 		}
 
 		out := &ListSettingsOutput{}
-		out.Body.Items = make([]InstanceSetting, len(rows))
-		for i, r := range rows {
-			out.Body.Items[i] = rowToSetting(r)
+		out.Body.Items = make([]InstanceSetting, 0, len(rows))
+		for _, r := range rows {
+			if _, ok := settingValidators[r.SettingKey]; !ok {
+				continue
+			}
+			out.Body.Items = append(out.Body.Items, rowToSetting(r))
 		}
 		return out, nil
 	}
@@ -44,17 +46,14 @@ func PatchSettings(deps Deps) func(context.Context, *PatchSettingsInput) (*Patch
 	return func(ctx context.Context, in *PatchSettingsInput) (*PatchSettingsOutput, error) {
 		uid, _ := authn.ActorFromContext(ctx)
 
-		// Validate all keys before writing anything.
-		for key := range in.Body.Settings {
-			if !allowedSettingKeys[key] {
+		// Validate every key and value before writing anything.
+		for key, value := range in.Body.Settings {
+			valid, ok := settingValidators[key]
+			if !ok {
 				return nil, httpErr(apierrors.InstanceSettingsInvalidKey)
 			}
-		}
-
-		// Validate values.
-		for key, value := range in.Body.Settings {
-			if err := validateSettingValue(key, value); err != nil {
-				return nil, err
+			if !valid(value) {
+				return nil, httpErr(apierrors.InstanceSettingsInvalidValue)
 			}
 		}
 
@@ -83,32 +82,6 @@ func PatchSettings(deps Deps) func(context.Context, *PatchSettingsInput) (*Patch
 		out.Body.Ok = true
 		return out, nil
 	}
-}
-
-// validateSettingValue checks that the value is acceptable for the given key.
-// Returns nil on success or an error suitable for returning from the handler.
-func validateSettingValue(key, value string) error {
-	switch key {
-	case "registration_open":
-		if value != "true" && value != "false" {
-			return httpErr(apierrors.InstanceSettingsInvalidValue)
-		}
-	case "mfa_enforcement":
-		if value != "none" && value != "optional" && value != "required" {
-			return httpErr(apierrors.InstanceSettingsInvalidValue)
-		}
-	case "max_workspaces_per_user", "max_members_per_workspace":
-		// Must be a positive integer string.
-		if len(value) == 0 {
-			return httpErr(apierrors.InstanceSettingsInvalidValue)
-		}
-		for _, c := range value {
-			if c < '0' || c > '9' {
-				return httpErr(apierrors.InstanceSettingsInvalidValue)
-			}
-		}
-	}
-	return nil
 }
 
 // settingsMetadata builds the audit metadata map from the updated settings.

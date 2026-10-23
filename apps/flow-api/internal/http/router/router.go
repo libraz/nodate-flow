@@ -56,6 +56,7 @@ import (
 	airelations "github.com/libraz/nodate-flow/apps/flow-api/internal/ai/relations"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -197,6 +198,12 @@ type Deps struct {
 	// uploads / downloads. Nil in tests; presign endpoints return
 	// INTERNAL.UNEXPECTED.
 	Storage *storage.Client
+
+	// HookRunner is the runner the event hooks registered here submit
+	// their work to, shared with the hooks cmd/api registers so one bound
+	// and one shutdown drain cover them all. Nil in tests, where each
+	// hook falls back to a private runner.
+	HookRunner *bgloop.HookRunner
 
 	// EmailSender is the outbound email transport. Nil or a NoopSender
 	// when SMTP is not configured; handlers should check for
@@ -792,7 +799,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlConstraintCompiler: nlConstraintCompiler,
 		nlCommandResolver:    nlCommandResolver,
 		prjDeps:              projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec},
+		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec, Mutations: mutationRec},
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
@@ -979,7 +986,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Description: "Returns every project the caller can see in the workspace. Backs the project switcher and the project list panel.",
 			Tags:        []string{"Workspace"},
 		}, projects.List(shared.prjDeps))
-		labelDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		labelDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		labels.RegisterWorkspaceScoped(subAPI, labelDeps)
 		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
@@ -989,7 +996,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
 		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
-		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		pages.RegisterWorkspaceScoped(subAPI, pageDeps)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
@@ -1150,11 +1157,11 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		// workspace, closes the stream instead of keeping it fed.
 		reauthorize := middleware.StreamReauthorizer(authMW, middleware.RequireWorkspaceMember(shared.aclDB))
 		sub.Get("/workspaces/{wsId}/stream", stream.SSEHandler(notifier, deps.StreamRemember, reauthorize))
-		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		relationDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		relations.RegisterWorkspaceScoped(subAPI, relationDeps)
 		intakeDeps := intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient, Mutations: shared.mutationRec}
 		intakehandlers.Register(subAPI, intakeDeps)
-		importDeps := importhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		importDeps := importhandlers.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		importhandlers.Register(subAPI, importDeps)
 	})
 
@@ -1264,9 +1271,9 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	//     actors / agents / labels / attachments / archive / step
 	//     decomposition). Workspace owners / admins pass via the
 	//     ProjectRoleElevated bypass inside RequireProjectRole.
-	labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
-	relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
-	reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+	labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
+	relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
+	reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 	stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Audit: shared.auditRec}
 
 	// Read group: RequireTaskAccess only.
@@ -1352,9 +1359,9 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		subAPI := mountGroup(sub, floorNone, &apis)
 		inbox.Register(subAPI, shared.inboxDeps)
 		notifications.Register(subAPI, shared.notifDeps)
-		favDeps := favorites.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		favDeps := favorites.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		favorites.Register(subAPI, favDeps)
-		relationAuthDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		relationAuthDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		relations.RegisterAuthScoped(subAPI, relationAuthDeps)
 	})
 
@@ -1368,9 +1375,9 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 
 	// Relation auto-detect pipeline (INTEL-3). Fires on task.created
 	// and task.updated events, creates relation_suggestions via
-	// embedding similarity in a background goroutine.
+	// embedding similarity on the shared event-hook runner.
 	if shared.embedClient != nil {
-		relationPipeline := &airelations.Pipeline{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient}
+		relationPipeline := &airelations.Pipeline{DB: deps.DB, Queries: deps.Queries, Embedder: shared.embedClient, Runner: deps.HookRunner}
 		eventbus.AddNotifyHook(relationPipeline.Hook())
 	}
 
@@ -2099,7 +2106,13 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		if err != nil {
 			return
 		}
+		// The caller is recorded so the workspace list can return a
+		// task-less row — whose prompt may embed several tasks — to the
+		// user who made the call and nobody else below admin.
 		var userID sql.NullInt32
+		if actorID, ok := middleware.ActorFromContext(ctx); ok && actorID != 0 {
+			userID = sql.NullInt32{Int32: int32(actorID), Valid: true} //#nosec G115 -- user id is users.id (INT UNSIGNED), fits int32 within realistic deployments
+		}
 		var agentID sql.NullInt32
 		if rec.AgentID != 0 {
 			agentID = sql.NullInt32{Int32: int32(rec.AgentID), Valid: true} //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments

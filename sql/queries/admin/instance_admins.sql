@@ -58,7 +58,8 @@ SELECT EXISTS(
 ) AS has_admin;
 
 -- name: AdminCountActiveInstanceAdmins :one
--- Count active instance admins (for last-admin guard).
+-- Count active instance admins. The last-admin guard does not use this: it
+-- locks the admin set in the revoking transaction instead.
 SELECT COUNT(*) AS admin_count
 FROM instance_admins
 WHERE enabled = TRUE AND revoked_at IS NULL;

@@ -4,8 +4,8 @@ package errors
 
 // Error codes and specs.
 var (
-	// INSTANCE.ADMIN.LAST_ADMIN — Cannot revoke the last remaining administrator
-	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot revoke the last remaining administrator", Description: "Returned when revoking would leave the instance with zero admins.", UserAction: "Grant admin privileges to another user first."}
+	// INSTANCE.ADMIN.LAST_ADMIN — Cannot remove the last remaining administrator
+	InstanceAdminLastAdmin = &Spec{Code: "INSTANCE.ADMIN.LAST_ADMIN", Status: 409, Message: "Cannot remove the last remaining administrator", Description: "Returned when revoking an admin grant, or suspending the user who holds it, would leave the instance with no enabled administrator.", UserAction: "Grant admin privileges to another user first."}
 	// INSTANCE.ADMIN.NOT_FOUND — User is not an instance administrator
 	InstanceAdminNotFound = &Spec{Code: "INSTANCE.ADMIN.NOT_FOUND", Status: 404, Message: "User is not an instance administrator", Description: "Returned when attempting to revoke admin privileges from a user who is not an instance admin.", UserAction: "Verify the user is listed as an instance administrator."}
 	// INSTANCE.ADMIN.SELF_REVOKE — Cannot revoke your own administrator privileges
@@ -26,6 +26,8 @@ var (
 	InstanceSetupAlreadyInitialized = &Spec{Code: "INSTANCE.SETUP.ALREADY_INITIALIZED", Status: 409, Message: "Instance has already been initialized", Description: "Returned when the initial setup endpoint is called after the instance has already been bootstrapped with an admin account.", UserAction: "Sign in with the existing admin account instead of running setup again."}
 	// INSTANCE.USER.NOT_FOUND — User not found
 	InstanceUserNotFound = &Spec{Code: "INSTANCE.USER.NOT_FOUND", Status: 404, Message: "User not found", Description: "Returned when an admin endpoint references a user that does not exist.", UserAction: "Verify the user ID."}
+	// INSTANCE.USER.SELF_SUSPEND — Cannot suspend your own account
+	InstanceUserSelfSuspend = &Spec{Code: "INSTANCE.USER.SELF_SUSPEND", Status: 409, Message: "Cannot suspend your own account", Description: "Returned when an instance admin tries to suspend their own account through the admin user endpoint.", UserAction: "Ask another instance administrator to suspend your account."}
 	// INSTANCE.WORKSPACE.NOT_FOUND — Workspace not found
 	InstanceWorkspaceNotFound = &Spec{Code: "INSTANCE.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when an admin endpoint references a workspace that does not exist.", UserAction: "Verify the workspace ID."}
 )

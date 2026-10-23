@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/priorityopt"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -79,6 +80,7 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 		}
 
 		now := time.Now().UTC()
+		zone := duedate.UserZone(ctx, deps.Queries, ws.ID, actorID)
 		signals := make([]priorityopt.Signals, 0, len(rows))
 		for _, r := range rows {
 			state := priorityopt.State(r.DerivedState)
@@ -97,6 +99,7 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 				// deprioritise rule for tasks that do have an owner.
 				HasAssignee: r.AssigneeCount > 0,
 				Now:         now,
+				Zone:        zone,
 			}
 			if r.UpdatedAt.Valid {
 				sig.UpdatedAt = r.UpdatedAt.Time

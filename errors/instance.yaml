@@ -36,10 +36,10 @@ resources:
       last_admin:
         code: INSTANCE.ADMIN.LAST_ADMIN
         status: 409
-        message: "Cannot revoke the last remaining administrator"
-        message_ja: "最後の管理者は取り消せません"
-        message_zh: "无法撤销最后一位管理员"
-        description: "Returned when revoking would leave the instance with zero admins."
+        message: "Cannot remove the last remaining administrator"
+        message_ja: "最後の管理者は外せません"
+        message_zh: "无法移除最后一位管理员"
+        description: "Returned when revoking an admin grant, or suspending the user who holds it, would leave the instance with no enabled administrator."
         userAction: "Grant admin privileges to another user first."
       status_unavailable:
         code: INSTANCE.ADMIN.STATUS_UNAVAILABLE
@@ -61,6 +61,14 @@ resources:
         message_zh: "未找到用户"
         description: "Returned when an admin endpoint references a user that does not exist."
         userAction: "Verify the user ID."
+      self_suspend:
+        code: INSTANCE.USER.SELF_SUSPEND
+        status: 409
+        message: "Cannot suspend your own account"
+        message_ja: "自分のアカウントは停止できません"
+        message_zh: "无法停用自己的账户"
+        description: "Returned when an instance admin tries to suspend their own account through the admin user endpoint."
+        userAction: "Ask another instance administrator to suspend your account."
 
   oauth_allowlist:
     breadcrumb: "Instance > OAuth Allowlist"

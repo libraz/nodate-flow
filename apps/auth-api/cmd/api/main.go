@@ -140,9 +140,9 @@ func main() {
 	go integrationsRefresher.Run(refresherCtx)
 	logger.Info("integrations refresher goroutine launched")
 
-	var oidcClient *auth.OIDCClient
+	var oidcClient *auth.GoogleOIDCClient
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		oidcClient = auth.NewOIDCClient(auth.OIDCConfig{
+		oidcClient = auth.NewGoogleOIDC(auth.OIDCConfig{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  cfg.PublicBaseURL + "/auth/oidc/google/callback",

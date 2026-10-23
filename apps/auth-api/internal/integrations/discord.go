@@ -171,15 +171,15 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code, redirectURI string
 
 	scopes := strings.Fields(tok.Scope)
 	return &TokenSet{
-			AccessToken:  tok.AccessToken,
-			RefreshToken: tok.RefreshToken,
-			ExpiresAt:    expiresAt,
-			Scopes:       scopes,
-		}, &Account{
-			ExternalID: u.ID,
-			Label:      label,
-			Metadata:   meta,
-		}, nil
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		ExpiresAt:    expiresAt,
+		Scopes:       scopes,
+	}, &Account{
+		ExternalID: u.ID,
+		Label:      label,
+		Metadata:   meta,
+	}, nil
 }
 
 // Refresh implements [Provider]. Discord issues refresh tokens and

@@ -107,12 +107,12 @@ func (p *SlackProvider) Exchange(ctx context.Context, code, redirectURI string) 
 		label = tok.Team.Name + " / " + tok.AuthedUser.ID
 	}
 	return &TokenSet{
-			AccessToken: tok.AuthedUser.AccessToken,
-			Scopes:      strings.Split(tok.AuthedUser.Scope, ","),
-		}, &Account{
-			ExternalID: tok.AuthedUser.ID,
-			Label:      label,
-		}, nil
+		AccessToken: tok.AuthedUser.AccessToken,
+		Scopes:      strings.Split(tok.AuthedUser.Scope, ","),
+	}, &Account{
+		ExternalID: tok.AuthedUser.ID,
+		Label:      label,
+	}, nil
 }
 
 // Refresh implements [Provider]. Slack user tokens (xoxp-) do not

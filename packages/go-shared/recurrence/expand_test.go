@@ -181,6 +181,63 @@ func TestExpandPreservesWallClockAcrossDST(t *testing.T) {
 	}
 }
 
+// An all-day series is stored at UTC midnight. Stepped on New York's wall
+// clock that midnight is 19:00 EST, which DST turns into 23:00Z on the
+// previous day; every occurrence must stay on UTC midnight instead, and a
+// bare-date exception must name that UTC day.
+func TestExpandAllDayStaysOnUTCMidnightAcrossDST(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
+	evt := Event{
+		StartAt:    start,
+		EndAt:      start.AddDate(0, 0, 1),
+		Timezone:   "America/New_York",
+		AllDay:     true,
+		Rule:       &Rule{Freq: FreqWeekly},
+		Exceptions: []string{"2027-03-22"},
+	}
+	occ := Expand(evt, start, time.Date(2027, 4, 1, 0, 0, 0, 0, time.UTC))
+
+	requireStarts(t, occ, time.UTC, []string{
+		"2027-03-01T00:00:00Z",
+		"2027-03-08T00:00:00Z",
+		"2027-03-15T00:00:00Z",
+		"2027-03-29T00:00:00Z",
+	})
+	for _, o := range occ {
+		if !o.EndAt.Equal(o.StartAt.AddDate(0, 0, 1)) {
+			t.Fatalf("occurrence %s ends at %s, want the next UTC midnight", o.StartAt, o.EndAt)
+		}
+	}
+	if !Produces(evt, time.Date(2027, 3, 15, 0, 0, 0, 0, time.UTC)) {
+		t.Fatal("the rule must produce the UTC midnight after the DST change")
+	}
+	if Produces(evt, time.Date(2027, 3, 14, 23, 0, 0, 0, time.UTC)) {
+		t.Fatal("the drifted local-evening instant is not an occurrence of an all-day series")
+	}
+}
+
+// The same holds for a yearly series in a zone east of UTC: Berlin's
+// 01:00 CET on 2026-03-29 is 23:00Z the day before once later years fall
+// after the DST change.
+func TestExpandAllDayYearlyStaysOnUTCMidnightInBerlin(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 3, 29, 0, 0, 0, 0, time.UTC)
+	occ := Expand(Event{
+		StartAt:  start,
+		EndAt:    start.AddDate(0, 0, 1),
+		Timezone: "Europe/Berlin",
+		AllDay:   true,
+		Rule:     &Rule{Freq: FreqYearly, Count: intPtr(3)},
+	}, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2029, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	requireStarts(t, occ, time.UTC, []string{
+		"2026-03-29T00:00:00Z",
+		"2027-03-29T00:00:00Z",
+		"2028-03-29T00:00:00Z",
+	})
+}
+
 // TestExpandUntilDateIsInclusive covers the bare-date UNTIL. Read at
 // local midnight it would drop every timed occurrence on the final day,
 // shortening the series by one without any visible error.

@@ -515,6 +515,9 @@ CREATE TABLE calendar_events (
   KEY idx_calendar_events_calendar_recurrence (calendar_id, recurrence_end),
   KEY idx_calendar_events_workspace_range (workspace_id, start_at, end_at),
   KEY idx_calendar_events_task_role (task_id, task_role, enabled),
+  -- The reminder scheduler's per-minute scan: live rows carrying a
+  -- reminder offset, so a tick reads those rather than the whole table.
+  KEY idx_calendar_events_reminder_scan (enabled, notification_offset, start_at),
   UNIQUE KEY uniq_calendar_events_task_singleton_role (task_id, task_singleton_role),
   -- One override per occurrence. Without this, two concurrent edits of
   -- the same occurrence both insert, and the expander has to pick.
@@ -2486,8 +2489,9 @@ CREATE TABLE relation_suggestions (
 --   expires_at        - provider-derived TTL; presence signals expire on the
 --                       next presence transition, weather signals expire at
 --                       the end of the window, manual signals do not expire.
---                       The retention sweep drops expired, non-applied rows
---                       for stateful kinds.
+--                       The flow-worker signal_retention job deletes
+--                       expired, non-applied rows no event or intake item
+--                       cites.
 --
 -- Subject columns:
 --   subject_type - what the signal is about. `task_id` remains the dedicated

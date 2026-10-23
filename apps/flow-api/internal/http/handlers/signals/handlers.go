@@ -357,6 +357,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 			},
 			CallSite: "signals.Create",
 		})
+		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
 
 		// Wake any matching signal_judge agents (ADR 0008 D3). The
 		// enqueuer is best-effort: a non-nil error is logged but does

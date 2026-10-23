@@ -27,8 +27,9 @@
 --   expires_at        - provider-derived TTL; presence signals expire on the
 --                       next presence transition, weather signals expire at
 --                       the end of the window, manual signals do not expire.
---                       The retention sweep drops expired, non-applied rows
---                       for stateful kinds.
+--                       The flow-worker signal_retention job deletes
+--                       expired, non-applied rows no event or intake item
+--                       cites.
 --
 -- Subject columns:
 --   subject_type - what the signal is about. `task_id` remains the dedicated

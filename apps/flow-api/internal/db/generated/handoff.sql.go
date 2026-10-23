@@ -14,49 +14,6 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const insertHandoffToAgentEvent = `-- name: InsertHandoffToAgentEvent :execlastid
-INSERT INTO events (
-  public_id,
-  workspace_id,
-  task_id,
-  actor_user_id,
-  type,
-  payload_json,
-  occurred_at
-) VALUES (?, ?, ?, ?, 'agent.task.handoff_to_agent', ?, ?)
-`
-
-type InsertHandoffToAgentEventParams struct {
-	PublicID    types.PublicID  `json:"publicId"`
-	WorkspaceID uint32          `json:"-"`
-	TaskID      sql.NullInt32   `json:"-"`
-	ActorUserID sql.NullInt32   `json:"-"`
-	PayloadJson json.RawMessage `json:"payloadJson"`
-	OccurredAt  time.Time       `json:"occurredAt"`
-}
-
-// Append an agent.task.handoff_to_agent event. The caller is a human (or a
-// system actor) transferring a task to an AI agent, so actor_user_id is
-// populated and actor_agent_id stays NULL. Payload is caller-shaped: the
-// handler embeds the target agent's public_id, the reason string, and any
-// delegation chain context. Mutual exclusion of actor_user_id and
-// actor_agent_id is preserved by this query's column list rather than a
-// CHECK constraint (see sql/core/tables/events.sql).
-func (q *Queries) InsertHandoffToAgentEvent(ctx context.Context, arg InsertHandoffToAgentEventParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, insertHandoffToAgentEvent,
-		arg.PublicID,
-		arg.WorkspaceID,
-		arg.TaskID,
-		arg.ActorUserID,
-		arg.PayloadJson,
-		arg.OccurredAt,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
-}
-
 const insertHandoffToUserEvent = `-- name: InsertHandoffToUserEvent :execlastid
 INSERT INTO events (
   public_id,

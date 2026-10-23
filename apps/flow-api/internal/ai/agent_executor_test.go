@@ -4,22 +4,39 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // stubExecQueries returns a fixed agent row, standing in for the sqlc
-// handle so a tick can run without a database.
+// handle so a tick can run without a database. capCents (when non-nil)
+// and spentCents feed the monthly cost cap check.
 type stubExecQueries struct {
-	row generated.GetAgentForExecRow
-	err error
+	row        generated.GetAgentForExecRow
+	err        error
+	capCents   *int32
+	spentCents int64
 }
 
 func (s stubExecQueries) GetAgentForExec(_ context.Context, _ generated.GetAgentForExecParams) (generated.GetAgentForExecRow, error) {
 	return s.row, s.err
+}
+
+func (s stubExecQueries) GetAgentGuardSnapshot(_ context.Context, _ uint32) (generated.GetAgentGuardSnapshotRow, error) {
+	row := generated.GetAgentGuardSnapshotRow{Enabled: true}
+	if s.capCents != nil {
+		row.MonthlyCostCapCents = sql.NullInt32{Int32: *s.capCents, Valid: true}
+	}
+	return row, nil
+}
+
+func (s stubExecQueries) SumAiCostForAgentSince(_ context.Context, _ generated.SumAiCostForAgentSinceParams) (int64, error) {
+	return s.spentCents, nil
 }
 
 // stubProvider is a Provider that answers without any network access. A
@@ -179,5 +196,78 @@ func TestExecuteAgentUsesTheProviderOwningTheAgentsModel(t *testing.T) {
 	}
 	if got != owner {
 		t.Fatalf("resolved provider = %v, want the model's owning provider %v", got, owner)
+	}
+}
+
+// TestExecuteAgentRefusesAnAgentAtItsMonthlyCap pins that a scheduled run
+// is refused before any provider call once the agent's month-to-date spend
+// reaches its monthly cap, and that the refusal is flagged as a cost-cap
+// hit so the runner pauses the agent and hands the task off.
+func TestExecuteAgentRefusesAnAgentAtItsMonthlyCap(t *testing.T) {
+	t.Parallel()
+
+	capCents := int32(1_000)
+	called := false
+	var recorded []InvocationRecord
+	e := newTestExecutor(&recorded, providerFunc(func(_ context.Context, req providers.Request) (*providers.Response, error) {
+		called = true
+		return &providers.Response{Model: req.Model, Text: "ok"}, nil
+	}))
+	q := e.Queries.(stubExecQueries)
+	q.capCents = &capCents
+	q.spentCents = 1_000
+	e.Queries = q
+
+	res, err := e.ExecuteAgent(context.Background(), 42, 7)
+	if !errors.Is(err, ErrAgentCostCapExceeded) {
+		t.Fatalf("ExecuteAgent err = %v, want ErrAgentCostCapExceeded", err)
+	}
+	if !res.CostCapHit {
+		t.Fatal("CostCapHit = false, want true so the runner pauses the agent")
+	}
+	if called {
+		t.Fatal("provider was called for an agent at its monthly cap")
+	}
+
+	q.spentCents = 100
+	e.Queries = q
+	if _, err := e.ExecuteAgent(context.Background(), 42, 7); err != nil {
+		t.Fatalf("ExecuteAgent under the cap: %v", err)
+	}
+	if !called {
+		t.Fatal("provider was not called for an agent under its monthly cap")
+	}
+}
+
+// TestExecuteAgentSendsANonEmptyUserTurn pins the user turn of each run
+// kind: providers reject an empty one, and an on_event run must tell the
+// model which event and task woke it.
+func TestExecuteAgentSendsANonEmptyUserTurn(t *testing.T) {
+	t.Parallel()
+
+	run := func(ctx context.Context) string {
+		var prompt string
+		var recorded []InvocationRecord
+		e := newTestExecutor(&recorded, providerFunc(func(_ context.Context, req providers.Request) (*providers.Response, error) {
+			prompt = req.Prompt
+			return &providers.Response{Model: req.Model, Text: "ok"}, nil
+		}))
+		if _, err := e.ExecuteAgent(ctx, 42, 7); err != nil {
+			t.Fatalf("ExecuteAgent: %v", err)
+		}
+		return prompt
+	}
+
+	if got := run(context.Background()); got == "" {
+		t.Fatal("interval run sent an empty user turn")
+	}
+	got := run(agentruntime.WithTrigger(context.Background(), agentruntime.Trigger{
+		EventType:    "task.transition.complete",
+		TaskPublicID: "0192f0c4-0000-7000-8000-000000000001",
+	}))
+	for _, want := range []string{"task.transition.complete", "0192f0c4-0000-7000-8000-000000000001"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("on_event user turn %q does not contain %q", got, want)
+		}
 	}
 }

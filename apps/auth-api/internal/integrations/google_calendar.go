@@ -136,14 +136,14 @@ func (p *GoogleCalendarProvider) Exchange(ctx context.Context, code, redirectURI
 		label = u.Sub
 	}
 	return &TokenSet{
-			AccessToken:  tok.AccessToken,
-			RefreshToken: tok.RefreshToken,
-			ExpiresAt:    expiresAt,
-			Scopes:       strings.Split(tok.Scope, " "),
-		}, &Account{
-			ExternalID: u.Sub,
-			Label:      label,
-		}, nil
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		ExpiresAt:    expiresAt,
+		Scopes:       strings.Split(tok.Scope, " "),
+	}, &Account{
+		ExternalID: u.Sub,
+		Label:      label,
+	}, nil
 }
 
 // Refresh implements [Provider]. Google's refresh endpoint reuses

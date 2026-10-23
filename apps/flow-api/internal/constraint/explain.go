@@ -45,10 +45,6 @@ func Explain(c Constraint) string {
 		return fmt.Sprintf("actor_has_role(%s)", c.Arg)
 	case OpSignalReceived:
 		return fmt.Sprintf("signal_received(%s)", c.Arg)
-	case OpApprovalGranted:
-		return fmt.Sprintf("approval_granted(%s)", c.Arg)
-	case OpCIStatusIs:
-		return fmt.Sprintf("ci_status_is(%s)", c.Arg)
 	}
 	return "unknown"
 }

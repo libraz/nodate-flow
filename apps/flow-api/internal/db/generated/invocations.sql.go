@@ -100,27 +100,56 @@ func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvoca
 
 const listAiInvocationsForWorkspace = `-- name: ListAiInvocationsForWorkspace :many
 SELECT
-  public_id,
-  purpose,
-  model,
-  prompt_redacted,
-  response_redacted,
-  tokens_input,
-  tokens_output,
-  cost_estimate,
-  status,
-  error_code,
-  invoked_at
-FROM ai_invocations
-WHERE workspace_id = ?
-ORDER BY invoked_at DESC, id DESC
+  ai.public_id,
+  ai.purpose,
+  ai.model,
+  ai.prompt_redacted,
+  ai.response_redacted,
+  ai.tokens_input,
+  ai.tokens_output,
+  ai.cost_estimate,
+  ai.status,
+  ai.error_code,
+  ai.invoked_at
+FROM ai_invocations ai
+LEFT JOIN tasks t ON t.id = ai.task_id AND t.enabled = TRUE
+WHERE ai.workspace_id = ?
+  AND (
+    CAST(? AS SIGNED) = 1
+    OR (ai.task_id IS NULL AND ai.user_id = CAST(? AS UNSIGNED))
+    OR (t.id IS NOT NULL AND (
+      t.visibility = 'public'
+      OR (t.visibility = 'project' AND EXISTS (
+        SELECT 1 FROM project_members pm_vis
+        WHERE pm_vis.project_id = t.project_id
+          AND pm_vis.user_id = CAST(? AS UNSIGNED)
+          AND pm_vis.enabled = TRUE
+      ))
+      OR (t.visibility = 'private' AND (
+        t.created_by_user_id = CAST(? AS UNSIGNED)
+        OR EXISTS (
+          SELECT 1 FROM task_actors ta_vis
+          WHERE ta_vis.task_id = t.id
+            AND ta_vis.kind = 'user'
+            AND ta_vis.user_id = CAST(? AS UNSIGNED)
+            AND ta_vis.enabled = TRUE
+        )
+      ))
+    ))
+  )
+ORDER BY ai.invoked_at DESC, ai.id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListAiInvocationsForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	WorkspaceID   uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	ActorUserID_4 int64  `json:"actorUserId4"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListAiInvocationsForWorkspaceRow struct {
@@ -140,8 +169,23 @@ type ListAiInvocationsForWorkspaceRow struct {
 // Recent redacted LLM call records for a workspace, newest first. Used
 // by the AI activity panel. All columns here are already redacted at
 // write time by the orchestrator; safe to surface at the API boundary.
+//
+// Redaction removes secrets, not task content: a prompt carries the
+// titles and descriptions it was built from. So a row about a task is
+// returned only when the reader may read that task (a deleted one reads
+// as unreadable), and a row with no task — a prompt that may embed
+// several — only to the user who made the call. Elevated roles see all.
 func (q *Queries) ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAiInvocationsForWorkspace, arg.WorkspaceID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listAiInvocationsForWorkspace,
+		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
+		arg.ActorUserID_4,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

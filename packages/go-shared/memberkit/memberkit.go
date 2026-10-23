@@ -43,9 +43,9 @@ var (
 	ErrSelfModify = errors.New("memberkit: actor cannot modify own membership")
 
 	// ErrLastOwner is returned when an operation would demote or remove
-	// the last remaining owner of the workspace. At least one owner
-	// must always remain.
-	ErrLastOwner = errors.New("memberkit: workspace must keep at least one owner")
+	// the last remaining owner of an owner set (a workspace, a calendar,
+	// the instance admins). At least one owner must always remain.
+	ErrLastOwner = errors.New("memberkit: at least one owner must remain")
 
 	// ErrRoleEscalation is returned when an actor attempts to grant,
 	// assign, or promote to a role that outranks their own workspace
@@ -55,21 +55,55 @@ var (
 	ErrRoleEscalation = errors.New("memberkit: target role exceeds actor role")
 )
 
-// countWorkspaceOwners returns the number of enabled members holding
-// the owner role in the workspace. Used by the last-owner guard so a
-// demote/remove never drops the owner count to zero.
-//
-// owner is the workspace top role in the workspace_members.role enum
-// (owner > admin > member > guest); it is distinct from the project
-// member role hierarchy.
-func countWorkspaceOwners(ctx context.Context, tx TX, wsID uint32) (int, error) {
-	const q = `SELECT COUNT(*) FROM workspace_members
-	           WHERE workspace_id = ? AND role = ? AND enabled = TRUE`
-	var n int
-	if err := tx.QueryRowContext(ctx, q, wsID, string(RoleOwner)).Scan(&n); err != nil {
-		return 0, fmt.Errorf("memberkit: count owners: %w", err)
+// OwnerSet names the rows the last-owner guard counts: a SELECT of the
+// user_id of every live owner, and its arguments. The workspace, calendar
+// and instance-admin owner sets each pass their own, so the guard itself is
+// written once.
+type OwnerSet struct {
+	// Query selects user_id for every enabled owner. It must not end in a
+	// locking clause; the guard appends FOR UPDATE.
+	Query string
+	Args  []any
+}
+
+// workspaceOwners is the owner set of a workspace: the enabled members
+// holding the owner role, distinct from the project member roles.
+func workspaceOwners(wsID uint32) OwnerSet {
+	return OwnerSet{
+		Query: `SELECT user_id FROM workspace_members
+		        WHERE workspace_id = ? AND role = 'owner' AND enabled = TRUE`,
+		Args: []any{wsID},
 	}
-	return n, nil
+}
+
+// EnsureOwnerRemains returns [ErrLastOwner] unless an owner other than
+// leaving remains in set. It locks every owner row it reads, so it must run
+// inside the transaction that then demotes or removes leaving: two owners
+// acting on each other serialize on the lock, and the second one counts the
+// owners the first one left rather than a snapshot from before it.
+func EnsureOwnerRemains(ctx context.Context, tx TX, set OwnerSet, leaving uint32) error {
+	rows, err := tx.QueryContext(ctx, set.Query+" FOR UPDATE", set.Args...)
+	if err != nil {
+		return fmt.Errorf("memberkit: lock owners: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	others := 0
+	for rows.Next() {
+		var uid uint32
+		if err := rows.Scan(&uid); err != nil {
+			return fmt.Errorf("memberkit: lock owners: %w", err)
+		}
+		if uid != leaving {
+			others++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("memberkit: lock owners: %w", err)
+	}
+	if others == 0 {
+		return ErrLastOwner
+	}
+	return nil
 }
 
 // Role is the enum value stored in workspace_members.role. The string

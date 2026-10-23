@@ -5,7 +5,9 @@ INSERT INTO intake_items (
 ) VALUES (?, ?, ?, ?, ?);
 
 -- name: ListIntakeItemsForWorkspace :many
--- List intake items for a workspace, filtered by status.
+-- List intake items for a workspace, filtered by status. A snooze whose
+-- deadline has passed is pending again: it never lists under snoozed, and
+-- include_expired_snoozes (1 when the filter is pending) lists it there.
 SELECT
   ii.public_id,
   ii.workspace_id,
@@ -26,12 +28,17 @@ FROM intake_items ii
 LEFT JOIN users tu ON tu.id = ii.triaged_by_user_id
 WHERE ii.workspace_id = ?
   AND ii.enabled = TRUE
-  AND (sqlc.arg(status_filter) = '' OR ii.triage_status = sqlc.arg(status_filter))
+  AND (sqlc.arg(status_filter) = ''
+       OR (ii.triage_status = sqlc.arg(status_filter)
+           AND NOT (ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
+       OR (CAST(sqlc.arg('include_expired_snoozes') AS SIGNED) = 1
+           AND ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
 ORDER BY ii.created_at DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListIntakeItemsForWorkspaceKeyset :many
--- Cursor-paginated intake items for a workspace, filtered by status.
+-- Cursor-paginated intake items for a workspace, filtered by status, with
+-- expired snoozes listed under pending as in ListIntakeItemsForWorkspace.
 SELECT
   ii.public_id,
   ii.workspace_id,
@@ -51,7 +58,11 @@ FROM intake_items ii
 LEFT JOIN users tu ON tu.id = ii.triaged_by_user_id
 WHERE ii.workspace_id = ?
   AND ii.enabled = TRUE
-  AND (sqlc.arg(status_filter) = '' OR ii.triage_status = sqlc.arg(status_filter))
+  AND (sqlc.arg(status_filter) = ''
+       OR (ii.triage_status = sqlc.arg(status_filter)
+           AND NOT (ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
+       OR (CAST(sqlc.arg('include_expired_snoozes') AS SIGNED) = 1
+           AND ii.triage_status = 'snoozed' AND ii.snooze_until <= NOW(3)))
   AND (
     sqlc.narg(cursor_created_at) IS NULL
     OR ii.created_at < sqlc.narg(cursor_created_at)
@@ -82,30 +93,28 @@ WHERE ii.workspace_id = ?
   AND ii.enabled = TRUE;
 
 -- name: UpdateIntakeItemTriage :execrows
--- Update the triage status of an intake item.
+-- Triage an intake item out of pending. The predicate is the claim: only an
+-- unconverted item that is pending, or snoozed past its deadline, matches,
+-- so of two racing triages exactly one counts a row.
 UPDATE intake_items
 SET triage_status      = ?,
     triaged_by_user_id = ?,
     snooze_until       = ?
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND task_id IS NULL
+  AND (triage_status = 'pending'
+       OR (triage_status = 'snoozed' AND snooze_until <= NOW(3)));
 
 -- name: SetIntakeItemTask :execrows
--- Link an intake item to a converted task.
+-- Link an intake item to a converted task. Matches only an item not yet
+-- converted, so a losing concurrent conversion counts zero rows and rolls
+-- its task back.
 UPDATE intake_items
 SET task_id        = ?,
     triage_status  = 'accepted'
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
-
--- name: SetIntakeItemAIScore :execrows
--- Set AI score and reasoning for an intake item.
-UPDATE intake_items
-SET ai_score     = ?,
-    ai_reasoning = ?,
-    scored_at    = NOW()
-WHERE workspace_id = ?
-  AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND task_id IS NULL;

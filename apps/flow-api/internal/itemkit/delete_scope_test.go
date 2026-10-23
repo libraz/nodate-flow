@@ -237,7 +237,7 @@ func TestDeleteTaskWithdrawsOnlyThisWorkspacesEvents(t *testing.T) {
 	neighbourBlock := scheduleTimeBlock(t, db, neighbour, time.Date(2030, 12, 2, 9, 0, 0, 0, time.UTC))
 
 	withTx(t, db, func(tx TX) {
-		if err := DeleteTask(ctx, tx, fx.wsID, fx.taskID, fx.userID); err != nil {
+		if _, err := DeleteTask(ctx, tx, fx.wsID, fx.taskID, fx.userID); err != nil {
 			t.Fatalf("DeleteTask: %v", err)
 		}
 	})

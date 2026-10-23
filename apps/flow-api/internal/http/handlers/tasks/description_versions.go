@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -13,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -161,8 +161,19 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 		// the description it describes is observable.
 		var taskRow generated.FindTaskByPublicIdRow
 		var restored taskdesc.Version
+		taskIDInt64 := int64(task.ID)
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.RestoreDescriptionVersion", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			qtx := deps.Queries.WithTx(tx.RawTx())
+
+			// Lock the task before reading it: UpdateTask writes every
+			// column back, so the read it merges from must not predate a
+			// PATCH committed while this request waited.
+			if _, lerr := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+				ID:          task.ID,
+				WorkspaceID: ws.ID,
+			}); lerr != nil {
+				return lerr
+			}
 
 			// Get the task public ID for the update query.
 			var rerr error
@@ -205,37 +216,26 @@ func RestoreDescriptionVersion(deps Deps) func(context.Context, *RestoreDescript
 			// The restored body is the one the task now carries, so it is the
 			// body the mentions table has to agree with — including when the
 			// version being restored to named nobody.
-			return syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), version.Body)
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		taskIDInt64 := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.DescriptionVersionRestored,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskIDInt64,
-			Payload: map[string]any{
-				"taskId":        types.FromUUID(task.PublicID).String(),
-				"restoredFrom":  versionPub.String(),
-				"newVersionId":  restored.PublicID.String(),
-				"versionNumber": restored.Number,
-			},
-		}, "tasks.RestoreDescriptionVersion")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "description_version.restore",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+			if serr := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), version.Body); serr != nil {
+				return serr
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.DescriptionVersionRestored,
+				AuditAction:  "description_version.restore",
 				ResourceType: "task",
 				ResourceID:   types.FromUUID(task.PublicID).String(),
-				Metadata: map[string]any{
+				TaskID:       &taskIDInt64,
+				Payload: map[string]any{
+					"taskId":            types.FromUUID(task.PublicID).String(),
+					"restoredFrom":      versionPub.String(),
 					"restoredVersionId": versionPub.String(),
 					"newVersionId":      restored.PublicID.String(),
+					"versionNumber":     restored.Number,
 				},
+				CallSite: "tasks.RestoreDescriptionVersion",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// A restore replaces the description the task is stored under, so

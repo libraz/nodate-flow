@@ -3,6 +3,7 @@ package intake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
@@ -42,22 +43,6 @@ func requireNonGuest(ws middleware.WorkspaceContext) *apierr.Spec {
 		return apierrors.WsMemberRoleDenied
 	}
 	return nil
-}
-
-// requireProjectEditor mirrors tasks.requireProjectEditor: converting an intake
-// item into a task writes into the target project, so the actor must hold an
-// editor (or higher) project role, or be a workspace-elevated admin/owner. The
-// workspace role is already resolved by RequireWorkspaceMember and carried on
-// the request context, so it is passed in rather than re-checked here.
-func requireProjectEditor(ctx context.Context, db *sql.DB, wsID, prjID, actorID uint32, wsRole acl.WorkspaceRole) *apierr.Spec {
-	prjRole, _, err := acl.LookupProjectMembership(ctx, db, wsID, prjID, actorID, wsRole)
-	if err != nil {
-		return apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected)
-	}
-	if prjRole == acl.ProjectRoleElevated || prjRole.AtLeast(acl.ProjectRoleEditor) {
-		return nil
-	}
-	return apierrors.WsProjectAccessDenied
 }
 
 // Create handles POST /workspaces/{wsId}/intake.
@@ -120,6 +105,12 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 			limit = 50
 		}
 		status := generated.IntakeItemsTriageStatus(in.Status)
+		// An expired snooze is pending again, so the pending filter
+		// lists it too.
+		var includeExpiredSnoozes int64
+		if status == generated.IntakeItemsTriageStatusPending {
+			includeExpiredSnoozes = 1
+		}
 
 		if in.Cursor != "" {
 			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
@@ -127,11 +118,12 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
 			}
 			rows, err := deps.Queries.ListIntakeItemsForWorkspaceKeyset(ctx, generated.ListIntakeItemsForWorkspaceKeysetParams{
-				WorkspaceID:     ws.ID,
-				StatusFilter:    status,
-				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
-				CursorPublicID:  cursorPID,
-				Limit:           limit + 1,
+				WorkspaceID:           ws.ID,
+				StatusFilter:          status,
+				IncludeExpiredSnoozes: includeExpiredSnoozes,
+				CursorCreatedAt:       sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
+				CursorPublicID:        cursorPID,
+				Limit:                 limit + 1,
 			})
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -154,10 +146,11 @@ func List(deps Deps) func(context.Context, *ListIntakeItemsInput) (*ListIntakeIt
 		}
 
 		rows, err := deps.Queries.ListIntakeItemsForWorkspace(ctx, generated.ListIntakeItemsForWorkspaceParams{
-			WorkspaceID:  ws.ID,
-			StatusFilter: status,
-			Limit:        limit,
-			Offset:       in.Offset,
+			WorkspaceID:           ws.ID,
+			StatusFilter:          status,
+			IncludeExpiredSnoozes: includeExpiredSnoozes,
+			Limit:                 limit,
+			Offset:                in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -204,6 +197,23 @@ func Get(deps Deps) func(context.Context, *GetIntakeItemInput) (*GetIntakeItemOu
 	}
 }
 
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("intake: answered")
+
+// triageable reports whether an item can leave the queue: it is pending,
+// or snoozed with a deadline that has passed.
+func triageable(status generated.IntakeItemsTriageStatus, snoozeUntil sql.NullTime) bool {
+	switch status {
+	case generated.IntakeItemsTriageStatusPending:
+		return true
+	case generated.IntakeItemsTriageStatusSnoozed:
+		return snoozeUntil.Valid && !snoozeUntil.Time.After(time.Now())
+	default:
+		return false
+	}
+}
+
 // triageEventKind maps a triage status string to its event bus kind.
 func triageEventKind(status string) eventbus.Kind {
 	switch status {
@@ -231,13 +241,12 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			return nil, httpErr(spec)
 		}
 
-		// A snooze is a deadline, and nothing resurfaces an item without
-		// one: the intake queue is filtered by triage_status alone, and no
-		// job scans snooze_until. An item parked as snoozed with a NULL
-		// snooze_until leaves the pending list with no date at which
-		// anything brings it back, so it is lost rather than deferred —
-		// and a non-positive deadline says the same thing, since epoch or
-		// earlier is not a date anything waits for. The check sits with
+		// A snooze is a deadline: once it passes, the item lists under
+		// pending again and can be triaged. An item parked as snoozed with
+		// a NULL snooze_until has no date at which that happens, so it is
+		// lost rather than deferred — and a non-positive deadline says the
+		// same thing, since epoch or earlier is not a date anything waits
+		// for. The check sits with
 		// the other argument validation, before the item is read, so a
 		// malformed call does not depend on the item existing. The MCP
 		// triage tool refuses the same inputs.
@@ -270,44 +279,56 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsIntakeNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Reject if already triaged (not pending).
-		if existing.TriageStatus != generated.IntakeItemsTriageStatusPending {
+		// Reject if already triaged. An expired snooze is pending again.
+		// A fast answer only: the conditional UPDATE below is the claim.
+		if !triageable(existing.TriageStatus, existing.SnoozeUntil) {
 			return nil, httpErr(apierrors.WsIntakeAlreadyTriaged)
 		}
 
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// Not an existence check: re-triaging an item to the status it
-		// already holds changes nothing and MySQL counts zero. The item is
-		// re-read below and that read is what fails if it is gone.
-		if _, err := deps.Queries.UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
-			TriageStatus:    generated.IntakeItemsTriageStatus(in.Body.Status),
-			TriagedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			SnoozeUntil:     snoozeUntil,
-			WorkspaceID:     ws.ID,
-			PublicID:        pub,
+		// The UPDATE matches only an item still pending (or past its
+		// snooze), so a losing concurrent triage counts zero rows and
+		// records nothing.
+		var claimed bool
+		if err := dbretry.InTx(ctx, deps.DB, "intake.Triage", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).UpdateIntakeItemTriage(ctx, generated.UpdateIntakeItemTriageParams{
+				TriageStatus:    generated.IntakeItemsTriageStatus(in.Body.Status),
+				TriagedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				SnoozeUntil:     snoozeUntil,
+				WorkspaceID:     ws.ID,
+				PublicID:        pub,
+			})
+			if err != nil {
+				return err
+			}
+			if claimed = rows > 0; !claimed {
+				return nil
+			}
+			// The event kind is chosen from the decision, so it is the one
+			// mutation here the static check cannot read off the literal;
+			// triageEventKind is total over the enum the schema accepts.
+			return deps.Mutations.RecordInTx(ctx, tx, actor(ctx, ws), mutationlog.Mutation{
+				EventType:    triageEventKind(in.Body.Status),
+				AuditAction:  "intake.triage",
+				ResourceType: "intake_item",
+				ResourceID:   pub.String(),
+				Payload:      map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
+				CallSite:     "intake.Triage",
+			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		// The event kind is chosen from the decision, so it is the one
-		// mutation here the static check cannot read off the literal;
-		// triageEventKind is total over the enum the schema accepts.
-		deps.Mutations.Record(ctx, actor(ctx, ws), mutationlog.Mutation{
-			EventType:    triageEventKind(in.Body.Status),
-			AuditAction:  "intake.triage",
-			ResourceType: "intake_item",
-			ResourceID:   pub.String(),
-			Payload:      map[string]any{"intakeItemId": pub.String(), "status": in.Body.Status},
-			CallSite:     "intake.Triage",
-		})
 
 		row, err := deps.Queries.FindIntakeItemByPublicId(ctx, generated.FindIntakeItemByPublicIdParams{
 			WorkspaceID: ws.ID,
 			PublicID:    pub,
 		})
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsIntakeNotFound, apierrors.InternalUnexpected))
+		}
+		if !claimed {
+			return nil, httpErr(apierrors.WsIntakeAlreadyTriaged)
 		}
 
 		return &TriageIntakeItemOutput{Body: mapFindRow(row)}, nil
@@ -338,7 +359,8 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsIntakeNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Prevent double conversion.
+		// Prevent double conversion. A fast answer only: the conditional
+		// link UPDATE inside the transaction is the claim.
 		if item.TaskID.Valid {
 			return nil, httpErr(apierrors.WsIntakeAlreadyConverted)
 		}
@@ -368,7 +390,7 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 
 		// Converting writes a task into the target project, so the actor must
 		// be a project editor (or workspace-elevated), matching tasks.Create.
-		if spec := requireProjectEditor(ctx, deps.DB, ws.ID, prj.ID, actorID, ws.Role); spec != nil {
+		if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
 			return nil, httpErr(spec)
 		}
 
@@ -381,7 +403,9 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			taskPub types.PublicID
 		)
 		act := actor(ctx, ws)
-		if err := dbretry.InTx(ctx, deps.DB, "intake.Convert", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "intake.Convert", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
 			qtx := deps.Queries.WithTx(tx.RawTx())
 
 			// An intake item is a workspace-level inbox entry with no audience of
@@ -398,16 +422,20 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 			taskID = created.ID
 			taskPub = created.PublicID
 
-			// Link intake item to the created task.
-			// The item was resolved earlier in this transaction and the task it
-			// is being linked to was just inserted, so the count adds nothing the
-			// transaction does not already guarantee.
-			if _, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+			// Link intake item to the created task. The UPDATE matches only
+			// an unconverted item, so a conversion that lost the race counts
+			// zero and rolls its task back with everything else here.
+			linked, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 				TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 				WorkspaceID: ws.ID,
 				PublicID:    pub,
-			}); err != nil {
+			})
+			if err != nil {
 				return err
+			}
+			if linked == 0 {
+				answered = httpErr(apierrors.WsIntakeAlreadyConverted)
+				return errAnswered
 			}
 
 			// One request, two changes: the item is triaged and a task
@@ -457,7 +485,11 @@ func Convert(deps Deps) func(context.Context, *ConvertIntakeItemInput) (*Convert
 				},
 				CallSite: "intake.Convert",
 			})
-		}); err != nil {
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

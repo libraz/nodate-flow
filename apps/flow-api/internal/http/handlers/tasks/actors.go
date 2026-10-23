@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"math"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -47,36 +47,34 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		pub := types.New()
-		if _, err := deps.Queries.AddActor(ctx, generated.AddActorParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			TaskID:      task.ID,
-			UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
-			Role:        role,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskActorAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":  task.PublicID.String(),
-				"actorId": pub.String(),
-				"userId":  userPub.String(),
-				"role":    in.Body.Role,
-			},
-		}, "tasks.AddActor")
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.actor.add",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddActor", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).AddActor(ctx, generated.AddActorParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
+				Role:        role,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskActorAdded,
+				AuditAction:  "task.actor.add",
 				ResourceType: "task_actor",
 				ResourceID:   pub.String(),
+				TaskID:       &taskInternal,
+				Payload: map[string]any{
+					"taskId":  task.PublicID.String(),
+					"actorId": pub.String(),
+					"userId":  userPub.String(),
+					"role":    in.Body.Role,
+				},
+				CallSite: "tasks.AddActor",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &AddTaskActorOutput{Body: TaskActor{
 			ID:     pub.String(),
@@ -142,35 +140,37 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 		// an actor on another task -- or none at all -- used to answer ok
 		// and append a task.actor.removed event for a removal that never
 		// happened.
-		rows, err := deps.Queries.RemoveActor(ctx, generated.RemoveActorParams{
-			WorkspaceID: ws.ID,
-			PublicID:    aid,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.WsTaskActorNotFound)
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskActorRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":  task.PublicID.String(),
-				"actorId": aid.String(),
-			},
-		}, "tasks.RemoveActor")
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.actor.remove",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
+		var missing bool
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.RemoveActor", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).RemoveActor(ctx, generated.RemoveActorParams{
+				WorkspaceID: ws.ID,
+				PublicID:    aid,
+			})
+			if err != nil {
+				return err
+			}
+			if missing = rows == 0; missing {
+				return nil
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskActorRemoved,
+				AuditAction:  "task.actor.remove",
 				ResourceType: "task_actor",
 				ResourceID:   aid.String(),
+				TaskID:       &taskInternal,
+				Payload: map[string]any{
+					"taskId":  task.PublicID.String(),
+					"actorId": aid.String(),
+				},
+				CallSite: "tasks.RemoveActor",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if missing {
+			return nil, httpErr(apierrors.WsTaskActorNotFound)
 		}
 		out := &RemoveTaskActorOutput{}
 		out.Body.Ok = true

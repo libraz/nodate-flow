@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
@@ -25,7 +26,27 @@ var ErrAgentPaused = errors.New("ai: agent is paused")
 // the concrete handle so the attribution and cost-accounting behaviour of
 // one tick can be exercised without a database.
 type AgentExecQueries interface {
+	AgentCostCapReader
 	GetAgentForExec(ctx context.Context, arg generated.GetAgentForExecParams) (generated.GetAgentForExecRow, error)
+}
+
+// agentTickPrompt is the user turn of a run no event triggered (an
+// interval tick or a manual run). Providers reject an empty user turn,
+// and the system prompt alone defines what the agent does.
+const agentTickPrompt = "Run your configured task now."
+
+// agentPrompt builds the user turn for one run: the triggering event and
+// its task for an on_event run, agentTickPrompt otherwise.
+func agentPrompt(t agentruntime.Trigger) string {
+	if t.EventType == "" {
+		return agentTickPrompt
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Triggered by event %s.", t.EventType)
+	if t.TaskPublicID != "" {
+		fmt.Fprintf(&b, "\nTask %s.", t.TaskPublicID)
+	}
+	return b.String()
 }
 
 // AgentProviderResolver loads the provider that owns an agent's bound model.
@@ -49,7 +70,7 @@ func (f AgentProviderResolverFunc) ForProvider(ctx context.Context, workspaceID 
 // main.go after both sides are constructed.
 //
 // Execute loads the agent row via [generated.Queries.GetAgentForExec],
-// enforces the cost guard, resolves the provider that owns the agent's model,
+// enforces the workspace cost guard and the agent's monthly cap, resolves the provider that owns the agent's model,
 // and calls Complete with the agent's system prompt, model, output cap,
 // and temperature — all of which come from that row via
 // [airequest.ForAgent], not from the provider's own defaults. The
@@ -110,6 +131,10 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		result.CostCapHit = capHit
 		return result, err
 	}
+	if err := CheckAgentCostCap(ctx, e.Queries, agentID, time.Now()); err != nil {
+		result.CostCapHit = errors.Is(err, ErrAgentCostCapExceeded)
+		return result, err
+	}
 	prov, err := e.Resolver.ForProvider(ctx, workspaceID, row.ProviderPublicID)
 	if err != nil {
 		return result, err
@@ -120,11 +145,7 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 	req := airequest.ForAgent(prov, airequest.FromExecRow(row), airequest.Args{
 		System: row.SystemPrompt,
-		// The tick prompt is intentionally empty — interval agents
-		// are self-directed; the system prompt defines the task and
-		// the model replies without additional user input. Event /
-		// manual triggers will populate Prompt in a later pass.
-		Prompt: "",
+		Prompt: agentPrompt(agentruntime.TriggerFromContext(ctx)),
 	})
 	start := time.Now()
 	resp, err := prov.Complete(ctx, req)

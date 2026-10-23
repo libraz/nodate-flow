@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/webhook"
@@ -39,9 +40,9 @@ func Create(deps Deps) func(context.Context, *CreateWebhookInput) (*CreateWebhoo
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		eventTypes := in.Body.EventTypes
-		if len(eventTypes) == 0 {
-			eventTypes = json.RawMessage(`["*"]`)
+		eventTypes, ok := normalizeEventTypes(in.Body.EventTypes)
+		if !ok {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 
 		pubID := types.New()
@@ -80,6 +81,39 @@ func Create(deps Deps) func(context.Context, *CreateWebhookInput) (*CreateWebhoo
 		}
 		return out, nil
 	}
+}
+
+// eventTypeWildcard subscribes to every event kind.
+const eventTypeWildcard = "*"
+
+// normalizeEventTypes validates a subscription's eventTypes against what
+// the delivery worker matches: each entry is eventTypeWildcard or a
+// declared eventbus kind compared by exact equality, never a pattern. An
+// absent value subscribes to everything; an empty array or an unknown
+// kind would store a subscription that is never delivered, so both are
+// refused. The returned JSON is the array as stored.
+func normalizeEventTypes(raw json.RawMessage) (json.RawMessage, bool) {
+	if len(raw) == 0 {
+		return json.RawMessage(`["*"]`), true
+	}
+	var entries []string
+	if err := json.Unmarshal(raw, &entries); err != nil || len(entries) == 0 {
+		return nil, false
+	}
+	known := make(map[string]struct{}, len(eventbus.Kinds()))
+	for _, k := range eventbus.Kinds() {
+		known[string(k)] = struct{}{}
+	}
+	for _, e := range entries {
+		if _, ok := known[e]; !ok && e != eventTypeWildcard {
+			return nil, false
+		}
+	}
+	out, err := json.Marshal(entries)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
 
 // List handles GET /workspaces/{wsId}/webhooks.

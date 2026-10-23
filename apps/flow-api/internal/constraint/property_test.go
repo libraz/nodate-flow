@@ -21,9 +21,6 @@ func factMatrix() []Facts {
 		{DependencyStates: map[string]string{"a": "waiting"}},
 		{ActorRoles: map[string]bool{"reviewer": true}},
 		{SignalsReceived: map[string]bool{"github.pr.merged": true}},
-		{Approvals: map[string]bool{"owner": true}},
-		{CIStatus: "success"},
-		{CIStatus: "failure"},
 	}
 }
 
@@ -34,8 +31,6 @@ func primitives() []Constraint {
 		{Op: OpDepAllDone, TaskIDs: []string{"a"}},
 		{Op: OpActorHasRole, Arg: "reviewer"},
 		{Op: OpSignalReceived, Arg: "github.pr.merged"},
-		{Op: OpApprovalGranted, Arg: "owner"},
-		{Op: OpCIStatusIs, Arg: "success"},
 	}
 }
 

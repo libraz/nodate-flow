@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -178,7 +179,7 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 			continue
 		}
 
-		sourceEventID, err := appendReminderEvent(ctx, queries, n)
+		sourceEventID, err := reminderEvent(ctx, queries, n)
 		if err != nil {
 			log.Error("notification scheduler: failed to append reminder event; will retry next tick",
 				"eventId", n.PublicID.String(), "err", err)
@@ -190,11 +191,9 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 			ctx, n.WorkspaceID, n.PublicID, n.Title, recipients, sourceEventID,
 		); err != nil {
 			// Release the claim so the next tick re-claims and retries
-			// the dispatch. Within one dispatch (and any concurrent
-			// replay of the same source event) the notifications unique
-			// key dedupes; a next-tick retry appends a fresh event row,
-			// which trades a possible duplicate row after a partial
-			// failure for never losing the reminder.
+			// the dispatch. The retry reuses this occurrence's event
+			// row, so the notifications unique key skips the recipients
+			// this attempt already reached.
 			log.Error("notification scheduler: dispatch failed; will retry next tick",
 				"eventId", n.PublicID.String(), "err", err)
 			releaseReminderClaim(ctx, db, n)
@@ -208,11 +207,11 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 	}
 }
 
-// appendReminderEvent appends a calendar.reminder row to the append-only
-// events log for a claimed reminder and returns the new events.id. The
-// id becomes notifications.source_event_id so the
-// (recipient_user_id, source_event_id, channel) unique key dedupes
-// concurrent fan-outs of the same reminder.
+// reminderEvent returns the events.id of the calendar.reminder row for a
+// claimed occurrence, appending it on the first attempt and reusing it on
+// a retry. The id becomes notifications.source_event_id, so reusing it is
+// what lets the (recipient_user_id, source_event_id, channel) unique key
+// skip the recipients a failed attempt already reached.
 //
 // It calls [generated.Queries.AppendEvent] directly instead of going
 // through eventbus.Append because the fan-out needs the inserted
@@ -228,13 +227,26 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 // the events table by the timeline and the activity filters, so the
 // constant has to be declared, and the conversion below is what keeps
 // the name traceable from here to the column.
-func appendReminderEvent(
+func reminderEvent(
 	ctx context.Context,
 	queries *generated.Queries,
 	n pendingNotification,
 ) (int64, error) {
-	payload, err := json.Marshal(map[string]string{
-		"calendarEventId": n.PublicID.String(),
+	occurrenceAt := n.OccurrenceStart.Unix()
+	id, err := queries.FindReminderEventForOccurrence(ctx, generated.FindReminderEventForOccurrenceParams{
+		WorkspaceID:       n.WorkspaceID,
+		CalendarEventID:   n.PublicID.String(),
+		OccurrenceStartAt: occurrenceAt,
+	})
+	if err == nil {
+		return int64(id), nil //#nosec G115 -- events.id is AUTO_INCREMENT, far below int64 max
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	payload, err := json.Marshal(map[string]any{
+		"calendarEventId":   n.PublicID.String(),
+		"occurrenceStartAt": occurrenceAt,
 	})
 	if err != nil {
 		return 0, err
@@ -255,6 +267,10 @@ func appendReminderEvent(
 // the row then stays claimed and the reminder is dropped, which is the
 // same outcome as failing silently but with an audit trail.
 func releaseReminderClaim(ctx context.Context, db *sql.DB, n pendingNotification) {
+	// Detached from cancellation: a dispatch that failed because shutdown
+	// cancelled the tick must still give its claim back, or the reminder
+	// is lost rather than retried by the next process.
+	ctx = context.WithoutCancel(ctx)
 	if err := generated.New(db).ReleaseReminderOccurrence(ctx, generated.ReleaseReminderOccurrenceParams{
 		EventID:         n.ID,
 		OccurrenceStart: n.OccurrenceStart,
@@ -299,7 +315,7 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 		SELECT ce.id, ce.public_id, ce.title, ce.start_at, ce.notification_offset,
 		       ce.owner_user_id, ce.workspace_id, ce.timezone,
 		       ce.recurrence_rule, ce.recurrence_end, ce.recurrence_exceptions,
-		       ce.recurrence_parent_id
+		       ce.recurrence_parent_id, ce.all_day
 		FROM calendar_events ce
 		INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
 		INNER JOIN workspaces w ON w.id = ce.workspace_id AND w.enabled = TRUE
@@ -332,7 +348,7 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 		if err := rows.Scan(
 			&c.n.ID, &c.n.PublicID, &c.n.Title, &c.n.StartAt, &c.n.NotificationOffset,
 			&c.n.OwnerUserID, &c.n.WorkspaceID, &c.timezone,
-			&ruleRaw, &seriesEnd, &exceptions, &seriesID,
+			&ruleRaw, &seriesEnd, &exceptions, &seriesID, &c.allDay,
 		); err != nil {
 			return nil, err
 		}
@@ -385,6 +401,7 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 			Exceptions:       c.exceptions,
 			OverriddenStarts: overridden[overrideKey{workspaceID: c.n.WorkspaceID, parentID: c.n.ID}],
 			RecurrenceEnd:    c.seriesEnd,
+			AllDay:           c.allDay,
 		}, now, horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute)) {
 			if occ, ok := dueOccurrence(c.n, inst.StartAt, now); ok {
 				claimedRows = append(claimedRows, occ)
@@ -404,6 +421,8 @@ type reminderCandidate struct {
 	rule       *recurrence.Rule
 	exceptions []string
 	seriesEnd  *time.Time
+	// allDay steps the series in UTC, as the calendar surfaces expand it.
+	allDay bool
 }
 
 // overrideKey names one master row. The scan spans every workspace, so

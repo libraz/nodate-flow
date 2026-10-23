@@ -46,8 +46,7 @@ import (
 type Args struct {
 	// System is the system prompt. May be empty.
 	System string
-	// Prompt is the user message. May be empty for self-directed agent
-	// ticks, where the system prompt is the whole instruction.
+	// Prompt is the user message. Providers reject an empty one.
 	Prompt string
 	// MaxTokens caps the response for call sites whose parser has a known
 	// ceiling (a JSON verdict, a generated page body). Zero means the

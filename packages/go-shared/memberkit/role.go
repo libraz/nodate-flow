@@ -154,15 +154,12 @@ func UpdateMemberRole(ctx context.Context, tx *dbretry.Tx, args UpdateMemberRole
 	}
 
 	// Last-owner guard: demoting an owner to a non-owner role is only
-	// allowed while another owner remains. Promotions and lateral
-	// owner→owner changes are already excluded by the no-op check above.
+	// allowed while another owner remains, decided under a lock on the
+	// owner rows. Promotions and lateral owner→owner changes are already
+	// excluded by the no-op check above.
 	if oldRole == string(RoleOwner) && args.NewRole != RoleOwner {
-		owners, err := countWorkspaceOwners(ctx, tx, args.WorkspaceID)
-		if err != nil {
+		if err := EnsureOwnerRemains(ctx, tx, workspaceOwners(args.WorkspaceID), args.UserID); err != nil {
 			return err
-		}
-		if owners <= 1 {
-			return ErrLastOwner
 		}
 	}
 

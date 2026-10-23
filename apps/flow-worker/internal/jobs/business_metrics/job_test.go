@@ -2,6 +2,7 @@ package business_metrics
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"log/slog"
@@ -25,6 +26,10 @@ type stubCounts struct {
 
 	since time.Time
 	calls int
+}
+
+func (s *stubCounts) DeleteExpiredUnappliedSignals(context.Context, sql.NullTime) (int64, error) {
+	return 0, nil
 }
 
 func (s *stubCounts) CountTasksByDerivedState(context.Context) ([]generated.CountTasksByDerivedStateRow, error) {

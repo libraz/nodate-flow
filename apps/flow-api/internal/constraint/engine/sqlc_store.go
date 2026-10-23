@@ -12,12 +12,9 @@ import (
 )
 
 // SqlcStore is the production [Store] implementation backed by sqlc
-// queries. It populates a minimal [constraint.Facts] value — due_on,
-// dependency states, and actor roles — and leaves the signal /
-// approval / CI fact maps empty until the signal ingestion slice
-// lands. Constraints that reference those builtins simply evaluate
-// to false in the meantime, which is the conservative outcome for
-// a constraint engine.
+// queries. It populates every [constraint.Facts] field a DSL op reads:
+// due_on, dependency states and kinds, actor roles, and the kinds of the
+// signals attached to the task.
 type SqlcStore struct {
 	// WorkspaceID is the workspace this store is scoped to. The
 	// caller MUST set it to the authenticated workspace before
@@ -88,6 +85,20 @@ func (s *SqlcStore) LoadTask(ctx context.Context, taskID uint32) (constraint.Fac
 		f.ActorRoles = make(map[string]bool, len(roles))
 		for _, r := range roles {
 			f.ActorRoles[string(r)] = true
+		}
+	}
+
+	kinds, err := s.Queries.ListSignalKindsForTaskForEngine(ctx, generated.ListSignalKindsForTaskForEngineParams{
+		WorkspaceID: s.WorkspaceID,
+		TaskID:      sql.NullInt32{Int32: int32(taskID), Valid: true}, //#nosec G115 -- tasks.id is INT UNSIGNED, fits int32 within realistic deployments
+	})
+	if err != nil {
+		return f, nil, err
+	}
+	if len(kinds) > 0 {
+		f.SignalsReceived = make(map[string]bool, len(kinds))
+		for _, k := range kinds {
+			f.SignalsReceived[k] = true
 		}
 	}
 

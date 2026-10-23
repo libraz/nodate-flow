@@ -146,3 +146,19 @@ func TestRegisterProductionJobsRegistersBusinessMetricsWithoutAServiceToken(t *t
 		t.Fatalf("business_metrics not registered; registered = %v", names)
 	}
 }
+
+// The signal retention sweep needs only the database, so a deploy waiting
+// on the flow-api token still deletes expired signals.
+func TestRegisterProductionJobsRegistersSignalRetentionWithoutAServiceToken(t *testing.T) {
+	t.Parallel()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	db := openIdlePool(t)
+	runner := &jobs.Runner{}
+	cfg := &config.Config{FlowAPIBaseURL: "http://127.0.0.1:8080"}
+
+	registerProductionJobs(cfg, logger)(runner, db)
+	if names := runner.Names(); !contains(names, "signal_retention") {
+		t.Fatalf("signal_retention not registered; registered = %v", names)
+	}
+}

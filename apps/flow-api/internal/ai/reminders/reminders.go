@@ -9,6 +9,9 @@ package reminders
 import (
 	"fmt"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // State mirrors tasks.derived_state for the subset reminders care about.
@@ -42,6 +45,9 @@ type Signals struct {
 	DueOn    time.Time
 	HasDueOn bool
 	Now      time.Time
+	// Zone is the zone whose calendar day "today" is; the zero value
+	// reads the day in UTC.
+	Zone region.Zone
 }
 
 // Reminder is the rule engine output. Evaluate returns nil when no
@@ -71,12 +77,7 @@ func Evaluate(s Signals) *Reminder {
 	if s.Now.IsZero() {
 		s.Now = time.Now().UTC()
 	}
-	// Compare at day granularity so "due today" is not confused with
-	// "overdue by a few hours" when the server clock drifts past the
-	// stored midnight.
-	now := truncateDay(s.Now)
-	due := truncateDay(s.DueOn)
-	diffDays := int(due.Sub(now) / (24 * time.Hour))
+	diffDays := duedate.DaysUntil(s.DueOn, s.Now, s.Zone)
 
 	switch {
 	case diffDays < 0:
@@ -99,8 +100,4 @@ func Evaluate(s Signals) *Reminder {
 		}
 	}
 	return nil
-}
-
-func truncateDay(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -13,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // Archive returns a handler for POST /tasks/{id}/archive.
@@ -28,34 +28,30 @@ func Archive(deps Deps) func(context.Context, *ArchiveTaskInput) (*ArchiveTaskOu
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// Not an existence check: archiving a task that is already archived
-		// writes the same archived_at and MySQL counts zero. The task was
-		// resolved by the task middleware before this runs.
-		if _, err := deps.Queries.ArchiveTask(ctx, generated.ArchiveTaskParams{
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			WorkspaceID:     ws.ID,
-			PublicID:        types.FromUUID(task.PublicID),
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
+		// The statement matches only a task not already in the target
+		// state, so a repeat or a losing concurrent call counts zero and
+		// records nothing: there is no change to describe.
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskArchived,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		}, "tasks.Archive")
-
-		if actorID != 0 {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.archived",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.Archive", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).ArchiveTask(ctx, generated.ArchiveTaskParams{
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				WorkspaceID:     ws.ID,
+				PublicID:        types.FromUUID(task.PublicID),
+			})
+			if err != nil || rows == 0 {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskArchived,
+				AuditAction:  "task.archived",
 				ResourceType: "task",
 				ResourceID:   task.PublicID.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String()},
+				CallSite:     "tasks.Archive",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &ArchiveTaskOutput{}
@@ -77,33 +73,30 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// See Archive: un-archiving an already-live task changes nothing
-		// and counts zero.
-		if _, err := deps.Queries.UnarchiveTask(ctx, generated.UnarchiveTaskParams{
-			UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-			WorkspaceID:     ws.ID,
-			PublicID:        types.FromUUID(task.PublicID),
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
+		// The statement matches only a task not already in the target
+		// state, so a repeat or a losing concurrent call counts zero and
+		// records nothing: there is no change to describe.
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskUnarchived,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload:     map[string]any{"taskId": task.PublicID.String()},
-		}, "tasks.Unarchive")
-
-		if actorID != 0 {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.unarchived",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		if err := dbretry.InTx(ctx, deps.DB, "tasks.Unarchive", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).UnarchiveTask(ctx, generated.UnarchiveTaskParams{
+				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: actorID != 0}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
+				WorkspaceID:     ws.ID,
+				PublicID:        types.FromUUID(task.PublicID),
+			})
+			if err != nil || rows == 0 {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskUnarchived,
+				AuditAction:  "task.unarchived",
 				ResourceType: "task",
 				ResourceID:   task.PublicID.String(),
+				TaskID:       &taskInternal,
+				Payload:      map[string]any{"taskId": task.PublicID.String()},
+				CallSite:     "tasks.Unarchive",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &UnarchiveTaskOutput{}

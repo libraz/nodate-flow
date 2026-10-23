@@ -15,6 +15,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -471,13 +472,13 @@ func exportedTasks(rows iter.Seq[exportRow]) iter.Seq[ExportedTask] {
 func fetchForWorkspace(
 	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, limit int32,
 ) (exportDataset, error) {
-	visibility := exportVisibilityParams(actorID, ws.Role)
+	visibility := acl.ListVisibilityArgs(actorID, ws.Role)
 	dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
 		WorkspaceID:   ws.ID,
-		IsElevated:    visibility.isElevated,
-		ActorUserID:   visibility.actorUserID,
-		ActorUserID_2: visibility.actorUserID,
-		ActorUserID_3: visibility.actorUserID,
+		IsElevated:    visibility.IsElevated,
+		ActorUserID:   visibility.ActorUserID,
+		ActorUserID_2: visibility.ActorUserID,
+		ActorUserID_3: visibility.ActorUserID,
 		Limit:         limit,
 	})
 	if err != nil {
@@ -529,14 +530,14 @@ func fetchForLens(
 
 	// If the lens has a project scope, use the project-scoped query.
 	if projectID.Valid {
-		visibility := exportVisibilityParams(actorID, ws.Role)
+		visibility := acl.ListVisibilityArgs(actorID, ws.Role)
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
 			WorkspaceID:   ws.ID,
 			ProjectID:     uint32(projectID.Int32), //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			IsElevated:    visibility.isElevated,
-			ActorUserID:   visibility.actorUserID,
-			ActorUserID_2: visibility.actorUserID,
-			ActorUserID_3: visibility.actorUserID,
+			IsElevated:    visibility.IsElevated,
+			ActorUserID:   visibility.ActorUserID,
+			ActorUserID_2: visibility.ActorUserID,
+			ActorUserID_3: visibility.ActorUserID,
 			Limit:         limit,
 		})
 		if err != nil {
@@ -571,22 +572,6 @@ func fetchForLens(
 
 	// Workspace-wide lens: fall back to the workspace query.
 	return fetchForWorkspace(ctx, deps, ws, actorID, limit)
-}
-
-type exportVisibility struct {
-	isElevated  int64
-	actorUserID int64
-}
-
-func exportVisibilityParams(actorID uint32, wsRole middleware.WorkspaceRole) exportVisibility {
-	var elevated int64
-	if wsRole.AtLeast(middleware.WorkspaceRoleAdmin) {
-		elevated = 1
-	}
-	return exportVisibility{
-		isElevated:  elevated,
-		actorUserID: int64(actorID),
-	}
 }
 
 // mapRow converts one internal exportRow to the public DTO.

@@ -1,10 +1,12 @@
 package calendar
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -242,6 +244,39 @@ func TestEventPermission_NonOwnerCannotSetOtherOwner(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Contains(t, string(body), "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED")
+}
+
+// The owner foreign key reaches every user on the instance, so only the
+// lookup keeps an event inside its workspace: a user of another workspace
+// is refused exactly as an unknown id is.
+func TestCreateEvent_OwnerOutsideTheWorkspaceIsNotFound(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	outsider := newTenant(t)
+	calID := createCalendar(t, owner)
+
+	for name, ownerID := range map[string]string{
+		"a user of another workspace": outsider.UserPublicID.String(),
+		"an unknown user":             uuid.Must(uuid.NewV7()).String(),
+	} {
+		status, body := helpers.DoJSONStatus(t, http.MethodPost, owner.WsPath("calendars", calID, "events"), owner.AccessToken, map[string]any{
+			"kind":        "event",
+			"title":       "Filed elsewhere",
+			"startAt":     time.Date(2026, 12, 2, 10, 0, 0, 0, time.UTC).Unix(),
+			"endAt":       time.Date(2026, 12, 2, 11, 0, 0, 0, time.UTC).Unix(),
+			"timezone":    "UTC",
+			"ownerUserId": ownerID,
+		})
+		assert.Equal(t, http.StatusBadRequest, status, "%s: body=%s", name, string(body))
+		assert.Contains(t, string(body), "CALENDAR.EVENT.OWNER_USER_NOT_FOUND", "%s: body=%s", name, string(body))
+	}
+
+	var n int
+	require.NoError(t, testDB.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM calendar_events WHERE owner_user_id = ?`, outsider.UserInternalID).Scan(&n))
+	assert.Zero(t, n, "no event may be filed under a user outside the workspace")
 }
 
 func TestEventPermission_NonOwnerCannotDeleteOthersEvent(t *testing.T) {

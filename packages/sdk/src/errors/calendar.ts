@@ -201,6 +201,11 @@ export const CalendarErrors = {
     status: 422,
     message: "This event does not repeat, so it has no single occurrence to act on",
   },
+  CALENDAR_EVENT_OCCURRENCE_START_NOT_IN_SERIES: {
+    code: "CALENDAR.EVENT.OCCURRENCE_START_NOT_IN_SERIES",
+    status: 422,
+    message: "occurrenceStart does not name an occurrence of this series",
+  },
   CALENDAR_EVENT_OCCURRENCE_START_REQUIRED: {
     code: "CALENDAR.EVENT.OCCURRENCE_START_REQUIRED",
     status: 422,

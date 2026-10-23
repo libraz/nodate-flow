@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -32,7 +34,7 @@ func Reorder(deps Deps) func(context.Context, *ReorderTasksInput) (*ReorderTasks
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 		}
 
-		if spec := requireProjectEditor(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID); spec != nil {
+		if spec := handlerutil.RequireProjectRole(ctx, deps.DB, prj.WorkspaceID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
 			return nil, httpErr(spec)
 		}
 

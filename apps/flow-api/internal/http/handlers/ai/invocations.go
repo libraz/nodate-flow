@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -43,17 +44,28 @@ type ListInvocationsOutput struct {
 // ListInvocations handles GET /workspaces/{wsId}/ai/invocations. It
 // returns the most recent redacted ai_invocations rows for the
 // workspace so the AI reasoning / activity panel can render them.
-// Workspace-member auth is enforced by the surrounding middleware.
+// Workspace-member auth is enforced by the surrounding middleware; the
+// query narrows the rows to what the caller may read.
 func ListInvocations(deps Deps) func(context.Context, *ListInvocationsInput) (*ListInvocationsOutput, error) {
 	return func(ctx context.Context, in *ListInvocationsInput) (*ListInvocationsOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		vis := acl.ListVisibilityArgs(actorID, ws.Role)
 		rows, err := deps.Queries.ListAiInvocationsForWorkspace(ctx, generated.ListAiInvocationsForWorkspaceParams{
-			WorkspaceID: ws.ID,
-			Limit:       in.Limit,
-			Offset:      in.Offset,
+			WorkspaceID:   ws.ID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			ActorUserID_4: vis.ActorUserID,
+			Limit:         in.Limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

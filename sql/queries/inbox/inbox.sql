@@ -120,3 +120,84 @@ SET received_at = ?
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
+
+-- name: GetInboxItemTaskVisible :one
+-- Resolve one inbox item in a workspace and whether the reader may read
+-- the task it points at. No row means the id names no inbox item here,
+-- which is what an AI suggestion reaction has to refuse.
+SELECT
+  (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  ) AS task_visible
+FROM v_inbox v
+WHERE v.workspace_id = sqlc.arg('workspace_id')
+  AND v.public_id = sqlc.arg('public_id')
+LIMIT 1;
+
+-- name: ListPendingAiSuggestionsForReader :many
+-- Pending AI triage suggestions a reader may see. A suggestion is pending
+-- while no later applied / dismissed event names the same inbox item; it
+-- is the reader's only while that item is still in the inbox and the task
+-- it points at is one they may read, because the stored reasoning is the
+-- model talking about that task.
+SELECT
+  e.public_id,
+  e.occurred_at,
+  e.payload_json
+FROM events e
+INNER JOIN v_inbox v
+  ON v.workspace_id = e.workspace_id
+ AND v.public_id = CASE
+       WHEN IS_UUID(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')))
+       THEN UUID_TO_BIN(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')), 0)
+     END
+WHERE e.workspace_id = sqlc.arg('workspace_id')
+  AND e.type = 'ai.suggestion.proposed'
+  AND NOT EXISTS (
+    SELECT 1 FROM events e2
+    WHERE e2.workspace_id = e.workspace_id
+      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
+      AND e2.id > e.id
+      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
+  )
+  AND (
+    CAST(sqlc.arg('is_elevated') AS SIGNED) = 1
+    OR v.task_internal_id IS NULL
+    OR v.task_visibility = 'public'
+    OR (v.task_visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = v.task_project_id
+        AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (v.task_visibility = 'private' AND (
+      v.task_created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = v.task_internal_id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+  )
+ORDER BY e.occurred_at DESC
+LIMIT 100;

@@ -227,6 +227,15 @@ resources:
         description: "Returned when a request uses the occurrence or thisAndFollowing scope without an occurrenceStart. The original start of the occurrence is what identifies which one the request means."
         userAction: "Send the occurrence's original start as occurrenceStart, or use the series scope to act on every occurrence."
 
+      occurrence_start_not_in_series:
+        code: CALENDAR.EVENT.OCCURRENCE_START_NOT_IN_SERIES
+        status: 422
+        message: "occurrenceStart does not name an occurrence of this series"
+        message_ja: "occurrenceStart がこの繰り返しイベントのいずれの回も指していません"
+        message_zh: "occurrenceStart 未指向此重复事件的任何一次日程"
+        description: "Returned when a request uses the occurrence or thisAndFollowing scope with an occurrenceStart the recurrence rule does not produce within its bounds, or that names an occurrence already cancelled."
+        userAction: "Send the original start of an occurrence the series still produces, as listed by the calendar."
+
       not_recurring:
         code: CALENDAR.EVENT.NOT_RECURRING
         status: 422

@@ -150,6 +150,25 @@ func TestTaskVisibilityFilter(t *testing.T) {
 	}
 }
 
+// TestTaskVisibilityPredicateWrapsTheOneFilter holds the cross-relation
+// form to the list filter: it is the same fragment, scoped to the matched
+// task, so a reader over the event log or an audit trail cannot apply a
+// spelling of the rule of its own.
+func TestTaskVisibilityPredicateWrapsTheOneFilter(t *testing.T) {
+	t.Parallel()
+
+	frag, args := acl.TaskVisibilityPredicate("v.task_internal_id = e.task_id", 1, acl.WorkspaceRoleAdmin)
+	require.Empty(t, frag, "elevated readers are not filtered")
+	require.Empty(t, args)
+
+	filter, filterArgs := acl.TaskVisibilityFilter(42, acl.WorkspaceRoleGuest)
+	frag, args = acl.TaskVisibilityPredicate("v.task_internal_id = e.task_id", 42, acl.WorkspaceRoleGuest)
+	require.Contains(t, frag, filter, "the predicate must carry the list filter verbatim")
+	require.Contains(t, frag, "FROM v_task_list_all v", "a deleted task must match nothing, an archived one still count")
+	require.Contains(t, frag, "v.task_internal_id = e.task_id")
+	require.Equal(t, filterArgs, args)
+}
+
 // -----------------------------------------------------------------------------
 // DB-backed tests
 //

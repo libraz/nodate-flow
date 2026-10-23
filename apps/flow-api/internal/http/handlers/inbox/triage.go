@@ -14,6 +14,7 @@ import (
 
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -64,11 +65,15 @@ type TriageOutput struct {
 // shape as the LLM path. Used when no AI provider is configured
 // and when the daily budget is exhausted, so the triage UI is
 // never empty.
-func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, limit int) ([]ai.InboxTriageSuggestion, error) {
+func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vis acl.VisibilityArgs, limit int) ([]ai.InboxTriageSuggestion, error) {
 	rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
-		WorkspaceID: wsID,
-		Limit:       int32(limit), //#nosec G115 -- limit is validated to maximum:50 by the handler
-		Offset:      0,
+		WorkspaceID:   wsID,
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+		Limit:         int32(limit), //#nosec G115 -- limit is validated to maximum:50 by the handler
+		Offset:        0,
 	})
 	if err != nil {
 		return nil, err
@@ -123,6 +128,10 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 		if err != nil {
 			return nil, err
 		}
+		vis, err := readerVisibility(ctx, deps, wsID, actorID)
+		if err != nil {
+			return nil, err
+		}
 		limit := in.Body.Limit
 		if limit <= 0 {
 			limit = 20
@@ -139,11 +148,11 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 		// the "no LLM" case.
 		var suggestions []ai.InboxTriageSuggestion
 		if deps.AI != nil {
-			suggestions, err = deps.AI.ProposeInboxTriage(ctx, wsID, limit)
+			suggestions, err = deps.AI.ProposeInboxTriage(ctx, wsID, vis, limit)
 			if err != nil {
 				switch {
 				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
-					suggestions, err = deterministicFallback(ctx, deps, wsID, limit)
+					suggestions, err = deterministicFallback(ctx, deps, wsID, vis, limit)
 				case errors.Is(err, ai.ErrParse):
 					return nil, httpErr(apierrors.AiResponseInvalidJson)
 				default:
@@ -151,7 +160,7 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 				}
 			}
 		} else {
-			suggestions, err = deterministicFallback(ctx, deps, wsID, limit)
+			suggestions, err = deterministicFallback(ctx, deps, wsID, vis, limit)
 		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

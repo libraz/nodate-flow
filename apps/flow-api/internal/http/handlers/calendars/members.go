@@ -3,9 +3,11 @@ package calendars
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -14,7 +16,36 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
+
+// errAnswered rolls a transaction back once the handler has decided the
+// response itself. It is not transient, so dbretry does not retry it.
+var errAnswered = errors.New("calendars: answered")
+
+// lockCalendarMemberRole locks a live calendar membership and returns its
+// role. sql.ErrNoRows when the user holds no live membership.
+func lockCalendarMemberRole(ctx context.Context, tx *dbretry.Tx, calendarID, userID uint32) (calendar.CalendarMembersRole, error) {
+	var role calendar.CalendarMembersRole
+	err := tx.QueryRowContext(ctx,
+		`SELECT role FROM calendar_members WHERE calendar_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`,
+		calendarID, userID).Scan(&role)
+	return role, err
+}
+
+// ensureCalendarOwnerRemains answers CALENDAR.MEMBER.LAST_OWNER_REMOVAL_BLOCKED
+// unless a live owner other than leaving remains on the calendar, through
+// the shared memberkit guard that locks the owner rows.
+func ensureCalendarOwnerRemains(ctx context.Context, tx *dbretry.Tx, calendarID, leaving uint32) (*apierr.Spec, error) {
+	err := memberkit.EnsureOwnerRemains(ctx, tx, memberkit.OwnerSet{
+		Query: `SELECT user_id FROM calendar_members WHERE calendar_id = ? AND role = 'owner' AND enabled = TRUE`,
+		Args:  []any{calendarID},
+	}, leaving)
+	if errors.Is(err, memberkit.ErrLastOwner) {
+		return apierrors.CalendarMemberLastOwnerRemovalBlocked, nil
+	}
+	return nil, err
+}
 
 var memberColors = []string{
 	"#4285F4", "#EA4335", "#FBBC04", "#34A853",
@@ -242,59 +273,54 @@ func UpdateMemberRole(deps Deps) func(context.Context, *UpdateMemberRoleInput) (
 
 		newRole := calendar.CalendarMembersRole(input.Body.Role)
 
-		// A manager may not mint owners, and may not touch an existing one.
-		// Otherwise the owner-only gate on deleting the calendar is
-		// reachable by anyone who can administer membership.
-		if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner) {
-			target, terr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+		// The role gates and the last-owner guard are decided against rows
+		// locked in the transaction that writes, so two owners demoting
+		// each other cannot both pass, and a manager cannot act on a member
+		// promoted to owner after a stale read.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.UpdateMemberRole", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			currentRole, err := lockCalendarMemberRole(ctx, tx, cal.ID, targetUserID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.CalendarMemberNotFound)
+					return errAnswered
+				}
+				return err
+			}
+			// A manager may not mint owners, and may not touch an existing one.
+			// Otherwise the owner-only gate on deleting the calendar is
+			// reachable by anyone who can administer membership.
+			if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner) &&
+				(newRole == calendar.CalendarMembersRoleOwner || currentRole == calendar.CalendarMembersRoleOwner) {
+				answered = httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+				return errAnswered
+			}
+			// Demoting the last owner would leave the calendar with nobody able
+			// to delete it or restore an owner.
+			if currentRole == calendar.CalendarMembersRoleOwner && newRole != calendar.CalendarMembersRoleOwner {
+				if spec, err := ensureCalendarOwnerRemains(ctx, tx, cal.ID, targetUserID); err != nil || spec != nil {
+					if spec != nil {
+						answered = httpErr(spec)
+						return errAnswered
+					}
+					return err
+				}
+			}
+			// The member row is locked above, so a zero count is a role the
+			// member already holds.
+			_, err = deps.CalendarQueries.WithTx(tx.RawTx()).UpdateCalendarMemberRole(ctx, calendar.UpdateCalendarMemberRoleParams{
+				Role:       newRole,
 				CalendarID: cal.ID,
 				UserID:     targetUserID,
 			})
-			if terr != nil {
-				return nil, httpErr(apierr.SpecForErrNoRows(terr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
-			}
-			if newRole == calendar.CalendarMembersRoleOwner ||
-				target.Role == calendar.CalendarMembersRoleOwner {
-				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
-			}
-		}
-
-		// Demoting the last owner would leave the calendar with nobody able
-		// to delete it or restore an owner.
-		if newRole != calendar.CalendarMembersRoleOwner {
-			owners, oerr := deps.CalendarQueries.CountCalendarOwners(ctx, cal.ID)
-			if oerr != nil {
-				return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
-			}
-			current, cerr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
-				CalendarID: cal.ID,
-				UserID:     targetUserID,
-			})
-			if cerr != nil {
-				return nil, httpErr(apierr.SpecForErrNoRows(cerr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
-			}
-			if current.Role == calendar.CalendarMembersRoleOwner && owners <= 1 {
-				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
-			}
-		}
-
-		res, err := deps.CalendarQueries.UpdateCalendarMemberRole(ctx, calendar.UpdateCalendarMemberRoleParams{
-			Role:       newRole,
-			CalendarID: cal.ID,
-			UserID:     targetUserID,
+			return err
 		})
-		if err != nil {
-			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
+		if answered != nil {
+			return nil, answered
 		}
-		if affected, _ := res.RowsAffected(); affected == 0 {
-			// Either no live membership, or the role already matched. The
-			// former must not report success; distinguish by looking.
-			if _, ferr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
-				CalendarID: cal.ID,
-				UserID:     targetUserID,
-			}); ferr != nil {
-				return nil, httpErr(apierr.SpecForErrNoRows(ferr, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
-			}
+		if txErr != nil {
+			return nil, httpErr(apierrors.CalendarMemberStoreWriteInterrupted)
 		}
 
 		out := &UpdateMemberRoleOutput{}
@@ -339,53 +365,62 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 			return nil, httpErr(apierrors.CalendarMemberUserNotFound)
 		}
 
-		target, err := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
-			CalendarID: cal.ID,
-			UserID:     targetUserID,
+		// Decided against the member row and the owner rows locked in the
+		// transaction that disables, for the same reason as UpdateMemberRole.
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "calendars.RemoveMember", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			targetRole, err := lockCalendarMemberRole(ctx, tx, cal.ID, targetUserID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.CalendarMemberNotFound)
+					return errAnswered
+				}
+				return err
+			}
+
+			// Leaving is always allowed; removing someone else needs manager or
+			// owner, and only an owner may remove another owner.
+			isSelf := targetUserID == actorID
+			if !isSelf {
+				if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleManager) ||
+					(targetRole == calendar.CalendarMembersRoleOwner &&
+						roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner)) {
+					answered = httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
+					return errAnswered
+				}
+			}
+
+			// The last owner cannot leave or be removed, including by
+			// themselves — a calendar with no owner can never regain one.
+			//
+			// Removing someone from the workspace keeps the same invariant by
+			// the other means: memberkit hands a sole-owned calendar to a
+			// remaining workspace owner before it retires the grants, because
+			// offboarding a person has to succeed. Refusing is only affordable
+			// here, where the caller asked about one calendar and can pick
+			// another owner first.
+			if targetRole == calendar.CalendarMembersRoleOwner {
+				if spec, err := ensureCalendarOwnerRemains(ctx, tx, cal.ID, targetUserID); err != nil || spec != nil {
+					if spec != nil {
+						answered = httpErr(spec)
+						return errAnswered
+					}
+					return err
+				}
+			}
+
+			// affected-rows: not-applicable — the member row is locked above.
+			_, err = deps.CalendarQueries.WithTx(tx.RawTx()).DisableCalendarMember(ctx, calendar.DisableCalendarMemberParams{
+				CalendarID: cal.ID,
+				UserID:     targetUserID,
+			})
+			return err
 		})
-		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarMemberNotFound, apierrors.CalendarMemberStoreReadInterrupted))
+		if answered != nil {
+			return nil, answered
 		}
-
-		// Leaving is always allowed; removing someone else needs manager or
-		// owner, and only an owner may remove another owner.
-		isSelf := targetUserID == actorID
-		if !isSelf {
-			if roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleManager) {
-				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
-			}
-			if target.Role == calendar.CalendarMembersRoleOwner &&
-				roleRank(actorMember.Role) < roleRank(calendar.CalendarMembersRoleOwner) {
-				return nil, httpErr(apierrors.CalendarCalendarOwnerRoleRequired)
-			}
-		}
-
-		// The last owner cannot leave or be removed, including by
-		// themselves — a calendar with no owner can never regain one.
-		//
-		// Removing someone from the workspace keeps the same invariant by
-		// the other means: memberkit hands a sole-owned calendar to a
-		// remaining workspace owner before it retires the grants, because
-		// offboarding a person has to succeed. Refusing is only affordable
-		// here, where the caller asked about one calendar and can pick
-		// another owner first.
-		if target.Role == calendar.CalendarMembersRoleOwner {
-			owners, oerr := deps.CalendarQueries.CountCalendarOwners(ctx, cal.ID)
-			if oerr != nil {
-				return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
-			}
-			if owners <= 1 {
-				return nil, httpErr(apierrors.CalendarMemberLastOwnerRemovalBlocked)
-			}
-		}
-
-		// affected-rows: not-applicable — FindCalendarMember above already
-		// answered for a user who is not a member of this calendar, and the
-		// role checks between the two ran against the row it returned.
-		if _, err = deps.CalendarQueries.DisableCalendarMember(ctx, calendar.DisableCalendarMemberParams{
-			CalendarID: cal.ID,
-			UserID:     targetUserID,
-		}); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.CalendarMemberStoreRemoveInterrupted)
 		}
 

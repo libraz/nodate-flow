@@ -19,8 +19,8 @@ type CostTodayInput struct {
 //
 // `costUsd` is the LLM spend so far in the current budget window, in USD
 // (cents-from-DB / 100).
-// `monthlyCapUsd` is omitted in the MVP (no env var defined yet); the field
-// is reserved for the upcoming monthly cap once it lands.
+// `monthlyCapUsd` is never populated: there is no workspace monthly cap,
+// only the daily budget the window below is measured against.
 // `windowStartsAt` is when the window the figure covers began, as a unixtime
 // in seconds per docs/conventions/api-types.md. It is the same instant the
 // cost guard measures from, so a workspace that has been cut off can be

@@ -9,6 +9,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
 )
 
 // ListUsers handles GET /admin/users. Returns a paginated list of all users
@@ -87,6 +88,20 @@ func PatchUser(deps Deps) func(context.Context, *PatchUserInput) (*PatchUserOutp
 			return out, nil
 		}
 
+		// Suspending is held to the rules revoking is: an admin cannot lock
+		// themselves out, and the instance keeps at least one enabled admin.
+		// The guard locks the admin set in the transaction that suspends.
+		var targetID uint32
+		if !*in.Body.Enabled {
+			targetID, err = deps.Queries.AdminFindUserIdByPublicId(ctx, pid)
+			if err != nil {
+				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.InstanceUserNotFound, apierrors.InternalUnexpected))
+			}
+			if targetID == uid {
+				return nil, httpErr(apierrors.InstanceUserSelfSuspend)
+			}
+		}
+
 		// Both statements guard on the current state, so a zero count is
 		// either "no such user" or "already in the requested state". The
 		// second is not an error — PATCH is idempotent — so tell them
@@ -94,13 +109,33 @@ func PatchUser(deps Deps) func(context.Context, *PatchUserInput) (*PatchUserOutp
 		// the check, suspending a user id that does not exist reported
 		// success and wrote an audit entry saying an account had been
 		// suspended, which is the record an incident review would read.
-		var rows int64
-		if *in.Body.Enabled {
-			rows, err = deps.Queries.AdminEnableUser(ctx, pid)
-		} else {
-			rows, err = deps.Queries.AdminSuspendUser(ctx, pid)
+		var (
+			rows     int64
+			answered error
+		)
+		txErr := dbretry.InTx(ctx, deps.DB, "admin.PatchUser", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			q := generated.New(tx)
+			var err error
+			if *in.Body.Enabled {
+				rows, err = q.AdminEnableUser(ctx, pid)
+				return err
+			}
+			spec, err := ensureAdminRemains(ctx, tx, targetID)
+			if err != nil {
+				return err
+			}
+			if spec != nil {
+				answered = httpErr(spec)
+				return errAnswered
+			}
+			rows, err = q.AdminSuspendUser(ctx, pid)
+			return err
+		})
+		if answered != nil {
+			return nil, answered
 		}
-		if err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if rows == 0 {

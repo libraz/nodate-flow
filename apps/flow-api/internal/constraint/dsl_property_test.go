@@ -53,13 +53,6 @@ func randLeaf(rng *rand.Rand) Constraint {
 		func(_ *rand.Rand) Constraint {
 			return Constraint{Op: OpSignalReceived, Arg: "github.pr.merged"}
 		},
-		func(_ *rand.Rand) Constraint {
-			return Constraint{Op: OpApprovalGranted, Arg: "owner"}
-		},
-		func(_ *rand.Rand) Constraint {
-			statuses := []string{"success", "failure", "pending"}
-			return Constraint{Op: OpCIStatusIs, Arg: statuses[rng.Intn(len(statuses))]}
-		},
 	}
 	return leaves[rng.Intn(len(leaves))](rng)
 }
@@ -115,7 +108,7 @@ func TestProperty_ParseArbitraryJSON(t *testing.T) {
 	rng := rand.New(rand.NewSource(99)) //#nosec G404 -- property test seeded for reproducibility, not crypto
 	ops := []string{
 		"and", "or", "not", "time.due_before", "bogus", "",
-		"dependency.all_done", "actor.has_role", "ci.status_is",
+		"dependency.all_done", "actor.has_role", "signal.received",
 	}
 	for i := 0; i < 200; i++ {
 		// Build a random JSON object with plausible keys.

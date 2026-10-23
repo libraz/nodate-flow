@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -13,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -48,38 +48,34 @@ func Create(deps Deps) func(context.Context, *CreateReactionInput) (*CreateReact
 		}
 
 		pub := types.New()
-		if _, err := deps.Queries.CreateReaction(ctx, generated.CreateReactionParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			UserID:      actorID,
-			TaskID:      taskID,
-			CommentID:   sql.NullInt32{},
-			Emoji:       in.Body.Emoji,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
 		taskIDInt64 := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.ReactionAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskIDInt64,
-			Payload: map[string]any{
-				"reactionId": pub.String(),
-				"emoji":      in.Body.Emoji,
-			},
-		}, "reactions.Create")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "reaction.create",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		if err := dbretry.InTx(ctx, deps.DB, "reactions.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreateReaction(ctx, generated.CreateReactionParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				UserID:      actorID,
+				TaskID:      taskID,
+				CommentID:   sql.NullInt32{},
+				Emoji:       in.Body.Emoji,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.ReactionAdded,
+				AuditAction:  "reaction.create",
 				ResourceType: "reaction",
 				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"emoji": in.Body.Emoji, "taskId": in.ID},
+				TaskID:       &taskIDInt64,
+				Payload:      map[string]any{"reactionId": pub.String(), "emoji": in.Body.Emoji, "taskId": in.ID},
+				CallSite:     "reactions.Create",
 			})
+		}); err != nil {
+			// A concurrent identical add loses on uniq_reactions_user_task_emoji
+			// and gets the same answer as the pre-check above.
+			if handlerutil.IsDuplicateEntry(err) {
+				return nil, httpErr(apierrors.WsReactionAlreadyExists)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// Fetch the actor's display name for the response.
@@ -187,37 +183,33 @@ func Delete(deps Deps) func(context.Context, *DeleteReactionInput) (*DeleteReact
 
 		// Scoped to this user's live reactions, so a zero count means there
 		// is no reaction here to remove.
-		rows, err := deps.Queries.DisableReaction(ctx, generated.DisableReactionParams{
-			PublicID: pub,
-			UserID:   actorID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.WsReactionNotFound)
-		}
-
 		taskIDInt64 := int64(row.TaskID.Int32)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.ReactionRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskIDInt64,
-			Payload: map[string]any{
-				"reactionId": pub.String(),
-				"emoji":      row.Emoji,
-			},
-		}, "reactions.Delete")
-
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "reaction.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		var missing bool
+		if err := dbretry.InTx(ctx, deps.DB, "reactions.Delete", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).DisableReaction(ctx, generated.DisableReactionParams{
+				PublicID: pub,
+				UserID:   actorID,
+			})
+			if err != nil {
+				return err
+			}
+			if missing = rows == 0; missing {
+				return nil
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.ReactionRemoved,
+				AuditAction:  "reaction.delete",
 				ResourceType: "reaction",
 				ResourceID:   pub.String(),
+				TaskID:       &taskIDInt64,
+				Payload:      map[string]any{"reactionId": pub.String(), "emoji": row.Emoji},
+				CallSite:     "reactions.Delete",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if missing {
+			return nil, httpErr(apierrors.WsReactionNotFound)
 		}
 
 		out := &DeleteReactionOutput{}

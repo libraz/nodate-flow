@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 func TestBuild(t *testing.T) {
@@ -19,7 +21,7 @@ func TestBuild(t *testing.T) {
 		{TaskID: "d", Title: "Old task", State: StateDone, HasCompleted: true, CompletedAt: day(-30)},
 		{TaskID: "e", Title: "Not due yet", State: StateOpen, HasDueOn: true, DueOn: day(5)},
 	}
-	d := Build(tasks, now)
+	d := Build(tasks, now, region.UTC())
 
 	if d.Counts[StateOpen] != 2 {
 		t.Errorf("open count: want 2 got %d", d.Counts[StateOpen])
@@ -41,5 +43,21 @@ func TestBuild(t *testing.T) {
 	}
 	if !strings.Contains(d.Markdown, "Docs update") {
 		t.Errorf("markdown missing completed task title")
+	}
+}
+
+// TestBuildDueTodayIsNotOverdue pins the overdue list to calendar days:
+// a task due 2026-10-23 is not overdue at 15:00 UTC that day, and is from
+// midnight on.
+func TestBuildDueTodayIsNotOverdue(t *testing.T) {
+	tasks := []TaskSnapshot{{
+		TaskID: "t", Title: "Due today", State: StateOpen,
+		HasDueOn: true, DueOn: time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC),
+	}}
+	if d := Build(tasks, time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC), region.UTC()); len(d.OverdueOpen) != 0 {
+		t.Fatalf("due today at 15:00Z: overdue = %+v, want none", d.OverdueOpen)
+	}
+	if d := Build(tasks, time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC), region.UTC()); len(d.OverdueOpen) != 1 {
+		t.Fatalf("the next day at 00:00Z: overdue = %+v, want the task", d.OverdueOpen)
 	}
 }

@@ -28,6 +28,7 @@ type goldenFixture struct {
 		StartAt              string   `json:"startAt"`
 		EndAt                string   `json:"endAt"`
 		Timezone             string   `json:"timezone"`
+		AllDay               bool     `json:"allDay"`
 		RecurrenceRule       *Rule    `json:"recurrenceRule"`
 		RecurrenceExceptions []string `json:"recurrenceExceptions"`
 		RecurrenceEnd        string   `json:"recurrenceEnd"`
@@ -88,6 +89,7 @@ func TestExpandMatchesSharedGoldenFixtures(t *testing.T) {
 				StartAt:    mustParseTime(t, "startAt", fixture.Event.StartAt),
 				EndAt:      mustParseTime(t, "endAt", fixture.Event.EndAt),
 				Timezone:   fixture.Event.Timezone,
+				AllDay:     fixture.Event.AllDay,
 				Rule:       fixture.Event.RecurrenceRule,
 				Exceptions: fixture.Event.RecurrenceExceptions,
 			}

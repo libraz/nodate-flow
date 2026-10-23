@@ -116,34 +116,51 @@ func unlinkEventRow(ctx context.Context, tx TX, evt eventRow, actorID uint32, re
 // DeleteTask soft-disables a task and every calendar_events row
 // linked to it. Symmetric to a cascade: the task goes, its
 // projection events go, but unrelated events stay.
-func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32) error {
+//
+// deleted reports whether this call disabled the task. A task already
+// gone, or disabled by a concurrent delete that committed first, answers
+// false with no error and no event, so only one delete is ever recorded.
+func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32) (deleted bool, err error) {
 	disarm, err := armProjectionGuard(ctx, tx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer disarm()
 
 	task, err := findTaskByID(ctx, tx, workspaceID, taskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil // already gone; idempotent
+			return false, nil // already gone; idempotent
 		}
-		return fmt.Errorf("itemkit: read task: %w", err)
+		return false, fmt.Errorf("itemkit: read task: %w", err)
 	}
 	if err := calendar.New(tx.RawTx()).DisableCalendarEventsByTask(ctx,
 		calendar.DisableCalendarEventsByTaskParams{
 			WorkspaceID: workspaceID,
 			TaskID:      taskIDParam(task.id),
 		}); err != nil {
-		return fmt.Errorf("itemkit: soft-disable linked events: %w", err)
+		return false, fmt.Errorf("itemkit: soft-disable linked events: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET enabled = FALSE WHERE id = ?`, task.id); err != nil {
-		return fmt.Errorf("itemkit: soft-disable task: %w", err)
+	// The read above is not locking, so the UPDATE is the claim: of two
+	// concurrent deletes only the first to commit matches a live row.
+	res, err := tx.ExecContext(ctx, `UPDATE tasks SET enabled = FALSE WHERE id = ? AND enabled = TRUE`, task.id)
+	if err != nil {
+		return false, fmt.Errorf("itemkit: soft-disable task: %w", err)
 	}
-	return appendItemEvents(ctx, tx, eventbus.ItemDeleted, workspaceID, &actorID, &task.id,
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("itemkit: soft-disable task: %w", err)
+	}
+	if n == 0 {
+		return false, nil
+	}
+	if err := appendItemEvents(ctx, tx, eventbus.ItemDeleted, workspaceID, &actorID, &task.id,
 		map[string]any{
 			"taskPublicId": task.publicID.String(),
-		})
+		}); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // DeleteEvent soft-disables a single calendar_events row, along with

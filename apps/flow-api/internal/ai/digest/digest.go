@@ -12,6 +12,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // State mirrors tasks.derived_state.
@@ -49,8 +52,9 @@ type Digest struct {
 const weekDays = 7
 
 // Build walks the snapshots and produces a Digest. "Now" is injected
-// so tests can pin the week window deterministically.
-func Build(tasks []TaskSnapshot, now time.Time) Digest {
+// so tests can pin the week window deterministically; z is the zone
+// whose calendar day decides which tasks are overdue.
+func Build(tasks []TaskSnapshot, now time.Time, z region.Zone) Digest {
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
@@ -66,7 +70,7 @@ func Build(tasks []TaskSnapshot, now time.Time) Digest {
 		if t.HasCompleted && !t.CompletedAt.Before(weekAgo) && t.State == StateDone {
 			d.CompletedThisWeek = append(d.CompletedThisWeek, t)
 		}
-		if t.HasDueOn && t.DueOn.Before(now) &&
+		if t.HasDueOn && duedate.Overdue(t.DueOn, now, z) &&
 			(t.State == StateOpen || t.State == StateWaiting || t.State == StateReview) {
 			d.OverdueOpen = append(d.OverdueOpen, t)
 		}
@@ -77,13 +81,13 @@ func Build(tasks []TaskSnapshot, now time.Time) Digest {
 	sort.SliceStable(d.OverdueOpen, func(i, j int) bool {
 		return d.OverdueOpen[i].DueOn.Before(d.OverdueOpen[j].DueOn)
 	})
-	d.Markdown = renderMarkdown(d, now)
+	d.Markdown = renderMarkdown(d, now, z)
 	return d
 }
 
-func renderMarkdown(d Digest, now time.Time) string {
+func renderMarkdown(d Digest, now time.Time, z region.Zone) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Weekly digest — %s\n\n", now.Format("2006-01-02"))
+	fmt.Fprintf(&b, "# Weekly digest — %s\n\n", region.DayOf(now, z))
 
 	b.WriteString("## By state\n\n")
 	order := []State{StateOpen, StateWaiting, StateReview, StateDone, StateCancelled}
@@ -97,7 +101,7 @@ func renderMarkdown(d Digest, now time.Time) string {
 		b.WriteString("_Nothing completed in the last 7 days._\n")
 	} else {
 		for _, t := range d.CompletedThisWeek {
-			fmt.Fprintf(&b, "- %s — %s\n", t.Title, t.CompletedAt.Format("2006-01-02"))
+			fmt.Fprintf(&b, "- %s — %s\n", t.Title, region.DayOf(t.CompletedAt, z))
 		}
 	}
 	b.WriteString("\n")
@@ -107,7 +111,7 @@ func renderMarkdown(d Digest, now time.Time) string {
 		b.WriteString("_No overdue tasks._\n")
 	} else {
 		for _, t := range d.OverdueOpen {
-			fmt.Fprintf(&b, "- %s — due %s\n", t.Title, t.DueOn.Format("2006-01-02"))
+			fmt.Fprintf(&b, "- %s — due %s\n", t.Title, region.DayFromDateColumn(t.DueOn))
 		}
 	}
 	return b.String()

@@ -165,13 +165,10 @@ func TestEventKindsWithOneProducerAreNotReported(t *testing.T) {
 
 	scope := emissionSetup(t)
 
-	// A kind appended by one Go call site, and one appended by a single
-	// sqlc statement with no Go constant anywhere on its path. The second
-	// is why SQL is read at all: dropping that half would report a kind
-	// whose producer is a VALUES list.
+	// A kind appended by one Go call site. The SQL half is pinned below by
+	// a kind with one producer in each language.
 	for name, want := range map[string]Language{
-		"CalendarReminder":       LangGo,
-		"AgentTaskHandoffToUser": LangSQL,
+		"CalendarReminder": LangGo,
 	} {
 		sites := scope.Emitters(name)
 		if len(sites) != 1 {
@@ -190,6 +187,20 @@ func TestEventKindsWithOneProducerAreNotReported(t *testing.T) {
 					name, surface.Path)
 			}
 		}
+	}
+
+	// A hand-back is appended by the REST handoff through the recorder and
+	// by the agent runtime through a sqlc statement with no Go constant on
+	// its path. The SQL site is why SQL is read at all: dropping that half
+	// would report one producer where there are two.
+	byLang := map[Language]int{}
+	handback := scope.Emitters("AgentTaskHandoffToUser")
+	for _, site := range handback {
+		byLang[site.Lang]++
+	}
+	if len(handback) != 2 || byLang[LangGo] != 1 || byLang[LangSQL] != 1 {
+		t.Errorf("AgentTaskHandoffToUser is derived as having producers %s; want one in Go and one in SQL",
+			describeSites(handback))
 	}
 
 	// The transition kinds have no call site of their own: they are built

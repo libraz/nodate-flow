@@ -1,8 +1,6 @@
 package intake
 
 import (
-	"strconv"
-
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
@@ -15,15 +13,9 @@ func mapListRow(r generated.ListIntakeItemsForWorkspaceRow) Record {
 		Body:                 nullStr(r.Body),
 		TriageStatus:         string(r.TriageStatus),
 		SnoozeUntil:          handlerutil.NullTimeUnix(r.SnoozeUntil),
-		AIReasoning:          nullStr(r.AiReasoning),
 		TriagedByUserID:      handlerutil.PublicIDOrEmpty(r.TriagedByPublicID),
 		TriagedByDisplayName: nullStr(r.TriagedByDisplayName),
 		CreatedAt:            r.CreatedAt.Unix(),
-	}
-	if r.AiScore.Valid {
-		if f, err := strconv.ParseFloat(r.AiScore.String, 64); err == nil {
-			item.AIScore = &f
-		}
 	}
 	return item
 }
@@ -36,15 +28,9 @@ func mapKeysetListRow(r generated.ListIntakeItemsForWorkspaceKeysetRow) Record {
 		Body:                 nullStr(r.Body),
 		TriageStatus:         string(r.TriageStatus),
 		SnoozeUntil:          handlerutil.NullTimeUnix(r.SnoozeUntil),
-		AIReasoning:          nullStr(r.AiReasoning),
 		TriagedByUserID:      handlerutil.PublicIDOrEmpty(r.TriagedByPublicID),
 		TriagedByDisplayName: nullStr(r.TriagedByDisplayName),
 		CreatedAt:            r.CreatedAt.Unix(),
-	}
-	if r.AiScore.Valid {
-		if f, err := strconv.ParseFloat(r.AiScore.String, 64); err == nil {
-			item.AIScore = &f
-		}
 	}
 	return item
 }
@@ -57,13 +43,7 @@ func mapFindRow(r generated.FindIntakeItemByPublicIdRow) Record {
 		Body:         nullStr(r.Body),
 		TriageStatus: string(r.TriageStatus),
 		SnoozeUntil:  handlerutil.NullTimeUnix(r.SnoozeUntil),
-		AIReasoning:  nullStr(r.AiReasoning),
 		CreatedAt:    r.CreatedAt.Unix(),
-	}
-	if r.AiScore.Valid {
-		if f, err := strconv.ParseFloat(r.AiScore.String, 64); err == nil {
-			item.AIScore = &f
-		}
 	}
 	return item
 }

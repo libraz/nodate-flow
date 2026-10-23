@@ -307,7 +307,7 @@ func TestDeleteTaskCascadesEvents(t *testing.T) {
 	})
 
 	withTx(t, db, func(tx TX) {
-		if err := DeleteTask(context.Background(), tx, fx.wsID, fx.taskID, fx.userID); err != nil {
+		if _, err := DeleteTask(context.Background(), tx, fx.wsID, fx.taskID, fx.userID); err != nil {
 			t.Fatalf("DeleteTask: %v", err)
 		}
 	})

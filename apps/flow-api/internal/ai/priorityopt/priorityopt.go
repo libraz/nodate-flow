@@ -15,6 +15,9 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // State mirrors tasks.derived_state. Only a subset is urgency-relevant
@@ -42,6 +45,9 @@ type Signals struct {
 	DependencyCount int64
 	HasAssignee     bool
 	Now             time.Time
+	// Zone is the zone whose calendar day "today" is; the zero value
+	// reads the day in UTC.
+	Zone region.Zone
 }
 
 // Suggestion is the output row. SuggestedPriority is clamped to
@@ -87,20 +93,21 @@ func evaluateOne(s Signals) Suggestion {
 	score := float32(1.5)
 	reasons := make([]string, 0, 4)
 
-	// Due date urgency: overdue > soon > far > none.
+	// Due date urgency: overdue > soon > far > none, counted in calendar
+	// days so a task due today is due soon, not overdue.
 	if s.HasDueOn {
-		hoursUntilDue := float32(s.DueOn.Sub(s.Now).Hours())
+		daysUntilDue := duedate.DaysUntil(s.DueOn, s.Now, s.Zone)
 		switch {
-		case hoursUntilDue <= 0:
+		case daysUntilDue < 0:
 			score += 2.5
 			reasons = append(reasons, "overdue")
-		case hoursUntilDue <= 48:
+		case daysUntilDue <= 1:
 			score += 1.8
 			reasons = append(reasons, "due within 48h")
-		case hoursUntilDue <= 24*7:
+		case daysUntilDue <= 7:
 			score += 0.9
 			reasons = append(reasons, "due this week")
-		case hoursUntilDue <= 24*14:
+		case daysUntilDue <= 14:
 			score += 0.3
 			reasons = append(reasons, "due this fortnight")
 		}
@@ -166,7 +173,7 @@ func confidenceFor(s Signals, suggested int32) float32 {
 		delta = -delta
 	}
 	base := float32(0.45) + float32(delta)*0.15
-	if s.HasDueOn && s.DueOn.Before(s.Now) {
+	if s.HasDueOn && duedate.Overdue(s.DueOn, s.Now, s.Zone) {
 		base += 0.20 // overdue → high confidence
 	}
 	if base > 0.95 {

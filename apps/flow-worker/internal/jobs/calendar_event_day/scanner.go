@@ -155,8 +155,8 @@ type EventOnDay struct {
 	Day string
 	// ExpiresAtUnix is the unix-seconds instant the row's workspace-local
 	// day ends (= next local midnight, projected to UTC). It feeds the
-	// signal's expiresAt so a matured event-day stops being a retention
-	// candidate once the day it describes rolls over. Computed per-row so
+	// signal's expiresAt so the signal_retention job deletes an unapplied
+	// event-day signal once the day it describes rolls over. Computed per-row so
 	// a catch-up backfill expires each day correctly, not relative to the
 	// tick's "today".
 	ExpiresAtUnix int64
@@ -437,6 +437,7 @@ func (s *Scanner) expandCandidate(c candidateRow, d arrivingDay) ([]EventOnDay, 
 		StartAt:          c.event.StartAt.UTC(),
 		EndAt:            endAt.UTC(),
 		Timezone:         c.timezone,
+		AllDay:           c.event.AllDay,
 		Rule:             rule,
 		Exceptions:       exceptions,
 		OverriddenStarts: c.overriddenStarts,

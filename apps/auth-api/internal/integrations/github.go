@@ -125,12 +125,12 @@ func (p *GithubProvider) Exchange(ctx context.Context, code, redirectURI string)
 		label = u.Email
 	}
 	return &TokenSet{
-			AccessToken: tok.AccessToken,
-			Scopes:      strings.Split(tok.Scope, ","),
-		}, &Account{
-			ExternalID: strconv.FormatInt(u.ID, 10),
-			Label:      label,
-		}, nil
+		AccessToken: tok.AccessToken,
+		Scopes:      strings.Split(tok.Scope, ","),
+	}, &Account{
+		ExternalID: strconv.FormatInt(u.ID, 10),
+		Label:      label,
+	}, nil
 }
 
 // Refresh implements [Provider]. GitHub OAuth Apps do not issue

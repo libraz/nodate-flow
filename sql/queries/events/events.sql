@@ -123,15 +123,6 @@ WHERE workspace_id = ?
   AND occurred_at >= ?
   AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed');
 
--- name: HasRecentEventsForWorkspace :one
--- Check if any events have occurred in the workspace since the given timestamp.
--- Used by the agent runtime pre-flight check to skip LLM calls when idle.
-SELECT EXISTS(
-  SELECT 1 FROM events
-  WHERE workspace_id = ? AND occurred_at > ?
-  LIMIT 1
-) AS has_events;
-
 -- name: GetEventPublicIDAndOccurredAt :one
 -- Resolve an event's public id and logical occurrence time given its
 -- internal id, scoped by workspace as a defence-in-depth check.

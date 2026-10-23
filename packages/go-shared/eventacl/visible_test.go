@@ -185,3 +185,17 @@ func TestDetailsNeverExceedRowVisibility(t *testing.T) {
 		}
 	}
 }
+
+// The runtime form must be the sqlc form with only the bind spelled
+// differently, so the two cannot disagree about which rows are hidden.
+func TestRowVisibilityFilterMatchesSQLForm(t *testing.T) {
+	t.Parallel()
+	frag, args := RowVisibilityFilter(42)
+	want := `(ce.visibility <> 'confidential' OR ce.owner_user_id = ?)`
+	if frag != want {
+		t.Fatalf("fragment = %q, want %q", frag, want)
+	}
+	if len(args) != 1 || args[0] != uint32(42) {
+		t.Fatalf("args = %v, want [42]", args)
+	}
+}

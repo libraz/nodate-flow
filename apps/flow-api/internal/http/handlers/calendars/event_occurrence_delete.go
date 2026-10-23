@@ -50,72 +50,25 @@ func requireDeleteOccurrenceScope(
 	return nil
 }
 
-// deleteEventOccurrence cancels one occurrence of a series.
-//
-// Cancellation is an entry in the master's recurrence_exceptions: the
-// expanders subtract it and the occurrence stops being produced. When an
-// override already stands in for that occurrence it is disabled in the
-// same transaction — the override is a row of its own that the
-// non-recurring range queries select directly, so an exception alone
-// would cancel the occurrence and leave the copy the user had moved
-// sitting on the calendar.
+// deleteEventOccurrence cancels one occurrence of a series through
+// [calendaroccurrence.CancelOccurrence], which refuses an occurrenceStart
+// the series does not produce and disables any override standing in for
+// the occurrence in the same transaction.
 func deleteEventOccurrence(
 	ctx context.Context,
 	deps Deps,
 	wsID uint32,
-	cal calendar.FindCalendarByPublicIdRow,
 	master calendar.FindCalendarEventByPublicIdRow,
 	occurrenceStart time.Time,
 ) error {
-	exceptions, changed, err := calendaroccurrence.AppendException(master.RecurrenceExceptions, occurrenceStart)
-	if err != nil {
-		return httpErr(apierrors.CalendarEventStoreReadInterrupted)
-	}
-
-	parentID := handlerutil.NullInt32From(master.ID)
-	originalStart := sql.NullTime{Time: occurrenceStart, Valid: true}
-
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "calendars.DeleteEventOccurrence", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
-		cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
-
-		if changed {
-			if _, err := cqtx.PatchCalendarEvent(ctx, calendar.PatchCalendarEventParams{
-				RecurrenceExceptions: exceptions,
-				PublicID:             master.PublicID,
-				CalendarID:           cal.ID,
-				WorkspaceID:          wsID,
-			}); err != nil {
-				return err
-			}
+		refusal, err := calendaroccurrence.CancelOccurrence(ctx, seriesQueries(deps, tx), wsID, master, occurrenceStart)
+		if refusal != nil {
+			answered = handlerutil.HTTPErrFromAPIError(refusal)
+			return refusal
 		}
-
-		override, findErr := cqtx.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
-			WorkspaceID:             wsID,
-			RecurrenceParentID:      parentID,
-			RecurrenceOriginalStart: originalStart,
-		})
-		switch {
-		case errors.Is(findErr, sql.ErrNoRows):
-			return nil
-		case findErr != nil:
-			answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
-			return findErr
-		}
-		if !override.Enabled {
-			return nil
-		}
-		// affected-rows: not-applicable — this only runs on an override the
-		// two statements above read as live in this same transaction, and
-		// what the caller asked to cancel is the occurrence, which the
-		// master's exception removes whether or not an override stood in
-		// for it.
-		_, err := cqtx.DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
-			PublicID:    override.PublicID,
-			CalendarID:  override.CalendarID,
-			WorkspaceID: wsID,
-		})
 		return err
 	})
 	if answered != nil {
@@ -142,6 +95,10 @@ func deleteEventFollowing(
 	txErr := dbretry.InTx(ctx, deps.DB, "calendars.DeleteEventFollowing", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		return calendaroccurrence.EndSeries(ctx, seriesQueries(deps, tx), wsID, cal.ID, actorID, master, splitStart)
 	})
+	var refusal *apierrors.APIError
+	if errors.As(txErr, &refusal) {
+		return handlerutil.HTTPErrFromAPIError(refusal)
+	}
 	if txErr != nil {
 		return httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
 	}

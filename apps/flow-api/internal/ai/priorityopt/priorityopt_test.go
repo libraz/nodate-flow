@@ -1,6 +1,7 @@
 package priorityopt
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -96,5 +97,27 @@ func TestEvaluate_EmptyReturnsNonNil(t *testing.T) {
 	}
 	if len(out) != 0 {
 		t.Fatalf("expected 0, got %d", len(out))
+	}
+}
+
+// TestEvaluate_DueTodayIsNotOverdue pins the due_on comparison to
+// calendar days: due 2026-10-23 is not overdue at 15:00 UTC that day,
+// and is from midnight on.
+func TestEvaluate_DueTodayIsNotOverdue(t *testing.T) {
+	t.Parallel()
+	sig := Signals{
+		TaskID: "t", State: StateOpen, CurrentPriority: 0, HasAssignee: true,
+		HasDueOn: true, DueOn: time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC),
+	}
+	sig.Now = time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
+	sig.UpdatedAt = sig.Now
+	out := Evaluate([]Signals{sig})
+	if len(out) != 1 || strings.Contains(out[0].Reason, "overdue") || !strings.Contains(out[0].Reason, "due within 48h") {
+		t.Fatalf("due today at 15:00Z: got %+v, want due within 48h and not overdue", out)
+	}
+	sig.Now = time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	out = Evaluate([]Signals{sig})
+	if len(out) != 1 || !strings.Contains(out[0].Reason, "overdue") {
+		t.Fatalf("the next day at 00:00Z: got %+v, want overdue", out)
 	}
 }

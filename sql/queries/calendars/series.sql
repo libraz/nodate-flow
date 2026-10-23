@@ -27,6 +27,19 @@ WHERE ce.id = ?
   AND ce.enabled = TRUE
 FOR UPDATE;
 
+-- name: SetCalendarEventSeriesExceptions :exec
+-- Write one master's exception list, keyed by the internal id the series
+-- lock read it under.
+--
+-- An override row deleted on its own names its master only by that id, and
+-- the cancellation it leaves behind belongs on the master: without it the
+-- master produces the occurrence again at its original slot.
+UPDATE calendar_events
+SET recurrence_exceptions = ?
+WHERE id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE;
+
 -- name: ListCalendarEventOverridesFromStart :many
 -- Every override of one master naming an occurrence at or after a point,
 -- soft-deleted ones included, for a write that moves or withdraws them as

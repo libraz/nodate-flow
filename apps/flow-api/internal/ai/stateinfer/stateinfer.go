@@ -13,6 +13,9 @@ package stateinfer
 import (
 	"fmt"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // State mirrors tasks.derived_state.
@@ -50,6 +53,9 @@ type Signals struct {
 	HasDueOn        bool
 	DependencyCount int64
 	Now             time.Time
+	// Zone is the zone whose calendar day "today" is; the zero value
+	// reads the day in UTC.
+	Zone region.Zone
 }
 
 // Proposal is the result of Infer. When the rules cannot produce a
@@ -76,7 +82,7 @@ func Infer(s Signals) *Proposal {
 		s.Now = time.Now().UTC()
 	}
 	idle := s.Now.Sub(s.UpdatedAt)
-	overdue := s.HasDueOn && s.Now.After(s.DueOn)
+	overdue := s.HasDueOn && duedate.Overdue(s.DueOn, s.Now, s.Zone)
 
 	switch s.State {
 	case StateOpen:

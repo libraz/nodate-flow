@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -31,7 +32,7 @@ const activityColumns = `va.public_id,
   va.resource_public_id,
   va.severity`
 
-// visibilityPredicate returns the WHERE fragment restricting the feed to
+// feedScope returns the WHERE fragment restricting the feed to
 // entries the caller is allowed to observe, plus its bind arguments. An
 // empty fragment means "no restriction".
 //
@@ -51,30 +52,22 @@ const activityColumns = `va.public_id,
 // endpoint. Elevated callers — the audit endpoint's own audience — see
 // everything.
 //
-// The task half reuses acl.TaskVisibilityFilter through the middleware
-// alias rather than restating the rule: the predicate is already written
-// twice in this repository (once as this fragment, once inside the sqlc
-// list queries), and a third copy is how the copies start disagreeing.
-func visibilityPredicate(actorPublicID types.PublicID, actorID uint32, wsRole middleware.WorkspaceRole) (string, []any) {
-	visFrag, visArgs := middleware.TaskVisibilityFilter(actorID, wsRole)
-	if visFrag == "" {
+// The task half is acl.TaskVisibilityPredicate rather than a restated
+// rule: a third copy of the predicate is how the copies start disagreeing.
+func feedScope(actorPublicID types.PublicID, actorID uint32, wsRole middleware.WorkspaceRole) (string, []any) {
+	taskFrag, taskArgs := acl.TaskVisibilityPredicate(
+		"v.workspace_id = va.workspace_id AND v.public_id = va.resource_public_id",
+		actorID, wsRole)
+	if taskFrag == "" {
 		// Workspace admins and owners read the whole trail.
 		return "", nil
 	}
 
 	frag := `(
     va.actor_user_public_id = ?
-    OR (
-      va.resource_type = 'task'
-      AND EXISTS (
-        SELECT 1 FROM v_task_list v
-        WHERE v.workspace_id = va.workspace_id
-          AND v.public_id = va.resource_public_id
-          AND ` + visFrag + `
-      )
-    )
+    OR (va.resource_type = 'task' AND ` + taskFrag + `)
   )`
-	args := append([]any{actorPublicID}, visArgs...)
+	args := append([]any{actorPublicID}, taskArgs...)
 	return frag, args
 }
 
@@ -86,7 +79,7 @@ func visibilityPredicate(actorPublicID types.PublicID, actorID uint32, wsRole mi
 // workspace id from context is trusted and the workspace_id column is
 // always part of the WHERE clause: a caller authorised for workspace A
 // can never observe workspace B's activity. Within the workspace,
-// [visibilityPredicate] narrows the rows a non-admin may observe.
+// [feedScope] narrows the rows a non-admin may observe.
 //
 // Pagination follows the keyset idiom used elsewhere (see tasks.ListComments):
 // the query asks for limit+1 rows; when the surplus row is present a
@@ -131,7 +124,7 @@ func List(deps Deps) func(context.Context, *ListActivityInput) (*ListActivityOut
 			where = append(where, "va.source = ?")
 			args = append(args, in.Source)
 		}
-		if visFrag, visArgs := visibilityPredicate(actorPublicID, actorID, ws.Role); visFrag != "" {
+		if visFrag, visArgs := feedScope(actorPublicID, actorID, ws.Role); visFrag != "" {
 			where = append(where, visFrag)
 			args = append(args, visArgs...)
 		}

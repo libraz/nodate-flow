@@ -561,6 +561,29 @@ func TaskVisibilityFilter(userID uint32, wsRole WorkspaceRole) (fragment string,
 	return frag, []any{userID, userID, userID}
 }
 
+// TaskVisibilityPredicate returns a fragment that holds when the task
+// matched by match exists, is enabled and passes [TaskVisibilityFilter]
+// for the actor. It is how a statement over some other relation — the
+// event log, an audit trail, an LLM call record — asks whether the task a
+// row is about is one the actor may read, without restating the rule.
+//
+// match is a condition on alias `v` (v_task_list_all, so archived tasks
+// still count) tying it to the outer row, e.g. "v.task_internal_id =
+// e.task_id". A soft-deleted task matches nothing, so its rows are
+// hidden rather than read as task-less. Admins and owners get an empty
+// fragment, as from TaskVisibilityFilter.
+func TaskVisibilityPredicate(match string, userID uint32, wsRole WorkspaceRole) (fragment string, args []any) {
+	frag, args := TaskVisibilityFilter(userID, wsRole)
+	if frag == "" {
+		return "", nil
+	}
+	return `EXISTS (
+  SELECT 1 FROM v_task_list_all v
+  WHERE ` + match + `
+    AND ` + frag + `
+)`, args
+}
+
 // VisibilityArgs carries the bind values for the .sql-file form of the
 // Layer 4 task visibility rule: the two named arguments those queries
 // declare, `is_elevated` and `actor_user_id`.

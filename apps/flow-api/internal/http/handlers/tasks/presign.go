@@ -15,10 +15,18 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
 const presignExpiry = 15 * time.Minute
+
+// errPresignRaceLost ends an attempt that lost the storage_objects insert
+// race, so the loop opens a fresh transaction whose snapshot sees the winner.
+var errPresignRaceLost = stderrors.New("tasks.PresignUpload: storage object race lost")
+
+// errPresignInternal ends an attempt on a driver result that cannot be used.
+var errPresignInternal = stderrors.New("tasks.PresignUpload: no insert id")
 
 // presignMaxAttempts bounds the duplicate-entry retry loop in
 // PresignUpload. We restart the transaction (not just the SELECT)
@@ -102,98 +110,98 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			committed          bool
 		)
 
-	attempts:
-		for attempt := 0; attempt < presignMaxAttempts; attempt++ {
-			tx, err := deps.DB.BeginTx(ctx, nil)
-			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			rolledBack := false
-			rollback := func() {
-				if !rolledBack {
-					_ = tx.Rollback()
-					rolledBack = true
-				}
-			}
-			qtx := deps.Queries.WithTx(tx)
+		taskInternal := int64(task.ID)
+		for attempt := 0; attempt < presignMaxAttempts && !committed; attempt++ {
+			txErr := dbretry.InTx(ctx, deps.DB, "tasks.PresignUpload", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+				qtx := generated.New(tx)
 
-			storageKey = baseStorageKey
-			deduplicated = false
+				storageKey = baseStorageKey
+				deduplicated = false
 
-			existing, findErr := qtx.FindStorageObjectByWorkspaceSha(ctx, generated.FindStorageObjectByWorkspaceShaParams{
-				WorkspaceID: handlerutil.NullInt32From(ws.ID),
-				Sha256:      shaBytes,
-			})
-			switch {
-			case findErr == nil:
-				// Dedup hit: bump the existing row's ref_count.
-				if err := qtx.IncrementStorageObjectRefCount(ctx, existing.ID); err != nil {
-					rollback()
-					return nil, httpErr(apierrors.InternalUnexpected)
-				}
-				storageObjectID = existing.ID
-				storageKey = existing.StorageKey
-				existingUploadedAt = existing.UploadedAt
-				deduplicated = true
-			case stderrors.Is(findErr, sql.ErrNoRows):
-				// Miss: allocate a new storage_objects row with ref_count=1.
-				soPub := types.New()
-				insRes, insErr := qtx.InsertStorageObject(ctx, generated.InsertStorageObjectParams{
-					PublicID:    soPub,
+				existing, findErr := qtx.FindStorageObjectByWorkspaceSha(ctx, generated.FindStorageObjectByWorkspaceShaParams{
 					WorkspaceID: handlerutil.NullInt32From(ws.ID),
-					OwnerUserID: sql.NullInt32{},
 					Sha256:      shaBytes,
-					ByteSize:    in.Body.ByteSize,
-					ContentType: in.Body.ContentType,
-					StorageKey:  storageKey,
 				})
 				switch {
-				case insErr == nil:
-					lastID, idErr := insRes.LastInsertId()
-					if idErr != nil || lastID <= 0 {
-						rollback()
-						return nil, httpErr(apierrors.InternalUnexpected)
+				case findErr == nil:
+					// Dedup hit: bump the existing row's ref_count.
+					if err := qtx.IncrementStorageObjectRefCount(ctx, existing.ID); err != nil {
+						return err
 					}
-					storageObjectID = uint32(lastID) //#nosec G115 -- AUTO_INCREMENT id fits uint32 within realistic deployments
-				case handlerutil.IsDuplicateEntry(insErr):
-					// Race lost: another tx committed the
-					// (workspace_id, sha256) row first. Roll back this
-					// tx so the next attempt's REPEATABLE READ
-					// snapshot can observe the winner; a same-tx
-					// re-find would still hit the pinned snapshot and
-					// see ErrNoRows.
-					rollback()
-					continue attempts
+					storageObjectID = existing.ID
+					storageKey = existing.StorageKey
+					existingUploadedAt = existing.UploadedAt
+					deduplicated = true
+				case stderrors.Is(findErr, sql.ErrNoRows):
+					// Miss: allocate a new storage_objects row with ref_count=1.
+					soPub := types.New()
+					insRes, insErr := qtx.InsertStorageObject(ctx, generated.InsertStorageObjectParams{
+						PublicID:    soPub,
+						WorkspaceID: handlerutil.NullInt32From(ws.ID),
+						OwnerUserID: sql.NullInt32{},
+						Sha256:      shaBytes,
+						ByteSize:    in.Body.ByteSize,
+						ContentType: in.Body.ContentType,
+						StorageKey:  storageKey,
+					})
+					switch {
+					case insErr == nil:
+						lastID, idErr := insRes.LastInsertId()
+						if idErr != nil || lastID <= 0 {
+							return errPresignInternal
+						}
+						storageObjectID = uint32(lastID) //#nosec G115 -- AUTO_INCREMENT id fits uint32 within realistic deployments
+					case handlerutil.IsDuplicateEntry(insErr):
+						// Race lost: another tx committed the
+						// (workspace_id, sha256) row first. Roll back this
+						// tx so the next attempt's REPEATABLE READ
+						// snapshot can observe the winner; a same-tx
+						// re-find would still hit the pinned snapshot and
+						// see ErrNoRows.
+						return errPresignRaceLost
+					default:
+						return insErr
+					}
 				default:
-					rollback()
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return findErr
 				}
+
+				if _, err := qtx.AddAttachment(ctx, generated.AddAttachmentParams{
+					PublicID:        attachPub,
+					WorkspaceID:     ws.ID,
+					TaskID:          handlerutil.NullInt32From(task.ID),
+					UploaderID:      actorID,
+					StorageObjectID: storageObjectID,
+					Filename:        in.Body.Filename,
+				}); err != nil {
+					return err
+				}
+
+				// Whether the caller still has to upload is settled against
+				// the store after commit, so the event carries only what
+				// this transaction makes true.
+				return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+					EventType:    eventbus.TaskAttachmentAdded,
+					AuditAction:  "attachment.create",
+					ResourceType: "attachment",
+					ResourceID:   attachPub.String(),
+					TaskID:       &taskInternal,
+					Payload: map[string]any{
+						"taskId":       task.PublicID.String(),
+						"attachmentId": attachPub.String(),
+						"filename":     in.Body.Filename,
+					},
+					CallSite: "tasks.PresignUpload",
+				})
+			})
+			switch {
+			case txErr == nil:
+				committed = true
+			case stderrors.Is(txErr, errPresignRaceLost):
+				continue
 			default:
-				rollback()
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-
-			if _, err := qtx.AddAttachment(ctx, generated.AddAttachmentParams{
-				PublicID:        attachPub,
-				WorkspaceID:     ws.ID,
-				TaskID:          handlerutil.NullInt32From(task.ID),
-				UploaderID:      actorID,
-				StorageObjectID: storageObjectID,
-				Filename:        in.Body.Filename,
-			}); err != nil {
-				rollback()
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-
-			if err := tx.Commit(); err != nil {
-				// Commit failed; the tx is already gone. Suppress the
-				// deferred rollback and surface the error.
-				rolledBack = true
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			rolledBack = true
-			committed = true
-			break attempts
 		}
 		if !committed {
 			// All retries lost the race. In practice unreachable: with
@@ -273,20 +281,6 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			uploadURL = u
 			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
-
-		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskAttachmentAdded,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"attachmentId": attachPub.String(),
-				"filename":     in.Body.Filename,
-				"deduplicated": deduplicated,
-			},
-		}, "tasks.PresignUpload")
 
 		return &PresignUploadOutput{Body: PresignUploadOutputBody{
 			UploadURL:       uploadURL,

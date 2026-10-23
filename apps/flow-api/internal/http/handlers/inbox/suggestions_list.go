@@ -7,12 +7,17 @@ package inbox
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
@@ -107,7 +112,17 @@ func ListAiSuggestions(deps TriageDeps) func(context.Context, *AiSuggestionListI
 		if err != nil {
 			return nil, err
 		}
-		rows, err := deps.Queries.ListPendingAiSuggestions(ctx, wsID)
+		vis, err := readerVisibility(ctx, deps, wsID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := deps.Queries.ListPendingAiSuggestionsForReader(ctx, generated.ListPendingAiSuggestionsForReaderParams{
+			WorkspaceID:   wsID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -176,6 +191,34 @@ func appendSuggestionReaction(deps TriageDeps, reaction suggestionReaction) func
 		if in.InboxItemID == "" {
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
+		// The reaction is keyed on the inbox item, so it has to name one
+		// here that the caller may read; otherwise any string would be
+		// recorded as a choice about nothing, or about a task they cannot see.
+		itemPub, err := types.Parse(in.InboxItemID)
+		if err != nil {
+			return nil, httpErr(apierrors.WsInboxNotFound)
+		}
+		vis, err := readerVisibility(ctx, deps, wsID, actorID)
+		if err != nil {
+			return nil, err
+		}
+		visible, err := deps.Queries.GetInboxItemTaskVisible(ctx, generated.GetInboxItemTaskVisibleParams{
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			WorkspaceID:   wsID,
+			PublicID:      itemPub,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.WsInboxNotFound)
+			}
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if !visible.Valid || !visible.Bool {
+			return nil, httpErr(apierrors.WsInboxNotFound)
+		}
 		// Strict rather than best effort: the reaction is idempotent, and
 		// the pending list is derived from the event row, so a lost append
 		// has to be reported. The caller's retry then repairs the log
@@ -195,4 +238,15 @@ func appendSuggestionReaction(deps TriageDeps, reaction suggestionReaction) func
 		}
 		return &AiSuggestionActionOutput{}, nil
 	}
+}
+
+// readerVisibility derives the Layer 4 binds for the caller in a
+// workspace the handler resolved by path rather than through
+// RequireWorkspaceMember, so the role is looked up here.
+func readerVisibility(ctx context.Context, deps TriageDeps, wsID, actorID uint32) (acl.VisibilityArgs, error) {
+	role, err := acl.CheckWorkspaceMember(ctx, deps.DB, wsID, actorID, apierrors.WsWorkspaceAccessDenied)
+	if err != nil {
+		return acl.VisibilityArgs{}, err
+	}
+	return acl.ListVisibilityArgs(actorID, role), nil
 }

@@ -48,17 +48,19 @@ var nullStr = handlerutil.NullStr
 // response — a promise the contract could not keep, and one that
 // generated clients typed as if it could. Restoring the link means
 // joining tasks in the three intake queries first.
+//
+// No AI score or reasoning either: no code path scores an item, so the
+// columns are always NULL and a field for them would be another promise
+// the contract cannot keep.
 type Record struct {
-	ID                   string   `json:"id" doc:"Intake item public id (UUID v7)"`
-	Title                string   `json:"title"`
-	Body                 string   `json:"body,omitempty"`
-	TriageStatus         string   `json:"triageStatus"`
-	SnoozeUntil          *int64   `json:"snoozeUntil,omitempty"`
-	AIScore              *float64 `json:"aiScore,omitempty"`
-	AIReasoning          string   `json:"aiReasoning,omitempty"`
-	TriagedByUserID      string   `json:"triagedByUserId,omitempty"`
-	TriagedByDisplayName string   `json:"triagedByDisplayName,omitempty"`
-	CreatedAt            int64    `json:"createdAt"`
+	ID                   string `json:"id" doc:"Intake item public id (UUID v7)"`
+	Title                string `json:"title"`
+	Body                 string `json:"body,omitempty"`
+	TriageStatus         string `json:"triageStatus"`
+	SnoozeUntil          *int64 `json:"snoozeUntil,omitempty"`
+	TriagedByUserID      string `json:"triagedByUserId,omitempty"`
+	TriagedByDisplayName string `json:"triagedByDisplayName,omitempty"`
+	CreatedAt            int64  `json:"createdAt"`
 }
 
 // ---- Create ----
@@ -85,7 +87,7 @@ type CreateIntakeItemOutput struct {
 // ListIntakeItemsInput is the query for GET /workspaces/{wsId}/intake.
 type ListIntakeItemsInput struct {
 	WsID   string `path:"wsId"`
-	Status string `query:"status" doc:"Filter by triage status: pending, accepted, rejected, snoozed, duplicate"`
+	Status string `query:"status" doc:"Filter by triage status: pending, accepted, rejected, snoozed, duplicate. A snoozed item whose snoozeUntil has passed lists under pending."`
 	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
 	Limit  int32  `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset int32  `query:"offset" minimum:"0" default:"0"`

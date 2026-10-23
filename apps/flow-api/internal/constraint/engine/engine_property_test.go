@@ -63,10 +63,8 @@ func validExpressions() []string {
 		`{"op":"dependency.all_done","taskIds":["a"]}`,
 		`{"op":"actor.has_role","arg":"reviewer"}`,
 		`{"op":"signal.received","arg":"github.pr.merged"}`,
-		`{"op":"approval.granted","arg":"owner"}`,
-		`{"op":"ci.status_is","arg":"success"}`,
-		`{"op":"and","terms":[{"op":"ci.status_is","arg":"success"},{"op":"actor.has_role","arg":"reviewer"}]}`,
-		`{"op":"not","term":{"op":"ci.status_is","arg":"failure"}}`,
+		`{"op":"and","terms":[{"op":"signal.received","arg":"github.pr.merged"},{"op":"actor.has_role","arg":"reviewer"}]}`,
+		`{"op":"not","term":{"op":"signal.received","arg":"github.pr.merged"}}`,
 	}
 }
 
@@ -89,19 +87,12 @@ func randomFacts(rng *rand.Rand) constraint.Facts {
 	if rng.Intn(2) == 0 {
 		signals["github.pr.merged"] = true
 	}
-	approvals := map[string]bool{}
-	if rng.Intn(2) == 0 {
-		approvals["owner"] = true
-	}
-	ciStatuses := []string{"", "success", "failure", "pending"}
 	return constraint.Facts{
 		Now:              time.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC),
 		DueOn:            dueOn,
 		DependencyStates: deps,
 		ActorRoles:       roles,
 		SignalsReceived:  signals,
-		Approvals:        approvals,
-		CIStatus:         ciStatuses[rng.Intn(len(ciStatuses))],
 	}
 }
 

@@ -35,7 +35,7 @@ type Deps struct {
 	DB                        *sql.DB
 	Queries                   *generated.Queries
 	JWT                       *auth.JWTIssuer
-	OIDC                      *auth.OIDCClient
+	OIDC                      *auth.GoogleOIDCClient
 	OIDCGithub                *auth.GithubOAuthClient
 	OIDCMicrosoft             *auth.MicrosoftOIDCClient
 	MicrosoftAllowedTenantIDs []string
@@ -218,9 +218,6 @@ func BuildResult(deps Deps) Result {
 		Queries:                   deps.Queries,
 		Sessions:                  sessionStore,
 		JWT:                       deps.JWT,
-		OIDC:                      deps.OIDC,
-		OIDCGithub:                deps.OIDCGithub,
-		OIDCMicrosoft:             deps.OIDCMicrosoft,
 		MicrosoftAllowedTenantIDs: deps.MicrosoftAllowedTenantIDs,
 		Cipher:                    deps.Cipher,
 		CookieSecure:              deps.CookieSecure,
@@ -233,6 +230,20 @@ func BuildResult(deps Deps) Result {
 		AccountsWebURL:            deps.AccountsWebURL,
 		Storage:                   deps.Storage,
 		PublicBaseURL:             deps.PublicBaseURL,
+	}
+
+	// A nil concrete pointer stored in an interface is not a nil
+	// interface, so each provider is assigned only when configured.
+	// Capabilities and the start/callback handlers all test the
+	// interface for nil.
+	if deps.OIDC != nil {
+		authDeps.OIDC = deps.OIDC
+	}
+	if deps.OIDCGithub != nil {
+		authDeps.OIDCGithub = deps.OIDCGithub
+	}
+	if deps.OIDCMicrosoft != nil {
+		authDeps.OIDCMicrosoft = deps.OIDCMicrosoft
 	}
 
 	// Auth capabilities — public, no rate limit, cacheable.

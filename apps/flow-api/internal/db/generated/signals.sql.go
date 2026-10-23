@@ -107,6 +107,48 @@ func (q *Queries) InsertSignal(ctx context.Context, arg InsertSignalParams) (int
 	return result.LastInsertId()
 }
 
+const listSignalKindsForTaskForEngine = `-- name: ListSignalKindsForTaskForEngine :many
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = ?
+  AND enabled = TRUE
+  AND (
+    task_id = ?
+    OR (subject_type = 'task' AND subject_id = ?)
+  )
+`
+
+type ListSignalKindsForTaskForEngineParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+}
+
+// Distinct kinds of the enabled signals attached to a task, through the
+// legacy task_id fast path or subject_type = 'task'. The constraint
+// engine's signal.received fact.
+func (q *Queries) ListSignalKindsForTaskForEngine(ctx context.Context, arg ListSignalKindsForTaskForEngineParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listSignalKindsForTaskForEngine, arg.WorkspaceID, arg.TaskID, arg.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var kind string
+		if err := rows.Scan(&kind); err != nil {
+			return nil, err
+		}
+		items = append(items, kind)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSignalsForTask = `-- name: ListSignalsForTask :many
 SELECT
   v.public_id,

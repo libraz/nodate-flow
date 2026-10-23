@@ -21,7 +21,8 @@ type Querier interface {
 	AdminBootstrapFirstInstanceAdmin(ctx context.Context, arg AdminBootstrapFirstInstanceAdminParams) (int64, error)
 	// Check if any active instance admin exists (for bootstrap guard).
 	AdminCheckInstanceAdminExists(ctx context.Context) (bool, error)
-	// Count active instance admins (for last-admin guard).
+	// Count active instance admins. The last-admin guard does not use this: it
+	// locks the admin set in the revoking transaction instead.
 	AdminCountActiveInstanceAdmins(ctx context.Context) (int64, error)
 	// Re-enable a previously suspended user account.
 	AdminEnableUser(ctx context.Context, publicID types.PublicID) (int64, error)

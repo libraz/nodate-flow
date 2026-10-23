@@ -13,8 +13,11 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -30,7 +33,8 @@ const (
 	// "relates". Scores below this are skipped.
 	RelatesThreshold = 0.75
 	// MaxCandidates is the maximum number of candidate embeddings to
-	// compare against.
+	// compare against: the most recent tasks by id, so a duplicate of an
+	// older task outside that window is not detected.
 	MaxCandidates = 200
 	// MaxSuggestions is the maximum number of suggestions created per
 	// pipeline run for a single task.
@@ -44,48 +48,76 @@ type Pipeline struct {
 	DB       *sql.DB
 	Queries  *generated.Queries
 	Embedder *embed.Client
+	// Runner is where Hook submits its jobs, normally the runner the
+	// other event hooks share. Nil gives the pipeline a private one.
+	Runner *bgloop.HookRunner
+
+	runnerOnce sync.Once
+	// process is the per-task step. Tests override it to observe which
+	// task an event resolved to; production leaves it nil and the event
+	// routes to [Pipeline.processTask].
+	process func(ctx context.Context, workspaceID, taskID uint32)
 }
 
-// Hook returns an eventbus.NotifyHook that triggers processTask in a
-// background goroutine when a task is created or updated.
+// defaultTimeout is each job's deadline; a job may call the external
+// embedding API and decode a few hundred vectors. defaultConcurrency
+// bounds the private runner used when no shared one is installed.
+const (
+	defaultConcurrency = 4
+	defaultTimeout     = 60 * time.Second
+)
+
+// Hook returns an eventbus.NotifyHook that submits processing of the
+// task the event names to the hook runner when a task is created or
+// updated.
 func (p *Pipeline) Hook() eventbus.NotifyHook {
-	return func(ctx context.Context, workspaceInternalID uint32, eventType string, _ uint64) {
+	return func(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64) {
 		if eventType != string(eventbus.TaskCreated) && eventType != string(eventbus.TaskUpdated) {
 			return
 		}
-		// The NotifyHook fires after each Append; the event row was just
-		// written. We find the most recent task event for this workspace
-		// to extract the task_id. Because the hook must be non-blocking,
-		// we spawn a goroutine. Use WithoutCancel so the request's tracing
-		// metadata is preserved while the goroutine outlives the response.
-		go p.processLatestTaskEvent(context.WithoutCancel(ctx), workspaceInternalID, eventType)
+		p.hooks().Go(ctx, defaultTimeout, func(runCtx context.Context) {
+			p.processEvent(runCtx, workspaceInternalID, eventInternalID)
+		})
 	}
 }
 
-// processLatestTaskEvent reads the most recent task event for the
-// workspace and dispatches processTask if it carries a task_id.
-func (p *Pipeline) processLatestTaskEvent(ctx context.Context, workspaceID uint32, eventType string) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("relations pipeline panic", "workspace", workspaceID, "err", r)
-		}
-	}()
+// Shutdown stops accepting jobs and waits for the accepted ones, or until
+// ctx is done.
+func (p *Pipeline) Shutdown(ctx context.Context) error {
+	return p.hooks().Shutdown(ctx)
+}
 
-	// Find the last event of this type for the workspace.
-	const q = `SELECT task_id FROM events
-WHERE workspace_id = ? AND type = ?
-ORDER BY id DESC LIMIT 1`
+// hooks returns the installed runner, or a private one when none was.
+func (p *Pipeline) hooks() *bgloop.HookRunner {
+	p.runnerOnce.Do(func() {
+		if p.Runner == nil {
+			p.Runner = bgloop.NewHookRunner("relations.pipeline", defaultConcurrency, defaultTimeout)
+		}
+	})
+	return p.Runner
+}
+
+// processEvent processes the task named by the event the hook was given.
+// It reads that event row by id rather than the latest event of its type:
+// in a burst, every hook reading "the latest" sees the same row, so one
+// task is processed many times and the others never are.
+func (p *Pipeline) processEvent(ctx context.Context, workspaceID uint32, eventInternalID uint64) {
+	const q = `SELECT task_id FROM events WHERE id = ? AND workspace_id = ? LIMIT 1`
 	var taskID sql.NullInt32
-	if err := p.DB.QueryRowContext(ctx, q, workspaceID, eventType).Scan(&taskID); err != nil {
+	if err := p.DB.QueryRowContext(ctx, q, eventInternalID, workspaceID).Scan(&taskID); err != nil {
 		if !stderrors.Is(err, sql.ErrNoRows) {
-			slog.Error("relations pipeline: fetch event", "err", err)
+			slog.ErrorContext(ctx, "relations pipeline: fetch event", "event_id", eventInternalID, "err", err)
 		}
 		return
 	}
 	if !taskID.Valid {
 		return
 	}
-	p.processTask(ctx, workspaceID, uint32(taskID.Int32)) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	process := p.process
+	if process == nil {
+		process = p.processTask
+	}
+	process(ctx, workspaceID, uint32(taskID.Int32)) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 }
 
 // processTask embeds the given task (if needed), finds similar tasks
@@ -239,7 +271,7 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		srcID := int64(taskID)
 		// The suggestion row and the event announcing it go in together.
 		// This pass runs detached from the request that triggered it (a
-		// notify hook spawns it with WithoutCancel), so the task it
+		// notify hook submits it to the hook runner), so the task it
 		// describes can be deleted while it works. Appending afterwards
 		// on its own connection then failed the events.task_id foreign
 		// key and left a suggestion no event ever announced. Inserting

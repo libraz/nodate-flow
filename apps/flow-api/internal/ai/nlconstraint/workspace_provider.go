@@ -75,9 +75,7 @@ Allowed ops (the "op" field):
 - "dependency.all_done" — all listed tasks must be done; requires "taskIds" (string array)
 - "dependency.open_at_most" — at most N dependencies may be open; requires "max" (int >= 0)
 - "actor.has_role"     — a specific role must be assigned; requires "arg" (role name)
-- "signal.received"    — a named signal must have been received; requires "arg"
-- "approval.granted"   — a named approval must have been granted; requires "arg"
-- "ci.status_is"       — CI pipeline must report a status; requires "arg" (e.g. "success")
+- "signal.received"    — a signal of the named kind must be attached to the task; requires "arg"
 
 Rules:
 - Return ONLY valid JSON, no prose, no markdown fences.

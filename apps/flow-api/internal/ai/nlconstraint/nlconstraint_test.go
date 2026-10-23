@@ -32,7 +32,7 @@ func TestCompile_EmptyPrompt(t *testing.T) {
 
 func TestCompile_Composite(t *testing.T) {
 	c := New(NewMockProvider())
-	parsed, err := c.Compile(context.Background(), "CI green and PR merged")
+	parsed, err := c.Compile(context.Background(), "All dependencies done and a reviewer assigned")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -114,13 +114,17 @@ func TestReverseRejectsEventOnInvisibleTask(t *testing.T) {
 // TestReverseAllowsEventOnVisibleTask is the other half: the same
 // non-admin member reversing an event on a task they can read still
 // gets the 201. Without it, a handler that denied everything would
-// satisfy the test above.
+// satisfy the test above. Reversing is a task write, so the member holds
+// the project editor role every task write needs; a viewer who can read
+// the same task is refused below.
 func TestReverseAllowsEventOnVisibleTask(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
 	owner := newTenant(t)
 	member := seedWorkspaceMemberTenant(t, owner)
+	addProjectRoleMember(t, owner, owner.ProjectPublicID, member.UserPublicID, "editor")
+	viewer := seedProjectRoleMember(t, owner, "viewer")
 
 	taskID := createTaskWithVisibility(t, owner, "Reverse: public task", "public")
 	agent := helpers.SeedAgent(t, testDB, owner.WorkspacePublicID, helpers.SeedAgentOptions{})
@@ -129,9 +133,15 @@ func TestReverseAllowsEventOnVisibleTask(t *testing.T) {
 	origID, origPub := appendAgentEventForTask(t, testDB, wsID, taskInternalID, agent.AgentID,
 		"ai.agent.run.completed")
 
-	status, body := reverseStatusAs(t, owner.WorkspacePublicID, member, origPub)
+	// A viewer reads the task, which is not the right to undo activity on
+	// it; the refusal writes nothing, so the editor's reversal below is
+	// still the first.
+	status, body := reverseStatusAs(t, owner.WorkspacePublicID, viewer, origPub)
+	requireDenied(t, status, body, http.StatusForbidden, "WS.PROJECT.ACCESS_DENIED", "viewer reversing a readable task")
+
+	status, body = reverseStatusAs(t, owner.WorkspacePublicID, member, origPub)
 	require.Equal(t, http.StatusCreated, status,
-		"a member who can read the task must still be able to reverse; body=%s", string(body))
+		"an editor who can read the task must still be able to reverse; body=%s", string(body))
 
 	row := selectReverseRow(t, testDB, wsID, origID)
 	require.Equal(t, "ai.agent.run.completed", row.Type,

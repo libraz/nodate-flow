@@ -17,12 +17,17 @@ import (
 // fakeAgentLookup is the in-memory stand-in for AgentLookup. It
 // returns a canned snapshot or error for every workspace/agent pair.
 type fakeAgentLookup struct {
-	snap AgentSnapshot
-	err  error
+	snap   AgentSnapshot
+	err    error
+	capErr error
 }
 
 func (f *fakeAgentLookup) Load(_ context.Context, _, _ uint32) (AgentSnapshot, error) {
 	return f.snap, f.err
+}
+
+func (f *fakeAgentLookup) CheckCostCap(_ context.Context, _ uint32) error {
+	return f.capErr
 }
 
 // fakeSignalLookup is the in-memory stand-in for SignalLookup.
@@ -275,6 +280,29 @@ func TestExecuteJudgePaused(t *testing.T) {
 	}
 	if prov.req.System != "" {
 		t.Fatalf("paused agent must not call provider; req=%+v", prov.req)
+	}
+}
+
+// TestExecuteJudgeRefusesAnAgentAtItsMonthlyCap asserts a judge whose
+// monthly cap is reached is refused before the provider call, flagged as a
+// cost-cap hit so the orchestrator pauses it.
+func TestExecuteJudgeRefusesAnAgentAtItsMonthlyCap(t *testing.T) {
+	t.Parallel()
+	prov := &recordingProvider{kind: providers.Kind("mock")}
+	r := &Runner{
+		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1}, capErr: ai.ErrAgentCostCapExceeded},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 1}},
+		Resolver: &fakeResolver{provider: prov},
+	}
+	res, err := r.ExecuteJudge(context.Background(), 1, 1, 1)
+	if !errors.Is(err, ai.ErrAgentCostCapExceeded) {
+		t.Fatalf("err = %v, want ai.ErrAgentCostCapExceeded", err)
+	}
+	if !res.CostCapHit {
+		t.Fatal("CostCapHit = false, want true")
+	}
+	if prov.req.System != "" {
+		t.Fatalf("capped judge must not call provider; req=%+v", prov.req)
 	}
 }
 

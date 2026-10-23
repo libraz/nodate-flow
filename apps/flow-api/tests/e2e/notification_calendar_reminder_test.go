@@ -234,15 +234,18 @@ func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
 		claimed.Format(time.RFC3339), anchor.Format(time.RFC3339))
 
 	// Releasing that claim is what the dispatch-failure path does; the
-	// next tick must retake it rather than treat the series as done.
+	// next tick must retake it rather than treat the series as done. The
+	// owner already holds this occurrence's row, so the retry reuses the
+	// occurrence's reminder event and writes no second row for them.
 	_, err = testDB.ExecContext(ctx,
 		`DELETE FROM calendar_event_reminders WHERE event_id = ?`, eventID)
 	require.NoError(t, err)
 
 	beforeRetry := notificationCountForUser(ctx, t, testDB, ownerID)
 	calnotifs.CheckAndNotify(ctx, testDB, f)
-	require.NoError(t, f.Shutdown(ctxWithTimeout(t, 10*time.Second)))
-	require.Equalf(t, int64(1),
-		notificationCountForUser(ctx, t, testDB, ownerID)-beforeRetry,
-		"a released occurrence must be retried, not skipped as already sent")
+	require.NoError(t, testDB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM calendar_event_reminders WHERE event_id = ?`, eventID).Scan(&claims))
+	require.Equal(t, 1, claims, "a released occurrence must be retaken by the next tick, not skipped as already sent")
+	require.Equal(t, beforeRetry, notificationCountForUser(ctx, t, testDB, ownerID),
+		"a recipient who already holds the occurrence's reminder must not get a second row on retry")
 }

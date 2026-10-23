@@ -19,6 +19,15 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 )
 
+// GoogleExchanger is the narrow contract used by the Google OIDC
+// start/callback handlers. The production implementation is
+// *auth.GoogleOIDCClient; tests inject a fake to avoid the real
+// discovery / token-exchange round trip.
+type GoogleExchanger interface {
+	AuthCodeURL(ctx context.Context, state, nonce string) (string, error)
+	Exchange(ctx context.Context, code, expectedNonce string) (*auth.GoogleClaims, error)
+}
+
 // GithubExchanger is the narrow contract used by the GitHub OIDC
 // start/callback handlers. The production implementation is
 // *auth.GithubOAuthClient; tests inject a fake to avoid real HTTP.
@@ -42,7 +51,10 @@ type Deps struct {
 	Queries  *generated.Queries
 	Sessions sessionstore.Store
 	JWT      *auth.JWTIssuer
-	OIDC     *auth.OIDCClient
+	// OIDC is the Google OIDC client for login. Nil when the Google
+	// client env is unset. Declared as an interface so unit tests can
+	// substitute a fake exchanger.
+	OIDC GoogleExchanger
 	// OIDCGithub is the GitHub OAuth2 client for login. Nil when the
 	// NF_AUTH_GITHUB_OIDC_CLIENT_ID env is unset. Declared as an
 	// interface so unit tests can substitute a fake exchanger.

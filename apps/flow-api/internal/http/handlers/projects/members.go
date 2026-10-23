@@ -13,11 +13,17 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
-func resolveUserInternalID(ctx context.Context, db *sql.DB, pub types.PublicID) (uint32, error) {
-	const q = `SELECT id FROM users WHERE public_id = ? LIMIT 1`
-	var uid uint32
-	if err := db.QueryRowContext(ctx, q, pub).Scan(&uid); err != nil {
-		return 0, err
+// resolveWorkspaceMember resolves a user public id to the internal id of an
+// enabled member of the workspace. A user of another workspace and an
+// unknown id are both WS.MEMBER.NOT_FOUND, so the answer says nothing about
+// accounts outside the caller's workspace.
+func resolveWorkspaceMember(ctx context.Context, deps Deps, wsID uint32, pub types.PublicID) (uint32, error) {
+	uid, err := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+		WorkspaceID: wsID,
+		PublicID:    pub,
+	})
+	if err != nil {
+		return 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
 	}
 	return uid, nil
 }
@@ -73,16 +79,10 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
 		}
-		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
+		// The user must already be a workspace member.
+		uid, err := resolveWorkspaceMember(ctx, deps, ws.ID, userPub)
 		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
-		}
-		// User must already be a workspace member.
-		if _, err := deps.Queries.FindWorkspaceMemberByUserId(ctx, generated.FindWorkspaceMemberByUserIdParams{
-			WorkspaceID: ws.ID,
-			UserID:      uid,
-		}); err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
+			return nil, err
 		}
 		// Idempotency.
 		if existing, err := deps.Queries.FindProjectMemberByUserId(ctx, generated.FindProjectMemberByUserIdParams{
@@ -130,13 +130,17 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveProjectMemberInput) (*
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
 		}
+		ws, ok := middleware.WorkspaceFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.WsProjectNotFound)
+		}
 		userPub, err := types.Parse(in.UserID)
 		if err != nil {
 			return nil, httpErr(apierrors.WsMemberNotFound)
 		}
-		uid, err := resolveUserInternalID(ctx, deps.DB, userPub)
+		uid, err := resolveWorkspaceMember(ctx, deps, ws.ID, userPub)
 		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsMemberNotFound, apierrors.InternalUnexpected))
+			return nil, err
 		}
 		if err := deps.Queries.RemoveProjectMemberByUserId(ctx, generated.RemoveProjectMemberByUserIdParams{
 			ProjectID: prj.ID,

@@ -85,3 +85,21 @@ func TestInfer(t *testing.T) {
 		})
 	}
 }
+
+// TestInferDueTodayIsNotOverdue pins the due_on comparison to calendar
+// days: a task due on 2026-10-23 is not past due at 15:00 UTC that day,
+// and is from midnight on.
+func TestInferDueTodayIsNotOverdue(t *testing.T) {
+	due := time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
+	base := Signals{State: StateWaiting, HasDueOn: true, DueOn: due}
+
+	base.UpdatedAt = time.Date(2026, 10, 23, 14, 0, 0, 0, time.UTC)
+	base.Now = time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
+	if got := Infer(base); got != nil {
+		t.Fatalf("due today at 15:00Z: got %+v, want no past-due proposal", got)
+	}
+	base.Now = time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	if got := Infer(base); got == nil || got.Transition != TransitionSubmit {
+		t.Fatalf("the next day at 00:00Z: got %+v, want the past-due submit proposal", got)
+	}
+}

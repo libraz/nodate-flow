@@ -223,3 +223,28 @@ func (q *Queries) RebaseCalendarEventOverride(ctx context.Context, arg RebaseCal
 	_, err := q.db.ExecContext(ctx, rebaseCalendarEventOverride, arg.RecurrenceOriginalStart, arg.ID, arg.WorkspaceID)
 	return err
 }
+
+const setCalendarEventSeriesExceptions = `-- name: SetCalendarEventSeriesExceptions :exec
+UPDATE calendar_events
+SET recurrence_exceptions = ?
+WHERE id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE
+`
+
+type SetCalendarEventSeriesExceptionsParams struct {
+	RecurrenceExceptions json.RawMessage `json:"recurrenceExceptions"`
+	ID                   uint32          `json:"-"`
+	WorkspaceID          uint32          `json:"-"`
+}
+
+// Write one master's exception list, keyed by the internal id the series
+// lock read it under.
+//
+// An override row deleted on its own names its master only by that id, and
+// the cancellation it leaves behind belongs on the master: without it the
+// master produces the occurrence again at its original slot.
+func (q *Queries) SetCalendarEventSeriesExceptions(ctx context.Context, arg SetCalendarEventSeriesExceptionsParams) error {
+	_, err := q.db.ExecContext(ctx, setCalendarEventSeriesExceptions, arg.RecurrenceExceptions, arg.ID, arg.WorkspaceID)
+	return err
+}

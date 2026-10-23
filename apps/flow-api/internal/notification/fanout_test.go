@@ -6,6 +6,7 @@ package notification
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -429,7 +430,8 @@ func TestClassifyEvent_AgentTaskEvents(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.eventType, func(t *testing.T) {
 			t.Parallel()
-			gotTitle, gotResource, gotSeverity := classifyEvent(tc.eventType)
+			c := classifications[eventbus.Kind(tc.eventType)]
+			gotTitle, gotResource, gotSeverity := c.Title, c.ResourceType, c.Severity
 			if gotTitle != tc.wantTitle {
 				t.Errorf("title: got %q, want %q", gotTitle, tc.wantTitle)
 			}
@@ -446,18 +448,48 @@ func TestClassifyEvent_AgentTaskEvents(t *testing.T) {
 	}
 }
 
+// stubRecipientSeams points a Fanout's recipient lookups at fixed data:
+// readers is who may read the task, byPublicID resolves payload user ids,
+// actors resolves task_actors public ids to users (removed ones included,
+// as production does), and owners is who an unnamed handoff goes back to.
+func stubRecipientSeams(f *Fanout, readers []uint32, byPublicID map[types.PublicID]uint32, actors map[types.PublicID]uint32, owners []uint32) {
+	f.listReaders = func(context.Context, uint32, uint32, bool) ([]uint32, error) {
+		return slices.Clone(readers), nil
+	}
+	f.resolveMembers = func(_ context.Context, params generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
+		var rows []generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow
+		for _, id := range params.PublicIds {
+			if internal, ok := byPublicID[id]; ok {
+				rows = append(rows, generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow{ID: internal, PublicID: id})
+			}
+		}
+		return rows, nil
+	}
+	f.resolveTaskActorUsers = func(_ context.Context, _, _ uint32, actorPub types.PublicID) ([]uint32, error) {
+		if id, ok := actors[actorPub]; ok {
+			return []uint32{id}, nil
+		}
+		return nil, nil
+	}
+	f.resolveTaskOwners = func(context.Context, uint32) ([]uint32, error) {
+		return slices.Clone(owners), nil
+	}
+}
+
+// taskEvent builds the event row fan-out reads for a task-scoped event.
+func taskEvent(payload string) eventRow {
+	return eventRow{
+		taskID:      sql.NullInt64{Int64: 1, Valid: true},
+		payloadJSON: json.RawMessage(payload),
+	}
+}
+
 // TestMentionRecipients narrows a mention to the people its payload names.
 //
-// The two cases are the whole contract of the intersection. A named user
-// who is in the recipient set is the only one delivered to, which is what
-// keeps a mention off everyone else's bell; a named user who is absent from
-// it is delivered nothing, because the set the visibility rule produced is
-// the one being narrowed and a mention cannot add to it. Nobody is the
-// correct answer in the second case, not an error.
-//
-// The resolution is stubbed at the same seam production reads it from, so
-// the test states what the workspace-scoped lookup returned rather than
-// re-deciding membership itself.
+// A named user who may read the task is the only one delivered to, which is
+// what keeps a mention off everyone else's bell; a named user who may not
+// read it is delivered nothing, because a mention cannot add to the set the
+// visibility rule produced. Nobody is the correct answer there, not an error.
 func TestMentionRecipients(t *testing.T) {
 	t.Parallel()
 
@@ -467,61 +499,28 @@ func TestMentionRecipients(t *testing.T) {
 		visibleUserID   uint32 = 7
 		invisibleUserID uint32 = 9
 	)
-	recipients := []uint32{4, visibleUserID, 12}
-
-	byPublicID := map[types.PublicID]uint32{
-		visible:   visibleUserID,
-		invisible: invisibleUserID,
-	}
+	readers := []uint32{4, visibleUserID, 12}
+	byPublicID := map[types.PublicID]uint32{visible: visibleUserID, invisible: invisibleUserID}
 
 	cases := []struct {
 		name    string
 		payload string
 		want    []uint32
 	}{
-		{
-			name:    "named user is in the recipient set",
-			payload: `{"taskId":"t","mentionedUserIds":["` + visible.String() + `"]}`,
-			want:    []uint32{visibleUserID},
-		},
-		{
-			name:    "named user is outside the recipient set",
-			payload: `{"taskId":"t","mentionedUserIds":["` + invisible.String() + `"]}`,
-			want:    nil,
-		},
-		{
-			name:    "one of each",
-			payload: `{"taskId":"t","mentionedUserIds":["` + invisible.String() + `","` + visible.String() + `"]}`,
-			want:    []uint32{visibleUserID},
-		},
-		{
-			name:    "payload names nobody",
-			payload: `{"taskId":"t"}`,
-			want:    nil,
-		},
+		{"named user is a reader", `{"mentionedUserIds":["` + visible.String() + `"]}`, []uint32{visibleUserID}},
+		{"named user is not a reader", `{"mentionedUserIds":["` + invisible.String() + `"]}`, nil},
+		{"one of each", `{"mentionedUserIds":["` + invisible.String() + `","` + visible.String() + `"]}`, []uint32{visibleUserID}},
+		{"payload names nobody", `{"taskId":"t"}`, nil},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
 			f := NewFanout(nil, nil, nil)
-			f.resolveMentionedUsers = func(_ context.Context, params generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
-				var rows []generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow
-				for _, id := range params.PublicIds {
-					if internal, ok := byPublicID[id]; ok {
-						rows = append(rows, generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow{
-							ID:       internal,
-							PublicID: id,
-						})
-					}
-				}
-				return rows, nil
-			}
-
-			got, err := f.mentionRecipients(context.Background(), 1, recipients, json.RawMessage(tc.payload))
+			stubRecipientSeams(f, readers, byPublicID, nil, nil)
+			got, err := f.recipientsFor(context.Background(), 1, classifications[eventbus.MentionCreated], taskEvent(tc.payload))
 			if err != nil {
-				t.Fatalf("mentionRecipients returned error: %v", err)
+				t.Fatalf("recipientsFor returned error: %v", err)
 			}
 			if !slices.Equal(got, tc.want) {
 				t.Fatalf("recipients: got %v, want %v", got, tc.want)
@@ -531,24 +530,108 @@ func TestMentionRecipients(t *testing.T) {
 }
 
 // TestMentionRecipients_ResolutionFailurePropagates keeps a failed lookup
-// from reading as "nobody was mentioned": the caller has to be able to tell
-// the two apart, because falling through with the unnarrowed set would send
-// the mention to everyone who can see the task.
+// from reading as "nobody was mentioned": falling through with the
+// unnarrowed set would send the mention to everyone who can see the task.
 func TestMentionRecipients_ResolutionFailurePropagates(t *testing.T) {
 	t.Parallel()
 
 	f := NewFanout(nil, nil, nil)
-	f.resolveMentionedUsers = func(_ context.Context, _ generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
+	stubRecipientSeams(f, []uint32{1, 2}, nil, nil, nil)
+	f.resolveMembers = func(_ context.Context, _ generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
 		return nil, errors.New("driver: bad connection")
 	}
 
-	payload := json.RawMessage(`{"mentionedUserIds":["` + types.New().String() + `"]}`)
-	got, err := f.mentionRecipients(context.Background(), 1, []uint32{1, 2}, payload)
+	payload := `{"mentionedUserIds":["` + types.New().String() + `"]}`
+	got, err := f.recipientsFor(context.Background(), 1, classifications[eventbus.MentionCreated], taskEvent(payload))
 	if err == nil {
 		t.Fatal("expected the resolution error to propagate, got nil")
 	}
 	if got != nil {
 		t.Fatalf("expected no recipients alongside the error, got %v", got)
+	}
+}
+
+// TestAddressedKindsReachOnlyTheNamedUser holds every second-person kind
+// to the user its event names, with three members who can all read the
+// task. Before, each of these reached all three.
+//
+// Removal is the case that also fails the other way: the removed user has
+// lost visibility by the time fan-out runs, so a rule that only narrowed
+// the readers would address "You were removed" to nobody at all.
+func TestAddressedKindsReachOnlyTheNamedUser(t *testing.T) {
+	t.Parallel()
+
+	const (
+		alice uint32 = 11
+		bob   uint32 = 12
+		carol uint32 = 13
+	)
+	readers := []uint32{alice, bob, carol}
+	bobPub := types.New()
+	addedActor := types.New()
+	removedActor := types.New()
+	agentActor := types.New()
+	byPublicID := map[types.PublicID]uint32{bobPub: bob}
+	actors := map[types.PublicID]uint32{addedActor: bob, removedActor: carol}
+
+	cases := []struct {
+		name    string
+		kind    eventbus.Kind
+		readers []uint32
+		payload string
+		want    []uint32
+	}{
+		{"task actor added", eventbus.TaskActorAdded, readers, `{"actorId":"` + addedActor.String() + `"}`, []uint32{bob}},
+		{"item actor added", eventbus.ItemActorAdded, readers, `{"actorId":"` + addedActor.String() + `"}`, []uint32{bob}},
+		{"task actor removed, no longer a reader", eventbus.TaskActorRemoved, []uint32{alice, bob}, `{"actorId":"` + removedActor.String() + `"}`, []uint32{carol}},
+		{"item actor removed, no longer a reader", eventbus.ItemActorRemoved, []uint32{alice, bob}, `{"actorId":"` + removedActor.String() + `"}`, []uint32{carol}},
+		{"agent actor names no user", eventbus.TaskActorAdded, readers, `{"actorId":"` + agentActor.String() + `","kind":"agent"}`, nil},
+		{"handoff to a named user", eventbus.AgentTaskHandoffToUser, readers, `{"targetUserPublicId":"` + bobPub.String() + `"}`, []uint32{bob}},
+		{"handoff naming nobody goes to the task's owners", eventbus.AgentTaskHandoffToUser, readers, `{"reason":"stuck"}`, []uint32{carol}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := NewFanout(nil, nil, nil)
+			stubRecipientSeams(f, tc.readers, byPublicID, actors, []uint32{carol})
+			got, err := f.recipientsFor(context.Background(), 1, classifications[tc.kind], taskEvent(tc.payload))
+			if err != nil {
+				t.Fatalf("recipientsFor returned error: %v", err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("recipients: got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDeletionKindReadsTheDisabledTask holds that a delete notification
+// asks for the readers of a task that is already disabled — the delete
+// commits before its event's hooks run — and that the delete notifies
+// once, through item.deleted rather than also through its legacy twin.
+func TestDeletionKindReadsTheDisabledTask(t *testing.T) {
+	t.Parallel()
+
+	f := NewFanout(nil, nil, nil)
+	var askedDisabled bool
+	f.listReaders = func(_ context.Context, _, _ uint32, includeDisabled bool) ([]uint32, error) {
+		askedDisabled = includeDisabled
+		if !includeDisabled {
+			return nil, nil
+		}
+		return []uint32{5, 6}, nil
+	}
+
+	got, err := f.recipientsFor(context.Background(), 1, classifications[eventbus.ItemDeleted], taskEvent(`{}`))
+	if err != nil {
+		t.Fatalf("recipientsFor returned error: %v", err)
+	}
+	if !askedDisabled || !slices.Equal(got, []uint32{5, 6}) {
+		t.Fatalf("item.deleted recipients = %v (asked for disabled task: %v); want the deleted task's readers", got, askedDisabled)
+	}
+	if classifications[eventbus.TaskDisabled].Title != "" {
+		t.Fatal("task.disabled is only ever item.deleted's twin; notifying on both writes two rows per delete")
 	}
 }
 

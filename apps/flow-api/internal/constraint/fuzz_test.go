@@ -13,7 +13,7 @@ import (
 func FuzzParse(f *testing.F) {
 	seeds := []string{
 		`{"op":"and","terms":[{"op":"time.due_before","arg":"2026-01-01"}]}`,
-		`{"op":"not","term":{"op":"ci.status_is","arg":"success"}}`,
+		`{"op":"not","term":{"op":"signal.received","arg":"pull_request.merged"}}`,
 		`{"op":"dependency.open_at_most","max":2}`,
 		`{"op":"or","terms":[]}`,
 		`{"op":"unknown"}`,
@@ -30,8 +30,6 @@ func FuzzParse(f *testing.F) {
 		DependencyStates: map[string]string{"a": "done"},
 		ActorRoles:       map[string]bool{"reviewer": true},
 		SignalsReceived:  map[string]bool{"github.pr.merged": true},
-		Approvals:        map[string]bool{"lead": true},
-		CIStatus:         "success",
 	}
 
 	f.Fuzz(func(t *testing.T, raw []byte) {
