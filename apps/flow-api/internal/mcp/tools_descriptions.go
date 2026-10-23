@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 )
 
@@ -137,12 +138,20 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 	// lookup belongs.
 	var taskTitle string
 	var restored taskdesc.Version
+	taskIDInt64 := int64(taskInternal)
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.restore_description_version", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		qtx := deps.Queries.WithTx(tx.RawTx())
 
-		// Get current task state for the UpdateTask call. Access was already
-		// authorized by resolveTask above; this transaction-scoped load reads
-		// the row for a consistent update.
+		// The row is locked before it is read, as REST restore does, so the
+		// fields the update carries through are the committed ones and a
+		// concurrent edit of another field is not overwritten. Access was
+		// already authorized above.
+		if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+			ID:          taskInternal,
+			WorkspaceID: s.workspaceID,
+		}); err != nil {
+			return err
+		}
 		taskRow, rerr := loadTaskRow(ctx, qtx, s.workspaceID, taskPub)
 		if rerr != nil {
 			return rerr
@@ -179,23 +188,22 @@ func runRestoreDescriptionVersion(ctx context.Context, deps Deps, s *session, ra
 		// The restored body is the one the task now carries, so it is the
 		// body the mentions table has to agree with — including when the
 		// version being restored to named nobody.
-		return syncTaskDescriptionMentions(ctx, tx, s, taskInternal, taskPub, version.Body)
+		if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, taskPub, version.Body); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.DescriptionVersionRestored,
+			AuditAction:  "description_version.restore",
+			ResourceType: "task",
+			ResourceID:   taskPub.String(),
+			TaskID:       &taskIDInt64,
+			Payload:      map[string]any{"taskId": taskPub.String(), "restoredFrom": versionPub.String(), "newVersionId": restored.PublicID.String(), "via": "mcp"},
+			CallSite:     "mcp.restore_description_version",
+		})
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
-	taskIDInt64 := int64(taskInternal)
-	// The restore committed a new description version row; a retry would
-	// add another one on top of it.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.DescriptionVersionRestored,
-		AuditAction:  "description_version.restore",
-		ResourceType: "task",
-		ResourceID:   taskPub.String(),
-		TaskID:       &taskIDInt64,
-		Payload:      map[string]any{"taskId": in.TaskID, "restoredFrom": in.VersionID, "newVersionId": restored.PublicID.String(), "via": "mcp"},
-		CallSite:     "mcp.restore_description_version",
-	})
 	// A restore replaces the task's description, so the embedding follows it
 	// back. The pair passed is what the update wrote: the title it carried
 	// through unchanged, and the restored body.

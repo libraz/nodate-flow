@@ -62,16 +62,10 @@ var (
 	WsMemberRoleDenied = &Spec{Code: "WS.MEMBER.ROLE_DENIED", Status: 403, Message: "Your role does not permit this action", Description: "Returned when the actor's workspace role is insufficient for the attempted operation.", UserAction: "Ask a workspace admin to elevate your role."}
 	// WS.MEMBER.SELF_MODIFY — You cannot change your own membership.
 	WsMemberSelfModify = &Spec{Code: "WS.MEMBER.SELF_MODIFY", Status: 403, Message: "You cannot change your own membership.", Description: "Returned when an actor attempts to change their own workspace membership role or remove themselves from the workspace.", UserAction: "Ask another workspace owner to change your role or remove you."}
-	// WS.MENTION.NOT_FOUND — Mention not found
-	WsMentionNotFound = &Spec{Code: "WS.MENTION.NOT_FOUND", Status: 404, Message: "Mention not found", Description: "Returned when a mention with the given public_id does not exist or has been removed.", UserAction: "Verify the mention ID."}
 	// WS.NOTIFICATION.NOT_FOUND — Notification not found
 	WsNotificationNotFound = &Spec{Code: "WS.NOTIFICATION.NOT_FOUND", Status: 404, Message: "Notification not found", Description: "Returned when a notification with the given public_id does not exist or belongs to another user.", UserAction: "Verify the notification ID."}
-	// WS.NOTIFICATION_PREFERENCE.NOT_FOUND — Notification preference not found
-	WsNotificationPreferenceNotFound = &Spec{Code: "WS.NOTIFICATION_PREFERENCE.NOT_FOUND", Status: 404, Message: "Notification preference not found", Description: "Returned when a notification preference with the given public_id does not exist for the current user.", UserAction: "Verify the notification preference ID, or create a new one."}
 	// WS.PROJECT.ACCESS_DENIED — You do not have access to this project
 	WsProjectAccessDenied = &Spec{Code: "WS.PROJECT.ACCESS_DENIED", Status: 403, Message: "You do not have access to this project", Description: "Returned when the actor is a workspace member but lacks the required project role.", UserAction: "Ask a project lead to grant you access."}
-	// WS.PROJECT.FEATURE_DISABLED — This feature is disabled for the project
-	WsProjectFeatureDisabled = &Spec{Code: "WS.PROJECT.FEATURE_DISABLED", Status: 403, Message: "This feature is disabled for the project", Description: "Returned when a request targets a feature that has been disabled in the project settings.", UserAction: "Enable the feature in project settings, or contact a project admin."}
 	// WS.PROJECT.IDENTIFIER_ALREADY_TAKEN — Project identifier is already taken
 	WsProjectIdentifierAlreadyTaken = &Spec{Code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN", Status: 409, Message: "Project identifier is already taken", Description: "Returned when the requested project identifier already exists within the workspace.", UserAction: "Choose a different identifier."}
 	// WS.PROJECT.NOT_FOUND — Project not found
@@ -94,16 +88,14 @@ var (
 	WsTaskActorRoleInvalid = &Spec{Code: "WS.TASK.ACTOR_ROLE_INVALID", Status: 422, Message: "Task actor role must be one of: assignee, reviewer, watcher, approver", Description: "Returned when a task create or update payload includes an `actors[].role` value outside the allowed enum. The persisted column is `task_actors.role ENUM('assignee','reviewer','watcher','approver')`, so any other string is rejected at the validation boundary before the SQL layer.", UserAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."}
 	// WS.TASK.ALREADY_ARCHIVED — Task is already archived
 	WsTaskAlreadyArchived = &Spec{Code: "WS.TASK.ALREADY_ARCHIVED", Status: 409, Message: "Task is already archived", Description: "Returned when attempting to archive a task that is already in the archived state.", UserAction: "The task is already archived."}
+	// WS.TASK.DEPENDENCY_ALREADY_EXISTS — This dependency already exists
+	WsTaskDependencyAlreadyExists = &Spec{Code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS", Status: 409, Message: "This dependency already exists", Description: "Returned when a new task dependency edge has the same source, target and kind as an edge that already exists.", UserAction: "The dependency is already in place; no change is needed."}
 	// WS.TASK.DEPENDENCY_CYCLE — Adding this dependency would create a cycle
 	WsTaskDependencyCycle = &Spec{Code: "WS.TASK.DEPENDENCY_CYCLE", Status: 422, Message: "Adding this dependency would create a cycle", Description: "Returned when a new task dependency edge would close a cycle in the workspace dependency graph (directly or transitively). The dependency graph must remain a DAG so blocked-by computation and topological scheduling terminate.", UserAction: "Remove the conflicting dependency on the other task before adding this edge."}
 	// WS.TASK.NOT_ARCHIVED — Task is not archived
 	WsTaskNotArchived = &Spec{Code: "WS.TASK.NOT_ARCHIVED", Status: 409, Message: "Task is not archived", Description: "Returned when attempting to unarchive a task that is not in the archived state.", UserAction: "The task is not archived."}
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
-	// WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT — Task cannot transition to the requested state
-	WsTaskStateTransitionBlockedByConstraint = &Spec{Code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT", Status: 422, Message: "Task cannot transition to the requested state", Description: "Reserved for a future hard-gated constraint mode. Current task transitions are gated by the taskstate state machine; unsatisfied task constraints are advisory markers and do not emit this error.", UserAction: "Review unmet constraints in the task detail panel. If hard-gated constraints are enabled in a future release, resolve them before retrying the transition."}
-	// WS.TASK.TITLE_TOO_LONG — Task title is too long
-	WsTaskTitleTooLong = &Spec{Code: "WS.TASK.TITLE_TOO_LONG", Status: 422, Message: "Task title is too long", Description: "Returned when the submitted title exceeds the maximum allowed length.", UserAction: "Shorten the title and retry."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state
 	WsTaskTransitionRejected = &Spec{Code: "WS.TASK.TRANSITION_REJECTED", Status: 422, Message: "Task transition not allowed in current state", Description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state.", UserAction: "Refresh the task to see its current state and choose a valid transition."}
 	// WS.TASK.TRANSITION_UNKNOWN — Unknown task transition
@@ -115,7 +107,7 @@ var (
 	// WS.TASK_AGENT.ALREADY_ASSIGNED — Agent is already the assignee for this task
 	WsTaskAgentAlreadyAssigned = &Spec{Code: "WS.TASK_AGENT.ALREADY_ASSIGNED", Status: 409, Message: "Agent is already the assignee for this task", Description: "Returned by POST /tasks/{id}/handoff/to-agent when the supplied agent_id matches the task's current actor_agent_id, so the handoff would be a no-op.", UserAction: "If you intended to refresh the run, use the agent run trigger endpoint instead; otherwise hand off to a different agent."}
 	// WS.TASK_AGENT.COST_CAP_EXCEEDED — Agent monthly cost cap has been reached
-	WsTaskAgentCostCapExceeded = &Spec{Code: "WS.TASK_AGENT.COST_CAP_EXCEEDED", Status: 422, Message: "Agent monthly cost cap has been reached", Description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month.", UserAction: "Wait for the next billing cycle, raise the agent's monthly_cost_cap_cents in agent settings, or hand the task off to another agent or user."}
+	WsTaskAgentCostCapExceeded = &Spec{Code: "WS.TASK_AGENT.COST_CAP_EXCEEDED", Status: 422, Message: "Agent monthly cost cap has been reached", Description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month.", UserAction: "Wait for the next billing month, or hand the task off to another agent or user."}
 	// WS.TASK_AGENT.HANDOFF_LOOP_DETECTED — Handoff bounced between agent and user too many times
 	WsTaskAgentHandoffLoopDetected = &Spec{Code: "WS.TASK_AGENT.HANDOFF_LOOP_DETECTED", Status: 422, Message: "Handoff bounced between agent and user too many times", Description: "Returned when the recent agent.task.handoff_* event history shows the task ping-ponging between agent and user beyond the configured threshold (NF_AGENT_HANDOFF_LOOP_LIMIT). Protects against runaway autoaction cycles.", UserAction: "Open the task and resolve the underlying disagreement manually; the loop limit resets after a cool-down window or admin override."}
 	// WS.TASK_AGENT.NOT_ASSIGNED — Task has no agent assignee
@@ -124,8 +116,6 @@ var (
 	WsTaskConstraintNotFound = &Spec{Code: "WS.TASK_CONSTRAINT.NOT_FOUND", Status: 404, Message: "Constraint not found", Description: "Returned when a constraint with the given public_id does not exist on this task, or was already removed.", UserAction: "Refresh the task and try again."}
 	// WS.TASK_EVENT_LINK.NOT_FOUND — Linked event not found
 	WsTaskEventLinkNotFound = &Spec{Code: "WS.TASK_EVENT_LINK.NOT_FOUND", Status: 404, Message: "Linked event not found", Description: "Returned when unlinking a calendar event that is not linked to this task, or was already unlinked.", UserAction: "Refresh the task and try again."}
-	// WS.VIEW_PREFERENCE.NOT_FOUND — View preference not found
-	WsViewPreferenceNotFound = &Spec{Code: "WS.VIEW_PREFERENCE.NOT_FOUND", Status: 404, Message: "View preference not found", Description: "Returned when a view preference with the given public_id does not exist for the current user.", UserAction: "Verify the view preference ID, or create a new one."}
 	// WS.WORKSPACE.ACCESS_DENIED — You do not have access to this workspace
 	WsWorkspaceAccessDenied = &Spec{Code: "WS.WORKSPACE.ACCESS_DENIED", Status: 403, Message: "You do not have access to this workspace", Description: "Returned when the actor is authenticated but is not a member of the target workspace.", UserAction: "Ask a workspace admin to invite you."}
 	// WS.WORKSPACE.NOT_FOUND — Workspace not found

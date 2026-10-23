@@ -66,11 +66,6 @@ export const AuthErrors = {
     status: 401,
     message: "Magic link token is malformed or unknown",
   },
-  AUTH_MAGIC_LINK_REVOKED: {
-    code: "AUTH.MAGIC_LINK.REVOKED",
-    status: 401,
-    message: "Magic link has been revoked",
-  },
   AUTH_OIDC_DOMAIN_NOT_ALLOWED: {
     code: "AUTH.OIDC.DOMAIN_NOT_ALLOWED",
     status: 403,
@@ -85,6 +80,11 @@ export const AuthErrors = {
     code: "AUTH.OIDC.GITHUB_NOT_CONFIGURED",
     status: 503,
     message: "GitHub login is not configured",
+  },
+  AUTH_OIDC_GOOGLE_NOT_CONFIGURED: {
+    code: "AUTH.OIDC.GOOGLE_NOT_CONFIGURED",
+    status: 503,
+    message: "Google login is not configured",
   },
   AUTH_OIDC_ID_TOKEN_INVALID: {
     code: "AUTH.OIDC.ID_TOKEN_INVALID",

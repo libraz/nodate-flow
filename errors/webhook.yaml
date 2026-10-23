@@ -23,33 +23,3 @@ resources:
         message_zh: "Webhook URL 不是允许的目标地址"
         description: "Returned when the webhook URL is not a valid https URL, embeds credentials, or its host resolves to a private, loopback, link-local, or otherwise non-public address."
         userAction: "Use a public https URL without embedded credentials as the webhook destination."
-
-      limit_exceeded:
-        code: WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED
-        status: 409
-        message: "Maximum webhook subscriptions per workspace reached"
-        message_ja: "ワークスペースの Webhook 購読数が上限に達しました"
-        message_zh: "工作区的 Webhook 订阅数量已达上限"
-        description: "Returned when the workspace has already reached the maximum number of allowed webhook subscriptions."
-        userAction: "Remove unused webhook subscriptions before adding a new one."
-
-  delivery:
-    breadcrumb: "Webhook > Delivery"
-    errors:
-      not_found:
-        code: WEBHOOK.DELIVERY.NOT_FOUND
-        status: 404
-        message: "Webhook delivery not found"
-        message_ja: "Webhook 配信が見つかりません"
-        message_zh: "未找到 Webhook 投递记录"
-        description: "Returned when a webhook delivery with the given public_id does not exist or the actor does not have access to it."
-        userAction: "Verify the delivery ID, or refresh the list to see recent deliveries."
-
-      already_delivered:
-        code: WEBHOOK.DELIVERY.ALREADY_DELIVERED
-        status: 409
-        message: "Webhook delivery has already been completed"
-        message_ja: "この Webhook 配信は既に完了しています"
-        message_zh: "该 Webhook 投递已完成"
-        description: "Returned when attempting to re-deliver a webhook delivery that has already been successfully completed."
-        userAction: "No action needed; the delivery has already been sent. Create a new delivery if needed."

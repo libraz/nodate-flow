@@ -19,6 +19,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
@@ -153,10 +155,8 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 				switch {
 				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
 					suggestions, err = deterministicFallback(ctx, deps, wsID, vis, limit)
-				case errors.Is(err, ai.ErrParse):
-					return nil, httpErr(apierrors.AiResponseInvalidJson)
 				default:
-					return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
+					return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 				}
 			}
 		} else {

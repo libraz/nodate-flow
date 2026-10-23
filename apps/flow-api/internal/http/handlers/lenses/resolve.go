@@ -553,6 +553,16 @@ func publicLensFilter(lensJSON json.RawMessage) lensFilter {
 	return parseLensFilter(lj.Filter)
 }
 
+// TaskFilter renders a stored lens_json blob as WHERE fragments over
+// v_task_list aliased `v`, plus their bind arguments. It is the reading
+// the share page renders, exported so every surface that selects tasks
+// by a lens selects the same set; a blob that cannot be read in full
+// selects nothing. The caller adds its own workspace, project and
+// visibility predicates.
+func TaskFilter(lensJSON json.RawMessage) ([]string, []any) {
+	return publicLensFilter(lensJSON).fragments()
+}
+
 // publicLensTaskColumns is the public-safe projection the share page
 // renders: no internal ids, no description, no creator, no workspace
 // metadata, and no person. A share URL carries no reader identity, so

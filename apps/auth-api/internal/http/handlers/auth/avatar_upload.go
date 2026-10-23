@@ -311,6 +311,10 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 					}
 					if affected, _ := gcRes.RowsAffected(); affected == 1 {
 						prevStorageKeyToRemove = prevFull.StorageKey
+						if err := storage.QueueRemoval(ctx, qtx, prevStorageKeyToRemove); err != nil {
+							rollback()
+							return nil, httpErr(apierrors.InternalUnexpected)
+						}
 					}
 				}
 			}
@@ -350,11 +354,11 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 		}
 
 		// Best-effort GC of the previous blob after commit. Failures
-		// are logged but do not affect the response: the next GC
-		// sweeper pass will catch any orphans.
+		// are logged but do not affect the response: the key was queued
+		// in the transaction, so the storage sweeper retries it.
 		if prevStorageKeyToRemove != "" {
 			cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
-			if rmErr := deps.Storage.RemoveObject(cleanupCtx, prevStorageKeyToRemove); rmErr != nil {
+			if rmErr := storage.RemoveQueued(cleanupCtx, deps.Queries, deps.Storage, prevStorageKeyToRemove); rmErr != nil {
 				slog.WarnContext(cleanupCtx, "avatar upload: stale object delete failed", "err", rmErr, "key", prevStorageKeyToRemove)
 			}
 			cleanupCancel()

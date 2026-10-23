@@ -20,6 +20,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/calendars"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
@@ -278,60 +279,56 @@ func resolveProject(ctx context.Context, deps Deps, s *session, publicID string)
 	return prj.ID, nil
 }
 
-// checkProjectRoleFloor applies the Layer-3 project-role floor a tool
-// declared to an already resolved role. It is the MCP mirror of REST
-// RequireProjectRole (apps/flow-api/internal/http/middleware/acl.go):
-// workspace owners / admins arrive as [acl.ProjectRoleElevated] and pass
-// unconditionally, everyone else must meet the declared role, and denial is
-// WS.PROJECT.ACCESS_DENIED — the same code the HTTP middleware writes.
+// checkProjectFloor applies the Layer-3 project-role floor a tool declared
+// to the caller's standing on a project, through the same
+// [handlerutil.RequireProjectRole] REST runs for every project-scoped write:
+// enabled workspace membership, then the project_members role, with
+// workspace owners / admins passing as elevated. Denial is
+// WS.PROJECT.ACCESS_DENIED on both transports.
 //
 // A floor that names no project role refuses outright. That is the
 // fail-closed half of tying enforcement to the declaration: a tool that
-// reaches into a project while claiming only a workspace floor is not a
-// tool with a lenient rule, it is a tool with no stated rule, and guessing
-// one for it is how the two transports came apart in the first place.
-func checkProjectRoleFloor(role acl.ProjectRole, floor auth.Floor) error {
-	minRole, ok := floorProjectRole(floor)
+// reaches into a project while claiming only a workspace floor has no
+// stated rule, and guessing one for it is how the two transports came
+// apart in the first place.
+func checkProjectFloor(ctx context.Context, deps Deps, s *session, projectID uint32) error {
+	minRole, ok := floorProjectRole(s.floor)
 	if !ok {
 		return apierrors.New(apierrors.WsProjectAccessDenied)
 	}
-	if role == acl.ProjectRoleElevated || role.AtLeast(minRole) {
-		return nil
-	}
-	return apierrors.New(apierrors.WsProjectAccessDenied)
+	return specErr(handlerutil.RequireProjectRole(ctx, deps.DB, s.workspaceID, projectID, s.userID, minRole))
 }
 
 // resolveProjectForWrite resolves a project public id for a tool that writes
 // inside that project. On top of [resolveProject]'s tenancy check it enforces
-// the Layer-3 project-role floor, so a workspace member with no
-// project_members row cannot create rows in a project they were never added
-// to.
-//
-// The decision is the same chain REST runs for the project-scoped writes that
-// have no path parameter to hang RequireProjectRole on
-// (tasks.requireProjectEditor / intake.requireProjectEditor):
-// acl.CheckWorkspaceMember → acl.LookupProjectMembership → role floor.
-//
-// The minimum role comes from the floor the tool was registered under, not
-// from an argument at the call site, so the floor the registry advertises is
-// the one the request is held to.
+// the project-role floor the tool was registered under, so a workspace
+// member with no project_members row cannot create rows in a project they
+// were never added to.
 func resolveProjectForWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
 	prjID, err := resolveProject(ctx, deps, s, publicID)
 	if err != nil {
 		return 0, err
 	}
-	wsRole, err := acl.CheckWorkspaceMember(ctx, deps.DB, s.workspaceID, s.userID, apierrors.WsProjectAccessDenied)
-	if err != nil {
-		return 0, err
-	}
-	role, _, err := acl.LookupProjectMembership(ctx, deps.DB, s.workspaceID, prjID, s.userID, wsRole)
-	if err != nil {
-		return 0, err
-	}
-	if err := checkProjectRoleFloor(role, s.floor); err != nil {
+	if err := checkProjectFloor(ctx, deps, s, prjID); err != nil {
 		return 0, err
 	}
 	return prjID, nil
+}
+
+// checkPageProjectFloor holds a write to an existing page to the
+// project-role floor the tool was registered under, applied to the project
+// the page belongs to, as REST page updates are; a page outside any project
+// needs no project role. db may be the write's transaction, so the decision
+// reads what the write will see.
+func checkPageProjectFloor(ctx context.Context, db acl.DB, s *session, project sql.NullInt32) error {
+	if !project.Valid {
+		return nil
+	}
+	minRole, ok := floorProjectRole(s.floor)
+	if !ok {
+		return apierrors.New(apierrors.WsProjectAccessDenied)
+	}
+	return specErr(handlerutil.RequireProjectRole(ctx, db, s.workspaceID, uint32(project.Int32), s.userID, minRole)) //#nosec G115 -- projects.id, positive by construction
 }
 
 // authorizeTask runs the shared Layer-3/4 task ACL and the MCP-specific
@@ -387,14 +384,24 @@ func resolveTask(ctx context.Context, deps Deps, s *session, publicID string) (u
 // a workspace member with no project_members row at all) who can read a task
 // cannot mutate it.
 func resolveTaskForWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, types.PublicID, error) {
-	access, pub, err := authorizeTask(ctx, deps, s, publicID)
+	access, pub, err := resolveTaskAccessForWrite(ctx, deps, s, publicID)
 	if err != nil {
 		return 0, types.PublicID{}, err
 	}
-	if err := checkProjectRoleFloor(access.ProjectRole, s.floor); err != nil {
-		return 0, types.PublicID{}, err
-	}
 	return access.Task.ID, pub, nil
+}
+
+// resolveTaskAccessForWrite is [resolveTaskForWrite] for a tool that also
+// needs the task's ACL record, such as its project.
+func resolveTaskAccessForWrite(ctx context.Context, deps Deps, s *session, publicID string) (acl.TaskAccess, types.PublicID, error) {
+	access, pub, err := authorizeTask(ctx, deps, s, publicID)
+	if err != nil {
+		return acl.TaskAccess{}, types.PublicID{}, err
+	}
+	if err := checkProjectFloor(ctx, deps, s, access.Task.ProjectID); err != nil {
+		return acl.TaskAccess{}, types.PublicID{}, err
+	}
+	return access, pub, nil
 }
 
 // loadTaskRow is the single MCP entry point to the tasks public-id lookup.
@@ -488,9 +495,11 @@ type calendarAccess struct {
 // calendar; [resolveCalendar] is the read gate on top of it and
 // [resolveCalendarWrite] the write gate.
 func authorizeCalendar(ctx context.Context, deps Deps, s *session, publicID string) (calendarAccess, error) {
+	// A malformed or unknown id is the REST calendar refusal, not a
+	// retryable tool fault.
 	pub, err := types.Parse(publicID)
 	if err != nil {
-		return calendarAccess{}, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid calendar id")
+		return calendarAccess{}, apierrors.New(apierrors.CalendarCalendarNotFound)
 	}
 	row, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
 		PublicID:    pub,
@@ -498,7 +507,7 @@ func authorizeCalendar(ctx context.Context, deps Deps, s *session, publicID stri
 	})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return calendarAccess{}, apierrors.Newf(apierrors.McpToolExecutionFailed, "calendar not found")
+			return calendarAccess{}, apierrors.New(apierrors.CalendarCalendarNotFound)
 		}
 		return calendarAccess{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -577,16 +586,17 @@ func specErr(spec *apierrors.Spec) error {
 // verifies the user is an enabled member of the session workspace.
 //
 // This mirrors [acl.CheckWorkspaceMember]'s membership rule but binds it
-// to a public-id lookup so a caller cannot assign a globally-existing
-// user that is not a member of their workspace (the FK on
+// to a public-id lookup so a caller cannot name a globally-existing user
+// that is not a member of their workspace (the FK on
 // calendar_events.owner_user_id references the global users table, so a
-// non-member would otherwise pass referential integrity). Non-members
-// surface as MCP.TOKEN.WORKSPACE_MISMATCH, never leaking whether the
-// user exists outside the workspace.
-func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+// non-member would otherwise pass referential integrity). A malformed id,
+// an unknown user and a non-member all answer missing — the caller's own
+// not-found code, the one REST answers for the same argument — so the
+// lookup never says whether the user exists outside the workspace.
+func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID string, missing *apierrors.Spec) (uint32, error) {
 	pub, err := types.Parse(publicID)
 	if err != nil {
-		return 0, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid userId")
+		return 0, apierrors.New(missing)
 	}
 	userID, err := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx,
 		generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
@@ -595,7 +605,7 @@ func resolveWorkspaceUser(ctx context.Context, deps Deps, s *session, publicID s
 		})
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return 0, apierrors.New(apierrors.McpTokenWorkspaceMismatch)
+			return 0, apierrors.New(missing)
 		}
 		return 0, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

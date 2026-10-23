@@ -11,7 +11,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestNotificationMarkReadAndArchive verifies that individual
@@ -79,7 +78,7 @@ func TestNotificationMarkReadAndArchive(t *testing.T) {
 	require.NotZero(t, actorEventID)
 
 	queries := generated.New(testDB)
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
 	hook(ctx, wsInternalID, "task.actor.added", actorEventID)

@@ -104,8 +104,9 @@ type ExportTasksForLensRow struct {
 	CreatedAt           time.Time         `json:"createdAt"`
 }
 
-// Fetch tasks for export scoped to a workspace + project (lens-scoped).
-// Lens filter/sort logic is applied in Go code; this provides the data set.
+// Fetch tasks for export scoped to a workspace + project. It applies no
+// lens filter: the REST lens export reads lenses through the shared lens
+// filter reader instead.
 // One row per task, whatever the number of assignees. Joining
 // task_actors on task_id alone multiplies the task across its
 // assignees, and an export is both counted and capped by row: a task

@@ -133,10 +133,29 @@ func TestTranslateTaskItemkitErrorInvariant(t *testing.T) {
 	}
 }
 
-func TestTranslateTaskItemkitErrorOther(t *testing.T) {
+// TestTranslateTaskItemkitErrorEveryKind holds the task translator to a
+// public code for every kind but Other, matching the calendar and MCP
+// translators, so a row disabled mid-request is never a 500.
+func TestTranslateTaskItemkitErrorEveryKind(t *testing.T) {
 	t.Parallel()
-	got := TranslateTaskItemkitError(errors.New("recurrence not allowed"))
-	if extractCode(t, got) != apierrors.InternalUnexpected.Code {
-		t.Errorf("task other: got %v", extractCode(t, got))
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"no rows", sql.ErrNoRows, apierrors.WsTaskNotFound.Code},
+		{"task vanished", errors.New("itemkit: task 7 not found in ws 3"), apierrors.WsTaskNotFound.Code},
+		{"event vanished", errors.New("itemkit: event 9 not found in ws 3"), apierrors.CalendarEventNotFound.Code},
+		{"recurrence with link", errors.New("recurrence not allowed"), apierrors.ItemItemkitRecurrenceWithTaskLink.Code},
+		{"invariant", errors.New("itemkit invariant: dual link"), apierrors.ItemItemkitInvariantViolation.Code},
+		{"other", errors.New("connection refused"), apierrors.InternalUnexpected.Code},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := extractCode(t, TranslateTaskItemkitError(tc.err)); got != tc.want {
+				t.Errorf("got %v want %v", got, tc.want)
+			}
+		})
 	}
 }

@@ -110,15 +110,6 @@ resources:
         description: "Returned when the upstream LLM returned a completion whose body could not be decoded as JSON, or where no JSON payload could be extracted from the surrounding text."
         userAction: "Retry the request; if the problem persists, check the provider or model configuration."
 
-      missing_field:
-        code: AI.RESPONSE.MISSING_FIELD
-        status: 502
-        message: "AI provider response is missing a required field"
-        message_ja: "AI プロバイダの応答に必須フィールドがありません"
-        message_zh: "AI 服务提供商的响应缺少必填字段"
-        description: "Returned when the JSON returned by the upstream LLM decoded successfully but a field required by the response schema (e.g. tool name, action, or score) was absent or empty."
-        userAction: "Retry the request; if the problem persists, lower the prompt complexity or pick a stronger model."
-
       schema_mismatch:
         code: AI.RESPONSE.SCHEMA_MISMATCH
         status: 502
@@ -139,36 +130,6 @@ resources:
         message_zh: "无法将其转换为筛选条件"
         description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar (ADR 0004)."
         userAction: "Rephrase the request — e.g. \"blocked tasks due this week\"."
-
-  redaction:
-    breadcrumb: "AI > Redaction"
-    errors:
-      lens_unavailable:
-        code: AI.REDACTION.LENS_UNAVAILABLE
-        status: 500
-        message: "Redaction lens is unavailable"
-        message_ja: "機密情報の除去設定を読み込めません"
-        message_zh: "脱敏配置不可用"
-        description: "Returned when the pre-LLM redactor could not load its configured lens (the rule set was missing, the workspace setting failed to fetch, or the lens registry is offline) and the request was blocked to avoid leaking secrets."
-        userAction: "Retry in a moment; if the problem persists, contact your administrator."
-
-      rule_invalid:
-        code: AI.REDACTION.RULE_INVALID
-        status: 500
-        message: "Redaction rule is invalid"
-        message_ja: "機密情報の除去ルールが不正です"
-        message_zh: "脱敏规则无效"
-        description: "Returned when the redactor compiled lens contains a malformed rule (e.g. an unparseable pattern or unsupported action) and refused to run."
-        userAction: "Ask your administrator to review the redaction rule configuration."
-
-      timeout:
-        code: AI.REDACTION.TIMEOUT
-        status: 504
-        message: "Redaction pipeline timed out"
-        message_ja: "機密情報の除去処理がタイムアウトしました"
-        message_zh: "脱敏处理超时"
-        description: "Returned when the pre-LLM redactor exceeded its configured deadline while scanning the prompt and the request was blocked to avoid leaking secrets."
-        userAction: "Retry with a shorter prompt; if the problem persists, contact your administrator."
 
   agent:
     breadcrumb: "AI > Agent"
@@ -211,18 +172,6 @@ resources:
         message_zh: "未找到 AI 模型"
         description: "Returned when an operation references an ai_models row that does not exist in the workspace or has been disabled."
         userAction: "Pick a model from the workspace's registered providers."
-
-  safety:
-    breadcrumb: "AI > Safety"
-    errors:
-      blocked:
-        code: AI.SAFETY.BLOCKED
-        status: 422
-        message: "Request blocked by safety policy"
-        message_ja: "安全ポリシーによりリクエストがブロックされました"
-        message_zh: "请求已被安全策略拦截"
-        description: "Returned when the prompt or response was blocked by the configured safety filters."
-        userAction: "Rephrase the request to comply with the safety policy."
 
   reverse:
     breadcrumb: "AI > Reverse"

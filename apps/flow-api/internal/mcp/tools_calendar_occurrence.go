@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // The scope vocabulary, the fallback bases, the argument merge, the
@@ -145,37 +146,34 @@ func updateCalendarEventOccurrences(
 	// requires one. So none of the itemkit propagation the series path
 	// performs applies, and the write below is the whole change.
 	originalStart := handlerutil.UnixToTime(in.OccurrenceStart)
-	var written types.PublicID
-	var scopeErr error
-	if scope == scopeOccurrence {
-		written, scopeErr = patchCalendarEventOccurrence(ctx, deps, s, calendarID, evt, in, originalStart)
-	} else {
-		written, scopeErr = patchCalendarEventFollowing(ctx, deps, s, calendarID, evt, in, originalStart)
-	}
-	if scopeErr != nil {
-		return nil, scopeErr
-	}
-
 	calID64 := int64(calendarID)
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.CalEventUpdated,
-		AuditAction:  "calendar.event.update",
-		ResourceType: "calendar.event",
-		ResourceID:   eventPub.String(),
-		CalendarID:   &calID64,
-		Payload: map[string]any{
-			"eventId":         eventPub.String(),
-			"scope":           string(scope),
-			"occurrenceStart": in.OccurrenceStart,
-			"writtenEventId":  written.String(),
-			"via":             "mcp",
-		},
-		CallSite: "mcp.update_calendar_event",
-	})
-	// A split also brings a series into existence, and a subscriber that
-	// learns only of the truncation never hears of the continuing master.
-	if scope == scopeThisAndFollowing {
-		recordMutation(ctx, deps, s, mutation{
+	// record commits the trail with the write, inside its transaction.
+	record := func(ctx context.Context, tx *dbretry.Tx, written types.PublicID) error {
+		rec := recorder(deps)
+		if err := rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.CalEventUpdated,
+			AuditAction:  "calendar.event.update",
+			ResourceType: "calendar.event",
+			ResourceID:   eventPub.String(),
+			CalendarID:   &calID64,
+			Payload: map[string]any{
+				"eventId":         eventPub.String(),
+				"scope":           string(scope),
+				"occurrenceStart": in.OccurrenceStart,
+				"writtenEventId":  written.String(),
+				"via":             "mcp",
+			},
+			CallSite: "mcp.update_calendar_event",
+		}); err != nil {
+			return err
+		}
+		if scope != scopeThisAndFollowing {
+			return nil
+		}
+		// A split also brings a series into existence, and a subscriber
+		// that learns only of the truncation never hears of the continuing
+		// master.
+		return rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
 			EventType:    eventbus.CalEventCreated,
 			AuditAction:  "calendar.event.create",
 			ResourceType: "calendar.event",
@@ -189,6 +187,15 @@ func updateCalendarEventOccurrences(
 			},
 			CallSite: "mcp.update_calendar_event",
 		})
+	}
+	var scopeErr error
+	if scope == scopeOccurrence {
+		scopeErr = patchCalendarEventOccurrence(ctx, deps, s, calendarID, evt, in, originalStart, record)
+	} else {
+		scopeErr = patchCalendarEventFollowing(ctx, deps, s, calendarID, evt, in, originalStart, record)
+	}
+	if scopeErr != nil {
+		return nil, scopeErr
 	}
 	return map[string]any{"success": true}, nil
 }
@@ -214,16 +221,6 @@ func deleteCalendarEventOccurrences(
 	}
 
 	start := handlerutil.UnixToTime(occurrenceStart)
-	var partErr error
-	if scope == scopeOccurrence {
-		partErr = deleteCalendarEventOccurrence(ctx, deps, s, calendarID, evt, start)
-	} else {
-		partErr = deleteCalendarEventFollowing(ctx, deps, s, calendarID, evt, start)
-	}
-	if partErr != nil {
-		return nil, partErr
-	}
-
 	calID64 := int64(calendarID)
 	// The event kind is the update one because that is what happened to
 	// the row named: the master survives with an exception or an earlier
@@ -232,20 +229,31 @@ func deleteCalendarEventOccurrences(
 	// occurrence say which part of the series went. The audit action
 	// stays the delete one, because a delete is what the caller asked
 	// for and what an administrator searches the log by.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.CalEventUpdated,
-		AuditAction:  "calendar.event.delete",
-		ResourceType: "calendar.event",
-		ResourceID:   eventPub.String(),
-		CalendarID:   &calID64,
-		Payload: map[string]any{
-			"eventId":         eventPub.String(),
-			"scope":           string(scope),
-			"occurrenceStart": occurrenceStart,
-			"via":             "mcp",
-		},
-		CallSite: "mcp.delete_calendar_event",
-	})
+	record := func(ctx context.Context, tx *dbretry.Tx) error {
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.CalEventUpdated,
+			AuditAction:  "calendar.event.delete",
+			ResourceType: "calendar.event",
+			ResourceID:   eventPub.String(),
+			CalendarID:   &calID64,
+			Payload: map[string]any{
+				"eventId":         eventPub.String(),
+				"scope":           string(scope),
+				"occurrenceStart": occurrenceStart,
+				"via":             "mcp",
+			},
+			CallSite: "mcp.delete_calendar_event",
+		})
+	}
+	var partErr error
+	if scope == scopeOccurrence {
+		partErr = deleteCalendarEventOccurrence(ctx, deps, s, evt, start, record)
+	} else {
+		partErr = deleteCalendarEventFollowing(ctx, deps, s, calendarID, evt, start, record)
+	}
+	if partErr != nil {
+		return nil, partErr
+	}
 	return map[string]any{"success": true}, nil
 }
 
@@ -282,20 +290,28 @@ func occurrenceWindowArg(at *int64, date *string, field string) (time.Time, bool
 // may be sent on its own — the other is then taken from the occurrence
 // the write falls back to.
 //
-// No clear flags are set, because no tool argument asks for one: a
-// nullable column the call did not mention keeps whatever the base
-// carries. Nor is there an allDay, timezone, url or notificationOffset
-// argument, so those columns are the base's too.
+// An empty location, memo or blockLabel is a clear, as on the series
+// path: see [eventFieldClears]. A nullable column the call did not
+// mention keeps whatever the base carries. There is no allDay, timezone,
+// url or notificationOffset argument, so those columns are the base's too.
 func occurrencePatch(in *updateCalendarEventArgs) (calendaroccurrence.Patch, error) {
+	clears := eventFieldClears(in)
 	p := calendaroccurrence.Patch{
 		Kind:        in.Kind,
 		Visibility:  in.Visibility,
 		ShowAs:      in.ShowAs,
 		Flexibility: in.Flexibility,
 		Title:       in.Title,
-		Location:    in.Location,
-		Memo:        in.Memo,
-		BlockLabel:  in.BlockLabel,
+		Clear:       clears,
+	}
+	if !clears.Location {
+		p.Location = in.Location
+	}
+	if !clears.Memo {
+		p.Memo = in.Memo
+	}
+	if !clears.BlockLabel {
+		p.BlockLabel = in.BlockLabel
 	}
 	start, startSent, err := occurrenceWindowArg(in.StartAt, in.StartDate, "startDate")
 	if err != nil {
@@ -312,6 +328,18 @@ func occurrencePatch(in *updateCalendarEventArgs) (calendaroccurrence.Patch, err
 		p.EndAt = &end
 	}
 	return p, nil
+}
+
+// eventFieldClears reads which nullable event columns an update asks to
+// empty. The tool has no clear list, so an empty string is the request:
+// stored as NULL, the column reads back exactly as one REST cleared.
+func eventFieldClears(in *updateCalendarEventArgs) calendaroccurrence.Clears {
+	empty := func(v *string) bool { return v != nil && *v == "" }
+	return calendaroccurrence.Clears{
+		Location:   empty(in.Location),
+		Memo:       empty(in.Memo),
+		BlockLabel: empty(in.BlockLabel),
+	}
 }
 
 // mergeOccurrenceFields folds the arguments the caller sent over the
@@ -346,8 +374,8 @@ func seriesQueries(deps Deps, tx *dbretry.Tx) calendaroccurrence.Queries {
 
 // patchCalendarEventOccurrence replaces a single occurrence of a
 // recurring series with an override row through
-// [calendaroccurrence.WriteOverride], and answers with that row's public
-// id.
+// [calendaroccurrence.WriteOverride], and hands that row's public id to
+// record inside the same transaction.
 //
 // The master cannot be task-linked here — the projection guard forbids a
 // rule on a projected row, and a non-series scope requires a rule — so
@@ -360,13 +388,13 @@ func patchCalendarEventOccurrence(
 	master calendar.FindCalendarEventByPublicIdRow,
 	in *updateCalendarEventArgs,
 	originalStart time.Time,
-) (types.PublicID, error) {
+	record func(context.Context, *dbretry.Tx, types.PublicID) error,
+) error {
 	patch, err := occurrencePatch(in)
 	if err != nil {
-		return types.PublicID{}, err
+		return err
 	}
 
-	var written types.PublicID
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event.occurrence", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
@@ -382,26 +410,28 @@ func patchCalendarEventOccurrence(
 			answered = refusal
 			return refusal
 		}
-		written = row.PublicID
-		return err
+		if err != nil {
+			return err
+		}
+		return record(ctx, tx, row.PublicID)
 	})
 	if answered != nil {
-		return types.PublicID{}, answered
+		return answered
 	}
 	if txErr != nil {
-		return types.PublicID{}, apierrors.New(apierrors.CalendarEventStoreWriteInterrupted)
+		return apierrors.New(apierrors.CalendarEventStoreWriteInterrupted)
 	}
-	return written, nil
+	return nil
 }
 
 // patchCalendarEventFollowing splits a series at an occurrence through
 // [calendaroccurrence.SplitSeries]: the master stops before the split and
-// a new master carries the edit and the remainder of the series. It
-// answers with the new master's public id.
+// a new master carries the edit and the remainder of the series.
 //
 // No MCP tool takes a rule, a recurrence end or an exception list, so the
 // continuing series' recurrence columns are always the master's, carried
-// forward by the shared transform.
+// forward by the shared transform. record receives the new master's public
+// id inside the same transaction.
 func patchCalendarEventFollowing(
 	ctx context.Context,
 	deps Deps,
@@ -410,13 +440,13 @@ func patchCalendarEventFollowing(
 	master calendar.FindCalendarEventByPublicIdRow,
 	in *updateCalendarEventArgs,
 	splitStart time.Time,
-) (types.PublicID, error) {
+	record func(context.Context, *dbretry.Tx, types.PublicID) error,
+) error {
 	patch, err := occurrencePatch(in)
 	if err != nil {
-		return types.PublicID{}, err
+		return err
 	}
 
-	var written types.PublicID
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event.following", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
@@ -432,85 +462,46 @@ func patchCalendarEventFollowing(
 			answered = refusal
 			return refusal
 		}
-		written = row.PublicID
-		return err
+		if err != nil {
+			return err
+		}
+		return record(ctx, tx, row.PublicID)
 	})
 	if answered != nil {
-		return types.PublicID{}, answered
+		return answered
 	}
 	if txErr != nil {
-		return types.PublicID{}, apierrors.New(apierrors.CalendarEventStoreWriteInterrupted)
+		return apierrors.New(apierrors.CalendarEventStoreWriteInterrupted)
 	}
-	return written, nil
+	return nil
 }
 
-// deleteCalendarEventOccurrence cancels one occurrence of a series.
-//
-// Cancellation is an entry in the master's recurrence_exceptions: the
-// expanders subtract it and the occurrence stops being produced. When an
-// override already stands in for that occurrence it is disabled in the
-// same transaction — the override is a row of its own that the
-// non-recurring range queries select directly, so an exception alone
-// would cancel the occurrence and leave the copy the user had moved
-// sitting on the calendar.
+// deleteCalendarEventOccurrence cancels one occurrence of a series through
+// [calendaroccurrence.CancelOccurrence], the function the REST delete route
+// cancels one through: it refuses an occurrenceStart the series does not
+// produce, re-reads the exception list under the series lock so a
+// concurrent cancel is never lost, and disables any override standing in
+// for the occurrence in the same transaction.
 func deleteCalendarEventOccurrence(
 	ctx context.Context,
 	deps Deps,
 	s *session,
-	calendarID uint32,
 	master calendar.FindCalendarEventByPublicIdRow,
 	occurrenceStart time.Time,
+	record func(context.Context, *dbretry.Tx) error,
 ) error {
-	exceptions, changed, err := calendaroccurrence.AppendException(master.RecurrenceExceptions, occurrenceStart)
-	if err != nil {
-		return apierrors.New(apierrors.CalendarEventStoreReadInterrupted)
-	}
-
-	parentID := handlerutil.NullInt32From(master.ID)
-	originalStart := sql.NullTime{Time: occurrenceStart, Valid: true}
-
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.delete_calendar_event.occurrence", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
-		cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
-
-		if changed {
-			if _, err := cqtx.PatchCalendarEvent(ctx, calendar.PatchCalendarEventParams{
-				RecurrenceExceptions: exceptions,
-				PublicID:             master.PublicID,
-				CalendarID:           calendarID,
-				WorkspaceID:          s.workspaceID,
-			}); err != nil {
-				return err
-			}
+		refusal, err := calendaroccurrence.CancelOccurrence(ctx, seriesQueries(deps, tx), s.workspaceID, master, occurrenceStart)
+		if refusal != nil {
+			answered = refusal
+			return refusal
 		}
-
-		override, findErr := cqtx.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
-			WorkspaceID:             s.workspaceID,
-			RecurrenceParentID:      parentID,
-			RecurrenceOriginalStart: originalStart,
-		})
-		switch {
-		case stderrors.Is(findErr, sql.ErrNoRows):
-			return nil
-		case findErr != nil:
-			answered = apierrors.New(apierrors.CalendarEventStoreReadInterrupted)
-			return findErr
+		if err != nil {
+			return err
 		}
-		if !override.Enabled {
-			return nil
-		}
-		// affected-rows: not-applicable — this only runs on an override
-		// the two statements above read as live in this same transaction,
-		// and what the caller asked to cancel is the occurrence, which the
-		// master's exception removes whether or not an override stood in
-		// for it.
-		_, err := cqtx.DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
-			PublicID:    override.PublicID,
-			CalendarID:  override.CalendarID,
-			WorkspaceID: s.workspaceID,
-		})
-		return err
+		return record(ctx, tx)
 	})
 	if answered != nil {
 		return answered
@@ -531,10 +522,20 @@ func deleteCalendarEventFollowing(
 	calendarID uint32,
 	master calendar.FindCalendarEventByPublicIdRow,
 	splitStart time.Time,
+	record func(context.Context, *dbretry.Tx) error,
 ) error {
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.delete_calendar_event.following", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		return calendaroccurrence.EndSeries(ctx, seriesQueries(deps, tx), s.workspaceID, calendarID, s.userID, master, splitStart)
+		if err := calendaroccurrence.EndSeries(ctx, seriesQueries(deps, tx), s.workspaceID, calendarID, s.userID, master, splitStart); err != nil {
+			return err
+		}
+		return record(ctx, tx)
 	})
+	// A splitStart the series does not produce comes back as the refusal
+	// itself, answered as REST answers it rather than as a store failure.
+	var refusal *apierrors.APIError
+	if stderrors.As(txErr, &refusal) {
+		return refusal
+	}
 	if txErr != nil {
 		return apierrors.New(apierrors.CalendarEventStoreDeleteInterrupted)
 	}

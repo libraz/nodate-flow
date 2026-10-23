@@ -43,7 +43,7 @@ func TestRetriedReminderReachesEachRecipientOnce(t *testing.T) {
 		OccurrenceStart: time.Date(2030, 6, 3, 9, 0, 0, 0, time.UTC),
 		WorkspaceID:     fx.workspaceID,
 	}
-	f := notification.NewFanout(db, queries, nil)
+	f := notification.NewFanout(db, queries)
 
 	first, err := reminderEvent(ctx, queries, n)
 	require.NoError(t, err)

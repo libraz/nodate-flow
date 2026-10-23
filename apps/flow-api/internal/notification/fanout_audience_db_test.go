@@ -85,7 +85,7 @@ func TestFanout_ActorKindsReachOnlyTheNamedUser(t *testing.T) {
 		actorPub, fx.wsID, fx.taskInternalID, third)
 	require.NoError(t, err)
 
-	f := NewFanout(db, generated.New(db), nil)
+	f := NewFanout(db, generated.New(db))
 	payload := `{"actorId":"` + actorPub.String() + `"}`
 
 	added := appendTaskEvent(t, db, fx, "task.actor.added", payload)
@@ -115,7 +115,7 @@ func TestFanout_DeleteNotifiesEachReaderOnce(t *testing.T) {
 		`UPDATE tasks SET enabled = FALSE WHERE id = ?`, fx.taskInternalID)
 	require.NoError(t, err)
 
-	f := NewFanout(db, generated.New(db), nil)
+	f := NewFanout(db, generated.New(db))
 	itemDeleted := appendTaskEvent(t, db, fx, "item.deleted", `{}`)
 	taskDisabled := appendTaskEvent(t, db, fx, "task.disabled", `{}`)
 	f.fanout(context.Background(), fx.wsID, "item.deleted", itemDeleted)
@@ -143,7 +143,7 @@ func TestNotificationReadsFollowMembership(t *testing.T) {
 	ctx := context.Background()
 	q := generated.New(db)
 
-	f := NewFanout(db, q, nil)
+	f := NewFanout(db, q)
 	f.fanout(ctx, fx.wsID, "task.created", fx.eventInternalID)
 
 	count := func() int64 {

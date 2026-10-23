@@ -385,6 +385,20 @@ func readPackageTrail(dir string, sources map[string]string, kinds map[string]st
 		}
 	}
 
+	// Helpers that take the audit action as a plain parameter and put it on
+	// the record. Their record reads as a forward, so the value is read at
+	// each call site instead, where it is written.
+	forwarded := map[string]int{}
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+				if idx, ok := forwardedActionParam(fn); ok {
+					forwarded[fn.Name.Name] = idx
+				}
+			}
+		}
+	}
+
 	out := packageTrail{direct: map[string]trail{}, calls: map[string][]funcRef{}}
 	for _, file := range files {
 		imports := importedPackageDirs(file)
@@ -398,7 +412,7 @@ func readPackageTrail(dir string, sources map[string]string, kinds map[string]st
 			if merged.unread == nil {
 				merged.unread = map[bool][]namedValue{}
 			}
-			read := readTrail(fset, fn, kinds, declared)
+			read := readTrail(fset, fn, kinds, declared, forwarded)
 			merged.kinds = append(merged.kinds, read.kinds...)
 			merged.actions = append(merged.actions, read.actions...)
 			merged.unread[isKind] = append(merged.unread[isKind], read.unread[isKind]...)
@@ -471,7 +485,7 @@ func calleeRef(fun ast.Expr, dir string, imports map[string]string) (funcRef, bo
 //
 // declared names the functions this package declares, which is what tells a
 // kind chosen at run time out of a kind the walk cannot see at all.
-func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string, declared map[string]bool) trail {
+func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string, declared map[string]bool, forwarded map[string]int) trail {
 	out := trail{unread: map[bool][]namedValue{}}
 	params := parameterNames(fn)
 	at := func(n ast.Node) namedValue {
@@ -486,6 +500,24 @@ func readTrail(fset *token.FileSet, fn *ast.FuncDecl, kinds map[string]string, d
 
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		switch node := n.(type) {
+		case *ast.CallExpr:
+			// A helper that forwards its action parameter onto the record:
+			// the action is the argument written here.
+			id, ok := node.Fun.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			idx, forwards := forwarded[id.Name]
+			if !forwards || idx >= len(node.Args) || forwardsParameter(node.Args[idx], params) {
+				return true
+			}
+			if action, ok := stringLiteral(node.Args[idx]); ok {
+				v := at(node.Args[idx])
+				v.value = action
+				out.actions = append(out.actions, v)
+			} else {
+				unread(isAction, node.Args[idx], "the action handed to %s is not written as a literal", id.Name)
+			}
 		case *ast.SelectorExpr:
 			qualifier, ok := node.X.(*ast.Ident)
 			if !ok || !eventbusQualifiers[qualifier.Name] {
@@ -550,6 +582,41 @@ func parameterNames(fn *ast.FuncDecl) map[string]bool {
 		return true
 	})
 	return out
+}
+
+// forwardedActionParam reports the position of the parameter fn puts, as
+// it is, on a record's audit action — the shape of a recording helper that
+// takes the action from its caller.
+func forwardedActionParam(fn *ast.FuncDecl) (int, bool) {
+	positions := map[string]int{}
+	i := 0
+	for _, field := range fn.Type.Params.List {
+		for _, name := range field.Names {
+			positions[name.Name] = i
+			i++
+		}
+		if len(field.Names) == 0 {
+			i++
+		}
+	}
+	idx, found := -1, false
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		lit, ok := n.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+		value, ok := literalField(lit, mutationActionField)
+		if !ok {
+			return true
+		}
+		if id, ok := value.(*ast.Ident); ok {
+			if pos, isParam := positions[id.Name]; isParam {
+				idx, found = pos, true
+			}
+		}
+		return true
+	})
+	return idx, found
 }
 
 // forwardsParameter reports whether a record field is filled from a value
@@ -1337,6 +1404,49 @@ func Append() {
 	if source.filedThroughTheSame(alsoDelegating, delegating, isAction) {
 		t.Error("the audit half is reported as settled, and neither sample writes an audit row at all")
 	}
+}
+
+// TestTrailReadingReadsAnActionHandedToARecordingHelper is the control for
+// a handler that records through a helper taking the audit action as a
+// parameter: the helper's record reads as a forward, so the action has to
+// be read at each call site, where it is written.
+func TestTrailReadingReadsAnActionHandedToARecordingHelper(t *testing.T) {
+	t.Parallel()
+
+	kinds := map[string]string{"TaskCreated": "task.created"}
+	const restSrc = `package q
+
+func ApplySmart() {
+	recordCreated("task.smart_create", 1)
+	recordCreated("task.create", 2)
+}
+
+func recordCreated(auditAction string, id int) error {
+	return rec.RecordInTx(mutationlog.Mutation{
+		EventType:   eventbus.TaskCreated,
+		AuditAction: auditAction,
+	})
+}
+`
+	source := newSourceTrail(t.TempDir(), kinds)
+	pkg, err := readPackageTrail("sample/handlers", map[string]string{"rest.go": restSrc}, kinds)
+	if err != nil {
+		t.Fatalf("read sample: %v", err)
+	}
+	source.add("sample/handlers", pkg)
+
+	side, declared := source.resolve(funcRef{dir: "sample/handlers", name: "ApplySmart"})
+	if !declared {
+		t.Fatal("the sample handler was not read")
+	}
+	if len(side.unread[isAction]) != 0 {
+		t.Fatalf("the sample reads as unresolved (%v); both actions are written as literals", describe(side.unread[isAction]))
+	}
+	assertValues(t, "actions", side.actions, []namedValue{
+		{value: "task.smart_create", file: "rest.go", line: 4},
+		{value: "task.create", file: "rest.go", line: 5},
+	})
+	assertValues(t, "kinds", side.kinds, []namedValue{{value: "task.created", file: "rest.go", line: 10}})
 }
 
 // TestTrailReadingReadsARecordItHasNoTypeNameFor holds the reading against

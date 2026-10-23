@@ -246,27 +246,34 @@ func (q *Queries) ListLensesForProject(ctx context.Context, arg ListLensesForPro
 	return items, nil
 }
 
-const resolveLensProjectID = `-- name: ResolveLensProjectID :one
+const resolveLensForExport = `-- name: ResolveLensForExport :one
 SELECT
-  l.project_id
+  l.project_id,
+  l.lens_json
 FROM lenses l
 WHERE l.workspace_id = ?
   AND l.public_id = ?
   AND l.enabled = TRUE
 `
 
-type ResolveLensProjectIDParams struct {
+type ResolveLensForExportParams struct {
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Resolve a lens public_id to its optional internal project_id.
-// Used by the export handler to decide workspace-wide vs project-scoped queries.
-func (q *Queries) ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error) {
-	row := q.db.QueryRowContext(ctx, resolveLensProjectID, arg.WorkspaceID, arg.PublicID)
-	var project_id sql.NullInt32
-	err := row.Scan(&project_id)
-	return project_id, err
+type ResolveLensForExportRow struct {
+	ProjectID sql.NullInt32   `json:"-"`
+	LensJson  json.RawMessage `json:"lensJson"`
+}
+
+// Resolve a lens public_id to its optional internal project_id and its
+// stored lens_json, which the export handler reads through the lens
+// filter reader shared with the share page.
+func (q *Queries) ResolveLensForExport(ctx context.Context, arg ResolveLensForExportParams) (ResolveLensForExportRow, error) {
+	row := q.db.QueryRowContext(ctx, resolveLensForExport, arg.WorkspaceID, arg.PublicID)
+	var i ResolveLensForExportRow
+	err := row.Scan(&i.ProjectID, &i.LensJson)
+	return i, err
 }
 
 const updateLens = `-- name: UpdateLens :execrows

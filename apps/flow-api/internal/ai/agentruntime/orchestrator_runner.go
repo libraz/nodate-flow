@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
@@ -123,8 +124,6 @@ type agentMemoSnapshot struct {
 // bundle. The production wiring satisfies it with a *generated.Queries
 // pointer constructed via generated.New(db).
 type RunnerQuerier interface {
-	AppendAgentEvent(ctx context.Context, arg generated.AppendAgentEventParams) (int64, error)
-	InsertHandoffToUserEvent(ctx context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error)
 	GetTaskAgentMemo(ctx context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error)
 	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error)
 }
@@ -144,11 +143,12 @@ type OrchestratorRunner struct {
 	// AgentExecutor with a warning, so deployments that have not
 	// opted into the judge wiring still degrade safely.
 	Judge JudgeExecutor
-	// Queries is the sqlc bundle used to update tasks.agent_memo,
-	// insert handoff events, and emit run events with actor_agent_id.
-	// May be nil during early single-binary smoke tests; the runner
-	// degrades to "best-effort" event-only behavior in that case.
+	// Queries is the sqlc bundle used to read and update
+	// tasks.agent_memo. Nil falls back to generated.New(DB).
 	Queries RunnerQuerier
+	// Events appends the run and hand-back events. Nil falls back to
+	// the eventbus/mutationlog writer over DB.
+	Events RunEventWriter
 	// HandoffLoopLimit caps automated handoffs per task before the
 	// runner pauses the agent and emits HANDOFF_LOOP_DETECTED.
 	// Zero falls back to defaultHandoffLoopLimit.
@@ -175,8 +175,9 @@ type OrchestratorRunner struct {
 // the loss is invisible: the timeline keeps a started with no completed,
 // and the UI shows a run that never ends.
 //
-// So every database call below goes through [dbretry.Do], which retries
-// exactly the transient class and returns anything else untouched. Only
+// So every database call below retries exactly the transient class —
+// memo writes through [dbretry.Do], events through the auto-commit or
+// [dbretry.InTx] handle the [RunEventWriter] appends on. Only
 // what survives the retries is swallowed, and that is logged at error
 // level because by then a row really has been lost.
 func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error {
@@ -201,7 +202,6 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		agentID:     j.AgentID,
 		agentPubID:  agentPubID,
 		taskID:      taskInternalID,
-		occurred:    started,
 		payload: map[string]any{
 			"agentId":   agentPubID,
 			"startedAt": started.Unix(),
@@ -244,7 +244,6 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 			agentID:     j.AgentID,
 			agentPubID:  agentPubID,
 			taskID:      taskInternalID,
-			occurred:    finished,
 			payload: map[string]any{
 				"agentId":    agentPubID,
 				"startedAt":  started.Unix(),
@@ -277,7 +276,6 @@ func (r *OrchestratorRunner) Run(ctx context.Context, j Job, _ time.Time) error 
 		agentID:     j.AgentID,
 		agentPubID:  agentPubID,
 		taskID:      taskInternalID,
-		occurred:    finished,
 		payload: map[string]any{
 			"agentId":    agentPubID,
 			"startedAt":  started.Unix(),
@@ -309,48 +307,74 @@ type runEventArgs struct {
 	agentID     uint32
 	agentPubID  string
 	taskID      uint32
-	occurred    time.Time
 	payload     map[string]any
 }
 
 func (r *OrchestratorRunner) appendRunEvent(ctx context.Context, args runEventArgs) {
-	q := r.queries()
-	if q == nil {
+	w := r.events()
+	if w == nil {
 		return
 	}
-	raw, err := json.Marshal(args.payload)
-	if err != nil {
-		slog.WarnContext(ctx, "agentruntime: marshal run event payload", "err", err, "type", args.eventType)
-		return
+	evt := eventbus.Event{
+		Type:        args.eventType,
+		WorkspaceID: args.workspaceID,
+		Payload:     args.payload,
 	}
-	taskID := sql.NullInt32{}
 	if args.taskID != 0 {
-		taskID = sql.NullInt32{Int32: int32(args.taskID), Valid: true} //#nosec G115 -- task_id sourced from events.task_id, fits int32 within realistic deployments
+		v := int64(args.taskID)
+		evt.TaskID = &v
 	}
-	actorAgentID := sql.NullInt32{}
 	if args.agentID != 0 {
-		actorAgentID = sql.NullInt32{Int32: int32(args.agentID), Valid: true} //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
+		v := int64(args.agentID)
+		evt.ActorAgentID = &v
 	}
-	// The parameters — public id included — are built once, outside the
-	// retry, so a retried attempt re-inserts the same row rather than a
-	// second one with a new identity.
-	params := generated.AppendAgentEventParams{
-		PublicID:     types.New(),
-		WorkspaceID:  args.workspaceID,
-		TaskID:       taskID,
-		ActorAgentID: actorAgentID,
-		Type:         string(args.eventType),
-		PayloadJson:  raw,
-		OccurredAt:   args.occurred,
-	}
-	if err := dbretry.Do(ctx, "agentruntime.AppendAgentEvent", func(ctx context.Context) error {
-		_, err := q.AppendAgentEvent(ctx, params)
-		return err
-	}); err != nil {
+	if err := w.AppendRunEvent(ctx, evt); err != nil {
 		slog.ErrorContext(ctx, "agentruntime: agent run event lost",
 			"err", err, "type", args.eventType, "workspace_id", args.workspaceID,
 			"agent_id", args.agentID, "agent_public_id", args.agentPubID)
 	}
+}
+
+// RunEventWriter appends the events rows a run produces. Both writes
+// must reach the eventbus notify hooks after their commit, because the
+// hand-back is how a stuck agent reaches a human and the run events
+// drive webhooks and SSE.
+type RunEventWriter interface {
+	// AppendRunEvent appends one ai.agent.run.* row on its own commit.
+	AppendRunEvent(ctx context.Context, evt eventbus.Event) error
+	// RecordHandBack records a hand-back in its own transaction.
+	RecordHandBack(ctx context.Context, workspaceID uint32, h mutationlog.HandBack) error
+}
+
+// dbRunEvents is the production [RunEventWriter]: run events go through
+// [eventbus.Append] on auto-commit, which retries transient lock
+// conflicts, and a hand-back through [mutationlog.Recorder.RecordHandBack]
+// inside [dbretry.InTx].
+type dbRunEvents struct {
+	db  *sql.DB
+	rec *mutationlog.Recorder
+}
+
+func (w dbRunEvents) AppendRunEvent(ctx context.Context, evt eventbus.Event) error {
+	return eventbus.Append(ctx, dbretry.AutoCommit(w.db), evt)
+}
+
+func (w dbRunEvents) RecordHandBack(ctx context.Context, workspaceID uint32, h mutationlog.HandBack) error {
+	return dbretry.InTx(ctx, w.db, h.CallSite, nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		return w.rec.RecordHandBack(ctx, tx, mutationlog.Actor{WorkspaceID: workspaceID}, h)
+	})
+}
+
+// events returns the runner's RunEventWriter, building the database one
+// from DB when none is injected.
+func (r *OrchestratorRunner) events() RunEventWriter {
+	if r.Events != nil {
+		return r.Events
+	}
+	if r.DB == nil {
+		return nil
+	}
+	return dbRunEvents{db: r.DB, rec: mutationlog.New(r.DB, generated.New(r.DB))}
 }
 
 // queries returns the runner's RunnerQuerier, falling back to a fresh
@@ -595,7 +619,6 @@ func (r *OrchestratorRunner) handleHandoff(ctx context.Context, reason string, j
 			agentID:     j.AgentID,
 			agentPubID:  agentPubID,
 			taskID:      taskID,
-			occurred:    at,
 			payload: map[string]any{
 				"agentId":      agentPubID,
 				"finishedAt":   at.Unix(),
@@ -629,7 +652,7 @@ func (r *OrchestratorRunner) handleHandoff(ctx context.Context, reason string, j
 	if lastError != "" {
 		payload["error"] = lastError
 	}
-	r.appendHandoffEvent(ctx, j, taskID, payload, at)
+	r.appendHandoffEvent(ctx, j, taskID, taskPubID, payload)
 
 	memoPatch := map[string]any{
 		"handoff_status":   "stuck",
@@ -644,38 +667,20 @@ func (r *OrchestratorRunner) handleHandoff(ctx context.Context, reason string, j
 	r.mergeMemo(ctx, j.WsID, taskID, memoPatch)
 }
 
-// appendHandoffEvent writes the agent.task.handoff_to_user row. It
-// uses the dedicated InsertHandoffToUserEvent query (binds
-// actor_agent_id, leaves actor_user_id NULL) rather than AppendAgentEvent
-// because the handoff family has its own audit shape downstream.
-func (r *OrchestratorRunner) appendHandoffEvent(ctx context.Context, j Job, taskID uint32, payload map[string]any, at time.Time) {
-	q := r.queries()
-	if q == nil {
+// appendHandoffEvent records the agent.task.handoff_to_user row. This
+// row is how a stuck agent reaches a human at all, so it goes through the
+// shared hand-back recorder like the REST handoff does.
+func (r *OrchestratorRunner) appendHandoffEvent(ctx context.Context, j Job, taskID uint32, taskPubID string, payload map[string]any) {
+	w := r.events()
+	if w == nil {
 		return
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		slog.WarnContext(ctx, "agentruntime: marshal handoff payload", "err", err)
-		return
-	}
-	taskIDNull := sql.NullInt32{}
-	if taskID != 0 {
-		taskIDNull = sql.NullInt32{Int32: int32(taskID), Valid: true} //#nosec G115 -- task_id fits int32
-	}
-	actorAgent := sql.NullInt32{Int32: int32(j.AgentID), Valid: true} //#nosec G115 -- ai_agents.id fits int32
-	params := generated.InsertHandoffToUserEventParams{
-		PublicID:     types.New(),
-		WorkspaceID:  j.WsID,
-		TaskID:       taskIDNull,
-		ActorAgentID: actorAgent,
-		PayloadJson:  raw,
-		OccurredAt:   at,
-	}
-	// This row is how a stuck agent reaches a human at all, so a lock
-	// conflict must not be the reason nobody is told.
-	if err := dbretry.Do(ctx, "agentruntime.InsertHandoffToUserEvent", func(ctx context.Context) error {
-		_, err := q.InsertHandoffToUserEvent(ctx, params)
-		return err
+	if err := w.RecordHandBack(ctx, j.WsID, mutationlog.HandBack{
+		TaskID:       taskID,
+		TaskPublicID: taskPubID,
+		PriorAgentID: j.AgentID,
+		Payload:      payload,
+		CallSite:     "agentruntime.handBack",
 	}); err != nil {
 		slog.ErrorContext(ctx, "agentruntime: handoff_to_user event lost",
 			slog.Uint64("agent_id", uint64(j.AgentID)), slog.Any("err", err))

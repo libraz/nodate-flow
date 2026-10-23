@@ -20,6 +20,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
@@ -34,6 +35,8 @@ type Deps struct {
 	NlCommand *nlcommand.Resolver
 	// Audit records audit log entries. Nil-safe.
 	Audit *audit.Recorder
+	// Mutations records a change on both the timeline and the audit log.
+	Mutations *mutationlog.Recorder
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

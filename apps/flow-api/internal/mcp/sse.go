@@ -320,10 +320,10 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	// rate allowance by splitting requests across the two methods.
 	if allowed, retryAfter, first := h.rl.allow(hashToken(tok)); !allowed {
 		if first {
-			h.auditTransportRefusal(r.Context(), sess, apierrors.RateLimitExceeded)
+			h.auditTransportRefusal(r.Context(), sess, apierrors.McpRateLimited)
 		}
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-		writeRPCTransportError(w, nil, apierrors.RateLimitExceeded, "rate limit exceeded")
+		writeRPCTransportError(w, nil, apierrors.McpRateLimited, "rate limit exceeded")
 		return
 	}
 

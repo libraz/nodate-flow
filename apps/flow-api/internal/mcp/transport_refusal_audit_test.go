@@ -97,7 +97,7 @@ func TestThrottleRefusalIsAuditedOncePerEpisode(t *testing.T) {
 
 	for range 3 {
 		rec := postToolsList(h)
-		require.Equal(t, apierrors.RateLimitExceeded.Status, rec.Code)
+		require.Equal(t, apierrors.McpRateLimited.Status, rec.Code)
 	}
 
 	rows := stub.auditRows()
@@ -105,7 +105,7 @@ func TestThrottleRefusalIsAuditedOncePerEpisode(t *testing.T) {
 		"a throttling episode must be recorded once, not once per refused request")
 	require.Equal(t, int64(refusalWorkspaceID), rows[0].workspaceID)
 	require.Equal(t, string(generated.McpInvocationsStatusDenied), rows[0].status)
-	require.Equal(t, apierrors.RateLimitExceeded.Code, rows[0].errorCode)
+	require.Equal(t, apierrors.McpRateLimited.Code, rows[0].errorCode)
 }
 
 // TestThrottleEpisodeRestartsAfterTheTokenIsAdmitted states why the

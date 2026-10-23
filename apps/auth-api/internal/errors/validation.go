@@ -24,6 +24,4 @@ var (
 	ValidationPathParamInvalid = &Spec{Code: "VALIDATION.PATH.PARAM_INVALID", Status: 400, Message: "A path parameter is invalid", Description: "Returned when a URL path parameter does not match its expected format (UUID, slug, integer).", UserAction: "Check the URL and correct the malformed parameter."}
 	// VALIDATION.QUERY.FIELD_INVALID — A query parameter is invalid
 	ValidationQueryFieldInvalid = &Spec{Code: "VALIDATION.QUERY.FIELD_INVALID", Status: 422, Message: "A query parameter is invalid", Description: "Returned when a query parameter fails schema validation (type, range, enum).", UserAction: "Correct the query parameter listed in details and retry."}
-	// VALIDATION.QUERY.UNKNOWN_FIELD — Unknown query parameter
-	ValidationQueryUnknownField = &Spec{Code: "VALIDATION.QUERY.UNKNOWN_FIELD", Status: 422, Message: "Unknown query parameter", Description: "Returned when an unknown query parameter is supplied and strict mode is enabled.", UserAction: "Remove the unknown query parameter."}
 )

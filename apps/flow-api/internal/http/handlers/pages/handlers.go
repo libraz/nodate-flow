@@ -7,12 +7,12 @@ import (
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
@@ -45,7 +45,7 @@ func lockPageLinks(ctx context.Context, tx *dbretry.Tx, wsID uint32, pub types.P
 	return id, project, parent, nil
 }
 
-// checkAncestorDepthAndCircular walks up the ancestor chain from the
+// CheckAncestorDepthAndCircular walks up the ancestor chain from the
 // proposed parent, verifying that:
 //  1. The chain does not exceed MaxPageDepth.
 //  2. The target page (selfID) is not an ancestor (circular reference).
@@ -53,7 +53,8 @@ func lockPageLinks(ctx context.Context, tx *dbretry.Tx, wsID uint32, pub types.P
 // selfID may be 0 for create operations (no circularity check needed).
 // Each ancestor is read with a row lock inside the caller's transaction,
 // so two opposite reparents cannot both pass the walk and form a cycle.
-func checkAncestorDepthAndCircular(ctx context.Context, tx *dbretry.Tx, wsID uint32, parentInternalID uint32, selfID uint32) (*apierr.Spec, error) {
+// REST and MCP page writes both call it.
+func CheckAncestorDepthAndCircular(ctx context.Context, tx *dbretry.Tx, wsID uint32, parentInternalID uint32, selfID uint32) (*apierr.Spec, error) {
 	const q = `SELECT id, parent_page_id FROM pages WHERE workspace_id = ? AND id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
 	currentID := parentInternalID
 	depth := 1 // starting at depth 1 since we will be a child of parentInternalID
@@ -161,7 +162,7 @@ func Create(deps Deps) func(context.Context, *CreatePageInput) (*CreatePageOutpu
 			var parentPageID sql.NullInt32
 			if parentInternal != 0 {
 				// Validate depth (selfID=0 for create, no circularity check needed).
-				spec, err := checkAncestorDepthAndCircular(ctx, tx, ws.ID, parentInternal, 0)
+				spec, err := CheckAncestorDepthAndCircular(ctx, tx, ws.ID, parentInternal, 0)
 				if err != nil {
 					return err
 				}
@@ -393,7 +394,7 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 						answered = httpErr(apierrors.PagePageCircularParent)
 						return errAnswered
 					}
-					spec, err := checkAncestorDepthAndCircular(ctx, tx, ws.ID, namedParent, pageID)
+					spec, err := CheckAncestorDepthAndCircular(ctx, tx, ws.ID, namedParent, pageID)
 					if err != nil {
 						return err
 					}
@@ -552,8 +553,8 @@ func Search(deps Deps) func(context.Context, *SearchPagesInput) (*SearchPagesOut
 // fetch.
 //
 // Error mapping:
-//   - no provider configured for the workspace → AI.PROVIDER.NOT_CONFIGURED
-//   - upstream call failed (timeout / network / non-2xx) → PAGE.GENERATION.UPSTREAM_UNAVAILABLE
+//   - AI failures → errormodel.PageGenerationFailure, shared with MCP
+//     generate_page
 //   - DB insert failed (title clash) → PAGE.PAGE.TITLE_TAKEN
 //   - any other internal failure → INTERNAL.UNEXPECTED
 func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*GeneratePageOutput, error) {
@@ -584,16 +585,14 @@ func GenerateWithAI(deps Deps) func(context.Context, *GeneratePageInput) (*Gener
 
 		body, err := deps.Generator.GeneratePageBody(ctx, ws.ID, in.Body.Title, in.Body.Prompt)
 		if err != nil {
-			switch {
-			case errors.Is(err, ai.ErrNoProvider):
-				return nil, httpErr(apierrors.AiProviderNotConfigured)
-			default:
+			spec, retryAfter := errormodel.PageGenerationFailure(err)
+			if spec == apierrors.PageGenerationUpstreamUnavailable {
 				slog.WarnContext(ctx, "pages.GenerateWithAI: provider call failed",
 					slog.Any("err", err),
 					logutil.LogEntity("workspace", ws.PublicID),
 				)
-				return nil, httpErr(apierrors.PageGenerationUpstreamUnavailable)
 			}
+			return nil, handlerutil.HTTPErrWithRetryAfter(spec, retryAfter)
 		}
 
 		pub := types.New()

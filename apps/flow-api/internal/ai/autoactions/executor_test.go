@@ -9,6 +9,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // fakeHandoffQuerier is an in-memory stand-in for the sqlc bundle used
@@ -18,7 +19,7 @@ import (
 // JSON_MERGE_PATCH behaviour from MySQL is reproduced faithfully.
 type fakeHandoffQuerier struct {
 	mu            sync.Mutex
-	handoffEvents []generated.InsertHandoffToUserEventParams
+	handoffEvents []handBackCall
 	memoState     map[uint32]map[string]any
 	memoUpdates   []generated.UpdateTaskAgentMemoParams
 	// missedTasks are the tasks whose memo write matches no row. The
@@ -43,11 +44,17 @@ func (f *fakeHandoffQuerier) memoWriteMisses(taskID uint32) {
 	f.missedTasks[taskID] = true
 }
 
-func (f *fakeHandoffQuerier) InsertHandoffToUserEvent(_ context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error) {
+// handBackCall is one RecordHandBack the fake received.
+type handBackCall struct {
+	workspaceID uint32
+	mutationlog.HandBack
+}
+
+func (f *fakeHandoffQuerier) RecordHandBack(_ context.Context, workspaceID uint32, h mutationlog.HandBack) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.handoffEvents = append(f.handoffEvents, arg)
-	return int64(len(f.handoffEvents)), nil
+	f.handoffEvents = append(f.handoffEvents, handBackCall{workspaceID: workspaceID, HandBack: h})
+	return nil
 }
 
 func (f *fakeHandoffQuerier) GetTaskAgentMemo(_ context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error) {
@@ -161,19 +168,16 @@ func TestApplyHandoffToUserEmitsEvent(t *testing.T) {
 		t.Fatalf("want 1 handoff event, got %d", got)
 	}
 	evt := q.handoffEvents[0]
-	if !evt.ActorAgentID.Valid || evt.ActorAgentID.Int32 != int32(r.agentID) { //#nosec G115 -- ai_agents.id fits int32
-		t.Fatalf("actor_agent_id = %+v, want valid=%d", evt.ActorAgentID, r.agentID)
+	if evt.PriorAgentID != r.agentID {
+		t.Fatalf("prior agent = %d, want %d", evt.PriorAgentID, r.agentID)
 	}
-	if !evt.TaskID.Valid || evt.TaskID.Int32 != int32(r.id) { //#nosec G115 -- tasks.id fits int32
-		t.Fatalf("task_id = %+v, want valid=%d", evt.TaskID, r.id)
+	if evt.TaskID != r.id {
+		t.Fatalf("task_id = %d, want %d", evt.TaskID, r.id)
 	}
-	if evt.WorkspaceID != r.workspaceID {
-		t.Fatalf("workspace_id = %d, want %d", evt.WorkspaceID, r.workspaceID)
+	if evt.workspaceID != r.workspaceID {
+		t.Fatalf("workspace_id = %d, want %d", evt.workspaceID, r.workspaceID)
 	}
-	var payload map[string]any
-	if err := json.Unmarshal(evt.PayloadJson, &payload); err != nil {
-		t.Fatalf("payload decode: %v", err)
-	}
+	payload := evt.Payload
 	if got := payload["reason"]; got != "stuck" {
 		t.Fatalf("reason = %v, want stuck", got)
 	}

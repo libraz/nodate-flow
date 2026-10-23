@@ -40,15 +40,3 @@ resources:
         message_zh: "and / or 至少需要一个子项"
         description: "Returned when an and / or node is supplied with an empty terms list."
         userAction: "Add at least one child expression to the and / or node."
-
-  eval:
-    breadcrumb: "Constraint > Eval"
-    errors:
-      date_parsing_failed:
-        code: CONSTRAINT.EVAL.DATE_PARSING_FAILED
-        status: 422
-        message: "Constraint date argument could not be parsed as YYYY-MM-DD"
-        message_ja: "制約の日付 {value} を YYYY-MM-DD 形式として解釈できませんでした"
-        message_zh: "无法将约束日期参数 {value} 解析为 YYYY-MM-DD 格式"
-        description: "Returned when a time.* builtin receives a non-parseable date literal {value} at evaluation time."
-        userAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."

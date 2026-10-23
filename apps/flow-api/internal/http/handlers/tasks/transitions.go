@@ -3,12 +3,12 @@ package tasks
 import (
 	"context"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -80,20 +80,19 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.transition",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task",
-				ResourceID:   task.PublicID.String(),
-				Metadata: map[string]any{
-					"transition": in.Body.Transition,
-					"fromState":  string(result.FromState),
-					"toState":    string(result.ToState),
-				},
-			})
-		}
+		// taskstate appended the transition event in the transaction.
+		aID, _ := middleware.ActorFromContext(ctx)
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: aID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "task.transition",
+			ResourceType: "task",
+			ResourceID:   task.PublicID.String(),
+			Payload: map[string]any{
+				"transition": in.Body.Transition,
+				"fromState":  string(result.FromState),
+				"toState":    string(result.ToState),
+			},
+			CallSite: "tasks.Transition",
+		})
 
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{

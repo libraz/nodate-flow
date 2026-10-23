@@ -433,6 +433,12 @@ func main() {
 		agentQueue = agentruntime.NewInProcessQueue(256)
 	}
 
+	// The event hooks that work off the append path — on_event agent
+	// dispatches, notification fan-out, webhook deliveries, relation
+	// suggestions — share one runner: one bound on how many hold pool
+	// connections at once, and one drain at shutdown.
+	hookRunner := bgloop.NewHookRunner("eventbus.hooks", eventHookConcurrency, cfg.NotificationFanoutTimeout)
+
 	// Register the on_event trigger against the eventbus notify
 	// fan-out. This sits alongside the stream tap so a single
 	// eventbus.Append both wakes SSE subscribers and enqueues any
@@ -441,6 +447,7 @@ func main() {
 		Queries: agentruntime.NewSqlcOnEventQuerier(db),
 		Queue:   agentQueue,
 		Logger:  logger,
+		Runner:  hookRunner,
 	}
 	eventbus.AddNotifyHook(eventTrigger.NotifyHook())
 
@@ -468,18 +475,11 @@ func main() {
 		logger.Warn("smtp email disabled: NF_FLOW_SMTP_HOST is not set")
 	}
 
-	// The event hooks that write rows off the append path — notification
-	// fan-out, webhook deliveries, relation suggestions — share one
-	// runner: one bound on how many hold pool connections at once, and
-	// one drain at shutdown.
-	hookRunner := bgloop.NewHookRunner("eventbus.hooks", eventHookConcurrency, cfg.NotificationFanoutTimeout)
-
 	// Notification fan-out: creates per-user notification rows whenever
 	// the eventbus fires a relevant event (task.created, task.comment.added,
-	// etc.). Email delivery is attempted when the SMTP sender is configured.
-	// Each fan-out goroutine detaches from the request context and is
-	// bounded by NF_NOTIFICATION_FANOUT_TIMEOUT (default 30s).
-	notifFanout := notification.NewFanout(db, queries, emailSender)
+	// etc.). Each fan-out job runs on the shared hook runner, bounded by
+	// NF_NOTIFICATION_FANOUT_TIMEOUT (default 30s).
+	notifFanout := notification.NewFanout(db, queries)
 	notifFanout.SetTimeout(cfg.NotificationFanoutTimeout)
 	notifFanout.SetNotificationPublisher(notificationPublisher)
 	notifFanout.SetRunner(hookRunner)
@@ -769,17 +769,12 @@ func main() {
 		logger.Error("graceful shutdown failed", "err", err)
 		os.Exit(1)
 	}
-	// Drain the event-hook jobs (notification fan-out, webhook delivery
-	// rows, relation suggestions), queued ones included. The shutdown
-	// context already has a 20s budget shared with the HTTP server
-	// drain above; if it expires we log and move on.
+	// Drain the event-hook jobs (on_event dispatches, notification
+	// fan-out, webhook delivery rows, relation suggestions), queued ones
+	// included. The shutdown context already has a 20s budget shared
+	// with the HTTP server drain above; if it expires we log and move on.
 	if err := hookRunner.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("event hook shutdown timed out", "err", err)
-	}
-	// Same for the on_event agent dispatches, which detach from the
-	// request that triggered them for the same reason.
-	if err := eventTrigger.Shutdown(shutdownCtx); err != nil {
-		logger.Warn("on_event dispatch shutdown timed out", "err", err)
 	}
 	logger.Info("shutdown complete")
 }

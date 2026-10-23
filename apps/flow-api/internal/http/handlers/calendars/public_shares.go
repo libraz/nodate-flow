@@ -264,7 +264,7 @@ func CreatePublicShare(deps Deps) func(context.Context, *CreatePublicShareInput)
 			return nil, err
 		}
 
-		if err := requireFutureShareExpiry(input.Body.ExpiresAt); err != nil {
+		if err := checkShareExpiry(input.Body.ExpiresAt); err != nil {
 			return nil, err
 		}
 
@@ -424,7 +424,7 @@ func PatchPublicShare(deps Deps) func(context.Context, *PatchPublicShareInput) (
 		// a caller from clearing a stale expiry. Only an expiresAt that will
 		// actually land on the row is checked.
 		if !input.Body.ClearExpiresAt {
-			if err := requireFutureShareExpiry(input.Body.ExpiresAt); err != nil {
+			if err := checkShareExpiry(input.Body.ExpiresAt); err != nil {
 				return nil, err
 			}
 		}
@@ -1002,7 +1002,7 @@ func nullStringFromPtr(p *string) sql.NullString {
 	return sql.NullString{String: *p, Valid: true}
 }
 
-// requireFutureShareExpiry refuses an expires_at that is not later than
+// checkShareExpiry refuses an expires_at that is not later than
 // the instant the request is handled. Such a share is already expired
 // when it is returned: the write reports success and hands back a URL,
 // while every reader of it is refused by the render path.
@@ -1016,7 +1016,10 @@ func nullStringFromPtr(p *string) sql.NullString {
 // The refusal is distinct from SHARE.SHARE.EXPIRED, which refuses a
 // reader whose share has since run out; this one refuses a writer
 // setting an expiry that is already past.
-func requireFutureShareExpiry(p *int64) error {
+//
+// An expiry past what the DATETIME column holds is refused here too, so
+// it never reaches the write as a store failure.
+func checkShareExpiry(p *int64) error {
 	if p == nil {
 		return nil
 	}
@@ -1026,8 +1029,15 @@ func requireFutureShareExpiry(p *int64) error {
 	if *p <= handlerutil.NowUnix() {
 		return httpErr(apierrors.ShareShareExpiresAtNotInFuture)
 	}
+	if *p > maxShareExpiryUnix {
+		return httpErr(apierrors.ShareShareExpiresAtOutOfRange)
+	}
 	return nil
 }
+
+// maxShareExpiryUnix is 9999-12-31T23:59:59Z, the last second a MySQL
+// DATETIME can hold.
+const maxShareExpiryUnix int64 = 253402300799
 
 func nullTimeFromUnixPtr(p *int64) sql.NullTime {
 	if p == nil {

@@ -18,18 +18,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
-
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	sharedbus "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
-
-// mysqlDuplicateEntry is ER_DUP_ENTRY (1062).
-const mysqlDuplicateEntry uint16 = 1062
 
 // ErrAlreadyReversed is returned by [AppendReverseEvent] when a
 // concurrent request already recorded a compensating event for the same
@@ -72,13 +68,6 @@ func validateActors(evt Event) error {
 			WithDetail("actor_system_source_set", evt.ActorSystemSource != "")
 	}
 	return nil
-}
-
-// isDuplicateEntry reports whether err is MySQL's ER_DUP_ENTRY. Kept
-// local so the eventbus does not depend on the HTTP handler helpers.
-func isDuplicateEntry(err error) bool {
-	var me *mysql.MySQLError
-	return errors.As(err, &me) && me.Number == mysqlDuplicateEntry
 }
 
 // workspaceSeq holds one monotonically increasing counter per
@@ -134,11 +123,9 @@ type Event struct {
 	// ActorUserID is the internal user id of the actor; nil for system.
 	ActorUserID *int64
 	// ActorAgentID is the internal ai_agents.id of the agent that
-	// produced this event. Today the orchestrator runner writes
-	// agent-actor events directly through AppendAgentEvent so this
-	// field is reserved for callers that go through [Append] with an
-	// agent context. Mutually exclusive with the other two actor
-	// fields.
+	// produced this event, such as the orchestrator runner's run events
+	// and an agent's hand-back. Mutually exclusive with the other two
+	// actor fields.
 	ActorAgentID *int64
 	// ActorSystemSource names the worker-tick origin (`worker.calendar`,
 	// `worker.retention`, ...) when the event was emitted by the worker
@@ -640,7 +627,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 	// auto-commit path can re-issue the statement.
 	err := db.RunStatement(ctx, "eventbus.Append", insert)
 	if err != nil {
-		if evt.ReversesEventID != nil && isDuplicateEntry(err) {
+		if evt.ReversesEventID != nil && apierr.IsDuplicateEntry(err) {
 			// Two requests reversed the same event at once and the
 			// UNIQUE (workspace_id, reverses_event_id) index rejected
 			// the second INSERT. Nothing was lost: the compensating row

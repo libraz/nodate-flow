@@ -81,8 +81,10 @@ ORDER BY t.updated_at DESC, t.id DESC
 LIMIT ?;
 
 -- name: ListCandidateTaskEmbeddings :many
--- Return all task_embeddings for (workspace_id, model), excluding a given
--- task_id (so self-similarity is filtered out). Cosine similarity is
+-- Return the newest task_embeddings for (workspace_id, model), up to the
+-- caller's LIMIT by descending task id, excluding a given task_id (so
+-- self-similarity is filtered out). Tasks older than that window are not
+-- candidates. Cosine similarity is
 -- computed in Go because MySQL 9.6 Community does not expose
 -- VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
 -- and applies the duplicate_threshold_high / low cutoffs from ai_settings.

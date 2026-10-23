@@ -6,25 +6,10 @@ export const ItemErrors = {
     status: 422,
     message: "Item invariant violated",
   },
-  ITEM_ITEMKIT_OPTIMISTIC_LOCK: {
-    code: "ITEM.ITEMKIT.OPTIMISTIC_LOCK",
-    status: 409,
-    message: "Item was modified by another actor",
-  },
   ITEM_ITEMKIT_RECURRENCE_WITH_TASK_LINK: {
     code: "ITEM.ITEMKIT.RECURRENCE_WITH_TASK_LINK",
     status: 422,
     message: "Recurring events cannot be linked to a task",
-  },
-  ITEM_ITEMKIT_SCHEDULED_LINK_COUNT_HIGH: {
-    code: "ITEM.ITEMKIT.SCHEDULED_LINK_COUNT_HIGH",
-    status: 422,
-    message: "Too many scheduled events linked to this task",
-  },
-  ITEM_ITEMKIT_SHIFT_CONFLICT: {
-    code: "ITEM.ITEMKIT.SHIFT_CONFLICT",
-    status: 409,
-    message: "Shift proposal has unresolved conflicts",
   },
 } as const;
 

@@ -6,4 +6,6 @@ package errors
 var (
 	// INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN — Google push channel token verification failed
 	IntegrationGoogleWebhookInvalidToken = &Spec{Code: "INTEGRATION.GOOGLE.WEBHOOK_INVALID_TOKEN", Status: 401, Message: "Google push channel token verification failed", Description: "Returned when the X-Goog-Channel-Token header does not match the expected channel token configured for the integration.", UserAction: "Verify that the channel token matches the one registered during push notification setup."}
+	// INTEGRATION.GOOGLE.WEBHOOK_PAYLOAD_UNPARSEABLE — Google push notification body could not be read
+	IntegrationGoogleWebhookPayloadUnparseable = &Spec{Code: "INTEGRATION.GOOGLE.WEBHOOK_PAYLOAD_UNPARSEABLE", Status: 400, Message: "Google push notification body could not be read", Description: "Returned when the Google push notification body cannot be read, including a body larger than the 1 MiB limit.", UserAction: "Check the Google push channel configuration; the notification body must be under 1 MiB."}
 )

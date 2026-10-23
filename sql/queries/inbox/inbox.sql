@@ -46,8 +46,7 @@ SELECT
   v.payload_json,
   v.received_at,
   v.updated_at,
-  v.created_at,
-  COUNT(*) OVER() AS total
+  v.created_at
 FROM v_inbox v
 WHERE v.workspace_id = ?
 ORDER BY v.received_at DESC, v.public_id DESC
@@ -94,8 +93,7 @@ SELECT
   v.payload_json,
   v.received_at,
   v.updated_at,
-  v.created_at,
-  COUNT(*) OVER() AS total
+  v.created_at
 FROM v_inbox v
 INNER JOIN workspace_members wm
   ON wm.workspace_id = v.workspace_id
@@ -103,6 +101,24 @@ INNER JOIN workspace_members wm
   AND wm.enabled = TRUE
 ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
+
+-- name: CountInbox :one
+-- Count of a workspace's inbox, the total ListInbox pages through. It is
+-- a bare count so the per-row visibility expression the list computes is
+-- evaluated only for the rows a page returns.
+SELECT COUNT(*) AS total
+FROM v_inbox v
+WHERE v.workspace_id = ?;
+
+-- name: CountInboxForUser :one
+-- Count of the actor's cross-workspace inbox, the total ListInboxForUser
+-- pages through.
+SELECT COUNT(*) AS total
+FROM v_inbox v
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = v.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE;
 
 -- name: ArchiveInboxItem :execrows
 -- Archive a signal by soft-disabling it. The inbox view excludes disabled rows.

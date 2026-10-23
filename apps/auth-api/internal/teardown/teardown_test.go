@@ -246,3 +246,39 @@ func TestWorkspace_NilStorageClientIsSkipped(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, res.Deleted)
 }
+
+func queuedRemovals(t *testing.T, db *sql.DB, key string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM storage_blob_removals WHERE storage_key = ?", key).Scan(&n))
+	return n
+}
+
+// TestWorkspace_FailedSweepLeavesTheKeyQueued holds the invariant the
+// cascade makes hard: once the rows naming a blob are gone, a failed
+// removal must still leave a record naming its key, which the storage
+// sweeper retries.
+func TestWorkspace_FailedSweepLeavesTheKeyQueued(t *testing.T) {
+	inst := requireTeardownDB(t)
+	ctx := context.Background()
+
+	wsID, wsPub, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-queued")
+	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), &recordingSweeper{err: assert.AnError}, wsID, wsPub)
+	require.NoError(t, err)
+	require.True(t, res.Deleted)
+	assert.Zero(t, storageObjectCount(t, inst.DB, wsID), "the rows naming the blob are gone")
+	assert.Equal(t, 1, queuedRemovals(t, inst.DB, key), "the key must stay queued for the sweeper")
+}
+
+// TestWorkspace_CleanSweepClearsTheQueue is the pair: a removal that
+// succeeded leaves nothing for the sweeper to retry.
+func TestWorkspace_CleanSweepClearsTheQueue(t *testing.T) {
+	inst := requireTeardownDB(t)
+	ctx := context.Background()
+
+	wsID, wsPub, key := seedWorkspaceWithBlob(t, inst.DB, "teardown-cleared")
+	res, err := Workspace(ctx, inst.DB, generated.New(inst.DB), &recordingSweeper{}, wsID, wsPub)
+	require.NoError(t, err)
+	require.True(t, res.Deleted)
+	assert.Zero(t, queuedRemovals(t, inst.DB, key))
+}

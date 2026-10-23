@@ -14,7 +14,7 @@ import (
 )
 
 // TestTriageIntakeItemRequiresSnoozeDeadline proves a snooze without a
-// deadline is refused.
+// deadline is refused, under the code REST answers it with.
 //
 // Nothing resurfaces a snoozed item: the intake queue filters on
 // triage_status, and no job scans snooze_until. An item accepted as snoozed
@@ -48,7 +48,8 @@ func TestTriageIntakeItemRequiresSnoozeDeadline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := mcp.RunTriageIntakeItem(ctx, deps, s, mcpVisJSON(t, tt.args))
 			require.Error(t, err)
-			require.Equal(t, apierrors.McpToolArgumentsInvalid.Code, apiErrorCode(t, err))
+			require.Equal(t, apierrors.WsIntakeSnoozeDeadlineRequired.Code, apiErrorCode(t, err),
+				"the refusal is the one REST gives the same request")
 		})
 	}
 

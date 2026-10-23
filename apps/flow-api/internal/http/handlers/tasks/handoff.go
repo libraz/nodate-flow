@@ -382,15 +382,10 @@ func recordHandoffToUser(ctx context.Context, tx *dbretry.Tx, rec *mutationlog.R
 		return httpErr(apierrors.WsTaskNotFound)
 	}
 
-	taskInternal := int64(w.taskID)
-	priorAgent := int64(w.priorAgentID)
-	return rec.RecordInTx(ctx, tx, actor, mutationlog.Mutation{
-		EventType:    eventbus.AgentTaskHandoffToUser,
-		AuditAction:  "task.handoff.to_user",
-		ResourceType: "task",
-		ResourceID:   w.taskPublicID,
-		TaskID:       &taskInternal,
-		ActorAgentID: &priorAgent,
+	return rec.RecordHandBack(ctx, tx, actor, mutationlog.HandBack{
+		TaskID:       w.taskID,
+		TaskPublicID: w.taskPublicID,
+		PriorAgentID: w.priorAgentID,
 		Payload:      w.payload,
 		CallSite:     "tasks.HandoffToUser",
 	})

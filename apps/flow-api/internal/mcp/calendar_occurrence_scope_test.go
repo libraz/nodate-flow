@@ -30,13 +30,8 @@ var seriesAnchor = time.Date(2030, 3, 4, 9, 0, 0, 0, time.UTC)
 
 // seriesRule repeats daily and stops on the fifth day, so the fixture has
 // five occurrences: one before the split point the tests use, one at it,
-// and three after.
-//
-// Bounded by until rather than by count on purpose. A count travels with
-// the rule into the series a "this and following" split creates, so the
-// remainder would start counting again and produce five more occurrences
-// from the split; an until is an instant, and both halves of a split
-// series stop at the same one.
+// and three after. A counted series splits just as well — the continuing
+// master carries the remaining count — and is covered by its own case.
 const seriesRule = `{"freq":"daily","interval":1,"until":"2030-03-08"}`
 
 // seriesOccurrence returns the start of the nth occurrence, counting from

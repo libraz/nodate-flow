@@ -7,6 +7,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/storage"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -106,6 +107,9 @@ func AvatarDelete(deps Deps) func(context.Context, *struct{}) (*AvatarDeleteOutp
 				}
 				if affected, _ := gcRes.RowsAffected(); affected == 1 {
 					storageKeyToRemove = fullRow.StorageKey
+					if err := storage.QueueRemoval(ctx, qtx, storageKeyToRemove); err != nil {
+						return nil, httpErr(apierrors.InternalUnexpected)
+					}
 				}
 			}
 		}
@@ -116,8 +120,8 @@ func AvatarDelete(deps Deps) func(context.Context, *struct{}) (*AvatarDeleteOutp
 
 		if storageKeyToRemove != "" && deps.Storage != nil {
 			cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
-			if rmErr := deps.Storage.RemoveObject(cleanupCtx, storageKeyToRemove); rmErr != nil {
-				slog.WarnContext(cleanupCtx, "avatar delete: object delete failed",
+			if rmErr := storage.RemoveQueued(cleanupCtx, deps.Queries, deps.Storage, storageKeyToRemove); rmErr != nil {
+				slog.WarnContext(cleanupCtx, "avatar delete: object delete failed; the sweeper will retry",
 					"err", rmErr, "key", storageKeyToRemove)
 			}
 			cleanupCancel()

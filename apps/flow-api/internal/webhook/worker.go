@@ -248,17 +248,20 @@ func (w *Worker) createDeliveries(ctx context.Context, workspaceID uint32, event
 }
 
 // matchesEventType checks whether eventType appears in the subscription's
-// event_types JSON array. A wildcard entry "*" matches everything.
+// event_types JSON array. Entries are exact event kinds; the only
+// wildcard is a whole entry "*", which matches everything. A prefix such
+// as "task.*" is not a pattern and matches nothing, which is why the
+// create handler refuses it.
 func matchesEventType(raw json.RawMessage, eventType string) bool {
 	if len(raw) == 0 {
 		return false
 	}
-	var patterns []string
-	if err := json.Unmarshal(raw, &patterns); err != nil {
+	var kinds []string
+	if err := json.Unmarshal(raw, &kinds); err != nil {
 		return false
 	}
-	for _, p := range patterns {
-		if p == "*" || p == eventType {
+	for _, k := range kinds {
+		if k == "*" || k == eventType {
 			return true
 		}
 	}

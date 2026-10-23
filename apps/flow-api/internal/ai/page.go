@@ -42,12 +42,12 @@ const pageGenerationMaxTokens = 2048
 // The returned string is the trimmed Markdown body suitable for
 // persisting directly into pages.body.
 //
-// Errors:
-//   - [ErrNoProvider] when the workspace has no enabled AI provider.
-//     Map to AI.PROVIDER.NOT_CONFIGURED at the HTTP boundary.
-//   - any other error is wrapped from the provider call (timeout,
-//     auth rejection, upstream non-success) and should map to
-//     PAGE.GENERATION.UPSTREAM_UNAVAILABLE at the HTTP boundary.
+// Errors are the AI layer's own: [ErrNoProvider] with no enabled
+// provider, the cost guard's budget errors, [ErrParse] for an empty
+// draft, and the provider call's failures wrapped with %w. REST and MCP
+// both map them through errormodel.PageGenerationFailure, which keeps
+// each failure's shared code and answers an unreachable provider with
+// PAGE.GENERATION.UPSTREAM_UNAVAILABLE.
 //
 // Both the prompt (system + user) and the response are redacted before
 // being persisted into ai_invocations.

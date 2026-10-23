@@ -3933,6 +3933,16 @@ type Signal struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Pending object-storage blob removals whose referencing rows are already deleted
+type StorageBlobRemoval struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Object key whose blob is still to be removed from object storage
+	StorageKey string       `json:"storageKey"`
+	UpdatedAt  sql.NullTime `json:"updatedAt"`
+	CreatedAt  time.Time    `json:"createdAt"`
+}
+
 // Content-addressed object storage references; rows shared across attachments via storage_object_id with ref_count GC.
 type StorageObject struct {
 	// Internal PK, never exposed

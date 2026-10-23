@@ -21,7 +21,7 @@ func TestRunAddFavoriteValidatesTargetBeforeInsert(t *testing.T) {
 	body := functionBodyInPackage(t, "runAddFavorite")
 
 	targetCheck := "ensureMCPFavoriteTargetExists(ctx, deps, s, tt, in.TargetID, targetPub)"
-	insert := "deps.Queries.CreateFavorite"
+	insert := ".CreateFavorite("
 
 	checkAt := strings.Index(body, targetCheck)
 	insertAt := strings.Index(body, insert)

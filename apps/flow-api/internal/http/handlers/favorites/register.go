@@ -23,7 +23,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/me/favorites",
 		Summary:     "Add an item to favorites",
-		Description: "Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.",
+		Description: "Pins the supplied target (kind + id) to the caller's favorites list. Returns 409 WS.FAVORITE.ALREADY_EXISTS when the item is already pinned.",
 		Tags:        []string{"Tasks"},
 	}, Create(deps))
 
@@ -32,7 +32,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/me/favorites/{id}",
 		Summary:     "Remove an item from favorites",
-		Description: "Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.",
+		Description: "Unpins the named favorite. Returns 404 WS.FAVORITE.NOT_FOUND when the favorite is already unpinned.",
 		Tags:        []string{"Tasks"},
 	}, Delete(deps))
 }

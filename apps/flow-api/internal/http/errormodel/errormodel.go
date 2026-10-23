@@ -44,7 +44,8 @@ import (
 
 // Install replaces huma.NewError with a wrapper that sanitises the
 // echoed values of every error detail Huma produces, including the
-// validation failures raised before a handler ever runs.
+// validation failures raised before a handler ever runs, and gives those
+// failures their catalog code.
 //
 // huma.NewError is process-global and huma.NewErrorWithContext delegates
 // to it, so one call covers every sub-API the router mounts. Repeat
@@ -57,6 +58,7 @@ func Install() {
 			se := inner(status, msg, errs...)
 			if em, ok := se.(*huma.ErrorModel); ok {
 				sanitize(em.Errors)
+				classify(em)
 			}
 			return se
 		}

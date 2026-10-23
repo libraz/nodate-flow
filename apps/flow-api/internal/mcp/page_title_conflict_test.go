@@ -128,18 +128,17 @@ func TestMCPPageWritesRefuseATitleALiveSiblingHolds(t *testing.T) {
 		require.Equal(t, "Runbook (v2)", pageTitle(t, db, fx.wsID, draftID))
 	})
 
-	t.Run("generate_page/the model drafted a title the workspace already holds", func(t *testing.T) {
+	t.Run("generate_page/the same brief builds a title the workspace already holds", func(t *testing.T) {
 		t.Parallel()
-		// The title comes from the model, so two runs of the same brief
-		// in one workspace draft the same title and collide. This is the
+		// The title is built from the brief, so two runs of the same brief
+		// in one workspace build the same title and collide. This is the
 		// ordinary way the tool meets the key, and every retry of a
 		// refusal reported as a server fault spends another model call.
 		fx := seedMCPVisibilityFixture(t, db)
 		deps := mcp.Deps{
 			DB:      db,
 			Queries: generated.New(db),
-			AI: cannedOrchestrator(
-				`[{"title":"Release process","description":"Cut from develop, fast-forward main, tag last.","priority":"medium"}]`),
+			AI:      cannedOrchestrator("Cut from develop, fast-forward main, tag last."),
 		}
 		sess := mcp.NewTestSession(fx.creatorID, fx.wsID, []string{"write:workspace"})
 		brief := map[string]any{"contextDescription": "Summarise how the release process works."}

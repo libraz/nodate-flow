@@ -3,11 +3,11 @@ package tasks
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
 
 // CompileConstraint handles POST /tasks/{id}/constraints/compile.
@@ -20,13 +20,7 @@ func CompileConstraint(deps Deps) func(context.Context, *CompileConstraintInput)
 		}
 		parsed, err := deps.NlConstraint.Compile(ctx, in.Body.Prompt)
 		if err != nil {
-			if errors.Is(err, nlconstraint.ErrBudgetExceeded) {
-				return nil, httpErr(apierrors.AiCostGuardExceeded)
-			}
-			if errors.Is(err, nlconstraint.ErrUnparseable) {
-				return nil, httpErr(apierrors.AiResponseInvalidJson)
-			}
-			return nil, httpErr(apierrors.AiProviderUpstreamUnreachable)
+			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 		}
 		raw, err := json.Marshal(parsed)
 		if err != nil {

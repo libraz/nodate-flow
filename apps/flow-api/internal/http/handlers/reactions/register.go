@@ -35,7 +35,7 @@ func RegisterTaskScopedWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/reactions",
 		Summary:     "Add a reaction to a task",
-		Description: "Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.",
+		Description: "Records a single emoji reaction from the caller on the task. Returns 409 WS.REACTION.ALREADY_EXISTS when the caller already reacted with that glyph.",
 		Tags:        []string{"Tasks"},
 	}, Create(deps))
 
@@ -44,7 +44,7 @@ func RegisterTaskScopedWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/reactions/{reactionId}",
 		Summary:     "Remove a reaction from a task",
-		Description: "Removes the caller's reaction from the task. Idempotent: deleting an already-removed reaction returns 200.",
+		Description: "Removes the caller's reaction from the task. Returns 404 WS.REACTION.NOT_FOUND when the reaction is already removed.",
 		Tags:        []string{"Tasks"},
 	}, Delete(deps))
 }

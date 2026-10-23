@@ -18,7 +18,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // stubExecutor is an AgentExecutor implementation that returns a fixed
@@ -432,7 +431,7 @@ func TestManualHandbackEndpoint(t *testing.T) {
 	// for agent.task.handoff_to_user without relying on the test server
 	// to register the production hook.
 	queries := generated.New(testDB)
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
 	hook(context.Background(), wsID, "agent.task.handoff_to_user", uint64(evs[0].ID)) //#nosec G115 -- events.id is BIGINT UNSIGNED, non-negative

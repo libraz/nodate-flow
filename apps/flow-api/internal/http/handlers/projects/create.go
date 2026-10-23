@@ -3,11 +3,8 @@ package projects
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"strings"
 	"time"
-
-	"github.com/go-sql-driver/mysql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -15,6 +12,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 // Create handles POST /workspaces/{wsId}/projects.
@@ -45,16 +43,11 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 			Color:       color,
 		})
 		if err != nil {
-			if handlerutil.IsDuplicateEntry(err) {
-				var mysqlErr *mysql.MySQLError
-				if errors.As(err, &mysqlErr) {
-					if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
-						return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
-					}
-					if strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_identifier") {
-						return nil, httpErr(apierrors.WsProjectIdentifierAlreadyTaken)
-					}
-				}
+			switch key, _ := apierr.DuplicateKey(err); key {
+			case "uniq_projects_workspace_id_slug_active":
+				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
+			case "uniq_projects_workspace_id_identifier_active":
+				return nil, httpErr(apierrors.WsProjectIdentifierAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

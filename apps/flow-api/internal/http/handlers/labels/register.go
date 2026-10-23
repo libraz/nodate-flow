@@ -51,7 +51,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/labels/{id}",
 		Summary:     "Soft-disable a label",
-		Description: "Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Idempotent.",
+		Description: "Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Returns 404 WS.LABEL.NOT_FOUND when the label is already disabled.",
 		Tags:        []string{"Labels"},
 	}, Disable(deps))
 }
@@ -85,7 +85,7 @@ func RegisterTaskScopedWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/labels",
 		Summary:     "Attach a label to a task",
-		Description: "Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.",
+		Description: "Attaches an existing workspace label to the task. Returns 409 WS.LABEL.ALREADY_ATTACHED when the label is already attached.",
 		Tags:        []string{"Labels"},
 	}, AddTaskLabel(deps))
 

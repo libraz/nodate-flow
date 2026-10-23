@@ -76,30 +76,10 @@ export const AiErrors = {
     status: 502,
     message: "Could not reach AI provider",
   },
-  AI_REDACTION_LENS_UNAVAILABLE: {
-    code: "AI.REDACTION.LENS_UNAVAILABLE",
-    status: 500,
-    message: "Redaction lens is unavailable",
-  },
-  AI_REDACTION_RULE_INVALID: {
-    code: "AI.REDACTION.RULE_INVALID",
-    status: 500,
-    message: "Redaction rule is invalid",
-  },
-  AI_REDACTION_TIMEOUT: {
-    code: "AI.REDACTION.TIMEOUT",
-    status: 504,
-    message: "Redaction pipeline timed out",
-  },
   AI_RESPONSE_INVALID_JSON: {
     code: "AI.RESPONSE.INVALID_JSON",
     status: 502,
     message: "AI provider response was not valid JSON",
-  },
-  AI_RESPONSE_MISSING_FIELD: {
-    code: "AI.RESPONSE.MISSING_FIELD",
-    status: 502,
-    message: "AI provider response is missing a required field",
   },
   AI_RESPONSE_SCHEMA_MISMATCH: {
     code: "AI.RESPONSE.SCHEMA_MISMATCH",
@@ -120,11 +100,6 @@ export const AiErrors = {
     code: "AI.REVERSE.TARGET_NOT_FOUND",
     status: 404,
     message: "Event not found in this workspace.",
-  },
-  AI_SAFETY_BLOCKED: {
-    code: "AI.SAFETY.BLOCKED",
-    status: 422,
-    message: "Request blocked by safety policy",
   },
 } as const;
 

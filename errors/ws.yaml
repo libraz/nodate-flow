@@ -173,15 +173,6 @@ resources:
         description: "Returned when the requested project identifier already exists within the workspace."
         userAction: "Choose a different identifier."
 
-      feature_disabled:
-        code: WS.PROJECT.FEATURE_DISABLED
-        status: 403
-        message: "This feature is disabled for the project"
-        message_ja: "この機能はプロジェクトで無効化されています"
-        message_zh: "此功能在该项目中已被禁用"
-        description: "Returned when a request targets a feature that has been disabled in the project settings."
-        userAction: "Enable the feature in project settings, or contact a project admin."
-
   task:
     breadcrumb: "Workspace > Task"
     errors:
@@ -211,24 +202,6 @@ resources:
         message_zh: "该任务已被其他用户更新"
         description: "Returned when an optimistic concurrency check (version or updated_at) fails during update."
         userAction: "Reload the task to see the latest version, then re-apply your changes."
-
-      title_too_long:
-        code: WS.TASK.TITLE_TOO_LONG
-        status: 422
-        message: "Task title is too long"
-        message_ja: "タスクのタイトルが長すぎます"
-        message_zh: "任务标题过长"
-        description: "Returned when the submitted title exceeds the maximum allowed length."
-        userAction: "Shorten the title and retry."
-
-      state_transition_blocked_by_constraint:
-        code: WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT
-        status: 422
-        message: "Task cannot transition to the requested state"
-        message_ja: "タスクを指定した状態に遷移できません"
-        message_zh: "任务无法转换为指定状态"
-        description: "Reserved for a future hard-gated constraint mode. Current task transitions are gated by the taskstate state machine; unsatisfied task constraints are advisory markers and do not emit this error."
-        userAction: "Review unmet constraints in the task detail panel. If hard-gated constraints are enabled in a future release, resolve them before retrying the transition."
 
       transition_unknown:
         code: WS.TASK.TRANSITION_UNKNOWN
@@ -284,6 +257,15 @@ resources:
         description: "Returned when a new task dependency edge would close a cycle in the workspace dependency graph (directly or transitively). The dependency graph must remain a DAG so blocked-by computation and topological scheduling terminate."
         userAction: "Remove the conflicting dependency on the other task before adding this edge."
 
+      dependency_already_exists:
+        code: WS.TASK.DEPENDENCY_ALREADY_EXISTS
+        status: 409
+        message: "This dependency already exists"
+        message_ja: "この依存関係は既に存在します"
+        message_zh: "该依赖关系已存在"
+        description: "Returned when a new task dependency edge has the same source, target and kind as an edge that already exists."
+        userAction: "The dependency is already in place; no change is needed."
+
   task_agent:
     breadcrumb: "Workspace > Task > Agent"
     errors:
@@ -321,7 +303,7 @@ resources:
         message_ja: "エージェントの月次コスト上限に達しました"
         message_zh: "代理的月度费用上限已达上限"
         description: "Returned when starting or resuming an agent run would push the agent's accumulated spend past ai_agents.monthly_cost_cap_cents for the current billing month."
-        userAction: "Wait for the next billing cycle, raise the agent's monthly_cost_cap_cents in agent settings, or hand the task off to another agent or user."
+        userAction: "Wait for the next billing month, or hand the task off to another agent or user."
 
   member:
     breadcrumb: "Workspace > Member"
@@ -511,42 +493,6 @@ resources:
         message_zh: "您已使用此表情进行过反应"
         description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target."
         userAction: "Remove the existing reaction first if you want to change it."
-
-  mention:
-    breadcrumb: "Workspace > Mention"
-    errors:
-      not_found:
-        code: WS.MENTION.NOT_FOUND
-        status: 404
-        message: "Mention not found"
-        message_ja: "メンションが見つかりません"
-        message_zh: "未找到提及"
-        description: "Returned when a mention with the given public_id does not exist or has been removed."
-        userAction: "Verify the mention ID."
-
-  view_preference:
-    breadcrumb: "Workspace > View Preference"
-    errors:
-      not_found:
-        code: WS.VIEW_PREFERENCE.NOT_FOUND
-        status: 404
-        message: "View preference not found"
-        message_ja: "ビュー設定が見つかりません"
-        message_zh: "未找到视图偏好设置"
-        description: "Returned when a view preference with the given public_id does not exist for the current user."
-        userAction: "Verify the view preference ID, or create a new one."
-
-  notification_preference:
-    breadcrumb: "Workspace > Notification Preference"
-    errors:
-      not_found:
-        code: WS.NOTIFICATION_PREFERENCE.NOT_FOUND
-        status: 404
-        message: "Notification preference not found"
-        message_ja: "通知設定が見つかりません"
-        message_zh: "未找到通知偏好设置"
-        description: "Returned when a notification preference with the given public_id does not exist for the current user."
-        userAction: "Verify the notification preference ID, or create a new one."
 
   intake:
     breadcrumb: "Workspace > Intake"

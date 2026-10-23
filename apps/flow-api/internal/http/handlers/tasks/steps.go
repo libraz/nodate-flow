@@ -11,14 +11,15 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -33,7 +34,8 @@ type StepsDeps struct {
 	Queries  *generated.Queries
 	AI       *ai.Orchestrator
 	Embedder *embed.Client
-	Audit    *audit.Recorder
+	// Mutations records each applied step as a task creation.
+	Mutations *mutationlog.Recorder
 }
 
 // ---- Propose Steps I/O -----------------------------------------------------
@@ -184,15 +186,16 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			desc = row.Description.String
 		}
 
+		// The prompt quotes this task, so its invocation row carries it.
 		steps, err := deps.AI.ProposeSteps(
-			ctx, ws.ID,
+			ai.WithTaskID(ctx, task.ID), ws.ID,
 			row.Title, desc,
 			granularity, children,
 			embedClient, reader,
 			vis,
 		)
 		if err != nil {
-			return nil, mapAIError(err)
+			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 		}
 
 		out := &ProposeStepsOutput{}
@@ -277,6 +280,12 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		// allocation reads MAX(task_number) inside the transaction, so each
 		// step sees the rows its predecessors inserted and the children get
 		// distinct numbers.
+		//
+		// Each child is recorded in the same transaction that creates it,
+		// under the action MCP apply_steps records. The title recorded is
+		// the title the row carries.
+		parentPubStr := task.PublicID.String()
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		created := make([]string, 0, len(in.Body.Steps))
 		childIDs := make([]int64, 0, len(in.Body.Steps))
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
@@ -295,6 +304,23 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 				if err != nil {
 					return err
 				}
+				childID := child.ID
+				if err := deps.Mutations.RecordInTx(ctx, tx, actor, mutationlog.Mutation{
+					EventType:    eventbus.TaskCreated,
+					AuditAction:  "task.apply_steps",
+					ResourceType: "task",
+					ResourceID:   child.PublicID.String(),
+					TaskID:       &childID,
+					Payload: map[string]any{
+						"taskId":       child.PublicID.String(),
+						"title":        stepTitles[i].String(),
+						"parentTaskId": parentPubStr,
+						"via":          "api:apply_steps",
+					},
+					CallSite: "tasks.ApplySteps",
+				}); err != nil {
+					return err
+				}
 				created = append(created, child.PublicID.String())
 				childIDs = append(childIDs, child.ID)
 			}
@@ -303,38 +329,6 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		// Emit events after commit so they reference committed rows. The
-		// title an event carries is the title the child row carries:
-		// recording the submitted one instead would describe the step as
-		// having a name it was never stored under.
-		parentPubStr := task.PublicID.String()
-		for i := range in.Body.Steps {
-			actor := int64(actorID)
-			eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-				Type:        eventbus.TaskCreated,
-				WorkspaceID: ws.ID,
-				ActorUserID: &actor,
-				TaskID:      &childIDs[i],
-				Payload: map[string]any{
-					"taskId":       created[i],
-					"title":        stepTitles[i].String(),
-					"parentTaskId": parentPubStr,
-					"via":          "api:apply_steps",
-				},
-			}, "tasks.ApplySteps")
-		}
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "task.apply_steps",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "task",
-			ResourceID:   parentPubStr,
-			Metadata: map[string]any{
-				"stepCount": len(created),
-			},
-		})
 
 		// Each step is a task in its own right, so it carries its own
 		// embedding. The embedded text is the stored text: the step

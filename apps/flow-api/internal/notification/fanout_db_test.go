@@ -158,7 +158,7 @@ func listChannelsForRecipient(t *testing.T, db *sql.DB, wsID, recipientID uint32
 func runFanout(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *Fanout {
 	t.Helper()
 	q := generated.New(db)
-	f := NewFanout(db, q, nil)
+	f := NewFanout(db, q)
 	f.fanout(context.Background(), fx.wsID, eventType, fx.eventInternalID)
 	return f
 }
@@ -189,7 +189,7 @@ func (r *publishRecorder) announced() []uint32 {
 func runFanoutRecordingPublishes(t *testing.T, db *sql.DB, fx *fanoutFixture, eventType string) *publishRecorder {
 	t.Helper()
 	rec := &publishRecorder{}
-	f := NewFanout(db, generated.New(db), nil)
+	f := NewFanout(db, generated.New(db))
 	f.SetNotificationPublisher(rec.publish)
 	f.fanout(context.Background(), fx.wsID, eventType, fx.eventInternalID)
 	return rec
@@ -406,4 +406,43 @@ func TestFanout_MutedPreferenceSuppressesChannel(t *testing.T) {
 
 	got := listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID)
 	require.Equal(t, []string{"email"}, got)
+}
+
+// TestBellListsAndCountsOneRowPerNotification pins the read side of a
+// multi-channel fan-out: a stored email opt-in writes a second row for
+// the same event, and the bell — every list and unread count — still
+// shows the notification once.
+func TestBellListsAndCountsOneRowPerNotification(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	fx := seedFanoutFixture(t, db)
+	ctx := context.Background()
+
+	upsertPreference(t, db, fx.wsID, fx.recipientUserID, "task.lifecycle", "email", false)
+	runFanout(t, db, fx, "task.created")
+	require.ElementsMatch(t, []string{"email", "in_app"},
+		listChannelsForRecipient(t, db, fx.wsID, fx.recipientUserID, fx.eventInternalID),
+		"fixture: the opt-in must produce a row per channel for the read side to collapse")
+
+	q := generated.New(db)
+	wsRows, err := q.ListNotificationsForWorkspace(ctx, generated.ListNotificationsForWorkspaceParams{
+		WorkspaceID: fx.wsID, RecipientUserID: fx.recipientUserID, Limit: 50,
+	})
+	require.NoError(t, err)
+	require.Len(t, wsRows, 1, "workspace bell list")
+	userRows, err := q.ListNotificationsForUser(ctx, generated.ListNotificationsForUserParams{
+		RecipientUserID: fx.recipientUserID, Limit: 50,
+	})
+	require.NoError(t, err)
+	require.Len(t, userRows, 1, "cross-workspace bell list")
+
+	wsCount, err := q.CountUnreadNotificationsForWorkspace(ctx, generated.CountUnreadNotificationsForWorkspaceParams{
+		WorkspaceID: fx.wsID, RecipientUserID: fx.recipientUserID,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, wsCount, "workspace unread count")
+	userCount, err := q.CountUnreadNotifications(ctx, fx.recipientUserID)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, userCount, "cross-workspace unread count")
 }

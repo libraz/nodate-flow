@@ -24,6 +24,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -56,20 +57,22 @@ type wsAutoActionConfig struct {
 	threshold       float32
 }
 
-// HandoffQuerier is the narrow slice of [generated.Querier] the
-// auto-action executor needs to apply a handoff_to_user action. Kept
-// as a small interface so unit tests can pass a fake without standing
-// up a real DB. Production wiring uses [generated.New] / WithTx on
-// the executor's *sql.DB.
+// HandoffQuerier is the narrow set of writes the auto-action executor
+// needs to apply a handoff_to_user action. Kept as a small interface so
+// unit tests can pass a fake without standing up a real DB. Production
+// wiring is [txHandoff], which binds every call to the pass's
+// transaction.
 type HandoffQuerier interface {
-	InsertHandoffToUserEvent(ctx context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error)
+	// RecordHandBack records the agent.task.handoff_to_user event
+	// through the shared hand-back recorder.
+	RecordHandBack(ctx context.Context, workspaceID uint32, h mutationlog.HandBack) error
 	GetTaskAgentMemo(ctx context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error)
 	UpdateTaskAgentMemo(ctx context.Context, arg generated.UpdateTaskAgentMemoParams) (int64, error)
 }
 
 // ActorDisabler disables a single (workspace_id, task_id, agent_id)
 // task_actors row by setting enabled = FALSE. The production
-// implementation wraps a *sql.Tx; tests pass a fake that records the
+// implementation wraps the pass's transaction; tests pass a fake that records the
 // disable for assertions.
 type ActorDisabler interface {
 	DisableAgentActor(ctx context.Context, workspaceID, taskID, agentID uint32) error
@@ -642,9 +645,21 @@ func (e *Executor) applyAction(ctx context.Context, r taskRow, act *Action) {
 	}
 }
 
+// txHandoff is the production [HandoffQuerier]: the memo statements
+// and the hand-back event all run on the pass's transaction.
+type txHandoff struct {
+	*generated.Queries
+	tx  *dbretry.Tx
+	rec *mutationlog.Recorder
+}
+
+func (q txHandoff) RecordHandBack(ctx context.Context, workspaceID uint32, h mutationlog.HandBack) error {
+	return q.rec.RecordHandBack(ctx, q.tx, mutationlog.Actor{WorkspaceID: workspaceID}, h)
+}
+
 // handoffToUser is the production wiring around [applyHandoffToUser].
-// It opens a transaction, builds the sqlc-backed HandoffQuerier and
-// raw-SQL ActorDisabler, runs the shared logic, and commits.
+// It runs the shared logic inside [dbretry.InTx], so the hand-back
+// event fans out to the notify hooks once the transaction commits.
 func (e *Executor) handoffToUser(ctx context.Context, r taskRow, act *Action) {
 	if !r.hasAgentAssignee || r.agentID == 0 {
 		// Defensive guard: the rule already filters for an agent
@@ -652,23 +667,16 @@ func (e *Executor) handoffToUser(ctx context.Context, r taskRow, act *Action) {
 		// not turn into an event with no actor.
 		return
 	}
-	tx, err := e.DB.BeginTx(ctx, nil)
-	if err != nil {
-		e.Logger.Error("auto-action executor: begin tx", "err", err)
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	q := generated.New(e.DB).WithTx(tx)
-	disabler := &txActorDisabler{tx: tx}
-
-	emitted, err := e.applyHandoffToUser(ctx, q, disabler, r, act, time.Now().UTC())
+	rec := mutationlog.New(e.DB, generated.New(e.DB))
+	var emitted bool
+	err := dbretry.InTx(ctx, e.DB, "autoactions.handoffToUser", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		q := txHandoff{Queries: generated.New(tx), tx: tx, rec: rec}
+		var err error
+		emitted, err = e.applyHandoffToUser(ctx, q, &txActorDisabler{tx: tx}, r, act, time.Now().UTC())
+		return err
+	})
 	if err != nil {
 		e.Logger.Error("auto-action executor: handoff_to_user", "task", r.publicID.String(), "err", err)
-		return
-	}
-	if err := tx.Commit(); err != nil {
-		e.Logger.Error("auto-action executor: commit", "task", r.publicID.String(), "err", err)
 		return
 	}
 	if emitted {
@@ -728,19 +736,14 @@ func (e *Executor) applyHandoffToUser(
 	if act != nil && act.Reason != "" {
 		payload["detail"] = act.Reason
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return false, fmt.Errorf("marshal handoff payload: %w", err)
-	}
-	if _, err := q.InsertHandoffToUserEvent(ctx, generated.InsertHandoffToUserEventParams{
-		PublicID:     types.New(),
-		WorkspaceID:  r.workspaceID,
-		TaskID:       sql.NullInt32{Int32: int32(r.id), Valid: true},      //#nosec G115 -- tasks.id fits int32
-		ActorAgentID: sql.NullInt32{Int32: int32(r.agentID), Valid: true}, //#nosec G115 -- ai_agents.id fits int32
-		PayloadJson:  raw,
-		OccurredAt:   at,
+	if err := q.RecordHandBack(ctx, r.workspaceID, mutationlog.HandBack{
+		TaskID:       r.id,
+		TaskPublicID: r.publicID.String(),
+		PriorAgentID: r.agentID,
+		Payload:      payload,
+		CallSite:     "autoactions.handoffToUser",
 	}); err != nil {
-		return false, fmt.Errorf("insert handoff event: %w", err)
+		return false, fmt.Errorf("record handoff event: %w", err)
 	}
 
 	if err := disabler.DisableAgentActor(ctx, r.workspaceID, r.id, r.agentID); err != nil {
@@ -804,11 +807,11 @@ func readMemoCounters(ctx context.Context, q HandoffQuerier, workspaceID, taskID
 	return memo.Attempts, memo.HandoffCount
 }
 
-// txActorDisabler implements ActorDisabler over a *sql.Tx by issuing a
+// txActorDisabler implements ActorDisabler over a transaction by issuing a
 // targeted UPDATE against task_actors. We match on (workspace_id,
 // task_id, agent_id, kind='agent', role='assignee') so a stale row in
 // some other role for the same agent does not get disabled.
-type txActorDisabler struct{ tx *sql.Tx }
+type txActorDisabler struct{ tx *dbretry.Tx }
 
 // DisableAgentActor flips enabled=FALSE on the agent assignee row.
 //

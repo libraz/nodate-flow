@@ -11,7 +11,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestNotificationDispatchOnAssignee verifies the fan-out contract for
@@ -93,7 +92,7 @@ func TestNotificationDispatchOnAssignee(t *testing.T) {
 	// Drive the fan-out directly. The Hook helper spawns a goroutine,
 	// so we must Shutdown to drain before asserting.
 	queries := generated.New(testDB)
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
 	hook(ctx, wsInternalID, "task.actor.added", actorEventID)

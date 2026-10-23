@@ -15,23 +15,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-sql-driver/mysql"
-
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
-
-// mysqlDuplicateEntry is ER_DUP_ENTRY (1062). Checked locally so this
-// package does not depend on the HTTP handler helpers.
-const mysqlDuplicateEntry uint16 = 1062
-
-func isDuplicateEntry(err error) bool {
-	var me *mysql.MySQLError
-	return errors.As(err, &me) && me.Number == mysqlDuplicateEntry
-}
 
 // ErrCycle is returned when the requested edge would close a cycle.
 // Callers map it onto their own surface (the REST handler answers
@@ -115,7 +105,7 @@ func Add(ctx context.Context, tx *dbretry.Tx, args Args) (types.PublicID, error)
 		ToTaskID:    args.ToTaskID,
 		Kind:        args.Kind,
 	}); err != nil {
-		if isDuplicateEntry(err) {
+		if apierr.IsDuplicateEntry(err) {
 			return types.PublicID{}, ErrDuplicate
 		}
 		return types.PublicID{}, err

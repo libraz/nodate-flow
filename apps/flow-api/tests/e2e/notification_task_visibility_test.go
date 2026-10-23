@@ -11,7 +11,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestNotificationFanoutRespectsTaskVisibility is the notification half
@@ -83,7 +82,7 @@ func TestNotificationFanoutRespectsTaskVisibility(t *testing.T) {
 	publicEventID := eventFor(publicTask.ID)
 
 	queries := generated.New(testDB)
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
 
@@ -97,7 +96,7 @@ func TestNotificationFanoutRespectsTaskVisibility(t *testing.T) {
 	require.Equal(t, int64(1), afterPublic-beforePublic,
 		"a workspace member must be notified about a public task")
 
-	f2 := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f2 := notification.NewFanout(testDB, queries)
 	f2.SetTimeout(5 * time.Second)
 	hook2 := f2.Hook()
 	beforePrivate := notificationCountForUser(ctx, t, testDB, outsiderInternalID)

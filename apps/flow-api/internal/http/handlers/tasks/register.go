@@ -240,7 +240,7 @@ func RegisterTaskScopedCommenterWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/comments/{cid}",
 		Summary:     "Delete a comment (author or workspace admin)",
-		Description: "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
+		Description: "Removes the named comment. Permitted to the comment author or any workspace admin. Returns 404 WS.COMMENT.NOT_FOUND when the comment is already removed.",
 		Tags:        []string{"Tasks"},
 	}, DeleteComment(deps))
 }
@@ -270,7 +270,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}",
 		Summary:     "Soft-disable a task",
-		Description: "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
+		Description: "Marks the task as removed so it disappears from active views without erasing data. Returns 404 WS.TASK.NOT_FOUND once the task is removed. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
 		Tags:        []string{"Tasks"},
 	}, Disable(deps))
 
@@ -378,7 +378,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/actors/{actorId}",
 		Summary:     "Remove an actor from a task",
-		Description: "Detaches the named actor from the task. Idempotent.",
+		Description: "Detaches the named actor from the task. Returns 404 WS.TASK_ACTOR.NOT_FOUND when the actor is already detached.",
 		Tags:        []string{"Tasks"},
 	}, RemoveActor(deps))
 
@@ -432,7 +432,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/tasks/{id}/attachments/{aid}",
 		Summary:     "Soft-delete an attachment from a task",
-		Description: "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
+		Description: "Marks the attachment as removed and best-effort deletes the underlying object. Returns 404 WS.TASK.NOT_FOUND when the attachment is already removed.",
 		Tags:        []string{"Tasks"},
 	}, DeleteAttachment(deps))
 

@@ -24,6 +24,9 @@ INSERT IGNORE INTO notifications (
 -- Excludes archived and disabled notifications. The workspace_members join
 -- is what "their workspaces" means: rows from a workspace the user has
 -- left stop being listed, on this and every sibling list and count.
+-- The bell is the in_app channel, and every sibling reads that channel
+-- alone: a row written for another channel is the same notification and
+-- must not be listed or counted a second time.
 SELECT
   n.public_id,
   n.workspace_id,
@@ -52,6 +55,7 @@ LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT ? OFFSET ?;
 
@@ -98,6 +102,7 @@ LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
   AND (sqlc.arg(read_filter) = 'all'
        OR (sqlc.arg(read_filter) = 'unread' AND n.read_at IS NULL)
        OR (sqlc.arg(read_filter) = 'read'   AND n.read_at IS NOT NULL))
@@ -139,6 +144,7 @@ WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT ? OFFSET ?;
 
@@ -183,6 +189,7 @@ WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
   AND (sqlc.arg(read_filter) = 'all'
        OR (sqlc.arg(read_filter) = 'unread' AND n.read_at IS NULL)
        OR (sqlc.arg(read_filter) = 'read'   AND n.read_at IS NOT NULL))
@@ -207,7 +214,8 @@ INNER JOIN workspace_members wm
 WHERE n.recipient_user_id = ?
   AND n.read_at IS NULL
   AND n.archived_at IS NULL
-  AND n.enabled = TRUE;
+  AND n.enabled = TRUE
+  AND n.channel = 'in_app';
 
 -- name: CountUnreadNotificationsForWorkspace :one
 -- Count unread notifications for a user within a specific workspace.
@@ -221,7 +229,8 @@ WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.read_at IS NULL
   AND n.archived_at IS NULL
-  AND n.enabled = TRUE;
+  AND n.enabled = TRUE
+  AND n.channel = 'in_app';
 
 -- name: MarkNotificationRead :execrows
 -- Mark a single notification as read.

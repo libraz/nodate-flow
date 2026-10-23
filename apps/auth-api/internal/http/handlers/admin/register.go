@@ -184,7 +184,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/admin/settings",
 		Summary:     "List instance settings",
-		Description: "Returns every mutable instance-level setting (registration toggles, password policy, etc.) for the admin Settings panel.",
+		Description: "Returns the stored instance-level settings whose key the server accepts. No key is accepted today: registration, MFA policy and workspace/member limits are governed by deployment configuration, so the list is empty.",
 		Tags:        []string{"Admin"},
 	}, ListSettings(deps))
 
@@ -193,7 +193,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/admin/settings",
 		Summary:     "Update instance settings",
-		Description: "Patches one or more instance-level settings. Each settings change is recorded in the audit log and takes effect immediately for new requests.",
+		Description: "Patches instance-level settings whose key the server accepts. No key is accepted today, so any key is refused with 400 INSTANCE.SETTINGS.INVALID_KEY; an accepted change would be recorded in the audit log.",
 		Tags:        []string{"Admin"},
 	}, PatchSettings(deps))
 }

@@ -35,7 +35,6 @@ func TestNewHandlerRegistersTools(t *testing.T) {
 		"add_favorite",
 		"add_reaction",
 		"list_reactions",
-		"list_recent",
 		"list_intake_items",
 		"triage_intake_item",
 		"convert_intake_to_task",

@@ -6,6 +6,11 @@ export const IntegrationGoogleErrors = {
     status: 401,
     message: "Google push channel token verification failed",
   },
+  INTEGRATION_GOOGLE_WEBHOOK_PAYLOAD_UNPARSEABLE: {
+    code: "INTEGRATION.GOOGLE.WEBHOOK_PAYLOAD_UNPARSEABLE",
+    status: 400,
+    message: "Google push notification body could not be read",
+  },
 } as const;
 
 export type IntegrationGoogleErrorCode = (typeof IntegrationGoogleErrors)[keyof typeof IntegrationGoogleErrors]["code"];

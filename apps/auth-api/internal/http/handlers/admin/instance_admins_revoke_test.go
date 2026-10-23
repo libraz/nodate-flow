@@ -297,3 +297,68 @@ func TestPatchUser_RefusesSuspendingTheLastEnabledAdmin(t *testing.T) {
 	assert.Empty(t, sink.actions())
 	assert.Equal(t, 1, enabledAdmins(t, db), "the admin must still be enabled")
 }
+
+// TestDeleteUser_RefusesDeletingTheLastEnabledAdmin holds the hard delete
+// to the rule suspending and revoking follow: the instance keeps an
+// enabled admin, the refusal records nothing, and the user survives.
+func TestDeleteUser_RefusesDeletingTheLastEnabledAdmin(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, "DELETE FROM instance_admins")
+	require.NoError(t, err)
+	actorID := setupNewUser(t, q)
+	onlyAdmin := setupNewUser(t, q)
+	grantAdmin(t, q, onlyAdmin)
+
+	sink := &recordingSink{}
+	deps := Deps{DB: db, Queries: q, Audit: sink}
+	confirm := true
+	in := &DeleteUserInput{UserID: userPublicID(t, db, onlyAdmin).String()}
+	in.Body.Confirm = &confirm
+	_, err = DeleteUser(deps)(authn.WithActor(ctx, actorID), in)
+
+	var prob *handlerutil.ProblemDetails
+	require.ErrorAs(t, err, &prob)
+	assert.Equal(t, "INSTANCE.ADMIN.LAST_ADMIN", prob.Type)
+	assert.Empty(t, sink.actions())
+	assert.Equal(t, 1, enabledAdmins(t, db), "the admin must survive the refused delete")
+}
+
+// TestDeleteUser_RefusesDeletingAWorkspacesLastOwner holds the hard delete
+// to the rule member removal follows: a workspace keeps an owner, so the
+// account of its only owner is not deleted out from under it.
+func TestDeleteUser_RefusesDeletingAWorkspacesLastOwner(t *testing.T) {
+	db := requireSetupDB(t)
+	q := generated.New(db)
+	ctx := context.Background()
+
+	actorID := setupNewUser(t, q)
+	grantAdmin(t, q, actorID)
+	owner := setupNewUser(t, q)
+	wsPub := types.New()
+	res, err := db.ExecContext(ctx, `INSERT INTO workspaces (public_id, slug, name) VALUES (?, ?, ?)`,
+		wsPub, "last-owner-"+wsPub.String()[:8], "Last owner")
+	require.NoError(t, err)
+	wsID, err := res.LastInsertId()
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO workspace_members (public_id, workspace_id, user_id, role) VALUES (?, ?, ?, 'owner')`,
+		types.New(), wsID, owner)
+	require.NoError(t, err)
+
+	sink := &recordingSink{}
+	deps := Deps{DB: db, Queries: q, Audit: sink}
+	confirm := true
+	in := &DeleteUserInput{UserID: userPublicID(t, db, owner).String()}
+	in.Body.Confirm = &confirm
+	_, err = DeleteUser(deps)(authn.WithActor(ctx, actorID), in)
+
+	var prob *handlerutil.ProblemDetails
+	require.ErrorAs(t, err, &prob)
+	assert.Equal(t, "WS.MEMBER.LAST_OWNER", prob.Type)
+	assert.Empty(t, sink.actions())
+	var n int
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE id = ?", owner).Scan(&n))
+	assert.Equal(t, 1, n, "the owner's account must survive the refused delete")
+}

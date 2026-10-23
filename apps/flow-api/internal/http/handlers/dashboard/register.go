@@ -60,7 +60,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/dashboard/widgets/{widgetId}",
 		Summary:     "Soft-delete a dashboard widget",
-		Description: "Marks the widget as removed without erasing config so an undo affordance can restore it. Idempotent.",
+		Description: "Marks the widget as removed without erasing config so an undo affordance can restore it. Returns 404 WS.DASHBOARD_WIDGET.NOT_FOUND when the widget is already removed.",
 		Tags:        []string{"Admin"},
 	}, Delete(deps))
 }

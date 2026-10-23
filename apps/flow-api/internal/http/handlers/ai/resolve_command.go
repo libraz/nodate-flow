@@ -2,11 +2,11 @@ package ai
 
 import (
 	"context"
-	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlcommand"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -46,13 +46,7 @@ func ResolveCommand(deps Deps) func(context.Context, *ResolveCommandInput) (*Res
 
 		tc, err := deps.NlCommand.Resolve(ctx, in.Body.Prompt)
 		if err != nil {
-			if errors.Is(err, nlcommand.ErrBudgetExceeded) {
-				return nil, httpErr(apierrors.AiCostGuardExceeded)
-			}
-			if errors.Is(err, nlcommand.ErrUnresolvable) {
-				return nil, httpErr(apierrors.AiResponseInvalidJson)
-			}
-			return nil, mapProviderError(err)
+			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 		}
 
 		// Audit the resolved command so usage analytics and cost tracking

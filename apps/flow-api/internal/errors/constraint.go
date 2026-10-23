@@ -4,8 +4,6 @@ package errors
 
 // Error codes and specs.
 var (
-	// CONSTRAINT.EVAL.DATE_PARSING_FAILED — Constraint date argument could not be parsed as YYYY-MM-DD
-	ConstraintEvalDateParsingFailed = &Spec{Code: "CONSTRAINT.EVAL.DATE_PARSING_FAILED", Status: 422, Message: "Constraint date argument could not be parsed as YYYY-MM-DD", Description: "Returned when a time.* builtin receives a non-parseable date literal {value} at evaluation time.", UserAction: "Send the date as a YYYY-MM-DD string (for example 2026-04-08)."}
 	// CONSTRAINT.PARSE.EMPTY_TERMS — Constraint and/or requires at least one term
 	ConstraintParseEmptyTerms = &Spec{Code: "CONSTRAINT.PARSE.EMPTY_TERMS", Status: 422, Message: "Constraint and/or requires at least one term", Description: "Returned when an and / or node is supplied with an empty terms list.", UserAction: "Add at least one child expression to the and / or node."}
 	// CONSTRAINT.PARSE.INVALID_JSON — Constraint expression is not valid JSON

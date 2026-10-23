@@ -155,6 +155,8 @@ func TestAdminDeleteUserAuditLandsInInstanceTable(t *testing.T) {
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 	adminUID := internalUserID(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, target)
 	out := adminDeleteUser(t, admin.AccessToken, target.UserPublicID)
 	require.Truef(t, out.Deleted, "admin user delete must report deleted=true; got %+v", out)
 

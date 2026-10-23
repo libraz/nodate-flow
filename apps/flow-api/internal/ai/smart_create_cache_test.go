@@ -32,3 +32,31 @@ func TestProposalCacheKeyFollowsVisibility(t *testing.T) {
 		t.Error("elevated callers read the same set and may share an entry")
 	}
 }
+
+// TestProposeStepsCacheKeyFollowsVisibilityAndChildren holds the
+// decomposition cache to every prompt input: the actor's readable set
+// and the existing children the model is told not to duplicate.
+func TestProposeStepsCacheKeyFollowsVisibilityAndChildren(t *testing.T) {
+	t.Parallel()
+
+	owner := acl.VisibilityArgs{IsElevated: 1, ActorUserID: 10}
+	member := acl.VisibilityArgs{IsElevated: 0, ActorUserID: 12}
+	one := []ChildTaskSummary{{Title: "Draft", State: "open"}}
+	two := append([]ChildTaskSummary{}, one[0], ChildTaskSummary{Title: "Review", State: "open"})
+	key := func(vis acl.VisibilityArgs, children []ChildTaskSummary) string {
+		return proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, children, vis)
+	}
+
+	if key(owner, one) == key(member, one) {
+		t.Error("a member must not be served steps cached for an elevated caller")
+	}
+	if key(member, one) == key(member, two) {
+		t.Error("adding a subtask must change the propose-steps cache key")
+	}
+	if key(member, one) == key(member, []ChildTaskSummary{{Title: "Draft", State: "done"}}) {
+		t.Error("a child's state is in the prompt and must be in the key")
+	}
+	if key(member, one) != key(member, []ChildTaskSummary{{Title: "Draft", State: "open"}}) {
+		t.Error("identical inputs must share an entry")
+	}
+}

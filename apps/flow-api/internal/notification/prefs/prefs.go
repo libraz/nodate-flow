@@ -38,7 +38,10 @@ var Categories = []string{
 	CategoryAI,
 }
 
-// Channels lists every delivery channel in display order.
+// Channels lists every delivery channel in display order. Only in_app
+// has a transport: the preference write refuses the others and the bell
+// lists and counts read in_app alone, so the matrix renders email and
+// push at their off default.
 var Channels = []generated.NotificationsChannel{
 	generated.NotificationsChannelInApp,
 	generated.NotificationsChannelEmail,

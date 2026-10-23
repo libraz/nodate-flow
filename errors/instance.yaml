@@ -125,15 +125,3 @@ resources:
         message_zh: "设置值无效"
         description: "Returned when a setting value does not pass validation for its key."
         userAction: "Check the expected format for this setting."
-
-  quota:
-    breadcrumb: "Instance > Quota"
-    errors:
-      exceeded:
-        code: INSTANCE.QUOTA.EXCEEDED
-        status: 429
-        message: "Instance quota has been exceeded"
-        message_ja: "インスタンスの利用上限を超えました"
-        message_zh: "实例使用配额已超出"
-        description: "Returned when an instance-wide resource quota (workspaces, users, storage) is exhausted."
-        userAction: "Contact your instance administrator to raise the quota."

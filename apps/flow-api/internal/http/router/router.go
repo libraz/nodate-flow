@@ -592,6 +592,18 @@ type sharedDeps struct {
 // the AI orchestrator. The wiring decisions (mock vs. workspace
 // resolver, embed provider, NL compilers) are concentrated here so the
 // individual builder functions stay focused on huma.Register calls.
+// newPageDeps builds the pages handlers' dependencies. Page generation
+// runs on the shared AI orchestrator, the same one every other AI
+// surface uses; with none configured the generator stays a nil interface
+// so the handler answers AI.PROVIDER.NOT_CONFIGURED.
+func newPageDeps(deps Deps, shared *sharedDeps) pages.Deps {
+	d := pages.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
+	if shared.aiOrch != nil {
+		d.Generator = shared.aiOrch
+	}
+	return d
+}
+
 func buildSharedDeps(deps Deps) *sharedDeps {
 	auditRec := audit.New(deps.Queries)
 	mutationRec := mutationlog.New(deps.DB, deps.Queries)
@@ -803,7 +815,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec},
+		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec, Mutations: mutationRec},
 		signalDeps: signals.Deps{
 			DB:                 deps.DB,
 			Queries:            deps.Queries,
@@ -990,14 +1002,13 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		labels.RegisterWorkspaceScoped(subAPI, labelDeps)
 		lensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		lenses.RegisterWorkspaceScoped(subAPI, lensDeps)
-		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		exportDeps := exporthandlers.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		exporthandlers.RegisterWorkspaceScoped(subAPI, exportDeps)
 		tbDeps := timeboxes.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		timeboxes.RegisterWorkspaceScoped(subAPI, tbDeps)
-		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
+		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
-		pageDeps := pages.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
-		pages.RegisterWorkspaceScoped(subAPI, pageDeps)
+		pages.RegisterWorkspaceScoped(subAPI, newPageDeps(deps, shared))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,
@@ -1139,7 +1150,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		tasks.RegisterWorkspaceScoped(subAPI, shared.taskDeps)
 
 		// AI-powered smart task creation (propose + apply).
-		smartCreateDeps := tasks.SmartCreateDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Audit: shared.auditRec}
+		smartCreateDeps := tasks.SmartCreateDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Mutations: shared.mutationRec}
 		tasks.RegisterSmartCreate(subAPI, smartCreateDeps)
 
 		// Realtime SSE stream for this workspace. Not a Huma
@@ -1274,7 +1285,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	labelTaskDeps := labels.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 	relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 	reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
-	stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Audit: shared.auditRec}
+	stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Mutations: shared.mutationRec}
 
 	// Read group: RequireTaskAccess only.
 	r.Group(func(sub chi.Router) {
@@ -1511,7 +1522,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}",
 			Summary:     "Delete a public share page (admin or owner only)",
-			Description: "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.",
+			Description: "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Returns 404 SHARE.SHARE.NOT_FOUND when the share is already removed.",
 			Tags:        []string{"Public"},
 		}, calendars.DeletePublicShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1527,7 +1538,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}",
 			Summary:     "Detach an event from a public share page",
-			Description: "Unpublishes the named event from the share page without deleting the event itself. Idempotent.",
+			Description: "Unpublishes the named event from the share page without deleting the event itself. Returns 404 SHARE.SHARE_EVENT.NOT_FOUND when the event is not on the share.",
 			Tags:        []string{"Public"},
 		}, calendars.DetachEventFromShare(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1612,7 +1623,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}",
 			Summary:     "Delete an event",
-			Description: "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.",
+			Description: "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Returns 404 CALENDAR.EVENT.NOT_FOUND when the event is already removed.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DeleteEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1806,7 +1817,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}",
 			Summary:     "Delete a checklist item",
-			Description: "Removes the named checklist item. Idempotent.",
+			Description: "Removes the named checklist item. Returns 404 CALENDAR.CHECKLIST.ITEM_NOT_FOUND when the item is already removed.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DeleteChecklistItem(shared.calDeps))
 
@@ -1840,7 +1851,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}",
 			Summary:     "Delete a memo",
-			Description: "Removes the memo. Idempotent.",
+			Description: "Removes the memo. Returns 404 CALENDAR.MEMO.NOT_FOUND when the memo is already removed.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DeleteMemo(shared.calDeps))
 
@@ -1882,7 +1893,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodDelete,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}",
 			Summary:     "Delete an attachment from an event",
-			Description: "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.",
+			Description: "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Returns 404 CALENDAR.ATTACHMENT.NOT_FOUND when the attachment is already removed.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DeleteAttachment(shared.calDeps))
 	})
@@ -2117,6 +2128,12 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		if rec.AgentID != 0 {
 			agentID = sql.NullInt32{Int32: int32(rec.AgentID), Valid: true} //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
+		// A prompt that quotes one task is recorded against it, so the
+		// list endpoints apply that task's visibility to the row.
+		var taskID sql.NullInt32
+		if rec.TaskID != 0 {
+			taskID = sql.NullInt32{Int32: int32(rec.TaskID), Valid: true} //#nosec G115 -- task id is tasks.id (INT UNSIGNED), fits int32 within realistic deployments
+		}
 		var response sql.NullString
 		if rec.ResponseRedacted != "" {
 			response = sql.NullString{String: rec.ResponseRedacted, Valid: true}
@@ -2163,7 +2180,7 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 			ProviderID:       providerID,
 			UserID:           userID,
 			AgentID:          agentID,
-			TaskID:           sql.NullInt32{},
+			TaskID:           taskID,
 			Purpose:          rec.Purpose,
 			Model:            model,
 			PromptRedacted:   rec.PromptRedacted,

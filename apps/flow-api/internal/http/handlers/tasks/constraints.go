@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -12,6 +11,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // constraintParseErr maps a constraint.Parse failure to the matching
@@ -52,9 +52,10 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 		if _, err := constraint.Parse([]byte(in.Body.Expression)); err != nil {
 			return nil, httpErr(constraintParseErr(err))
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		pub := types.New()
 		taskInternal := int64(task.ID)
-		// Insert and append atomically so a crash between the insert and a
+		// Insert and record atomically so a crash between the insert and a
 		// post-commit append cannot lose the timeline row.
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddConstraint", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			qtx := deps.Queries.WithTx(tx.RawTx())
@@ -67,28 +68,21 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 			}); e != nil {
 				return e
 			}
-			return eventbus.Append(ctx, tx, eventbus.Event{
-				Type:        eventbus.TaskConstraintAdded,
-				WorkspaceID: ws.ID,
-				ActorUserID: actorPtr(ctx),
-				TaskID:      &taskInternal,
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskConstraintAdded,
+				AuditAction:  "task.constraint.add",
+				ResourceType: "task_constraint",
+				ResourceID:   pub.String(),
+				TaskID:       &taskInternal,
 				Payload: map[string]any{
 					"taskId":       task.PublicID.String(),
 					"constraintId": pub.String(),
 					"kind":         in.Body.Kind,
 				},
+				CallSite: "tasks.AddConstraint",
 			})
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.constraint.add",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task_constraint",
-				ResourceID:   pub.String(),
-			})
 		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskConstraintOutput{Body: TaskConstraint{
@@ -114,40 +108,45 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		affected, err := deps.Queries.DeleteConstraint(ctx, generated.DeleteConstraintParams{
-			WorkspaceID: ws.ID,
-			PublicID:    cid,
-			TaskID:      task.ID,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		// 0 rows means the constraint does not exist on this task's path (it
-		// may belong to a sibling task). Return NOT_FOUND so a no-op is
-		// distinguishable from a real delete and one task cannot delete
-		// another task's constraint.
-		if affected == 0 {
-			return nil, httpErr(apierrors.WsTaskNotFound)
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.TaskConstraintRemoved,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			TaskID:      &taskInternal,
-			Payload: map[string]any{
-				"taskId":       task.PublicID.String(),
-				"constraintId": cid.String(),
-			},
-		}, "tasks.RemoveConstraint")
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.constraint.remove",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
+		var answered error
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.RemoveConstraint", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			answered = nil
+			affected, err := deps.Queries.WithTx(tx.RawTx()).DeleteConstraint(ctx, generated.DeleteConstraintParams{
+				WorkspaceID: ws.ID,
+				PublicID:    cid,
+				TaskID:      task.ID,
+			})
+			if err != nil {
+				return err
+			}
+			// 0 rows means the constraint does not exist on this task's path
+			// (it may belong to a sibling task). Return NOT_FOUND so a no-op
+			// is distinguishable from a real delete and one task cannot
+			// delete another task's constraint.
+			if affected == 0 {
+				answered = httpErr(apierrors.WsTaskConstraintNotFound)
+				return answered
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskConstraintRemoved,
+				AuditAction:  "task.constraint.remove",
 				ResourceType: "task_constraint",
 				ResourceID:   cid.String(),
+				TaskID:       &taskInternal,
+				Payload: map[string]any{
+					"taskId":       task.PublicID.String(),
+					"constraintId": cid.String(),
+				},
+				CallSite: "tasks.RemoveConstraint",
 			})
+		})
+		if answered != nil {
+			return nil, answered
+		}
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskConstraintOutput{}

@@ -75,9 +75,11 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 					CreatedAt:   r.CreatedAt.Unix(),
 				})
 			}
-			if len(rows) > 0 {
-				out.Body.Total = totalAsInt64(rows[0].Total)
+			total, err := deps.Queries.CountInbox(ctx, wsID)
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			out.Body.Total = total
 			return out, nil
 		}
 
@@ -118,9 +120,11 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 				CreatedAt:   r.CreatedAt.Unix(),
 			})
 		}
-		if len(rows) > 0 {
-			out.Body.Total = totalAsInt64(rows[0].Total)
+		total, err := deps.Queries.CountInboxForUser(ctx, actorID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		out.Body.Total = total
 		return out, nil
 	}
 }

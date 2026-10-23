@@ -76,8 +76,9 @@ ORDER BY t.created_at DESC, t.id DESC
 LIMIT ?;
 
 -- name: ExportTasksForLens :many
--- Fetch tasks for export scoped to a workspace + project (lens-scoped).
--- Lens filter/sort logic is applied in Go code; this provides the data set.
+-- Fetch tasks for export scoped to a workspace + project. It applies no
+-- lens filter: the REST lens export reads lenses through the shared lens
+-- filter reader instead.
 SELECT
   t.public_id,
   t.title,

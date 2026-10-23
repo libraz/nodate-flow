@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -15,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // shiftRefusal answers which refusal shifting an event on a calendar of
@@ -163,15 +163,13 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 			return nil, translateItemkitTaskError(err)
 		}
 
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "calendar_event.shift.apply",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "calendar_event",
-				ResourceID:   in.EventID,
-			})
-		}
+		// itemkit appended the shift events in the transaction.
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "calendar_event.shift.apply",
+			ResourceType: "calendar_event",
+			ResourceID:   in.EventID,
+			CallSite:     "tasks.ApplyShift",
+		})
 
 		var delta int64
 		if oldStart.Valid {

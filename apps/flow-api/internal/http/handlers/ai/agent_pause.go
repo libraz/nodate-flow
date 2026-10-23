@@ -2,14 +2,19 @@ package ai
 
 import (
 	"context"
+	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
+
+// errAgentNotFound rolls a pause back when the agent is not there, so no
+// event or audit row describes it.
+var errAgentNotFound = errors.New("ai: agent not found")
 
 // PauseAgentInput is the body for POST /workspaces/{wsId}/ai/agents/{agentId}/pause.
 type PauseAgentInput struct {
@@ -43,47 +48,49 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		const q = `UPDATE ai_agents
-			SET paused = ?
-			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE`
-		res, err := deps.DB.ExecContext(ctx, q, in.Body.Paused, ws.ID, agentPub)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if n == 0 {
-			exists, eerr := agentExists(ctx, deps.DB, ws.ID, agentPub)
-			if eerr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			if !exists {
-				return nil, httpErr(apierrors.AiAgentNotFound)
-			}
-		}
 		kind := eventbus.AiAgentResumed
 		if in.Body.Paused {
 			kind = eventbus.AiAgentPaused
 		}
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        kind,
-			WorkspaceID: ws.ID,
-			Payload: map[string]any{
-				"agentId": agentPub.String(),
-				"paused":  in.Body.Paused,
-			},
-		}, "ai.PauseAgent")
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "ai_agent.pause",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		const q = `UPDATE ai_agents
+			SET paused = ?
+			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE`
+		err = dbretry.InTx(ctx, deps.DB, "ai.PauseAgent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			res, err := tx.ExecContext(ctx, q, in.Body.Paused, ws.ID, agentPub)
+			if err != nil {
+				return err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				exists, err := agentExists(ctx, tx, ws.ID, agentPub)
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return errAgentNotFound
+				}
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    kind,
+				AuditAction:  "ai_agent.pause",
 				ResourceType: "ai_agent",
 				ResourceID:   agentPub.String(),
-				Metadata:     map[string]any{"paused": in.Body.Paused},
+				Payload: map[string]any{
+					"agentId": agentPub.String(),
+					"paused":  in.Body.Paused,
+				},
+				CallSite: "ai.PauseAgent",
 			})
+		})
+		if errors.Is(err, errAgentNotFound) {
+			return nil, httpErr(apierrors.AiAgentNotFound)
+		}
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		out := &PauseAgentOutput{}
 		out.Body.Ok = true

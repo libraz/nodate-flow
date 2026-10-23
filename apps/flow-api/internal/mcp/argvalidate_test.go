@@ -313,8 +313,8 @@ func TestValidateArgsAcceptsEmptyArguments(t *testing.T) {
 	t.Parallel()
 
 	for _, raw := range []json.RawMessage{nil, json.RawMessage("{}")} {
-		if err := validateArgsAgainstSchema(toolSchema(t, "list_projects"), raw); err != nil {
-			t.Fatalf("list_projects takes no arguments but %q was refused: %v", string(raw), err)
+		if err := validateArgsAgainstSchema(toolSchema(t, "list_calendars"), raw); err != nil {
+			t.Fatalf("list_calendars takes no arguments but %q was refused: %v", string(raw), err)
 		}
 	}
 }

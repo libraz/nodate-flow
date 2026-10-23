@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 )
 
 type fakeOnEventQuerier struct {
@@ -236,7 +238,7 @@ func TestDispatchConcurrencyIsBounded(t *testing.T) {
 	var inFlight, peak int32
 	counting := &countingQuerier{inner: q, inFlight: &inFlight, peak: &peak}
 
-	et := &EventTrigger{Queries: counting, Queue: NewInProcessQueue(64), DispatchConcurrency: 2}
+	et := &EventTrigger{Queries: counting, Queue: NewInProcessQueue(64), Runner: bgloop.NewHookRunner("test", 2, 0)}
 	hook := et.NotifyHook()
 	for i := 0; i < 8; i++ {
 		hook(context.Background(), 1, "task.updated", 0)

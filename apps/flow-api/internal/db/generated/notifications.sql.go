@@ -80,6 +80,7 @@ WHERE n.recipient_user_id = ?
   AND n.read_at IS NULL
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 `
 
 // Count unread notifications for a user across all workspaces.
@@ -105,6 +106,7 @@ WHERE n.workspace_id = ?
   AND n.read_at IS NULL
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 `
 
 type CountUnreadNotificationsForWorkspaceParams struct {
@@ -305,6 +307,7 @@ LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT ? OFFSET ?
 `
@@ -339,6 +342,9 @@ type ListNotificationsForUserRow struct {
 // Excludes archived and disabled notifications. The workspace_members join
 // is what "their workspaces" means: rows from a workspace the user has
 // left stop being listed, on this and every sibling list and count.
+// The bell is the in_app channel, and every sibling reads that channel
+// alone: a row written for another channel is the same notification and
+// must not be listed or counted a second time.
 func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNotificationsForUser, arg.RecipientUserID, arg.Limit, arg.Offset)
 	if err != nil {
@@ -408,6 +414,7 @@ LEFT JOIN users au ON au.id = n.actor_user_id
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
   AND (? = 'all'
        OR (? = 'unread' AND n.read_at IS NULL)
        OR (? = 'read'   AND n.read_at IS NOT NULL))
@@ -541,6 +548,7 @@ WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT ? OFFSET ?
 `
@@ -648,6 +656,7 @@ WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
+  AND n.channel = 'in_app'
   AND (? = 'all'
        OR (? = 'unread' AND n.read_at IS NULL)
        OR (? = 'read'   AND n.read_at IS NOT NULL))

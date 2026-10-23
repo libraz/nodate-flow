@@ -36,6 +36,40 @@ func (q *Queries) ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemPara
 	return result.RowsAffected()
 }
 
+const countInbox = `-- name: CountInbox :one
+SELECT COUNT(*) AS total
+FROM v_inbox v
+WHERE v.workspace_id = ?
+`
+
+// Count of a workspace's inbox, the total ListInbox pages through. It is
+// a bare count so the per-row visibility expression the list computes is
+// evaluated only for the rows a page returns.
+func (q *Queries) CountInbox(ctx context.Context, workspaceID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countInbox, workspaceID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
+const countInboxForUser = `-- name: CountInboxForUser :one
+SELECT COUNT(*) AS total
+FROM v_inbox v
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = v.workspace_id
+  AND wm.user_id = ?
+  AND wm.enabled = TRUE
+`
+
+// Count of the actor's cross-workspace inbox, the total ListInboxForUser
+// pages through.
+func (q *Queries) CountInboxForUser(ctx context.Context, userID uint32) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countInboxForUser, userID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const getInboxItemTaskVisible = `-- name: GetInboxItemTaskVisible :one
 SELECT
   (
@@ -131,8 +165,7 @@ SELECT
   v.payload_json,
   v.received_at,
   v.updated_at,
-  v.created_at,
-  COUNT(*) OVER() AS total
+  v.created_at
 FROM v_inbox v
 WHERE v.workspace_id = ?
 ORDER BY v.received_at DESC, v.public_id DESC
@@ -163,7 +196,6 @@ type ListInboxRow struct {
 	ReceivedAt        time.Time       `json:"receivedAt"`
 	UpdatedAt         sql.NullTime    `json:"updatedAt"`
 	CreatedAt         time.Time       `json:"createdAt"`
-	Total             interface{}     `json:"total"`
 }
 
 // List a workspace's inbox via v_inbox.
@@ -205,7 +237,6 @@ func (q *Queries) ListInbox(ctx context.Context, arg ListInboxParams) ([]ListInb
 			&i.ReceivedAt,
 			&i.UpdatedAt,
 			&i.CreatedAt,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}
@@ -260,8 +291,7 @@ SELECT
   v.payload_json,
   v.received_at,
   v.updated_at,
-  v.created_at,
-  COUNT(*) OVER() AS total
+  v.created_at
 FROM v_inbox v
 INNER JOIN workspace_members wm
   ON wm.workspace_id = v.workspace_id
@@ -295,7 +325,6 @@ type ListInboxForUserRow struct {
 	ReceivedAt        time.Time       `json:"receivedAt"`
 	UpdatedAt         sql.NullTime    `json:"updatedAt"`
 	CreatedAt         time.Time       `json:"createdAt"`
-	Total             interface{}     `json:"total"`
 }
 
 // List inbox items across every workspace the actor is an active member of.
@@ -330,7 +359,6 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 			&i.ReceivedAt,
 			&i.UpdatedAt,
 			&i.CreatedAt,
-			&i.Total,
 		); err != nil {
 			return nil, err
 		}

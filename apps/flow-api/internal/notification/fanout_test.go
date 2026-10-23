@@ -29,7 +29,7 @@ import (
 func TestHook_DetachesFromParentContext(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	f.SetTimeout(2 * time.Second)
 
 	done := make(chan struct{})
@@ -74,7 +74,7 @@ func TestHook_DetachesFromParentContext(t *testing.T) {
 func TestHook_TimeoutAborts(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	f.SetTimeout(50 * time.Millisecond)
 
 	done := make(chan struct{})
@@ -119,7 +119,7 @@ func TestHook_TimeoutAborts(t *testing.T) {
 func TestShutdown_WaitsForInFlight(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	f.SetTimeout(5 * time.Second)
 
 	release := make(chan struct{})
@@ -186,7 +186,7 @@ func TestShutdown_WaitsForInFlight(t *testing.T) {
 func TestShutdown_ContextDeadline(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	f.SetTimeout(5 * time.Second)
 
 	release := make(chan struct{})
@@ -225,7 +225,7 @@ func TestShutdown_ContextDeadline(t *testing.T) {
 func TestLoadPreferencesWithRetry_TransientErrorRecovers(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 
 	var calls atomic.Int32
 	wantRow := generated.GetNotificationPreferencesForRecipientsRow{
@@ -262,7 +262,7 @@ func TestLoadPreferencesWithRetry_TransientErrorRecovers(t *testing.T) {
 func TestLoadPreferencesWithRetry_PersistentErrorPropagates(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 
 	var calls atomic.Int32
 	dbErr := errors.New("driver: bad connection")
@@ -291,7 +291,7 @@ func TestLoadPreferencesWithRetry_PersistentErrorPropagates(t *testing.T) {
 func TestLoadPreferencesWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 
 	var calls atomic.Int32
 	f.fetchPreferences = func(_ context.Context, _ generated.GetNotificationPreferencesForRecipientsParams) ([]generated.GetNotificationPreferencesForRecipientsRow, error) {
@@ -364,7 +364,7 @@ func TestFanout_SilentKindAnnouncesNothing(t *testing.T) {
 	}
 
 	var announced atomic.Int64
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	f.SetNotificationPublisher(func(context.Context, uint32) { announced.Add(1) })
 
 	f.fanout(context.Background(), 1, string(kind), 1)
@@ -516,7 +516,7 @@ func TestMentionRecipients(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := NewFanout(nil, nil, nil)
+			f := NewFanout(nil, nil)
 			stubRecipientSeams(f, readers, byPublicID, nil, nil)
 			got, err := f.recipientsFor(context.Background(), 1, classifications[eventbus.MentionCreated], taskEvent(tc.payload))
 			if err != nil {
@@ -535,7 +535,7 @@ func TestMentionRecipients(t *testing.T) {
 func TestMentionRecipients_ResolutionFailurePropagates(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	stubRecipientSeams(f, []uint32{1, 2}, nil, nil, nil)
 	f.resolveMembers = func(_ context.Context, _ generated.FindWorkspaceMemberUserInternalIdsByPublicIdsParams) ([]generated.FindWorkspaceMemberUserInternalIdsByPublicIdsRow, error) {
 		return nil, errors.New("driver: bad connection")
@@ -593,7 +593,7 @@ func TestAddressedKindsReachOnlyTheNamedUser(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := NewFanout(nil, nil, nil)
+			f := NewFanout(nil, nil)
 			stubRecipientSeams(f, tc.readers, byPublicID, actors, []uint32{carol})
 			got, err := f.recipientsFor(context.Background(), 1, classifications[tc.kind], taskEvent(tc.payload))
 			if err != nil {
@@ -613,7 +613,7 @@ func TestAddressedKindsReachOnlyTheNamedUser(t *testing.T) {
 func TestDeletionKindReadsTheDisabledTask(t *testing.T) {
 	t.Parallel()
 
-	f := NewFanout(nil, nil, nil)
+	f := NewFanout(nil, nil)
 	var askedDisabled bool
 	f.listReaders = func(_ context.Context, _, _ uint32, includeDisabled bool) ([]uint32, error) {
 		askedDisabled = includeDisabled

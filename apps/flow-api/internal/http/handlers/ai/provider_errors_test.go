@@ -8,8 +8,14 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 )
+
+// aiFailure is the answer this package's AI handlers give for err.
+func aiFailure(err error) error {
+	return handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
+}
 
 // problemOf digs the canonical problem envelope out of a handler error.
 func problemOf(t *testing.T, err error) *handlerutil.ProblemDetails {
@@ -42,7 +48,7 @@ func TestRefusedEndpointDoesNotReadAsANetworkFault(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := problemOf(t, mapProviderError(tc.err)).Type
+			got := problemOf(t, aiFailure(tc.err)).Type
 			if got == apierrors.AiProviderUpstreamUnreachable.Code {
 				t.Fatal("a refused endpoint must not be reported as an unreachable upstream")
 			}
@@ -59,7 +65,7 @@ func TestRefusedEndpointDoesNotReadAsANetworkFault(t *testing.T) {
 func TestGenuineTransportFailureStaysUnreachable(t *testing.T) {
 	t.Parallel()
 
-	got := problemOf(t, mapProviderError(fmt.Errorf("complete: %w", providers.ErrUpstreamUnreachable))).Type
+	got := problemOf(t, aiFailure(fmt.Errorf("complete: %w", providers.ErrUpstreamUnreachable))).Type
 	if got != apierrors.AiProviderUpstreamUnreachable.Code {
 		t.Fatalf("code = %s, want %s", got, apierrors.AiProviderUpstreamUnreachable.Code)
 	}
@@ -77,7 +83,7 @@ func TestGenuineTransportFailureStaysUnreachable(t *testing.T) {
 func TestUnsealableKeyNamesTheSecretRatherThanTheNetwork(t *testing.T) {
 	t.Parallel()
 
-	pd := problemOf(t, mapProviderError(fmt.Errorf("anthropic: decrypt key: %w", providers.ErrKeyDecryptFailed)))
+	pd := problemOf(t, aiFailure(fmt.Errorf("anthropic: decrypt key: %w", providers.ErrKeyDecryptFailed)))
 	if pd.Type == apierrors.AiProviderUpstreamUnreachable.Code {
 		t.Fatal("an unsealable key must not be reported as an unreachable upstream")
 	}
@@ -116,7 +122,7 @@ func TestCreateProviderErrorNamesTheEndpointPolicy(t *testing.T) {
 func TestBaseUrlErrorTellsTheOperatorHowToAllowIt(t *testing.T) {
 	t.Parallel()
 
-	pd := problemOf(t, mapProviderError(providers.ErrBaseURLDestinationNotAllowed))
+	pd := problemOf(t, aiFailure(providers.ErrBaseURLDestinationNotAllowed))
 	if pd.Status != 412 {
 		t.Errorf("status = %d, want 412 (the configuration is what has to change)", pd.Status)
 	}

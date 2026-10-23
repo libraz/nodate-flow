@@ -168,6 +168,8 @@ func TestUserDeleteRemovesAvatarRowAndBlob(t *testing.T) {
 	admin := newTenant(t)
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, target)
 	out := adminDeleteUser(t, admin.AccessToken, target.UserPublicID)
 	require.True(t, out.Deleted, "user delete response must report deleted=true")
 	require.GreaterOrEqualf(t, out.StorageObjectsDeleted, int64(1),

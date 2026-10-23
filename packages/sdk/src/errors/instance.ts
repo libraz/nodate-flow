@@ -26,11 +26,6 @@ export const InstanceErrors = {
     status: 404,
     message: "OAuth sign-in allowlist entry not found",
   },
-  INSTANCE_QUOTA_EXCEEDED: {
-    code: "INSTANCE.QUOTA.EXCEEDED",
-    status: 429,
-    message: "Instance quota has been exceeded",
-  },
   INSTANCE_SESSION_NOT_FOUND: {
     code: "INSTANCE.SESSION.NOT_FOUND",
     status: 404,

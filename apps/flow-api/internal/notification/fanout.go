@@ -18,7 +18,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification/prefs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 )
 
@@ -48,13 +47,9 @@ const defaultFanoutConcurrency = 8
 // MarkNotificationDelivered has no caller, so delivered_at stays NULL for
 // the lifetime of the row.
 //
-// That is more than an unimplemented feature, because the list queries
-// carry no channel predicate. A recipient who enables email for a category
-// gets two rows per event and the bell renders both, identically. The fix
-// belongs on the read side — a channel filter on
-// ListNotificationsForUser / …Keyset / …ForWorkspace — not here: dropping
-// the row instead would throw away the delivery record the eventual sender
-// is meant to consume, and would make the stored preference silently inert.
+// The bell lists and counts read the in_app channel only, so a stored
+// email or push opt-in does not show one event twice, and the preference
+// write refuses both until a sender exists.
 
 // Fanout creates per-user notification rows in response to eventbus
 // events. It subscribes via [eventbus.AddNotifyHook] and, for each
@@ -68,7 +63,6 @@ const defaultFanoutConcurrency = 8
 type Fanout struct {
 	db      *sql.DB
 	queries *generated.Queries
-	email   email.Sender
 
 	timeout time.Duration
 	runner  *bgloop.HookRunner
@@ -114,14 +108,11 @@ type Fanout struct {
 	resolveTaskOwners func(ctx context.Context, taskID uint32) ([]uint32, error)
 }
 
-// NewFanout creates a Fanout backed by the given database and email
-// transport. When emailSender is nil or a [email.NoopSender], email
-// delivery is silently skipped.
-func NewFanout(db *sql.DB, q *generated.Queries, emailSender email.Sender) *Fanout {
+// NewFanout creates a Fanout backed by the given database.
+func NewFanout(db *sql.DB, q *generated.Queries) *Fanout {
 	return &Fanout{
 		db:      db,
 		queries: q,
-		email:   emailSender,
 		timeout: defaultFanoutTimeout,
 		runner:  bgloop.NewHookRunner("notification.fanout", defaultFanoutConcurrency, defaultFanoutTimeout),
 	}

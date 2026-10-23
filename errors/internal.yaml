@@ -14,18 +14,6 @@ resources:
         description: "Generic code for an unexpected server-side failure: an unhandled panic, or a store call that failed for a reason the handler has no more specific code for. Always paired with a request_id in the structured log for triage."
         userAction: "Retry; if the problem persists, contact your administrator with the request ID."
 
-  db:
-    breadcrumb: "Internal > Database"
-    errors:
-      unavailable:
-        code: INTERNAL.DB.UNAVAILABLE
-        status: 503
-        message: "Database is temporarily unavailable"
-        message_ja: "データベースに一時的にアクセスできません"
-        message_zh: "数据库暂时不可用"
-        description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress)."
-        userAction: "Retry shortly; contact your administrator if the problem persists."
-
   storage:
     breadcrumb: "Internal > Storage"
     errors:

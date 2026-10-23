@@ -23,7 +23,7 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			return nil, oidcProviderRejection(ctx, "google", in.Error, in.ErrorDescription)
 		}
 		if deps.OIDC == nil {
-			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
+			return nil, httpErr(apierrors.AuthOidcGoogleNotConfigured)
 		}
 		// Verify and consume the state before touching the code. See
 		// consumeOIDCState for what the gate covers.

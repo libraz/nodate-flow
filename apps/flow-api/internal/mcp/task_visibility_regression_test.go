@@ -223,6 +223,8 @@ func TestMCPToolsEnforceTaskVisibility(t *testing.T) {
 		require.Equalf(t, apiErrorCode(t, absentErr), apiErrorCode(t, invisibleErr),
 			"an invisible task and an absent one must be indistinguishable; got %v vs %v",
 			invisibleErr, absentErr)
+		require.Equal(t, apierrors.WsFavoriteNotFound.Code, apiErrorCode(t, absentErr),
+			"an unreachable target is refused with the code REST answers")
 
 		// And nothing was written: a favorite row for a task the caller
 		// cannot see would resurface its id in list_favorites.
@@ -230,9 +232,15 @@ func TestMCPToolsEnforceTaskVisibility(t *testing.T) {
 		require.NoError(t, err)
 		require.NotContains(t, mcpVisJSONString(t, listed), fx.privateTask.String())
 
-		// Positive control: the creator, who can see the task, may favorite it.
+		// Positive control: the creator, who can see the task, may favorite
+		// it, and the favorite then shows up in list_favorites — which is
+		// what makes the absence above mean something.
 		_, err = mcp.RunAddFavorite(ctx, deps, creator, invisible)
 		require.NoError(t, err)
+		creatorListed, err := mcp.RunListFavorites(ctx, deps, creator, mcpVisJSON(t, map[string]any{}))
+		require.NoError(t, err)
+		require.Contains(t, mcpVisJSONString(t, creatorListed), fx.privateTask.String(),
+			"list_favorites must carry the target id for the NotContains above to prove anything")
 	})
 
 	t.Run("resolve_task_ref/not_visible_matches_missing", func(t *testing.T) {

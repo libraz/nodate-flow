@@ -161,6 +161,8 @@ func TestAdminDeleteAfterSuspendUser(t *testing.T) {
 		u.Enabled, string(body))
 
 	// 3. Admin delete must succeed in one shot.
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, target)
 	out := adminDeleteUser(t, admin.AccessToken, target.UserPublicID)
 	require.Truef(t, out.Deleted,
 		"admin delete on a suspended user must report deleted=true (suspension is "+

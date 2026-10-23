@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // reactionListLimit bounds the reactions returned by the MCP
@@ -39,11 +42,12 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if in.Emoji == "" {
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 	}
-	taskInternal, _, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
+	taskInternal, taskPub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
 	taskNullID := sql.NullInt32{Int32: int32(taskInternal), Valid: true} //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+	alreadyReacted := map[string]any{"ok": true, "alreadyReacted": true}
 	// Check for existing reaction to avoid duplicates.
 	_, err = deps.Queries.FindExistingReaction(ctx, generated.FindExistingReactionParams{
 		UserID: s.userID,
@@ -51,34 +55,42 @@ func runAddReaction(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		Emoji:  in.Emoji,
 	})
 	if err == nil {
-		return map[string]any{"ok": true, "alreadyReacted": true}, nil
+		return alreadyReacted, nil
 	}
 	if !stderrors.Is(err, sql.ErrNoRows) {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	pub := newPublicID()
-	if _, err := deps.Queries.CreateReaction(ctx, generated.CreateReactionParams{
-		PublicID:    pub,
-		WorkspaceID: s.workspaceID,
-		UserID:      s.userID,
-		TaskID:      taskNullID,
-		CommentID:   sql.NullInt32{},
-		Emoji:       in.Emoji,
+	taskID64 := int64(taskInternal)
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_reaction", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.Queries.WithTx(tx.RawTx()).CreateReaction(ctx, generated.CreateReactionParams{
+			PublicID:    pub,
+			WorkspaceID: s.workspaceID,
+			UserID:      s.userID,
+			TaskID:      taskNullID,
+			CommentID:   sql.NullInt32{},
+			Emoji:       in.Emoji,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.ReactionAdded,
+			AuditAction:  "reaction.create",
+			ResourceType: "reaction",
+			ResourceID:   pub.String(),
+			TaskID:       &taskID64,
+			Payload:      map[string]any{"taskId": taskPub.String(), "emoji": in.Emoji, "via": "mcp"},
+			CallSite:     "mcp.add_reaction",
+		})
 	}); err != nil {
+		// A concurrent identical add lost the unique key: the reaction the
+		// caller asked for exists, so it gets the same answer as the check
+		// above rather than a failure.
+		if handlerutil.IsDuplicateEntry(err) {
+			return alreadyReacted, nil
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	taskID64 := int64(taskInternal)
-	// Same shape as add_favorite: committed row, and a retry returns on
-	// the existing-reaction check before it could re-append.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.ReactionAdded,
-		AuditAction:  "reaction.create",
-		ResourceType: "reaction",
-		ResourceID:   pub.String(),
-		TaskID:       &taskID64,
-		Payload:      map[string]any{"taskId": in.TaskID, "emoji": in.Emoji, "via": "mcp"},
-		CallSite:     "mcp.add_reaction",
-	})
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 

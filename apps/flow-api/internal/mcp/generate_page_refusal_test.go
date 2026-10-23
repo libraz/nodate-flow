@@ -90,26 +90,20 @@ func TestGeneratePageRefusesAGenerationThatDidNotHappen(t *testing.T) {
 					return unreachableProvider{}, nil
 				}),
 			},
-			want: apierrors.AiProviderUpstreamUnreachable,
-			why:  "a call that never completed is retryable, and the caller can only know that if it is told",
-		},
-		{
-			name: "the provider answered with no draft at all",
-			ai:   cannedOrchestrator(`[]`),
 			want: apierrors.PageGenerationUpstreamUnavailable,
-			why:  "an empty answer is a response with no page in it",
+			why:  "a call that never completed is retryable, and REST page generation names it the same way",
 		},
 		{
-			name: "the provider answered with an empty body",
-			ai:   cannedOrchestrator(`[{"title":"Release process","description":"","priority":"medium"}]`),
-			want: apierrors.PageGenerationUpstreamUnavailable,
-			why:  "a page with a title and no body is not the draft that was asked for",
-		},
-		{
-			name: "the provider answered with something that is not JSON",
-			ai:   cannedOrchestrator(`I am afraid I cannot help with that.`),
+			name: "the provider answered with nothing",
+			ai:   cannedOrchestrator(""),
 			want: apierrors.AiResponseInvalidJson,
-			why:  "an answer that could not be read is not an answer the caller should find stored as a page",
+			why:  "an empty answer is a response with no page in it, and REST page generation refuses it with the same code",
+		},
+		{
+			name: "the provider answered with whitespace only",
+			ai:   cannedOrchestrator(" \n\t "),
+			want: apierrors.AiResponseInvalidJson,
+			why:  "a body of blanks is no more a draft than an empty one",
 		},
 	}
 
@@ -139,9 +133,10 @@ func TestGeneratePageRefusesAGenerationThatDidNotHappen(t *testing.T) {
 //
 // Without it, "refuses and writes nothing" is also what an
 // implementation that refuses everything produces. It additionally pins
-// the two properties a caller reads a success for: the stored body is
-// the model's, not the brief that was sent, and the row says it was
-// drafted.
+// what a caller reads a success for: the stored body is the page
+// generator's Markdown as the model wrote it — no task proposer sits in
+// between to reshape it — not the brief that was sent, and the row says
+// it was drafted.
 func TestGeneratePageStoresTheDraftItWasGiven(t *testing.T) {
 	requireMCPIntegration(t)
 	inst := helpers.StartShared(t)
@@ -150,12 +145,12 @@ func TestGeneratePageStoresTheDraftItWasGiven(t *testing.T) {
 	ctx := context.Background()
 
 	const brief = "Summarise how the release process works."
-	const drafted = "The release runs from develop, is fast-forwarded onto main, and is tagged last."
+	const drafted = "## Release process\n\n- The release runs from develop.\n- It is fast-forwarded onto main and tagged last."
 
 	deps := mcp.Deps{
 		DB:      db,
 		Queries: generated.New(db),
-		AI:      cannedOrchestrator(`[{"title":"Release process","description":"` + drafted + `","priority":"medium"}]`),
+		AI:      cannedOrchestrator(drafted),
 	}
 	caller := mcp.NewTestSession(fx.creatorID, fx.wsID, []string{"write:workspace"})
 
@@ -176,8 +171,8 @@ func TestGeneratePageStoresTheDraftItWasGiven(t *testing.T) {
 		`SELECT title, body, is_ai_generated FROM pages WHERE public_id = UUID_TO_BIN(?, 0) AND workspace_id = ?`,
 		pageID, fx.wsID).Scan(&title, &body, &isAI))
 
-	require.Equal(t, drafted, body, "the stored body has to be the model's draft")
+	require.Equal(t, drafted, body, "the stored body has to be the model's draft, verbatim")
 	require.NotEqual(t, brief, body, "the brief is the question, never the page")
-	require.Equal(t, "Release process", title)
+	require.Equal(t, "Generated: "+brief, title, "the title is built from the brief")
 	require.True(t, isAI, "a page drafted by a model has to be stored as one")
 }

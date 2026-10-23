@@ -136,7 +136,10 @@ const (
 // agentExists reports whether a live agent row exists in the workspace. An
 // UPDATE that writes the value already stored affects zero rows, so a zero
 // count alone cannot distinguish "unchanged" from "no such agent".
-func agentExists(ctx context.Context, db *sql.DB, workspaceID uint32, agentPub types.PublicID) (bool, error) {
+func agentExists(ctx context.Context, db interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}, workspaceID uint32, agentPub types.PublicID,
+) (bool, error) {
 	var one int
 	err := db.QueryRowContext(ctx,
 		`SELECT 1 FROM ai_agents WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`,

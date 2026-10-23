@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -13,11 +13,13 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
-// actorPtr delegates to handlerutil.ActorPtr.
-var actorPtr = handlerutil.ActorPtr
+// errWidgetNotFound rolls a delete back when the widget is not there to
+// remove, so no event or audit row describes it.
+var errWidgetNotFound = errors.New("dashboard: widget not found")
 
 // Create handles POST /workspaces/{wsId}/dashboard/widgets.
 func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetOutput, error) {
@@ -37,41 +39,36 @@ func Create(deps Deps) func(context.Context, *CreateWidgetInput) (*CreateWidgetO
 		}
 
 		pub := types.New()
-		_, err := deps.Queries.CreateWidget(ctx, generated.CreateWidgetParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			CreatorID:   actorID,
-			WidgetType:  generated.DashboardWidgetsWidgetType(in.Body.WidgetType),
-			Title:       in.Body.Title,
-			Config:      configRaw,
-			PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
-			PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
-			Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
-			Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
-		})
-		if err != nil {
+		if err := dbretry.InTx(ctx, deps.DB, "dashboard.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).CreateWidget(ctx, generated.CreateWidgetParams{
+				PublicID:    pub,
+				WorkspaceID: ws.ID,
+				CreatorID:   actorID,
+				WidgetType:  generated.DashboardWidgetsWidgetType(in.Body.WidgetType),
+				Title:       in.Body.Title,
+				Config:      configRaw,
+				PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
+				PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
+				Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
+				Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.DashboardWidgetCreated,
+				AuditAction:  "dashboard.widget.create",
+				ResourceType: "dashboard_widget",
+				ResourceID:   pub.String(),
+				Payload: map[string]any{
+					"widgetId":   pub.String(),
+					"widgetType": in.Body.WidgetType,
+					"title":      in.Body.Title,
+				},
+				CallSite: "dashboard.Create",
+			})
+		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.DashboardWidgetCreated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"widgetId":   pub.String(),
-				"widgetType": in.Body.WidgetType,
-				"title":      in.Body.Title,
-			},
-		}, "dashboard.Create")
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "dashboard.widget.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "dashboard_widget",
-			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"widgetType": in.Body.WidgetType, "title": in.Body.Title},
-		})
 
 		return &CreateWidgetOutput{Body: WidgetDTO{
 			ID:                 pub.String(),
@@ -195,27 +192,21 @@ func Update(deps Deps) func(context.Context, *UpdateWidgetInput) (*UpdateWidgetO
 		// Existence is not decided by the row count here; MySQL counts
 		// changed rows, so a PATCH that sets the values already stored
 		// reports zero. The re-read below fails if the widget is gone.
-		if _, err := deps.Queries.UpdateWidget(ctx, params); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.DashboardWidgetUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"widgetId": pub.String(),
-			},
-		}, "dashboard.Update")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "dashboard.widget.update",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		if err := dbretry.InTx(ctx, deps.DB, "dashboard.Update", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).UpdateWidget(ctx, params); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.DashboardWidgetUpdated,
+				AuditAction:  "dashboard.widget.update",
 				ResourceType: "dashboard_widget",
 				ResourceID:   pub.String(),
+				Payload:      map[string]any{"widgetId": pub.String()},
+				CallSite:     "dashboard.Update",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// Re-fetch to return the updated row.
@@ -254,36 +245,29 @@ func UpdatePosition(deps Deps) func(context.Context, *UpdateWidgetPositionInput)
 		// The affected-row count is not the existence check: MySQL counts
 		// changed rows, so re-sending the position a widget already has
 		// reports zero. Existence is checked by the read just above.
-		if _, err := deps.Queries.UpdateWidgetPosition(ctx, generated.UpdateWidgetPositionParams{
-			PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
-			PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
-			Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
-			Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
-			SortWeight:  int32(in.Body.SortWeight), //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.DashboardWidgetUpdated,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"widgetId": pub.String(),
-				"action":   "position",
-			},
-		}, "dashboard.UpdatePosition")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "dashboard.widget.position",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		if err := dbretry.InTx(ctx, deps.DB, "dashboard.UpdatePosition", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if _, err := generated.New(tx).UpdateWidgetPosition(ctx, generated.UpdateWidgetPositionParams{
+				PositionX:   uint16(in.Body.PositionX), //#nosec G115 -- PositionX request-validated to maximum:1023 (well below uint16)
+				PositionY:   uint16(in.Body.PositionY), //#nosec G115 -- PositionY request-validated to maximum:1023 (well below uint16)
+				Width:       uint16(in.Body.Width),     //#nosec G115 -- Width request-validated to a small uint range
+				Height:      uint16(in.Body.Height),    //#nosec G115 -- Height request-validated to a small uint range
+				SortWeight:  int32(in.Body.SortWeight), //#nosec G115 -- SortWeight request-validated to a 32-bit signed range
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			}); err != nil {
+				return err
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.DashboardWidgetUpdated,
+				AuditAction:  "dashboard.widget.position",
 				ResourceType: "dashboard_widget",
 				ResourceID:   pub.String(),
+				Payload:      map[string]any{"widgetId": pub.String(), "action": "position"},
+				CallSite:     "dashboard.UpdatePosition",
 			})
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		// Re-fetch to return the updated row.
@@ -314,34 +298,32 @@ func Delete(deps Deps) func(context.Context, *DeleteWidgetInput) (*DeleteWidgetO
 		// zero count means the caller named a widget that is not there to
 		// remove. Reporting success wrote a dashboard.widget.disabled event
 		// for a widget that never existed.
-		rows, err := deps.Queries.DisableWidget(ctx, generated.DisableWidgetParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
-			return nil, httpErr(apierrors.WsDashboardWidgetNotFound)
-		}
-
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.DashboardWidgetDisabled,
-			WorkspaceID: ws.ID,
-			ActorUserID: actorPtr(ctx),
-			Payload: map[string]any{
-				"widgetId": pub.String(),
-			},
-		}, "dashboard.Delete")
-
-		if actorID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "dashboard.widget.delete",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
+		actorID, _ := middleware.ActorFromContext(ctx)
+		err = dbretry.InTx(ctx, deps.DB, "dashboard.Delete", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			rows, err := generated.New(tx).DisableWidget(ctx, generated.DisableWidgetParams{
+				WorkspaceID: ws.ID,
+				PublicID:    pub,
+			})
+			if err != nil {
+				return err
+			}
+			if rows == 0 {
+				return errWidgetNotFound
+			}
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.DashboardWidgetDisabled,
+				AuditAction:  "dashboard.widget.delete",
 				ResourceType: "dashboard_widget",
 				ResourceID:   pub.String(),
+				Payload:      map[string]any{"widgetId": pub.String()},
+				CallSite:     "dashboard.Delete",
 			})
+		})
+		if errors.Is(err, errWidgetNotFound) {
+			return nil, httpErr(apierrors.WsDashboardWidgetNotFound)
+		}
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &DeleteWidgetOutput{}

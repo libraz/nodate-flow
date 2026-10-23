@@ -10,16 +10,18 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
-// fakeRunnerQuerier is the in-memory stand-in for the sqlc bundle the
-// runner depends on. It records every method call and serves
+// fakeRunnerQuerier is the in-memory stand-in for the sqlc bundle and the
+// event writer the runner depends on. It records every method call and serves
 // per-(workspace,task) memo state from a map so the JSON_MERGE_PATCH
 // semantics in production can be exercised without a database.
 type fakeRunnerQuerier struct {
 	mu            sync.Mutex
-	agentEvents   []generated.AppendAgentEventParams
-	handoffEvents []generated.InsertHandoffToUserEventParams
+	agentEvents   []eventbus.Event
+	handoffEvents []mutationlog.HandBack
 	memoState     map[uint32]map[string]any
 	memoUpdates   []generated.UpdateTaskAgentMemoParams
 	// missedTasks are the tasks whose memo write matches no row. The
@@ -44,18 +46,18 @@ func (f *fakeRunnerQuerier) memoWriteMisses(taskID uint32) {
 	f.missedTasks[taskID] = true
 }
 
-func (f *fakeRunnerQuerier) AppendAgentEvent(_ context.Context, arg generated.AppendAgentEventParams) (int64, error) {
+func (f *fakeRunnerQuerier) AppendRunEvent(_ context.Context, evt eventbus.Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.agentEvents = append(f.agentEvents, arg)
-	return int64(len(f.agentEvents)), nil
+	f.agentEvents = append(f.agentEvents, evt)
+	return nil
 }
 
-func (f *fakeRunnerQuerier) InsertHandoffToUserEvent(_ context.Context, arg generated.InsertHandoffToUserEventParams) (int64, error) {
+func (f *fakeRunnerQuerier) RecordHandBack(_ context.Context, _ uint32, h mutationlog.HandBack) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.handoffEvents = append(f.handoffEvents, arg)
-	return int64(len(f.handoffEvents)), nil
+	f.handoffEvents = append(f.handoffEvents, h)
+	return nil
 }
 
 func (f *fakeRunnerQuerier) GetTaskAgentMemo(_ context.Context, arg generated.GetTaskAgentMemoParams) (json.RawMessage, error) {
@@ -113,7 +115,7 @@ func (f *fakeRunnerQuerier) eventTypes() []string {
 	defer f.mu.Unlock()
 	out := make([]string, 0, len(f.agentEvents))
 	for _, e := range f.agentEvents {
-		out = append(out, e.Type)
+		out = append(out, string(e.Type))
 	}
 	return out
 }
@@ -133,6 +135,7 @@ func (f *fakeExecutor) ExecuteAgent(_ context.Context, _, _ uint32) (ExecutionRe
 func newRunnerWithFakes(q *fakeRunnerQuerier, exec AgentExecutor) *OrchestratorRunner {
 	return &OrchestratorRunner{
 		Queries:  q,
+		Events:   q,
 		Executor: exec,
 		Now:      func() time.Time { return time.Unix(1_700_000_000, 0).UTC() },
 	}
@@ -160,7 +163,7 @@ func TestRunnerEmitsActorAgentIDOnSuccess(t *testing.T) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
 	}
 	for _, evt := range q.agentEvents {
-		if !evt.ActorAgentID.Valid || evt.ActorAgentID.Int32 != 42 {
+		if evt.ActorAgentID == nil || *evt.ActorAgentID != 42 {
 			t.Fatalf("event %q actor_agent_id=%+v, want valid=42", evt.Type, evt.ActorAgentID)
 		}
 	}
@@ -252,11 +255,7 @@ func TestRunnerHandoffTriggers(t *testing.T) {
 			if len(q.handoffEvents) != 1 {
 				t.Fatalf("want exactly 1 handoff, got %d", len(q.handoffEvents))
 			}
-			var payload map[string]any
-			if err := json.Unmarshal(q.handoffEvents[0].PayloadJson, &payload); err != nil {
-				t.Fatalf("payload decode: %v", err)
-			}
-			if got := payload["reason"]; got != tc.wantReason {
+			if got := q.handoffEvents[0].Payload["reason"]; got != tc.wantReason {
 				t.Fatalf("reason = %v, want %s", got, tc.wantReason)
 			}
 		})
@@ -296,11 +295,10 @@ func TestRunnerHandoffLoopBudget(t *testing.T) {
 	if got := len(q.agentEvents); got != 1 {
 		t.Fatalf("want 1 ai.agent.run.failed, got %d", got)
 	}
-	if got := q.agentEvents[0].Type; got != "ai.agent.run.failed" {
+	if got := q.agentEvents[0].Type; got != eventbus.AiAgentRunFailed {
 		t.Fatalf("event type = %s, want ai.agent.run.failed", got)
 	}
-	var payload map[string]any
-	_ = json.Unmarshal(q.agentEvents[0].PayloadJson, &payload)
+	payload, _ := q.agentEvents[0].Payload.(map[string]any)
 	if got := payload["error"]; got != apierrors.WsTaskAgentHandoffLoopDetected.Code {
 		t.Fatalf("error = %v, want %s", got, apierrors.WsTaskAgentHandoffLoopDetected.Code)
 	}

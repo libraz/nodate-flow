@@ -264,6 +264,8 @@ func TestAdminDeleteUserSpansTaskAndCalendarUploaders(t *testing.T) {
 	admin := newTenant(t)
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, owner)
 	out := adminDeleteUser(t, admin.AccessToken, owner.UserPublicID)
 	require.Truef(t, out.Deleted, "admin user-delete must report deleted=true; got %+v", out)
 	require.Equalf(t, int64(0), out.MinioErrors,

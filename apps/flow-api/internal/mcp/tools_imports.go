@@ -9,11 +9,13 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 )
 
 // importJobScanPage is how many rows a status-filtered listing reads per
@@ -253,68 +255,70 @@ func runCreateImportJob(ctx context.Context, deps Deps, s *session, raw json.Raw
 		return nil, err
 	}
 
+	// A job targeting a project creates tasks in it, so it needs the
+	// project editor floor direct task creation holds, as REST does.
 	var projectID sql.NullInt32
 	if in.ProjectID != "" {
-		prjPub, err := types.Parse(in.ProjectID)
+		prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 		if err != nil {
-			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+			return nil, err
 		}
-		prj, err := deps.Queries.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{
-			WorkspaceID: s.workspaceID,
-			PublicID:    prjPub,
-		})
-		if err != nil {
-			if stderrors.Is(err, sql.ErrNoRows) {
-				return nil, apierrors.New(apierrors.WsProjectNotFound)
-			}
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-		projectID = sql.NullInt32{Int32: int32(prj.ID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-
-		// One import at a time per project, the same rule REST enforces.
-		// Two concurrent imports of the same source into the same project
-		// produce duplicate tasks that nobody can tell apart afterwards,
-		// and an agent is far more likely than a person to start the
-		// second one — it does not see the progress bar that stops a human.
-		_, err = deps.Queries.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
-			WorkspaceID: s.workspaceID,
-			ProjectID:   projectID,
-		})
-		if err == nil {
-			return nil, apierrors.New(apierrors.WsImportAlreadyRunning)
-		}
-		if !stderrors.Is(err, sql.ErrNoRows) {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
+		projectID = sql.NullInt32{Int32: int32(prjID), Valid: true} //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 	}
 
 	pub := newPublicID()
-	_, err = deps.Queries.CreateImportJob(ctx, generated.CreateImportJobParams{
-		PublicID:          pub,
-		WorkspaceID:       s.workspaceID,
-		ProjectID:         projectID,
-		InitiatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		Source:            generated.ImportJobsSource(in.Source),
-		ConfigJson:        configJSON,
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.create_import_job", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		q := deps.Queries.WithTx(tx.RawTx())
+		if projectID.Valid {
+			// One import at a time per project, the same rule REST enforces,
+			// decided under the project row lock so two concurrent creates
+			// cannot both pass it. Two imports of the same source into one
+			// project produce duplicate tasks nobody can tell apart.
+			if err := taskcreate.LockProject(ctx, tx, s.workspaceID, uint32(projectID.Int32)); err != nil { //#nosec G115 -- projects.id, positive by construction
+				return err
+			}
+			_, err := q.FindRunningImportForProject(ctx, generated.FindRunningImportForProjectParams{
+				WorkspaceID: s.workspaceID,
+				ProjectID:   projectID,
+			})
+			if err == nil {
+				answered = apierrors.New(apierrors.WsImportAlreadyRunning)
+				return answered
+			}
+			if !stderrors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
+		if _, err := q.CreateImportJob(ctx, generated.CreateImportJobParams{
+			PublicID:          pub,
+			WorkspaceID:       s.workspaceID,
+			ProjectID:         projectID,
+			InitiatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			Source:            generated.ImportJobsSource(in.Source),
+			ConfigJson:        configJSON,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.ImportJobCreated,
+			AuditAction:  "import.create",
+			ResourceType: "import_job",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"importJobId": pub.String(),
+				"source":      in.Source,
+				"via":         "mcp",
+			},
+			CallSite: "mcp.create_import_job",
+		})
 	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	if answered != nil {
+		return nil, answered
 	}
-
-	// The job row is committed and the worker will pick it up; a retry
-	// would queue a second import of the same source.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.ImportJobCreated,
-		AuditAction:  "import.create",
-		ResourceType: "import_job",
-		ResourceID:   pub.String(),
-		Payload: map[string]any{
-			"importJobId": pub.String(),
-			"source":      in.Source,
-			"via":         "mcp",
-		},
-		CallSite: "mcp.create_import_job",
-	})
-
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
+	}
 	return map[string]any{"ok": true, "importJobId": pub.String()}, nil
 }

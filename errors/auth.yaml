@@ -269,15 +269,6 @@ resources:
         description: "Returned when the magic link token is past its 15-minute expiration timestamp."
         userAction: "Request a new magic link from the login page; links remain valid for 15 minutes."
 
-      revoked:
-        code: AUTH.MAGIC_LINK.REVOKED
-        status: 401
-        message: "Magic link has been revoked"
-        message_ja: "マジックリンクは無効化されました"
-        message_zh: "魔法链接已被撤销"
-        description: "Returned when the magic link token has been explicitly invalidated before use (for example when a newer link supersedes it or an admin revoked the account)."
-        userAction: "Request a new magic link from the login page."
-
       already_used:
         code: AUTH.MAGIC_LINK.ALREADY_USED
         status: 409
@@ -344,6 +335,15 @@ resources:
         description: "Returned when the OIDC callback URL carries `error` / `error_description` query parameters, meaning the identity provider refused to issue an authorization code. Common causes include the user denying the consent screen, the relying-party application being misconfigured at the IdP, or the IdP rejecting the requested scopes."
         userAction: "Retry the sign-in flow and approve the consent screen, or contact your workspace administrator if the identity provider keeps rejecting the request."
         i18nKey: "auth.errors.oidc_provider_rejected"
+
+      google_not_configured:
+        code: AUTH.OIDC.GOOGLE_NOT_CONFIGURED
+        status: 503
+        message: "Google login is not configured"
+        message_ja: "Google ログインが設定されていません"
+        message_zh: "Google 登录未配置"
+        description: "Returned when the user attempts to sign in via Google but the instance has no Google OIDC client configured."
+        userAction: "Ask the instance administrator to configure Google login credentials."
 
       github_not_configured:
         code: AUTH.OIDC.GITHUB_NOT_CONFIGURED

@@ -62,15 +62,6 @@ resources:
         description: "Returned when a query parameter fails schema validation (type, range, enum)."
         userAction: "Correct the query parameter listed in details and retry."
 
-      unknown_field:
-        code: VALIDATION.QUERY.UNKNOWN_FIELD
-        status: 422
-        message: "Unknown query parameter"
-        message_ja: "未知のクエリパラメータです"
-        message_zh: "未知的查询参数"
-        description: "Returned when an unknown query parameter is supplied and strict mode is enabled."
-        userAction: "Remove the unknown query parameter."
-
   file:
     breadcrumb: "Validation > File"
     errors:

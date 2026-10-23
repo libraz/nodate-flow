@@ -6,12 +6,10 @@ package handlerutil
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
@@ -171,6 +169,12 @@ func (p *headersProblemDetails) GetHeaders() http.Header {
 	return http.Header{"Retry-After": []string{p.retryAfter}}
 }
 
+// Unwrap exposes the envelope, so a caller matching *ProblemDetails with
+// errors.As reads the code of an error that also carries Retry-After.
+func (p *headersProblemDetails) Unwrap() error {
+	return &p.ProblemDetails
+}
+
 // WriteSpecError writes a JSON error envelope for raw chi handlers that
 // cannot return errors through the Huma pipeline (file downloads,
 // streaming responses, etc.). It forwards to [problem.Write], which is
@@ -181,16 +185,11 @@ func WriteSpecError(w http.ResponseWriter, spec *apierrors.Spec) {
 	problem.Write(w, spec)
 }
 
-// mysqlErrDuplicateEntry is the MySQL error number for a unique-constraint
-// violation (ER_DUP_ENTRY). See https://dev.mysql.com/doc/mysql-errors/8.4/en/
-const mysqlErrDuplicateEntry = 1062
-
-// IsDuplicateEntry reports whether the given error is a MySQL duplicate-entry
-// error (error 1062 / ER_DUP_ENTRY). It uses a type assertion against the
-// mysql driver error type for reliable detection.
+// IsDuplicateEntry reports whether err is a unique-key violation. It
+// delegates to [apierr.IsDuplicateEntry], the one reader of the driver's
+// error type.
 func IsDuplicateEntry(err error) bool {
-	var mysqlErr *mysql.MySQLError
-	return errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlErrDuplicateEntry
+	return apierr.IsDuplicateEntry(err)
 }
 
 // ActorPtr returns a pointer to the actor's internal user id (as int64) for

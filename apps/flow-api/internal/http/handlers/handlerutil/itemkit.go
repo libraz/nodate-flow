@@ -3,7 +3,7 @@
 // itemkit returns plain Go errors with semantic substrings (the
 // "itemkit invariant" / "recurrence" / "not found" sentinels are
 // matched by message). Different domains want to map those into
-// different apierrors specs (calendar event 404 vs. internal 500),
+// different apierrors specs (a calendar event 404 vs. a task 404),
 // so the translator splits into per-domain functions sharing a
 // single classifier.
 package handlerutil
@@ -91,16 +91,31 @@ func TranslateCalendarItemkitError(ctx context.Context, op string, err error, fa
 }
 
 // TranslateTaskItemkitError maps an itemkit error coming from a
-// task-domain handler into the task apierrors spec set. Tasks only
-// surface the invariant kind as a public 422; everything else
-// collapses into INTERNAL.UNEXPECTED so callers don't leak schema
-// drift. nil err → nil error.
+// task-domain handler into the task apierrors spec set. Every kind but
+// Other answers with the same public code the calendar and MCP
+// translators give it; a row disabled between the handler's resolve and
+// itemkit's in-transaction re-read is a 404, not a server error. Only
+// ItemkitErrorOther collapses into INTERNAL.UNEXPECTED. nil err → nil.
 func TranslateTaskItemkitError(err error) error {
-	if err == nil {
+	switch ClassifyItemkitError(err) {
+	case ItemkitErrorNone:
 		return nil
-	}
-	if ClassifyItemkitError(err) == ItemkitErrorInvariant {
+	case ItemkitErrorNotFound:
+		if itemkitMissingEvent(err) {
+			return HTTPErr(apierrors.CalendarEventNotFound)
+		}
+		return HTTPErr(apierrors.WsTaskNotFound)
+	case ItemkitErrorRecurrenceWithLink:
+		return HTTPErr(apierrors.ItemItemkitRecurrenceWithTaskLink)
+	case ItemkitErrorInvariant:
 		return HTTPErr(apierrors.ItemItemkitInvariantViolation)
 	}
 	return HTTPErr(apierrors.InternalUnexpected)
+}
+
+// itemkitMissingEvent reports whether a not-found itemkit error names the
+// event rather than the task; itemkit words both "itemkit: <kind> N not
+// found". A task handler's own row is the default.
+func itemkitMissingEvent(err error) bool {
+	return strings.Contains(err.Error(), "itemkit: event ")
 }

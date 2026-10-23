@@ -3,7 +3,6 @@ package tasks
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"math"
 	"net/http"
 
@@ -12,14 +11,15 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -30,11 +30,11 @@ import (
 // these endpoints require an AI orchestrator and embedder that the
 // regular CRUD routes do not need.
 type SmartCreateDeps struct {
-	DB       *sql.DB
-	Queries  *generated.Queries
-	AI       *ai.Orchestrator
-	Embedder *embed.Client
-	Audit    *audit.Recorder
+	DB        *sql.DB
+	Queries   *generated.Queries
+	AI        *ai.Orchestrator
+	Embedder  *embed.Client
+	Mutations *mutationlog.Recorder
 }
 
 // ---- Propose Smart I/O ---------------------------------------------------
@@ -119,7 +119,7 @@ func ProposeSmart(deps SmartCreateDeps) func(context.Context, *ProposeSmartInput
 			vis,
 		)
 		if err != nil {
-			return nil, mapAIError(err)
+			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 		}
 		return &ProposeSmartOutput{Body: *proposal}, nil
 	}
@@ -187,6 +187,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			return nil, httpErr(spec)
 		}
 
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		var (
 			parentID  int64
 			parentPub types.PublicID
@@ -234,6 +235,20 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 			}
 			parentID = parent.ID
 			parentPub = parent.PublicID
+			// The title an event carries is the title the row carries:
+			// recording the submitted one instead would describe the task
+			// as having a name it was never stored under.
+			if err := deps.Mutations.RecordInTx(ctx, tx, actor, mutationlog.Mutation{
+				EventType:    eventbus.TaskCreated,
+				AuditAction:  "task.smart_create",
+				ResourceType: "task",
+				ResourceID:   parentPub.String(),
+				TaskID:       &parentID,
+				Payload:      smartCreatedPayload(parentPub, prjPub, parentTitle.String(), nil),
+				CallSite:     "tasks.ApplySmart",
+			}); err != nil {
+				return err
+			}
 
 			// Create subtasks.
 			subtasks = make([]createdSubtask, 0, len(in.Body.Subtasks))
@@ -259,6 +274,20 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 					return err
 				}
 				subtasks = append(subtasks, createdSubtask{ID: child.ID, PublicID: child.PublicID})
+				// Each subtask is a task in its own right, so its own
+				// history has to start where the others do.
+				childID := child.ID
+				if err := deps.Mutations.RecordInTx(ctx, tx, actor, mutationlog.Mutation{
+					EventType:    eventbus.TaskCreated,
+					AuditAction:  "task.create",
+					ResourceType: "task",
+					ResourceID:   child.PublicID.String(),
+					TaskID:       &childID,
+					Payload:      smartCreatedPayload(child.PublicID, prjPub, subtaskTitles[i].String(), &parentPub),
+					CallSite:     "tasks.ApplySmart",
+				}); err != nil {
+					return err
+				}
 			}
 			return nil
 		})
@@ -272,44 +301,6 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		subtaskIDs := make([]string, 0, len(subtasks))
 		for _, sub := range subtasks {
 			subtaskIDs = append(subtaskIDs, sub.PublicID.String())
-		}
-
-		// Emit events after commit so they reference committed rows. The
-		// title an event carries is the title the row carries: recording
-		// the submitted one instead would describe the task as having a
-		// name it was never stored under.
-		emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, parentID, parentPub, prjPub, parentTitle.String(), nil)
-		for i, sub := range subtasks {
-			emitCreatedEvent(ctx, deps.DB, ws.ID, actorID, sub.ID, sub.PublicID, prjPub, subtaskTitles[i].String(), &parentPub)
-		}
-
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "task.smart_create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
-			ResourceType: "task",
-			ResourceID:   parentPub.String(),
-			Metadata: map[string]any{
-				"subtaskCount": len(subtaskIDs),
-				"projectId":    in.Body.ProjectID,
-			},
-		})
-
-		// Each subtask is a task in its own right, so its own history has
-		// to start where the others do.
-		for i := range in.Body.Subtasks {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.create",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task",
-				ResourceID:   subtaskIDs[i],
-				Metadata: map[string]any{
-					"title":        subtaskTitles[i].String(),
-					"projectId":    in.Body.ProjectID,
-					"parentTaskId": parentPub.String(),
-				},
-			})
 		}
 
 		// The embedded text is the stored text. Embedding the submitted
@@ -380,13 +371,12 @@ func resolveAssignee(ctx context.Context, qtx *generated.Queries, wsID uint32, u
 	return uid, nil
 }
 
-// emitCreatedEvent appends a TaskCreated event for a newly created task.
-// The payload names the route that produced the task, and carries
+// smartCreatedPayload is the payload of a task.created event apply-smart
+// records. It names the route that produced the task, and carries
 // parentTaskId when parent is non-nil so a subtask reads as a subtask from
 // the event alone. A top-level task carries no parentTaskId key at all;
 // parent is positional so a caller has to say which of the two it is.
-func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, taskID int64, taskPub, prjPub types.PublicID, title string, parent *types.PublicID) {
-	actorIDv := int64(actorID)
+func smartCreatedPayload(taskPub, prjPub types.PublicID, title string, parent *types.PublicID) map[string]any {
 	payload := map[string]any{
 		"taskId":    taskPub.String(),
 		"projectId": prjPub.String(),
@@ -396,26 +386,5 @@ func emitCreatedEvent(ctx context.Context, db *sql.DB, wsID, actorID uint32, tas
 	if parent != nil {
 		payload["parentTaskId"] = parent.String()
 	}
-	eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(db), eventbus.Event{
-		Type:        eventbus.TaskCreated,
-		WorkspaceID: wsID,
-		ActorUserID: &actorIDv,
-		TaskID:      &taskID,
-		Payload:     payload,
-	}, "tasks.emitCreatedEvent")
-}
-
-// mapAIError translates AI package sentinel errors into HTTP error
-// responses.
-func mapAIError(err error) error {
-	switch {
-	case errors.Is(err, ai.ErrNoProvider):
-		return httpErr(apierrors.AiProviderNotConfigured)
-	case errors.Is(err, ai.ErrDailyBudgetExceeded):
-		return httpErr(apierrors.AiCostGuardExceeded)
-	case errors.Is(err, ai.ErrParse):
-		return httpErr(apierrors.AiResponseInvalidJson)
-	default:
-		return httpErr(apierrors.AiProviderUpstreamUnreachable)
-	}
+	return payload
 }

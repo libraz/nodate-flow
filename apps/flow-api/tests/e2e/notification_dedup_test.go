@@ -12,7 +12,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestNotificationFanoutDedup verifies that re-firing the fan-out for
@@ -72,7 +71,7 @@ func TestNotificationFanoutDedup(t *testing.T) {
 	// Fire the fan-out twice for the same event. The Hook helper spawns
 	// goroutines, so we exercise the package-private fanout method
 	// directly to keep the assertions deterministic.
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	hook := f.Hook()
 	hook(ctx, wsInternalID, "task.created", eventInternalID)

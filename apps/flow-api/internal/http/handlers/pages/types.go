@@ -27,8 +27,8 @@ type PageGenerator interface {
 // Deps is the dependency bundle passed to each handler in this package.
 //
 // Generator is optional: when nil, GenerateWithAI returns
-// PAGE.GENERATION.UPSTREAM_UNAVAILABLE so the endpoint surfaces a
-// well-formed error rather than 500. The shared router wires Generator
+// AI.PROVIDER.NOT_CONFIGURED so the endpoint surfaces a well-formed
+// error rather than 500. The shared router wires Generator
 // to the AI orchestrator only when an LLM provider is configured.
 type Deps struct {
 	DB        *sql.DB

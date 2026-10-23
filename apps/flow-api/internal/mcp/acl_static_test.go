@@ -99,9 +99,11 @@ func TestMCPFindTaskByPublicIdCentralized(t *testing.T) {
 // project-role floor. A mutating tool must reach one of them, directly or
 // through a helper in this package.
 var projectRoleWriteGates = map[string]bool{
-	"resolveProjectForWrite": true,
-	"resolveTaskForWrite":    true,
-	"resolveTaskRowForWrite": true,
+	"resolveProjectForWrite":    true,
+	"resolveTaskForWrite":       true,
+	"resolveTaskAccessForWrite": true,
+	"resolveTaskRowForWrite":    true,
+	"checkPageProjectFloor":     true,
 }
 
 // writeToolsWithoutProjectGate lists every write-scoped tool whose write
@@ -121,12 +123,7 @@ var writeToolsWithoutProjectGate = map[string]string{
 	"propose_relations":     "read-only similarity search behind the Layer-4 visibility ACL; write-scoped because it bills the embedder",
 	"propose_lens":          "compiles a query and persists nothing; write-scoped because it bills the model",
 	"create_label":          "workspace-level row; REST labels are workspace-member gated",
-	"create_page":           "workspace-level row; REST pages are workspace-member gated",
-	"update_page":           "workspace-level row; REST pages are workspace-member gated",
-	"generate_page":         "workspace-level row; REST pages are workspace-member gated",
-	"create_timebox":        "workspace-level row; REST timeboxes are workspace-member gated",
 	"add_task_to_timebox":   "timebox membership row; REST timeboxes are workspace-member gated",
-	"create_import_job":     "workspace-level row; REST imports are workspace-member gated",
 	"triage_intake_item":    "workspace-level queue; REST intake triage is workspace-member gated",
 	"add_favorite":          "per-user row that grants nothing and is invisible to others",
 	"create_calendar_event": "calendar write; gated by the calendar_members grant",
@@ -181,15 +178,13 @@ func TestMCPWriteToolsPassProjectRoleGate(t *testing.T) {
 // TestMCPProjectRoleFloorCentralized proves the role comparison itself lives
 // in one place. A tool that re-derives the floor from acl.LookupProjectMembership
 // on its own would satisfy the reachability check above while quietly picking a
-// different minimum role, so the membership lookups stay confined to acl.go.
+// different minimum role, so the membership lookups stay out of this package
+// and acl.go hands every decision to the helper REST uses.
 func TestMCPProjectRoleFloorCentralized(t *testing.T) {
 	t.Parallel()
 
 	const owner = "acl.go"
 	for _, name := range mcpPackageSourceFiles(t) {
-		if name == owner {
-			continue
-		}
 		b, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
@@ -206,7 +201,7 @@ func TestMCPProjectRoleFloorCentralized(t *testing.T) {
 		"func resolveProjectForWrite(",
 		"func resolveTaskForWrite(",
 		"func resolveTaskRowForWrite(",
-		"acl.LookupProjectMembership",
+		"handlerutil.RequireProjectRole",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("%s must define %s so MCP writes reuse the REST project-role decision", owner, want)

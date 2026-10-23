@@ -2,10 +2,11 @@ package ai
 
 import (
 	"context"
-	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
@@ -44,13 +45,7 @@ func CompileLens(deps Deps) func(context.Context, *CompileLensInput) (*CompileLe
 		}
 		lens, err := deps.NlQuery.Compile(ctx, in.Body.Prompt)
 		if err != nil {
-			if errors.Is(err, nlquery.ErrBudgetExceeded) {
-				return nil, httpErr(apierrors.AiCostGuardExceeded)
-			}
-			if errors.Is(err, nlquery.ErrUnparseable) {
-				return nil, httpErr(apierrors.AiNlQueryUnparseable)
-			}
-			return nil, mapProviderError(err)
+			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 		}
 		out := &CompileLensOutput{}
 		out.Body.Prompt = in.Body.Prompt

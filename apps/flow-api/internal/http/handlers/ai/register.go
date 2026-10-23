@@ -73,7 +73,7 @@ func RegisterMcpTokens(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/me/mcp-tokens/{tokenId}",
 		Summary:     "Revoke an MCP bearer token",
-		Description: "Marks the token as revoked so future /mcp requests carrying it are rejected. Idempotent.",
+		Description: "Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
 		Tags:        []string{"AI"},
 	}, DeleteMcpToken(deps))
 }

@@ -78,7 +78,7 @@ func TestMCPDuplicateKeyRefusalsAreNamed(t *testing.T) {
 		// The control: without a first attach that succeeds, a refusal on
 		// the second proves nothing about duplicates.
 		require.NoError(t, attach())
-		requireDuplicateRefusal(t, attach(), apierrors.WsLabelNameAlreadyTaken)
+		requireDuplicateRefusal(t, attach(), apierrors.WsLabelAlreadyAttached)
 
 		// A refused attach must not have written a second junction row.
 		var n int

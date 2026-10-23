@@ -30,3 +30,26 @@ func AgentIDFromContext(ctx context.Context) uint32 {
 	v, _ := ctx.Value(agentCtxKey{}).(uint32)
 	return v
 }
+
+type taskCtxKey struct{}
+
+// WithTaskID returns a copy of ctx tagged with the internal id of the
+// task whose content the next orchestrator call quotes into its prompt,
+// so the ai_invocations row carries task_id and the list endpoints can
+// apply task visibility to it. Passing zero is a no-op.
+func WithTaskID(ctx context.Context, taskID uint32) context.Context {
+	if taskID == 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, taskCtxKey{}, taskID)
+}
+
+// TaskIDFromContext returns the task id previously set via WithTaskID,
+// or zero when the context was never tagged.
+func TaskIDFromContext(ctx context.Context) uint32 {
+	if ctx == nil {
+		return 0
+	}
+	v, _ := ctx.Value(taskCtxKey{}).(uint32)
+	return v
+}

@@ -32,7 +32,23 @@ type AttributionException struct {
 
 // AttributionExceptions are the branches whose write this package cannot
 // name.
-var AttributionExceptions = []AttributionException{}
+var AttributionExceptions = []AttributionException{
+	{
+		File:   "apps/flow-api/internal/http/handlers/handlerutil/helpers.go",
+		Func:   "apps/flow-api/internal/http/handlers/handlerutil.IsDuplicateEntry",
+		Reason: "a delegate predicate over its caller's error; it issues no write of its own, and each caller's branch is placed at the call site",
+	},
+	{
+		File:   "apps/auth-api/internal/http/handlers/handlerutil/dbutil.go",
+		Func:   "apps/auth-api/internal/http/handlers/handlerutil.IsDuplicateEntry",
+		Reason: "a delegate predicate over its caller's error; it issues no write of its own, and each caller's branch is placed at the call site",
+	},
+	{
+		File:   "apps/flow-api/internal/ai/agentruntime/mysql_queue.go",
+		Func:   "apps/flow-api/internal/ai/agentruntime.Enqueue",
+		Reason: "the agent_runs insert is a raw ExecContext with no sqlc statement to name; the collision is the dedupe_key unique key, answered as ErrDuplicate",
+	},
+}
 
 // Covers reports whether the exception is about this branch.
 func (e AttributionException) Covers(b Branch) bool {

@@ -5,13 +5,13 @@ import (
 	stderrors "errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdeps"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -144,19 +144,20 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			if stderrors.Is(txErr, taskdeps.ErrCycle) {
 				return nil, httpErr(apierrors.WsTaskDependencyCycle)
 			}
+			if stderrors.Is(txErr, taskdeps.ErrDuplicate) {
+				return nil, httpErr(apierrors.WsTaskDependencyAlreadyExists)
+			}
 			// ErrNoRows from inside the transaction means an endpoint
 			// vanished (disabled) between the resolve and the tx.
 			return nil, httpErr(apierr.SpecForErrNoRows(txErr, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.dependency.add",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task_dependency",
-				ResourceID:   pub.String(),
-			})
-		}
+		actorID, _ := middleware.ActorFromContext(ctx)
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "task.dependency.add",
+			ResourceType: "task_dependency",
+			ResourceID:   pub.String(),
+			CallSite:     "tasks.AddDependency (taskdeps.Add appended the event)",
+		})
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskDependencyOutput{Body: TaskDependency{
 			ID:         pub.String(),
@@ -182,8 +183,9 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
-		// Delete the edge and append the event atomically inside one tx so
+		// Delete the edge and record it atomically inside one tx so
 		// the timeline row cannot be lost between the UPDATE and a
 		// post-commit append (the AddDependency path already commits both
 		// in one tx). dbretry retries transient FK deadlocks with
@@ -205,15 +207,17 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 				// NOT_FOUND mapping happens outside the tx.
 				return nil
 			}
-			return eventbus.Append(ctx, tx, eventbus.Event{
-				Type:        eventbus.TaskDependencyRemoved,
-				WorkspaceID: ws.ID,
-				ActorUserID: actorPtr(ctx),
-				TaskID:      &taskInternal,
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskDependencyRemoved,
+				AuditAction:  "task.dependency.remove",
+				ResourceType: "task_dependency",
+				ResourceID:   depID.String(),
+				TaskID:       &taskInternal,
 				Payload: map[string]any{
 					"taskId":       task.PublicID.String(),
 					"dependencyId": depID.String(),
 				},
+				CallSite: "tasks.RemoveDependency",
 			})
 		})
 		if txErr != nil {
@@ -225,15 +229,6 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		// another task's edge.
 		if affected == 0 {
 			return nil, httpErr(apierrors.WsTaskNotFound)
-		}
-		if aID, aOk := middleware.ActorFromContext(ctx); aOk {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.dependency.remove",
-				ActorID:      aID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task_dependency",
-				ResourceID:   depID.String(),
-			})
 		}
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskDependencyOutput{}

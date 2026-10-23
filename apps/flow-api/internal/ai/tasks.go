@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -119,6 +120,7 @@ type InvocationLogger func(ctx context.Context, rec InvocationRecord)
 type InvocationRecord struct {
 	WorkspaceID      uint32
 	AgentID          uint32 // non-zero when the call was made on behalf of an AI agent
+	TaskID           uint32 // non-zero when the prompt quotes one task's content
 	Purpose          string
 	Model            string
 	PromptRedacted   string
@@ -348,7 +350,7 @@ func (o *Orchestrator) ProposeSteps(
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
 
 	// ---- cache check ----
-	cacheKey := ProposalCacheKey(workspaceID, "propose_steps", title, description, string(granularity))
+	cacheKey := proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis)
 	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
 		if tasks, _ := cached.([]ProposedTask); tasks != nil {
 			return tasks, nil
@@ -417,6 +419,20 @@ func (o *Orchestrator) ProposeSteps(
 	}
 	o.ProposalCache.Put(cacheKey, tasks)
 	return tasks, nil
+}
+
+// proposeStepsCacheKey keys a decomposition on every prompt input: the
+// actor's visibility (the similar tasks quoted are that actor's readable
+// set) and the existing children (adding a subtask changes what must not
+// be duplicated). The child count leads so the key stays unambiguous.
+func proposeStepsCacheKey(workspaceID uint32, title, description string, granularity Granularity, children []ChildTaskSummary, vis acl.VisibilityArgs) string {
+	parts := make([]string, 0, 5+2*len(children))
+	parts = append(parts, "propose_steps", VisibilityCacheScope(vis), title, description, string(granularity),
+		"children:"+strconv.Itoa(len(children)))
+	for _, c := range children {
+		parts = append(parts, c.Title, c.State)
+	}
+	return ProposalCacheKey(workspaceID, parts...)
 }
 
 // buildStepsPrompt assembles the user prompt for step decomposition,
@@ -543,6 +559,7 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 	o.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:      workspaceID,
 		AgentID:          AgentIDFromContext(ctx),
+		TaskID:           TaskIDFromContext(ctx),
 		Purpose:          purpose,
 		Model:            model,
 		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
@@ -562,6 +579,7 @@ func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpo
 	o.LogInvoke(ctx, InvocationRecord{
 		WorkspaceID:    workspaceID,
 		AgentID:        AgentIDFromContext(ctx),
+		TaskID:         TaskIDFromContext(ctx),
 		Purpose:        purpose,
 		Model:          req.Model,
 		PromptRedacted: Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),

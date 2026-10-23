@@ -7,29 +7,38 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog/mutationguard"
 )
 
-// mutationLogGates are the entry points that record a change. Every one
-// of them lives in mutationlog.go and writes the audit row; the first
-// two additionally append the event.
+// mutationLogGates are the shared recorder's entry points, keyed by the
+// method name a call site uses. Every one writes the audit row; all but
+// RecordTxAudit additionally append the event.
 var mutationLogGates = map[string]bool{
-	"recordMutation":        true,
-	"recordMutationStrict":  true,
-	"recordTxMutationAudit": true,
+	"Record":        true,
+	"RecordStrict":  true,
+	"RecordInTx":    true,
+	"RecordTxAudit": true,
 }
 
-// mutationLogOwner is the file holding those entry points, and the only
-// file in this package allowed to reach the event bus.
-const mutationLogOwner = "mutationlog.go"
+// bannedRawAppends are the event-log entry points no file in this
+// package may reach. A tool reaching one directly has appended the event
+// and skipped the audit row, which is the half-recorded change the gates
+// exist to prevent.
+var bannedRawAppends = []string{
+	"eventbus.Append",
+	"eventbus.AppendBestEffort",
+	"eventbus.AppendJudgeEvent",
+	"eventbus.AppendReverseEvent",
+}
 
-// eventAppends are the event-bus calls that put a change on the timeline.
-// A tool reaching one of them directly has appended the event and skipped
-// the audit row, which is the half-recorded change the gates exist to
-// prevent.
-var eventAppends = []string{"eventbus.Append", "eventbus.AppendBestEffort"}
+// bannedImports keeps the audit recorder out of this package's import
+// set, so a call to a gate name can only be the mutation log's, which is
+// what makes the name-based reachability check mean what it says.
+var bannedImports = []string{
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit",
+}
 
 // eventOptionalGates is the gate whose event another writer already
 // appended, so a mutation handed to it names no kind and every other one
 // must.
-var eventOptionalGates = map[string]bool{"recordTxMutationAudit": true}
+var eventOptionalGates = map[string]bool{"RecordTxAudit": true}
 
 // writeToolsWithoutMutationLog lists the write-scoped tools that record
 // nothing because they change nothing a person could later find missing.
@@ -65,17 +74,12 @@ var readToolsRequiringMutationLog = map[string]string{
 }
 
 // analyzeMCPPackage parses this package for the structural checks below.
-//
-// The graph is restricted to plain identifier calls, which is the shape
-// the tools and their helpers reach the gates through. Reachability only
-// grows as edges are added, so recording a selector's last segment as a
-// call could turn a tool that reaches no gate into one that appears to,
-// never the reverse — a package whose recorder is never reached through a
-// field would be buying nothing and paying for it with the check's
-// meaning.
+// Selector calls count, because the tools reach the recorder as a method;
+// the banned import above is what keeps an unrelated method of the same
+// name from satisfying the check.
 func analyzeMCPPackage(t *testing.T) *mutationguard.Analysis {
 	t.Helper()
-	a, err := mutationguard.Load(".", mutationguard.PlainCallsOnly())
+	a, err := mutationguard.Load(".")
 	if err != nil {
 		t.Fatalf("analyse this package: %v", err)
 	}
@@ -118,8 +122,8 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 		entry := mcpRunFuncName(t, registry, name)
 		if !analysis.Reaches(entry, mutationLogGates) {
 			t.Errorf("tool %q (%s) changes the workspace but never reaches a mutation-log gate (%s); "+
-				"route it through recordMutation / recordMutationStrict, or through recordTxMutationAudit "+
-				"when a shared transactional helper already appended the event, or add it to "+
+				"route it through the shared recorder (RecordInTx inside the write's transaction, or "+
+				"RecordTxAudit when a shared transactional helper already appended the event), or add it to "+
 				"writeToolsWithoutMutationLog with the reason it persists nothing",
 				name, entry, strings.Join(mutationguard.SortedKeys(mutationLogGates), " / "))
 		}
@@ -138,20 +142,19 @@ func TestMCPMutatingToolsRecordBothHalves(t *testing.T) {
 }
 
 // TestMCPEventbusAppendCentralized proves no tool reaches around the
-// mutation log straight to the event bus.
+// shared recorder to the event bus or the audit recorder.
 //
 // Without this half, the reachability test above is satisfiable by a
 // tool that appends its event directly and skips the audit row — which
-// is the exact state most of these tools were in. Keeping the append in
-// one file is what makes "event and audit row together" a property of
-// the package rather than a habit.
-//
-// The owner half matters as much: a check whose owner has stopped
-// calling the thing it owns has quietly become a check on nothing.
+// is the exact state most of these tools were in.
 func TestMCPEventbusAppendCentralized(t *testing.T) {
 	t.Parallel()
 
-	for _, finding := range analyzeMCPPackage(t).Centralized(mutationLogOwner, eventAppends) {
+	a := analyzeMCPPackage(t)
+	for _, finding := range a.Centralized("", bannedRawAppends) {
+		t.Error(finding.String())
+	}
+	for _, finding := range a.Imports(bannedImports) {
 		t.Error(finding.String())
 	}
 }
@@ -168,7 +171,7 @@ func TestMCPMutationLiteralsNameBothHalves(t *testing.T) {
 	t.Parallel()
 
 	findings, examined := analyzeMCPPackage(t).Literals(mutationguard.LiteralSpec{
-		TypeName:           "mutation",
+		TypeName:           "mutationlog.Mutation",
 		Gates:              mutationLogGates,
 		Required:           []string{"AuditAction"},
 		EventOptionalGates: eventOptionalGates,

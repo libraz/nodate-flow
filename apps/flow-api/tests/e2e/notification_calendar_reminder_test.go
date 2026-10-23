@@ -11,7 +11,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	calnotifs "github.com/libraz/nodate-flow/apps/flow-api/internal/notifications"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // TestCalendarReminderDispatch verifies the calendar reminder scheduler
@@ -95,7 +94,7 @@ func TestCalendarReminderDispatch(t *testing.T) {
 	// Drive a single scheduler tick directly so the assertions are
 	// deterministic. We use the real Fanout so the production path is
 	// exercised end-to-end.
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 	calnotifs.CheckAndNotify(ctx, testDB, f)
 
@@ -203,7 +202,7 @@ func TestRecurringCalendarReminderFiresEveryOccurrence(t *testing.T) {
 	require.NoError(t, err)
 	eventID := uint32(evLastID) //#nosec G115 -- LastInsertId in test seed, fits uint32
 
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 
 	before := notificationCountForUser(ctx, t, testDB, ownerID)

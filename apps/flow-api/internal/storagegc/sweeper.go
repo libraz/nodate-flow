@@ -1,7 +1,7 @@
 // Package storagegc reclaims object-storage rows and the blobs behind
 // them.
 //
-// Two kinds of residue accumulate. The schema comment on
+// Three kinds of residue accumulate. The schema comment on
 // storage_objects and the attachment delete paths rely on a sweeper
 // hard-deleting a row once nothing references it, and a failed
 // RemoveObject keeps the row so the blob is retried on the next pass.
@@ -13,6 +13,10 @@
 // one byte, send ten gigabytes to the URL, skip the confirm call that
 // would measure it, and repeat: without reclamation the only bound on
 // what one account can store is how fast it can ask.
+//
+// The third is a blob whose rows a workspace or user teardown already
+// deleted: the teardown queues its key in storage_blob_removals, and the
+// sweeper retries it until the object store confirms the removal.
 package storagegc
 
 import (
@@ -145,6 +149,9 @@ func (s *Sweeper) loop(ctx context.Context) {
 type Result struct {
 	Reservations int
 	Unreferenced int
+	// QueuedBlobs counts blobs removed from storage_blob_removals, the
+	// keys a teardown left behind after deleting the rows that named them.
+	QueuedBlobs int
 }
 
 // reclaimKind picks the predicate the row delete is made conditional
@@ -209,13 +216,56 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 		}
 	}
 
-	if out.Reservations > 0 || out.Unreferenced > 0 {
+	queued, err := s.drainQueuedRemovals(ctx)
+	out.QueuedBlobs = queued
+	if err != nil {
+		return out, err
+	}
+
+	if out.Reservations > 0 || out.Unreferenced > 0 || out.QueuedBlobs > 0 {
 		s.Logger.Info("storage sweeper: reclaimed",
 			slog.Int("reservations", out.Reservations),
 			slog.Int("unreferenced", out.Unreferenced),
+			slog.Int("queued_blobs", out.QueuedBlobs),
 		)
 	}
 	return out, nil
+}
+
+// drainQueuedRemovals removes one batch of blobs a teardown queued in
+// storage_blob_removals. Each record is dropped only after its blob is
+// gone, so a failed removal is retried on the next pass; removing a key
+// that is already absent is not an error. Without an object store
+// nothing can be removed, so the records stay.
+func (s *Sweeper) drainQueuedRemovals(ctx context.Context) (int, error) {
+	if s.Storage == nil {
+		return 0, nil
+	}
+	rows, err := s.Queries.ListStorageBlobRemovals(ctx, s.batchSize())
+	if err != nil {
+		return 0, err
+	}
+	removed := 0
+	for _, row := range rows {
+		if err := ctx.Err(); err != nil {
+			return removed, err
+		}
+		if err := s.Storage.RemoveObject(ctx, row.StorageKey); err != nil {
+			s.Logger.Warn("storage sweeper: queued blob remove failed; kept for retry",
+				slog.String("storage_key", row.StorageKey),
+				slog.String("err", err.Error()))
+			continue
+		}
+		// affected-rows: not-applicable — a teardown clearing its own
+		// records after a clean sweep can take this row first; the blob is
+		// gone either way.
+		if _, err := s.Queries.DeleteStorageBlobRemoval(ctx, row.ID); err != nil {
+			s.Logger.Error("storage sweeper: drop queued removal", slog.String("err", err.Error()))
+			continue
+		}
+		removed++
+	}
+	return removed, nil
 }
 
 // reclaim drops the rows that reference a storage object, then the

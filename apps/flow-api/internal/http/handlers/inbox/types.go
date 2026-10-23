@@ -28,9 +28,6 @@ var httpErr = handlerutil.HTTPErr
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
-// totalAsInt64 delegates to handlerutil.TotalAsInt64.
-var totalAsInt64 = handlerutil.TotalAsInt64
-
 // Item is the public DTO for an inbox row (a signal projected through v_inbox).
 type Item struct {
 	ID          string          `json:"id" doc:"Inbox item public id (UUID v7)"`

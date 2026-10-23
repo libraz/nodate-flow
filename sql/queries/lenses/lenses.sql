@@ -75,11 +75,13 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
--- name: ResolveLensProjectID :one
--- Resolve a lens public_id to its optional internal project_id.
--- Used by the export handler to decide workspace-wide vs project-scoped queries.
+-- name: ResolveLensForExport :one
+-- Resolve a lens public_id to its optional internal project_id and its
+-- stored lens_json, which the export handler reads through the lens
+-- filter reader shared with the share page.
 SELECT
-  l.project_id
+  l.project_id,
+  l.lens_json
 FROM lenses l
 WHERE l.workspace_id = ?
   AND l.public_id = ?

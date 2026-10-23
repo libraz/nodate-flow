@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 )
 
 // OnEventAgentsQuerier is the narrow contract [EventTrigger] needs
@@ -46,22 +48,15 @@ type EventTrigger struct {
 	Queue   Queue
 	Logger  *slog.Logger
 	Now     func() time.Time
+	// Runner is where NotifyHook submits its dispatches, normally the
+	// runner the other event hooks share. Nil gives the trigger a
+	// private one.
+	Runner *bgloop.HookRunner
 
-	// DispatchTimeout caps one detached dispatch. Zero means
-	// [defaultDispatchTimeout].
-	DispatchTimeout time.Duration
-	// DispatchConcurrency caps how many dispatches touch the database
-	// at once. Zero means [defaultDispatchConcurrency].
-	DispatchConcurrency int
-
-	semOnce  sync.Once
-	sem      chan struct{}
-	wg       sync.WaitGroup
-	stopMu   sync.RWMutex
-	stopping bool
+	runnerOnce sync.Once
 }
 
-// Defaults for the detached dispatch.
+// Bounds of the private runner used when no shared one is installed.
 const (
 	// defaultDispatchTimeout bounds a dispatch that outlives its
 	// request. One lookup plus a handful of enqueues is a sub-second
@@ -70,108 +65,46 @@ const (
 	defaultDispatchTimeout = 30 * time.Second
 	// defaultDispatchConcurrency caps how many dispatches hold a
 	// database connection at once.
-	//
-	// Goroutines are cheap and connections are not, so the limit is on
-	// the scarce resource: a burst of events parks goroutines rather
-	// than draining the pool that the request handlers share. Blocking
-	// the caller instead would reintroduce the very coupling this
-	// removes, and dropping the dispatch would silently fail to wake an
-	// agent — so excess work waits.
 	defaultDispatchConcurrency = 8
 )
 
 // NotifyHook returns a closure compatible with eventbus.AddNotifyHook.
 //
-// The lookup and the enqueues run on their own goroutine. They used to
-// run inline: every event append paid for one query plus an INSERT per
-// matching agent before the request that caused it could return, so a
-// workspace with several on_event agents made every write in that
-// workspace slower, and a slow query there stalled unrelated request
-// handlers. Nothing about waking an agent is worth blocking the write
-// that woke it.
+// The lookup and the enqueues run on the hook runner rather than inline:
+// every event append would otherwise pay for one query plus an INSERT per
+// matching agent before the request that caused it could return, and a
+// slow query there would stall unrelated request handlers. The runner
+// detaches the job from the request's cancellation, bounds how many hold
+// a connection at once, and drains them at shutdown.
 //
-// The detached context keeps the request's values (trace span, logger)
-// but not its cancellation, since the work must outlive the response;
-// [defaultDispatchTimeout] bounds it instead. The eventInternalID is
-// the events.id row that was just appended; the scoped lookup joins
-// through it so schedule_scope='assigned_tasks' agents only wake when
-// the source event is bound to a task they own.
+// The eventInternalID is the events.id row that was just appended; the
+// scoped lookup joins through it so schedule_scope='assigned_tasks'
+// agents only wake when the source event is bound to a task they own.
 func (e *EventTrigger) NotifyHook() func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 	return func(ctx context.Context, workspaceID uint32, eventType string, eventInternalID uint64) {
 		if e == nil || e.Queries == nil || e.Queue == nil {
 			return
 		}
-		e.stopMu.RLock()
-		if e.stopping {
-			e.stopMu.RUnlock()
-			return
-		}
-		e.wg.Add(1)
-		e.stopMu.RUnlock()
-
-		detached := context.WithoutCancel(ctx)
-		go func() {
-			defer e.wg.Done()
-			defer func() {
-				// A panic here would otherwise end the process: this
-				// goroutine has no caller left to recover it.
-				if r := recover(); r != nil {
-					e.logger().Error("on_event dispatch panic",
-						"recover", r, "ws", workspaceID, "event", eventType)
-				}
-			}()
-			sem := e.semaphore()
-			select {
-			case sem <- struct{}{}:
-			case <-detached.Done():
-				return
-			}
-			defer func() { <-sem }()
-
-			runCtx, cancel := context.WithTimeout(detached, e.dispatchTimeout())
-			defer cancel()
+		e.hooks().Go(ctx, 0, func(runCtx context.Context) {
 			e.dispatch(runCtx, workspaceID, eventType, eventInternalID)
-		}()
+		})
 	}
 }
 
-// Shutdown stops accepting new dispatches and waits for the in-flight
-// ones, or until ctx is cancelled. Mirrors the notification fan-out so
-// process exit drains both the same way.
+// Shutdown stops accepting new dispatches and waits for the accepted
+// ones, or until ctx is cancelled.
 func (e *EventTrigger) Shutdown(ctx context.Context) error {
-	e.stopMu.Lock()
-	e.stopping = true
-	e.stopMu.Unlock()
-
-	done := make(chan struct{})
-	go func() {
-		e.wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return e.hooks().Shutdown(ctx)
 }
 
-func (e *EventTrigger) semaphore() chan struct{} {
-	e.semOnce.Do(func() {
-		n := e.DispatchConcurrency
-		if n <= 0 {
-			n = defaultDispatchConcurrency
+// hooks returns the installed runner, or a private one when none was.
+func (e *EventTrigger) hooks() *bgloop.HookRunner {
+	e.runnerOnce.Do(func() {
+		if e.Runner == nil {
+			e.Runner = bgloop.NewHookRunner("agentruntime.on_event", defaultDispatchConcurrency, defaultDispatchTimeout)
 		}
-		e.sem = make(chan struct{}, n)
 	})
-	return e.sem
-}
-
-func (e *EventTrigger) dispatchTimeout() time.Duration {
-	if e.DispatchTimeout > 0 {
-		return e.DispatchTimeout
-	}
-	return defaultDispatchTimeout
+	return e.Runner
 }
 
 func (e *EventTrigger) now() time.Time {

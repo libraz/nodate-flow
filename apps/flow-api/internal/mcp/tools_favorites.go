@@ -9,10 +9,13 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
 // validFavoriteTargetTypes enumerates the accepted target_type values for
@@ -83,11 +86,12 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	targetPub, err := types.Parse(in.TargetID)
 	if err != nil {
-		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+		return nil, apierrors.New(apierrors.WsFavoriteNotFound)
 	}
 	if err := ensureMCPFavoriteTargetExists(ctx, deps, s, tt, in.TargetID, targetPub); err != nil {
 		return nil, err
 	}
+	alreadyFavorited := map[string]any{"ok": true, "alreadyFavorited": true}
 	// Check for existing favorite to avoid duplicates.
 	_, err = deps.Queries.FindFavoriteByTarget(ctx, generated.FindFavoriteByTargetParams{
 		WorkspaceID:    s.workspaceID,
@@ -97,33 +101,40 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	})
 	if err == nil {
 		// Already favorited, return idempotent success.
-		return map[string]any{"ok": true, "alreadyFavorited": true}, nil
+		return alreadyFavorited, nil
 	}
 	if !stderrors.Is(err, sql.ErrNoRows) {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	pub := newPublicID()
-	if _, err := deps.Queries.CreateFavorite(ctx, generated.CreateFavoriteParams{
-		PublicID:       pub,
-		WorkspaceID:    s.workspaceID,
-		UserID:         s.userID,
-		TargetType:     tt,
-		TargetPublicID: targetPub,
-		FolderName:     sql.NullString{},
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_favorite", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.Queries.WithTx(tx.RawTx()).CreateFavorite(ctx, generated.CreateFavoriteParams{
+			PublicID:       pub,
+			WorkspaceID:    s.workspaceID,
+			UserID:         s.userID,
+			TargetType:     tt,
+			TargetPublicID: targetPub,
+			FolderName:     sql.NullString{},
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.FavoriteAdded,
+			AuditAction:  "favorite.create",
+			ResourceType: "favorite",
+			ResourceID:   pub.String(),
+			Payload:      map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
+			CallSite:     "mcp.add_favorite",
+		})
 	}); err != nil {
+		// A concurrent add of the same favorite lost the unique key: the
+		// state the caller asked for holds, so it gets the same answer as
+		// the check above.
+		if handlerutil.IsDuplicateEntry(err) {
+			return alreadyFavorited, nil
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	// The favorite row is committed, and the tool short-circuits on an
-	// existing favorite, so a retry returns early without reaching this
-	// append: propagating would report a failure nothing can repair.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.FavoriteAdded,
-		AuditAction:  "favorite.create",
-		ResourceType: "favorite",
-		ResourceID:   pub.String(),
-		Payload:      map[string]any{"targetType": in.TargetType, "targetId": in.TargetID, "via": "mcp"},
-		CallSite:     "mcp.add_favorite",
-	})
 	return map[string]any{"ok": true, "id": pub.String()}, nil
 }
 
@@ -136,9 +147,10 @@ func runAddFavorite(ctx context.Context, deps Deps, s *session, raw json.RawMess
 // per guess is all an oracle needs.
 //
 // The task branch therefore goes through resolveTask, the same gate every
-// other task-touching tool uses, and returns its WS.TASK.NOT_FOUND verbatim
-// — the invisible and the absent answer identically. The other target types
-// have no per-row visibility, so workspace scope is the whole rule for them.
+// other task-touching tool uses, so the invisible and the absent answer
+// identically. The other target types have no per-row visibility, so
+// workspace scope is the whole rule for them. Every unreachable target is
+// WS.FAVORITE.NOT_FOUND, the code REST answers with.
 func ensureMCPFavoriteTargetExists(
 	ctx context.Context,
 	deps Deps,
@@ -154,6 +166,10 @@ func ensureMCPFavoriteTargetExists(
 		_, err = q.FindProjectByPublicId(ctx, generated.FindProjectByPublicIdParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
 	case generated.UserFavoritesTargetTypeTask:
 		_, _, taskErr := resolveTask(ctx, deps, s, targetID)
+		var ae *apierrors.APIError
+		if stderrors.As(taskErr, &ae) && ae.Spec == apierrors.WsTaskNotFound {
+			return apierrors.New(apierrors.WsFavoriteNotFound)
+		}
 		return taskErr
 	case generated.UserFavoritesTargetTypePage:
 		_, err = q.GetPageByPublicId(ctx, generated.GetPageByPublicIdParams{WorkspaceID: s.workspaceID, PublicID: targetPublicID})
@@ -166,7 +182,7 @@ func ensureMCPFavoriteTargetExists(
 	}
 	if err != nil {
 		if stderrors.Is(err, sql.ErrNoRows) {
-			return apierrors.New(apierrors.McpToolArgumentsInvalid)
+			return apierrors.New(apierrors.WsFavoriteNotFound)
 		}
 		return apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

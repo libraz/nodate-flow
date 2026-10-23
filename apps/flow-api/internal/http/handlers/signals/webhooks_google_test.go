@@ -1,8 +1,13 @@
 package signals
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 )
 
 // TestGoogleDeliveryKeyIsPerDelivery pins the property that makes Drive
@@ -55,5 +60,29 @@ func TestDedupeKeyRejectsOverlongValue(t *testing.T) {
 	}
 	if k := dedupeKey(strings.Repeat("x", externalIDMaxLen+1)); k.Valid {
 		t.Fatalf("an over-long value produced external_id of len %d; want NULL", len(k.String))
+	}
+}
+
+// TestGoogleOverLimitBodyNamesGoogle holds a body-read failure on the
+// Google endpoint to Google's own code. Answering with the GitHub code
+// told the reader to go check a GitHub integration that was never involved.
+func TestGoogleOverLimitBodyNamesGoogle(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/google",
+		strings.NewReader(strings.Repeat("x", (1<<20)+1)))
+	rec := httptest.NewRecorder()
+
+	HandleGoogleWebhook(Deps{})(rec, req)
+
+	var body struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode problem body %q: %v", rec.Body.String(), err)
+	}
+	if body.Type != apierrors.IntegrationGoogleWebhookPayloadUnparseable.Code {
+		t.Fatalf("type = %q; want %q", body.Type, apierrors.IntegrationGoogleWebhookPayloadUnparseable.Code)
+	}
+	if rec.Code != apierrors.IntegrationGoogleWebhookPayloadUnparseable.Status {
+		t.Fatalf("status = %d; want %d", rec.Code, apierrors.IntegrationGoogleWebhookPayloadUnparseable.Status)
 	}
 }

@@ -198,6 +198,44 @@ func (r *Recorder) RecordInTx(ctx context.Context, tx *dbretry.Tx, a Actor, m Mu
 	return nil
 }
 
+// HandBack is an agent handing a task back to a human.
+type HandBack struct {
+	// TaskID is the internal task id, or zero for a run with no task.
+	TaskID uint32
+	// TaskPublicID is the public UUID of the task, empty with TaskID zero.
+	TaskPublicID string
+	// PriorAgentID is the internal ai_agents.id handing the task back;
+	// the event is attributed to it.
+	PriorAgentID uint32
+	// Payload describes the hand-back, free of internal ids.
+	Payload map[string]any
+	// CallSite names the operation in the log line written on loss.
+	CallSite string
+}
+
+// RecordHandBack records a hand-back inside tx. It is the one producer
+// of agent.task.handoff_to_user for every path that hands a task back —
+// the REST handoff, the agent runtime and the auto-action executor — so
+// all of them reach the notify hooks and write the same audit action.
+func (r *Recorder) RecordHandBack(ctx context.Context, tx *dbretry.Tx, a Actor, h HandBack) error {
+	var taskID *int64
+	if h.TaskID != 0 {
+		v := int64(h.TaskID)
+		taskID = &v
+	}
+	agent := int64(h.PriorAgentID)
+	return r.RecordInTx(ctx, tx, a, Mutation{
+		EventType:    eventbus.AgentTaskHandoffToUser,
+		AuditAction:  "task.handoff.to_user",
+		ResourceType: "task",
+		ResourceID:   h.TaskPublicID,
+		TaskID:       taskID,
+		ActorAgentID: &agent,
+		Payload:      h.Payload,
+		CallSite:     h.CallSite,
+	})
+}
+
 // RecordTxAudit records the audit half of a change whose event row was
 // appended by a shared transactional helper — taskstate for a task
 // transition, taskdeps for a dependency edge, itemkit for a calendar

@@ -37,6 +37,9 @@ func TestUnconfiguredOIDCProvidersAreDisabledOverTheWire(t *testing.T) {
 	for path, want := range map[string]*apierrors.Spec{
 		"/auth/oidc/github/start":    apierrors.AuthOidcGithubNotConfigured,
 		"/auth/oidc/microsoft/start": apierrors.AuthOidcMicrosoftNotConfigured,
+		// The callback answers an unconfigured provider the way its start
+		// route and the GitHub callback do, not as an unreachable one.
+		"/auth/oidc/google/callback?code=c&state=s": apierrors.AuthOidcGoogleNotConfigured,
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))

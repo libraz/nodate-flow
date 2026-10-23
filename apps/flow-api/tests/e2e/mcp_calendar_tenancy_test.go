@@ -145,7 +145,8 @@ func TestMCPListCalendarEventsHidesInternalIDs(t *testing.T) {
 // globally-existing non-member would be assignable as owner. The fix
 // resolves the owner through a
 // workspace-membership-scoped query and rejects non-members with
-// MCP.TOKEN.WORKSPACE_MISMATCH.
+// CALENDAR.EVENT.OWNER_USER_NOT_FOUND, the code REST answers for the same
+// owner.
 func TestMCPCreateCalendarEventRejectsNonMemberOwner(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -176,8 +177,8 @@ func TestMCPCreateCalendarEventRejectsNonMemberOwner(t *testing.T) {
 	})
 	require.Equal(t, http.StatusOK, status,
 		"app-layer rejection must use HTTP 200 + envelope, body=%s", string(body))
-	require.Equal(t, "MCP.TOKEN.WORKSPACE_MISMATCH", mcpErrorCode(t, body),
-		"non-member owner must be rejected with MCP.TOKEN.WORKSPACE_MISMATCH, body=%s", string(body))
+	require.Equal(t, "CALENDAR.EVENT.OWNER_USER_NOT_FOUND", mcpErrorCode(t, body),
+		"non-member owner must be rejected with REST's CALENDAR.EVENT.OWNER_USER_NOT_FOUND, body=%s", string(body))
 
 	// Sanity: the same call WITHOUT a foreign owner must succeed, so the
 	// rejection above is specifically about cross-tenant ownership and not

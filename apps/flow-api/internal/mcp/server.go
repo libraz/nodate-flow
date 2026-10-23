@@ -4,11 +4,11 @@
 //   - POST: single JSON-RPC 2.0 request/response (tools/call, etc.)
 //   - GET:  SSE stream delivering real-time workspace event notifications
 //
-// Tools are intentionally implemented as direct sqlc calls in-process
-// (Path A) rather than calling the HTTP handlers of the REST API.
-// Direct sqlc is not considered "raw SQL" for the purposes of the DRY
-// rule — the generated queries package is the single source of truth
-// for SQL.
+// Tools run in-process rather than calling the REST API over HTTP. A
+// tool decodes its arguments and shapes its result; the rules it applies
+// — access floors, claims, recording, error mapping, AI calls — are the
+// shared helpers and transforms the REST handlers call, so the two
+// transports cannot answer the same request differently.
 //
 // The registered tools are listed by tools/list. Per-token rate limiting is
 // enforced at 60 req/min.
@@ -228,10 +228,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tokHash := hashToken(tok)
 	if allowed, retryAfter, first := h.rl.allow(tokHash); !allowed {
 		if first {
-			h.auditTransportRefusal(r.Context(), session, apierrors.RateLimitExceeded)
+			h.auditTransportRefusal(r.Context(), session, apierrors.McpRateLimited)
 		}
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
-		writeRPCTransportError(w, req.ID, apierrors.RateLimitExceeded, "rate limit exceeded")
+		writeRPCTransportError(w, req.ID, apierrors.McpRateLimited, "rate limit exceeded")
 		return
 	}
 
@@ -311,35 +311,21 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		writeRPCAppError(w, req.ID, apierrors.McpScopeInsufficient, "scope "+t.requiredScope+" required")
 		return
 	}
-	// Agent guard: when the session is backed by an AI agent token,
-	// run agentguard.Decide to enforce enabled / paused /
-	// allowed-scopes and the monthly cost cap.
+	// Agent guard: when the session is backed by an AI agent token, the
+	// access half (enabled / paused / allowed scopes) is
+	// agentguard.DecideAccess and the spend half is ai.CheckAgentCostCap,
+	// the monthly-cap check the executor and the judge run too.
 	//
-	// The guard answers two different questions here: whether the agent
-	// may act at all (enabled / paused / allowed scopes) and whether it
-	// may spend (the monthly cost cap). Both refuse with the same
-	// Outcome, so the refusal is named from decision.Cause instead: an
-	// operator who flips the kill switch must not see the agent's client
-	// report a budget failure and go looking at spending limits for it.
-	// AI.AGENT.PAUSED is what the SSE stream returns for the same two
-	// rules, so both transports name the kill switch identically.
+	// The two halves refuse under different codes: an operator who flips
+	// the kill switch must not see the agent's client report a budget
+	// failure and go looking at spending limits for it. AI.AGENT.PAUSED
+	// is what the SSE stream returns for the same access rules, and a
+	// cap refusal is WS.TASK_AGENT.COST_CAP_EXCEEDED, never the workspace
+	// daily-budget code.
 	//
-	// Monthly cost-cap enforcement is a deliberate SOFT cap with
-	// post-hoc + 95%-margin semantics, not a hard pre-call reserve:
-	//   - spend is real: loadAgentMonthSpendCents sums
-	//     ai_invocations.cost_estimate for this agent_id this month
-	//     (the agent_id column already lands, despite older comments);
-	//   - we pass EstimatedCents = 0 because there is no per-tool cost
-	//     model yet, so an in-flight call's cost is unknown until it
-	//     returns. agentguard therefore pauses the agent the moment
-	//     recorded spend reaches 95% of the cap (SpentCentsMonth >=
-	//     effectiveCap), bounding worst-case overrun to roughly one
-	//     tool call beyond the cap.
-	// The would-exceed branch inside agentguard.Decide stays live for
-	// future callers that can supply a real EstimatedCents; at this
-	// call site it is intentionally inert (0 estimate) until a per-tool
-	// estimate lands. Do not fabricate a constant estimate here: a wrong
-	// guess would spuriously pause agents well under their real spend.
+	// The cap is soft: there is no per-tool cost estimate, so the agent is
+	// refused once recorded spend reaches 95% of the cap, bounding the
+	// overrun to roughly one call.
 	if s.agentID != 0 {
 		agent, aerr := h.loadAgentGuardSnapshot(r.Context(), s.agentID)
 		if aerr != nil {
@@ -349,44 +335,33 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 			writeRPCAppError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent guard check failed")
 			return
 		}
-		spent, serr := h.loadAgentMonthSpendCents(r.Context(), s.agentID)
-		if serr != nil {
-			slog.ErrorContext(r.Context(), "mcp: agent spend load failed", slog.Any("err", serr))
-			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
-				generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
-			writeRPCAppError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent spend check failed")
-			return
-		}
-		decision := agentguard.Decide(agent, agentguard.Request{
-			ToolName:        params.Name,
-			RequiredScope:   t.requiredScope,
-			SpentCentsMonth: spent,
-			// Soft cap: no per-tool estimate yet, so the would-exceed
-			// branch is intentionally inert here and the cap bites
-			// post-hoc at 95% of the limit. See the comment above.
-			EstimatedCents: 0,
-		})
-		if decision.Outcome != agentguard.OutcomeAllow {
-			var spec *apierrors.Spec
-			switch decision.Cause {
-			case agentguard.CauseDisabled, agentguard.CausePaused:
-				spec = apierrors.AiAgentPaused
-			case agentguard.CauseCostCapExhausted, agentguard.CauseCostCapWouldExceed:
-				spec = apierrors.AiCostGuardExceeded
-			case agentguard.CauseScopeNotAllowed:
-				spec = apierrors.McpScopeInsufficient
-			case agentguard.CauseNone:
-				// CauseNone belongs to an allow, so it cannot reach here;
-				// the branch keeps the switch total so a cause added to
-				// agentguard still refuses the call rather than falling
-				// through to a nil spec.
-				spec = apierrors.McpScopeInsufficient
-			default:
-				spec = apierrors.McpScopeInsufficient
+		var spec *apierrors.Spec
+		decision := agentguard.DecideAccess(agent, t.requiredScope)
+		switch decision.Outcome {
+		case agentguard.OutcomePause:
+			spec = apierrors.AiAgentPaused
+		case agentguard.OutcomeDeny:
+			spec = apierrors.McpScopeInsufficient
+		case agentguard.OutcomeAllow:
+			// The monthly cap is the rule every agent-initiated call is
+			// held to, through the one check the executor and the judge
+			// also run. Its refusal is the per-agent code, not the
+			// workspace daily-budget one.
+			switch cerr := ai.CheckAgentCostCap(r.Context(), h.deps.Queries, s.agentID, time.Now()); {
+			case errors.Is(cerr, ai.ErrAgentCostCapExceeded):
+				spec = apierrors.WsTaskAgentCostCapExceeded
+			case cerr != nil:
+				slog.ErrorContext(r.Context(), "mcp: agent spend load failed", slog.Any("err", cerr))
+				h.audit(r.Context(), s, params.Name, params.Arguments, nil,
+					generated.McpInvocationsStatusError, apierrors.McpToolGuardUnavailable.Code, 0)
+				writeRPCAppError(w, req.ID, apierrors.McpToolGuardUnavailable, "agent spend check failed")
+				return
 			}
+		}
+		if spec != nil {
 			h.audit(r.Context(), s, params.Name, params.Arguments, nil,
 				generated.McpInvocationsStatusDenied, spec.Code, 0)
-			writeRPCAppError(w, req.ID, spec, "agent guard: "+decision.Reason)
+			writeRPCAppError(w, req.ID, spec, "agent guard: "+spec.Message)
 			return
 		}
 	}
@@ -539,7 +514,7 @@ func writeRPCTransportError(w http.ResponseWriter, id json.RawMessage, spec *api
 }
 
 // loadAgentGuardSnapshot fetches the minimal ai_agents row that
-// agentguard.Decide needs. Returns a zero Agent (not enabled) if the
+// agentguard.DecideAccess needs. Returns a zero Agent (not enabled) if the
 // row is missing so Decide will pause the caller.
 func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (agentguard.Agent, error) {
 	row, err := h.deps.Queries.GetAgentGuardSnapshot(ctx, agentID)
@@ -558,36 +533,13 @@ func (h *Handler) loadAgentGuardSnapshot(ctx context.Context, agentID uint32) (a
 			slog.WarnContext(ctx, "mcp: malformed allowed_scopes_json", slog.String("err", uerr.Error()))
 		}
 	}
-	var costCap *int64
-	if row.MonthlyCostCapCents.Valid {
-		v := int64(row.MonthlyCostCapCents.Int32)
-		costCap = &v
-	}
+	// The monthly cap is not part of the snapshot: it is answered by
+	// ai.CheckAgentCostCap, the check every agent-initiated call shares.
 	return agentguard.Agent{
-		Enabled:             row.Enabled,
-		Paused:              row.Paused,
-		AllowedScopes:       scopes,
-		MonthlyCostCapCents: costCap,
+		Enabled:       row.Enabled,
+		Paused:        row.Paused,
+		AllowedScopes: scopes,
 	}, nil
-}
-
-// loadAgentMonthSpendCents returns the sum of cost_estimate (in cents)
-// for ai_invocations attributed to agentID since the first day of the
-// current UTC month. Used by the dispatch guard.
-func (h *Handler) loadAgentMonthSpendCents(ctx context.Context, agentID uint32) (int64, error) {
-	now := time.Now().UTC()
-	since := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	cents, err := h.deps.Queries.SumAiCostForAgentSince(ctx, generated.SumAiCostForAgentSinceParams{
-		AgentID:   sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- agent id is agents.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		InvokedAt: since,
-	})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	return cents, nil
 }
 
 // maxToolArgBytes is the maximum size of a single MCP tool argument

@@ -51,11 +51,6 @@ export const ValidationErrors = {
     status: 422,
     message: "A query parameter is invalid",
   },
-  VALIDATION_QUERY_UNKNOWN_FIELD: {
-    code: "VALIDATION.QUERY.UNKNOWN_FIELD",
-    status: 422,
-    message: "Unknown query parameter",
-  },
 } as const;
 
 export type ValidationErrorCode = (typeof ValidationErrors)[keyof typeof ValidationErrors]["code"];

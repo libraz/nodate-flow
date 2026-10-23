@@ -58,7 +58,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 				slog.Any("error", err),
 				slog.String("source", "google"),
 			)
-			writeError(w, apierrors.IntegrationGhWebhookPayloadUnparseable)
+			writeError(w, apierrors.IntegrationGoogleWebhookPayloadUnparseable)
 			return
 		}
 		token := r.Header.Get(goog.HeaderChannelToken)

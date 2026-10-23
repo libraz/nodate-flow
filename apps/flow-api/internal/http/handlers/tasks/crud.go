@@ -10,7 +10,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -484,25 +483,24 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 			pub = created.PublicID
 			taskID = tID
 
-			// Append the lifecycle event inside the same tx so a crash
-			// between commit and a post-commit append cannot lose the
-			// timeline/audit row. On a deadlock retry the whole tx
-			// (including this append) rolls back and re-runs, so no
-			// duplicate row is committed.
-			if err := eventbus.Append(ctx, tx, eventbus.Event{
-				Type:        eventbus.TaskCreated,
-				WorkspaceID: prj.WorkspaceID,
-				ActorUserID: actorPtr(ctx),
-				TaskID:      &taskID,
+			// Record the creation inside the same tx so a crash between
+			// commit and a post-commit append cannot lose the timeline
+			// row; the audit row follows the commit. On a deadlock retry
+			// the whole tx (including this append) rolls back and re-runs,
+			// so no duplicate row is committed.
+			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: prj.WorkspaceID}, mutationlog.Mutation{
+				EventType:    eventbus.TaskCreated,
+				AuditAction:  "task.create",
+				ResourceType: "task",
+				ResourceID:   pub.String(),
+				TaskID:       &taskID,
 				Payload: map[string]any{
 					"taskId":    pub.String(),
 					"projectId": prjPub.String(),
 					"title":     title.String(),
 				},
-			}); err != nil {
-				return err
-			}
-			return nil
+				CallSite: "tasks.Create",
+			})
 		})
 		if validationFn != nil {
 			return nil, validationFn()
@@ -510,14 +508,6 @@ func Create(deps Deps) func(context.Context, *CreateTaskInput) (*CreateTaskOutpu
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "task.create",
-			ActorID:      actorID,
-			WorkspaceID:  prj.WorkspaceID,
-			ResourceType: "task",
-			ResourceID:   pub.String(),
-			Metadata:     map[string]any{"title": title.String(), "projectId": in.Body.ProjectID},
-		})
 		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, prj.WorkspaceID, uint32(taskID), title.String(), in.Body.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{

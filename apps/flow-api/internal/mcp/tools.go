@@ -16,18 +16,23 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/pages"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
@@ -36,23 +41,6 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
-
-// countLinkedEvents returns how many enabled calendar_events are
-// attached to a task. Used to decide when an MCP mutation must route
-// through itemkit to keep the task / event pair consistent.
-//
-// The same question decides the same thing on the REST task read path,
-// so both ask it with the same generated query.
-func countLinkedEvents(ctx context.Context, deps Deps, taskID uint32) (int, error) {
-	n, err := deps.Queries.CountActiveCalendarEventsByTaskId(ctx, sql.NullInt32{
-		Int32: int32(taskID), //#nosec G115 -- internal row id, bounded by realistic deployments
-		Valid: true,
-	})
-	if err != nil {
-		return 0, err
-	}
-	return int(n), nil
-}
 
 // toolRun is the signature every tool body has.
 type toolRun func(ctx context.Context, deps Deps, s *session, args json.RawMessage) (any, error)
@@ -124,10 +112,13 @@ func withFloor(floor auth.Floor, run toolRun) toolRun {
 func registerTools(h *Handler) {
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_projects",
-		description:   "List projects in the caller's workspace.",
+		description:   "List projects in the caller's workspace that the caller can open. Page with limit/offset while hasMore is true.",
 		requiredScope: "read:workspace",
-		inputSchema:   objectSchema(nil, nil),
-		run:           runListProjects,
+		inputSchema: objectSchema(map[string]any{
+			"limit":  intSchema("Max number of rows (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset": intSchema("Row offset.", Constraints{Min: intPtr(0)}),
+		}, nil),
+		run: runListProjects,
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_tasks",
@@ -165,15 +156,15 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorProjectEditor, tool{
 		name:          "update_task",
-		description:   "Update mutable fields of a task.",
+		description:   "Update mutable fields of a task. Omitted fields are left as they are; an empty dueOn or startOn clears that date.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId":      stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(taskTitleLimit)}),
 			"description": stringSchema("New description.", Constraints{MaxLength: intPtr(50000)}),
 			"priority":    intSchema("New priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
-			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"startOn":     stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"dueOn":       stringSchema("YYYY-MM-DD, or an empty string to clear the due date.", Constraints{Pattern: `^(\d{4}-\d{2}-\d{2})?$`}),
+			"startOn":     stringSchema("YYYY-MM-DD, or an empty string to clear the start date.", Constraints{Pattern: `^(\d{4}-\d{2}-\d{2})?$`}),
 		}, []string{"taskId"}),
 		run: runUpdateTask,
 	})
@@ -293,7 +284,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListTimeboxes,
 	})
-	h.register(auth.FloorWorkspaceMember, tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_timebox",
 		description:   "Create a new timebox (sprint / iteration) in the workspace.",
 		requiredScope: "write:workspace",
@@ -337,11 +328,13 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_pages",
-		description:   "List wiki pages for the current workspace. Returns root-level pages by default.",
+		description:   "List wiki pages for the current workspace. Returns root-level pages by default; total counts every page the listing covers, so page with limit/offset until it is reached.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"projectId":    stringSchema("Optional project public id (UUID v7) to scope pages.", Constraints{Pattern: publicIDPattern}),
 			"parentPageId": stringSchema("Optional parent page public id (UUID v7) to list child pages.", Constraints{Pattern: publicIDPattern}),
+			"limit":        intSchema("Max number of rows (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),
+			"offset":       intSchema("Row offset.", Constraints{Min: intPtr(0)}),
 		}, nil),
 		run: runListPages,
 	})
@@ -354,7 +347,7 @@ func registerTools(h *Handler) {
 		}, []string{"pageId"}),
 		run: runGetPage,
 	})
-	h.register(auth.FloorWorkspaceMember, tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_page",
 		description:   "Create a new wiki page.",
 		requiredScope: "write:workspace",
@@ -369,7 +362,7 @@ func registerTools(h *Handler) {
 		}, []string{"title"}),
 		run: runCreatePage,
 	})
-	h.register(auth.FloorWorkspaceMember, tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "update_page",
 		description:   "Update a wiki page's title or content.",
 		requiredScope: "write:workspace",
@@ -380,7 +373,7 @@ func registerTools(h *Handler) {
 		}, []string{"pageId"}),
 		run: runUpdatePage,
 	})
-	h.register(auth.FloorWorkspaceMember, tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "generate_page",
 		description:   "Generate a wiki page using AI based on project or task context. Refuses and writes nothing when the workspace has no AI provider or the provider returns no usable draft; a success always means the stored body was drafted, never echoed back from the request.",
 		requiredScope: "write:workspace",
@@ -476,9 +469,9 @@ func registerTools(h *Handler) {
 			"showAs":      stringSchema("New reading of the time to others.", Constraints{Enum: calendarEventShowAs}),
 			"flexibility": stringSchema("New answer to whether the commitment can be moved. Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),
 			"visibility":  stringSchema("New answer to who may see the event's details.", Constraints{Enum: calendarEventVisibility}),
-			"location":    stringSchema("New location.", Constraints{MaxLength: intPtr(500)}),
-			"memo":        stringSchema("New memo/notes.", Constraints{MaxLength: intPtr(10000)}),
-			"blockLabel":  stringSchema("New block label.", Constraints{MaxLength: intPtr(100)}),
+			"location":    stringSchema("New location; an empty string clears it.", Constraints{MaxLength: intPtr(500)}),
+			"memo":        stringSchema("New memo/notes; an empty string clears it.", Constraints{MaxLength: intPtr(10000)}),
+			"blockLabel":  stringSchema("New block label; an empty string clears it.", Constraints{MaxLength: intPtr(100)}),
 			// The same two arguments the REST patch route takes, under the
 			// same names and with the same closed set of values: a
 			// recurring series is one master row, so without them every
@@ -621,7 +614,7 @@ func registerTools(h *Handler) {
 		run: runUnarchiveTask,
 	})
 
-	// Favorites, reactions, and recent visits.
+	// Favorites and reactions.
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_favorites",
 		description:   "List the current user's favorite items in the workspace.",
@@ -660,15 +653,6 @@ func registerTools(h *Handler) {
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 		}, []string{"taskId"}),
 		run: runListReactions,
-	})
-	h.register(auth.FloorWorkspaceMember, tool{
-		name:          "list_recent",
-		description:   "List the user's recently visited entities in the workspace.",
-		requiredScope: "read:workspace",
-		inputSchema: objectSchema(map[string]any{
-			"limit": intSchema("Max results (1..20, default 20).", Constraints{Min: intPtr(1), Max: intPtr(20)}),
-		}, nil),
-		run: runListRecent,
 	})
 
 	// Intake triage and description version history.
@@ -736,7 +720,7 @@ func registerTools(h *Handler) {
 		}, nil),
 		run: runListImportJobs,
 	})
-	h.register(auth.FloorWorkspaceMember, tool{
+	h.register(auth.FloorProjectEditor, tool{
 		name:          "create_import_job",
 		description:   "Create a new import job.",
 		requiredScope: "write:workspace",
@@ -950,27 +934,60 @@ func parseDateOrNull(s string) (sql.NullTime, error) {
 	return sql.NullTime{Time: t, Valid: true}, nil
 }
 
-func runListProjects(ctx context.Context, deps Deps, s *session, _ json.RawMessage) (any, error) {
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+func runListProjects(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		Limit  int32 `json:"limit"`
+		Offset int32 `json:"offset"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
 	rows, err := deps.Queries.ListProjectsForWorkspace(ctx, generated.ListProjectsForWorkspaceParams{
 		WorkspaceID: s.workspaceID,
-		Limit:       200,
-		Offset:      0,
+		Limit:       in.Limit,
+		Offset:      in.Offset,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// The REST listing's rule: owners and admins see every project, anyone
+	// else only the projects they hold an enabled project_members row on.
+	var allowed map[types.PublicID]bool
+	if !wsRole.AtLeast(acl.WorkspaceRoleAdmin) {
+		ids, err := deps.Queries.ListProjectPublicIdsForUserInWorkspace(ctx, generated.ListProjectPublicIdsForUserInWorkspaceParams{
+			WorkspaceID: s.workspaceID,
+			UserID:      s.userID,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		allowed = make(map[types.PublicID]bool, len(ids))
+		for _, id := range ids {
+			allowed[id] = true
+		}
+	}
 	items := make([]map[string]any, 0, len(rows))
 	for _, r := range rows {
+		if allowed != nil && !allowed[r.PublicID] {
+			continue
+		}
 		items = append(items, map[string]any{
 			"id":   r.PublicID.String(),
 			"slug": r.Slug,
 			"name": r.Name,
 		})
 	}
-	return map[string]any{"projects": items}, nil
+	// hasMore is the truncation signal: the window is applied before the
+	// membership filter, so a short page does not mean the end.
+	hasMore := len(rows) > 0 && int64(in.Offset)+int64(len(rows)) < handlerutil.TotalAsInt64(rows[0].Total)
+	return map[string]any{"projects": items, "hasMore": hasMore}, nil
 }
 
 func runListTasks(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -1190,26 +1207,25 @@ func runCreateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		}
 		pub = created.PublicID
 		taskID = created.ID
-		return nil
+		// The lifecycle event commits with the task; the audit row waits
+		// for the commit.
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TaskCreated,
+			AuditAction:  "task.create",
+			ResourceType: "task",
+			ResourceID:   pub.String(),
+			TaskID:       &taskID,
+			Payload: map[string]any{
+				"taskId": pub.String(),
+				"title":  title.String(),
+				"via":    "mcp",
+			},
+			CallSite: "mcp.create_task",
+		})
 	}); txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 	noteInvocationTask(ctx, uint32(taskID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-	// The task row is committed. Reporting a failure here would tell the
-	// caller nothing was created and invite a duplicate on retry.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.TaskCreated,
-		AuditAction:  "task.create",
-		ResourceType: "task",
-		ResourceID:   pub.String(),
-		TaskID:       &taskID,
-		Payload: map[string]any{
-			"taskId": pub.String(),
-			"title":  title.String(),
-			"via":    "mcp",
-		},
-		CallSite: "mcp.create_task",
-	})
 	// The embedded text is the stored text. The rule trims the title before
 	// the insert, so embedding the submitted string would index a padded
 	// string against a row holding the trimmed one.
@@ -1239,217 +1255,205 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
-		return nil, err
-	}
-	taskInternal, current, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
-	if err != nil {
-		return nil, err
-	}
-	title, err := taskrules.PatchTitle(current.Title, in.Title)
-	if err != nil {
-		return nil, translateTaskRuleError(err)
-	}
-	desc := current.Description
-	if in.Description != nil {
-		desc = sql.NullString{String: *in.Description, Valid: *in.Description != ""}
-	}
-	prio := current.Priority
-	if in.Priority != nil {
-		prio = *in.Priority
-	}
-	due := current.DueOn
+	// Dates are parsed before the transaction; everything merged against
+	// the stored row happens inside it.
+	var argDue, argStart sql.NullTime
 	if in.DueOn != nil {
 		p, err := parseDateOrNull(*in.DueOn)
 		if err != nil {
 			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 		}
-		due = p
+		argDue = p
 	}
-	start := current.StartedOn
 	if in.StartOn != nil {
 		p, err := parseDateOrNull(*in.StartOn)
 		if err != nil {
 			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 		}
-		start = p
+		argStart = p
 	}
-	// The merged pair, not the arguments: a call that moves only one side
-	// still has to face the other side's stored value. Answered before any
-	// of the writes below, so a refusal leaves the task as it was.
-	if err := taskrules.DateOrder(due, start); err != nil {
-		return nil, translateTaskRuleError(err)
+	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+		return nil, err
 	}
-
-	titleChanged := in.Title != nil && title.String() != current.Title
-	dueOnChanged := in.DueOn != nil && due != current.DueOn
-	// Whether the stored body moved, not whether the caller named it: the
-	// history holds the bodies the task has actually carried, so a call
-	// re-sending the current description appends nothing to it.
-	descChanged := in.Description != nil && desc != current.Description
-	// Whether the embedded text moved, not whether the caller named it. A
-	// call that re-sends the stored title leaves the row's text where it
-	// was, and re-embedding it would bill the workspace's embedding budget
-	// for a vector it already holds.
-	textChanged := titleChanged || descChanged
-
-	needsItemkit := false
-	if titleChanged || dueOnChanged {
-		n, cerr := countLinkedEvents(ctx, deps, taskInternal)
-		if cerr != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, cerr)
-		}
-		needsItemkit = n > 0
-	}
-
-	updateParams := generated.UpdateTaskParams{
-		Title:           title.String(),
-		Description:     desc,
-		Priority:        prio,
-		DueOn:           due,
-		StartedOn:       start,
-		SortWeight:      current.SortWeight,
-		Visibility:      current.Visibility,
-		UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		WorkspaceID:     s.workspaceID,
-		PublicID:        current.PublicID,
-	}
-
-	if !needsItemkit {
-		// Same transaction boundary as the itemkit branch below. The
-		// description version has to commit with the update it records, so
-		// this path cannot write the row outside a transaction: a body that
-		// commits without its snapshot is one no restore can return to.
-		//
-		// Not an existence check: MySQL counts changed rows, so an update
-		// carrying the task's current values reports zero. The task is
-		// resolved into `current` above.
-		if err := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			qtx := deps.Queries.WithTx(tx.RawTx())
-			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
-				return err
-			}
-			if descChanged {
-				version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
-				if err != nil {
-					return err
-				}
-				if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
-					return err
-				}
-				// Alongside the snapshot, not inside it: a body edited down to
-				// nothing writes no version and still has to stop naming the
-				// people it used to.
-				if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
-					return err
-				}
-			}
-			return nil
-		}); err != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-		}
-	} else {
-		// itemkit writes an event row through eventlog inside this
-		// transaction, and a deadlock there rolls the whole transaction
-		// back — re-running one statement inside a dead transaction
-		// would achieve nothing. dbretry.InTx retries the unit that
-		// actually failed.
-		var answered error
-		txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			answered = nil
-			qtx := deps.Queries.WithTx(tx.RawTx())
-			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
-				return err
-			}
-			// Same reason as the branch above: the snapshot, the event naming
-			// it and the mention sync share the transaction that writes the
-			// description.
-			if descChanged {
-				version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
-				if err != nil {
-					return err
-				}
-				if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
-					return err
-				}
-				if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
-					return err
-				}
-			}
-			if titleChanged {
-				// The renamed text is discarded here: this tool carries
-				// the task's new title and body already and refreshes the
-				// embedding from them below.
-				if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-					WorkspaceID: s.workspaceID,
-					ActorUserID: s.userID,
-					TaskID:      taskInternal,
-					NewTitle:    title,
-				}); err != nil {
-					answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
-					return err
-				}
-			}
-			if dueOnChanged {
-				// The snap badges come from the actor's working week and
-				// holiday set, resolved from the same workspace and actor
-				// REST resolves them from. Left unresolved the reschedule
-				// would store no snap at all, so the same move made through
-				// a tool and through REST would leave two different rows.
-				snap, err := itemkit.ResolveSnapConfig(ctx, tx, s.workspaceID, s.userID)
-				if err != nil {
-					return err
-				}
-				var t time.Time
-				if due.Valid {
-					t = due.Time
-				}
-				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-					WorkspaceID: s.workspaceID,
-					TaskID:      taskInternal,
-					ActorUserID: s.userID,
-					SetDueOn:    true,
-					DueOn:       t,
-					Snap:        snap,
-				}); err != nil {
-					answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
-					return err
-				}
-			}
-			return nil
-		})
-		if answered != nil {
-			return nil, answered
-		}
-		if txErr != nil {
-			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
-		}
-	}
-
-	// Ahead of the event append rather than after it: the field values are
-	// committed by here, and the append below can answer with an error that
-	// leaves this function. A refresh placed past that point would be
-	// skipped for a write the task is already carrying.
-	if textChanged {
-		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, title.String(), desc.String)
+	taskInternal, pub, err := resolveTaskForWrite(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
 	}
 
 	taskID64 := int64(taskInternal)
-	// Propagated rather than absorbed: re-running this tool with the same
-	// arguments re-applies the same field values and re-appends the
-	// event, so the caller's retry is what repairs the log.
-	if err := recordMutationStrict(ctx, deps, s, mutation{
-		EventType:    eventbus.TaskUpdated,
-		AuditAction:  "task.update",
-		ResourceType: "task",
-		ResourceID:   current.PublicID.String(),
-		TaskID:       &taskID64,
-		Payload:      map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
-		CallSite:     "mcp.update_task",
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	var (
+		title        taskrules.Title
+		desc         sql.NullString
+		titleChanged bool
+		descChanged  bool
+		answered     error
+	)
+	// One transaction for the merge and the write, as REST PATCH does. The
+	// row is locked before it is read, so the merge starts from what the
+	// previous writer committed and a concurrent edit of another field is
+	// kept rather than overwritten with a value read before it landed.
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		qtx := deps.Queries.WithTx(tx.RawTx())
+		if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+			ID:          taskInternal,
+			WorkspaceID: s.workspaceID,
+		}); err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				answered = apierrors.New(apierrors.WsTaskNotFound)
+			}
+			return err
+		}
+		current, err := loadTaskRow(ctx, qtx, s.workspaceID, pub)
+		if err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				answered = apierrors.New(apierrors.WsTaskNotFound)
+			}
+			return err
+		}
+		title, err = taskrules.PatchTitle(current.Title, in.Title)
+		if err != nil {
+			answered = translateTaskRuleError(err)
+			return err
+		}
+		desc = current.Description
+		if in.Description != nil {
+			desc = sql.NullString{String: *in.Description, Valid: *in.Description != ""}
+		}
+		prio := current.Priority
+		if in.Priority != nil {
+			prio = *in.Priority
+		}
+		due := current.DueOn
+		if in.DueOn != nil {
+			due = argDue
+		}
+		start := current.StartedOn
+		if in.StartOn != nil {
+			start = argStart
+		}
+		// The merged pair, not the arguments: a call that moves only one
+		// side still has to face the other side's stored value.
+		if err := taskrules.DateOrder(due, start); err != nil {
+			answered = translateTaskRuleError(err)
+			return err
+		}
+
+		titleChanged = in.Title != nil && title.String() != current.Title
+		dueOnChanged := in.DueOn != nil && due != current.DueOn
+		// Whether the stored body moved, not whether the caller named it:
+		// the history holds the bodies the task has actually carried.
+		descChanged = in.Description != nil && desc != current.Description
+
+		needsItemkit := false
+		if titleChanged || dueOnChanged {
+			n, err := qtx.CountActiveCalendarEventsByTaskId(ctx, sql.NullInt32{
+				Int32: int32(taskInternal), //#nosec G115 -- internal row id, bounded by realistic deployments
+				Valid: true,
+			})
+			if err != nil {
+				return err
+			}
+			needsItemkit = n > 0
+		}
+
+		updateParams := generated.UpdateTaskParams{
+			Title:           title.String(),
+			Description:     desc,
+			Priority:        prio,
+			DueOn:           due,
+			StartedOn:       start,
+			SortWeight:      current.SortWeight,
+			Visibility:      current.Visibility,
+			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			WorkspaceID:     s.workspaceID,
+			PublicID:        current.PublicID,
+		}
+		// Not an existence check: an update carrying the task's current
+		// values changes nothing and MySQL counts zero. The row lock above
+		// is what established the task exists.
+		if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
+			return err
+		}
+		// Inside the transaction that writes the description: a body that
+		// commits without its snapshot is one no restore can return to.
+		if descChanged {
+			version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
+			if err != nil {
+				return err
+			}
+			if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
+				return err
+			}
+			// Alongside the snapshot, not inside it: a body edited down to
+			// nothing writes no version and still has to stop naming the
+			// people it used to.
+			if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
+				return err
+			}
+		}
+		if needsItemkit && titleChanged {
+			// The renamed text is discarded here: this tool carries the
+			// task's new title and body already and refreshes the embedding
+			// from them below.
+			if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
+				WorkspaceID: s.workspaceID,
+				ActorUserID: s.userID,
+				TaskID:      taskInternal,
+				NewTitle:    title,
+			}); err != nil {
+				answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
+				return err
+			}
+		}
+		if needsItemkit && dueOnChanged {
+			// The snap badges come from the actor's working week and holiday
+			// set, resolved from the same workspace and actor REST resolves
+			// them from.
+			snap, err := itemkit.ResolveSnapConfig(ctx, tx, s.workspaceID, s.userID)
+			if err != nil {
+				return err
+			}
+			var t time.Time
+			if due.Valid {
+				t = due.Time
+			}
+			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
+				WorkspaceID: s.workspaceID,
+				TaskID:      taskInternal,
+				ActorUserID: s.userID,
+				SetDueOn:    true,
+				DueOn:       t,
+				Snap:        snap,
+			}); err != nil {
+				answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
+				return err
+			}
+		}
+		// The lifecycle event commits with the change; the audit row waits
+		// for the commit.
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TaskUpdated,
+			AuditAction:  "task.update",
+			ResourceType: "task",
+			ResourceID:   current.PublicID.String(),
+			TaskID:       &taskID64,
+			Payload:      map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
+			CallSite:     "mcp.update_task",
+		})
+	})
+	if answered != nil {
+		return nil, answered
 	}
-	return map[string]any{"id": current.PublicID.String()}, nil
+	if txErr != nil {
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
+	}
+	// Only text that actually moved invalidates the vector: a refresh costs
+	// a provider call the workspace pays for.
+	if titleChanged || descChanged {
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, title.String(), desc.String)
+	}
+	return map[string]any{"id": pub.String()}, nil
 }
 
 // translateItemkitMCPError maps an itemkit failure onto the error a
@@ -1561,10 +1565,15 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
+	// The task's own constraints and its dependents' dependency.* facts
+	// read the state just committed. Best effort, as on REST: the next
+	// evaluation recovers from a failure here.
+	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: s.workspaceID, Queries: deps.Queries}}
+	_ = eng.EvaluateTaskAndDependents(ctx, taskInternal)
 	// taskstate appended the transition event inside the transaction so
 	// the event and the state change commit together; only the audit row
 	// belongs to the transport.
-	recordTxMutationAudit(ctx, deps, s, mutation{
+	recorder(deps).RecordTxAudit(ctx, mutationActor(s), mutationlog.Mutation{
 		AuditAction:  "task.transition",
 		ResourceType: "task",
 		ResourceID:   pub.String(),
@@ -1604,9 +1613,11 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, err
 	}
 	cpub := newPublicID()
-	// One commit boundary for the body and the mentions it names: a mention
-	// row that lands without its comment, or a comment that lands without
-	// its mentions, is a thread that says one thing and notifies another.
+	taskID64 := int64(taskInternal)
+	// One commit boundary for the body, the mentions it names and its event:
+	// a mention row that lands without its comment, or a comment that lands
+	// without its mentions, is a thread that says one thing and notifies
+	// another.
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_comment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		qtx := deps.Queries.WithTx(tx.RawTx())
 		id, e := qtx.AddComment(ctx, generated.AddCommentParams{
@@ -1619,25 +1630,25 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		if e != nil {
 			return e
 		}
-		return syncCommentMentions(ctx, tx, s, taskInternal, pub, uint32(id), cpub, in.Body) //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
+		if err := syncCommentMentions(ctx, tx, s, taskInternal, pub, uint32(id), cpub, in.Body); err != nil { //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TaskCommentAdded,
+			AuditAction:  "comment.create",
+			ResourceType: "comment",
+			ResourceID:   cpub.String(),
+			TaskID:       &taskID64,
+			Payload: map[string]any{
+				"taskId":    pub.String(),
+				"commentId": cpub.String(),
+				"via":       "mcp",
+			},
+			CallSite: "mcp.add_comment",
+		})
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	taskID64 := int64(taskInternal)
-	// The comment row is committed; a retry would post it twice.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.TaskCommentAdded,
-		AuditAction:  "comment.create",
-		ResourceType: "comment",
-		ResourceID:   cpub.String(),
-		TaskID:       &taskID64,
-		Payload: map[string]any{
-			"taskId":    pub.String(),
-			"commentId": cpub.String(),
-			"via":       "mcp",
-		},
-		CallSite: "mcp.add_comment",
-	})
 	return map[string]any{"id": cpub.String()}, nil
 }
 
@@ -1662,7 +1673,9 @@ func runSearchTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		in.Limit = 50
 	}
 
-	pattern := "%" + in.Query + "%"
+	// Matched as literal text, as the REST search is: % and _ in the query
+	// are characters to find, not wildcards.
+	pattern := "%" + stringutil.EscapeLike(in.Query) + "%"
 	rows, err := searchMCPTasks(ctx, deps.DB, s.workspaceID, s.userID, wsRole, pattern, in.Limit, in.Offset)
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -1754,7 +1767,7 @@ func runProposeTasksFrom(ctx context.Context, deps Deps, s *session, raw json.Ra
 	}
 	tasks, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, in.Source)
 	if err != nil {
-		return nil, mapAiError(err)
+		return nil, aiFailure(err)
 	}
 	out := make([]map[string]any, 0, len(tasks))
 	for _, t := range tasks {
@@ -1779,7 +1792,7 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	_, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
+	taskInternal, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -1790,46 +1803,58 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if row.Description.Valid && row.Description.String != "" {
 		summary = row.Title + "\n\n" + row.Description.String
 	}
-	priority, err := deps.AI.ProposePriority(ctx, s.workspaceID, summary)
+	// Filed under the task its prompt quotes, as propose_steps is.
+	label, err := deps.AI.ProposePriority(ai.WithTaskID(ctx, taskInternal), s.workspaceID, summary)
 	if err != nil {
-		return nil, mapAiError(err)
+		return nil, aiFailure(err)
 	}
-	return map[string]any{
-		"priority":  priority,
-		"rationale": "",
-	}, nil
+	// The model answers with a word; the result speaks the 0-4 scale
+	// update_task and create_task take.
+	return map[string]any{"priority": proposedPriority(ctx, label, "mcp.propose_priority")}, nil
 }
 
-// runProposeDuplicates ranks stored embeddings against the source task
-// via Go-side cosine similarity (MySQL 9.6 Community lacks
-// VEC_DISTANCE_COSINE). Thresholds come from ai_settings, with ADR 0003
-// defaults when the workspace has no row yet.
-func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
-	var in struct {
-		TaskID string `json:"taskId"`
+// proposedPriority maps a model's priority word onto the 0-4 task scale
+// through the mapping REST uses. A word outside the vocabulary still yields
+// a value, but the substitution is logged: otherwise a model drifting off
+// the vocabulary is indistinguishable from one choosing "none".
+func proposedPriority(ctx context.Context, label, callSite string) int32 {
+	priority, known := handlerutil.PriorityFromLabel(label)
+	if !known {
+		slog.WarnContext(ctx, "mcp: LLM returned a priority outside the vocabulary",
+			slog.String("call_site", callSite),
+			slog.String("priority_label", label),
+		)
 	}
-	if err := parseArgs(raw, &in); err != nil {
-		return nil, err
-	}
-	wsRole, wsErr := requireWorkspaceMember(ctx, deps, s)
-	if wsErr != nil {
-		return nil, wsErr
-	}
-	vis := acl.ListVisibilityArgs(s.userID, wsRole)
-	if deps.Embedder == nil {
-		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
-	}
-	taskInternal, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
-	if err != nil {
-		return nil, err
-	}
+	return priority
+}
 
+// Similarity thresholds and bounds, the ADR 0003 defaults the REST
+// duplicate listing uses when ai_settings has no row for the workspace.
+const (
+	defaultDuplicateHigh    = 0.870
+	defaultDuplicateLow     = 0.750
+	duplicateCandidateLimit = 200
+	duplicateResultLimit    = 20
+)
+
+// similarTask is one candidate of a similarity search, ranked by score.
+type similarTask struct {
+	publicID  string
+	title     string
+	score     float64
+	duplicate bool
+}
+
+// rankSimilarTasks is the similarity search behind propose_duplicates and
+// propose_relations: it ranks stored embeddings against the source task via
+// Go-side cosine similarity (MySQL 9.6 Community lacks VEC_DISTANCE_COSINE),
+// over the caller's readable set, with thresholds from ai_settings. A source
+// task with no usable embedding yields no candidates rather than an error.
+func rankSimilarTasks(ctx context.Context, deps Deps, s *session, wsRole acl.WorkspaceRole, taskInternal uint32, title string, description sql.NullString) (string, []similarTask, error) {
 	// The lookup key is the embedder's own model, which is what wrote
-	// every row: see [embed.Client.Model]. Thresholds come from
-	// ai_settings, with the ADR 0003 defaults on miss.
+	// every row: see [embed.Client.Model].
 	model := deps.Embedder.Model()
-	high := 0.870
-	low := 0.750
+	high, low := defaultDuplicateHigh, defaultDuplicateLow
 	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
 		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
 			high = v
@@ -1845,11 +1870,11 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 	})
 	if stderrors.Is(err, sql.ErrNoRows) {
 		desc := ""
-		if row.Description.Valid {
-			desc = row.Description.String
+		if description.Valid {
+			desc = description.String
 		}
-		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, row.Title, desc); eerr != nil {
-			return map[string]any{"candidates": []any{}, "model": model}, nil
+		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, title, desc); eerr != nil {
+			return model, nil, nil
 		}
 		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
 			TaskID: taskInternal,
@@ -1857,13 +1882,14 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		})
 	}
 	if err != nil {
-		return map[string]any{"candidates": []any{}, "model": model}, nil
+		return model, nil, nil
 	}
 	srcVec, err := embed.Decode(toBytes(src.Vector))
 	if err != nil || len(srcVec) == 0 {
-		return map[string]any{"candidates": []any{}, "model": model}, nil
+		return model, nil, nil
 	}
 
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
 		WorkspaceID:   s.workspaceID,
 		Model:         model,
@@ -1872,18 +1898,12 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		ActorUserID:   vis.ActorUserID,
 		ActorUserID_2: vis.ActorUserID,
 		ActorUserID_3: vis.ActorUserID,
-		Limit:         200,
+		Limit:         duplicateCandidateLimit,
 	})
 	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return model, nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	type cand struct {
-		id       string
-		title    string
-		score    float64
-		classify string
-	}
-	ranked := make([]cand, 0, len(rows))
+	ranked := make([]similarTask, 0, len(rows))
 	for _, r := range rows {
 		v, derr := embed.Decode(toBytes(r.Vector))
 		if derr != nil || len(v) != len(srcVec) {
@@ -1893,45 +1913,77 @@ func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.R
 		if score < low {
 			continue
 		}
-		classification := "related"
-		if score >= high {
-			classification = "duplicate"
-		}
-		ranked = append(ranked, cand{
-			id:       r.PublicID.String(),
-			title:    r.Title,
-			score:    score,
-			classify: classification,
+		ranked = append(ranked, similarTask{
+			publicID:  r.PublicID.String(),
+			title:     r.Title,
+			score:     score,
+			duplicate: score >= high,
 		})
 	}
 	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
-	if len(ranked) > 20 {
-		ranked = ranked[:20]
+	if len(ranked) > duplicateResultLimit {
+		ranked = ranked[:duplicateResultLimit]
 	}
-	out := make([]map[string]any, 0, len(ranked))
-	for _, c := range ranked {
-		out = append(out, map[string]any{
-			"taskId":         c.id,
-			"title":          c.title,
-			"score":          c.score,
-			"classification": c.classify,
-		})
-	}
-	return map[string]any{"candidates": out, "model": model}, nil
+	return model, ranked, nil
 }
 
-// runProposeSteps asks the workspace LLM to break an existing task
-// into concrete execution steps. It reuses ProposeTasksFrom by
-// feeding the task's title + description back in as the source
-// signal, which keeps the prompt path and cost guard identical to
-// propose_tasks_from.
+// similarTaskCandidates shapes ranked candidates for a tool result, naming
+// the duplicate-or-related verdict under kindKey.
+func similarTaskCandidates(ranked []similarTask, kindKey string) []map[string]any {
+	out := make([]map[string]any, 0, len(ranked))
+	for _, c := range ranked {
+		kind := "related"
+		if c.duplicate {
+			kind = "duplicate"
+		}
+		out = append(out, map[string]any{
+			"taskId": c.publicID,
+			"title":  c.title,
+			"score":  c.score,
+			kindKey:  kind,
+		})
+	}
+	return out
+}
+
+// runProposeDuplicates returns likely duplicates of a task, classified as
+// "duplicate" or "related".
+func runProposeDuplicates(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
+	var in struct {
+		TaskID string `json:"taskId"`
+	}
+	if err := parseArgs(raw, &in); err != nil {
+		return nil, err
+	}
+	wsRole, wsErr := requireWorkspaceMember(ctx, deps, s)
+	if wsErr != nil {
+		return nil, wsErr
+	}
+	if deps.Embedder == nil {
+		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+	}
+	taskInternal, row, err := resolveTaskRow(ctx, deps, s, in.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	model, ranked, err := rankSimilarTasks(ctx, deps, s, wsRole, taskInternal, row.Title, row.Description)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"candidates": similarTaskCandidates(ranked, "classification"), "model": model}, nil
+}
+
+// runProposeSteps asks the workspace LLM to break an existing task into
+// concrete execution steps, through the same orchestrator call REST
+// propose-steps makes: existing children the caller can see are handed to
+// the model so it does not re-propose them, similar tasks come from the
+// caller's readable set, and priorities are on the 0-4 scale apply_steps
+// takes, so the result can be applied unchanged.
 //
 // The project-editor floor is the one REST holds the same request to: a
 // breakdown is the first half of apply_steps, it spends the workspace's
-// model budget on a task the caller may only be able to read, and the
-// decomposition it returns is meant for whoever may restructure the task.
-// Reading the task was the whole gate here, so anyone who could see a task
-// could bill the workspace for a plan they could not act on.
+// model budget, and the decomposition it returns is meant for whoever may
+// restructure the task.
 func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID string `json:"taskId"`
@@ -1939,30 +1991,58 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
 	}
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
-	_, row, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
+	taskInternal, row, err := resolveTaskRowForWrite(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
 	if deps.AI == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
-	source := "Break this task into concrete execution steps.\n\nTitle: " + row.Title
-	if row.Description.Valid && row.Description.String != "" {
-		source += "\n\nDescription:\n" + row.Description.String
+	// A child carries its own visibility and its title reaches the prompt,
+	// so the children are filtered by the Layer-4 rule in their own right.
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
+	var children []ai.ChildTaskSummary
+	childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
+		WorkspaceID:   s.workspaceID,
+		ParentTaskID:  sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+	})
+	if err == nil {
+		for _, c := range childRows {
+			children = append(children, ai.ChildTaskSummary{Title: c.Title, State: string(c.DerivedState)})
+		}
 	}
-	steps, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, source)
+	// The interfaces stay unset when no embedder is configured: a nil
+	// *embed.Client held in one would be non-nil as an interface.
+	var embedClient ai.EmbedClient
+	var reader ai.SmartCreateReader
+	if deps.Embedder != nil {
+		embedClient = deps.Embedder
+		reader = deps.Queries
+	}
+	desc := ""
+	if row.Description.Valid {
+		desc = row.Description.String
+	}
+	// The invocation is filed under the task its prompt quotes, so the
+	// invocation list can apply the task's visibility to it.
+	steps, err := deps.AI.ProposeSteps(ai.WithTaskID(ctx, taskInternal), s.workspaceID, row.Title, desc, ai.GranularityStandard, children, embedClient, reader, vis)
 	if err != nil {
-		return nil, mapAiError(err)
+		return nil, aiFailure(err)
 	}
 	out := make([]map[string]any, 0, len(steps))
 	for _, st := range steps {
 		out = append(out, map[string]any{
 			"title":       st.Title,
 			"description": st.Description,
-			"priority":    st.Priority,
+			"priority":    proposedPriority(ctx, st.Priority, "mcp.propose_steps"),
 		})
 	}
 	return map[string]any{"parentTaskId": row.PublicID.String(), "steps": out}, nil
@@ -2001,12 +2081,18 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	// is FOR UPDATE and belongs inside the transition transaction, so reading
 	// through it here would take a row lock this path has no reason to hold.
 	// Replacing this takes a plain generated read of tasks.project_id keyed on
-	// the internal id.
+	// the internal id. The read is the one REST apply-steps makes.
+	//
+	// A step is a task derived from the parent, so it carries the parent's
+	// visibility rather than the create-path default: a public child of a
+	// private parent would put the private task's plan in front of the whole
+	// workspace.
 	var parentProjectID uint32
+	var parentVisibility generated.TasksVisibility
 	if err := deps.DB.QueryRowContext(ctx,
-		`SELECT project_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
+		`SELECT project_id, visibility FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
 		parentInternal, s.workspaceID,
-	).Scan(&parentProjectID); err != nil {
+	).Scan(&parentProjectID, &parentVisibility); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	// Every step title is checked before the transaction opens, so a
@@ -2039,41 +2125,41 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 				Title:        stepTitles[i],
 				Description:  sql.NullString{String: st.Description, Valid: st.Description != ""},
 				Priority:     st.Priority,
+				Visibility:   parentVisibility,
 			})
 			if err != nil {
 				return err
 			}
 			created = append(created, child.PublicID.String())
 			childIDs = append(childIDs, child.ID)
+			childID := child.ID
+			// The event commits with the child it names, and carries the
+			// title the row actually holds: the rule trims before the
+			// insert.
+			if err := recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+				EventType:    eventbus.TaskCreated,
+				AuditAction:  "task.apply_steps",
+				ResourceType: "task",
+				ResourceID:   created[i],
+				TaskID:       &childID,
+				Payload: map[string]any{
+					"taskId":       created[i],
+					"title":        stepTitles[i].String(),
+					"parentTaskId": parentPub.String(),
+					"via":          "mcp:apply_steps",
+				},
+				CallSite: "mcp.apply_steps",
+			}); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 
-	// Events are appended after commit so they reference committed rows and
-	// a retried transaction cannot publish a child that was rolled back.
 	for i := range in.Steps {
 		childID := childIDs[i]
-		// The children are committed; a retry would create them again.
-		// The event carries the title the row actually holds, not the one
-		// the caller submitted: the rule trims before the insert, and an
-		// append-only event naming the untrimmed string would disagree with
-		// the task forever.
-		recordMutation(ctx, deps, s, mutation{
-			EventType:    eventbus.TaskCreated,
-			AuditAction:  "task.apply_steps",
-			ResourceType: "task",
-			ResourceID:   created[i],
-			TaskID:       &childID,
-			Payload: map[string]any{
-				"taskId":       created[i],
-				"title":        stepTitles[i].String(),
-				"parentTaskId": parentPub.String(),
-				"via":          "mcp:apply_steps",
-			},
-			CallSite: "mcp.apply_steps",
-		})
 		// Each step is a task in its own right, so it carries its own
 		// embedding. Left unrefreshed a step would be absent from semantic
 		// search entirely rather than merely stale.
@@ -2082,18 +2168,11 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"created": created}, nil
 }
 
-// mapAiError maps ai package sentinel errors to the appropriate API
-// error spec for the MCP boundary.
-func mapAiError(err error) error {
-	switch {
-	case stderrors.Is(err, ai.ErrNoProvider):
-		return apierrors.New(apierrors.AiProviderNotConfigured)
-	case stderrors.Is(err, ai.ErrDailyBudgetExceeded):
-		return apierrors.New(apierrors.AiCostGuardExceeded)
-	case stderrors.Is(err, ai.ErrParse):
-		return apierrors.New(apierrors.AiResponseInvalidJson)
-	}
-	return apierrors.Wrap(apierrors.AiProviderUpstreamUnreachable, err)
+// aiFailure answers an AI-layer failure with the code the shared mapping
+// assigns it, so the same failure reads the same on REST and MCP.
+func aiFailure(err error) error {
+	spec, _ := errormodel.AIFailure(err)
+	return apierrors.Wrap(spec, err)
 }
 
 // toBytes coerces an interface{} column (returned by sqlc for VECTOR
@@ -2184,7 +2263,7 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	}
 	var projectID sql.NullInt32
 	if in.ProjectID != "" {
-		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 		if err != nil {
 			return nil, err
 		}
@@ -2192,17 +2271,32 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	}
 	pub := newPublicID()
 	desc := sql.NullString{String: in.Description, Valid: in.Description != ""}
-	timeboxID, err := deps.Queries.CreateTimebox(ctx, generated.CreateTimeboxParams{
-		PublicID:    pub,
-		WorkspaceID: s.workspaceID,
-		ProjectID:   projectID,
-		CreatorID:   s.userID,
-		Name:        in.Name,
-		Description: desc,
-		StartsOn:    starts,
-		EndsOn:      ends,
-	})
-	if err != nil {
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.create_timebox", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.Queries.WithTx(tx.RawTx()).CreateTimebox(ctx, generated.CreateTimeboxParams{
+			PublicID:    pub,
+			WorkspaceID: s.workspaceID,
+			ProjectID:   projectID,
+			CreatorID:   s.userID,
+			Name:        in.Name,
+			Description: desc,
+			StartsOn:    starts,
+			EndsOn:      ends,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TimeboxCreated,
+			AuditAction:  "timebox.create",
+			ResourceType: "timebox",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"timeboxId": pub.String(),
+				"name":      in.Name,
+				"via":       "mcp",
+			},
+			CallSite: "mcp.create_timebox",
+		})
+	}); err != nil {
 		// A workspace holds one live timebox per name. The refusal is
 		// permanent — the caller has to pick another name — so it is
 		// named the way the REST route names it rather than reported as a
@@ -2212,20 +2306,6 @@ func runCreateTimebox(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	// The timebox row is committed; a retry would create a second one.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.TimeboxCreated,
-		AuditAction:  "timebox.create",
-		ResourceType: "timebox",
-		ResourceID:   pub.String(),
-		Payload: map[string]any{
-			"timeboxId": pub.String(),
-			"name":      in.Name,
-			"via":       "mcp",
-		},
-		CallSite: "mcp.create_timebox",
-	})
-	_ = timeboxID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -2260,17 +2340,39 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	// A completed timebox is closed to changes, on REST and here alike.
+	if tbRow.Status == generated.TimeboxesStatusCompleted {
+		return nil, apierrors.New(apierrors.TimeboxTimeboxAlreadyCompleted)
+	}
 	// Resolve task public_id -> internal id.
 	taskInternal, taskPub, err := resolveTask(ctx, deps, s, in.TaskID)
 	if err != nil {
 		return nil, err
 	}
 	linkPub := newPublicID()
-	if err := deps.Queries.AddTaskToTimebox(ctx, generated.AddTaskToTimeboxParams{
-		PublicID:    linkPub,
-		WorkspaceID: s.workspaceID,
-		TimeboxID:   tbRow.ID,
-		TaskID:      taskInternal,
+	taskID64 := int64(taskInternal)
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_task_to_timebox", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if err := deps.Queries.WithTx(tx.RawTx()).AddTaskToTimebox(ctx, generated.AddTaskToTimeboxParams{
+			PublicID:    linkPub,
+			WorkspaceID: s.workspaceID,
+			TimeboxID:   tbRow.ID,
+			TaskID:      taskInternal,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TimeboxTaskAdded,
+			AuditAction:  "timebox.task.add",
+			ResourceType: "timebox",
+			ResourceID:   tbPub.String(),
+			TaskID:       &taskID64,
+			Payload: map[string]any{
+				"timeboxId": tbPub.String(),
+				"taskId":    taskPub.String(),
+				"via":       "mcp",
+			},
+			CallSite: "mcp.add_task_to_timebox",
+		})
 	}); err != nil {
 		// The task is already in this timebox. The state the caller asked
 		// for already holds and no retry changes that, so it is answered
@@ -2281,22 +2383,6 @@ func runAddTaskToTimebox(ctx context.Context, deps Deps, s *session, raw json.Ra
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	taskID64 := int64(taskInternal)
-	// The link row is committed and carries a unique key, so a retry
-	// would be rejected before it could re-append the event.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.TimeboxTaskAdded,
-		AuditAction:  "timebox.task.add",
-		ResourceType: "timebox",
-		ResourceID:   tbPub.String(),
-		TaskID:       &taskID64,
-		Payload: map[string]any{
-			"timeboxId": tbPub.String(),
-			"taskId":    taskPub.String(),
-			"via":       "mcp",
-		},
-		CallSite: "mcp.add_task_to_timebox",
-	})
 	return map[string]any{"ok": true}, nil
 }
 
@@ -2412,7 +2498,8 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	// reason; leaving MCP out meant an administrator investigating a leak
 	// saw only the exports made by people using a browser, and none of
 	// the ones made by the automated callers that use this surface most.
-	recordMutation(ctx, deps, s, mutation{
+	// Nothing was written, so there is no transaction for the event to join.
+	recorder(deps).Record(ctx, mutationActor(s), mutationlog.Mutation{
 		EventType:    eventbus.ExportRequested,
 		AuditAction:  "export.create",
 		ResourceType: "export",
@@ -2427,9 +2514,8 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 }
 
 // runProposeRelations finds related or duplicate tasks for a given task
-// by embedding similarity, returning structured suggestions with a
-// suggestedKind field ("duplicate" or "related"). This is similar to
-// propose_duplicates but returns richer structured output.
+// by embedding similarity, naming the verdict suggestedKind. It is the
+// same search as propose_duplicates; only the output key differs.
 func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		TaskID string `json:"taskId"`
@@ -2441,7 +2527,6 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if wsErr != nil {
 		return nil, wsErr
 	}
-	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	if deps.Embedder == nil {
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
@@ -2449,101 +2534,11 @@ func runProposeRelations(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if err != nil {
 		return nil, err
 	}
-
-	// The lookup key is the embedder's own model, which is what wrote
-	// every row: see [embed.Client.Model]. Thresholds come from
-	// ai_settings, with the ADR 0003 defaults on miss.
-	model := deps.Embedder.Model()
-	high := 0.870
-	low := 0.750
-	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
-			high = v
-		}
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdLow, 64); perr == nil {
-			low = v
-		}
-	}
-
-	src, err := deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-		TaskID: taskInternal,
-		Model:  model,
-	})
-	if stderrors.Is(err, sql.ErrNoRows) {
-		desc := ""
-		if row.Description.Valid {
-			desc = row.Description.String
-		}
-		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, row.Title, desc); eerr != nil {
-			return map[string]any{"candidates": []any{}, "model": model}, nil
-		}
-		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-			TaskID: taskInternal,
-			Model:  model,
-		})
-	}
+	model, ranked, err := rankSimilarTasks(ctx, deps, s, wsRole, taskInternal, row.Title, row.Description)
 	if err != nil {
-		return map[string]any{"candidates": []any{}, "model": model}, nil
+		return nil, err
 	}
-	srcVec, err := embed.Decode(toBytes(src.Vector))
-	if err != nil || len(srcVec) == 0 {
-		return map[string]any{"candidates": []any{}, "model": model}, nil
-	}
-
-	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID:   s.workspaceID,
-		Model:         model,
-		TaskID:        taskInternal,
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		Limit:         200,
-	})
-	if err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	type cand struct {
-		id    string
-		title string
-		score float64
-		kind  string
-	}
-	ranked := make([]cand, 0, len(rows))
-	for _, r := range rows {
-		v, derr := embed.Decode(toBytes(r.Vector))
-		if derr != nil || len(v) != len(srcVec) {
-			continue
-		}
-		score := float64(embed.Cosine(srcVec, v))
-		if score < low {
-			continue
-		}
-		suggestedKind := "related"
-		if score >= high {
-			suggestedKind = "duplicate"
-		}
-		ranked = append(ranked, cand{
-			id:    r.PublicID.String(),
-			title: r.Title,
-			score: score,
-			kind:  suggestedKind,
-		})
-	}
-	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
-	if len(ranked) > 20 {
-		ranked = ranked[:20]
-	}
-	out := make([]map[string]any, 0, len(ranked))
-	for _, c := range ranked {
-		out = append(out, map[string]any{
-			"taskId":        c.id,
-			"title":         c.title,
-			"score":         c.score,
-			"suggestedKind": c.kind,
-		})
-	}
-	return map[string]any{"candidates": out, "model": model}, nil
+	return map[string]any{"candidates": similarTaskCandidates(ranked, "suggestedKind"), "model": model}, nil
 }
 
 // runProposeLens compiles a prose prompt into a validated Lens via
@@ -2564,10 +2559,7 @@ func runProposeLens(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	}
 	lens, err := deps.NlQuery.Compile(ctx, in.Prompt)
 	if err != nil {
-		if stderrors.Is(err, nlquery.ErrUnparseable) {
-			return nil, apierrors.New(apierrors.AiResponseInvalidJson)
-		}
-		return nil, apierrors.Wrap(apierrors.AiProviderUpstreamUnreachable, err)
+		return nil, aiFailure(err)
 	}
 	return map[string]any{"lens": lens}, nil
 }
@@ -2598,15 +2590,21 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 	var in struct {
 		ProjectID    string `json:"projectId"`
 		ParentPageID string `json:"parentPageId"`
+		Limit        int32  `json:"limit"`
+		Offset       int32  `json:"offset"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
 
 	items := []map[string]any{}
+	var total int64
 
 	if in.ParentPageID != "" {
 		parentInternal, _, err := resolvePage(ctx, deps, s, in.ParentPageID)
@@ -2616,11 +2614,14 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 		rows, err := deps.Queries.ListChildPages(ctx, generated.ListChildPagesParams{
 			WorkspaceID:  s.workspaceID,
 			ParentPageID: sql.NullInt32{Int32: int32(parentInternal), Valid: true}, //#nosec G115 -- parent page id is pages.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Limit:        200,
-			Offset:       0,
+			Limit:        in.Limit,
+			Offset:       in.Offset,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if len(rows) > 0 {
+			total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		for _, r := range rows {
 			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
@@ -2638,11 +2639,14 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 		rows, err := deps.Queries.ListPagesForProject(ctx, generated.ListPagesForProjectParams{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   sql.NullInt32{Int32: int32(prjID), Valid: true}, //#nosec G115 -- project id is projects.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			Limit:       200,
-			Offset:      0,
+			Limit:       in.Limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if len(rows) > 0 {
+			total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		for _, r := range rows {
 			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
@@ -2654,11 +2658,14 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 	} else {
 		rows, err := deps.Queries.ListPagesForWorkspace(ctx, generated.ListPagesForWorkspaceParams{
 			WorkspaceID: s.workspaceID,
-			Limit:       200,
-			Offset:      0,
+			Limit:       in.Limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if len(rows) > 0 {
+			total = handlerutil.TotalAsInt64(rows[0].Total)
 		}
 		for _, r := range rows {
 			m := pageListRowToMap(r.PublicID, r.Title, r.IsAiGenerated, r.SortWeight, r.UpdatedAt, r.CreatedAt)
@@ -2669,7 +2676,7 @@ func runListPages(ctx context.Context, deps Deps, s *session, raw json.RawMessag
 			items = append(items, m)
 		}
 	}
-	return map[string]any{"pages": items}, nil
+	return map[string]any{"pages": items, "total": total}, nil
 }
 
 // runGetPage fetches a single wiki page by public id, including content.
@@ -2757,7 +2764,7 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 
 	var projectID sql.NullInt32
 	if in.ProjectID != "" {
-		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 		if err != nil {
 			return nil, err
 		}
@@ -2774,37 +2781,54 @@ func runCreatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 
 	pub := newPublicID()
-	pageID, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
-		PublicID:      pub,
-		WorkspaceID:   s.workspaceID,
-		ProjectID:     projectID,
-		CreatorID:     s.userID,
-		ParentPageID:  parentPageID,
-		Title:         in.Title,
-		Body:          in.Body,
-		IsAiGenerated: false,
-	})
-	if err != nil {
+	var answered error
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.create_page", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		// The nesting limit is checked by the walk REST page writes run,
+		// under row locks on the ancestors, in the transaction that inserts.
+		if parentPageID.Valid {
+			spec, err := pages.CheckAncestorDepthAndCircular(ctx, tx, s.workspaceID, uint32(parentPageID.Int32), 0) //#nosec G115 -- pages.id, positive by construction
+			if err != nil {
+				return err
+			}
+			if spec != nil {
+				answered = apierrors.New(spec)
+				return answered
+			}
+		}
+		if _, err := deps.Queries.WithTx(tx.RawTx()).CreatePage(ctx, generated.CreatePageParams{
+			PublicID:      pub,
+			WorkspaceID:   s.workspaceID,
+			ProjectID:     projectID,
+			CreatorID:     s.userID,
+			ParentPageID:  parentPageID,
+			Title:         in.Title,
+			Body:          in.Body,
+			IsAiGenerated: false,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.PageCreated,
+			AuditAction:  "page.create",
+			ResourceType: "page",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"pageId": pub.String(),
+				"title":  in.Title,
+				"via":    "mcp",
+			},
+			CallSite: "mcp.create_page",
+		})
+	}); err != nil {
+		if answered != nil {
+			return nil, answered
+		}
 		if handlerutil.IsDuplicateEntry(err) {
 			return nil, apierrors.New(apierrors.PagePageTitleTaken)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-
-	// The page row is committed; a retry would create a second one.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.PageCreated,
-		AuditAction:  "page.create",
-		ResourceType: "page",
-		ResourceID:   pub.String(),
-		Payload: map[string]any{
-			"pageId": pub.String(),
-			"title":  in.Title,
-			"via":    "mcp",
-		},
-		CallSite: "mcp.create_page",
-	})
-	_ = pageID // internal id not exposed
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -2826,26 +2850,9 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
 	}
-	pageInternal, pub, err := resolvePage(ctx, deps, s, in.PageID)
+	_, pub, err := resolvePage(ctx, deps, s, in.PageID)
 	if err != nil {
 		return nil, err
-	}
-
-	// Fetch current project_id and parent_page_id to preserve them: UpdatePage
-	// takes both as parameters, so a value not read back here is a value the
-	// update would clear.
-	//
-	// no-generated-query: UpdatePage takes the internal project_id and
-	// parent_page_id, and GetPageByPublicId — the only generated read of a single
-	// page — projects ProjectPublicID and ParentPagePublicID instead. Going
-	// through it would mean resolving two public ids back to internal ones to
-	// write back values that were never meant to change. Replacing this takes a
-	// generated read that returns the two FK columns as they are stored.
-	var projectID sql.NullInt32
-	var parentPageID sql.NullInt32
-	const qPage = `SELECT project_id, parent_page_id FROM pages WHERE id = ? AND workspace_id = ? LIMIT 1`
-	if err := deps.DB.QueryRowContext(ctx, qPage, pageInternal, s.workspaceID).Scan(&projectID, &parentPageID); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
 	// Build update params; COALESCE in SQL preserves existing values when NULL.
@@ -2858,40 +2865,64 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		bodyParam = sql.NullString{String: *in.Body, Valid: true}
 	}
 
-	// Not an existence check: an update carrying the page's current
-	// title and body reports zero. resolvePage above is what answers for
-	// a page that is not there.
-	if _, err := deps.Queries.UpdatePage(ctx, generated.UpdatePageParams{
-		Title:        titleParam,
-		Body:         bodyParam,
-		ProjectID:    projectID,
-		ParentPageID: parentPageID,
-		WorkspaceID:  s.workspaceID,
-		PublicID:     pub,
-	}); err != nil {
-		if handlerutil.IsDuplicateEntry(err) {
+	var answered error
+	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_page", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		// UpdatePage writes project_id and parent_page_id verbatim, so they
+		// are read under a row lock in the same transaction: a reparent
+		// committed by another writer is written back as it stands rather
+		// than reverted to a value read before it landed.
+		//
+		// no-generated-query: GetPageByPublicId — the only generated read of
+		// a single page — projects the two FK columns as public ids and takes
+		// no lock. Replacing this takes a generated locking read that returns
+		// them as stored.
+		var projectID, parentPageID sql.NullInt32
+		const qPage = `SELECT project_id, parent_page_id FROM pages WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
+		if err := tx.QueryRowContext(ctx, qPage, s.workspaceID, pub).Scan(&projectID, &parentPageID); err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				answered = apierrors.New(apierrors.PagePageNotFound)
+			}
+			return err
+		}
+		if err := checkPageProjectFloor(ctx, tx, s, projectID); err != nil {
+			answered = err
+			return err
+		}
+		// Not an existence check: an update carrying the page's current
+		// title and body reports zero. The row lock above is what answers
+		// for a page that is not there.
+		if _, err := deps.Queries.WithTx(tx.RawTx()).UpdatePage(ctx, generated.UpdatePageParams{
+			Title:        titleParam,
+			Body:         bodyParam,
+			ProjectID:    projectID,
+			ParentPageID: parentPageID,
+			WorkspaceID:  s.workspaceID,
+			PublicID:     pub,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.PageUpdated,
+			AuditAction:  "page.update",
+			ResourceType: "page",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"pageId": pub.String(),
+				"via":    "mcp",
+			},
+			CallSite: "mcp.update_page",
+		})
+	})
+	if answered != nil {
+		return nil, answered
+	}
+	if txErr != nil {
+		if handlerutil.IsDuplicateEntry(txErr) {
 			return nil, apierrors.New(apierrors.PagePageTitleTaken)
 		}
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
-
-	pageID64 := int64(pageInternal)
-	// Propagated: the update is idempotent, so a retry re-applies the
-	// same values and re-appends the event.
-	if err := recordMutationStrict(ctx, deps, s, mutation{
-		EventType:    eventbus.PageUpdated,
-		AuditAction:  "page.update",
-		ResourceType: "page",
-		ResourceID:   pub.String(),
-		Payload: map[string]any{
-			"pageId": pub.String(),
-			"via":    "mcp",
-		},
-		CallSite: "mcp.update_page",
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
-	_ = pageID64 // used only for the event; no page-specific event field yet
 	return map[string]any{"id": pub.String()}, nil
 }
 
@@ -2904,12 +2935,12 @@ const (
 	eventTitleLimit = 500
 )
 
-// generatedPageTitleLimit caps, in bytes, the page title this tool
-// produces, whether it came from the caller's description or from the
-// model. It is the tool's own bound, narrower than pageTitleLimit.
+// generatedPageTitleLimit caps, in bytes, the page title generate_page
+// builds from the caller's description. It is the tool's own bound,
+// narrower than pageTitleLimit.
 const generatedPageTitleLimit = 200
 
-// generatedPageTitle builds the fallback page title from the caller's
+// generatedPageTitle builds the generate_page title from the caller's
 // context description.
 //
 // The cut lands on a rune boundary: the description arrives over MCP and
@@ -2922,28 +2953,20 @@ func generatedPageTitle(contextDescription string) string {
 }
 
 // runGeneratePage writes a wiki page whose body an LLM drafted from the
-// caller's brief.
+// caller's brief, through the same page generator and failure mapping REST
+// page generation uses.
 //
-// A generation that did not happen is refused, and nothing is written.
-// The tool used to answer such a call with a page whose body was the
-// brief itself, flagged is_ai_generated=false, and report success — so a
-// caller that asked for a drafted page got its own question back, stored
-// in the workspace's wiki, with an ok. No provider wired on the
-// deployment, a provider call that failed, and a call that came back
-// carrying nothing all landed there. Each is a refusal now, under the
-// code REST answers for the same condition, and every one of them is
-// decided before the insert, so a refusal leaves no page behind.
+// A generation that did not happen is refused, and nothing is written:
+// every refusal is decided before the insert. The page title is built from
+// the brief, since this tool takes no title of its own.
 //
-// A title the model chose is refused when a live sibling already holds
-// it, under the same key and the same code as a title a caller typed —
-// see [runCreatePage], including why a duplicate key on this table cannot
-// be read as a title conflict with certainty. Repeated briefs in one
-// workspace draft similar titles, so this is a collision the tool meets
-// in ordinary use rather than a theoretical one; reported as a tool fault
-// it would read as a server problem an agent retries, and every retry
-// spends another model call on a page that cannot be stored. The insert
-// is the only write this tool makes, so a refused one leaves the
-// workspace exactly as it was.
+// A title a live sibling already holds is refused under the same key and
+// the same code as a title a caller typed — see [runCreatePage], including
+// why a duplicate key on this table cannot be read as a title conflict with
+// certainty. Repeated briefs in one workspace build the same title, so this
+// is a collision the tool meets in ordinary use; reported as a tool fault it
+// would read as a server problem an agent retries, and every retry spends
+// another model call on a page that cannot be stored.
 func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
 	var in struct {
 		ContextDescription string   `json:"contextDescription"`
@@ -2960,9 +2983,11 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		return nil, err
 	}
 
+	// Resolved, and held to the editor floor, before the model call so a
+	// refused project spends no budget.
 	var projectID sql.NullInt32
 	if in.ProjectID != "" {
-		prjID, err := resolveProject(ctx, deps, s, in.ProjectID)
+		prjID, err := resolveProjectForWrite(ctx, deps, s, in.ProjectID)
 		if err != nil {
 			return nil, err
 		}
@@ -2974,17 +2999,17 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	// caller cannot access is rejected outright rather than silently
 	// skipped, so generated page content can never incorporate task data
 	// the caller is not permitted to read.
-	contextParts := []string{in.ContextDescription}
+	var prompt strings.Builder
+	prompt.WriteString(in.ContextDescription)
 	for _, tid := range in.TaskIDs {
 		_, tRow, err := resolveTaskRow(ctx, deps, s, tid)
 		if err != nil {
 			return nil, err
 		}
-		taskCtx := "\n\nTask: " + tRow.Title
+		prompt.WriteString("\n\nTask: " + tRow.Title)
 		if tRow.Description.Valid && tRow.Description.String != "" {
-			taskCtx += "\nDescription: " + tRow.Description.String
+			prompt.WriteString("\nDescription: " + tRow.Description.String)
 		}
-		contextParts = append(contextParts, taskCtx)
 	}
 
 	// A deployment with no provider wired cannot draft anything, which is
@@ -2994,79 +3019,50 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
 
-	signal := "Generate a wiki page about the following topic.\n\n"
-	for _, part := range contextParts {
-		signal += part
-	}
-	proposed, err := deps.AI.ProposeTasksFrom(ctx, s.workspaceID, signal)
+	title := generatedPageTitle(in.ContextDescription)
+	body, err := deps.AI.GeneratePageBody(ctx, s.workspaceID, title, prompt.String())
 	if err != nil {
-		// mapAiError separates the reasons a caller can act on — no
-		// provider, the workspace's daily budget spent, an answer that
-		// did not parse — from the ones it can only retry, and every AI
-		// tool here reports them the same way.
-		return nil, mapAiError(err)
-	}
-	// The first proposal's title and description are the page. Nothing
-	// obliges a model to return one: an empty list, or an entry with no
-	// description, is an answer with no page in it, which is the
-	// condition PAGE.GENERATION.UPSTREAM_UNAVAILABLE names. Storing the
-	// brief instead would hand the caller its own question back.
-	if len(proposed) == 0 || proposed[0].Description == "" {
-		return nil, apierrors.New(apierrors.PageGenerationUpstreamUnavailable)
-	}
-
-	// The model's title gets the same bound the fallback title carries.
-	// Nothing constrains what a model returns, so an overlong title
-	// reached pages.title unclipped and the insert failed, losing the
-	// body the call had already paid for. The cut is rune-aware for the
-	// same reason as in generatedPageTitle.
-	title := stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleLimit)
-	if title == "" {
-		// A page needs a name, and a blank one reaches a NOT NULL column
-		// as an empty string that nothing in a list can be clicked by.
-		// The brief is a fair name for a page drafted from it — unlike a
-		// body, where the brief is the wrong content entirely.
-		title = generatedPageTitle(in.ContextDescription)
+		// The page-generation mapping REST uses: the shared AI codes, with
+		// an unreachable provider named as page generation unavailable.
+		spec, _ := errormodel.PageGenerationFailure(err)
+		return nil, apierrors.Wrap(spec, err)
 	}
 
 	pub := newPublicID()
-	pageID, err := deps.Queries.CreatePage(ctx, generated.CreatePageParams{
-		PublicID:      pub,
-		WorkspaceID:   s.workspaceID,
-		ProjectID:     projectID,
-		CreatorID:     s.userID,
-		ParentPageID:  sql.NullInt32{},
-		Title:         title,
-		Body:          proposed[0].Description,
-		IsAiGenerated: true,
-	})
-	if err != nil {
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.generate_page", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.Queries.WithTx(tx.RawTx()).CreatePage(ctx, generated.CreatePageParams{
+			PublicID:      pub,
+			WorkspaceID:   s.workspaceID,
+			ProjectID:     projectID,
+			CreatorID:     s.userID,
+			ParentPageID:  sql.NullInt32{},
+			Title:         title,
+			Body:          body,
+			IsAiGenerated: true,
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.PageCreated,
+			AuditAction:  "page.generate",
+			ResourceType: "page",
+			ResourceID:   pub.String(),
+			Payload: map[string]any{
+				"pageId":        pub.String(),
+				"title":         title,
+				"isAiGenerated": true,
+				"via":           "mcp:generate_page",
+			},
+			CallSite: "mcp.generate_page",
+		})
+	}); err != nil {
 		if handlerutil.IsDuplicateEntry(err) {
 			return nil, apierrors.New(apierrors.PagePageTitleTaken)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-
-	// The page row is committed, and a retry would repeat the model call
-	// that produced its body as well as duplicating the page.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.PageCreated,
-		AuditAction:  "page.generate",
-		ResourceType: "page",
-		ResourceID:   pub.String(),
-		Payload: map[string]any{
-			"pageId":        pub.String(),
-			"title":         title,
-			"isAiGenerated": true,
-			"via":           "mcp:generate_page",
-		},
-		CallSite: "mcp.generate_page",
-	})
-	_ = pageID // internal id not exposed
-	// isAiGenerated stays in the answer even though this tool can now
-	// only return it true: it is the same field pages carry everywhere
-	// else, and a client reading page metadata by one shape should not
-	// have to special-case where the page came from.
+	// isAiGenerated stays in the answer even though this tool can only
+	// return it true: it is the same field pages carry everywhere else.
 	return map[string]any{
 		"id":            pub.String(),
 		"isAiGenerated": true,
@@ -3117,7 +3113,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		vis,
 	)
 	if err != nil {
-		return nil, mapAiError(err)
+		return nil, aiFailure(err)
 	}
 
 	// Bound every title the model produced before any of them reaches a
@@ -3139,25 +3135,12 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	subtaskPriorities := make([]int32, len(proposal.Subtasks))
 	for i := range proposal.Subtasks {
 		proposal.Subtasks[i].Title = stringutil.TruncateRunes(proposal.Subtasks[i].Title, taskTitleLimit)
-		priority, known := handlerutil.PriorityFromLabel(proposal.Subtasks[i].Priority)
-		if !known {
-			// The batch still goes out — one unrankable subtask is not
-			// worth failing a decomposition over — but the substitution is
-			// recorded. A caller sees a priority and cannot tell it was
-			// chosen by a fallback rather than by the model, so absorbing
-			// this silently makes a malformed answer indistinguishable
-			// from a deliberate one.
-			slog.WarnContext(ctx, "mcp: LLM returned a priority outside the vocabulary",
-				slog.String("tool", "smart_create_task"),
-				slog.String("priority_label", proposal.Subtasks[i].Priority),
-			)
-		}
-		subtaskPriorities[i] = priority
+		subtaskPriorities[i] = proposedPriority(ctx, proposal.Subtasks[i].Priority, "mcp.smart_create_task")
 	}
 
 	// Create the parent and every proposed subtask in one transaction, so a
 	// failure partway through the batch does not leave a parent with a
-	// truncated set of children.
+	// truncated set of children. Each event commits with the task it names.
 	type createdChild struct {
 		id    int64
 		pub   string
@@ -3167,10 +3150,13 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	var (
 		parentPub types.PublicID
 		parentID  int64
-		children  []createdChild
+		// children is indexed by proposal position; a subtask that was not
+		// created leaves its slot empty, so the response pairs every
+		// proposal with the task made from it and no other.
+		children []createdChild
 	)
 	if txErr := dbretry.InTx(ctx, deps.DB, "mcp.smart_create_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		children = children[:0]
+		children = make([]createdChild, len(proposal.Subtasks))
 		parent, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
@@ -3182,6 +3168,21 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		}
 		parentPub = parent.PublicID
 		parentID = parent.ID
+		if err := recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.TaskCreated,
+			AuditAction:  "task.smart_create",
+			ResourceType: "task",
+			ResourceID:   parentPub.String(),
+			TaskID:       &parentID,
+			Payload: map[string]any{
+				"taskId": parentPub.String(),
+				"title":  parentTitle.String(),
+				"via":    "mcp:smart_create_task",
+			},
+			CallSite: "mcp.smart_create_task",
+		}); err != nil {
+			return err
+		}
 
 		for i, st := range proposal.Subtasks {
 			// A subtask the model returned without a usable title is
@@ -3203,53 +3204,40 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			if cerr != nil {
 				return cerr
 			}
-			children = append(children, createdChild{id: child.ID, pub: child.PublicID.String(), title: childTitle.String(), desc: st.Description})
+			childID := child.ID
+			children[i] = createdChild{id: childID, pub: child.PublicID.String(), title: childTitle.String(), desc: st.Description}
+			if err := recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+				EventType:    eventbus.TaskCreated,
+				AuditAction:  "task.create",
+				ResourceType: "task",
+				ResourceID:   children[i].pub,
+				TaskID:       &childID,
+				Payload: map[string]any{
+					"taskId":       children[i].pub,
+					"title":        children[i].title,
+					"parentTaskId": parentPub.String(),
+					"via":          "mcp:smart_create_task",
+				},
+				CallSite: "mcp.smart_create_task",
+			}); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
 
-	// Events are appended after commit so they reference committed rows.
-	// The whole tree is durable by now, so a failure here is absorbed:
-	// a retry would build a second copy of it.
 	noteInvocationTask(ctx, uint32(parentID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.TaskCreated,
-		AuditAction:  "task.smart_create",
-		ResourceType: "task",
-		ResourceID:   parentPub.String(),
-		TaskID:       &parentID,
-		Payload: map[string]any{
-			"taskId": parentPub.String(),
-			"title":  parentTitle.String(),
-			"via":    "mcp:smart_create_task",
-		},
-		CallSite: "mcp.smart_create_task",
-	})
 	// The parent and every child are separate tasks with separate
 	// embeddings, and the children hold text the model wrote that nothing
 	// else indexes.
 	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(parentID), parentTitle.String(), in.Description) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-	subtaskIDs := make([]string, 0, len(children))
-	for i := range children {
-		childID := children[i].id
-		recordMutation(ctx, deps, s, mutation{
-			EventType:    eventbus.TaskCreated,
-			AuditAction:  "task.create",
-			ResourceType: "task",
-			ResourceID:   children[i].pub,
-			TaskID:       &childID,
-			Payload: map[string]any{
-				"taskId":       children[i].pub,
-				"title":        children[i].title,
-				"parentTaskId": parentPub.String(),
-				"via":          "mcp:smart_create_task",
-			},
-			CallSite: "mcp.smart_create_task",
-		})
-		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(childID), children[i].title, children[i].desc) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		subtaskIDs = append(subtaskIDs, children[i].pub)
+	for _, c := range children {
+		if c.pub == "" {
+			continue
+		}
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(c.id), c.title, c.desc) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	}
 
 	// Build assignee suggestions for the response (we do not auto-assign
@@ -3270,8 +3258,8 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 			"title":    st.Title,
 			"priority": st.Priority,
 		}
-		if i < len(subtaskIDs) {
-			m["id"] = subtaskIDs[i]
+		if children[i].pub != "" {
+			m["id"] = children[i].pub
 		}
 		if st.Assignee != nil {
 			m["suggestedAssignee"] = map[string]any{
@@ -3443,6 +3431,7 @@ func listCalendarOccurrences(
 			StartAt:          r.StartAt.Time,
 			EndAt:            r.EndAt.Time,
 			Timezone:         r.Timezone,
+			AllDay:           r.AllDay,
 			Rule:             rule,
 			Exceptions:       recurrence.ParseExceptions(r.RecurrenceExceptions),
 			OverriddenStarts: overridden[r.ID],
@@ -3727,7 +3716,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if in.OwnerUserID != "" {
 		// Resolve the target user by public id, scoped to workspace
 		// membership so a non-member cannot be assigned as owner.
-		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.OwnerUserID)
+		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.OwnerUserID, apierrors.CalendarEventOwnerUserNotFound)
 		if uerr != nil {
 			return nil, uerr
 		}
@@ -3752,53 +3741,54 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	zone := resolveUserTimezone(ctx, deps, s.workspaceID, s.userID)
 
 	pub := newPublicID()
-	_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
-		PublicID:           pub,
-		WorkspaceID:        s.workspaceID,
-		CalendarID:         calID,
-		Kind:               kind,
-		Visibility:         visibility,
-		ShowAs:             showAs,
-		Flexibility:        flexibility,
-		Title:              in.Title,
-		AllDay:             allDay,
-		StartAt:            sql.NullTime{Time: startAt, Valid: true},
-		EndAt:              sql.NullTime{Time: endAt, Valid: true},
-		Timezone:           zone.Name(),
-		Location:           sql.NullString{String: in.Location, Valid: in.Location != ""},
-		Memo:               sql.NullString{String: in.Memo, Valid: in.Memo != ""},
-		Url:                sql.NullString{},
-		OwnerUserID:        ownerUserID,
-		CreatedByUserID:    s.userID,
-		BlockLabel:         sql.NullString{String: in.BlockLabel, Valid: in.BlockLabel != ""},
-		RecurrenceRule:     nil,
-		RecurrenceEnd:      sql.NullTime{},
-		NotificationOffset: sql.NullInt32{},
-		TaskID:             sql.NullInt32{},
-	})
-	if err != nil {
+	calID64 := int64(calID)
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.create_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.CalendarQueries.WithTx(tx.RawTx()).CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
+			PublicID:           pub,
+			WorkspaceID:        s.workspaceID,
+			CalendarID:         calID,
+			Kind:               kind,
+			Visibility:         visibility,
+			ShowAs:             showAs,
+			Flexibility:        flexibility,
+			Title:              in.Title,
+			AllDay:             allDay,
+			StartAt:            sql.NullTime{Time: startAt, Valid: true},
+			EndAt:              sql.NullTime{Time: endAt, Valid: true},
+			Timezone:           zone.Name(),
+			Location:           sql.NullString{String: in.Location, Valid: in.Location != ""},
+			Memo:               sql.NullString{String: in.Memo, Valid: in.Memo != ""},
+			Url:                sql.NullString{},
+			OwnerUserID:        ownerUserID,
+			CreatedByUserID:    s.userID,
+			BlockLabel:         sql.NullString{String: in.BlockLabel, Valid: in.BlockLabel != ""},
+			RecurrenceRule:     nil,
+			RecurrenceEnd:      sql.NullTime{},
+			NotificationOffset: sql.NullInt32{},
+			TaskID:             sql.NullInt32{},
+		}); err != nil {
+			return err
+		}
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.CalEventCreated,
+			AuditAction:  "calendar.event.create",
+			ResourceType: "calendar.event",
+			ResourceID:   pub.String(),
+			CalendarID:   &calID64,
+			Payload: map[string]any{
+				"eventId":    pub.String(),
+				"calendarId": in.CalendarID,
+				"title":      in.Title,
+				"kind":       string(kind),
+				"startAt":    startAt.Unix(),
+				"endAt":      endAt.Unix(),
+				"via":        "mcp",
+			},
+			CallSite: "mcp.create_calendar_event",
+		})
+	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	calID64 := int64(calID)
-	// The event row is committed; a retry would create a second entry on
-	// somebody's calendar.
-	recordMutation(ctx, deps, s, mutation{
-		EventType:    eventbus.CalEventCreated,
-		AuditAction:  "calendar.event.create",
-		ResourceType: "calendar.event",
-		ResourceID:   pub.String(),
-		CalendarID:   &calID64,
-		Payload: map[string]any{
-			"eventId":    pub.String(),
-			"calendarId": in.CalendarID,
-			"title":      in.Title,
-			"kind":       string(kind),
-			"startAt":    startAt.Unix(),
-			"endAt":      endAt.Unix(),
-			"via":        "mcp",
-		},
-		CallSite: "mcp.create_calendar_event",
-	})
 	out := map[string]any{
 		"id":          pub.String(),
 		"title":       in.Title,
@@ -4016,40 +4006,57 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			Valid:                    true,
 		}
 	}
-	if in.Location != nil {
+	// An empty string clears the column to NULL, the state REST's clear
+	// list reaches.
+	clears := eventFieldClears(&in)
+	switch {
+	case clears.Location:
+		params.ClearLocation = 1
+	case in.Location != nil:
 		params.Location = sql.NullString{String: *in.Location, Valid: true}
 	}
-	if in.Memo != nil {
+	switch {
+	case clears.Memo:
+		params.ClearMemo = 1
+	case in.Memo != nil:
 		params.Memo = sql.NullString{String: *in.Memo, Valid: true}
 	}
-	if in.BlockLabel != nil {
+	switch {
+	case clears.BlockLabel:
+		params.ClearBlockLabel = 1
+	case in.BlockLabel != nil:
 		params.BlockLabel = sql.NullString{String: *in.BlockLabel, Valid: true}
 	}
 
+	// A start moved on a recurring master moves every occurrence, so the
+	// overrides and exceptions naming them are realigned in the same
+	// transaction, through the transform REST's series PATCH uses.
+	realignSeries := calendaroccurrence.HasRule(evt.RecurrenceRule) &&
+		timeChanged && !newStartAt.Equal(evt.StartAt.Time)
+
 	if !isLinked || (!titleChanged && !timeChanged) {
-		// Not an existence check: a patch carrying the event's current
-		// values reports zero. The event was read above to decide this
-		// branch.
-		if _, err := deps.CalendarQueries.PatchCalendarEvent(ctx, params); err != nil {
+		calID64 := int64(owner.CalendarID)
+		if err := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries); err != nil {
+				return err
+			}
+			// This branch never reaches itemkit, so nothing else appends
+			// the event.
+			return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+				EventType:    eventbus.CalEventUpdated,
+				AuditAction:  "calendar.event.update",
+				ResourceType: "calendar.event",
+				ResourceID:   eventPub.String(),
+				CalendarID:   &calID64,
+				Payload: map[string]any{
+					"eventId": eventPub.String(),
+					"via":     "mcp",
+				},
+				CallSite: "mcp.update_calendar_event",
+			})
+		}); err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
-		calID64 := int64(owner.CalendarID)
-		// This branch never reaches itemkit, so nothing else appends the
-		// event. That is why an agent editing a standalone event used to
-		// leave no trace at all: the linked-event path borrowed itemkit's
-		// event row and this one had nobody to borrow from.
-		recordMutation(ctx, deps, s, mutation{
-			EventType:    eventbus.CalEventUpdated,
-			AuditAction:  "calendar.event.update",
-			ResourceType: "calendar.event",
-			ResourceID:   eventPub.String(),
-			CalendarID:   &calID64,
-			Payload: map[string]any{
-				"eventId": eventPub.String(),
-				"via":     "mcp",
-			},
-			CallSite: "mcp.update_calendar_event",
-		})
 		return map[string]any{"success": true}, nil
 	}
 
@@ -4070,8 +4077,10 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	// because their SET expression wraps the COALESCE in an IF that
 	// reads the matching clear flag; nil is the absent case.
 	patchRemaining := params.Title.Valid || params.Kind.Valid || params.ShowAs.Valid ||
-		params.Visibility.Valid || params.Location != nil || params.Memo != nil ||
-		params.BlockLabel != nil || params.StartAt.Valid || params.EndAt.Valid
+		params.Flexibility.Valid || params.Visibility.Valid ||
+		params.Location != nil || params.Memo != nil || params.BlockLabel != nil ||
+		params.ClearLocation == 1 || params.ClearMemo == 1 || params.ClearBlockLabel == 1 ||
+		params.StartAt.Valid || params.EndAt.Valid
 
 	// answered holds a response-shaped error decided inside the
 	// transaction, so an itemkit invariant is not reported as a generic
@@ -4083,7 +4092,6 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
 		renamed = itemkit.RenamedTask{}
-		qtxCal := deps.CalendarQueries.WithTx(tx.RawTx())
 
 		if titleChanged {
 			var rerr error
@@ -4110,8 +4118,8 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 				return err
 			}
 		}
-		if patchRemaining {
-			if _, err := qtxCal.PatchCalendarEvent(ctx, params); err != nil {
+		if patchRemaining || realignSeries {
+			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries); err != nil {
 				return err
 			}
 		}
@@ -4132,7 +4140,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	// itemkit appended calendar.event.updated inside the transaction that
 	// just committed, so only the audit half is left to add here.
-	recordTxMutationAudit(ctx, deps, s, mutation{
+	recorder(deps).RecordTxAudit(ctx, mutationActor(s), mutationlog.Mutation{
 		AuditAction:  "calendar.event.update",
 		ResourceType: "calendar.event",
 		ResourceID:   eventPub.String(),
@@ -4143,6 +4151,55 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		CallSite: "mcp.update_calendar_event",
 	})
 	return map[string]any{"success": true}, nil
+}
+
+// patchCalendarSeries writes a whole-series patch and, when realign is set,
+// brings the master's overrides and exceptions along to where its
+// occurrences now fall, through [calendaroccurrence.RealignSeries]. The
+// series columns are read under the row lock first, so the realignment
+// starts from what is committed.
+func patchCalendarSeries(
+	ctx context.Context,
+	deps Deps,
+	tx *dbretry.Tx,
+	s *session,
+	evt calendar.FindCalendarEventByPublicIdRow,
+	params calendar.PatchCalendarEventParams,
+	realign bool,
+) error {
+	q := seriesQueries(deps, tx)
+	var before calendaroccurrence.SeriesState
+	if realign {
+		locked, err := q.Calendar.LockCalendarEventSeries(ctx, calendar.LockCalendarEventSeriesParams{
+			ID:          evt.ID,
+			WorkspaceID: s.workspaceID,
+		})
+		if err != nil {
+			return err
+		}
+		before = calendaroccurrence.SeriesStateOf(evt)
+		before.Rule = locked.RecurrenceRule
+		before.End = locked.RecurrenceEnd
+		before.Exceptions = locked.RecurrenceExceptions
+	}
+	// Not an existence check: a patch carrying the event's current values
+	// reports zero. The event was read before the transaction.
+	if _, err := q.Calendar.PatchCalendarEvent(ctx, params); err != nil {
+		return err
+	}
+	if !realign {
+		return nil
+	}
+	updated, err := q.Calendar.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+		PublicID:    evt.PublicID,
+		CalendarID:  evt.CalendarID,
+		WorkspaceID: s.workspaceID,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = calendaroccurrence.RealignSeries(ctx, q, s.workspaceID, before, updated, false)
+	return err
 }
 
 // runDeleteCalendarEvent soft-deletes a calendar event, or the part of a
@@ -4225,6 +4282,12 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.delete_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
+		// Deleting a moved occurrence on its own leaves the cancellation on
+		// the master, or the master produces the occurrence again at its
+		// original slot.
+		if err := calendaroccurrence.CancelOverride(ctx, seriesQueries(deps, tx), s.workspaceID, evt); err != nil {
+			return err
+		}
 		if err := itemkit.DeleteEvent(ctx, tx, s.workspaceID, evt.ID, s.userID); err != nil {
 			answered = translateItemkitMCPError(err, apierrors.CalendarEventNotFound)
 			return err
@@ -4240,7 +4303,7 @@ func runDeleteCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	// itemkit appended item.unscheduled and the legacy
 	// calendar.event.deleted inside the committed transaction; the audit
 	// row is the remaining half.
-	recordTxMutationAudit(ctx, deps, s, mutation{
+	recorder(deps).RecordTxAudit(ctx, mutationActor(s), mutationlog.Mutation{
 		AuditAction:  "calendar.event.delete",
 		ResourceType: "calendar.event",
 		ResourceID:   eventPub.String(),
@@ -4263,36 +4326,11 @@ const (
 )
 
 // resolveUserTimezone returns the zone to interpret a user's day in:
-// their own preference, else the workspace default, else UTC.
-//
-// Same chain as the REST handlers' resolveEffectiveTimezone, minus the
-// explicit-request tier, because no MCP tool takes a timezone argument.
-// Lookup failures fall through rather than erroring: a missing profile
-// row should degrade to the workspace's timezone, not fail the tool. A
-// stored name the zoneinfo database cannot resolve falls through for the
-// same reason, so the tiers below it still apply.
+// their own preference, else the workspace default, else UTC — the chain
+// [duedate.UserZone] resolves for every surface. No MCP tool takes a
+// timezone argument, so there is no explicit-request tier above it.
 func resolveUserTimezone(ctx context.Context, deps Deps, workspaceID, userID uint32) region.Zone {
-	var userTz string
-	if profile, err := deps.Queries.FindUserProfileById(ctx, userID); err == nil {
-		userTz = profile.Timezone
-	}
-	var wsTz string
-	if row, err := deps.Queries.FindWorkspaceTimezoneCountryById(ctx, workspaceID); err == nil {
-		wsTz = row.Timezone
-	}
-	if region.ValidateTimezone(userTz) != nil {
-		userTz = ""
-	}
-	if region.ValidateTimezone(wsTz) != nil {
-		wsTz = ""
-	}
-	// The chain ends at region.DefaultTimezone, which always resolves,
-	// so the surviving candidates cannot fail.
-	z, err := region.Resolve(userTz, wsTz)
-	if err != nil {
-		return region.UTC()
-	}
-	return z
+	return duedate.UserZone(ctx, deps.Queries, workspaceID, userID)
 }
 
 func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -4316,7 +4354,7 @@ func runListFreeSlots(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		// Scope the lookup to workspace membership so the free/busy
 		// probe cannot act as an existence oracle for users outside
 		// the workspace.
-		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.UserID)
+		resolved, uerr := resolveWorkspaceUser(ctx, deps, s, in.UserID, apierrors.WsMemberNotFound)
 		if uerr != nil {
 			return nil, uerr
 		}
@@ -4510,7 +4548,7 @@ func runCreateEventFromTask(ctx context.Context, deps Deps, s *session, raw json
 	// left. No calendar id is named: the engine files through an event type
 	// that carries none, so there is nothing here that a per-calendar feed
 	// could be pointed at.
-	recordTxMutationAudit(ctx, deps, s, mutation{
+	recorder(deps).RecordTxAudit(ctx, mutationActor(s), mutationlog.Mutation{
 		AuditAction:  "calendar.event.create",
 		ResourceType: "calendar.event",
 		ResourceID:   eventPub.String(),
@@ -4606,31 +4644,33 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	if _, err := deps.CalendarQueries.UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
-		Done:        sql.NullBool{Bool: *in.Done, Valid: true},
-		PublicID:    memoPub,
-		CalendarID:  calID,
-		WorkspaceID: s.workspaceID,
-	}); err != nil {
-		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
-	}
 	calID64 := int64(calID)
-	// Same kind and action the REST memo patch uses, so a shared memo
-	// ticked off by an agent reads the same on the timeline as one ticked
-	// off in the web app.
-	if err := recordMutationStrict(ctx, deps, s, mutation{
-		EventType:    eventbus.CalMemoUpdated,
-		AuditAction:  "calendar.memo.update",
-		ResourceType: "calendar.memo",
-		ResourceID:   in.MemoID,
-		CalendarID:   &calID64,
-		Payload: map[string]any{
-			"memoId":     in.MemoID,
-			"calendarId": in.CalendarID,
-			"done":       *in.Done,
-			"via":        "mcp",
-		},
-		CallSite: "mcp.toggle_calendar_memo",
+	if err := dbretry.InTx(ctx, deps.DB, "mcp.toggle_calendar_memo", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := deps.CalendarQueries.WithTx(tx.RawTx()).UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
+			Done:        sql.NullBool{Bool: *in.Done, Valid: true},
+			PublicID:    memoPub,
+			CalendarID:  calID,
+			WorkspaceID: s.workspaceID,
+		}); err != nil {
+			return err
+		}
+		// Same kind and action the REST memo patch uses, so a shared memo
+		// ticked off by an agent reads the same on the timeline as one
+		// ticked off in the web app.
+		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+			EventType:    eventbus.CalMemoUpdated,
+			AuditAction:  "calendar.memo.update",
+			ResourceType: "calendar.memo",
+			ResourceID:   in.MemoID,
+			CalendarID:   &calID64,
+			Payload: map[string]any{
+				"memoId":     in.MemoID,
+				"calendarId": in.CalendarID,
+				"done":       *in.Done,
+				"via":        "mcp",
+			},
+			CallSite: "mcp.toggle_calendar_memo",
+		})
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}

@@ -374,6 +374,13 @@ type Querier interface {
 	// Progress counters as the worker last published them, for callers that
 	// need the finished totals without re-reading the whole row.
 	CountImportedTasksForJob(ctx context.Context, id uint32) (CountImportedTasksForJobRow, error)
+	// Count of a workspace's inbox, the total ListInbox pages through. It is
+	// a bare count so the per-row visibility expression the list computes is
+	// evaluated only for the rows a page returns.
+	CountInbox(ctx context.Context, workspaceID uint32) (int64, error)
+	// Count of the actor's cross-workspace inbox, the total ListInboxForUser
+	// pages through.
+	CountInboxForUser(ctx context.Context, userID uint32) (int64, error)
 	// Row count behind ListTasksForProject. Filters must stay identical to
 	// that query's WHERE clause or the pager reports a total the list can
 	// never reach -- including the Layer-4 visibility predicate, whose
@@ -591,6 +598,11 @@ type Querier interface {
 	// not-found / wrong-workspace target (0 rows) instead of reporting a false
 	// success.
 	DeleteProvider(ctx context.Context, arg DeleteProviderParams) (int64, error)
+	// Drop a queued removal once its blob is gone from object storage.
+	DeleteStorageBlobRemoval(ctx context.Context, id uint32) (int64, error)
+	// Drop the queued removals for keys a teardown has just removed from
+	// object storage itself.
+	DeleteStorageBlobRemovalsByKey(ctx context.Context, storageKeys []string) (int64, error)
 	// Remove a reclaimed row. Restricted to rows nothing references so a
 	// concurrent upload that adopted the row between listing and deleting
 	// is left alone.
@@ -691,8 +703,9 @@ type Querier interface {
 	// causes a second scheduler replica to get a duplicate-entry error,
 	// which callers translate to ErrDuplicate. No row is inserted on conflict.
 	EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams) (int64, error)
-	// Fetch tasks for export scoped to a workspace + project (lens-scoped).
-	// Lens filter/sort logic is applied in Go code; this provides the data set.
+	// Fetch tasks for export scoped to a workspace + project. It applies no
+	// lens filter: the REST lens export reads lenses through the shared lens
+	// filter reader instead.
 	// One row per task, whatever the number of assignees. Joining
 	// task_actors on task_id alone multiplies the task across its
 	// assignees, and an export is both counted and capped by row: a task
@@ -1184,12 +1197,6 @@ type Querier interface {
 	// same transaction as the referencing INSERT so the count cannot drift
 	// if the INSERT fails.
 	IncrementStorageObjectRefCount(ctx context.Context, id uint32) error
-	// Append an agent.task.handoff_to_user event. The caller is an AI agent
-	// handing the task back to a human, so actor_agent_id is populated and
-	// actor_user_id stays NULL. Payload is caller-shaped: the handler embeds
-	// the target user's public_id, the reason string, and any handoff status
-	// recorded in tasks.agent_memo.
-	InsertHandoffToUserEvent(ctx context.Context, arg InsertHandoffToUserEventParams) (int64, error)
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
 	// Insert an inbound signal (manual or webhook).
@@ -1320,8 +1327,10 @@ type Querier interface {
 	// ref_count so the purge driver can decrement and GC blobs whose last
 	// referencing row is being removed.
 	ListCalendarEventAttachmentsForUploaderPurge(ctx context.Context, uploaderID uint32) ([]ListCalendarEventAttachmentsForUploaderPurgeRow, error)
-	// Return all task_embeddings for (workspace_id, model), excluding a given
-	// task_id (so self-similarity is filtered out). Cosine similarity is
+	// Return the newest task_embeddings for (workspace_id, model), up to the
+	// caller's LIMIT by descending task id, excluding a given task_id (so
+	// self-similarity is filtered out). Tasks older than that window are not
+	// candidates. Cosine similarity is
 	// computed in Go because MySQL 9.6 Community does not expose
 	// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
 	// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
@@ -1637,6 +1646,9 @@ type Querier interface {
 	// Excludes archived and disabled notifications. The workspace_members join
 	// is what "their workspaces" means: rows from a workspace the user has
 	// left stop being listed, on this and every sibling list and count.
+	// The bell is the in_app channel, and every sibling reads that channel
+	// alone: a row written for another channel is the same notification and
+	// must not be listed or counted a second time.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error)
 	// Keyset-paginated variant of ListNotificationsForUser.
 	//
@@ -1799,6 +1811,8 @@ type Querier interface {
 	// the given (workspace_id, model). Used by the background re-embed worker.
 	// LEFT JOIN so tasks with no row at all are returned as "stale".
 	ListStaleTaskEmbeddings(ctx context.Context, arg ListStaleTaskEmbeddingsParams) ([]ListStaleTaskEmbeddingsRow, error)
+	// Oldest queued removals first, one sweeper batch at a time.
+	ListStorageBlobRemovals(ctx context.Context, limit int32) ([]ListStorageBlobRemovalsRow, error)
 	// Enumerate every storage_objects row owned directly by a user (avatars
 	// only at the moment) so the admin purge driver can clean MinIO before
 	// the users row is hard-deleted. Workspace-scoped attachments uploaded
@@ -2047,6 +2061,11 @@ type Querier interface {
 	// the cutoff. No request is waiting on a row here, and a tick that finds
 	// nothing to drop is the steady state rather than a missing resource.
 	PurgeFinishedAgentRuns(ctx context.Context, finishedAt sql.NullTime) error
+	// Record a key whose blob must be removed once the rows naming it are
+	// gone. Written inside the teardown transaction that deletes those rows,
+	// so the record commits with the delete. A key already queued stays one
+	// row.
+	QueueStorageBlobRemoval(ctx context.Context, storageKey string) error
 	// Publish the running counters so the polling UI can show movement.
 	RecordImportJobProgress(ctx context.Context, arg RecordImportJobProgressParams) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
@@ -2113,9 +2132,10 @@ type Querier interface {
 	RequeueStrandedDeliveries(ctx context.Context, updatedAt sql.NullTime) (int64, error)
 	// Clear failed login counter and lockout after a successful authentication.
 	ResetIdentityFailedAttempts(ctx context.Context, id uint32) error
-	// Resolve a lens public_id to its optional internal project_id.
-	// Used by the export handler to decide workspace-wide vs project-scoped queries.
-	ResolveLensProjectID(ctx context.Context, arg ResolveLensProjectIDParams) (sql.NullInt32, error)
+	// Resolve a lens public_id to its optional internal project_id and its
+	// stored lens_json, which the export handler reads through the lens
+	// filter reader shared with the share page.
+	ResolveLensForExport(ctx context.Context, arg ResolveLensForExportParams) (ResolveLensForExportRow, error)
 	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
 	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) (int64, error)
 	// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.

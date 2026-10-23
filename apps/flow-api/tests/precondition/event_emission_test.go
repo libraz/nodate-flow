@@ -158,17 +158,21 @@ func TestEveryDeclaredEventKindIsAppendedSomewhere(t *testing.T) {
 // the fan-out would report no kind at all, and a green run is what that
 // looks like from the outside. A matcher tight enough to miss the
 // spellings a producer actually uses would report most of them. Both are
-// pinned here by kinds appended from exactly one place, in each of the
-// two forms a single append can take.
+// pinned here by kinds appended from exactly one place. No sqlc statement
+// writes a kind literal today, so the SQL form is pinned by the control
+// fixture instead.
 func TestEventKindsWithOneProducerAreNotReported(t *testing.T) {
 	t.Parallel()
 
 	scope := emissionSetup(t)
 
-	// A kind appended by one Go call site. The SQL half is pinned below by
-	// a kind with one producer in each language.
+	// A kind appended by one Go call site.
 	for name, want := range map[string]Language{
 		"CalendarReminder": LangGo,
+		// Every hand-back — REST, agent runtime, auto-action executor —
+		// goes through mutationlog's hand-back recorder, so a second
+		// producer is a path that skips the eventbus hooks.
+		"AgentTaskHandoffToUser": LangGo,
 	} {
 		sites := scope.Emitters(name)
 		if len(sites) != 1 {
@@ -187,20 +191,6 @@ func TestEventKindsWithOneProducerAreNotReported(t *testing.T) {
 					name, surface.Path)
 			}
 		}
-	}
-
-	// A hand-back is appended by the REST handoff through the recorder and
-	// by the agent runtime through a sqlc statement with no Go constant on
-	// its path. The SQL site is why SQL is read at all: dropping that half
-	// would report one producer where there are two.
-	byLang := map[Language]int{}
-	handback := scope.Emitters("AgentTaskHandoffToUser")
-	for _, site := range handback {
-		byLang[site.Lang]++
-	}
-	if len(handback) != 2 || byLang[LangGo] != 1 || byLang[LangSQL] != 1 {
-		t.Errorf("AgentTaskHandoffToUser is derived as having producers %s; want one in Go and one in SQL",
-			describeSites(handback))
 	}
 
 	// The transition kinds have no call site of their own: they are built

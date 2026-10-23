@@ -4,8 +4,6 @@ package errors
 
 // Error codes and specs.
 var (
-	// INTERNAL.DB.UNAVAILABLE — Database is temporarily unavailable
-	InternalDbUnavailable = &Spec{Code: "INTERNAL.DB.UNAVAILABLE", Status: 503, Message: "Database is temporarily unavailable", Description: "Returned when the API cannot reach the database (connection refused, timeout, failover in progress).", UserAction: "Retry shortly; contact your administrator if the problem persists."}
 	// INTERNAL.EVENTBUS.ACTOR_MULTIPLE — Event has more than one actor source set
 	InternalEventbusActorMultiple = &Spec{Code: "INTERNAL.EVENTBUS.ACTOR_MULTIPLE", Status: 500, Message: "Event has more than one actor source set", Description: "Internal-only guard. The events table allows at most one of (actor_user_id, actor_agent_id, actor_system_source) per row, but the eventbus caller supplied more than one. MySQL cannot enforce this via CHECK (FK ON DELETE SET NULL conflict) so the guard lives in the Go appender (ADR 0008 D8).", UserAction: "This is a server bug. Contact your administrator with the request ID."}
 	// INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER — Judge-driven event kind appended outside the signaljudge Applier

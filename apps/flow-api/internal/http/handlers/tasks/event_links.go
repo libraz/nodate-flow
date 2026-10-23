@@ -6,13 +6,13 @@ import (
 	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -119,15 +119,13 @@ func CreateTaskEventLink(deps Deps) func(context.Context, *CreateTaskEventLinkIn
 			return nil, translateItemkitTaskError(err)
 		}
 
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.event_link.add",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task_event_link",
-				ResourceID:   linkPub.String(),
-			})
-		}
+		// itemkit appended the link event in the transaction.
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "task.event_link.add",
+			ResourceType: "task_event_link",
+			ResourceID:   linkPub.String(),
+			CallSite:     "tasks.CreateTaskEventLink",
+		})
 
 		return &CreateTaskEventLinkOutput{Body: TaskEventLink{
 			ID:         linkPub.String(),
@@ -210,15 +208,13 @@ func DeleteTaskEventLink(deps Deps) func(context.Context, *DeleteTaskEventLinkIn
 			return nil, translateItemkitTaskError(err)
 		}
 
-		if deps.Audit != nil {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "task.event_link.remove",
-				ActorID:      actorID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "task_event_link",
-				ResourceID:   linkPub.String(),
-			})
-		}
+		// itemkit appended the unlink event in the transaction.
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "task.event_link.remove",
+			ResourceType: "task_event_link",
+			ResourceID:   linkPub.String(),
+			CallSite:     "tasks.DeleteTaskEventLink",
+		})
 
 		out := &DeleteTaskEventLinkOutput{}
 		out.Body.Ok = true

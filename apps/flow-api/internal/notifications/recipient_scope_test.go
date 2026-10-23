@@ -13,7 +13,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
@@ -60,7 +59,7 @@ func TestReminderIsNotSentForAnEventOnADeletedCalendar(t *testing.T) {
 	_, err := db.ExecContext(ctx, `UPDATE calendars SET enabled = FALSE WHERE id = ?`, fx.calendarID)
 	require.NoError(t, err)
 
-	fanout := notification.NewFanout(db, generated.New(db), email.NoopSender{})
+	fanout := notification.NewFanout(db, generated.New(db))
 	fanout.SetTimeout(5 * time.Second)
 	CheckAndNotify(ctx, db, fanout)
 

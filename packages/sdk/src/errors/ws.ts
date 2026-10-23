@@ -146,30 +146,15 @@ export const WsErrors = {
     status: 403,
     message: "You cannot change your own membership.",
   },
-  WS_MENTION_NOT_FOUND: {
-    code: "WS.MENTION.NOT_FOUND",
-    status: 404,
-    message: "Mention not found",
-  },
   WS_NOTIFICATION_NOT_FOUND: {
     code: "WS.NOTIFICATION.NOT_FOUND",
     status: 404,
     message: "Notification not found",
   },
-  WS_NOTIFICATION_PREFERENCE_NOT_FOUND: {
-    code: "WS.NOTIFICATION_PREFERENCE.NOT_FOUND",
-    status: 404,
-    message: "Notification preference not found",
-  },
   WS_PROJECT_ACCESS_DENIED: {
     code: "WS.PROJECT.ACCESS_DENIED",
     status: 403,
     message: "You do not have access to this project",
-  },
-  WS_PROJECT_FEATURE_DISABLED: {
-    code: "WS.PROJECT.FEATURE_DISABLED",
-    status: 403,
-    message: "This feature is disabled for the project",
   },
   WS_PROJECT_IDENTIFIER_ALREADY_TAKEN: {
     code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN",
@@ -226,6 +211,11 @@ export const WsErrors = {
     status: 409,
     message: "Task is already archived",
   },
+  WS_TASK_DEPENDENCY_ALREADY_EXISTS: {
+    code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS",
+    status: 409,
+    message: "This dependency already exists",
+  },
   WS_TASK_DEPENDENCY_CYCLE: {
     code: "WS.TASK.DEPENDENCY_CYCLE",
     status: 422,
@@ -240,16 +230,6 @@ export const WsErrors = {
     code: "WS.TASK.NOT_FOUND",
     status: 404,
     message: "Task not found",
-  },
-  WS_TASK_STATE_TRANSITION_BLOCKED_BY_CONSTRAINT: {
-    code: "WS.TASK.STATE_TRANSITION_BLOCKED_BY_CONSTRAINT",
-    status: 422,
-    message: "Task cannot transition to the requested state",
-  },
-  WS_TASK_TITLE_TOO_LONG: {
-    code: "WS.TASK.TITLE_TOO_LONG",
-    status: 422,
-    message: "Task title is too long",
   },
   WS_TASK_TRANSITION_REJECTED: {
     code: "WS.TASK.TRANSITION_REJECTED",
@@ -300,11 +280,6 @@ export const WsErrors = {
     code: "WS.TASK_EVENT_LINK.NOT_FOUND",
     status: 404,
     message: "Linked event not found",
-  },
-  WS_VIEW_PREFERENCE_NOT_FOUND: {
-    code: "WS.VIEW_PREFERENCE.NOT_FOUND",
-    status: 404,
-    message: "View preference not found",
   },
   WS_WORKSPACE_ACCESS_DENIED: {
     code: "WS.WORKSPACE.ACCESS_DENIED",

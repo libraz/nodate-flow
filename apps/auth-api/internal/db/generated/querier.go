@@ -265,6 +265,11 @@ type Querier interface {
 	// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
 	// same RESTRICT edge exists from calendar_event_attachments.
 	DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error)
+	// Drop a queued removal once its blob is gone from object storage.
+	DeleteStorageBlobRemoval(ctx context.Context, id uint32) (int64, error)
+	// Drop the queued removals for keys a teardown has just removed from
+	// object storage itself.
+	DeleteStorageBlobRemovalsByKey(ctx context.Context, storageKeys []string) (int64, error)
 	// Remove a reclaimed row. Restricted to rows nothing references so a
 	// concurrent upload that adopted the row between listing and deleting
 	// is left alone.
@@ -584,6 +589,8 @@ type Querier interface {
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
+	// Oldest queued removals first, one sweeper batch at a time.
+	ListStorageBlobRemovals(ctx context.Context, limit int32) ([]ListStorageBlobRemovalsRow, error)
 	// Enumerate every storage_objects row owned directly by a user (avatars
 	// only at the moment) so the admin purge driver can clean MinIO before
 	// the users row is hard-deleted. Workspace-scoped attachments uploaded
@@ -689,6 +696,11 @@ type Querier interface {
 	// expired. The callback's own answer comes from ClaimOauthState, which
 	// does report its count; this one is housekeeping alongside it.
 	PurgeExpiredOauthStates(ctx context.Context) error
+	// Record a key whose blob must be removed once the rows naming it are
+	// gone. Written inside the teardown transaction that deletes those rows,
+	// so the record commits with the delete. A key already queued stays one
+	// row.
+	QueueStorageBlobRemoval(ctx context.Context, storageKey string) error
 	// Insert a new global user account. The caller supplies a UUID v7 public_id.
 	RegisterUser(ctx context.Context, arg RegisterUserParams) (int64, error)
 	// Soft-remove a member from a workspace.

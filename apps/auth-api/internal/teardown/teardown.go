@@ -55,14 +55,15 @@ type BlobSweeper interface {
 // UI and cannot be undone.
 //
 // Committing first inverts the failure into an orphaned blob, which is
-// recoverable — but only if the keys are written down: the rows that
-// named them are already deleted, so this log is their last record.
-// Each key is therefore logged individually rather than as a count.
+// recoverable because the transaction queued each key in
+// storage_blob_removals ([queueBlobRemovals]). A clean sweep drops those
+// records; a failed one, or a sweep that never runs, leaves them for the
+// storage sweeper to retry until the blobs are gone.
 //
 // store is optional: it is nil when NF_S3_ENDPOINT is unset. A nil
 // *storage.Client wrapped in an interface is not itself nil, so the
 // guard has to unwrap the concrete type.
-func sweepBlobs(ctx context.Context, store BlobSweeper, keys []string, owner slog.Attr) int64 {
+func sweepBlobs(ctx context.Context, q *generated.Queries, store BlobSweeper, keys []string, owner slog.Attr) int64 {
 	switch s := store.(type) {
 	case nil:
 		return 0
@@ -76,24 +77,35 @@ func sweepBlobs(ctx context.Context, store BlobSweeper, keys []string, owner slo
 	}
 	err := store.RemoveObjects(ctx, keys)
 	if err == nil {
+		// affected-rows: not-applicable — the sweeper may already have
+		// drained some of these records, and the blobs are gone either way.
+		if _, derr := q.DeleteStorageBlobRemovalsByKey(ctx, keys); derr != nil {
+			slog.WarnContext(ctx, "teardown: queued removals not cleared; the sweeper will retry them",
+				owner, slog.String("err", derr.Error()))
+		}
 		return 0
 	}
-	slog.WarnContext(ctx, "teardown: object storage sweep had errors",
+	// RemoveObjects collapses per-key failures into the first error, so
+	// which keys survived is unknown. Every key stays queued, and
+	// removing a key that is already gone is not an error.
+	slog.WarnContext(ctx, "teardown: object storage sweep had errors; keys left queued for the sweeper",
 		owner,
 		logutil.LogNumber("key_count", len(keys)),
 		slog.String("err", err.Error()),
 	)
-	// RemoveObjects collapses per-key failures into the first error, so
-	// we cannot tell which keys survived. List them all: over-reporting
-	// costs an operator one HEAD request per key, under-reporting costs
-	// an unreclaimable blob.
-	for _, k := range keys {
-		slog.WarnContext(ctx, "teardown: blob may be orphaned",
-			owner,
-			slog.String("storage_key", k),
-		)
-	}
 	return 1
+}
+
+// queueBlobRemovals records keys in storage_blob_removals inside the
+// teardown transaction, so the commit that deletes the rows naming the
+// blobs also commits the record of what is left to remove.
+func queueBlobRemovals(ctx context.Context, qtx *generated.Queries, keys []string) error {
+	for _, k := range keys {
+		if err := storage.QueueRemoval(ctx, qtx, k); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // WorkspaceResult captures the observable side effects of [Workspace] so
@@ -176,6 +188,9 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store Blob
 			}
 		}
 
+		if qerr := queueBlobRemovals(ctx, qtx, keys); qerr != nil {
+			return qerr
+		}
 		if derr := qtx.DeleteAttachmentsByWorkspace(ctx, wsID); derr != nil {
 			return derr
 		}
@@ -206,7 +221,7 @@ func Workspace(ctx context.Context, db *sql.DB, q *generated.Queries, store Blob
 		return WorkspaceResult{}, nil
 	}
 
-	minioErrors := sweepBlobs(ctx, store, keys,
+	minioErrors := sweepBlobs(ctx, q, store, keys,
 		logutil.LogEntity("workspace", wsPublicID))
 
 	return WorkspaceResult{
@@ -272,7 +287,12 @@ type UserResult struct {
 //
 // userPublicID identifies the user in the log lines the sweep emits. The
 // internal userID drives the queries and never reaches a log line.
-func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, userID uint32, userPublicID uuid.UUID) (UserResult, error) {
+//
+// guard runs first inside the delete transaction, so a precondition it
+// locks — the instance keeping an enabled admin — holds at the commit
+// that removes the user. Its error rolls the delete back and is returned
+// as is. Nil means no precondition.
+func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweeper, userID uint32, userPublicID uuid.UUID, guard func(ctx context.Context, tx *dbretry.Tx) error) (UserResult, error) {
 	taskAtts, err := q.ListAttachmentsForUploaderPurge(ctx, userID)
 	if err != nil {
 		return UserResult{}, err
@@ -313,6 +333,11 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 	err = dbretry.InTx(ctx, db, "teardown.User", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		freedSharedKeys = nil
 		deleted = false
+		if guard != nil {
+			if err := guard(ctx, tx); err != nil {
+				return err
+			}
+		}
 		qtx := q.WithTx(tx.RawTx())
 
 		for _, a := range taskAtts {
@@ -365,35 +390,21 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 			}
 		}
 
-		return nil
+		// The avatar rows went with the user and the freed shared rows
+		// just above, so their keys are queued in the same commit.
+		return queueBlobRemovals(ctx, qtx, userOrphanKeys(avatarObjs, freedSharedKeys))
 	})
 	if err != nil && !stderrors.Is(err, errConcurrentDelete) {
 		return UserResult{}, err
 	}
 
-	// Combine avatar keys (always orphaned by CASCADE when we got
-	// deleted=true) with the shared SO keys whose ref_count truly reached
-	// zero. Deduplicate so an avatar that happens to share a storage_key
-	// with an attachment is only swept once.
-	keySet := make(map[string]struct{}, len(avatarObjs)+len(freedSharedKeys))
+	var (
+		keys        []string
+		minioErrors int64
+	)
 	if deleted {
-		for _, o := range avatarObjs {
-			if o.StorageKey != "" {
-				keySet[o.StorageKey] = struct{}{}
-			}
-		}
-		for _, k := range freedSharedKeys {
-			keySet[k] = struct{}{}
-		}
-	}
-	keys := make([]string, 0, len(keySet))
-	for k := range keySet {
-		keys = append(keys, k)
-	}
-
-	var minioErrors int64
-	if deleted {
-		minioErrors = sweepBlobs(ctx, store, keys,
+		keys = userOrphanKeys(avatarObjs, freedSharedKeys)
+		minioErrors = sweepBlobs(ctx, q, store, keys,
 			logutil.LogEntity("user", userPublicID))
 	}
 
@@ -402,4 +413,25 @@ func User(ctx context.Context, db *sql.DB, q *generated.Queries, store BlobSweep
 		StorageObjectsDeleted: int64(len(keys)),
 		MinioErrors:           minioErrors,
 	}, nil
+}
+
+// userOrphanKeys combines the avatar keys (always orphaned by the user
+// CASCADE) with the shared keys whose ref_count truly reached zero,
+// deduplicated so an avatar sharing a storage_key with an attachment is
+// queued and swept once.
+func userOrphanKeys(avatarObjs []generated.ListStorageObjectsByOwnerUserRow, freedSharedKeys []string) []string {
+	keySet := make(map[string]struct{}, len(avatarObjs)+len(freedSharedKeys))
+	for _, o := range avatarObjs {
+		if o.StorageKey != "" {
+			keySet[o.StorageKey] = struct{}{}
+		}
+	}
+	for _, k := range freedSharedKeys {
+		keySet[k] = struct{}{}
+	}
+	keys := make([]string, 0, len(keySet))
+	for k := range keySet {
+		keys = append(keys, k)
+	}
+	return keys
 }

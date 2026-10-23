@@ -510,6 +510,8 @@ func TestAdminDeleteUserHappyPath(t *testing.T) {
 	admin := newTenant(t)
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, target)
 	out := adminDeleteUser(t, admin.AccessToken, target.UserPublicID)
 	require.Truef(t, out.Deleted, "user delete must report deleted=true; got %+v", out)
 	// Avatar (1) + uploaded attachment whose ref_count was 1 (1) = 2
@@ -542,6 +544,8 @@ func TestAdminDeleteUserIdempotent(t *testing.T) {
 	admin := newTenant(t)
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, target)
 	first := adminDeleteUser(t, admin.AccessToken, target.UserPublicID)
 	require.Truef(t, first.Deleted, "first delete must report deleted=true; got %+v", first)
 
@@ -644,6 +648,8 @@ func TestAdminDeleteUserSharedAttachment(t *testing.T) {
 	admin := newTenant(t)
 	grantInstanceAdmin(t, testDB, admin.UserPublicID)
 
+	// The subject owns a workspace; a sole owner cannot be deleted.
+	addCoOwner(t, other)
 	out := adminDeleteUser(t, admin.AccessToken, other.UserPublicID)
 	require.Truef(t, out.Deleted, "other-delete must report deleted=true; got %+v", out)
 	// The shared blob has ref_count==2, so the delete driver's

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/stateinfer"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -55,6 +56,7 @@ func InferState(deps Deps) func(context.Context, *InferStateInput) (*InferStateO
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
+		actorID, _ := middleware.ActorFromContext(ctx)
 		updated := row.CreatedAt
 		if row.UpdatedAt.Valid {
 			updated = row.UpdatedAt.Time
@@ -64,6 +66,8 @@ func InferState(deps Deps) func(context.Context, *InferStateInput) (*InferStateO
 			UpdatedAt:       updated,
 			DependencyCount: row.DependencyCount,
 			Now:             time.Now().UTC(),
+			// Overdue is a calendar-day question, read in the caller's zone.
+			Zone: duedate.UserZone(ctx, deps.Queries, ws.ID, actorID),
 		}
 		if row.DueOn.Valid {
 			sig.HasDueOn = true

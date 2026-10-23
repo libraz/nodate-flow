@@ -201,7 +201,7 @@ func TestMCPStreamHonorsTheAgentKillSwitch(t *testing.T) {
 		// A refusal the dispatcher reaches after the envelope is parsed rides
 		// in the JSON-RPC error body, not the HTTP status.
 		require.Equal(t, http.StatusOK, status)
-		require.Equal(t, apierrors.AiCostGuardExceeded.Code, toolCallErrorCode(t, body),
+		require.Equal(t, apierrors.WsTaskAgentCostCapExceeded.Code, toolCallErrorCode(t, body),
 			"the seeded spend must actually put the agent over its cap")
 
 		sess := mcp.NewTestAgentSession(fx.userID, fx.wsID, fx.agent.AgentID, []string{"read:workspace"})

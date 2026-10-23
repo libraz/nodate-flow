@@ -13,7 +13,7 @@ import (
 func OIDCGoogleStart(deps Deps) func(context.Context, *struct{}) (*OIDCStartOutput, error) {
 	return func(ctx context.Context, _ *struct{}) (*OIDCStartOutput, error) {
 		if deps.OIDC == nil {
-			return nil, httpErr(apierrors.AuthOidcProviderUnreachable)
+			return nil, httpErr(apierrors.AuthOidcGoogleNotConfigured)
 		}
 		nonce := authn.RandomHex(16)
 		// The state is a signed JWT embedding the nonce, the provider it

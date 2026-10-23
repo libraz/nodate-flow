@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
 // MySQLQueue is a [Queue] backed by the agent_runs table. It supports
@@ -43,7 +43,7 @@ func (q *MySQLQueue) Enqueue(ctx context.Context, r Run) error {
 		pub, r.Job.WsID, r.Job.AgentID, r.DedupeKey, r.ScheduledAt.UTC(),
 	)
 	if err != nil {
-		if isDuplicateKey(err) {
+		if apierr.IsDuplicateEntry(err) {
 			return ErrDuplicate
 		}
 		return err
@@ -141,15 +141,4 @@ func (q *MySQLQueue) Nack(ctx context.Context, dedupeKey string, runErr error) e
 		WHERE dedupe_key = ? AND status = 'claimed'`
 	_, err := q.DB.ExecContext(ctx, upd, time.Now().UTC(), sql.NullString{String: msg, Valid: msg != ""}, dedupeKey)
 	return err
-}
-
-// isDuplicateKey detects MySQL error 1062 without taking a hard
-// dependency on the mysql driver package. Matching on the substring
-// keeps this package driver-agnostic and easy to unit-test.
-func isDuplicateKey(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "Error 1062") || strings.Contains(s, "Duplicate entry")
 }

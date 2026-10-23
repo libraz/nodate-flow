@@ -11,20 +11,21 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/lenses"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -69,29 +70,18 @@ func Export(deps Deps) func(ctx context.Context, in *Input) (*Output, error) {
 
 		tasks := collectTasks(data)
 
-		// Audit log.
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "export.create",
-			ActorID:      actorID,
-			WorkspaceID:  ws.ID,
+		// An export changes nothing, so there is no transaction to join:
+		// the record is written once the rows have been read.
+		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			EventType:    eventbus.ExportRequested,
+			AuditAction:  "export.create",
 			ResourceType: "export",
-			Metadata: map[string]any{
-				"format": in.Format,
-				"count":  len(tasks),
-			},
-		})
-
-		// Append event.
-		actorInt64 := int64(actorID)
-		eventbus.AppendBestEffort(ctx, dbretry.AutoCommit(deps.DB), eventbus.Event{
-			Type:        eventbus.ExportRequested,
-			WorkspaceID: ws.ID,
-			ActorUserID: &actorInt64,
 			Payload: map[string]any{
 				"format": in.Format,
 				"count":  len(tasks),
 			},
-		}, "export.Export")
+			CallSite: "export.Export",
+		})
 
 		return &Output{
 			Body: Body{
@@ -203,23 +193,13 @@ func recordExport(
 	ctx context.Context, deps Deps, ws middleware.WorkspaceContext,
 	actorID uint32, selected int, res csvWriteResult,
 ) {
-	meta := exportMetadata(selected, res)
-
-	deps.Audit.Record(context.WithoutCancel(ctx), audit.Entry{
-		Action:       "export.create",
-		ActorID:      actorID,
-		WorkspaceID:  ws.ID,
+	deps.Mutations.Record(context.WithoutCancel(ctx), mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+		EventType:    eventbus.ExportRequested,
+		AuditAction:  "export.create",
 		ResourceType: "export",
-		Metadata:     meta,
+		Payload:      exportMetadata(selected, res),
+		CallSite:     "export.CSVOperation",
 	})
-
-	actorInt64 := int64(actorID)
-	eventbus.AppendBestEffort(context.WithoutCancel(ctx), dbretry.AutoCommit(deps.DB), eventbus.Event{
-		Type:        eventbus.ExportRequested,
-		WorkspaceID: ws.ID,
-		ActorUserID: &actorInt64,
-		Payload:     meta,
-	}, "export.CSVOperation")
 
 	if res.err != nil {
 		slog.ErrorContext(ctx, "export: CSV body write failed",
@@ -511,7 +491,18 @@ func fetchForWorkspace(
 	}, nil
 }
 
-// fetchForLens resolves the lens and fetches export rows scoped to its project.
+// fetchForLens fetches the rows a saved lens selects for the caller.
+//
+// The lens filter is read by the same reader the share page renders
+// ([lenses.TaskFilter]), over the same active-task projection the lens
+// list view reads, under the caller's task visibility. A workspace-wide
+// lens therefore narrows by its filter rather than widening to the whole
+// workspace, and a filter that cannot be read in full selects nothing.
+//
+// task-visibility: not-applicable — every row comes from v_task_list under
+// the acl.TaskVisibilityFilter fragment ANDed into this statement; tasks t
+// is joined on v.task_internal_id only to read the description of a row
+// that fragment already admitted.
 func fetchForLens(
 	ctx context.Context, deps Deps, ws middleware.WorkspaceContext, actorID uint32, lensID string, limit int32,
 ) (exportDataset, error) {
@@ -520,7 +511,7 @@ func fetchForLens(
 		return exportDataset{}, httpErr(apierrors.ExportTaskLensNotFound)
 	}
 
-	projectID, err := deps.Queries.ResolveLensProjectID(ctx, generated.ResolveLensProjectIDParams{
+	lens, err := deps.Queries.ResolveLensForExport(ctx, generated.ResolveLensForExportParams{
 		WorkspaceID: ws.ID,
 		PublicID:    lid,
 	})
@@ -528,50 +519,84 @@ func fetchForLens(
 		return exportDataset{}, httpErr(apierr.SpecForErrNoRows(err, apierrors.ExportTaskLensNotFound, apierrors.ExportTaskDatasetQueryFailed))
 	}
 
-	// If the lens has a project scope, use the project-scoped query.
-	if projectID.Valid {
-		visibility := acl.ListVisibilityArgs(actorID, ws.Role)
-		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
-			WorkspaceID:   ws.ID,
-			ProjectID:     uint32(projectID.Int32), //#nosec G115 -- project_id is projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-			IsElevated:    visibility.IsElevated,
-			ActorUserID:   visibility.ActorUserID,
-			ActorUserID_2: visibility.ActorUserID,
-			ActorUserID_3: visibility.ActorUserID,
-			Limit:         limit,
-		})
-		if err != nil {
+	where := []string{"v.workspace_id = ?"}
+	args := []any{ws.ID}
+	if lens.ProjectID.Valid {
+		where = append(where, "v.project_id = ?")
+		args = append(args, lens.ProjectID.Int32)
+	}
+	if frag, visArgs := acl.TaskVisibilityFilter(actorID, ws.Role); frag != "" {
+		where = append(where, frag)
+		args = append(args, visArgs...)
+	}
+	lensWhere, lensArgs := lenses.TaskFilter(lens.LensJson)
+	where = append(where, lensWhere...)
+	args = append(args, lensArgs...)
+	args = append(args, limit)
+
+	// The columns and order match ExportTasksForWorkspace, so a lens
+	// export and a workspace export read as one file format.
+	//#nosec G201 -- WHERE fragments are static literals from acl and lenses; every value is bound via placeholders.
+	q := fmt.Sprintf(`SELECT
+  v.public_id,
+  v.title,
+  t.description,
+  v.derived_state,
+  v.priority,
+  v.due_on,
+  v.started_on,
+  v.completed_at,
+  v.project_public_id,
+  v.project_name,
+  a_user.public_id,
+  a_user.display_name,
+  v.updated_at,
+  v.created_at
+FROM v_task_list v
+INNER JOIN tasks t ON t.id = v.task_internal_id
+LEFT JOIN users a_user ON a_user.public_id = v.primary_assignee_public_id AND a_user.enabled = TRUE
+WHERE %s
+ORDER BY v.created_at DESC, v.task_internal_id DESC
+LIMIT ?`, strings.Join(where, " AND "))
+
+	rows, err := deps.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return exportDataset{}, datasetQueryFailed(ctx, "lens", err)
+	}
+	defer rows.Close()
+	var out []exportRow
+	for rows.Next() {
+		var (
+			r        exportRow
+			assignee types.PublicID
+			created  time.Time
+		)
+		if err := rows.Scan(
+			&r.PublicID, &r.Title, &r.Description, &r.DerivedState, &r.Priority,
+			&r.DueOn, &r.StartedOn, &r.CompletedAt,
+			&r.ProjectPublicID, &r.ProjectName,
+			&assignee, &r.AssigneeDisplayName,
+			&r.UpdatedAt, &created,
+		); err != nil {
 			return exportDataset{}, datasetQueryFailed(ctx, "lens", err)
 		}
-		return exportDataset{
-			count: len(dbRows),
-			rows: func(yield func(exportRow) bool) {
-				for _, r := range dbRows {
-					if !yield(exportRow{
-						PublicID:            r.PublicID,
-						Title:               r.Title,
-						Description:         r.Description,
-						DerivedState:        r.DerivedState,
-						Priority:            r.Priority,
-						DueOn:               r.DueOn,
-						StartedOn:           r.StartedOn,
-						CompletedAt:         r.CompletedAt,
-						ProjectPublicID:     r.ProjectPublicID,
-						ProjectName:         r.ProjectName,
-						AssigneePublicID:    r.AssigneePublicID,
-						AssigneeDisplayName: r.AssigneeDisplayName,
-						UpdatedAt:           r.UpdatedAt,
-						CreatedAt:           sql.NullTime{Time: r.CreatedAt, Valid: true},
-					}) {
-						return
-					}
-				}
-			},
-		}, nil
+		r.AssigneePublicID = assignee
+		r.CreatedAt = sql.NullTime{Time: created, Valid: true}
+		out = append(out, r)
 	}
-
-	// Workspace-wide lens: fall back to the workspace query.
-	return fetchForWorkspace(ctx, deps, ws, actorID, limit)
+	if err := rows.Err(); err != nil {
+		return exportDataset{}, datasetQueryFailed(ctx, "lens", err)
+	}
+	return exportDataset{
+		count: len(out),
+		rows: func(yield func(exportRow) bool) {
+			for _, r := range out {
+				if !yield(r) {
+					return
+				}
+			}
+		},
+	}, nil
 }
 
 // mapRow converts one internal exportRow to the public DTO.

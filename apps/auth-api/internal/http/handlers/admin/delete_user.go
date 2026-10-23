@@ -9,7 +9,10 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/teardown"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbretry"
+	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
 
 // DeleteUser handles DELETE /admin/users/{userId}, the admin
@@ -58,7 +61,30 @@ func DeleteUser(deps Deps) func(context.Context, *DeleteUserInput) (*DeleteUserO
 			return nil, httpErr(apierrors.UserDeleteSelfNotAllowed)
 		}
 
-		res, err := teardown.User(ctx, deps.DB, deps.Queries, deps.Storage, uid, pid.UUID())
+		// Deleting is held to the rules suspending and removing a member
+		// are: the instance keeps at least one enabled admin, and every
+		// workspace the user owns keeps another owner. The guard locks both
+		// owner sets inside the transaction that deletes the user.
+		var answered error
+		res, err := teardown.User(ctx, deps.DB, deps.Queries, deps.Storage, uid, pid.UUID(),
+			func(ctx context.Context, tx *dbretry.Tx) error {
+				answered = nil
+				spec, err := ensureAdminRemains(ctx, tx, uid)
+				if err == nil && spec == nil {
+					spec, err = ensureWorkspacesKeepOwner(ctx, tx, uid)
+				}
+				if err != nil {
+					return err
+				}
+				if spec != nil {
+					answered = httpErr(spec)
+					return errAnswered
+				}
+				return nil
+			})
+		if answered != nil {
+			return nil, answered
+		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -82,4 +108,45 @@ func DeleteUser(deps Deps) func(context.Context, *DeleteUserInput) (*DeleteUserO
 		out.Body.MinioErrors = res.MinioErrors
 		return out, nil
 	}
+}
+
+// ensureWorkspacesKeepOwner answers WS.MEMBER.LAST_OWNER when leaving is
+// the only enabled owner of any workspace. It locks each owner set it
+// reads, so it must run in the transaction that then deletes leaving.
+func ensureWorkspacesKeepOwner(ctx context.Context, tx *dbretry.Tx, leaving uint32) (*apierr.Spec, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT workspace_id FROM workspace_members
+		 WHERE user_id = ? AND role = 'owner' AND enabled = TRUE`, leaving)
+	if err != nil {
+		return nil, err
+	}
+	var owned []uint32
+	for rows.Next() {
+		var wsID uint32
+		if err := rows.Scan(&wsID); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		owned = append(owned, wsID)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, wsID := range owned {
+		err := memberkit.EnsureOwnerRemains(ctx, tx, memberkit.OwnerSet{
+			Query: `SELECT user_id FROM workspace_members
+			        WHERE workspace_id = ? AND role = 'owner' AND enabled = TRUE`,
+			Args: []any{wsID},
+		}, leaving)
+		if errors.Is(err, memberkit.ErrLastOwner) {
+			return apierrors.WsMemberLastOwner, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // preferenceCell is one row of the preferences matrix on the wire.
@@ -105,7 +104,7 @@ func TestNotificationPreferenceMuteStopsFanout(t *testing.T) {
 	memberInternalID := lookupUserInternalID(ctx, t, testDB, member.UserPublicID)
 
 	queries := generated.New(testDB)
-	f := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f := notification.NewFanout(testDB, queries)
 	f.SetTimeout(5 * time.Second)
 
 	// task.actor.added maps to the muted task.mention category.
@@ -133,7 +132,7 @@ func TestNotificationPreferenceMuteStopsFanout(t *testing.T) {
 	lifecycleEventID := latestEventID(ctx, t, wsInternalID, ownerInternalID, "task.updated")
 
 	beforeUnmuted := notificationCountForUser(ctx, t, testDB, memberInternalID)
-	f2 := notification.NewFanout(testDB, queries, email.NoopSender{})
+	f2 := notification.NewFanout(testDB, queries)
 	f2.SetTimeout(5 * time.Second)
 	hook2 := f2.Hook()
 	hook2(ctx, wsInternalID, "task.updated", lifecycleEventID)

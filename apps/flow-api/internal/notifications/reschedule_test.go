@@ -12,7 +12,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
-	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
@@ -63,7 +62,7 @@ func TestReminderFiresAgainAfterReschedule(t *testing.T) {
 	ctx := context.Background()
 
 	fx := seedClaimFixture(t, db)
-	fanout := notification.NewFanout(db, generated.New(db), email.NoopSender{})
+	fanout := notification.NewFanout(db, generated.New(db))
 	fanout.SetTimeout(5 * time.Second)
 
 	// The fixture's reminder window is already open: it starts in five
@@ -133,7 +132,7 @@ func TestReminderIsNotResentWhenOnlyTheTitleChanges(t *testing.T) {
 	ctx := context.Background()
 
 	fx := seedClaimFixture(t, db)
-	fanout := notification.NewFanout(db, generated.New(db), email.NoopSender{})
+	fanout := notification.NewFanout(db, generated.New(db))
 	fanout.SetTimeout(5 * time.Second)
 
 	CheckAndNotify(ctx, db, fanout)

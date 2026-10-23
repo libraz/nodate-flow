@@ -17,6 +17,7 @@ import (
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 )
 
@@ -155,6 +156,9 @@ func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, t
 		}
 		if affected, _ := gcResult.RowsAffected(); affected == 1 {
 			storageKeyToRemove = fullRow.StorageKey
+			if err := storagegc.Queue(ctx, qtx, storageKeyToRemove); err != nil {
+				return err
+			}
 		}
 
 		return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
@@ -177,8 +181,8 @@ func rejectOversizeTaskAttachment(ctx context.Context, deps Deps, wsID uint32, t
 
 	if storageKeyToRemove != "" && deps.Storage != nil {
 		cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
-		if rmErr := deps.Storage.RemoveObject(cleanupCtx, storageKeyToRemove); rmErr != nil {
-			nflog.LoggerFromContext(cleanupCtx).WarnContext(cleanupCtx, "attachment confirm: oversize cleanup failed",
+		if rmErr := storagegc.RemoveQueued(cleanupCtx, deps.Queries, deps.Storage, storageKeyToRemove); rmErr != nil {
+			nflog.LoggerFromContext(cleanupCtx).WarnContext(cleanupCtx, "attachment confirm: oversize cleanup failed; the sweeper will retry",
 				slog.Any("err", rmErr),
 				slog.String("storage_key", storageKeyToRemove),
 			)

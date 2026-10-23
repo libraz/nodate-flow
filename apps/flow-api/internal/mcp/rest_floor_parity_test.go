@@ -120,7 +120,6 @@ var mcpRESTCounterparts = map[string]string{
 var mcpToolsWithoutRESTOperation = map[string]string{
 	"propose_tasks_from": "turns free text into task candidates and persists nothing; the REST proposal routes all start from an existing project or task, so none of them is the same request",
 	"resolve_task_ref":   "translates a human-readable reference into a public id; REST clients already hold the id by the time they call, so no route does this",
-	"list_recent":        "the caller's own recently visited entities, recorded by the transport rather than by a route",
 	"list_free_slots":    "derives free time from events the caller can already list; REST exposes the events and leaves the arithmetic to the client",
 }
 

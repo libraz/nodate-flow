@@ -3,16 +3,11 @@ package projects
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"strings"
-
-	"github.com/go-sql-driver/mysql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -65,11 +60,8 @@ func Patch(deps Deps) func(context.Context, *PatchProjectInput) (*PatchProjectOu
 			WorkspaceID: current.WorkspaceID,
 			PublicID:    types.FromUUID(prj.PublicID),
 		}); err != nil {
-			if handlerutil.IsDuplicateEntry(err) {
-				var mysqlErr *mysql.MySQLError
-				if errors.As(err, &mysqlErr) && strings.Contains(mysqlErr.Message, "uniq_projects_workspace_id_slug") {
-					return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
-				}
+			if key, _ := apierr.DuplicateKey(err); key == "uniq_projects_workspace_id_slug_active" {
+				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
