@@ -74,7 +74,7 @@ func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintPara
 
 const failConstraint = `-- name: FailConstraint :execrows
 UPDATE task_constraints
-SET failed_at = CURRENT_TIMESTAMP,
+SET failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP),
     satisfied_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
@@ -87,7 +87,8 @@ type FailConstraintParams struct {
 }
 
 // Mark a constraint as currently failing. Clears satisfied_at so the
-// transition is visible in v_task_constraint_satisfaction.
+// transition is visible in v_task_constraint_satisfaction; failed_at keeps
+// the time the failure began across re-evaluations.
 func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)
 	if err != nil {
@@ -176,7 +177,7 @@ func (q *Queries) ListConstraintsForTask(ctx context.Context, arg ListConstraint
 
 const satisfyConstraint = `-- name: SatisfyConstraint :execrows
 UPDATE task_constraints
-SET satisfied_at = CURRENT_TIMESTAMP,
+SET satisfied_at = COALESCE(satisfied_at, CURRENT_TIMESTAMP),
     failed_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
@@ -188,7 +189,8 @@ type SatisfyConstraintParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Mark a constraint as satisfied at the current time.
+// Mark a constraint as satisfied. satisfied_at records when it first became
+// satisfied, so re-evaluating an already satisfied constraint keeps it.
 func (q *Queries) SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, satisfyConstraint, arg.WorkspaceID, arg.PublicID)
 	if err != nil {

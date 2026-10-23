@@ -21,7 +21,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/inbox/{id}/archive",
 		Summary:     "Archive an inbox item",
-		Description: "Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.",
+		Description: "Removes the named inbox item from the active list. Returns 404 WS.INBOX.NOT_FOUND when the item is already archived or does not exist.",
 		Tags:        []string{"Tasks"},
 	}, Archive(deps))
 	huma.Register(api, huma.Operation{

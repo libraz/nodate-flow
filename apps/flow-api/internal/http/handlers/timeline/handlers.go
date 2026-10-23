@@ -40,14 +40,14 @@ type timelineRow struct {
 	eventType                 string
 	payload                   json.RawMessage
 	occurredAt                time.Time
-	total                     interface{}
 }
 
 // queryTimeline runs a dynamic SELECT against v_task_timeline and
-// returns the materialised rows plus the COUNT(*) OVER() total. baseWhere
-// holds scope predicates that are always applied (e.g. workspace_id);
-// baseArgs holds the matching args. The kind / actor filters are layered
-// on top.
+// returns the materialised rows plus the total, counted by a separate
+// statement over the same scope so the page query never windows the whole
+// scope. baseWhere holds scope predicates that are always applied (e.g.
+// workspace_id); baseArgs holds the matching args. The kind / actor
+// filters are layered on top.
 func queryTimeline(
 	ctx context.Context,
 	db *sql.DB,
@@ -56,6 +56,7 @@ func queryTimeline(
 	kinds []string,
 	actorPublicID []byte,
 	callerUserID uint32,
+	wsRole middleware.WorkspaceRole,
 	limit, offset int32,
 ) ([]timelineRow, int64, error) {
 	where := append([]string{}, baseWhere...)
@@ -65,16 +66,12 @@ func queryTimeline(
 	// CheckTaskVisibility for timeline rows: public tasks are visible to
 	// workspace members, project tasks require project membership, private
 	// tasks require creator/actor access, and workspace owner/admin bypass.
-	// Events with no associated task remain workspace-root events.
-	where = append(where, `(
+	// Events with no associated task remain workspace-root events. The
+	// owner/admin bypass is decided from the role the request context
+	// already carries, so no per-row membership lookup is needed.
+	if !wsRole.AtLeast(middleware.WorkspaceRoleAdmin) {
+		where = append(where, `(
   v.task_public_id IS NULL
-  OR EXISTS (
-    SELECT 1 FROM workspace_members wm
-    WHERE wm.user_id = ?
-      AND wm.workspace_id = v.workspace_id
-      AND wm.role IN ('owner','admin')
-      AND wm.enabled = TRUE
-  )
   OR EXISTS (
     SELECT 1
     FROM tasks tv
@@ -111,7 +108,8 @@ func queryTimeline(
       )
   )
 )`)
-	args = append(args, callerUserID, callerUserID, callerUserID, callerUserID)
+		args = append(args, callerUserID, callerUserID, callerUserID)
+	}
 
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))
@@ -140,24 +138,20 @@ func queryTimeline(
   v.was_reversed,
   v.type,
   v.payload_json,
-  v.occurred_at,
-  COUNT(*) OVER() AS total
+  v.occurred_at
 FROM v_task_timeline v
 WHERE %s
 ORDER BY v.occurred_at DESC, v.event_id DESC
 LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
-	args = append(args, limit, offset)
+	pageArgs := append(append([]any{}, args...), limit, offset)
 
-	rows, err := db.QueryContext(ctx, q, args...)
+	rows, err := db.QueryContext(ctx, q, pageArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var (
-		out   []timelineRow
-		total int64
-	)
+	var out []timelineRow
 	for rows.Next() {
 		var r timelineRow
 		if err := rows.Scan(
@@ -174,7 +168,6 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.eventType,
 			&r.payload,
 			&r.occurredAt,
-			&r.total,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -183,8 +176,12 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	if len(out) > 0 {
-		total = totalAsInt64(out[0].total)
+
+	//#nosec G201 -- WHERE fragments are static literals composed in this file; all user-supplied values are bound via parameter placeholders.
+	countQ := fmt.Sprintf(`SELECT COUNT(*) FROM v_task_timeline v WHERE %s`, strings.Join(where, " AND "))
+	var total int64
+	if err := db.QueryRowContext(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -282,7 +279,7 @@ func ListForTask(deps Deps) func(context.Context, *ListTimelineForTaskInput) (*L
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?", "v.task_public_id = ?"},
 			[]any{ws.ID, taskPubBytes},
-			in.Kind, actorPub, userID, limit, in.Offset)
+			in.Kind, actorPub, userID, ws.Role, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -316,7 +313,7 @@ func ListForProject(deps Deps) func(context.Context, *ListTimelineForProjectInpu
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?", "v.project_public_id = ?"},
 			[]any{ws.ID, prjPubBytes},
-			in.Kind, actorPub, userID, limit, in.Offset)
+			in.Kind, actorPub, userID, ws.Role, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -344,7 +341,7 @@ func ListForWorkspace(deps Deps) func(context.Context, *ListTimelineForWorkspace
 		rows, total, err := queryTimeline(ctx, deps.DB,
 			[]string{"v.workspace_id = ?"},
 			[]any{ws.ID},
-			in.Kind, actorPub, userID, limit, in.Offset)
+			in.Kind, actorPub, userID, ws.Role, limit, in.Offset)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

@@ -26,6 +26,11 @@ export const AuthErrors = {
     status: 415,
     message: "Unsupported image type. Use JPEG, PNG, WebP, or GIF.",
   },
+  AUTH_LOGIN_ACCOUNT_DISABLED: {
+    code: "AUTH.LOGIN.ACCOUNT_DISABLED",
+    status: 403,
+    message: "This account has been suspended",
+  },
   AUTH_LOGIN_ACCOUNT_LOCKED: {
     code: "AUTH.LOGIN.ACCOUNT_LOCKED",
     status: 423,
@@ -85,6 +90,11 @@ export const AuthErrors = {
     code: "AUTH.OIDC.ID_TOKEN_INVALID",
     status: 401,
     message: "OIDC ID token is invalid",
+  },
+  AUTH_OIDC_LINK_UNVERIFIED_ACCOUNT: {
+    code: "AUTH.OIDC.LINK_UNVERIFIED_ACCOUNT",
+    status: 409,
+    message: "An account with this email already has a password or two-factor authentication and cannot be linked automatically",
   },
   AUTH_OIDC_MICROSOFT_NOT_CONFIGURED: {
     code: "AUTH.OIDC.MICROSOFT_NOT_CONFIGURED",

@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
+	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
@@ -135,6 +137,128 @@ func TestOIDCGithubCallback_LinksExistingPasswordAccount(t *testing.T) {
 	pub, perr := deps.Queries.FindUserPublicIdById(context.Background(), existingUID)
 	require.NoError(t, perr)
 	assert.Equal(t, existingPub.String(), pub.String())
+}
+
+// githubLinkAttempt signs in through GitHub with the given email and a
+// fresh subject, returning the callback result and the subject used.
+func githubLinkAttempt(t *testing.T, deps Deps, email string) (*OIDCCallbackOutput, string, error) {
+	t.Helper()
+	sub := "gh-claim-" + types.New().String()
+	deps.OIDCGithub = &fakeGithubExchanger{
+		claims: &internauth.GithubClaims{Sub: sub, Login: "victim", Name: "Victim", Email: email},
+	}
+	state, stateCookie := signedGithubState(t, &deps)
+	out, err := OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
+		Code:        "auth-code",
+		State:       state,
+		StateCookie: stateCookie,
+	})
+	return out, sub, err
+}
+
+// setLocalPassword plants a password hash on the user's local identity, as
+// self-registration does without ever proving the address.
+func setLocalPassword(t *testing.T, deps Deps, uid uint32) {
+	t.Helper()
+	ident, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+	require.NoError(t, err)
+	require.NoError(t, deps.Queries.UpdateIdentityPasswordHash(context.Background(), generated.UpdateIdentityPasswordHashParams{
+		PasswordHash: sql.NullString{String: "$argon2id$planted", Valid: true},
+		ID:           ident.ID,
+	}))
+}
+
+// TestOIDCLink_UnverifiedAccountWithPasswordIsRefused is the pre-account
+// takeover: someone registers the victim's address with a password, the
+// victim later signs in through an IdP. Linking would hand the victim an
+// account the registrant can still sign into, so the link is refused.
+func TestOIDCLink_UnverifiedAccountWithPasswordIsRefused(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	uid, _, email := b2NewUser(t, deps.Queries)
+	setLocalPassword(t, deps, uid)
+
+	out, sub, err := githubLinkAttempt(t, deps, email)
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthOidcLinkUnverifiedAccount.Code, problem.Type)
+	assert.Nil(t, out)
+	_, linked := findIdentityUserID(t, db, "github", sub)
+	assert.False(t, linked, "no identity may be bound onto the unverified account")
+}
+
+// TestOIDCLink_UnverifiedAccountWithTotpIsRefused covers a planted TOTP
+// secret without a password: it is a credential the registrant holds.
+func TestOIDCLink_UnverifiedAccountWithTotpIsRefused(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	uid, _, email := b2NewUser(t, deps.Queries)
+	b2EnrollTotp(t, deps, uid)
+
+	_, sub, err := githubLinkAttempt(t, deps, email)
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthOidcLinkUnverifiedAccount.Code, problem.Type)
+	_, linked := findIdentityUserID(t, db, "github", sub)
+	assert.False(t, linked)
+}
+
+// TestOIDCLink_UnverifiedAccountLosesEarlierSessions proves a credential-
+// free unverified account is linked only after every session that
+// predates the email proof is revoked, and that the proof is recorded.
+func TestOIDCLink_UnverifiedAccountLosesEarlierSessions(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	uid, _, email := b2NewUser(t, deps.Queries)
+	_, plantedHash := b2NewSession(t, deps, uid)
+
+	out, sub, err := githubLinkAttempt(t, deps, email)
+	require.NoError(t, err)
+	assert.NotEmpty(t, out.Body.AccessToken)
+	linkedUID, ok := findIdentityUserID(t, db, "github", sub)
+	require.True(t, ok)
+	assert.Equal(t, uid, linkedUID)
+
+	var plantedLive int
+	require.NoError(t, db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM sessions WHERE refresh_hash = ? AND enabled = TRUE AND revoked_at IS NULL",
+		plantedHash).Scan(&plantedLive))
+	assert.Zero(t, plantedLive, "a session issued before the email proof must not survive the link")
+	assert.Equal(t, 1, b2ActiveSessions(t, db, uid), "only the session the link issued remains")
+
+	var verified sql.NullTime
+	require.NoError(t, db.QueryRowContext(context.Background(),
+		"SELECT email_verified_at FROM users WHERE id = ?", uid).Scan(&verified))
+	assert.True(t, verified.Valid, "the link is the email proof and must be recorded")
+}
+
+// TestOIDCLink_VerifiedAccountKeepsPassword is the other side: once the
+// address was proven, a password on the account is the owner's own and
+// linking leaves it in place.
+func TestOIDCLink_VerifiedAccountKeepsPassword(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	uid, _, email := b2NewUser(t, deps.Queries)
+	setLocalPassword(t, deps, uid)
+	require.NoError(t, deps.Queries.MarkUserEmailVerified(context.Background(), uid))
+
+	_, sub, err := githubLinkAttempt(t, deps, email)
+	require.NoError(t, err)
+	_, ok := findIdentityUserID(t, db, "github", sub)
+	require.True(t, ok)
+	ident, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+	require.NoError(t, err)
+	assert.True(t, ident.PasswordHash.Valid)
 }
 
 // TestOIDCMicrosoftCallback_DoesNotAutoLinkExistingPasswordAccount proves

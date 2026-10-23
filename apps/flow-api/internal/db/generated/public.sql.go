@@ -212,7 +212,7 @@ const setLensPublic = `-- name: SetLensPublic :execrows
 UPDATE lenses
 SET is_public = TRUE,
     public_token_hash = ?,
-    shared_at = NOW(3)
+    shared_at = COALESCE(shared_at, NOW(3))
 WHERE workspace_id = ?
   AND public_id = ?
   AND is_public = FALSE
@@ -229,6 +229,7 @@ type SetLensPublicParams struct {
 // URL token minted by the caller; the plaintext is returned to the
 // publisher once and is not recoverable afterwards.
 // No-op if the lens is already public (WHERE is_public = FALSE guard).
+// shared_at keeps the first share time across revoke and re-publish.
 func (q *Queries) SetLensPublic(ctx context.Context, arg SetLensPublicParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, setLensPublic, arg.PublicTokenHash, arg.WorkspaceID, arg.PublicID)
 	if err != nil {

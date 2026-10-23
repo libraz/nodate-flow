@@ -2,10 +2,16 @@ package calendar_event_day
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 func testJob() *Job {
@@ -143,4 +149,46 @@ func TestCursorDoesNotAdvanceOnAFailedTick(t *testing.T) {
 	require.Equal(t, span.upper, moved)
 	require.True(t, moved.Before(now),
 		"a catch-up tick must not claim the whole gap it did not scan")
+}
+
+// postArrivalsAgainst runs one workspace's post loop against a flow-api
+// stub answering every signal with status.
+func postArrivalsAgainst(t *testing.T, status int) (int, error) {
+	t.Helper()
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(status)
+	}))
+	t.Cleanup(srv.Close)
+
+	job := testJob()
+	job.Client = newClient(t, srv.URL, "secret-token")
+	job.Logger = silentLogger()
+	events := []EventOnDay{
+		{Event: Event{PublicID: dbtype.New(), StartAt: time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC)}, Day: "2026-07-05"},
+		{Event: Event{PublicID: dbtype.New(), StartAt: time.Date(2026, time.July, 5, 11, 0, 0, 0, time.UTC)}, Day: "2026-07-05"},
+	}
+	err := job.postArrivals(context.Background(), Workspace{ID: 7, PublicID: dbtype.New(), Timezone: "UTC"}, events)
+	return int(calls.Load()), err
+}
+
+// A 5xx or an unreachable flow-api is transient: the span has to come
+// back as failed so the cursor stays on it and the next tick re-posts
+// it, or the day's signals are lost for good.
+func TestPostArrivalsReportsATransientFailureSoTheCursorStays(t *testing.T) {
+	t.Parallel()
+	calls, err := postArrivalsAgainst(t, http.StatusServiceUnavailable)
+	require.Error(t, err)
+	require.False(t, errors.Is(err, ErrSignalRejected))
+	require.Equal(t, 2, calls, "the rest of the span is still posted after a transient failure")
+}
+
+// A 4xx is flow-api's permanent answer for that body; retrying it every
+// tick would only hold the cursor on a span that can never succeed.
+func TestPostArrivalsSkipsAPermanentlyRejectedSignal(t *testing.T) {
+	t.Parallel()
+	calls, err := postArrivalsAgainst(t, http.StatusUnprocessableEntity)
+	require.NoError(t, err)
+	require.Equal(t, 2, calls)
 }

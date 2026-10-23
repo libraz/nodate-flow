@@ -208,13 +208,11 @@ func (w *WorkspaceProvider) CompileLens(ctx context.Context, prompt string) ([]b
 	// provider, matching the orchestrator (ai/tasks.go) and signal-judge
 	// runner. On would-exceed, surface the shared budget sentinel; any
 	// other guard error (e.g. the budget reader failing) propagates as-is.
-	if w.Guard != nil {
-		if err := w.Guard.Check(ctx, wsID); err != nil {
-			if errors.Is(err, ai.ErrDailyBudgetExceeded) {
-				return nil, ErrBudgetExceeded
-			}
-			return nil, fmt.Errorf("nlquery: cost guard: %w", err)
+	if capHit, err := ai.CheckBudget(ctx, w.Guard, wsID); err != nil {
+		if capHit {
+			return nil, ErrBudgetExceeded
 		}
+		return nil, fmt.Errorf("nlquery: cost guard: %w", err)
 	}
 
 	prov, err := w.Resolver.Default(ctx, wsID)

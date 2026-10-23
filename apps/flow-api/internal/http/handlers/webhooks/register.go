@@ -60,7 +60,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}/deliveries",
 		Summary:     "List delivery log for a webhook subscription",
-		Description: "Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.",
+		Description: "Returns recent delivery attempts for the subscription with event type, status, HTTP status code, attempt counts, and delivered, failed and created timestamps. Used by the webhook detail panel for diagnostics.",
 		Tags:        []string{"Webhook"},
 	}, ListDeliveries(deps))
 
@@ -69,7 +69,7 @@ func Register(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/webhooks/{webhookId}/test",
 		Summary:     "Send a test ping delivery",
-		Description: "Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.",
+		Description: "Queues a test ping delivery for the subscription and returns its delivery id. The worker sends it signed with the subscription's secret; read its outcome from the delivery log.",
 		Tags:        []string{"Webhook"},
 	}, TestDelivery(deps))
 }

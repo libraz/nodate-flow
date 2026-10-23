@@ -47,6 +47,7 @@ vi.mock('../src/api.js', () => {
     createFlowClient: vi.fn(() => client),
     createIdentityClient: vi.fn(() => client),
     extractRefreshTokenFromSetCookie: vi.fn(() => undefined),
+    revokeSession: vi.fn(async () => true),
   };
 });
 
@@ -88,10 +89,15 @@ describe('printed task ids round-trip', () => {
     vi.mocked(createFlowClient).mockClear();
     vi.mocked(createIdentityClient).mockClear();
     get.mockImplementation(async (path: string) => {
-      if (path === '/tasks') return { data: { tasks: [task], total: 1, nextCursor: null } };
-      return { data: task };
+      if (path === '/tasks') {
+        return {
+          response: new Response(null, { status: 200 }),
+          data: { tasks: [task], total: 1, nextCursor: null },
+        };
+      }
+      return { response: new Response(null, { status: 200 }), data: task };
     });
-    patch.mockResolvedValue({ data: task });
+    patch.mockResolvedValue({ response: new Response(null, { status: 200 }), data: task });
   });
 
   it('prints an id `task view` resolves', async () => {

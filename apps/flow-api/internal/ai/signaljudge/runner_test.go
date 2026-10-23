@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // fakeAgentLookup is the in-memory stand-in for AgentLookup. It
@@ -37,9 +39,12 @@ func (f *fakeSignalLookup) Load(_ context.Context, _ uint32, _ int64) (SignalSna
 type fakeResolver struct {
 	provider providers.Provider
 	err      error
+	// requested is the provider id of the most recent call.
+	requested types.PublicID
 }
 
-func (f *fakeResolver) Default(_ context.Context, _ uint32) (providers.Provider, error) {
+func (f *fakeResolver) ForProvider(_ context.Context, _ uint32, id types.PublicID) (providers.Provider, error) {
+	f.requested = id
 	return f.provider, f.err
 }
 
@@ -198,17 +203,59 @@ func TestExecuteJudgeCostCap(t *testing.T) {
 		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1}},
 		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 1}},
 		Resolver: &fakeResolver{provider: prov},
-		Guard:    &fakeGuard{err: errors.New("budget exceeded")},
+		Guard:    &fakeGuard{err: ai.ErrDailyBudgetExceeded},
+	}
+	result, err := r.ExecuteJudge(context.Background(), 1, 1, 1)
+	if !errors.Is(err, ai.ErrDailyBudgetExceeded) {
+		t.Fatalf("err = %v, want ErrDailyBudgetExceeded", err)
+	}
+	if !result.CostCapHit {
+		t.Fatalf("CostCapHit = false, want true (budget exceeded must set the flag)")
+	}
+	if prov.req.System != "" || prov.req.Prompt != "" {
+		t.Fatalf("provider was called despite cost-guard failure; req=%+v", prov.req)
+	}
+}
+
+// TestExecuteJudgeBudgetReadFailure asserts a failing budget read is returned
+// without setting CostCapHit, so the runner does not pause the agent.
+func TestExecuteJudgeBudgetReadFailure(t *testing.T) {
+	t.Parallel()
+	prov := &recordingProvider{kind: providers.Kind("mock")}
+	r := &Runner{
+		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1}},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 1}},
+		Resolver: &fakeResolver{provider: prov},
+		Guard:    &fakeGuard{err: errors.New("db unavailable")},
 	}
 	result, err := r.ExecuteJudge(context.Background(), 1, 1, 1)
 	if err == nil {
 		t.Fatalf("ExecuteJudge should have returned err")
 	}
-	if !result.CostCapHit {
-		t.Fatalf("CostCapHit = false, want true (cost guard error must set the flag)")
+	if result.CostCapHit {
+		t.Fatalf("CostCapHit = true, want false (budget read failure is not a cap breach)")
 	}
 	if prov.req.System != "" || prov.req.Prompt != "" {
-		t.Fatalf("provider was called despite cost-guard failure; req=%+v", prov.req)
+		t.Fatalf("provider was called despite guard failure; req=%+v", prov.req)
+	}
+}
+
+// TestExecuteJudgeUsesTheProviderOwningTheAgentsModel asserts the judge
+// resolves the provider bound to the agent's model, not the workspace default.
+func TestExecuteJudgeUsesTheProviderOwningTheAgentsModel(t *testing.T) {
+	t.Parallel()
+	owner := types.New()
+	res := &fakeResolver{provider: &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: `{"action":"noop"}`}}}
+	r := &Runner{
+		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1, ProviderPublicID: owner}},
+		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 1}},
+		Resolver: res,
+	}
+	if _, err := r.ExecuteJudge(context.Background(), 1, 1, 1); err != nil {
+		t.Fatalf("ExecuteJudge: %v", err)
+	}
+	if res.requested != owner {
+		t.Fatalf("resolved provider = %v, want %v", res.requested, owner)
 	}
 }
 

@@ -8,6 +8,7 @@
 // Shared API error utilities
 export {
   ApiError,
+  type ApiErrorDetail,
   NetworkError,
   type ProblemJson,
   toApiError,

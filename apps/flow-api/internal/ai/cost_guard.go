@@ -87,3 +87,23 @@ func (g *CostGuard) Check(ctx context.Context, workspaceID uint32) error {
 	}
 	return nil
 }
+
+// BudgetChecker is the contract every AI call site consults before billing a
+// provider. *CostGuard satisfies it.
+type BudgetChecker interface {
+	Check(ctx context.Context, workspaceID uint32) error
+}
+
+// CheckBudget is the single place an AI call site consults its guard. A nil
+// checker disables enforcement. capHit is true only when the daily budget was
+// actually exceeded; any other error (a failing budget read) is returned with
+// capHit false so callers never treat it as a cost-cap breach.
+func CheckBudget(ctx context.Context, g BudgetChecker, workspaceID uint32) (capHit bool, err error) {
+	if g == nil {
+		return false, nil
+	}
+	if err := g.Check(ctx, workspaceID); err != nil {
+		return errors.Is(err, ErrDailyBudgetExceeded), err
+	}
+	return false, nil
+}

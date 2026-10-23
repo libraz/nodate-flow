@@ -76,6 +76,16 @@ export const WsErrors = {
     status: 422,
     message: "Snoozing an intake item requires a deadline",
   },
+  WS_LABEL_ALREADY_ATTACHED: {
+    code: "WS.LABEL.ALREADY_ATTACHED",
+    status: 409,
+    message: "This label is already attached to the task",
+  },
+  WS_LABEL_CIRCULAR_PARENT: {
+    code: "WS.LABEL.CIRCULAR_PARENT",
+    status: 400,
+    message: "Cannot set parent to self or descendant",
+  },
   WS_LABEL_NAME_ALREADY_TAKEN: {
     code: "WS.LABEL.NAME_ALREADY_TAKEN",
     status: 409,
@@ -85,6 +95,11 @@ export const WsErrors = {
     code: "WS.LABEL.NOT_FOUND",
     status: 404,
     message: "Label not found",
+  },
+  WS_LABEL_SCOPE_MISMATCH: {
+    code: "WS.LABEL.SCOPE_MISMATCH",
+    status: 400,
+    message: "Label belongs to a different project",
   },
   WS_LENS_ALREADY_PRIVATE: {
     code: "WS.LENS.ALREADY_PRIVATE",

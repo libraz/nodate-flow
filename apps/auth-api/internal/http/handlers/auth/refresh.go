@@ -8,16 +8,19 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 )
 
-// refreshReuseGrace is the window after a session is rotated/revoked in
-// which presenting the just-superseded refresh token is treated as a
-// benign double-submit (browser retry, duplicated request) rather than a
-// theft signal. Inside the window the stale token is simply rejected;
-// outside it, the presentation is treated as refresh-token reuse and the
-// entire session family is torn down. Kept short so a real stolen token
-// replayed minutes later still trips the detector.
+// refreshReuseGrace is the window after a session is rotated in which
+// presenting the just-superseded refresh token is treated as a benign
+// concurrent refresh (two tabs, a duplicated request) rather than a theft
+// signal. Inside the window the loser of the race is answered with an
+// access token for the same session and no new cookie, since the winner's
+// response carries the current one; outside it, the presentation is
+// treated as refresh-token reuse and the entire session family is torn
+// down. Kept short so a stolen token replayed later still trips the
+// detector.
 const refreshReuseGrace = 10 * time.Second
 
 // sessionIdleTimeout is how long a session is allowed to sit unused
@@ -43,15 +46,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		sess, err := deps.Sessions.FindByRefreshHash(ctx, hash)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
-				// The hash matched no active session. Before rejecting,
-				// check whether some session rotated this token away:
-				// that means a superseded refresh token was replayed
-				// (token theft or a leaked cookie), so the whole session
-				// family is torn down and the event is audited. A
-				// rotation that just happened is treated as a benign
-				// double-submit and only rejected.
-				detectRefreshReuse(ctx, deps, hash)
-				return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
+				return refreshSuperseded(ctx, deps, hash)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
@@ -69,17 +64,24 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 		if time.Since(lastActive) > sessionIdleTimeout {
 			return nil, httpErr(apierrors.AuthTokenRefreshExpired)
 		}
+		// A suspended account is refused before its token is rotated, so
+		// the refusal does not also strand the client's cookie.
+		pub, qerr := deps.Queries.FindUserPublicIdById(ctx, sess.UserID)
+		if qerr != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(qerr, apierrors.AuthSessionRevoked, apierrors.InternalUnexpected))
+		}
 		newPlain, newHash, err := auth.GenerateRefresh()
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		newExp := time.Now().Add(refreshCookieTTL)
 		if err := deps.Sessions.RotateRefreshHash(ctx, hash, newHash, newExp); err != nil {
+			if errors.Is(err, sessionstore.ErrNotFound) {
+				// A concurrent refresh rotated the token between the
+				// lookup above and the row lock.
+				return refreshSuperseded(ctx, deps, hash)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		pub, qerr := deps.Queries.FindUserPublicIdById(ctx, sess.UserID)
-		if qerr != nil {
-			return nil, httpErr(apierrors.AuthSessionRevoked)
 		}
 		access, exp, err := deps.JWT.Sign(pub, sess.PublicID)
 		if err != nil {
@@ -96,14 +98,42 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 	}
 }
 
+// refreshSuperseded answers a refresh whose token matched no active
+// session. A token the session rotated away within [refreshReuseGrace]
+// lost a concurrent refresh: it is answered with an access token for that
+// session and no Set-Cookie, so the winner's rotated cookie stays the one
+// the client holds. Anything else is AUTH.TOKEN.REFRESH_INVALID, after
+// [detectRefreshReuse] has had its chance to tear the family down.
+func refreshSuperseded(ctx context.Context, deps Deps, hash string) (*RefreshOutput, error) {
+	winner := detectRefreshReuse(ctx, deps, hash)
+	if winner == nil || winner.RevokedAt != nil || !winner.ExpiresAt.After(time.Now()) {
+		return nil, httpErr(apierrors.AuthTokenRefreshInvalid)
+	}
+	pub, err := deps.Queries.FindUserPublicIdById(ctx, winner.UserID)
+	if err != nil {
+		return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthSessionRevoked, apierrors.InternalUnexpected))
+	}
+	access, exp, err := deps.JWT.Sign(pub, winner.PublicID)
+	if err != nil {
+		return nil, httpErr(apierrors.InternalUnexpected)
+	}
+	return &RefreshOutput{
+		Body: AuthTokens{
+			AccessToken: access,
+			ExpiresAt:   exp.Unix(),
+			UserID:      pub.String(),
+		},
+	}, nil
+}
+
 // detectRefreshReuse inspects a refresh hash that matched no active
-// session. When the hash is one a session rotated away, a superseded
-// token is being replayed: every active session for that user is
-// revoked (session-family teardown) and an
-// "auth.refresh_reuse_detected" audit entry is written. Failures are
-// swallowed — this runs on a path that already returns
-// AUTH.TOKEN.REFRESH_INVALID, and a detection hiccup must never change
-// the user-visible outcome.
+// session. When the hash is one a session rotated away more than
+// [refreshReuseGrace] ago, a superseded token is being replayed: every
+// active session for that user is revoked (session-family teardown) and
+// an "auth.refresh_reuse_detected" audit entry is written. It returns the
+// rotating session only when the rotation is inside the grace window, and
+// nil otherwise. Store failures are swallowed — the caller then rejects
+// the token, and a detection hiccup must never change that outcome.
 //
 // The signal is the rotation record, not the revocation state, and the
 // difference is the whole point. Asking whether the hash matches some
@@ -115,27 +145,25 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 // filed a high-severity finding about it. Meanwhile the case the check
 // was written for could never match, because rotation overwrites the
 // hash in place and leaves the superseded token resolving to nothing.
-func detectRefreshReuse(ctx context.Context, deps Deps, hash string) {
+func detectRefreshReuse(ctx context.Context, deps Deps, hash string) *sessionstore.Session {
 	if deps.Sessions == nil {
-		return
+		return nil
 	}
 	superseded, err := deps.Sessions.FindSupersededBy(ctx, hash)
 	if err != nil || superseded == nil {
 		// The hash was never issued, or belongs to a session that was
-		// signed out rather than rotated. Either way the caller has
-		// already rejected it, and neither is evidence of theft.
-		return
+		// signed out rather than rotated. Neither is evidence of theft.
+		return nil
 	}
-	// Benign double-submit grace: a client that fires two refreshes at
+	// Benign concurrent refresh: a client that fires two refreshes at
 	// once presents the same token twice, and the second arrives just
-	// after the first rotated it away. Reject it — the caller does —
-	// but do not tear the family down over a duplicated request.
+	// after the first rotated it away.
 	rotatedAt := superseded.CreatedAt
 	if superseded.LastUsedAt != nil {
 		rotatedAt = *superseded.LastUsedAt
 	}
 	if time.Since(rotatedAt) <= refreshReuseGrace {
-		return
+		return superseded
 	}
 
 	if rerr := deps.Sessions.RevokeAllForUser(ctx, superseded.UserID); rerr != nil {
@@ -160,4 +188,5 @@ func detectRefreshReuse(ctx context.Context, deps Deps, hash string) {
 			},
 		})
 	}
+	return nil
 }

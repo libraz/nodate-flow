@@ -29,6 +29,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sessionguard"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -260,10 +261,9 @@ func wrapInvariant(name, detail string) error {
 // Deferring the returned function inside an entry point satisfies that,
 // because the entry point always returns first.
 func armProjectionGuard(ctx context.Context, tx TX) (func(), error) {
-	if _, err := tx.ExecContext(ctx, "SET @nf_item_projection_engine = 1"); err != nil {
+	disarm, err := sessionguard.Arm(ctx, tx, sessionguard.ItemProjectionEngine)
+	if err != nil {
 		return nil, fmt.Errorf("itemkit: arm projection guard: %w", err)
 	}
-	return func() {
-		_, _ = tx.ExecContext(ctx, "SET @nf_item_projection_engine = NULL")
-	}, nil
+	return disarm, nil
 }

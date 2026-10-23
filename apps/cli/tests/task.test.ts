@@ -30,8 +30,12 @@ import {
  * call arguments.
  */
 function createSdkMock(
-  response: { data?: unknown; error?: unknown } = { data: { ok: true } },
+  result: { data?: unknown; error?: unknown } = { data: { ok: true } },
 ): SdkClientLike {
+  const response =
+    result.error === undefined
+      ? { ...result, response: new Response(null, { status: 200 }) }
+      : result;
   return {
     GET: vi.fn().mockResolvedValue(response),
     POST: vi.fn().mockResolvedValue(response),
@@ -228,9 +232,11 @@ describe('executeTaskListPaginated', () => {
       GET: vi
         .fn()
         .mockResolvedValueOnce({
+          response: new Response(null, { status: 200 }),
           data: { tasks: [{ id: 'a' }], total: 3, nextCursor: 'cursor-2' },
         })
         .mockResolvedValueOnce({
+          response: new Response(null, { status: 200 }),
           data: { tasks: [{ id: 'b' }, { id: 'c' }], nextCursor: null },
         }),
       POST: vi.fn(),
@@ -251,6 +257,7 @@ describe('executeTaskListPaginated', () => {
   it('stops once the requested limit is reached', async () => {
     const sdk: SdkClientLike = {
       GET: vi.fn().mockResolvedValue({
+        response: new Response(null, { status: 200 }),
         data: { tasks: [{ id: 'a' }, { id: 'b' }], total: 5, nextCursor: 'cursor-2' },
       }),
       POST: vi.fn(),
@@ -267,8 +274,14 @@ describe('executeTaskListPaginated', () => {
     const sdk: SdkClientLike = {
       GET: vi
         .fn()
-        .mockResolvedValueOnce({ data: { tasks: [{ id: 'a' }], total: 2 } })
-        .mockResolvedValueOnce({ data: { tasks: [{ id: 'b' }], total: 2 } }),
+        .mockResolvedValueOnce({
+          response: new Response(null, { status: 200 }),
+          data: { tasks: [{ id: 'a' }], total: 2 },
+        })
+        .mockResolvedValueOnce({
+          response: new Response(null, { status: 200 }),
+          data: { tasks: [{ id: 'b' }], total: 2 },
+        }),
       POST: vi.fn(),
       PATCH: vi.fn(),
     };
@@ -304,6 +317,7 @@ describe('executeTaskListPaginated', () => {
    */
   it('splits a limit above the page maximum across several requests', async () => {
     const page = (offset: number) => ({
+      response: new Response(null, { status: 200 }),
       data: {
         tasks: Array.from({ length: 200 }, (_, i) => ({ id: `task-${offset + i}` })),
         total: 600,

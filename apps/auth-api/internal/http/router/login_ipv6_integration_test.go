@@ -182,13 +182,16 @@ func TestMagicLinkRequestFromIPv6Client(t *testing.T) {
 	require.Equalf(t, http.StatusOK, rec.Code,
 		"magic-link request from an IPv6 client must succeed; body=%s", rec.Body.String())
 
+	// The link is issued after the response, so the row appears shortly
+	// after it; one that never appears means the write failed.
 	var stored sql.NullString
-	err := db.QueryRow(
-		`SELECT t.ip_address FROM magic_link_tokens t
-		 JOIN users u ON u.id = t.user_id
-		 WHERE u.email = ?
-		 ORDER BY t.id DESC LIMIT 1`, email).Scan(&stored)
-	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		return db.QueryRow(
+			`SELECT t.ip_address FROM magic_link_tokens t
+			 JOIN users u ON u.id = t.user_id
+			 WHERE u.email = ?
+			 ORDER BY t.id DESC LIMIT 1`, email).Scan(&stored) == nil
+	}, 10*time.Second, 50*time.Millisecond, "magic link token from an IPv6 client must be stored")
 	require.True(t, stored.Valid, "magic_link_tokens.ip_address must be populated")
 	require.Len(t, stored.String, 16)
 	require.Equal(t, ipv6ClientAddr, dbtype.IPStringFromNullString(stored))

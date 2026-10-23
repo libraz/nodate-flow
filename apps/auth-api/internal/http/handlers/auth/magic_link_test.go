@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,3 +151,48 @@ type staticResult struct {
 
 func (s staticResult) LastInsertId() (int64, error) { return 0, nil }
 func (s staticResult) RowsAffected() (int64, error) { return s.rowsAffected, nil }
+
+// stalledLookupDBTX blocks every row lookup until the test process ends,
+// standing for an account lookup of arbitrary latency.
+type stalledLookupDBTX struct {
+	queryCaptureDBTX
+	lookupStarted chan struct{}
+	once          sync.Once
+}
+
+func (f *stalledLookupDBTX) QueryRowContext(_ context.Context, _ string, _ ...interface{}) *sql.Row {
+	f.once.Do(func() { close(f.lookupStarted) })
+	select {}
+}
+
+// TestMagicLinkRequest_ResponseDoesNotWaitOnAccountLookup pins the
+// enumeration fix structurally: whatever the account lookup and the work
+// behind it cost, the response is already sent, so its status, body and
+// latency cannot depend on whether the address has an account.
+func TestMagicLinkRequest_ResponseDoesNotWaitOnAccountLookup(t *testing.T) {
+	t.Parallel()
+	db := &stalledLookupDBTX{lookupStarted: make(chan struct{})}
+	deps := Deps{Queries: generated.New(db)}
+
+	in := &MagicLinkRequestInput{}
+	in.Body.Email = "someone@example.test"
+	done := make(chan *MagicLinkRequestOutput, 1)
+	go func() {
+		out, err := MagicLinkRequest(deps)(context.Background(), in)
+		assert.NoError(t, err)
+		done <- out
+	}()
+
+	select {
+	case out := <-done:
+		require.NotNil(t, out)
+		assert.True(t, out.Body.Ok)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the response waited on the account lookup")
+	}
+	select {
+	case <-db.lookupStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the lookup never ran in the background")
+	}
+}

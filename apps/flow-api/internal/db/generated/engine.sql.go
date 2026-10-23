@@ -88,6 +88,46 @@ func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, arg ListDep
 	return items, nil
 }
 
+const listDependentTaskIDsForEngine = `-- name: ListDependentTaskIDsForEngine :many
+SELECT DISTINCT td.from_task_id
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+WHERE td.to_task_id = ?
+  AND td.workspace_id = ?
+  AND td.enabled = TRUE
+`
+
+type ListDependentTaskIDsForEngineParams struct {
+	ToTaskID    uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Tasks holding an enabled outgoing edge to the given task. Their
+// dependency facts (ListDependencyStatesForEngine) read the given task's
+// derived_state, so a change to it re-opens their constraints.
+func (q *Queries) ListDependentTaskIDsForEngine(ctx context.Context, arg ListDependentTaskIDsForEngineParams) ([]uint32, error) {
+	rows, err := q.db.QueryContext(ctx, listDependentTaskIDsForEngine, arg.ToTaskID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var from_task_id uint32
+		if err := rows.Scan(&from_task_id); err != nil {
+			return nil, err
+		}
+		items = append(items, from_task_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaskActorRolesForEngine = `-- name: ListTaskActorRolesForEngine :many
 SELECT DISTINCT role
 FROM task_actors

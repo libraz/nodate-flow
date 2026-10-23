@@ -129,6 +129,20 @@ func TestValidateEnumsPorts(t *testing.T) {
 	}
 }
 
+// TestValidateEnumsRefusesRedisSessionStore pins the startup refusal: the
+// access-token validator on auth-api and flow-api reads the MySQL sessions
+// table, so a session created in Redis would make every token fail.
+func TestValidateEnumsRefusesRedisSessionStore(t *testing.T) {
+	t.Parallel()
+	err := validateEnums(&Config{Port: "8082", MetricsPort: "9092", SessionStore: "redis"})
+	if err == nil {
+		t.Fatal("validateEnums() accepted NF_AUTH_SESSION_STORE=redis, want a startup refusal")
+	}
+	if !strings.Contains(err.Error(), "NF_AUTH_SESSION_STORE") {
+		t.Fatalf("validateEnums() error = %q, does not name NF_AUTH_SESSION_STORE", err)
+	}
+}
+
 func TestValidateDevModeSkipsGuards(t *testing.T) {
 	t.Parallel()
 	// In development the same insecure settings are tolerated.

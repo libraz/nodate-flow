@@ -9,15 +9,22 @@ import {
   type SdkClientLike,
 } from '../src/resource-builders.js';
 
-function createSdkMock(response: { data?: unknown; error?: unknown }): SdkClientLike {
+function createSdkMock(result: { data?: unknown; error?: unknown }): SdkClientLike {
   return {
-    GET: vi.fn().mockResolvedValue(response),
+    GET: vi
+      .fn()
+      .mockResolvedValue(
+        result.error === undefined
+          ? { ...result, response: new Response(null, { status: 200 }) }
+          : result,
+      ),
   };
 }
 
 /** Builds a page of `count` rows keyed by `field`, starting at `offset`. */
 function page(field: 'workspaces' | 'projects', offset: number, count: number, total: number) {
   return {
+    response: new Response(null, { status: 200 }),
     data: {
       [field]: Array.from({ length: count }, (_, i) => ({ id: `${field}-${offset + i}` })),
       total,

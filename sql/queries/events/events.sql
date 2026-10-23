@@ -77,35 +77,6 @@ INSERT INTO events (
   occurred_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
--- name: ListEventsForTask :many
--- List a task's timeline via v_task_timeline. Projects
--- `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
--- events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
--- traceability link), `reverses_event_public_id` (ADR 0008 D4,
--- target event the row compensates) and `was_reversed` (TRUE when some
--- other enabled event reverses this one) so the timeline UI can render
--- the causal chain plus the reversal state of each entry. The view
--- backs `was_reversed` with a correlated EXISTS on idx_events_reverses
--- so per-row cost stays bounded.
-SELECT
-  v.public_id,
-  v.task_public_id,
-  v.actor_user_public_id,
-  v.actor_display_name,
-  v.actor_system_source,
-  v.triggered_by_signal_public_id,
-  v.reverses_event_public_id,
-  v.was_reversed,
-  v.type,
-  v.payload_json,
-  v.occurred_at,
-  COUNT(*) OVER() AS total
-FROM v_task_timeline v
-WHERE v.workspace_id = ?
-  AND v.task_public_id = ?
-ORDER BY v.occurred_at DESC, v.public_id DESC
-LIMIT ? OFFSET ?;
-
 -- name: ListTransitionEventsForReplay :many
 -- Ordered list of task.transition.* events for a single task,
 -- ascending by occurred_at + id. Used by the replay tool to derive
@@ -116,33 +87,6 @@ WHERE workspace_id = ?
   AND task_id = ?
   AND type LIKE 'task.transition.%'
 ORDER BY occurred_at ASC, id ASC;
-
--- name: ListEventsForProject :many
--- List a project's timeline via v_task_timeline. Filters events whose
--- owning task lives in the given project (events with no task_id are
--- excluded by virtue of project_public_id being NULL). Projects
--- `actor_system_source`, `triggered_by_signal_public_id`,
--- `reverses_event_public_id` and `was_reversed` for the same reasons as
--- ListEventsForTask.
-SELECT
-  v.public_id,
-  v.task_public_id,
-  v.project_public_id,
-  v.actor_user_public_id,
-  v.actor_display_name,
-  v.actor_system_source,
-  v.triggered_by_signal_public_id,
-  v.reverses_event_public_id,
-  v.was_reversed,
-  v.type,
-  v.payload_json,
-  v.occurred_at,
-  COUNT(*) OVER() AS total
-FROM v_task_timeline v
-WHERE v.workspace_id = ?
-  AND v.project_public_id = ?
-ORDER BY v.occurred_at DESC, v.event_id DESC
-LIMIT ? OFFSET ?;
 
 -- name: ListPendingAiSuggestions :many
 -- List pending AI suggestions for a workspace. A suggestion is "pending"
@@ -178,29 +122,6 @@ FROM events
 WHERE workspace_id = ?
   AND occurred_at >= ?
   AND type IN ('ai.suggestion.proposed', 'ai.suggestion.applied', 'ai.suggestion.dismissed');
-
--- name: ListEventsForWorkspace :many
--- List the workspace-wide event timeline via v_task_timeline. Projects
--- `actor_system_source`, `triggered_by_signal_public_id`,
--- `reverses_event_public_id` and `was_reversed` for the same reasons as
--- ListEventsForTask.
-SELECT
-  v.public_id,
-  v.task_public_id,
-  v.actor_user_public_id,
-  v.actor_display_name,
-  v.actor_system_source,
-  v.triggered_by_signal_public_id,
-  v.reverses_event_public_id,
-  v.was_reversed,
-  v.type,
-  v.payload_json,
-  v.occurred_at,
-  COUNT(*) OVER() AS total
-FROM v_task_timeline v
-WHERE v.workspace_id = ?
-ORDER BY v.occurred_at DESC, v.public_id DESC
-LIMIT ? OFFSET ?;
 
 -- name: HasRecentEventsForWorkspace :one
 -- Check if any events have occurred in the workspace since the given timestamp.

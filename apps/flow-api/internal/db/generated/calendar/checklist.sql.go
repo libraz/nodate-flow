@@ -13,6 +13,43 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const copyCalendarChecklistItem = `-- name: CopyCalendarChecklistItem :exec
+INSERT INTO calendar_event_checklist_items (
+  public_id,
+  workspace_id,
+  event_id,
+  created_by_user_id,
+  title,
+  done,
+  sort_weight
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+type CopyCalendarChecklistItemParams struct {
+	PublicID        types.PublicID `json:"publicId"`
+	WorkspaceID     uint32         `json:"-"`
+	EventID         uint32         `json:"-"`
+	CreatedByUserID uint32         `json:"-"`
+	Title           string         `json:"title"`
+	Done            bool           `json:"done"`
+	SortWeight      int32          `json:"sortWeight"`
+}
+
+// Carry one checklist item onto the continuing master of a split series,
+// done state included: the list describes the series, not an occurrence.
+func (q *Queries) CopyCalendarChecklistItem(ctx context.Context, arg CopyCalendarChecklistItemParams) error {
+	_, err := q.db.ExecContext(ctx, copyCalendarChecklistItem,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.EventID,
+		arg.CreatedByUserID,
+		arg.Title,
+		arg.Done,
+		arg.SortWeight,
+	)
+	return err
+}
+
 const createCalendarChecklistItem = `-- name: CreateCalendarChecklistItem :execlastid
 INSERT INTO calendar_event_checklist_items (
   public_id,

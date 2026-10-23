@@ -4,13 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -159,9 +157,6 @@ func requireOccurrenceScope(
 	return nil
 }
 
-// occurrenceFields is the whole occurrence an override row carries.
-type occurrenceFields = calendaroccurrence.Fields
-
 // occurrencePatch reads the members a patch request sends into the shape
 // the shared merge takes.
 //
@@ -200,30 +195,18 @@ func occurrencePatch(input *PatchEventInput, cleared clearableEventFields) calen
 	return p
 }
 
-// mergeOccurrenceFields folds the caller's sent members over the values
-// the occurrence falls back to, and renders a refusal from the shared
-// rules as this transport's own.
-func mergeOccurrenceFields(
-	base occurrenceFields,
-	input *PatchEventInput,
-	cleared clearableEventFields,
-) (occurrenceFields, error) {
-	fields, err := occurrencePatch(input, cleared).Apply(base)
-	if err != nil {
-		return occurrenceFields{}, handlerutil.HTTPErrFromAPIError(err)
+// seriesQueries binds both query handles to one transaction, in the shape
+// the shared series transforms take.
+func seriesQueries(deps Deps, tx *dbretry.Tx) calendaroccurrence.Queries {
+	return calendaroccurrence.Queries{
+		Calendar: deps.CalendarQueries.WithTx(tx.RawTx()),
+		Core:     deps.Queries.WithTx(tx.RawTx()),
 	}
-	return fields, nil
 }
 
 // patchEventOccurrence replaces a single occurrence of a recurring series
-// with an override row, and answers with that row.
-//
-// The override is looked up before it is written because
-// uniq_calendar_events_recurrence_override counts soft-deleted rows: an
-// occurrence that was overridden, reverted to the series and then edited
-// again already has a row, and inserting a second one collides.
-// UpdateCalendarEventOverride sets enabled back to TRUE, which is what
-// revives it.
+// with an override row through [calendaroccurrence.WriteOverride], and
+// answers with that row.
 //
 // The master cannot be task-linked here — the projection guard forbids a
 // rule on a projected row, and a non-series scope requires a rule — so
@@ -241,116 +224,32 @@ func patchEventOccurrence(
 	if err != nil {
 		return calendar.FindCalendarEventByPublicIdRow{}, err
 	}
-
-	parentID := handlerutil.NullInt32From(master.ID)
-	originalStartNT := sql.NullTime{Time: originalStart, Valid: true}
+	patch := occurrencePatch(input, cleared)
 
 	var written calendar.FindCalendarEventByPublicIdRow
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "calendars.PatchEventOccurrence", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
-		cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
-
-		existing, findErr := cqtx.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
-			WorkspaceID:             wsID,
-			RecurrenceParentID:      parentID,
-			RecurrenceOriginalStart: originalStartNT,
+		q := seriesQueries(deps, tx)
+		row, refusal, err := calendaroccurrence.WriteOverride(ctx, q, calendaroccurrence.Override{
+			WorkspaceID:   wsID,
+			ActorID:       actorID,
+			CalendarID:    cal.ID,
+			Master:        master,
+			OriginalStart: originalStart,
+			Patch:         patch,
 		})
-		overridden := findErr == nil
-		if !overridden && !errors.Is(findErr, sql.ErrNoRows) {
-			answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
-			return findErr
+		if refusal != nil {
+			answered = handlerutil.HTTPErrFromAPIError(refusal)
+			return refusal
 		}
-
-		// What the caller's omissions fall back to is decided by the same
-		// lookup that decides whether the write is an update or an insert,
-		// so it is decided here rather than before the transaction: an
-		// override written between the two would otherwise be updated from
-		// the series' values.
-		base := calendaroccurrence.MasterBase(master, originalStart)
-		if overridden {
-			base = calendaroccurrence.OverrideBase(existing)
+		if err != nil {
+			return err
 		}
-		fields, mergeErr := mergeOccurrenceFields(base, input, cleared)
-		if mergeErr != nil {
-			answered = mergeErr
-			return mergeErr
-		}
-		// The zone written is whichever survived the merge — the caller's,
-		// the override's or the master's. Checking the merged value is what
-		// keeps a column no renderer can resolve out of the row, whichever
-		// side it came from.
-		if tzErr := requireValidTimezone("timezone", fields.Timezone); tzErr != nil {
-			answered = tzErr
-			return tzErr
-		}
-
-		if overridden {
-			if _, err := cqtx.UpdateCalendarEventOverride(ctx, calendar.UpdateCalendarEventOverrideParams{
-				Kind:               fields.Kind,
-				Visibility:         fields.Visibility,
-				ShowAs:             fields.ShowAs,
-				Flexibility:        fields.Flexibility,
-				Title:              fields.Title,
-				AllDay:             fields.AllDay,
-				StartAt:            fields.StartAt,
-				EndAt:              fields.EndAt,
-				Timezone:           fields.Timezone,
-				Location:           fields.Location,
-				Memo:               fields.Memo,
-				Url:                fields.URL,
-				BlockLabel:         fields.BlockLabel,
-				NotificationOffset: fields.NotificationOffset,
-				PublicID:           existing.PublicID,
-				CalendarID:         existing.CalendarID,
-				WorkspaceID:        wsID,
-			}); err != nil {
-				return err
-			}
-		} else {
-			if _, err := cqtx.CreateCalendarEventOverride(ctx, calendar.CreateCalendarEventOverrideParams{
-				PublicID:                types.New(),
-				WorkspaceID:             wsID,
-				CalendarID:              cal.ID,
-				RecurrenceParentID:      parentID,
-				RecurrenceOriginalStart: originalStartNT,
-				Kind:                    fields.Kind,
-				Visibility:              fields.Visibility,
-				ShowAs:                  fields.ShowAs,
-				Flexibility:             fields.Flexibility,
-				Title:                   fields.Title,
-				AllDay:                  fields.AllDay,
-				StartAt:                 fields.StartAt,
-				EndAt:                   fields.EndAt,
-				Timezone:                fields.Timezone,
-				Location:                fields.Location,
-				Memo:                    fields.Memo,
-				Url:                     fields.URL,
-				OwnerUserID:             master.OwnerUserID,
-				CreatedByUserID:         actorID,
-				BlockLabel:              fields.BlockLabel,
-				NotificationOffset:      fields.NotificationOffset,
-			}); err != nil {
-				return err
-			}
-			// Re-read through the same lookup the revive path uses, so
-			// both arrive at the response by one route.
-			var reErr error
-			existing, reErr = cqtx.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
-				WorkspaceID:             wsID,
-				RecurrenceParentID:      parentID,
-				RecurrenceOriginalStart: originalStartNT,
-			})
-			if reErr != nil {
-				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
-				return reErr
-			}
-		}
-
 		var readErr error
-		written, readErr = cqtx.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
-			PublicID:    existing.PublicID,
-			CalendarID:  existing.CalendarID,
+		written, readErr = q.Calendar.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+			PublicID:    row.PublicID,
+			CalendarID:  row.CalendarID,
 			WorkspaceID: wsID,
 		})
 		if readErr != nil {
@@ -367,17 +266,13 @@ func patchEventOccurrence(
 	return written, nil
 }
 
-// patchEventFollowing splits a series at an occurrence: the master stops
-// before the split and a new master carries the edit and the remainder of
-// the rule. It answers with the new master.
+// patchEventFollowing splits a series at an occurrence through
+// [calendaroccurrence.SplitSeries]: the master stops before the split and
+// a new master carries the edit and the remainder of the series. It
+// answers with the new master.
 //
-// Where the master stops, and why that bound is recurrence_end rather
-// than the rule's own until, is [seriesTruncationPoint] — the delete-side
-// split truncates a series the same way and reads the same answer.
-//
-// Overrides at or after the split describe occurrences of the new series
-// and are handed to it, soft-deleted ones included — left behind they
-// would name an occurrence the truncated master no longer produces.
+// What this route adds is the part only it can send: a rule, recurrence
+// end or exception list for the continuing series, as a value or a clear.
 func patchEventFollowing(
 	ctx context.Context,
 	deps Deps,
@@ -391,105 +286,48 @@ func patchEventFollowing(
 	if err != nil {
 		return calendar.FindCalendarEventByPublicIdRow{}, err
 	}
-	// The continuing series starts from the master alone: it is a new
-	// master carrying the remainder of the rule, not an edit of an
-	// occurrence, so no override row describes it.
-	fields, err := mergeOccurrenceFields(calendaroccurrence.MasterBase(master, splitStart), input, cleared)
-	if err != nil {
-		return calendar.FindCalendarEventByPublicIdRow{}, err
+	series := calendaroccurrence.SeriesPatch{
+		ClearRule:       cleared.recurrenceRule == 1,
+		ClearEnd:        cleared.recurrenceEnd == 1,
+		ClearExceptions: cleared.recurrenceExceptions == 1,
 	}
-	// The continuing series carries whichever zone survived the merge, so
-	// it is checked here rather than only where the caller's value entered.
-	if err := requireValidTimezone("timezone", fields.Timezone); err != nil {
-		return calendar.FindCalendarEventByPublicIdRow{}, err
+	if input.Body.RecurrenceRule != nil {
+		series.Rule = json.RawMessage(*input.Body.RecurrenceRule)
 	}
-
-	truncateAt := calendaroccurrence.TruncationPoint(master, splitStart)
-
-	newPublicID := types.New()
-	newMaster := calendar.CreateCalendarEventParams{
-		PublicID:           newPublicID,
-		WorkspaceID:        wsID,
-		CalendarID:         cal.ID,
-		Kind:               fields.Kind,
-		Visibility:         fields.Visibility,
-		ShowAs:             fields.ShowAs,
-		Flexibility:        fields.Flexibility,
-		Title:              fields.Title,
-		AllDay:             fields.AllDay,
-		StartAt:            fields.StartAt,
-		EndAt:              fields.EndAt,
-		Timezone:           fields.Timezone,
-		Location:           fields.Location,
-		Memo:               fields.Memo,
-		Url:                fields.URL,
-		OwnerUserID:        master.OwnerUserID,
-		CreatedByUserID:    actorID,
-		BlockLabel:         fields.BlockLabel,
-		NotificationOffset: fields.NotificationOffset,
+	if input.Body.RecurrenceEnd != nil {
+		end := handlerutil.UnixToTime(*input.Body.RecurrenceEnd)
+		series.End = &end
 	}
-	// Clearing the rule clears the two columns that only describe a
-	// series, the same way PatchCalendarEvent does: leaving them on a row
-	// that no longer repeats keeps state nothing reads.
-	if cleared.recurrenceRule != 1 {
-		newMaster.RecurrenceRule = master.RecurrenceRule
-		if input.Body.RecurrenceRule != nil {
-			newMaster.RecurrenceRule = json.RawMessage(*input.Body.RecurrenceRule)
-		}
-		if cleared.recurrenceEnd != 1 {
-			newMaster.RecurrenceEnd = master.RecurrenceEnd
-			if input.Body.RecurrenceEnd != nil {
-				newMaster.RecurrenceEnd = sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.RecurrenceEnd), Valid: true}
-			}
-		}
-		if cleared.recurrenceExceptions != 1 {
-			// The master's exceptions carry over whole. An entry naming an
-			// occurrence before the split simply never matches what the
-			// new series produces, and deciding which entries to drop
-			// would mean expanding the rule to find out.
-			newMaster.RecurrenceExceptions = master.RecurrenceExceptions
-			if input.Body.RecurrenceExceptions != nil {
-				newMaster.RecurrenceExceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
-			}
-		}
+	if input.Body.RecurrenceExceptions != nil {
+		series.Exceptions = json.RawMessage(*input.Body.RecurrenceExceptions)
+	}
+	split := calendaroccurrence.Split{
+		WorkspaceID: wsID,
+		ActorID:     actorID,
+		CalendarID:  cal.ID,
+		Master:      master,
+		SplitStart:  splitStart,
+		Patch:       occurrencePatch(input, cleared),
+		Series:      series,
 	}
 
 	var written calendar.FindCalendarEventByPublicIdRow
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "calendars.PatchEventFollowing", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
-		cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
-
-		if _, err := cqtx.PatchCalendarEvent(ctx, calendar.PatchCalendarEventParams{
-			RecurrenceEnd: sql.NullTime{Time: truncateAt, Valid: true},
-			PublicID:      master.PublicID,
-			CalendarID:    cal.ID,
-			WorkspaceID:   wsID,
-		}); err != nil {
-			return err
+		q := seriesQueries(deps, tx)
+		row, refusal, err := calendaroccurrence.SplitSeries(ctx, q, split)
+		if refusal != nil {
+			answered = handlerutil.HTTPErrFromAPIError(refusal)
+			return refusal
 		}
-
-		newID, err := cqtx.CreateCalendarEvent(ctx, newMaster)
 		if err != nil {
 			return err
 		}
-
-		if _, err := cqtx.ReparentCalendarEventOverridesFromStart(ctx, calendar.ReparentCalendarEventOverridesFromStartParams{
-			// LAST_INSERT_ID answers as int64; the column behind the
-			// parameter is INT UNSIGNED and sqlc emits sql.NullInt32 for
-			// it, the same narrowing every internal id here goes through.
-			NewParentID: sql.NullInt32{Int32: int32(newID), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic workspace size
-			WorkspaceID: wsID,
-			OldParentID: handlerutil.NullInt32From(master.ID),
-			SplitStart:  sql.NullTime{Time: splitStart, Valid: true},
-		}); err != nil {
-			return err
-		}
-
 		var readErr error
-		written, readErr = cqtx.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
-			PublicID:    newPublicID,
-			CalendarID:  cal.ID,
+		written, readErr = q.Calendar.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+			PublicID:    row.PublicID,
+			CalendarID:  row.CalendarID,
 			WorkspaceID: wsID,
 		})
 		if readErr != nil {
@@ -536,4 +374,23 @@ func recordOccurrencePatch(
 		Payload:      payload,
 		CallSite:     "calendars.PatchEvent",
 	})
+	// A split also brings a series into existence, and a subscriber that
+	// learns only of the truncation never hears of the continuing master.
+	if scope == scopeThisAndFollowing {
+		recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+			EventType:    eventbus.CalEventCreated,
+			AuditAction:  "calendar.event.create",
+			ResourceType: "calendar.event",
+			ResourceID:   written.PublicID.String(),
+			Payload: map[string]any{
+				"eventId":      written.PublicID.String(),
+				"calendarId":   input.CalID,
+				"title":        written.Title,
+				"kind":         string(written.Kind),
+				"splitFromId":  input.EvtID,
+				"splitStartAt": *input.Body.OccurrenceStart,
+			},
+			CallSite: "calendars.PatchEvent",
+		})
+	}
 }

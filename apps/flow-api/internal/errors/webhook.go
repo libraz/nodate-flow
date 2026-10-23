@@ -14,6 +14,4 @@ var (
 	WebhookSubscriptionNotFound = &Spec{Code: "WEBHOOK.SUBSCRIPTION.NOT_FOUND", Status: 404, Message: "Webhook subscription not found", Description: "Returned when a webhook subscription with the given public_id does not exist or the actor does not have access to it.", UserAction: "Verify the subscription ID, or refresh the list to see current webhook subscriptions."}
 	// WEBHOOK.SUBSCRIPTION.URL_INVALID — Webhook URL is not an allowed destination
 	WebhookSubscriptionUrlInvalid = &Spec{Code: "WEBHOOK.SUBSCRIPTION.URL_INVALID", Status: 422, Message: "Webhook URL is not an allowed destination", Description: "Returned when the webhook URL is not a valid https URL, embeds credentials, or its host resolves to a private, loopback, link-local, or otherwise non-public address.", UserAction: "Use a public https URL without embedded credentials as the webhook destination."}
-	// WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE — Webhook URL is not reachable
-	WebhookSubscriptionUrlUnreachable = &Spec{Code: "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE", Status: 400, Message: "Webhook URL is not reachable", Description: "Returned when a test delivery to the configured webhook URL fails because the endpoint cannot be reached or does not respond with a success status.", UserAction: "Check the webhook URL is correct, publicly accessible, and returns a 2xx status."}
 )

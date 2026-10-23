@@ -11,7 +11,7 @@ resources:
         message: "An unexpected internal error occurred"
         message_ja: "予期しない内部エラーが発生しました"
         message_zh: "发生意外的内部错误"
-        description: "Final catch-all for unhandled panics or bugs. Should never be thrown explicitly from a handler; always paired with a request_id in the structured log for triage."
+        description: "Generic code for an unexpected server-side failure: an unhandled panic, or a store call that failed for a reason the handler has no more specific code for. Always paired with a request_id in the structured log for triage."
         userAction: "Retry; if the problem persists, contact your administrator with the request ID."
 
   db:

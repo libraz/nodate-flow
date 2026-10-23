@@ -24,9 +24,6 @@ type Deps struct {
 // httpErr delegates to handlerutil.HTTPErr.
 var httpErr = handlerutil.HTTPErr
 
-// totalAsInt64 delegates to handlerutil.TotalAsInt64.
-var totalAsInt64 = handlerutil.TotalAsInt64
-
 // nullStr delegates to handlerutil.NullStr.
 var nullStr = handlerutil.NullStr
 
@@ -122,7 +119,7 @@ type ListTimelineForWorkspaceInput struct {
 }
 
 // ListTimelineOutput is the response body for every timeline endpoint.
-// total reflects the COUNT(*) OVER() of the filtered set, NextCursor is
+// total is the size of the filtered set before paging, NextCursor is
 // reserved for a future cursor-based migration and is currently nil.
 type ListTimelineOutput struct {
 	Body struct {

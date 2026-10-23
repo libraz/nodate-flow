@@ -30,7 +30,7 @@ func TestTotpEnrollAndConfirmRequirePasswordReauth_SourceGuard(t *testing.T) {
 
 	for _, want := range []string{
 		"func TotpEnroll(deps Deps) func(context.Context, *TotpEnrollInput)",
-		"verifyLocalIdentityPassword(row, in.Body.Password)",
+		"verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password)",
 		"AuthPasswordNoLocalIdentity",
 		"AuthPasswordCurrentMismatch",
 	} {
@@ -38,7 +38,7 @@ func TestTotpEnrollAndConfirmRequirePasswordReauth_SourceGuard(t *testing.T) {
 			t.Fatalf("TOTP handlers must enforce password reauth: missing %q", want)
 		}
 	}
-	if strings.Count(handlerSource, "verifyLocalIdentityPassword(row, in.Body.Password)") < 4 {
+	if strings.Count(handlerSource, "verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password)") < 4 {
 		t.Fatal("enroll, confirm, recovery regeneration, and disable must all use the shared password reauth helper")
 	}
 }

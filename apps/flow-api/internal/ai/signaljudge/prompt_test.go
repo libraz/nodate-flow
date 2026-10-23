@@ -216,3 +216,30 @@ func (p linkedTasksProbe) LoadLinked(_ context.Context, _ uint32, _ int32, _ int
 	p.onCall()
 	return nil, nil
 }
+
+// A task in a section dropped for size was never shown to the model, so it
+// must not become an acceptable verdict target.
+func TestRenderUserPromptOfferedListsOnlyRenderedTasks(t *testing.T) {
+	t.Parallel()
+
+	pc := PromptContext{
+		Signal:      SignalContext{PublicID: "sig-1", Kind: "manual"},
+		RecentTasks: []TaskSummary{{PublicID: "recent-1", Title: "a", DerivedState: "open"}},
+		LinkedTasks: []TaskSummary{{PublicID: "linked-1", Title: "b", DerivedState: "open"}},
+	}
+	_, offered := RenderUserPromptOffered(pc)
+	for _, id := range []string{"recent-1", "linked-1"} {
+		if _, ok := offered[id]; !ok {
+			t.Errorf("%s was rendered but is not offered", id)
+		}
+	}
+
+	pc.JudgeInstructions = strings.Repeat("x", MaxContextBytes)
+	body, offered := RenderUserPromptOffered(pc)
+	if strings.Contains(body, "recent-1") {
+		t.Fatalf("test setup: recent tasks should have been dropped")
+	}
+	if _, ok := offered["recent-1"]; ok {
+		t.Errorf("recent-1 was dropped from the prompt but is still offered")
+	}
+}

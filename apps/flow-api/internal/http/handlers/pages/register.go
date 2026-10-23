@@ -60,7 +60,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/pages/{pageId}",
 		Summary:     "Update a page",
-		Description: "Updates page title and Markdown body. Optionally re-parents the page within the tree.",
+		Description: "Updates the named fields of a page: title, Markdown body, project and parent. Omitted fields are left unchanged; an empty projectId or parentPageId unsets the link.",
 		Tags:        []string{"Public"},
 	}, Update(deps))
 
@@ -69,7 +69,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/pages/{pageId}",
 		Summary:     "Soft-delete a page",
-		Description: "Marks the page as deleted so it disappears from the tree without losing content. Idempotent.",
+		Description: "Marks the page as deleted so it and its descendants disappear from the tree without losing content. Deleting an already-deleted page returns not found.",
 		Tags:        []string{"Public"},
 	}, Delete(deps))
 

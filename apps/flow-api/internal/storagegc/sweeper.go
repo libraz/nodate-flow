@@ -1,15 +1,12 @@
 // Package storagegc reclaims object-storage rows and the blobs behind
 // them.
 //
-// Two kinds of residue accumulate, and both were assumed to be someone
-// else's job. The schema comment on storage_objects, the attachment
-// delete paths and the workspace teardown all say a sweeper hard-deletes
-// a row once nothing references it — six places written against a
-// component that did not exist, so a RemoveObject that failed, or a
-// tenant deleted while the object store was unreachable, left a blob
-// nobody could ever name again. Separately, every presigned upload URL
-// is handed out against a row committed before the bytes arrive, so a
-// client that asks for a URL and never uploads leaves a reservation
+// Two kinds of residue accumulate. The schema comment on
+// storage_objects and the attachment delete paths rely on a sweeper
+// hard-deleting a row once nothing references it, and a failed
+// RemoveObject keeps the row so the blob is retried on the next pass.
+// Separately, every presigned upload URL is handed out against a row
+// committed before the bytes arrive, so a client that asks for a URL and never uploads leaves a reservation
 // whose declared size nobody checked.
 //
 // The second kind is what makes the first urgent. A member can declare
@@ -222,14 +219,14 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 }
 
 // reclaim drops the rows that reference a storage object, then the
-// object row, then the blob. It reports whether the row went.
+// object row, then the blob, and commits only once the blob is gone.
+// It reports whether the row went.
 //
 // The order is forced by the schema: attachments reference
 // storage_objects with ON DELETE RESTRICT, so the referrers go first.
-// The blob goes last and outside the transaction, because a failed
-// object-store call must not undo a committed delete — a blob left
-// behind is found again on the next pass, whereas a row rolled back
-// after its referrers were removed is a row nothing can reach.
+// A row is never committed away while its blob may still exist: if the
+// object store fails, everything rolls back and the next pass retries
+// from the same row.
 func (s *Sweeper) reclaim(ctx context.Context, id uint32, key string, kind reclaimKind, reason string) bool {
 	log := s.Logger.With(
 		slog.Uint64("storage_object_id", uint64(id)),
@@ -280,20 +277,23 @@ func (s *Sweeper) reclaim(ctx context.Context, id uint32, key string, kind recla
 		// the guard held and the rollback puts the referrers back.
 		return false
 	}
+	// The blob goes while the row delete is still uncommitted. The row
+	// lock keeps a dedup adoption or a confirm out until the commit, and
+	// a failed object-store call rolls the delete back so the row, which
+	// names the key, is picked up again by the next pass. A commit that
+	// fails after the blob is gone leaves the same row, and removing an
+	// absent key is not an error.
+	if s.Storage != nil && key != "" {
+		if err := s.Storage.RemoveObject(ctx, key); err != nil {
+			log.Warn("storage sweeper: blob remove failed; row kept for retry",
+				slog.String("storage_key", key),
+				slog.String("err", err.Error()))
+			return false
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		log.Error("storage sweeper: commit", slog.String("err", err.Error()))
 		return false
-	}
-
-	if s.Storage != nil && key != "" {
-		if err := s.Storage.RemoveObject(ctx, key); err != nil {
-			// The row is gone, so the blob is now unnameable from the
-			// database. It is still reachable by key, which is what the
-			// bucket-listing sweep in the follow-up work is for.
-			log.Warn("storage sweeper: blob remove failed",
-				slog.String("storage_key", key),
-				slog.String("err", err.Error()))
-		}
 	}
 	return true
 }

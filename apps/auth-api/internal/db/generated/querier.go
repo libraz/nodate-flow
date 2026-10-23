@@ -674,6 +674,9 @@ type Querier interface {
 	// about. The stamp is what promotes it to a dedup candidate and takes
 	// it out of the sweeper's reach.
 	MarkStorageObjectUploaded(ctx context.Context, arg MarkStorageObjectUploadedParams) error
+	// Record that the account's email address has been proven, keeping the
+	// first proof's timestamp when one is already set.
+	MarkUserEmailVerified(ctx context.Context, id uint32) error
 	// Patch the authenticated user's profile. NULL params leave the column untouched.
 	PatchMe(ctx context.Context, arg PatchMeParams) error
 	// Patch a workspace via COALESCE; NULL params leave existing columns untouched.

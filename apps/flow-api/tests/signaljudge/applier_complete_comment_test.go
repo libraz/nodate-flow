@@ -71,10 +71,11 @@ func TestApplierCompleteTaskMovesDerivedStateToDone(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	res, err := applier.Apply(ctx, signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-c0ffee000001",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-c0ffee000001",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{srcPub: {}},
 	}, signaljudge.AgentRef{InternalID: agent.AgentID}, 10, signaljudge.Verdict{
 		Action:             signaljudge.ActionCompleteTask,
 		TargetTaskPublicID: ptrString(srcPub),
@@ -137,10 +138,11 @@ func TestApplierCompleteTaskIsIdempotent(t *testing.T) {
 		ReasoningExcerpt:   "closing the task",
 	}
 	sig := signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-c0ffee000002",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-c0ffee000002",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{srcPub: {}},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -195,10 +197,11 @@ func TestApplierAddCommentPersistsRealCommentRow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	res, err := applier.Apply(ctx, signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-c0ffee000003",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-c0ffee000003",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{srcPub: {}},
 	}, signaljudge.AgentRef{InternalID: agent.AgentID}, 30, signaljudge.Verdict{
 		Action:             signaljudge.ActionAddComment,
 		TargetTaskPublicID: ptrString(srcPub),

@@ -23,6 +23,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
@@ -302,8 +303,8 @@ func writeCSV(w io.Writer, tasks iter.Seq[ExportedTask]) csvWriteResult {
 		return cw.Write(cells)
 	}
 	if err := write([]string{
-		"ID", "Title", "Description", "Status", "Priority",
-		"Due Date", "Start Date", "Completed At",
+		"ID", importer.HeaderTitle, importer.HeaderDescription, "Status", importer.HeaderPriority,
+		importer.HeaderDueDate, importer.HeaderStartDate, "Completed At",
 		"Project ID", "Project", "Assignee ID", "Assignee",
 		"Updated At", "Created At",
 	}); err != nil {

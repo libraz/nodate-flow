@@ -9,6 +9,7 @@
 
 import type { components, NodateFlowClient } from '@nodate-flow/sdk';
 
+import { resultError } from './util/api-error.js';
 import { clampPageLimit, MAX_PAGES, requestedCount } from './util/paging.js';
 
 /* ── State transition helpers ──────────────────────────────────── */
@@ -167,10 +168,11 @@ export interface TaskListResult {
 async function executeTaskListPage(
   client: SdkClientLike,
   query: TaskListQuery,
-): Promise<{ data?: TaskListPage; error?: unknown }> {
+): Promise<{ data?: TaskListPage; error?: unknown; response?: Response }> {
   return client.GET('/tasks', { params: { query } }) as Promise<{
     data?: TaskListPage;
     error?: unknown;
+    response?: Response;
   }>;
 }
 
@@ -203,7 +205,8 @@ export async function executeTaskListPaginated(
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const result = await executeTaskListPage(client, nextQuery);
-    if (result.error) return { error: result.error };
+    const error = resultError(result);
+    if (error) return { error };
 
     const pageTasks = Array.isArray(result.data?.tasks) ? result.data.tasks : [];
     tasks.push(...pageTasks);
@@ -255,7 +258,8 @@ export async function executeUpdate(
       params: { path: { id: taskId } },
       body: plan.patchBody,
     });
-    if (result.error) return { error: result.error };
+    const error = resultError(result);
+    if (error) return { error };
     latest = result.data;
   }
 
@@ -264,7 +268,8 @@ export async function executeUpdate(
       params: { path: { id: taskId } },
       body: { transition: plan.stateTransition },
     });
-    if (result.error) return { error: result.error };
+    const error = resultError(result);
+    if (error) return { error };
     latest = result.data;
   }
 

@@ -169,10 +169,11 @@ func TestApplierGenerateRetroCreatesDraftTaskAndDependency(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	res, err := applier.Apply(ctx, signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-feedfacedead",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-feedfacedead",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{srcPub: {}},
 	}, signaljudge.AgentRef{InternalID: agent.AgentID}, 1, verdict)
 	require.NoError(t, err)
 	require.NotNil(t, res)
@@ -250,10 +251,11 @@ func TestApplierGenerateRetroOnMissingTargetTaskRejectsSignal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	res, err := applier.Apply(ctx, signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-feedfacedeae",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-feedfacedeae",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{ghost: {}},
 	}, signaljudge.AgentRef{InternalID: agent.AgentID}, 2, signaljudge.Verdict{
 		Action:             signaljudge.ActionGenerateRetro,
 		TargetTaskPublicID: ptrString(ghost),
@@ -321,10 +323,11 @@ func TestApplierGenerateRetroRollsBackOnDependencyInsertFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, err := applier.Apply(ctx, signaljudge.SignalRef{
-		InternalID:  signalInternalID,
-		PublicID:    "00000000-0000-0000-0000-feedfacedeaf",
-		WorkspaceID: wsID,
-		Kind:        "calendar.event_day_arrived",
+		InternalID:   signalInternalID,
+		PublicID:     "00000000-0000-0000-0000-feedfacedeaf",
+		WorkspaceID:  wsID,
+		Kind:         "calendar.event_day_arrived",
+		OfferedTasks: map[string]struct{}{srcPub: {}},
 	}, signaljudge.AgentRef{InternalID: agent.AgentID}, 3, signaljudge.Verdict{
 		Action:             signaljudge.ActionGenerateRetro,
 		TargetTaskPublicID: ptrString(srcPub),

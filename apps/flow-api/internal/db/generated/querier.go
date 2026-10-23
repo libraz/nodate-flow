@@ -721,7 +721,8 @@ type Querier interface {
 	// nullability a LEFT JOIN implies.
 	ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error)
 	// Mark a constraint as currently failing. Clears satisfied_at so the
-	// transition is visible in v_task_constraint_satisfaction.
+	// transition is visible in v_task_constraint_satisfaction; failed_at keeps
+	// the time the failure began across re-evaluations.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error)
 	// Fail agent runs that stranded once too often. Without this the rows
 	// requeued above would cycle between pending and claimed forever,
@@ -1002,7 +1003,8 @@ type Querier interface {
 	// Restricted to 'running' so a job cancelled mid-flight keeps the
 	// cancelled status the API gave it.
 	FinishImportJob(ctx context.Context, arg FinishImportJobParams) error
-	// Fetch the minimal fields an agent runner needs to invoke an LLM.
+	// Fetch the minimal fields an agent runner needs to invoke an LLM, including
+	// the provider that owns the agent's model.
 	GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error)
 	// Fetch the minimal fields the agent guard needs to make an allow/deny
 	// decision. Returns enabled, paused, allowed_scopes_json, and the
@@ -1153,6 +1155,11 @@ type Querier interface {
 	// ON DELETE RESTRICT and would otherwise block this statement depending
 	// on the order InnoDB walks the cascade.
 	HardDeleteWorkspace(ctx context.Context, id uint32) (sql.Result, error)
+	// Check whether anything other than the agent's own bookkeeping happened in
+	// the workspace since the given timestamp. Run lifecycle events
+	// (ai.agent.run.*) and events the agent itself authored never count, so an
+	// idle workspace lets the pre-flight skip the next tick.
+	HasNewActivityForAgent(ctx context.Context, arg HasNewActivityForAgentParams) (bool, error)
 	// Check if any events have occurred in the workspace since the given timestamp.
 	// Used by the agent runtime pre-flight check to skip LLM calls when idle.
 	HasRecentEventsForWorkspace(ctx context.Context, arg HasRecentEventsForWorkspaceParams) (bool, error)
@@ -1364,14 +1371,14 @@ type Querier interface {
 	ListDependenciesForProject(ctx context.Context, arg ListDependenciesForProjectParams) ([]ListDependenciesForProjectRow, error)
 	// List outgoing dependencies of a task. Returns the target task public_id.
 	ListDependenciesForTask(ctx context.Context, arg ListDependenciesForTaskParams) ([]ListDependenciesForTaskRow, error)
-	// List every enabled dependency edge in the workspace as (from, to) internal
-	// id pairs. Read-only callers (the "would this be rejected" preview) use this
-	// one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
-	// Internal ids are safe here because the result never leaves the handler
-	// (json:"-" on *.id).
-	ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error)
-	// The same edge set, read under a lock. This is the serialization point for
-	// adding an edge: the writer walks the graph to reject an edge that would
+	// Every live edge in the workspace as (from, to, kind), read under a lock; the
+	// only edge-set read the cycle check uses, for the write and for any preview.
+	// An edge is live when it and both endpoint tasks are enabled, so an edge to
+	// a deleted task neither closes a cycle nor outlives the task invisibly. The
+	// endpoint checks are EXISTS subqueries rather than joins: a locking read
+	// locks only the tables of the outer statement, which keeps the lock
+	// footprint on edge rows and off the tasks rows that transitions write.
+	// This is the serialization point for adding an edge: the writer walks the graph to reject an edge that would
 	// close a cycle, and the walk is only sound if no other writer can add an
 	// edge between the walk and the insert.
 	//
@@ -1406,6 +1413,10 @@ type Querier interface {
 	// rowset; dependency.open_at_most uses the kind to ignore
 	// non-blocking (informational) links.
 	ListDependencyStatesForEngine(ctx context.Context, arg ListDependencyStatesForEngineParams) ([]ListDependencyStatesForEngineRow, error)
+	// Tasks holding an enabled outgoing edge to the given task. Their
+	// dependency facts (ListDependencyStatesForEngine) read the given task's
+	// derived_state, so a change to it re-opens their constraints.
+	ListDependentTaskIDsForEngine(ctx context.Context, arg ListDependentTaskIDsForEngineParams) ([]uint32, error)
 	// List all description versions for a task, newest first.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
 	// oauth_signin_allowlist statements.
@@ -1441,13 +1452,6 @@ type Querier interface {
 	// (entry_kind, entry_value) is unique, so ordering by the pair is already a
 	// total order and needs no further tie-breaker.
 	ListEnabledOauthSigninAllowlistEntries(ctx context.Context) ([]ListEnabledOauthSigninAllowlistEntriesRow, error)
-	// List a project's timeline via v_task_timeline. Filters events whose
-	// owning task lives in the given project (events with no task_id are
-	// excluded by virtue of project_public_id being NULL). Projects
-	// `actor_system_source`, `triggered_by_signal_public_id`,
-	// `reverses_event_public_id` and `was_reversed` for the same reasons as
-	// ListEventsForTask.
-	ListEventsForProject(ctx context.Context, arg ListEventsForProjectParams) ([]ListEventsForProjectRow, error)
 	// Incremental polling source for an agent whose schedule_scope is
 	// 'assigned_tasks'. Returns events newer than since_id whose owning task
 	// has this agent as an enabled actor, filtered by the agent's
@@ -1468,21 +1472,6 @@ type Querier interface {
 	// reverses_event_id); on the polling hot-path this keeps the per-row
 	// cost to an index-only probe.
 	ListEventsForScopedAgent(ctx context.Context, arg ListEventsForScopedAgentParams) ([]ListEventsForScopedAgentRow, error)
-	// List a task's timeline via v_task_timeline. Projects
-	// `actor_system_source` (ADR 0008 D8, third actor source for worker-tick
-	// events), `triggered_by_signal_public_id` (ADR 0008 D4, signal
-	// traceability link), `reverses_event_public_id` (ADR 0008 D4,
-	// target event the row compensates) and `was_reversed` (TRUE when some
-	// other enabled event reverses this one) so the timeline UI can render
-	// the causal chain plus the reversal state of each entry. The view
-	// backs `was_reversed` with a correlated EXISTS on idx_events_reverses
-	// so per-row cost stays bounded.
-	ListEventsForTask(ctx context.Context, arg ListEventsForTaskParams) ([]ListEventsForTaskRow, error)
-	// List the workspace-wide event timeline via v_task_timeline. Projects
-	// `actor_system_source`, `triggered_by_signal_public_id`,
-	// `reverses_event_public_id` and `was_reversed` for the same reasons as
-	// ListEventsForTask.
-	ListEventsForWorkspace(ctx context.Context, arg ListEventsForWorkspaceParams) ([]ListEventsForWorkspaceRow, error)
 	// List all favorites for a user within a workspace, ordered by sort weight.
 	ListFavoritesForUser(ctx context.Context, arg ListFavoritesForUserParams) ([]ListFavoritesForUserRow, error)
 	// List import jobs for a workspace with total count.
@@ -1557,6 +1546,13 @@ type Querier interface {
 	ListLinkedTasksForEvent(ctx context.Context, arg ListLinkedTasksForEventParams) ([]ListLinkedTasksForEventRow, error)
 	// List a user's MCP tokens in a workspace, masked.
 	ListMcpTokensForUser(ctx context.Context, arg ListMcpTokensForUserParams) ([]ListMcpTokensForUserRow, error)
+	// Users the comment currently names; same purpose and bound as
+	// ListMentionedUserIdsForTaskDescription.
+	ListMentionedUserIdsForComment(ctx context.Context, arg ListMentionedUserIdsForCommentParams) ([]uint32, error)
+	// Users the task's description currently names, read before a re-extraction
+	// clears them so only newly named users are notified. Workspace-bounded
+	// like the clear.
+	ListMentionedUserIdsForTaskDescription(ctx context.Context, arg ListMentionedUserIdsForTaskDescriptionParams) ([]uint32, error)
 	// List mentions within a specific task (description or comments).
 	// Paginated (LIMIT/OFFSET) so the result set is always bounded; total
 	// carries the pre-page count.
@@ -1990,6 +1986,9 @@ type Querier interface {
 	// about. The stamp is what promotes it to a dedup candidate and takes
 	// it out of the sweeper's reach.
 	MarkStorageObjectUploaded(ctx context.Context, arg MarkStorageObjectUploadedParams) error
+	// Record that the account's email address has been proven, keeping the
+	// first proof's timestamp when one is already set.
+	MarkUserEmailVerified(ctx context.Context, id uint32) error
 	// Resolve the most specific auto-action rule for a (workspace, kind, signal_kind)
 	// triple. Ordering:
 	//   1) exact signal_kind match (signal_kind = sqlc.arg(signal_kind))
@@ -2122,7 +2121,8 @@ type Querier interface {
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error)
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
-	// Mark a constraint as satisfied at the current time.
+	// Mark a constraint as satisfied. satisfied_at records when it first became
+	// satisfied, so re-evaluating an already satisfied constraint keeps it.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error)
 	// Search enabled pages by title pattern within a workspace.
 	// The recursive CTE filters out pages whose ancestor chain contains any
@@ -2144,6 +2144,7 @@ type Querier interface {
 	// URL token minted by the caller; the plaintext is returned to the
 	// publisher once and is not recoverable afterwards.
 	// No-op if the lens is already public (WHERE is_public = FALSE guard).
+	// shared_at keeps the first share time across revoke and re-publish.
 	SetLensPublic(ctx context.Context, arg SetLensPublicParams) (int64, error)
 	// Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
 	// storage_objects row. Used by POST /me/avatar after a successful upload to

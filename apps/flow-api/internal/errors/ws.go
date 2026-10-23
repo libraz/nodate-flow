@@ -34,10 +34,16 @@ var (
 	WsIntakeNotFound = &Spec{Code: "WS.INTAKE.NOT_FOUND", Status: 404, Message: "Intake item not found", Description: "Returned when an intake item with the given public_id does not exist or has been removed.", UserAction: "Verify the intake item ID, or refresh the list to see current items."}
 	// WS.INTAKE.SNOOZE_DEADLINE_REQUIRED — Snoozing an intake item requires a deadline
 	WsIntakeSnoozeDeadlineRequired = &Spec{Code: "WS.INTAKE.SNOOZE_DEADLINE_REQUIRED", Status: 422, Message: "Snoozing an intake item requires a deadline", Description: "Returned when a triage request sets the status to snoozed without a snoozeUntil deadline. The pending queue is filtered on triage status alone, so an item parked as snoozed with no deadline leaves the pending list with no date at which anything brings it back.", UserAction: "Supply a snoozeUntil timestamp in the future, or choose a different triage status."}
+	// WS.LABEL.ALREADY_ATTACHED — This label is already attached to the task
+	WsLabelAlreadyAttached = &Spec{Code: "WS.LABEL.ALREADY_ATTACHED", Status: 409, Message: "This label is already attached to the task", Description: "Returned when attaching a label that the task already carries.", UserAction: "No action needed; the label is already on the task."}
+	// WS.LABEL.CIRCULAR_PARENT — Cannot set parent to self or descendant
+	WsLabelCircularParent = &Spec{Code: "WS.LABEL.CIRCULAR_PARENT", Status: 400, Message: "Cannot set parent to self or descendant", Description: "Returned when a label parent would create a cycle by pointing at the label itself or one of its descendants.", UserAction: "Choose a parent that is not the label itself or any of its children."}
 	// WS.LABEL.NAME_ALREADY_TAKEN — A label with this name already exists
 	WsLabelNameAlreadyTaken = &Spec{Code: "WS.LABEL.NAME_ALREADY_TAKEN", Status: 409, Message: "A label with this name already exists", Description: "Returned when the requested label name already exists within the same workspace/project scope.", UserAction: "Choose a different name."}
 	// WS.LABEL.NOT_FOUND — Label not found
 	WsLabelNotFound = &Spec{Code: "WS.LABEL.NOT_FOUND", Status: 404, Message: "Label not found", Description: "Returned when a label with the given public_id does not exist or has been deleted.", UserAction: "Verify the label ID, or refresh the list to see current labels."}
+	// WS.LABEL.SCOPE_MISMATCH — Label belongs to a different project
+	WsLabelScopeMismatch = &Spec{Code: "WS.LABEL.SCOPE_MISMATCH", Status: 400, Message: "Label belongs to a different project", Description: "Returned when a project-scoped label is attached to a task of another project, or when a label's parent sits in a different scope.", UserAction: "Use a workspace-wide label or one scoped to the task's project."}
 	// WS.LENS.ALREADY_PRIVATE — This saved view is already private
 	WsLensAlreadyPrivate = &Spec{Code: "WS.LENS.ALREADY_PRIVATE", Status: 409, Message: "This saved view is already private", Description: "Returned when attempting to unpublish a lens that is not currently shared.", UserAction: "The view is already private."}
 	// WS.LENS.ALREADY_PUBLIC — This saved view is already published

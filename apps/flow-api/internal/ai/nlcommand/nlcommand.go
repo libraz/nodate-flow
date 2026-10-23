@@ -57,6 +57,48 @@ type ToolCall struct {
 	Confidence float64        `json:"confidence"`
 }
 
+// clone returns a deep copy so a cached ToolCall is never shared between
+// callers that may mutate its args.
+func (tc *ToolCall) clone() *ToolCall {
+	if tc == nil {
+		return nil
+	}
+	return &ToolCall{Tool: tc.Tool, Args: cloneMap(tc.Args), Confidence: tc.Confidence}
+}
+
+func cloneMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = cloneValue(v)
+	}
+	return out
+}
+
+func cloneValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		return cloneMap(t)
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = cloneValue(e)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+// Admitter is implemented by Providers that bill a workspace. Resolve calls
+// it before consulting the cache so a cached result is served only to a
+// workspace that passes the cost guard, and keys the cache by that workspace.
+type Admitter interface {
+	Admit(ctx context.Context) (workspaceID uint32, err error)
+}
+
 // ToolSpec describes one MCP tool for the LLM prompt so it can pick
 // the right tool and shape the args correctly.
 type ToolSpec struct {
@@ -99,7 +141,15 @@ func (r *Resolver) Resolve(ctx context.Context, prompt string) (*ToolCall, error
 		return nil, ErrUnresolvable
 	}
 
-	cacheKey := Normalize(trimmed)
+	var workspaceID uint32
+	if a, ok := r.Provider.(Admitter); ok {
+		id, err := a.Admit(ctx)
+		if err != nil {
+			return nil, err
+		}
+		workspaceID = id
+	}
+	cacheKey := fmt.Sprintf("%d:%s", workspaceID, Normalize(trimmed))
 	if cached := r.Cache.Get(cacheKey); cached != nil {
 		return cached, nil
 	}

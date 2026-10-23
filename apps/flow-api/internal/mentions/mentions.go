@@ -126,6 +126,11 @@ type bodyParams struct {
 // the event, all on the caller's commit boundary.
 func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) error {
 	q := generated.New(db)
+	// Read before the clear: the previous set decides who is newly named.
+	previous, err := previousUserIDs(ctx, q, p)
+	if err != nil {
+		return err
+	}
 	// The clear runs before the body is looked at. "No mentions" is a
 	// state the table has to be able to reach, and it is reached by a body
 	// that no longer names anyone — including an empty one.
@@ -155,7 +160,7 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 	if p.actorUserID != nil {
 		actor = sql.NullInt32{Int32: int32(*p.actorUserID), Valid: true} //#nosec G115 -- actor user id sourced from the session, fits int32 within realistic deployments
 	}
-	mentioned := make([]string, 0, len(members))
+	var mentioned []string
 	for _, m := range members {
 		// A self-mention is written like any other row. The notification
 		// fan-out excludes the actor, so it costs no delivery, and skipping
@@ -172,7 +177,14 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 		}); err != nil {
 			return fmt.Errorf("mentions: create mention: %w", err)
 		}
-		mentioned = append(mentioned, m.PublicID.String())
+		// Only users the previous body did not already name are notified;
+		// an edit that keeps a mention must not re-send it.
+		if _, seen := previous[m.ID]; !seen {
+			mentioned = append(mentioned, m.PublicID.String())
+		}
+	}
+	if len(mentioned) == 0 {
+		return nil
 	}
 	// Public ids only: eventlog.ValidatePayloadIDs refuses an append whose
 	// payload carries an internal key. The fan-out resolves these back
@@ -194,6 +206,35 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 		return fmt.Errorf("mentions: append event: %w", err)
 	}
 	return nil
+}
+
+// previousUserIDs returns the users the body's rows currently name, by
+// internal id, using the same scope as clearRows.
+func previousUserIDs(ctx context.Context, q *generated.Queries, p bodyParams) (map[uint32]struct{}, error) {
+	var (
+		ids []uint32
+		err error
+	)
+	switch p.source {
+	case generated.MentionsSourceComment:
+		ids, err = q.ListMentionedUserIdsForComment(ctx, generated.ListMentionedUserIdsForCommentParams{
+			CommentID:   p.commentID,
+			WorkspaceID: p.workspaceID,
+		})
+	default:
+		ids, err = q.ListMentionedUserIdsForTaskDescription(ctx, generated.ListMentionedUserIdsForTaskDescriptionParams{
+			TaskID:      p.taskID,
+			WorkspaceID: p.workspaceID,
+		})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("mentions: read previous mentions: %w", err)
+	}
+	set := make(map[uint32]struct{}, len(ids))
+	for _, id := range ids {
+		set[id] = struct{}{}
+	}
+	return set, nil
 }
 
 // clearRows removes the rows the body owns, which is what makes the sync

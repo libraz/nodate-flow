@@ -22,6 +22,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sessionguard"
 )
 
 // Transition names accepted by [NextState] / [ApplyTransitionTx]. The
@@ -199,16 +200,14 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	}
 
 	// The trg_tasks_derived_state_guard BEFORE UPDATE trigger rejects
-	// any mutation of derived_state unless this session variable is
-	// set. Scope is the connection/tx; we clear it before returning so
-	// the value never leaks to the next checkout of the pooled
-	// connection.
-	if _, err := tx.ExecContext(ctx, "SET @nf_derived_state_engine = 1"); err != nil {
+	// any mutation of derived_state unless the engine variable is set
+	// on this connection; sessionguard clears it before the connection
+	// returns to the pool.
+	disarm, err := sessionguard.Arm(ctx, tx, sessionguard.DerivedStateEngine)
+	if err != nil {
 		return ApplyResult{}, apierrors.InternalUnexpected, err
 	}
-	defer func() {
-		_, _ = tx.ExecContext(ctx, "SET @nf_derived_state_engine = NULL")
-	}()
+	defer disarm()
 
 	updatedBy := sql.NullInt32{}
 	if p.ActorUserID != nil {

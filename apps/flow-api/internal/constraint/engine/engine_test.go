@@ -86,3 +86,45 @@ func TestEngine_NoStore(t *testing.T) {
 		t.Fatal("expected error without store")
 	}
 }
+
+// dependentsStore evaluates a different constraint set per task id and
+// names the tasks that depend on the evaluated one.
+type dependentsStore struct {
+	*fakeStore
+	dependents []uint32
+	loaded     []uint32
+}
+
+func (s *dependentsStore) LoadTask(ctx context.Context, id uint32) (constraint.Facts, []Row, error) {
+	s.loaded = append(s.loaded, id)
+	return s.fakeStore.LoadTask(ctx, id)
+}
+
+func (s *dependentsStore) ListDependents(context.Context, uint32) ([]uint32, error) {
+	return s.dependents, nil
+}
+
+func TestEngine_EvaluateTaskAndDependents(t *testing.T) {
+	store := &dependentsStore{fakeStore: newFake(constraint.Facts{}, nil), dependents: []uint32{7, 9}}
+	eng := &Engine{Store: store}
+
+	if err := eng.EvaluateTaskAndDependents(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	want := []uint32{1, 7, 9}
+	if len(store.loaded) != len(want) {
+		t.Fatalf("evaluated %v, want %v", store.loaded, want)
+	}
+	for i, id := range want {
+		if store.loaded[i] != id {
+			t.Fatalf("evaluated %v, want %v", store.loaded, want)
+		}
+	}
+}
+
+func TestEngine_EvaluateTaskAndDependentsNeedsLister(t *testing.T) {
+	eng := &Engine{Store: newFake(constraint.Facts{}, nil)}
+	if err := eng.EvaluateTaskAndDependents(context.Background(), 1); err == nil {
+		t.Fatal("a store that cannot list dependents must be reported")
+	}
+}

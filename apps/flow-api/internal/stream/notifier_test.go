@@ -319,3 +319,19 @@ func TestKindForEventType(t *testing.T) {
 		}
 	}
 }
+
+func TestOfferOrResync_FullInboxEndsWithResync(t *testing.T) {
+	t.Parallel()
+	out := make(chan Event, 2)
+	offerOrResync(out, Event{Kind: KindTaskChanged, At: 1}, "ws-1")
+	offerOrResync(out, Event{Kind: KindTaskChanged, At: 2}, "ws-1")
+	offerOrResync(out, Event{Kind: KindTaskChanged, At: 3}, "ws-1")
+
+	var last Event
+	for len(out) > 0 {
+		last = <-out
+	}
+	if last.Kind != KindResync || last.WorkspaceID != "ws-1" {
+		t.Fatalf("inbox must end with a resync marker, got %+v", last)
+	}
+}

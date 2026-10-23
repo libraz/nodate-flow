@@ -213,7 +213,9 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 	// the day range. A recurring row qualifies whenever its base start_at
 	// precedes the day's upper bound — a later occurrence may still land in
 	// the day even though the base is earlier; the Go-side expansion makes
-	// the final per-day decision.
+	// the final per-day decision — and its recurrence_end has not passed
+	// before the day starts. recurrence_end is inclusive, so a series
+	// ending exactly at the day's first instant is still read.
 	const q = `
 		SELECT ce.id, ce.public_id, ce.start_at, ce.end_at, ce.all_day,
 		       ce.timezone, ce.recurrence_rule, ce.recurrence_end, ce.recurrence_exceptions
@@ -227,7 +229,8 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 		  AND ce.start_at IS NOT NULL
 		  AND ce.start_at < ?
 		  AND (
-		        ce.recurrence_rule IS NOT NULL
+		        (ce.recurrence_rule IS NOT NULL
+		         AND (ce.recurrence_end IS NULL OR ce.recurrence_end >= ?))
 		     OR ce.start_at >= ?
 		  )
 		ORDER BY ce.start_at ASC
@@ -242,7 +245,7 @@ func (s *Scanner) ListEventsForDays(ctx context.Context, workspaceID uint32, tz 
 	}
 	var candidates []dayCandidate
 	for _, d := range days {
-		rows, err := s.DB.QueryContext(ctx, q, workspaceID, d.utcEnd, d.utcStart)
+		rows, err := s.DB.QueryContext(ctx, q, workspaceID, d.utcEnd, d.utcStart, d.utcStart)
 		if err != nil {
 			return nil, fmt.Errorf("query events arriving on %s: %w", d.day, err)
 		}
@@ -327,10 +330,24 @@ func (s *Scanner) listOverriddenStarts(
 	workspaceID uint32,
 	parentIDs []uint32,
 ) (map[uint32][]string, error) {
-	if len(parentIDs) == 0 {
-		return nil, nil
+	out := map[uint32][]string{}
+	// Chunked so one statement binds a bounded number of placeholders
+	// however many series a workspace holds.
+	for lo := 0; lo < len(parentIDs); lo += overrideLookupChunk {
+		if err := s.appendOverriddenStarts(ctx, workspaceID, parentIDs[lo:min(lo+overrideLookupChunk, len(parentIDs))], out); err != nil {
+			return nil, err
+		}
 	}
+	return out, nil
+}
 
+// overrideLookupChunk bounds how many master ids one override lookup
+// binds.
+const overrideLookupChunk = 1000
+
+// appendOverriddenStarts reads the overridden starts of one chunk of
+// masters into out.
+func (s *Scanner) appendOverriddenStarts(ctx context.Context, workspaceID uint32, parentIDs []uint32, out map[uint32][]string) error {
 	//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from len(parentIDs); every id travels as a bound argument
 	q := `
 		SELECT ov.recurrence_parent_id, ov.recurrence_original_start
@@ -348,25 +365,24 @@ func (s *Scanner) listOverriddenStarts(
 
 	rows, err := s.DB.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("query overridden occurrence starts: %w", err)
+		return fmt.Errorf("query overridden occurrence starts: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	out := map[uint32][]string{}
 	for rows.Next() {
 		var (
 			parentID uint32
 			start    time.Time
 		)
 		if scanErr := rows.Scan(&parentID, &start); scanErr != nil {
-			return nil, fmt.Errorf("scan overridden occurrence start: %w", scanErr)
+			return fmt.Errorf("scan overridden occurrence start: %w", scanErr)
 		}
 		out[parentID] = append(out[parentID], start.UTC().Format(time.RFC3339))
 	}
 	if rowsErr := rows.Err(); rowsErr != nil {
-		return nil, fmt.Errorf("iterate overridden occurrence starts: %w", rowsErr)
+		return fmt.Errorf("iterate overridden occurrence starts: %w", rowsErr)
 	}
-	return out, nil
+	return nil
 }
 
 // expandCandidate turns one scanned candidateRow into the (event, day)

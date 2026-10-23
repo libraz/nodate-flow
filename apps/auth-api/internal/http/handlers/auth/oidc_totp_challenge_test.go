@@ -24,9 +24,13 @@ func TestOIDCCallback_2FAAccountReturnsChallenge(t *testing.T) {
 	deps.RegistrationOpen = true
 	ctx := context.Background()
 
-	// A pre-existing account that has enrolled and confirmed app TOTP.
+	// A pre-existing account that has enrolled and confirmed app TOTP. Its
+	// email is verified, so the TOTP is its owner's own; on an unverified
+	// account the link is refused instead (see
+	// TestOIDCLink_UnverifiedAccountWithTotpIsRefused).
 	uid, _, email := b2NewUser(t, deps.Queries)
 	b2EnrollTotp(t, deps, uid)
+	require.NoError(t, deps.Queries.MarkUserEmailVerified(ctx, uid))
 
 	// The same email signs in via GitHub, linking the OIDC identity onto
 	// the existing (TOTP-enrolled) account.

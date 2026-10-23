@@ -29,9 +29,10 @@ ORDER BY tc.sort_weight ASC, tc.created_at ASC, tc.public_id ASC
 LIMIT ? OFFSET ?;
 
 -- name: SatisfyConstraint :execrows
--- Mark a constraint as satisfied at the current time.
+-- Mark a constraint as satisfied. satisfied_at records when it first became
+-- satisfied, so re-evaluating an already satisfied constraint keeps it.
 UPDATE task_constraints
-SET satisfied_at = CURRENT_TIMESTAMP,
+SET satisfied_at = COALESCE(satisfied_at, CURRENT_TIMESTAMP),
     failed_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
@@ -39,9 +40,10 @@ WHERE workspace_id = ?
 
 -- name: FailConstraint :execrows
 -- Mark a constraint as currently failing. Clears satisfied_at so the
--- transition is visible in v_task_constraint_satisfaction.
+-- transition is visible in v_task_constraint_satisfaction; failed_at keeps
+-- the time the failure began across re-evaluations.
 UPDATE task_constraints
-SET failed_at = CURRENT_TIMESTAMP,
+SET failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP),
     satisfied_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?

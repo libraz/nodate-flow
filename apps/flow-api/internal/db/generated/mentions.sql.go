@@ -105,6 +105,82 @@ func (q *Queries) DeleteMentionsForTaskDescription(ctx context.Context, arg Dele
 	return err
 }
 
+const listMentionedUserIdsForComment = `-- name: ListMentionedUserIdsForComment :many
+SELECT mentioned_user_id
+FROM mentions
+WHERE comment_id = ?
+  AND workspace_id = ?
+`
+
+type ListMentionedUserIdsForCommentParams struct {
+	CommentID   sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+}
+
+// Users the comment currently names; same purpose and bound as
+// ListMentionedUserIdsForTaskDescription.
+func (q *Queries) ListMentionedUserIdsForComment(ctx context.Context, arg ListMentionedUserIdsForCommentParams) ([]uint32, error) {
+	rows, err := q.db.QueryContext(ctx, listMentionedUserIdsForComment, arg.CommentID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var mentioned_user_id uint32
+		if err := rows.Scan(&mentioned_user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, mentioned_user_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMentionedUserIdsForTaskDescription = `-- name: ListMentionedUserIdsForTaskDescription :many
+SELECT mentioned_user_id
+FROM mentions
+WHERE task_id = ?
+  AND workspace_id = ?
+  AND source = 'task_description'
+`
+
+type ListMentionedUserIdsForTaskDescriptionParams struct {
+	TaskID      sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+}
+
+// Users the task's description currently names, read before a re-extraction
+// clears them so only newly named users are notified. Workspace-bounded
+// like the clear.
+func (q *Queries) ListMentionedUserIdsForTaskDescription(ctx context.Context, arg ListMentionedUserIdsForTaskDescriptionParams) ([]uint32, error) {
+	rows, err := q.db.QueryContext(ctx, listMentionedUserIdsForTaskDescription, arg.TaskID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var mentioned_user_id uint32
+		if err := rows.Scan(&mentioned_user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, mentioned_user_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMentionsForTask = `-- name: ListMentionsForTask :many
 SELECT
   m.public_id,

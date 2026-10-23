@@ -517,9 +517,32 @@ func capJudgeInstructions(s string) string {
 // that failed to load leaves behind — no heading — and the model cannot
 // tell either apart from a workspace that has nothing to show.
 func RenderUserPrompt(pc PromptContext) string {
+	body, _ := renderTrimmed(pc)
+	return body
+}
+
+// RenderUserPromptOffered renders like [RenderUserPrompt] and also returns
+// the public ids of the tasks the rendered body actually lists. A task in a
+// section dropped for size was never shown to the model, so it is not in
+// the set. The Applier accepts a verdict target only from this set.
+func RenderUserPromptOffered(pc PromptContext) (string, map[string]struct{}) {
+	body, rendered := renderTrimmed(pc)
+	offered := make(map[string]struct{}, len(rendered.RecentTasks)+len(rendered.LinkedTasks))
+	for _, t := range rendered.RecentTasks {
+		offered[t.PublicID] = struct{}{}
+	}
+	for _, t := range rendered.LinkedTasks {
+		offered[t.PublicID] = struct{}{}
+	}
+	return body, offered
+}
+
+// renderTrimmed returns the body together with the context it was rendered
+// from, which differs from pc when sections were dropped for size.
+func renderTrimmed(pc PromptContext) (string, PromptContext) {
 	body := renderFull(pc)
 	if len(body) <= MaxContextBytes {
-		return body
+		return body, pc
 	}
 	// Drop noisy sections in priority order, recording each one. The
 	// gaps are copied rather than appended in place so a caller holding
@@ -542,7 +565,7 @@ func RenderUserPrompt(pc PromptContext) string {
 		trimmed.ContextGaps = append(trimmed.ContextGaps, ContextGapJudgeInstructionsDropped)
 		body = renderFull(trimmed)
 	}
-	return body
+	return body, trimmed
 }
 
 // renderFull does the actual string assembly. Split out so

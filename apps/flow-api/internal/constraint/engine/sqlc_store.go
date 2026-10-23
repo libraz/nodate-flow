@@ -115,7 +115,7 @@ func (s *SqlcStore) MarkSatisfied(ctx context.Context, publicID string, _ time.T
 		return err
 	}
 	// The count is not an existence check: re-evaluating a constraint
-	// that is already satisfied writes the same values and MySQL reports
+	// that is already satisfied changes no column and MySQL reports
 	// zero changed rows. The constraint was read from the database a
 	// moment earlier by the evaluation that got us here.
 	_, err = s.Queries.SatisfyConstraint(ctx, generated.SatisfyConstraintParams{
@@ -123,6 +123,14 @@ func (s *SqlcStore) MarkSatisfied(ctx context.Context, publicID string, _ time.T
 		PublicID:    pid,
 	})
 	return err
+}
+
+// ListDependents implements DependentLister.
+func (s *SqlcStore) ListDependents(ctx context.Context, taskID uint32) ([]uint32, error) {
+	return s.Queries.ListDependentTaskIDsForEngine(ctx, generated.ListDependentTaskIDsForEngineParams{
+		ToTaskID:    taskID,
+		WorkspaceID: s.WorkspaceID,
+	})
 }
 
 // MarkFailed implements Store.

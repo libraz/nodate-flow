@@ -20,6 +20,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
+	"github.com/libraz/nodate-flow/packages/go-shared/sessionstore"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
@@ -299,8 +301,8 @@ func TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits(t *testing.T) {
 
 // TestRefresh_GraceWindowDoesNotRevokeFamily confirms a benign
 // double-submit — the same token sent twice, the second arriving just
-// after the first rotated it — is rejected without tearing the family
-// down.
+// after the first rotated it — resolves to the same session: the second
+// call gets an access token and no cookie, and the family stays intact.
 func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
@@ -310,18 +312,27 @@ func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 	uid, _, _ := b2NewUser(t, deps.Queries)
 	plain, _ := b2NewSession(t, deps, uid)
 
-	_, err := Refresh(deps)(ctx, &RefreshInput{
+	first, err := Refresh(deps)(ctx, &RefreshInput{
 		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
 	})
 	require.NoError(t, err)
+	require.NotEmpty(t, first.SetCookie.Value)
 
 	// Immediately again with the same cookie, still inside the grace
 	// window.
-	_, err = Refresh(deps)(ctx, &RefreshInput{
+	second, err := Refresh(deps)(ctx, &RefreshInput{
 		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
 	})
-	problem := problemFor(t, err)
-	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
+	require.NoError(t, err, "the race loser inside the grace window must not be refused")
+	assert.NotEmpty(t, second.Body.AccessToken)
+	assert.Empty(t, second.SetCookie.Value,
+		"the loser must not overwrite the winner's rotated cookie")
+	firstClaims, err := deps.JWT.Verify(first.Body.AccessToken)
+	require.NoError(t, err)
+	secondClaims, err := deps.JWT.Verify(second.Body.AccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, firstClaims.SessionPublicID, secondClaims.SessionPublicID,
+		"both racers must resolve to the one rotated session")
 
 	assert.Equal(t, 1, b2ActiveSessions(t, db, uid),
 		"a duplicated request must not revoke the family")
@@ -329,6 +340,74 @@ func TestRefresh_GraceWindowDoesNotRevokeFamily(t *testing.T) {
 		assert.NotEqual(t, "auth.refresh_reuse_detected", e.Action,
 			"grace-window replay must not raise the reuse alarm")
 	}
+}
+
+// TestRefresh_ConcurrentRefreshesResolveToOneRotation fires two refreshes
+// with the same cookie at once: neither may fail, and exactly one rotates.
+func TestRefresh_ConcurrentRefreshesResolveToOneRotation(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	ctx := context.Background()
+
+	uid, _, _ := b2NewUser(t, deps.Queries)
+	plain, _ := b2NewSession(t, deps, uid)
+
+	type result struct {
+		out *RefreshOutput
+		err error
+	}
+	results := make(chan result, 2)
+	start := make(chan struct{})
+	for range 2 {
+		go func() {
+			<-start
+			out, err := Refresh(deps)(ctx, &RefreshInput{
+				RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
+			})
+			results <- result{out, err}
+		}()
+	}
+	close(start)
+	rotated := 0
+	for range 2 {
+		r := <-results
+		require.NoError(t, r.err, "a concurrent refresh must never fail")
+		assert.NotEmpty(t, r.out.Body.AccessToken)
+		if r.out.SetCookie.Value != "" {
+			rotated++
+		}
+	}
+	assert.Equal(t, 1, rotated, "exactly one racer rotates the token")
+	assert.Equal(t, 1, b2ActiveSessions(t, db, uid))
+}
+
+// losingRotationStore stands for a refresh that passed the lookup but
+// found the row already rotated by a concurrent refresh when it took the
+// row lock.
+type losingRotationStore struct{ sessionstore.Store }
+
+func (losingRotationStore) RotateRefreshHash(context.Context, string, string, time.Time) error {
+	return sessionstore.ErrNotFound
+}
+
+// TestRefresh_RotationLostAtLockIsRefusedNotInternal pins the race loser
+// with no superseding session inside the grace window: it is a refused
+// token, never a 500.
+func TestRefresh_RotationLostAtLockIsRefusedNotInternal(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.Sessions = losingRotationStore{deps.Sessions}
+
+	uid, _, _ := b2NewUser(t, deps.Queries)
+	plain, _ := b2NewSession(t, deps, uid)
+
+	_, err := Refresh(deps)(context.Background(), &RefreshInput{
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: plain}, //#nosec G124 -- test cookie
+	})
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
 }
 
 // TestRefresh_SignedOutSessionDoesNotRevokeFamily is the other half of
@@ -409,4 +488,140 @@ func b2ActiveSessions(t *testing.T, db *sql.DB, uid uint32) int {
 		"SELECT COUNT(*) FROM sessions WHERE user_id = ? AND enabled = TRUE AND revoked_at IS NULL", uid,
 	).Scan(&n))
 	return n
+}
+
+// TestTotpDisable_WrongPasswordsLockIdentity proves the password
+// re-verification behind a stolen access token is no unthrottled oracle:
+// failures count against the same identity lockout as login, and a locked
+// identity is refused before its password is even checked.
+func TestTotpDisable_WrongPasswordsLockIdentity(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+
+	uid, _, _ := b2NewUser(t, deps.Queries)
+	b2EnrollTotp(t, deps, uid)
+	const password = "correct horse battery staple"
+	hash, err := internauth.HashPassword(password)
+	require.NoError(t, err)
+	ident, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+	require.NoError(t, err)
+	require.NoError(t, deps.Queries.UpdateIdentityPasswordHash(context.Background(), generated.UpdateIdentityPasswordHashParams{
+		PasswordHash: sql.NullString{String: hash, Valid: true},
+		ID:           ident.ID,
+	}))
+
+	ctx := authn.WithActor(context.Background(), uid)
+	disable := func(pw string) error {
+		in := &TotpDisableInput{}
+		in.Body.Password = pw
+		_, err := TotpDisable(deps)(ctx, in)
+		return err
+	}
+	for range maxFailedBeforeLock {
+		problem := problemFor(t, disable("wrong guess"))
+		assert.Equal(t, apierrors.AuthPasswordCurrentMismatch.Code, problem.Type)
+	}
+
+	locked, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+	require.NoError(t, err)
+	require.True(t, locked.LockedUntilAt.Valid && locked.LockedUntilAt.Time.After(time.Now()),
+		"repeated wrong current passwords must lock the identity like failed logins")
+
+	problem := problemFor(t, disable(password))
+	assert.Equal(t, apierrors.AuthLoginAccountLocked.Code, problem.Type,
+		"a locked identity must be refused before the password is verified")
+	still, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+	require.NoError(t, err)
+	assert.True(t, still.MfaConfirmedAt.Valid, "2FA must stay enabled while the identity is locked")
+}
+
+// b2DisableUser suspends a user the way the admin endpoint does.
+func b2DisableUser(t *testing.T, db *sql.DB, uid uint32) {
+	t.Helper()
+	_, err := db.ExecContext(context.Background(), "UPDATE users SET enabled = FALSE WHERE id = ?", uid)
+	require.NoError(t, err)
+}
+
+// TestMagicLinkVerify_SuspendedAccountIsRefused proves a link issued
+// before a suspension answers with the defined disabled-account error,
+// not a 500, and issues nothing.
+func TestMagicLinkVerify_SuspendedAccountIsRefused(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	ctx := context.Background()
+
+	uid, _, _ := b2NewUser(t, deps.Queries)
+	plain, hash, err := internauth.GenerateOpaque("ml")
+	require.NoError(t, err)
+	_, err = deps.Queries.CreateMagicLinkToken(ctx, generated.CreateMagicLinkTokenParams{
+		PublicID:  types.New(),
+		UserID:    uid,
+		TokenHash: hash,
+		ExpiresAt: time.Now().Add(15 * time.Minute),
+	})
+	require.NoError(t, err)
+	b2DisableUser(t, db, uid)
+
+	out, err := MagicLinkVerify(deps)(ctx, &MagicLinkVerifyInput{Token: plain})
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthLoginAccountDisabled.Code, problem.Type)
+	assert.Nil(t, out)
+	assert.Equal(t, 0, b2ActiveSessions(t, db, uid))
+}
+
+// TestOIDCCallback_SuspendedAccountIsRefused covers both OIDC shapes: an
+// identity already bound to the suspended user, and a new provider whose
+// email matches it. Neither may surface as a 500 or issue a session.
+func TestOIDCCallback_SuspendedAccountIsRefused(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.RegistrationOpen = true
+
+	uid, _, email := b2NewUser(t, deps.Queries)
+	_, sub, err := githubLinkAttempt(t, deps, email)
+	require.NoError(t, err)
+	b2DisableUser(t, db, uid)
+
+	deps.OIDCGithub = &fakeGithubExchanger{
+		claims: &internauth.GithubClaims{Sub: sub, Login: "victim", Name: "Victim", Email: email},
+	}
+	state, stateCookie := signedGithubState(t, &deps)
+	_, err = OIDCGithubCallback(deps)(context.Background(), &OIDCCallbackInput{
+		Code: "auth-code", State: state, StateCookie: stateCookie,
+	})
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthLoginAccountDisabled.Code, problem.Type, "bound identity")
+
+	_, _, err = githubLinkAttempt(t, deps, email)
+	problem = problemFor(t, err)
+	assert.Equal(t, apierrors.AuthLoginAccountDisabled.Code, problem.Type, "new provider, same email")
+	assert.Equal(t, 1, countUsersByEmail(t, db, email))
+}
+
+// failingSender refuses every delivery.
+type failingSender struct{}
+
+func (failingSender) Send(context.Context, email.Message) error {
+	return errors.New("smtp: connection refused")
+}
+
+// TestIssueMagicLink_SendFailureIsReported proves a delivery failure on
+// the known-address path comes back to the caller, which logs it, rather
+// than being dropped.
+func TestIssueMagicLink_SendFailureIsReported(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	deps, _ := b2Deps(t, db)
+	deps.EmailSender = failingSender{}
+
+	_, _, addr := b2NewUser(t, deps.Queries)
+	err := issueMagicLink(context.Background(), deps, addr)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection refused")
+
+	assert.NoError(t, issueMagicLink(context.Background(), deps, "nobody-"+types.New().String()+"@example.test"),
+		"an address with no account is not a failure")
 }

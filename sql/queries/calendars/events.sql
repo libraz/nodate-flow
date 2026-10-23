@@ -30,6 +30,10 @@ INSERT INTO calendar_events (
 -- Resolve a calendar event by UUID v7 within a calendar. The creator
 -- (created_by_user_id) is LEFT JOINed so a soft-disabled creator yields
 -- NULL identity columns rather than dropping the event row.
+--
+-- recurrence_parent_id is selected so an override's attendance can be read
+-- off its series, whose attendee list it shares. It is internal and never
+-- reaches an API response.
 SELECT
   ce.id,
   ce.public_id,
@@ -58,6 +62,7 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.notification_offset,
   ce.task_id,
+  ce.recurrence_parent_id,
   ce.enabled,
   ce.updated_at,
   ce.created_at
@@ -96,9 +101,11 @@ SELECT
   ce.task_id,
   ce.updated_at,
   ce.created_at,
+  -- An override shares its series' attendee list, so attendance is read
+  -- off the master as well as off the row itself.
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -156,7 +163,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -198,7 +205,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -272,7 +279,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -339,17 +346,17 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
-  (SELECT COUNT(*) FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -433,10 +440,10 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
-  (SELECT COUNT(*) FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -446,7 +453,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -850,9 +857,16 @@ WHERE workspace_id = ?
 -- enabled rows. Reparenting has to carry soft-deleted overrides so a revived
 -- one still names a master that can produce it, while withdrawing a row that
 -- is already withdrawn changes nothing and must not be counted.
+--
+-- Scoped to the overrides the acting user can see, on the row filter the
+-- range queries carry: a confidential override belonging to somebody else
+-- stays enabled past the truncation and keeps rendering to its owner, since
+-- disabling it would remove an occurrence from a calendar the actor has no
+-- view of.
 UPDATE calendar_events
 SET enabled = FALSE
 WHERE workspace_id = ?
   AND recurrence_parent_id = sqlc.arg('parent_id')
   AND recurrence_original_start >= sqlc.arg('split_start')
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND (visibility <> 'confidential' OR owner_user_id = sqlc.arg('viewer_user_id'));

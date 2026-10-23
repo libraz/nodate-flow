@@ -57,6 +57,11 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			if err != nil {
 				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 			}
+			if spec, err := CheckParent(ctx, deps.DB, ws.ID, 0, projectID, parent.ProjectID, parent.ID); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			} else if spec != nil {
+				return nil, httpErr(spec)
+			}
 			parentLabelID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent_label_id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 		}
 
@@ -254,6 +259,11 @@ func Patch(deps Deps) func(context.Context, *PatchLabelInput) (*PatchLabelOutput
 				if findErr != nil {
 					return nil, httpErr(apierr.SpecForErrNoRows(findErr, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 				}
+				if spec, chkErr := CheckParent(ctx, deps.DB, ws.ID, row.ID, row.ProjectID, parent.ProjectID, parent.ID); chkErr != nil {
+					return nil, httpErr(apierrors.InternalUnexpected)
+				} else if spec != nil {
+					return nil, httpErr(spec)
+				}
 				parentID = sql.NullInt32{Int32: int32(parent.ID), Valid: true} //#nosec G115 -- parent label id is task_labels.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			}
 		}
@@ -387,6 +397,17 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsLabelNotFound, apierrors.InternalUnexpected))
 		}
 
+		var taskProject uint32
+		if err := deps.DB.QueryRowContext(ctx,
+			`SELECT project_id FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
+			task.ID, ws.ID,
+		).Scan(&taskProject); err != nil {
+			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
+		}
+		if spec := CheckAttachScope(label.ProjectID, taskProject); spec != nil {
+			return nil, httpErr(spec)
+		}
+
 		pub := types.New()
 		if _, err := deps.Queries.CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
 			PublicID:    pub,
@@ -396,7 +417,7 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			SortWeight:  0,
 		}); err != nil {
 			if isDuplicateEntry(err) {
-				return nil, httpErr(apierrors.WsLabelNameAlreadyTaken)
+				return nil, httpErr(apierrors.WsLabelAlreadyAttached)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

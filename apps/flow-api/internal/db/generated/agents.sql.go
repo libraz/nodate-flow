@@ -73,9 +73,11 @@ SELECT
   a.max_output_tokens,
   a.paused,
   m.public_id AS model_public_id,
-  m.name AS model_name
+  m.name AS model_name,
+  p.public_id AS provider_public_id
 FROM ai_agents a
 INNER JOIN ai_models m ON m.id = a.model_id AND m.enabled = TRUE
+INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
 WHERE a.workspace_id = ? AND a.id = ? AND a.enabled = TRUE
 `
 
@@ -85,19 +87,21 @@ type GetAgentForExecParams struct {
 }
 
 type GetAgentForExecRow struct {
-	ID              uint32         `json:"-"`
-	PublicID        types.PublicID `json:"publicId"`
-	WorkspaceID     uint32         `json:"-"`
-	Name            string         `json:"name"`
-	SystemPrompt    string         `json:"systemPrompt"`
-	Temperature     uint16         `json:"temperature"`
-	MaxOutputTokens sql.NullInt32  `json:"maxOutputTokens"`
-	Paused          bool           `json:"paused"`
-	ModelPublicID   types.PublicID `json:"modelPublicId"`
-	ModelName       string         `json:"modelName"`
+	ID               uint32         `json:"-"`
+	PublicID         types.PublicID `json:"publicId"`
+	WorkspaceID      uint32         `json:"-"`
+	Name             string         `json:"name"`
+	SystemPrompt     string         `json:"systemPrompt"`
+	Temperature      uint16         `json:"temperature"`
+	MaxOutputTokens  sql.NullInt32  `json:"maxOutputTokens"`
+	Paused           bool           `json:"paused"`
+	ModelPublicID    types.PublicID `json:"modelPublicId"`
+	ModelName        string         `json:"modelName"`
+	ProviderPublicID types.PublicID `json:"providerPublicId"`
 }
 
-// Fetch the minimal fields an agent runner needs to invoke an LLM.
+// Fetch the minimal fields an agent runner needs to invoke an LLM, including
+// the provider that owns the agent's model.
 func (q *Queries) GetAgentForExec(ctx context.Context, arg GetAgentForExecParams) (GetAgentForExecRow, error) {
 	row := q.db.QueryRowContext(ctx, getAgentForExec, arg.WorkspaceID, arg.ID)
 	var i GetAgentForExecRow
@@ -112,6 +116,7 @@ func (q *Queries) GetAgentForExec(ctx context.Context, arg GetAgentForExecParams
 		&i.Paused,
 		&i.ModelPublicID,
 		&i.ModelName,
+		&i.ProviderPublicID,
 	)
 	return i, err
 }

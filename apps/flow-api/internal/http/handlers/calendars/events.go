@@ -11,8 +11,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -420,13 +422,17 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			if parseErr != nil {
 				return nil, httpErr(apierrors.CalendarEventOwnerUserIdMalformed)
 			}
-			// Resolve the owner user's internal ID.
-			var ownerInternal uint32
-			row := deps.DB.QueryRowContext(ctx,
-				`SELECT id FROM users WHERE public_id = ? AND enabled = TRUE LIMIT 1`,
-				types.FromUUID(ownerUID))
-			if scanErr := row.Scan(&ownerInternal); scanErr != nil {
-				if errors.Is(scanErr, sql.ErrNoRows) {
+			// The owner FK references the global users table, so the
+			// lookup itself is what keeps the event inside this workspace:
+			// a user who is not an enabled member answers exactly as an
+			// unknown id does, and says nothing about other tenants.
+			ownerInternal, lookupErr := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx,
+				generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+					WorkspaceID: wsID,
+					PublicID:    types.FromUUID(ownerUID),
+				})
+			if lookupErr != nil {
+				if errors.Is(lookupErr, sql.ErrNoRows) {
 					return nil, httpErr(apierrors.CalendarEventOwnerUserNotFound)
 				}
 				return nil, httpErr(apierrors.CalendarEventOwnerUserResolveInterrupted)
@@ -596,14 +602,25 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		// this viewer's to read, so it is resolved before either check.
 		// One lookup is affordable here; the list paths get the same
 		// answer from the is_attendee column instead of a query per row.
+		// An override shares its series' attendee list, so the master is
+		// asked as well.
 		isAttendee := false
-		if _, aerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: handlerutil.NullInt32From(evt.ID),
-			UserID:  actorID,
-		}); aerr == nil {
-			isAttendee = true
-		} else if !errors.Is(aerr, sql.ErrNoRows) {
-			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+		attendanceRows := []sql.NullInt32{handlerutil.NullInt32From(evt.ID)}
+		if evt.RecurrenceParentID.Valid {
+			attendanceRows = append(attendanceRows, evt.RecurrenceParentID)
+		}
+		for _, eventID := range attendanceRows {
+			_, aerr := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+				EventID: eventID,
+				UserID:  actorID,
+			})
+			if aerr == nil {
+				isAttendee = true
+				break
+			}
+			if !errors.Is(aerr, sql.ErrNoRows) {
+				return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
 		}
 
 		aclEvent := eventacl.Event{
@@ -901,6 +918,17 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			params.StartAt, params.EndAt = normalizeAllDayBounds(true, params.StartAt, params.EndAt)
 		}
 
+		// A write that moves where a series' occurrences fall — its start,
+		// zone, rule or bounds — takes the overrides and exceptions naming
+		// those occurrences along with it, in the same transaction. The
+		// exception list stays as sent when the caller sent one.
+		realignSeries := calendaroccurrence.HasRule(evt.RecurrenceRule) &&
+			((params.StartAt.Valid && !params.StartAt.Time.Equal(evt.StartAt.Time)) ||
+				(input.Body.Timezone != nil && *input.Body.Timezone != evt.Timezone) ||
+				input.Body.RecurrenceRule != nil || cleared.recurrenceRule == 1 ||
+				input.Body.RecurrenceEnd != nil || cleared.recurrenceEnd == 1)
+		keepExceptions := input.Body.RecurrenceExceptions != nil || cleared.recurrenceExceptions == 1
+
 		// updated carries the post-write row out of the transaction; evt
 		// stays the pre-write snapshot the decisions above were made from.
 		updated := evt
@@ -945,6 +973,26 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				}
 			}
 
+			// The series columns as they stand before this write, read
+			// under the row lock so the realignment below starts from what
+			// is committed rather than from the snapshot taken before the
+			// transaction.
+			var before calendaroccurrence.SeriesState
+			if realignSeries {
+				locked, lerr := cqtx.LockCalendarEventSeries(ctx, calendar.LockCalendarEventSeriesParams{
+					ID:          evt.ID,
+					WorkspaceID: wsID,
+				})
+				if lerr != nil {
+					answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
+					return lerr
+				}
+				before = calendaroccurrence.SeriesStateOf(evt)
+				before.Rule = locked.RecurrenceRule
+				before.End = locked.RecurrenceEnd
+				before.Exceptions = locked.RecurrenceExceptions
+			}
+
 			// Not an existence check: MySQL counts changed rows, so a PATCH
 			// that re-sends the event's current values reports zero. The
 			// event is re-read below and that read is what would fail.
@@ -962,8 +1010,19 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			})
 			if rerr != nil {
 				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
+				return rerr
 			}
-			return rerr
+
+			if realignSeries {
+				exceptions, err := calendaroccurrence.RealignSeries(ctx, seriesQueries(deps, tx), wsID, before, updated, keepExceptions)
+				if err != nil {
+					return err
+				}
+				if exceptions != nil {
+					updated.RecurrenceExceptions = exceptions
+				}
+			}
+			return nil
 		})
 		if answered != nil {
 			return nil, answered

@@ -8,6 +8,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // stubExecQueries returns a fixed agent row, standing in for the sqlc
@@ -51,7 +52,7 @@ func newTestExecutor(recorded *[]InvocationRecord, prov providers.Provider) *Age
 			MaxOutputTokens: sql.NullInt32{Int32: 256, Valid: true},
 			ModelName:       "stub-model",
 		}},
-		Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
+		Resolver: AgentProviderResolverFunc(func(context.Context, uint32, types.PublicID) (providers.Provider, error) {
 			return prov, nil
 		}),
 		Log: func(_ context.Context, rec InvocationRecord) {
@@ -149,4 +150,34 @@ func (providerFunc) Kind() providers.Kind { return providers.KindOllama }
 func (providerFunc) Model() string        { return "stub-default" }
 func (f providerFunc) Complete(ctx context.Context, req providers.Request) (*providers.Response, error) {
 	return f(ctx, req)
+}
+
+// TestExecuteAgentUsesTheProviderOwningTheAgentsModel pins that the agent's
+// model is sent to the provider row that owns it, not to the workspace
+// default: a model name from one provider kind is meaningless, and its key
+// and endpoint are different, on another.
+func TestExecuteAgentUsesTheProviderOwningTheAgentsModel(t *testing.T) {
+	t.Parallel()
+
+	owner := types.New()
+	var got types.PublicID
+	var recorded []InvocationRecord
+	exec := newTestExecutor(&recorded, &stubProvider{})
+	exec.Queries = stubExecQueries{row: generated.GetAgentForExecRow{
+		ID:               7,
+		WorkspaceID:      42,
+		ModelName:        "stub-model",
+		ProviderPublicID: owner,
+	}}
+	exec.Resolver = AgentProviderResolverFunc(func(_ context.Context, _ uint32, id types.PublicID) (providers.Provider, error) {
+		got = id
+		return &stubProvider{}, nil
+	})
+
+	if _, err := exec.ExecuteAgent(context.Background(), 42, 7); err != nil {
+		t.Fatalf("ExecuteAgent: %v", err)
+	}
+	if got != owner {
+		t.Fatalf("resolved provider = %v, want the model's owning provider %v", got, owner)
+	}
 }

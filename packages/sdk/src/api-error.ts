@@ -12,12 +12,23 @@
  */
 import { lookupErrorI18nKey } from './error-lookup.js';
 
+/**
+ * One entry of a problem+json `errors` list: which input was refused and
+ * why, e.g. `{ location: 'body.title', message: 'expected length <= 255' }`.
+ */
+export interface ApiErrorDetail {
+  location?: string;
+  message?: string;
+}
+
 export class ApiError extends Error {
   readonly code: string | undefined;
   readonly httpStatus: number | undefined;
   readonly userAction: string | undefined;
   readonly i18nKey: string | undefined;
   readonly extensions: Record<string, unknown> | undefined;
+  /** The per-field entries of the envelope's `errors` list, when it had one. */
+  readonly details: ApiErrorDetail[] | undefined;
 
   constructor(
     code: string | undefined,
@@ -26,6 +37,7 @@ export class ApiError extends Error {
     userAction?: string,
     i18nKey?: string,
     extensions?: Record<string, unknown>,
+    details?: ApiErrorDetail[],
   ) {
     super(message);
     this.name = 'ApiError';
@@ -34,6 +46,7 @@ export class ApiError extends Error {
     this.userAction = userAction;
     this.i18nKey = i18nKey;
     this.extensions = extensions;
+    this.details = details;
   }
 }
 
@@ -133,6 +146,7 @@ export function toApiError(err: unknown, fallback: string, httpStatus?: number):
       message?: unknown;
       userAction?: unknown;
       extensions?: unknown;
+      errors?: unknown;
     };
     const message =
       (typeof obj.detail === 'string' && obj.detail) ||
@@ -154,9 +168,32 @@ export function toApiError(err: unknown, fallback: string, httpStatus?: number):
           ? extensions.i18nKey
           : undefined;
     const i18nKey = extensionI18nKey ?? lookupErrorI18nKey(code);
-    return new ApiError(code, message, resolvedStatus, userAction, i18nKey, extensions);
+    return new ApiError(
+      code,
+      message,
+      resolvedStatus,
+      userAction,
+      i18nKey,
+      extensions,
+      toErrorDetails(obj.errors),
+    );
   }
   return new ApiError(undefined, fallback, httpStatus);
+}
+
+/** Keeps the location and message of each well-formed `errors` entry. */
+function toErrorDetails(raw: unknown): ApiErrorDetail[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const details: ApiErrorDetail[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const { location, message } = entry as { location?: unknown; message?: unknown };
+    const detail: ApiErrorDetail = {};
+    if (typeof location === 'string') detail.location = location;
+    if (typeof message === 'string') detail.message = message;
+    if (detail.location !== undefined || detail.message !== undefined) details.push(detail);
+  }
+  return details.length > 0 ? details : undefined;
 }
 
 /** RFC 7807 problem+json shape extracted from SDK error responses. */

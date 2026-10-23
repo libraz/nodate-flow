@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 // Facts is the read-only world the evaluator sees for one task. All
@@ -172,17 +174,8 @@ func isTerminalState(state string) bool {
 	}
 }
 
-// blockingDepKind reports whether a dependency kind actually gates the
-// dependent task's progress. "blocks" and "subtask_of" hold work back;
-// "relates", "duplicates", and "retro_of" are informational and must
-// not count toward dependency.open_at_most. An empty kind is treated
-// as blocking so callers that do not populate kinds keep the prior
-// (count-everything) behaviour.
+// blockingDepKind reports whether a dependency kind gates the dependent
+// task's progress; the definition is shared with the cycle check.
 func blockingDepKind(kind string) bool {
-	switch kind {
-	case "relates", "duplicates", "retro_of":
-		return false
-	default:
-		return true
-	}
+	return taskrules.IsBlockingDependencyKind(kind)
 }

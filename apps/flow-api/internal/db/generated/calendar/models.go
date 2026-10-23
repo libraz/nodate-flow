@@ -3424,7 +3424,7 @@ type Lense struct {
 	PublicTokenHash sql.NullString `json:"publicTokenHash"`
 	// Timestamp when first shared publicly
 	SharedAt sql.NullTime `json:"sharedAt"`
-	// Timestamp of last AI safety check
+	// Reserved for the timestamp of the last AI safety check; nothing writes it yet
 	SafetyCheckedAt sql.NullTime `json:"safetyCheckedAt"`
 	// Set when lens is archived (distinct from enabled)
 	ArchivedAt sql.NullTime `json:"archivedAt"`

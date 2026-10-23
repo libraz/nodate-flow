@@ -186,10 +186,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 // tickForWorkspace runs the scan + emit cycle for a single workspace.
 // `span` is the fire-once day window this tick materialises. Only events
 // whose local day arrives inside it are scanned, so a steady cadence
-// emits each (event, day) once. Returned errors describe the
-// workspace-level failure (event query); per-event POST failures are
-// logged inside the loop and do not abort the workspace — partial
-// progress is better than none.
+// emits each (event, day) once.
 func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, span scanSpan) error {
 	events, err := j.Scanner.ListEventsForDays(ctx, ws.ID, ws.Timezone, span.upper, span.width)
 	if err != nil {
@@ -202,7 +199,18 @@ func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, span scanSpan)
 		)
 		return nil
 	}
+	return j.postArrivals(ctx, ws, events)
+}
 
+// postArrivals posts one signal per arriving (event, day).
+//
+// A signal flow-api refuses is a permanent answer and is skipped. A
+// transport failure or a 5xx is not: the rest of the span is still
+// posted — partial progress is better than none — but the error comes
+// back, so the cursor stays and the next tick retries the span. The
+// dedupe key collapses the signals that did land.
+func (j *Job) postArrivals(ctx context.Context, ws Workspace, events []EventOnDay) error {
+	var transient error
 	for _, eod := range events {
 		// Honour ctx cancellation between events so a shutdown signal
 		// during a long workspace fan-out drains promptly.
@@ -231,10 +239,13 @@ func (j *Job) tickForWorkspace(ctx context.Context, ws Workspace, span scanSpan)
 				slog.String("event_public_id", eod.Event.PublicID.String()),
 				slog.String("event_day", eod.Day),
 			)
+			if !errors.Is(err, ErrSignalRejected) && transient == nil {
+				transient = fmt.Errorf("post signal: %w", err)
+			}
 			continue
 		}
 	}
-	return nil
+	return transient
 }
 
 // buildSignalBody assembles the PostSignalBody for one (workspace,

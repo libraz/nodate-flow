@@ -3,6 +3,8 @@ package vacuousassert
 import (
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -255,4 +257,46 @@ func scanRepository(t *testing.T) ([]UnprovenNegation, []UnprovenLoop, []StaleMa
 		t.Fatalf("scan: %v", err)
 	}
 	return negations, loops, stale
+}
+
+// TestRootsFollowGoWork pins that the scanned trees come from go.work, and
+// that a listed module with no directory fails instead of being skipped.
+func TestRootsFollowGoWork(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "a"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, "go.work"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("go 1.26.0\n\nuse (\n\t./a // first\n)\n")
+	roots, err := TestRoots(dir)
+	if err != nil || !slices.Equal(roots, []string{"a"}) {
+		t.Fatalf("TestRoots = %v, %v; want [a]", roots, err)
+	}
+
+	write("go 1.26.0\n\nuse (\n\t./a\n\t./missing\n)\n")
+	if _, err := TestRoots(dir); err == nil {
+		t.Fatal("a go.work module with no directory must be an error, not skipped")
+	}
+
+	root, err := RepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	real, err := TestRoots(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"apps/flow-api", "apps/flow-worker", "packages/go-shared"} {
+		if !slices.Contains(real, filepath.FromSlash(want)) {
+			t.Errorf("repository roots %v lack %s", real, want)
+		}
+	}
 }

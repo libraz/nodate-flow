@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -830,6 +831,32 @@ func TestRecurringPastRecurrenceEndDoesNotFire(t *testing.T) {
 		loadSignalsForEvent(t, h.db, tt.WorkspaceID, eventInternalID), "2026-08-04")
 	require.Emptyf(t, signals,
 		"an occurrence past recurrence_end must not fire, got %d", len(signals))
+}
+
+// TestEndedSeriesIsNotReadByTheScan keeps a series whose recurrence_end
+// passed before the scanned day out of the read altogether. Its rule is
+// one the expander cannot step, so a scan that still read it would log the
+// row as malformed; one that does not read it says nothing about it.
+func TestEndedSeriesIsNotReadByTheScan(t *testing.T) {
+	t.Parallel()
+	h := getHarness(t)
+
+	tt := helpers.CreateCalendarTestTenant(t, h.srv)
+	setWorkspaceTimezone(t, h.db, tt.WorkspaceID, "UTC")
+	calID := createCalendarViaAPI(t, tt)
+
+	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
+	eventPublicID := createEventViaAPI(t, tt, calID, base, base.Add(time.Hour), "UTC", "Ended Series")
+	ended := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"unsupported"}`, "", &ended)
+
+	var logged bytes.Buffer
+	scanner := &calendar_event_day.Scanner{DB: h.db, Logger: slog.New(slog.NewJSONHandler(&logged, nil))}
+	tick := time.Date(2026, time.August, 4, 0, 0, 30, 0, time.UTC)
+	_, err := scanner.ListEventsForDays(context.Background(), tt.WorkspaceID, "UTC", tick, time.Nanosecond)
+	require.NoError(t, err)
+	require.NotContains(t, logged.String(), eventPublicID,
+		"a series whose recurrence_end passed before the scanned day must not be read")
 }
 
 func TestMalformedRecurrenceDoesNotBlockWorkspaceScan(t *testing.T) {

@@ -127,13 +127,10 @@ func deleteEventOccurrence(
 	return nil
 }
 
-// deleteEventFollowing stops a series at an occurrence: the master keeps
-// the occurrences before the split and produces none from it onwards.
-//
-// The overrides at or after the split go with them. They describe
-// occurrences the truncated master no longer produces, and each is a row
-// the non-recurring range queries select on its own, so left enabled
-// they outlive the part of the series they belong to.
+// deleteEventFollowing stops a series at an occurrence through
+// [calendaroccurrence.EndSeries]: the master keeps the occurrences before
+// the split, and the exceptions and overrides from it onwards go with the
+// rest. The MCP delete tool ends a series through the same function.
 func deleteEventFollowing(
 	ctx context.Context,
 	deps Deps,
@@ -142,77 +139,9 @@ func deleteEventFollowing(
 	master calendar.FindCalendarEventByPublicIdRow,
 	splitStart time.Time,
 ) error {
-	truncateAt := calendaroccurrence.TruncationPoint(master, splitStart)
-	parentID := handlerutil.NullInt32From(master.ID)
-
-	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "calendars.DeleteEventFollowing", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		answered = nil
-		cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
-
-		if _, err := cqtx.PatchCalendarEvent(ctx, calendar.PatchCalendarEventParams{
-			RecurrenceEnd: sql.NullTime{Time: truncateAt, Valid: true},
-			PublicID:      master.PublicID,
-			CalendarID:    cal.ID,
-			WorkspaceID:   wsID,
-		}); err != nil {
-			return err
-		}
-
-		// DisableCalendarEventOverridesByParent takes the whole series and
-		// cannot be given a range, and the overrides before the split
-		// describe occurrences the master still produces. So the rows are
-		// listed and disabled one at a time: the list is already confined
-		// to this parent's live overrides, and a series carries few enough
-		// of them that the loop is bounded by the same runaway limit the
-		// expander reads them under.
-		//
-		// The list is scoped to the acting user, so a confidential override
-		// belonging to somebody else stays enabled past the truncation and
-		// keeps rendering to its owner. That is the same row the actor is
-		// not served anywhere else; disabling one they cannot see would
-		// remove an occurrence from a calendar they have no view of.
-		starts, err := cqtx.ListCalendarEventOverriddenStarts(ctx, calendar.ListCalendarEventOverriddenStartsParams{
-			WorkspaceID:  wsID,
-			ParentIds:    []sql.NullInt32{parentID},
-			ViewerUserID: actorID,
-		})
-		if err != nil {
-			answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
-			return err
-		}
-		for _, s := range starts {
-			if !s.RecurrenceOriginalStart.Valid || s.RecurrenceOriginalStart.Time.Before(splitStart) {
-				continue
-			}
-			override, findErr := cqtx.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
-				WorkspaceID:             wsID,
-				RecurrenceParentID:      parentID,
-				RecurrenceOriginalStart: s.RecurrenceOriginalStart,
-			})
-			if findErr != nil {
-				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
-				return findErr
-			}
-			// affected-rows: not-applicable — the loop walks the live
-			// overrides listed in this transaction and disables each one it
-			// re-read by key, so a zero says another writer got there first
-			// rather than that anything was missing. The caller named the
-			// series, and truncating the master is what removes the
-			// occurrences these describe.
-			if _, err := cqtx.DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
-				PublicID:    override.PublicID,
-				CalendarID:  override.CalendarID,
-				WorkspaceID: wsID,
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
+		return calendaroccurrence.EndSeries(ctx, seriesQueries(deps, tx), wsID, cal.ID, actorID, master, splitStart)
 	})
-	if answered != nil {
-		return answered
-	}
 	if txErr != nil {
 		return httpErr(apierrors.CalendarEventStoreDeleteInterrupted)
 	}

@@ -37,7 +37,7 @@ func NewCache(ttl time.Duration) *Cache {
 	return &Cache{ttl: ttl, m: make(map[string]cacheEntry)}
 }
 
-// Get returns a cached ToolCall for the normalized key, or nil if
+// Get returns a private copy of the cached ToolCall for the key, or nil if
 // absent or expired.
 func (c *Cache) Get(key string) *ToolCall {
 	if c == nil || c.ttl <= 0 {
@@ -53,7 +53,7 @@ func (c *Cache) Get(key string) *ToolCall {
 		delete(c.m, key)
 		return nil
 	}
-	return e.result
+	return e.result.clone()
 }
 
 // Put stores a ToolCall under the normalized key with the configured TTL.
@@ -63,7 +63,7 @@ func (c *Cache) Put(key string, tc *ToolCall) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.m[key] = cacheEntry{result: tc, expireAt: time.Now().Add(c.ttl)}
+	c.m[key] = cacheEntry{result: tc.clone(), expireAt: time.Now().Add(c.ttl)}
 	if len(c.m) > cacheMax {
 		ai.EvictOldest(c.m, cacheMax, func(e cacheEntry) time.Time { return e.expireAt })
 	}

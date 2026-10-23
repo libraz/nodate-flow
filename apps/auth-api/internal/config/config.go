@@ -115,10 +115,11 @@ type Config struct {
 	// remain false in production.
 	CorsDevLocalhost bool `env:"NF_CORS_DEV_LOCALHOST" envDefault:"false"`
 
-	// SessionStore selects the refresh-token session driver: mysql or redis.
+	// SessionStore selects the refresh-token session driver. Only mysql is
+	// accepted: auth-api and flow-api both validate access tokens against
+	// the MySQL sessions table, so a session held anywhere else would make
+	// every token it backs fail.
 	SessionStore string `env:"NF_AUTH_SESSION_STORE" envDefault:"mysql"`
-	// RedisAddr is the host:port for the Redis session store.
-	RedisAddr string `env:"NF_REDIS_ADDR" envDefault:""`
 
 	// OIDC Google configuration.
 	GoogleClientID     string `env:"NF_AUTH_GOOGLE_CLIENT_ID" envDefault:""`
@@ -294,9 +295,11 @@ func validateEnums(cfg *Config) error {
 		return fmt.Errorf("config: NF_AUTH_METRICS_PORT must be an integer between 1 and 65535, got %q", cfg.MetricsPort)
 	}
 	switch cfg.SessionStore {
-	case "mysql", "redis":
+	case "mysql":
+	case "redis":
+		return fmt.Errorf("config: NF_AUTH_SESSION_STORE=redis is not supported: access tokens are validated against the MySQL sessions table on auth-api and flow-api, so sessions held in Redis would reject every token")
 	default:
-		return fmt.Errorf("config: NF_AUTH_SESSION_STORE must be \"mysql\" or \"redis\", got %q", cfg.SessionStore)
+		return fmt.Errorf("config: NF_AUTH_SESSION_STORE must be \"mysql\", got %q", cfg.SessionStore)
 	}
 	return nil
 }

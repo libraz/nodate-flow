@@ -95,6 +95,10 @@ type pendingNotification struct {
 	NotificationOffset int32
 	OwnerUserID        uint32
 	WorkspaceID        uint32
+	// SeriesID is the master an override stands in for an occurrence of,
+	// zero for any other row. An override shares its series' attendee
+	// list, so the recipients are read off both.
+	SeriesID uint32
 }
 
 // CheckAndNotify queries for events whose notification window has opened
@@ -113,9 +117,9 @@ type pendingNotification struct {
 func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatcher) {
 	log := schedLog()
 	// Find events where the notification window has opened but the event
-	// has not started yet and no notification has been sent. Limited to
-	// events starting within the next 24 hours to avoid scanning the
-	// entire table.
+	// has not started yet and no notification has been sent. Plain events
+	// are bounded to the reminder window; every live series is read and
+	// expanded, since its next occurrence is not a column to filter on.
 	now := time.Now().UTC()
 	notifications, err := dueReminders(ctx, db, now)
 	if err != nil {
@@ -123,15 +127,33 @@ func CheckAndNotify(ctx context.Context, db *sql.DB, dispatcher ReminderDispatch
 		return
 	}
 
+	// An occurrence already claimed stays claimed until it starts, so it
+	// is dropped here rather than re-reading its recipients and losing the
+	// claim race again on every tick until then.
+	claimed, err := claimedOccurrences(ctx, db, notifications, now)
+	if err != nil {
+		log.Error("notification scheduler: failed to read sent reminders", "err", err)
+		return
+	}
+
 	queries := generated.New(db)
 	delivered := 0
 	for _, n := range notifications {
+		if claimed[claimKey{eventID: n.ID, occurrence: n.OccurrenceStart.UnixMilli()}] {
+			continue
+		}
 		// Load recipients before claiming so a read failure does not
 		// consume the claim (nothing to release, next tick retries).
-		recipients, err := reminderRecipients(ctx, db, n.ID, n.OwnerUserID)
+		recipients, err := reminderRecipients(ctx, db, n)
 		if err != nil {
 			log.Error("notification scheduler: failed to load recipients",
 				"eventId", n.PublicID.String(), "err", err)
+			continue
+		}
+		// Nobody left to remind: the owner and every attendee have left
+		// the workspace. Nothing is claimed, so a member added before the
+		// occurrence starts is still reminded.
+		if len(recipients) == 0 {
 			continue
 		}
 
@@ -270,11 +292,17 @@ const reminderWindow = 24 * time.Hour
 // reminders early or late rather than absent.
 func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNotification, error) {
 	horizon := now.Add(reminderWindow)
+	// An event is reminded only while everything above it is live: a
+	// deleted calendar or a disabled workspace takes its events with it,
+	// the same scope the calendar read paths apply.
 	rows, err := db.QueryContext(ctx, `
 		SELECT ce.id, ce.public_id, ce.title, ce.start_at, ce.notification_offset,
 		       ce.owner_user_id, ce.workspace_id, ce.timezone,
-		       ce.recurrence_rule, ce.recurrence_end, ce.recurrence_exceptions
+		       ce.recurrence_rule, ce.recurrence_end, ce.recurrence_exceptions,
+		       ce.recurrence_parent_id
 		FROM calendar_events ce
+		INNER JOIN calendars c ON c.id = ce.calendar_id AND c.enabled = TRUE
+		INNER JOIN workspaces w ON w.id = ce.workspace_id AND w.enabled = TRUE
 		WHERE ce.notification_offset IS NOT NULL
 		  AND ce.start_at IS NOT NULL
 		  AND ce.enabled = TRUE
@@ -299,13 +327,17 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 			ruleRaw    []byte
 			seriesEnd  sql.NullTime
 			exceptions []byte
+			seriesID   sql.NullInt32
 		)
 		if err := rows.Scan(
 			&c.n.ID, &c.n.PublicID, &c.n.Title, &c.n.StartAt, &c.n.NotificationOffset,
 			&c.n.OwnerUserID, &c.n.WorkspaceID, &c.timezone,
-			&ruleRaw, &seriesEnd, &exceptions,
+			&ruleRaw, &seriesEnd, &exceptions, &seriesID,
 		); err != nil {
 			return nil, err
+		}
+		if seriesID.Valid {
+			c.n.SeriesID = uint32(seriesID.Int32) //#nosec G115 -- internal row id read back from an INT UNSIGNED column
 		}
 
 		rule, perr := recurrence.ParseRule(ruleRaw)
@@ -408,10 +440,7 @@ func overriddenReminderStarts(
 	db *sql.DB,
 	candidates []reminderCandidate,
 ) (map[overrideKey][]string, error) {
-	var (
-		workspaceIDs []any
-		parentIDs    []any
-	)
+	var keys []overrideKey
 	seen := map[overrideKey]bool{}
 	for _, c := range candidates {
 		// Only a row carrying a rule can be overridden; an override names
@@ -424,50 +453,119 @@ func overriddenReminderStarts(
 			continue
 		}
 		seen[key] = true
-		workspaceIDs = append(workspaceIDs, key.workspaceID)
-		parentIDs = append(parentIDs, key.parentID)
+		keys = append(keys, key)
 	}
-	if len(parentIDs) == 0 {
-		return nil, nil
-	}
-
-	//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from the id slices; every id travels as a bound argument
-	q := `
-		SELECT ov.workspace_id, ov.recurrence_parent_id, ov.recurrence_original_start
-		FROM calendar_events ov
-		WHERE ov.enabled = TRUE
-		  AND ov.recurrence_original_start IS NOT NULL
-		  AND ov.workspace_id IN (?` + strings.Repeat(",?", len(workspaceIDs)-1) + `)
-		  AND ov.recurrence_parent_id IN (?` + strings.Repeat(",?", len(parentIDs)-1) + `)`
-
-	args := make([]any, 0, len(workspaceIDs)+len(parentIDs))
-	args = append(args, workspaceIDs...)
-	args = append(args, parentIDs...)
-
-	rows, err := db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
 	out := map[overrideKey][]string{}
-	for rows.Next() {
-		var (
-			key   overrideKey
-			start time.Time
-		)
-		if err := rows.Scan(&key.workspaceID, &key.parentID, &start); err != nil {
+	// Chunked so the statement binds a bounded number of placeholders
+	// however many series the instance holds; one unbounded list stops
+	// every reminder once it passes the protocol's placeholder limit.
+	for lo := 0; lo < len(keys); lo += lookupChunk {
+		chunk := keys[lo:min(lo+lookupChunk, len(keys))]
+		workspaceIDs := make([]any, 0, len(chunk))
+		parentIDs := make([]any, 0, len(chunk))
+		for _, k := range chunk {
+			workspaceIDs = append(workspaceIDs, k.workspaceID)
+			parentIDs = append(parentIDs, k.parentID)
+		}
+
+		//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from the id slices; every id travels as a bound argument
+		q := `
+			SELECT ov.workspace_id, ov.recurrence_parent_id, ov.recurrence_original_start
+			FROM calendar_events ov
+			WHERE ov.enabled = TRUE
+			  AND ov.recurrence_original_start IS NOT NULL
+			  AND ov.workspace_id IN (?` + strings.Repeat(",?", len(workspaceIDs)-1) + `)
+			  AND ov.recurrence_parent_id IN (?` + strings.Repeat(",?", len(parentIDs)-1) + `)`
+
+		args := make([]any, 0, len(workspaceIDs)+len(parentIDs))
+		args = append(args, workspaceIDs...)
+		args = append(args, parentIDs...)
+
+		if err := func() error {
+			rows, err := db.QueryContext(ctx, q, args...)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var (
+					key   overrideKey
+					start time.Time
+				)
+				if err := rows.Scan(&key.workspaceID, &key.parentID, &start); err != nil {
+					return err
+				}
+				// The two IN lists are independent, so a row may pair a
+				// scanned workspace with another workspace's master.
+				// Keeping only pairs the scan actually produced makes the
+				// scoping exact.
+				if !seen[key] {
+					continue
+				}
+				out[key] = append(out[key], start.UTC().Format(time.RFC3339))
+			}
+			return rows.Err()
+		}(); err != nil {
 			return nil, err
 		}
-		// The two IN lists are independent, so a row may pair a scanned
-		// workspace with another workspace's master. Keeping only pairs
-		// the scan actually produced makes the scoping exact.
-		if !seen[key] {
-			continue
-		}
-		out[key] = append(out[key], start.UTC().Format(time.RFC3339))
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+// lookupChunk bounds how many ids one IN list binds.
+const lookupChunk = 1000
+
+// claimKey names one occurrence's reminder claim.
+type claimKey struct {
+	eventID    uint32
+	occurrence int64
+}
+
+// claimedOccurrences returns which of the due occurrences already hold a
+// claim. Claims are read from now onwards, since a due occurrence has not
+// started yet.
+func claimedOccurrences(ctx context.Context, db *sql.DB, due []pendingNotification, now time.Time) (map[claimKey]bool, error) {
+	var ids []any
+	seen := map[uint32]bool{}
+	for _, n := range due {
+		if !seen[n.ID] {
+			seen[n.ID] = true
+			ids = append(ids, n.ID)
+		}
+	}
+	out := map[claimKey]bool{}
+	for lo := 0; lo < len(ids); lo += lookupChunk {
+		chunk := ids[lo:min(lo+lookupChunk, len(ids))]
+		//#nosec G202 -- the interpolated text is a generated ?-placeholder list sized from the id slice; every id travels as a bound argument
+		q := `
+			SELECT event_id, occurrence_start
+			FROM calendar_event_reminders
+			WHERE occurrence_start >= ?
+			  AND event_id IN (?` + strings.Repeat(",?", len(chunk)-1) + `)`
+		args := append([]any{now}, chunk...)
+		if err := func() error {
+			rows, err := db.QueryContext(ctx, q, args...)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var (
+					id uint32
+					at time.Time
+				)
+				if err := rows.Scan(&id, &at); err != nil {
+					return err
+				}
+				out[claimKey{eventID: id, occurrence: at.UnixMilli()}] = true
+			}
+			return rows.Err()
+		}(); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // maxReminderOffsetMinutes bounds how far before an occurrence a
@@ -492,47 +590,46 @@ func dueOccurrence(base pendingNotification, occurrenceStart, now time.Time) (pe
 }
 
 // reminderRecipients returns the set of user ids that should receive a
-// reminder for eventID: every enabled attendee plus the event owner.
-// Duplicates are removed so an owner who is also listed as an attendee
+// reminder: every enabled attendee plus the event owner, kept only while
+// each is an enabled user and an enabled member of the event's
+// workspace. An override's attendees are its series', so both rows are
+// read. Each user appears once, so an owner who is also an attendee
 // receives one notification row, not two.
-func reminderRecipients(
-	ctx context.Context,
-	db *sql.DB,
-	eventID uint32,
-	ownerUserID uint32,
-) ([]uint32, error) {
+func reminderRecipients(ctx context.Context, db *sql.DB, n pendingNotification) ([]uint32, error) {
+	seriesID := n.SeriesID
+	if seriesID == 0 {
+		seriesID = n.ID
+	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT user_id
-		FROM calendar_event_attendees
-		WHERE event_id = ?
-		  AND enabled = TRUE
-	`, eventID)
+		SELECT DISTINCT wm.user_id
+		FROM workspace_members wm
+		INNER JOIN users u ON u.id = wm.user_id AND u.enabled = TRUE
+		WHERE wm.workspace_id = ?
+		  AND wm.enabled = TRUE
+		  AND (
+		    wm.user_id = ?
+		    OR wm.user_id IN (
+		      SELECT a.user_id
+		      FROM calendar_event_attendees a
+		      WHERE a.event_id IN (?, ?)
+		        AND a.enabled = TRUE
+		    )
+		  )
+	`, n.WorkspaceID, n.OwnerUserID, n.ID, seriesID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	seen := make(map[uint32]struct{})
 	var ids []uint32
 	for rows.Next() {
 		var uid uint32
 		if err := rows.Scan(&uid); err != nil {
 			return nil, err
 		}
-		if _, dup := seen[uid]; dup {
-			continue
-		}
-		seen[uid] = struct{}{}
 		ids = append(ids, uid)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if _, dup := seen[ownerUserID]; !dup {
-		seen[ownerUserID] = struct{}{}
-		ids = append(ids, ownerUserID)
-	}
-	return ids, nil
+	return ids, rows.Err()
 }
 
 // Compile-time guard: *notification.Fanout must satisfy

@@ -53,6 +53,15 @@ resources:
         description: "Returned when the account has been locked after repeated failed login attempts."
         userAction: "Wait for the lock period to elapse or contact an administrator."
 
+      account_disabled:
+        code: AUTH.LOGIN.ACCOUNT_DISABLED
+        status: 403
+        message: "This account has been suspended"
+        message_ja: "このアカウントは停止されています"
+        message_zh: "此账户已被停用"
+        description: "Returned by sign-in paths whose caller has already proven control of the address (magic link, OIDC) when the matching account has been suspended by an administrator. The password path keeps answering INVALID_CREDENTIALS so it does not reveal whether an address is registered."
+        userAction: "Contact your instance administrator."
+
       rate_limited_after_retries:
         code: AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES
         status: 429
@@ -371,6 +380,15 @@ resources:
         message_zh: "此实例的登录仅限于受批准的电子邮件域"
         description: "Returned when an OIDC sign-in succeeds at the identity provider but the authenticated account's email domain is not in the instance's allowed sign-in allowlist, so the session is refused."
         userAction: "Sign in with an email address on an approved domain, or ask your instance administrator to add your domain to the allowlist."
+
+      link_unverified_account:
+        code: AUTH.OIDC.LINK_UNVERIFIED_ACCOUNT
+        status: 409
+        message: "An account with this email already has a password or two-factor authentication and cannot be linked automatically"
+        message_ja: "このメールアドレスのアカウントには既にパスワードまたは二要素認証が設定されているため、自動的に連携できません"
+        message_zh: "使用此邮箱的账户已设置密码或双重验证，无法自动关联"
+        description: "Returned when an OIDC sign-in matches an existing account by email, the account's email address has never been verified, and the account holds a local password or TOTP secret. Linking would leave credentials set before the email was proven working on the account."
+        userAction: "Sign in with your password instead."
 
   pat:
     breadcrumb: "Auth > Personal Access Token"

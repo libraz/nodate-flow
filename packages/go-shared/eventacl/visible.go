@@ -162,10 +162,11 @@ const RowVisibilitySQL = `(ce.visibility <> 'confidential' OR ce.owner_user_id =
 // whether the private-event details are theirs to read.
 //
 // A correlated EXISTS rather than a join, so an event with several
-// attendees still produces one row.
+// attendees still produces one row. An override shares its series'
+// attendee list, so attendance is read off the master as well.
 const AttendeeExistsSQL = `EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   )`

@@ -343,65 +343,33 @@ func (q *Queries) ListDependenciesForTask(ctx context.Context, arg ListDependenc
 	return items, nil
 }
 
-const listDependencyEdgesForWorkspace = `-- name: ListDependencyEdgesForWorkspace :many
-SELECT
-  td.from_task_id,
-  td.to_task_id
-FROM task_dependencies td
-WHERE td.workspace_id = ?
-  AND td.enabled = TRUE
-`
-
-type ListDependencyEdgesForWorkspaceRow struct {
-	FromTaskID uint32 `json:"-"`
-	ToTaskID   uint32 `json:"-"`
-}
-
-// List every enabled dependency edge in the workspace as (from, to) internal
-// id pairs. Read-only callers (the "would this be rejected" preview) use this
-// one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
-// Internal ids are safe here because the result never leaves the handler
-// (json:"-" on *.id).
-func (q *Queries) ListDependencyEdgesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListDependencyEdgesForWorkspaceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDependencyEdgesForWorkspace, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListDependencyEdgesForWorkspaceRow{}
-	for rows.Next() {
-		var i ListDependencyEdgesForWorkspaceRow
-		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listDependencyEdgesForWorkspaceForUpdate = `-- name: ListDependencyEdgesForWorkspaceForUpdate :many
 SELECT
   td.from_task_id,
-  td.to_task_id
+  td.to_task_id,
+  td.kind
 FROM task_dependencies td
 WHERE td.workspace_id = ?
   AND td.enabled = TRUE
+  AND EXISTS (SELECT 1 FROM tasks ft WHERE ft.id = td.from_task_id AND ft.enabled = TRUE)
+  AND EXISTS (SELECT 1 FROM tasks tt WHERE tt.id = td.to_task_id AND tt.enabled = TRUE)
 FOR UPDATE
 `
 
 type ListDependencyEdgesForWorkspaceForUpdateRow struct {
-	FromTaskID uint32 `json:"-"`
-	ToTaskID   uint32 `json:"-"`
+	FromTaskID uint32               `json:"-"`
+	ToTaskID   uint32               `json:"-"`
+	Kind       TaskDependenciesKind `json:"kind"`
 }
 
-// The same edge set, read under a lock. This is the serialization point for
-// adding an edge: the writer walks the graph to reject an edge that would
+// Every live edge in the workspace as (from, to, kind), read under a lock; the
+// only edge-set read the cycle check uses, for the write and for any preview.
+// An edge is live when it and both endpoint tasks are enabled, so an edge to
+// a deleted task neither closes a cycle nor outlives the task invisibly. The
+// endpoint checks are EXISTS subqueries rather than joins: a locking read
+// locks only the tables of the outer statement, which keeps the lock
+// footprint on edge rows and off the tasks rows that transitions write.
+// This is the serialization point for adding an edge: the writer walks the graph to reject an edge that would
 // close a cycle, and the walk is only sound if no other writer can add an
 // edge between the walk and the insert.
 //
@@ -438,7 +406,7 @@ func (q *Queries) ListDependencyEdgesForWorkspaceForUpdate(ctx context.Context, 
 	items := []ListDependencyEdgesForWorkspaceForUpdateRow{}
 	for rows.Next() {
 		var i ListDependencyEdgesForWorkspaceForUpdateRow
-		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID); err != nil {
+		if err := rows.Scan(&i.FromTaskID, &i.ToTaskID, &i.Kind); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -181,8 +181,152 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 		return nil
 	}
 	loc := zoneFor(evt.Timezone).Location()
-	anchor := evt.StartAt.In(loc)
 	duration := evt.EndAt.Sub(evt.StartAt)
+	exactSkips, daySkips := buildExceptions(evt.Exceptions, loc)
+	overriddenExact, overriddenDays := buildExceptions(evt.OverriddenStarts, loc)
+
+	var out []Occurrence
+	walk(evt, rangeEnd, func(candidate time.Time) bool {
+		if exactSkips[candidate.UTC().Unix()] || daySkips[candidate.Format("2006-01-02")] {
+			return true
+		}
+		// Suppressed by an override row, which renders this occurrence
+		// at its own time. A separate check from the exception one, so
+		// which of the two applies stays readable here.
+		if overriddenExact[candidate.UTC().Unix()] || overriddenDays[candidate.Format("2006-01-02")] {
+			return true
+		}
+		end := candidate.Add(duration)
+		if end.After(rangeStart) {
+			out = append(out, Occurrence{StartAt: candidate, EndAt: end})
+		}
+		return true
+	})
+	return out
+}
+
+// CountBefore reports how many occurrences the rule counts strictly
+// before t, cancelled and overridden ones included: the share of COUNT
+// the series has already used up by then.
+func CountBefore(evt Event, t time.Time) int {
+	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
+		return 0
+	}
+	n := 0
+	walk(evt, t, func(time.Time) bool {
+		n++
+		return true
+	})
+	return n
+}
+
+// Produces reports whether the rule yields an occurrence starting exactly
+// at t within its own bounds. Exceptions and overridden starts are not
+// consulted: a cancelled occurrence is still one the rule produces.
+func Produces(evt Event, t time.Time) bool {
+	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
+		return false
+	}
+	found := false
+	walk(evt, t.Add(time.Second), func(candidate time.Time) bool {
+		if candidate.UTC().Unix() == t.UTC().Unix() {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// Starts returns up to n instants the rule counts at or after from and
+// before limit, in order, before exceptions and overridden starts are
+// subtracted. A zero limit leaves the series' own bounds to end the walk.
+func Starts(evt Event, from time.Time, n int, limit time.Time) []time.Time {
+	if evt.Rule == nil || !evt.Rule.Freq.Valid() || n <= 0 {
+		return nil
+	}
+	if limit.IsZero() {
+		limit = startsHorizon
+	}
+	var out []time.Time
+	walk(evt, limit, func(candidate time.Time) bool {
+		if candidate.Before(from) {
+			return true
+		}
+		out = append(out, candidate)
+		return len(out) < n
+	})
+	return out
+}
+
+// startsHorizon is the open upper bound an unlimited [Starts] walks to.
+// The walk ends on its own once n instants are found or the series'
+// bounds stop it; the horizon only has to sit past anything a stored row
+// can name.
+var startsHorizon = time.Date(9999, time.January, 1, 0, 0, 0, 0, time.UTC)
+
+// EntryNames reports whether one stored exception or overridden-start
+// entry names the occurrence starting at candidate, read in the event's
+// timezone the way [Expand] reads it.
+func EntryNames(entry, timezone string, candidate time.Time) bool {
+	loc := zoneFor(timezone).Location()
+	e, ok := parseExceptionEntry(entry, loc)
+	switch {
+	case !ok:
+		return false
+	case e.Day != "":
+		return candidate.In(loc).Format("2006-01-02") == e.Day
+	}
+	return e.At.UTC().Unix() == candidate.UTC().Unix()
+}
+
+// EntryLatest returns the latest instant one stored entry can name in the
+// event's timezone: the instant itself, or the last instant of the local
+// day a bare date names. False means the entry names nothing.
+func EntryLatest(entry, timezone string) (time.Time, bool) {
+	loc := zoneFor(timezone).Location()
+	e, ok := parseExceptionEntry(entry, loc)
+	if !ok {
+		return time.Time{}, false
+	}
+	if e.Day == "" {
+		return e.At, true
+	}
+	d, err := time.ParseInLocation("2006-01-02", e.Day, loc)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return d.AddDate(0, 0, 1).Add(-time.Nanosecond), true
+}
+
+// ProducesEntry reports whether the rule yields, within its own bounds,
+// an occurrence that one stored exception or overridden-start entry names.
+func ProducesEntry(evt Event, entry string) bool {
+	if evt.Rule == nil || !evt.Rule.Freq.Valid() {
+		return false
+	}
+	latest, ok := EntryLatest(entry, evt.Timezone)
+	if !ok {
+		return false
+	}
+	found := false
+	walk(evt, latest.Add(time.Nanosecond), func(candidate time.Time) bool {
+		if EntryNames(entry, evt.Timezone, candidate) {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// walk calls visit with every instant the rule counts, in order from the
+// anchor, before any exception or overridden start is subtracted. It
+// stops when visit returns false, when the series' own bounds end it, or
+// at the first candidate at or after limit.
+func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
+	loc := zoneFor(evt.Timezone).Location()
+	anchor := evt.StartAt.In(loc)
 
 	interval := 1
 	if evt.Rule.Interval != nil && *evt.Rule.Interval > 0 {
@@ -207,9 +351,6 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	byDay := normalizeByDay(evt.Rule.ByDay)
 	byMonthDay := evt.Rule.ByMonthDay
 
-	exactSkips, daySkips := buildExceptions(evt.Exceptions, loc)
-	overriddenExact, overriddenDays := buildExceptions(evt.OverriddenStarts, loc)
-
 	// RFC 5545 BYDAY expands a WEEKLY rule: WEEKLY;BYDAY=MO,WE yields an
 	// occurrence on each listed weekday of every included week, not just
 	// on the anchor's weekday. That path walks day by day and keeps a day
@@ -218,9 +359,8 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 	// narrow the freq cursor instead of expanding it.
 	expandsWeekdays := evt.Rule.Freq == FreqWeekly && len(byDay) > 0
 	anchorWeekStart := startOfISOWeek(anchor)
-	budget := scanBudget(anchor, rangeEnd, evt.Rule.Freq, interval, expandsWeekdays)
+	budget := scanBudget(anchor, limit, evt.Rule.Freq, interval, expandsWeekdays)
 
-	var out []Occurrence
 	emitted := 0
 	for n := 0; emitted < maxCount && n < budget; n++ {
 		var candidate time.Time
@@ -230,11 +370,11 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 			candidate = occurrenceFromAnchor(anchor, evt.Rule.Freq, n*interval)
 		}
 
-		if !candidate.Before(rangeEnd) {
-			break
+		if !candidate.Before(limit) {
+			return
 		}
 		if until != nil && candidate.After(*until) {
-			break
+			return
 		}
 
 		var passes bool
@@ -257,21 +397,10 @@ func Expand(evt Event, rangeStart, rangeEnd time.Time) []Occurrence {
 		// so it consumes a count exactly as an ordinary occurrence
 		// does, and the ten meetings are still ten.
 		emitted++
-		if exactSkips[candidate.UTC().Unix()] || daySkips[candidate.Format("2006-01-02")] {
-			continue
-		}
-		// Suppressed by an override row, which renders this occurrence
-		// at its own time. A separate check from the exception one, so
-		// which of the two applies stays readable here.
-		if overriddenExact[candidate.UTC().Unix()] || overriddenDays[candidate.Format("2006-01-02")] {
-			continue
-		}
-		end := candidate.Add(duration)
-		if end.After(rangeStart) {
-			out = append(out, Occurrence{StartAt: candidate, EndAt: end})
+		if !visit(candidate) {
+			return
 		}
 	}
-	return out
 }
 
 // scanBudget returns how many candidates the scan may examine before

@@ -140,10 +140,11 @@ func TestApplyRedactsExcerptInEventAndComment(t *testing.T) {
 	}
 
 	if _, err := a.Apply(context.Background(), SignalRef{
-		InternalID:  1,
-		PublicID:    "sig-1",
-		WorkspaceID: 7,
-		Kind:        "task.idle",
+		InternalID:   1,
+		PublicID:     "sig-1",
+		WorkspaceID:  7,
+		Kind:         "task.idle",
+		OfferedTasks: map[string]struct{}{target: {}},
 	}, AgentRef{InternalID: 3}, 99, verdict); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}

@@ -83,6 +83,24 @@ describe('completeLogin', () => {
     });
   });
 
+  it('fails a bodyless non-2xx first leg instead of treating it as a login', async () => {
+    const promptTotp = vi.fn();
+    const client = {
+      POST: vi.fn(async () => ({ response: new Response(null, { status: 502 }) })),
+    };
+
+    const result = await completeLogin({
+      client,
+      email: 'me@example.com',
+      password: 'pw',
+      promptTotp,
+    });
+
+    expect(result.error).toBeDefined();
+    expect(result.data).toBeUndefined();
+    expect(promptTotp).not.toHaveBeenCalled();
+  });
+
   it('returns a clear error when the challenge token is missing', async () => {
     const response = new Response('{}', { status: 200 });
     const client = {

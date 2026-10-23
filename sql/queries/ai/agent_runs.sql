@@ -109,3 +109,16 @@ WHERE status = 'claimed'
   AND claimed_at < ?
   AND attempts >= ?
   AND enabled = TRUE;
+
+-- name: HasNewActivityForAgent :one
+-- Check whether anything other than the agent's own bookkeeping happened in
+-- the workspace since the given timestamp. Run lifecycle events
+-- (ai.agent.run.*) and events the agent itself authored never count, so an
+-- idle workspace lets the pre-flight skip the next tick.
+SELECT EXISTS(
+  SELECT 1 FROM events
+  WHERE workspace_id = ? AND occurred_at > ?
+    AND type NOT LIKE 'ai.agent.run.%'
+    AND (actor_agent_id IS NULL OR actor_agent_id <> ?)
+  LIMIT 1
+) AS has_activity;

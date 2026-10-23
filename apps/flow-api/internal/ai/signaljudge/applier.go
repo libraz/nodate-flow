@@ -49,6 +49,10 @@ type SignalRef struct {
 	// Kind is the signal kind; passed verbatim to the autonomy
 	// resolver so per-kind rules can match.
 	Kind string
+	// OfferedTasks holds the public ids of the tasks the judge's prompt
+	// listed for this run. A verdict may target only one of them; nil
+	// means no task was offered.
+	OfferedTasks map[string]struct{}
 }
 
 // AgentRef is the minimal projection of an ai_agents row the Applier
@@ -223,6 +227,14 @@ func (a *Applier) Apply(ctx context.Context, sig SignalRef, agent AgentRef, runI
 	verdict = SanitizeVerdict(verdict)
 
 	signalInternalID := sig.InternalID
+	// The judge may only act on tasks it was shown. An id it names from
+	// anywhere else is refused before any lookup or mutation.
+	if target := derefStr(verdict.TargetTaskPublicID); target != "" {
+		if _, offered := sig.OfferedTasks[target]; !offered {
+			return a.reject(ctx, sig, agent, runID, verdict, rejectTargetNotOffered,
+				fmt.Errorf("target_task_public_id %q was not offered to the judge", target))
+		}
+	}
 	taskID, taskOK, taskErr := a.resolveTarget(ctx, sig.WorkspaceID, verdict)
 	if taskErr != nil {
 		return nil, fmt.Errorf("signaljudge: resolve target task: %w", taskErr)
@@ -501,9 +513,20 @@ func (a *Applier) emitProposedEvents(ctx context.Context, sig SignalRef, agent A
 // setting applied_at. The original verdict bytes are stored so
 // operators can inspect what the LLM actually returned.
 func (a *Applier) rejectVerdict(ctx context.Context, sig SignalRef, agent AgentRef, runID uint32, verdict Verdict, vErr error) (*ApplyResult, error) {
+	return a.reject(ctx, sig, agent, runID, verdict, rejectVerdictInvalid, vErr)
+}
+
+// Rejection reasons carried in SignalRejected.reason and
+// ApplyResult.SkipReason.
+const (
+	rejectVerdictInvalid   = "verdict_invalid"
+	rejectTargetNotOffered = "target_not_offered"
+)
+
+func (a *Applier) reject(ctx context.Context, sig SignalRef, agent AgentRef, runID uint32, verdict Verdict, reason string, vErr error) (*ApplyResult, error) {
 	signalInternalID := sig.InternalID
 	reasonPayload := map[string]any{
-		"reason":          "verdict_invalid",
+		"reason":          reason,
 		"validationError": vErr.Error(),
 		"action":          string(verdict.Action),
 		"confidence":      verdict.Confidence,
@@ -526,7 +549,7 @@ func (a *Applier) rejectVerdict(ctx context.Context, sig SignalRef, agent AgentR
 	return &ApplyResult{
 		EventsAppended: 1,
 		Skipped:        true,
-		SkipReason:     "verdict_invalid",
+		SkipReason:     reason,
 	}, nil
 }
 

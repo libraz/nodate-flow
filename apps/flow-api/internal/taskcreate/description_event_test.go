@@ -159,14 +159,17 @@ func (c createConn) ExecContext(_ context.Context, query string, args []driver.N
 	return createResult{rows: 1, lastID: int64(c.stub.count())}, nil
 }
 
-// QueryContext answers the three single-value reads a create makes: the
-// project row it locks, the task number it allocates, and the version
-// number the snapshot claims. An unrecognised read fails rather than
-// returning an empty page, which would leave a create silently taking a
-// path no test meant to exercise.
+// QueryContext answers the reads a create makes: the project row it
+// locks, the task number it allocates, the version number the snapshot
+// claims, and the empty set of previous description mentions.
+// An unrecognised read fails rather than returning an empty page, which
+// would leave a create silently taking a path no test meant to exercise.
 func (c createConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.stub.record(query, args)
 	switch {
+	case strings.Contains(query, "ListMentionedUserIdsForTaskDescription"):
+		// A fresh task has no previous mentions.
+		return &singleValueRows{col: "mentioned_user_id", done: true}, nil
 	case strings.Contains(query, "FROM projects"):
 		return &singleValueRows{col: "id", value: int64(createProjectID)}, nil
 	case strings.Contains(query, "MAX(task_number)"):

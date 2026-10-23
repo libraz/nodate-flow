@@ -164,6 +164,33 @@ func (q *Queries) GetLastSuccessfulAgentRun(ctx context.Context, arg GetLastSucc
 	return scheduled_at, err
 }
 
+const hasNewActivityForAgent = `-- name: HasNewActivityForAgent :one
+SELECT EXISTS(
+  SELECT 1 FROM events
+  WHERE workspace_id = ? AND occurred_at > ?
+    AND type NOT LIKE 'ai.agent.run.%'
+    AND (actor_agent_id IS NULL OR actor_agent_id <> ?)
+  LIMIT 1
+) AS has_activity
+`
+
+type HasNewActivityForAgentParams struct {
+	WorkspaceID  uint32        `json:"-"`
+	OccurredAt   time.Time     `json:"occurredAt"`
+	ActorAgentID sql.NullInt32 `json:"-"`
+}
+
+// Check whether anything other than the agent's own bookkeeping happened in
+// the workspace since the given timestamp. Run lifecycle events
+// (ai.agent.run.*) and events the agent itself authored never count, so an
+// idle workspace lets the pre-flight skip the next tick.
+func (q *Queries) HasNewActivityForAgent(ctx context.Context, arg HasNewActivityForAgentParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasNewActivityForAgent, arg.WorkspaceID, arg.OccurredAt, arg.ActorAgentID)
+	var has_activity bool
+	err := row.Scan(&has_activity)
+	return has_activity, err
+}
+
 const listAgentRunsByTask = `-- name: ListAgentRunsByTask :many
 SELECT
   e.public_id,

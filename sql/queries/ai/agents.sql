@@ -116,7 +116,8 @@ WHERE id = ?
 LIMIT 1;
 
 -- name: GetAgentForExec :one
--- Fetch the minimal fields an agent runner needs to invoke an LLM.
+-- Fetch the minimal fields an agent runner needs to invoke an LLM, including
+-- the provider that owns the agent's model.
 SELECT
   a.id,
   a.public_id,
@@ -127,7 +128,9 @@ SELECT
   a.max_output_tokens,
   a.paused,
   m.public_id AS model_public_id,
-  m.name AS model_name
+  m.name AS model_name,
+  p.public_id AS provider_public_id
 FROM ai_agents a
 INNER JOIN ai_models m ON m.id = a.model_id AND m.enabled = TRUE
+INNER JOIN ai_providers p ON p.id = m.provider_id AND p.enabled = TRUE
 WHERE a.workspace_id = ? AND a.id = ? AND a.enabled = TRUE;

@@ -195,26 +195,32 @@ func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, 
 	}
 }
 
+// Admit implements Admitter. It extracts the request's workspace and enforces
+// the per-workspace daily spend cap, matching the orchestrator
+// (ai/tasks.go) and signal-judge runner. On would-exceed it returns
+// ErrBudgetExceeded; any other guard error (e.g. the budget reader failing)
+// propagates wrapped.
+func (w *WorkspaceProvider) Admit(ctx context.Context) (uint32, error) {
+	wsID, ok := w.ExtractWS(ctx)
+	if !ok {
+		return 0, fmt.Errorf("nlcommand: workspace ID not found in context")
+	}
+	if capHit, err := ai.CheckBudget(ctx, w.Guard, wsID); err != nil {
+		if capHit {
+			return 0, ErrBudgetExceeded
+		}
+		return 0, fmt.Errorf("nlcommand: cost guard: %w", err)
+	}
+	return wsID, nil
+}
+
 // ResolveCommand implements Provider. It resolves the workspace's
 // default LLM provider, builds a system prompt that includes the tool
 // catalogue, and returns the raw response bytes.
 func (w *WorkspaceProvider) ResolveCommand(ctx context.Context, prompt string, tools []ToolSpec) ([]byte, error) {
-	wsID, ok := w.ExtractWS(ctx)
-	if !ok {
-		return nil, fmt.Errorf("nlcommand: workspace ID not found in context")
-	}
-
-	// Enforce the per-workspace daily spend cap before billing the
-	// provider, matching the orchestrator (ai/tasks.go) and signal-judge
-	// runner. On would-exceed, surface the shared budget sentinel; any
-	// other guard error (e.g. the budget reader failing) propagates as-is.
-	if w.Guard != nil {
-		if err := w.Guard.Check(ctx, wsID); err != nil {
-			if errors.Is(err, ai.ErrDailyBudgetExceeded) {
-				return nil, ErrBudgetExceeded
-			}
-			return nil, fmt.Errorf("nlcommand: cost guard: %w", err)
-		}
+	wsID, err := w.Admit(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	prov, err := w.Resolver.Default(ctx, wsID)

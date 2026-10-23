@@ -57,6 +57,24 @@ WHERE m.task_id = ?
 ORDER BY m.created_at ASC, m.public_id ASC
 LIMIT ? OFFSET ?;
 
+-- name: ListMentionedUserIdsForTaskDescription :many
+-- Users the task's description currently names, read before a re-extraction
+-- clears them so only newly named users are notified. Workspace-bounded
+-- like the clear.
+SELECT mentioned_user_id
+FROM mentions
+WHERE task_id = ?
+  AND workspace_id = ?
+  AND source = 'task_description';
+
+-- name: ListMentionedUserIdsForComment :many
+-- Users the comment currently names; same purpose and bound as
+-- ListMentionedUserIdsForTaskDescription.
+SELECT mentioned_user_id
+FROM mentions
+WHERE comment_id = ?
+  AND workspace_id = ?;
+
 -- name: DeleteMentionsForTaskDescription :exec
 -- Remove the workspace's task_description mentions for a task (before
 -- re-extracting). A row here only caches what the description currently

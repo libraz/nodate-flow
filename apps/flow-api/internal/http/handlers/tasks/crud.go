@@ -196,7 +196,11 @@ func listTasksFiltered(
 			placeholders = append(placeholders, "?")
 			args = append(args, s)
 		}
-		if len(placeholders) > 0 {
+		// No recognised state: match nothing rather than dropping the
+		// clause, which would widen the result to the unfiltered list.
+		if len(placeholders) == 0 {
+			where = append(where, "1 = 0")
+		} else {
 			where = append(where, "v.derived_state IN ("+strings.Join(placeholders, ",")+")")
 		}
 	}
@@ -1102,6 +1106,8 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 				ResourceID:   task.PublicID.String(),
 			})
 		}
+		// A deleted blocker drops out of its dependents' facts.
+		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		// No task.disabled append here: itemkit.DeleteTask already emits
 		// item.deleted plus its legacy task.disabled dual-emit inside the
 		// tx above (see itemkit.legacyKindFor). A second post-commit append

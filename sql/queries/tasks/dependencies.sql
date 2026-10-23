@@ -120,22 +120,15 @@ WHERE td.workspace_id = ?
 ORDER BY td.created_at ASC, td.public_id ASC
 LIMIT 5000;
 
--- name: ListDependencyEdgesForWorkspace :many
--- List every enabled dependency edge in the workspace as (from, to) internal
--- id pairs. Read-only callers (the "would this be rejected" preview) use this
--- one. Writers must use ListDependencyEdgesForWorkspaceForUpdate instead.
--- Internal ids are safe here because the result never leaves the handler
--- (json:"-" on *.id).
-SELECT
-  td.from_task_id,
-  td.to_task_id
-FROM task_dependencies td
-WHERE td.workspace_id = ?
-  AND td.enabled = TRUE;
-
 -- name: ListDependencyEdgesForWorkspaceForUpdate :many
--- The same edge set, read under a lock. This is the serialization point for
--- adding an edge: the writer walks the graph to reject an edge that would
+-- Every live edge in the workspace as (from, to, kind), read under a lock; the
+-- only edge-set read the cycle check uses, for the write and for any preview.
+-- An edge is live when it and both endpoint tasks are enabled, so an edge to
+-- a deleted task neither closes a cycle nor outlives the task invisibly. The
+-- endpoint checks are EXISTS subqueries rather than joins: a locking read
+-- locks only the tables of the outer statement, which keeps the lock
+-- footprint on edge rows and off the tasks rows that transitions write.
+-- This is the serialization point for adding an edge: the writer walks the graph to reject an edge that would
 -- close a cycle, and the walk is only sound if no other writer can add an
 -- edge between the walk and the insert.
 --
@@ -165,10 +158,13 @@ WHERE td.workspace_id = ?
 -- (dbretry.InTx), and a workspace with no edges has no cycle to close.
 SELECT
   td.from_task_id,
-  td.to_task_id
+  td.to_task_id,
+  td.kind
 FROM task_dependencies td
 WHERE td.workspace_id = ?
   AND td.enabled = TRUE
+  AND EXISTS (SELECT 1 FROM tasks ft WHERE ft.id = td.from_task_id AND ft.enabled = TRUE)
+  AND EXISTS (SELECT 1 FROM tasks tt WHERE tt.id = td.to_task_id AND tt.enabled = TRUE)
 FOR UPDATE;
 
 -- name: DeleteDependency :execrows

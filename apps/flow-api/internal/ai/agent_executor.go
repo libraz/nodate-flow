@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
@@ -27,6 +28,20 @@ type AgentExecQueries interface {
 	GetAgentForExec(ctx context.Context, arg generated.GetAgentForExecParams) (generated.GetAgentForExecRow, error)
 }
 
+// AgentProviderResolver loads the provider that owns an agent's bound model.
+// *providers.WorkspaceResolver satisfies it.
+type AgentProviderResolver interface {
+	ForProvider(ctx context.Context, workspaceID uint32, providerPublicID types.PublicID) (providers.Provider, error)
+}
+
+// AgentProviderResolverFunc adapts a plain function to AgentProviderResolver.
+type AgentProviderResolverFunc func(ctx context.Context, workspaceID uint32, providerPublicID types.PublicID) (providers.Provider, error)
+
+// ForProvider implements AgentProviderResolver.
+func (f AgentProviderResolverFunc) ForProvider(ctx context.Context, workspaceID uint32, providerPublicID types.PublicID) (providers.Provider, error) {
+	return f(ctx, workspaceID, providerPublicID)
+}
+
 // AgentExecutor runs one tick of an AI agent. It is the production
 // adapter behind the [agentruntime.AgentExecutor] interface — the
 // runner stays in the agentruntime package and never imports the ai
@@ -34,7 +49,7 @@ type AgentExecQueries interface {
 // main.go after both sides are constructed.
 //
 // Execute loads the agent row via [generated.Queries.GetAgentForExec],
-// enforces the cost guard, resolves the workspace's default provider,
+// enforces the cost guard, resolves the provider that owns the agent's model,
 // and calls Complete with the agent's system prompt, model, output cap,
 // and temperature — all of which come from that row via
 // [airequest.ForAgent], not from the provider's own defaults. The
@@ -43,7 +58,7 @@ type AgentExecQueries interface {
 // them so per-agent cost accounting can see them.
 type AgentExecutor struct {
 	Queries      AgentExecQueries
-	Resolver     ProviderResolver
+	Resolver     AgentProviderResolver
 	Guard        *CostGuard
 	Log          InvocationLogger
 	OnInvocation InvocationMetricsHook
@@ -88,18 +103,14 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 			return result, nil
 		}
 	}
-	if e.Guard != nil {
-		if err := e.Guard.Check(ctx, workspaceID); err != nil {
-			// The runner uses CostCapHit to fire the cost_cap handoff
-			// trigger and pause the agent, so distinguish budget hits
-			// from generic guard read failures.
-			if errors.Is(err, ErrDailyBudgetExceeded) {
-				result.CostCapHit = true
-			}
-			return result, err
-		}
+	// The runner uses CostCapHit to fire the cost_cap handoff trigger and
+	// pause the agent, so CheckBudget distinguishes budget hits from generic
+	// guard read failures.
+	if capHit, err := CheckBudget(ctx, e.Guard, workspaceID); err != nil {
+		result.CostCapHit = capHit
+		return result, err
 	}
-	prov, err := e.Resolver.Default(ctx, workspaceID)
+	prov, err := e.Resolver.ForProvider(ctx, workspaceID, row.ProviderPublicID)
 	if err != nil {
 		return result, err
 	}

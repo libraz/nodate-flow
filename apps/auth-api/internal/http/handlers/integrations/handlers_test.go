@@ -420,6 +420,72 @@ func TestCallback_MissingCode_RedirectsWithError(t *testing.T) {
 		"redirect target must be the web app")
 }
 
+// TestCallback_FailuresLandOnTheIntegrationsPage pins where a failed
+// callback goes: the integrations page is the one that renders
+// integration_error, so a failure sent anywhere else is silently lost.
+func TestCallback_FailuresLandOnTheIntegrationsPage(t *testing.T) {
+	t.Parallel()
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubProvider{name: "github"}, nil
+		},
+	)
+	for name, path := range map[string]string{
+		"consent denied": "/oauth/callback/github?state=abc&error=access_denied",
+		"unknown state":  "/oauth/callback/github?code=xxx&state=bogus",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			deps := Deps{
+				Queries:    &fakeQueries{findStateErr: sql.ErrNoRows},
+				Registry:   reg,
+				Cipher:     newTestCipher(t),
+				WebBaseURL: "https://app.example.com",
+			}
+			resp := serveNoAuth(t, deps, "callback", http.MethodGet, path)
+			assert.Equal(t, http.StatusFound, resp.Code)
+			loc := resp.Header().Get("Location")
+			assert.True(t, strings.HasPrefix(loc, "https://app.example.com/settings/integrations?"),
+				"a failed callback must land on the page that renders integration_error, got %q", loc)
+			assert.Contains(t, loc, "integration_error=")
+		})
+	}
+}
+
+// TestCallback_ExchangeFailure_HonoursStoredRedirect proves a failure
+// after the state row was trusted returns to the same same-origin page a
+// success would have.
+func TestCallback_ExchangeFailure_HonoursStoredRedirect(t *testing.T) {
+	t.Parallel()
+	q := &fakeQueries{
+		findStateRow: generated.FindOauthStateRow{
+			UserID:     1,
+			Provider:   "github",
+			ExpiresAt:  time.Now().Add(10 * time.Minute),
+			RedirectTo: sql.NullString{String: "https://app.example.com/inbox?welcome=1", Valid: true},
+		},
+	}
+	reg := integrationspkg.NewRegistry(
+		func() (integrationspkg.Provider, error) {
+			return &stubExchangeProvider{
+				stubProvider: stubProvider{name: "github"},
+				exchErr:      errors.New("exchange boom"),
+			}, nil
+		},
+	)
+	deps := Deps{
+		Queries:       q,
+		Registry:      reg,
+		Cipher:        newTestCipher(t),
+		PublicBaseURL: "https://auth.example.com",
+		WebBaseURL:    "https://app.example.com",
+	}
+	resp := serveNoAuth(t, deps, "callback", http.MethodGet, "/oauth/callback/github?code=c&state=s")
+	assert.Equal(t, http.StatusFound, resp.Code)
+	assert.Equal(t, "https://app.example.com/inbox?welcome=1&integration_error=exchange_failed",
+		resp.Header().Get("Location"))
+}
+
 func TestCallback_InvalidState_RedirectsWithError(t *testing.T) {
 	t.Parallel()
 	reg := integrationspkg.NewRegistry(

@@ -66,13 +66,48 @@ const MarkerForm = "vacuous-assert: not-applicable — <why this needs no positi
 // comment describing this package, for instance — from acting as one.
 var MarkerPattern = regexp.MustCompile("vacuous-assert:[ \t]*not-applicable[ \t]*—[ \t]*[A-Za-z][^\n]*[A-Za-z]")
 
-// TestRoots are the directories this package scans, repository-relative.
-// apps/auth-api/tests does not exist at the time of writing; a missing
-// root is skipped rather than failing the scan, so the day it appears it
-// is picked up without anyone updating this list.
-var TestRoots = []string{
-	filepath.Join("apps", "flow-api", "tests"),
-	filepath.Join("apps", "auth-api", "tests"),
+// TestRoots returns the module directories named by go.work's use
+// directives, repository-relative. A listed module whose directory is
+// missing is an error: a silently skipped root is a part of the tree
+// the guard never looked at.
+func TestRoots(root string) ([]string, error) {
+	src, err := os.ReadFile(filepath.Join(root, "go.work")) //#nosec G304 -- repository file
+	if err != nil {
+		return nil, err
+	}
+	var (
+		roots []string
+		inUse bool
+	)
+	for _, line := range strings.Split(string(src), "\n") {
+		line = strings.TrimSpace(line)
+		if i := strings.Index(line, "//"); i >= 0 {
+			line = strings.TrimSpace(line[:i])
+		}
+		var dir string
+		switch {
+		case inUse && line == ")":
+			inUse = false
+		case inUse:
+			dir = line
+		case line == "use (":
+			inUse = true
+		case strings.HasPrefix(line, "use "):
+			dir = strings.TrimSpace(strings.TrimPrefix(line, "use "))
+		}
+		if dir == "" {
+			continue
+		}
+		dir = filepath.Clean(dir)
+		if _, statErr := os.Stat(filepath.Join(root, dir)); statErr != nil {
+			return nil, fmt.Errorf("vacuousassert: go.work module %s: %w", dir, statErr)
+		}
+		roots = append(roots, dir)
+	}
+	if len(roots) == 0 {
+		return nil, errors.New("vacuousassert: go.work lists no modules")
+	}
+	return roots, nil
 }
 
 // UnprovenNegation is a NotContains call against a serialized response
@@ -128,18 +163,22 @@ func RepoRoot() (string, error) {
 	}
 }
 
-// TestFiles returns every *_test.go file under the configured roots,
+// TestFiles returns every *_test.go file under the go.work modules,
 // repository-relative and slash-separated, in a stable order.
 func TestFiles(root string) ([]string, error) {
+	roots, err := TestRoots(root)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	for _, testRoot := range TestRoots {
+	for _, testRoot := range roots {
 		dir := filepath.Join(root, testRoot)
-		if _, statErr := os.Stat(dir); statErr != nil {
-			continue
-		}
 		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
+			}
+			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == "testdata") {
+				return filepath.SkipDir
 			}
 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
 				return nil
@@ -159,7 +198,7 @@ func TestFiles(root string) ([]string, error) {
 	return out, nil
 }
 
-// Scan parses every test file under the configured roots and returns the
+// Scan parses every test file under the go.work modules and returns the
 // unproven negations, the unproven loops, and the markers that covered
 // neither.
 func Scan(root string) ([]UnprovenNegation, []UnprovenLoop, []StaleMarker, error) {

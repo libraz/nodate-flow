@@ -8,6 +8,7 @@
 
 import type { components, NodateFlowClient } from '@nodate-flow/sdk';
 
+import { resultError } from './util/api-error.js';
 import { clampPageLimit, DEFAULT_LIST_LIMIT, MAX_PAGES, requestedCount } from './util/paging.js';
 
 export type SdkClientLike = Pick<NodateFlowClient, 'GET'>;
@@ -35,7 +36,7 @@ export function buildListQuery(limit: number | undefined, offset: number | undef
 export async function executeWorkspaceList(
   client: SdkClientLike,
   query: ListQuery,
-): Promise<{ data?: WorkspaceListPage; error?: unknown }> {
+): Promise<{ data?: WorkspaceListPage; error?: unknown; response?: Response }> {
   return client.GET('/workspaces', { params: { query } });
 }
 
@@ -43,7 +44,7 @@ export async function executeProjectList(
   client: SdkClientLike,
   workspaceId: string,
   query: ListQuery,
-): Promise<{ data?: ProjectListPage; error?: unknown }> {
+): Promise<{ data?: ProjectListPage; error?: unknown; response?: Response }> {
   return client.GET('/workspaces/{wsId}/projects', {
     params: { path: { wsId: workspaceId }, query },
   });
@@ -94,9 +95,10 @@ export async function executeWorkspaceListPaginated(
   query: ListQuery,
 ): Promise<{ data?: ListResult; error?: unknown }> {
   return collectPages(async (limit, offset) => {
-    const { data, error } = await executeWorkspaceList(client, { limit, offset });
+    const result = await executeWorkspaceList(client, { limit, offset });
+    const error = resultError(result);
     if (error) return { rows: [], error };
-    return { rows: data?.workspaces ?? [], total: data?.total };
+    return { rows: result.data?.workspaces ?? [], total: result.data?.total };
   }, query);
 }
 
@@ -107,8 +109,9 @@ export async function executeProjectListPaginated(
   query: ListQuery,
 ): Promise<{ data?: ListResult; error?: unknown }> {
   return collectPages(async (limit, offset) => {
-    const { data, error } = await executeProjectList(client, workspaceId, { limit, offset });
+    const result = await executeProjectList(client, workspaceId, { limit, offset });
+    const error = resultError(result);
     if (error) return { rows: [], error };
-    return { rows: data?.projects ?? [], total: data?.total };
+    return { rows: result.data?.projects ?? [], total: result.data?.total };
   }, query);
 }

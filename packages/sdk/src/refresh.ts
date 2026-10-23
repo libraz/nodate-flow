@@ -127,9 +127,11 @@ export function decodeTokenExp(token: string): number | null {
 /**
  * Why the most recent refresh returned no token.
  *
- * `network` means the request never reached the server, so nothing is
- * known about the session; `rejected` means the server answered and
- * declined. Only the second is grounds for ending the session.
+ * `network` means no definitive answer came back — the request never
+ * reached the server, or the server could not answer it (429, 5xx) — so
+ * nothing is known about the session; `rejected` means the server
+ * answered 401 and declined. Only the second is grounds for ending the
+ * session.
  */
 export type RefreshFailureKind = 'none' | 'network' | 'rejected';
 
@@ -165,14 +167,18 @@ export interface TokenRefresher {
  *   pre-rotation token reuse the same new token.
  * - On success: decodes the new token's `exp` claim for later expiry
  *   checks, calls `setAccessToken`, and returns the new token.
- * - On rejection by the server: calls `clearSession`, then
+ * - On a 401 from the server: calls `clearSession`, then
  *   `onSessionExpired` (if provided), and returns `null`.
- * - On a transport failure (the request never reached the server):
- *   returns `null` with the session **left intact**. A connection that
- *   dropped for a moment says nothing about whether the refresh cookie
- *   is still good, and signing someone out over it discards unsaved work
- *   with no way back but a manual reload. Callers distinguish the two
- *   through {@link TokenRefresher.lastFailure}.
+ * - On a transport failure or any other non-2xx status (a 429 from the
+ *   rate limiter, a 5xx): returns `null` with the session **left
+ *   intact**. Neither says whether the refresh cookie is still good, and
+ *   signing someone out over it discards unsaved work with no way back
+ *   but a manual reload. Callers distinguish the two through
+ *   {@link TokenRefresher.lastFailure}.
+ *
+ * A refresh that loses a race with another tab is answered by auth-api
+ * with a token for the same session, so concurrent refreshes never end
+ * the session either.
  *
  * The returned function carries two helper methods (`isExpiringSoon`,
  * `currentExp`) so request-middleware callers can decide whether to
@@ -214,8 +220,14 @@ export function createTokenRefresher(options: RefreshMiddlewareOptions): TokenRe
           method: 'POST',
           credentials: 'include',
         });
-        if (!res.ok) {
+        if (res.status === 401) {
           endSession();
+          return null;
+        }
+        if (!res.ok) {
+          // Throttled or failing server: the session is unproven, not
+          // invalid.
+          lastFailureKind = 'network';
           return null;
         }
         const body = (await res.json()) as { accessToken?: string };
@@ -334,9 +346,13 @@ function skipsRefresh(url: string): boolean {
 }
 
 /**
- * Creates an openapi-fetch response middleware that intercepts 401
- * responses, attempts a token refresh via the provided `refreshFn`,
- * and replays the original request with the new token.
+ * Creates an openapi-fetch middleware that intercepts 401 responses,
+ * attempts a token refresh via the provided `refreshFn`, and replays the
+ * original request with the new token.
+ *
+ * `fetch` consumes a request body, so `onRequest` keeps an unsent clone
+ * per request id and the replay sends that clone: method, body and
+ * headers are the original ones, with only the bearer replaced.
  *
  * Auth-related paths are excluded to prevent infinite loops, and the
  * API's public paths because a 401 from one of those says the token in
@@ -348,24 +364,35 @@ function skipsRefresh(url: string): boolean {
  * in the first place.
  */
 export function createRefreshMiddleware(refreshFn: () => Promise<string | null>): {
-  onResponse: (ctx: { request: Request; response: Response }) => Promise<Response>;
+  onRequest: (ctx: { request: Request; id: string }) => Request;
+  onResponse: (ctx: { request: Request; response: Response; id?: string }) => Promise<Response>;
+  onError: (ctx: { id: string }) => void;
 } {
+  const unsent = new Map<string, Request>();
   return {
-    async onResponse({ request, response }) {
+    onRequest({ request, id }) {
+      if (!skipsRefresh(request.url)) unsent.set(id, request.clone());
+      return request;
+    },
+    async onResponse({ request, response, id }) {
+      const saved = id === undefined ? undefined : unsent.get(id);
+      if (id !== undefined) unsent.delete(id);
       if (response.status !== 401) return response;
 
       if (skipsRefresh(request.url)) return response;
 
+      // Without an unsent copy a consumed body cannot be sent again.
+      const replay = saved ?? (request.bodyUsed ? undefined : request.clone());
+      if (!replay) return response;
+
       const newToken = await refreshFn();
       if (!newToken) return response;
 
-      // Replay original request with the rotated token. Clone because
-      // Request bodies are single-use streams.
-      const replay = new Request(request, {
-        headers: new Headers(request.headers),
-      });
       replay.headers.set('Authorization', `Bearer ${newToken}`);
       return fetch(replay);
+    },
+    onError({ id }) {
+      unsent.delete(id);
     },
   };
 }

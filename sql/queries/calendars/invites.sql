@@ -162,3 +162,15 @@ UPDATE calendar_event_invites
 SET enabled = FALSE
 WHERE expires_at <= NOW(6)
   AND enabled = TRUE;
+
+-- name: ReassignCalendarEventInvite :exec
+-- Hand a live invite to the attendee row that continues it on a split
+-- series, so accepting the link answers for the occurrences still to come.
+-- The token stays: the invite is the same standing grant, and the link the
+-- recipient holds has to keep working.
+UPDATE calendar_event_invites
+SET event_id    = sqlc.arg('new_event_id'),
+    attendee_id = sqlc.arg('new_attendee_id')
+WHERE id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE;

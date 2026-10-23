@@ -42,7 +42,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/workspaces/{wsId}/lenses/{lensId}",
 		Summary:     "Update a saved view",
-		Description: "Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
+		Description: "Updates a lens's name, description, filter, sort, grouping or default flag. Omitted fields are left unchanged. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
 		Tags:        []string{"Lens"},
 	}, Update(deps))
 

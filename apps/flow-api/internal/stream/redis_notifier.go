@@ -76,18 +76,29 @@ func (n *RedisNotifier) Subscribe(ctx context.Context, workspacePublicID string)
 					n.log.Warn("stream/redis: unmarshal failed", "err", err)
 					continue
 				}
-				select {
-				case out <- evt:
-				default:
-					// Slow consumer: drop the event and queue a
-					// resync marker, matching the InProcess policy.
-					select {
-					case out <- Event{Kind: KindResync, WorkspaceID: workspacePublicID}:
-					default:
-					}
-				}
+				offerOrResync(out, evt, workspacePublicID)
 			}
 		}
 	}()
 	return out
+}
+
+// offerOrResync queues evt on out. When the inbox is full the oldest
+// queued event is dropped to make room for a [KindResync] marker, which
+// supersedes any single lost event. The caller is the only sender on out,
+// so the slot freed here cannot be taken before the marker is queued.
+func offerOrResync(out chan Event, evt Event, workspacePublicID string) {
+	select {
+	case out <- evt:
+		return
+	default:
+	}
+	select {
+	case <-out:
+	default:
+	}
+	select {
+	case out <- Event{Kind: KindResync, WorkspaceID: workspacePublicID, At: evt.At}:
+	default:
+	}
 }

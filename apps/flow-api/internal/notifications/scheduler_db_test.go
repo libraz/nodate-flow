@@ -24,6 +24,8 @@ import (
 // reminder window is open and notified_at is still NULL.
 type claimFixture struct {
 	workspaceID   uint32
+	userID        uint32
+	calendarID    uint32
 	eventID       uint32
 	eventPublicID types.PublicID
 }
@@ -49,6 +51,13 @@ func seedClaimFixture(t *testing.T, db *sql.DB) *claimFixture {
 	wsRaw, err := res.LastInsertId()
 	require.NoError(t, err)
 	wsID := uint32(wsRaw) //#nosec G115 -- LastInsertId in test seed, fits uint32
+
+	// Reminders go only to enabled members of the event's workspace, so
+	// the owner has to be one.
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO workspace_members (public_id, workspace_id, user_id, role) VALUES (?, ?, ?, 'owner')`,
+		types.New(), wsID, userID)
+	require.NoError(t, err)
 
 	res, err = db.ExecContext(ctx,
 		`INSERT INTO calendars (public_id, workspace_id, kind, name, owner_user_id)
@@ -79,6 +88,8 @@ func seedClaimFixture(t *testing.T, db *sql.DB) *claimFixture {
 
 	return &claimFixture{
 		workspaceID:   wsID,
+		userID:        userID,
+		calendarID:    calID,
 		eventID:       uint32(evRaw), //#nosec G115 -- LastInsertId in test seed, fits uint32
 		eventPublicID: eventPub,
 	}

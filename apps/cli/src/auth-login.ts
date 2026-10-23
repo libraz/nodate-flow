@@ -1,6 +1,6 @@
 import type { components, NodateFlowClient } from '@nodate-flow/sdk';
 
-import { apiErrorMessage } from './util/api-error.js';
+import { apiErrorMessage, resultError } from './util/api-error.js';
 
 type AuthClientLike = Pick<NodateFlowClient, 'POST'>;
 
@@ -25,8 +25,9 @@ export async function completeLogin(options: CompleteLoginOptions): Promise<Comp
   const first = await options.client.POST('/auth/login', {
     body: { email: options.email, password: options.password },
   });
-  if (first.error) {
-    return { error: first.error, response: first.response };
+  const firstError = resultError(first);
+  if (firstError) {
+    return { error: firstError, response: first.response };
   }
 
   const firstData = recordOrEmpty(first.data);
@@ -48,8 +49,9 @@ export async function completeLogin(options: CompleteLoginOptions): Promise<Comp
   }
 
   const second = await options.client.POST('/auth/login/totp', { body });
-  if (second.error) {
-    return { error: second.error, response: second.response };
+  const secondError = resultError(second);
+  if (secondError) {
+    return { error: secondError, response: second.response };
   }
   return { data: recordOrEmpty(second.data), response: second.response };
 }

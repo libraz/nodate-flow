@@ -76,3 +76,19 @@ DELETE FROM calendar_event_attachments
 WHERE workspace_id = ?
   AND event_id = ?
   AND public_id = ?;
+
+-- name: ListCalendarEventAttachmentRefs :many
+-- The storage references behind one event's live attachments, for a split
+-- that re-attaches the same files to the continuing master. Each copy is a
+-- new referencing row, so the caller bumps storage_objects.ref_count for it
+-- in the same transaction.
+SELECT
+  a.uploader_id,
+  a.storage_object_id,
+  a.filename
+FROM calendar_event_attachments a
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
+  AND a.enabled = TRUE
+ORDER BY a.created_at ASC, a.id ASC
+LIMIT 1000;

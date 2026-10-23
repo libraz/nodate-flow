@@ -355,3 +355,16 @@ WHERE ovr.workspace_id = sqlc.arg('workspace_id')
   AND ovr.id NOT IN (SELECT event_id FROM published_events)
 ORDER BY ovr.recurrence_original_start ASC, ovr.public_id ASC
 LIMIT 2000;
+
+-- name: ListCalendarEventShareLinks :many
+-- The shares one event is published on, for a split that has to publish
+-- the continuing series wherever the original series appeared.
+-- Publication is opt-in per event row, so a continuing master that is not
+-- attached would drop every later occurrence from the share page.
+SELECT share_id, sort_weight
+FROM calendar_public_share_events
+WHERE workspace_id = ?
+  AND event_id = ?
+  AND enabled = TRUE
+ORDER BY id ASC
+LIMIT 1000;

@@ -72,10 +72,11 @@ LIMIT ?;
 -- URL token minted by the caller; the plaintext is returned to the
 -- publisher once and is not recoverable afterwards.
 -- No-op if the lens is already public (WHERE is_public = FALSE guard).
+-- shared_at keeps the first share time across revoke and re-publish.
 UPDATE lenses
 SET is_public = TRUE,
     public_token_hash = ?,
-    shared_at = NOW(3)
+    shared_at = COALESCE(shared_at, NOW(3))
 WHERE workspace_id = ?
   AND public_id = ?
   AND is_public = FALSE

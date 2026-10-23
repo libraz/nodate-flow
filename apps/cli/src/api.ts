@@ -16,6 +16,7 @@ import {
   loadCredentials,
   resolveAuthApiUrl,
   saveCredentials,
+  withCredentialsLock,
 } from './config.js';
 import { AuthRequiredError } from './util/exit.js';
 
@@ -26,6 +27,14 @@ export interface AuthenticatedFetchOptions {
   getAccessToken: () => string;
   getRefreshToken: () => string | undefined;
   setTokens: (tokens: { accessToken: string; refreshToken?: string }) => void;
+  /**
+   * Re-reads the credential store shared with other processes. When it
+   * holds a refresh token other than the one in memory, another process
+   * rotated first: adopt its tokens and return its access token.
+   */
+  adoptStoredTokens?: () => string | undefined;
+  /** Holds a lock shared with other processes across one refresh. */
+  lock?: <T>(fn: () => Promise<T>) => Promise<T>;
   fetchImpl?: typeof fetch;
 }
 
@@ -72,7 +81,21 @@ function refreshCookieHeader(refreshToken: string): string {
   return `${REFRESH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}`;
 }
 
+/**
+ * Refreshes under the cross-process lock: tokens another process already
+ * rotated and saved are adopted instead of presenting the superseded
+ * refresh token, which the server would treat as reuse.
+ */
 async function refreshAccessToken(options: AuthenticatedFetchOptions): Promise<string | null> {
+  const lock = options.lock ?? (<T>(fn: () => Promise<T>) => fn());
+  return lock(async () => {
+    const adopted = options.adoptStoredTokens?.();
+    if (adopted) return adopted;
+    return rotateRefreshToken(options);
+  });
+}
+
+async function rotateRefreshToken(options: AuthenticatedFetchOptions): Promise<string | null> {
   const refreshToken = options.getRefreshToken();
   if (!refreshToken) return null;
 
@@ -139,6 +162,29 @@ export function createAuthenticatedFetch(options: AuthenticatedFetchOptions): ty
 }
 
 /**
+ * Asks auth-api to revoke the session behind the stored refresh token.
+ * Resolves false when the revocation could not be confirmed: the request
+ * never arrived or the server did not answer 2xx.
+ */
+export async function revokeSession(
+  creds: Pick<Credentials, 'refreshToken' | 'authApiBaseUrl'>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetchImpl(`${resolveAuthApiUrl(creds)}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        cookie: refreshCookieHeader(creds.refreshToken),
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Creates a typed SDK client for the service `selectBaseUrl` picks out of
  * the stored credentials, authenticated with the stored access token and
  * able to rotate it on a 401. Throws when no credentials are found.
@@ -167,6 +213,13 @@ function createAuthenticatedClient(
           };
           saveCredentials(creds);
         },
+        adoptStoredTokens: () => {
+          const stored = loadCredentials();
+          if (!creds || !stored || stored.refreshToken === creds.refreshToken) return undefined;
+          creds = { ...creds, accessToken: stored.accessToken, refreshToken: stored.refreshToken };
+          return stored.accessToken;
+        },
+        lock: withCredentialsLock,
       }),
     },
   });

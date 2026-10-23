@@ -478,7 +478,7 @@ func ParseTools(path, src string) ([]Declaration, error) {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 
-	w := &toolWalker{fset: fset, path: path}
+	w := &toolWalker{fset: fset, path: path, consts: packageIntConsts(file)}
 	ast.Inspect(file, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
 		if !ok {
@@ -532,6 +532,9 @@ type toolWalker struct {
 	resource string
 	found    []Declaration
 	unknown  []string
+	// consts holds the integer constants the source declares at package
+	// level, so a bound written as a named width resolves to its number.
+	consts map[string]int
 }
 
 // property reads one schema expression: a tool's whole input schema, the
@@ -621,7 +624,7 @@ func (w *toolWalker) element(prefix, key string, expr ast.Expr) {
 // stringProperty records one string property with the bound it states or
 // the record that it states none.
 func (w *toolWalker) stringProperty(prefix, key string, call *ast.CallExpr) {
-	bound, bounded := toolBound(call)
+	bound, bounded := toolBound(call, w.consts)
 	if !bounded && toolStatesValueSet(call) {
 		// The same reading as a field tag naming its values: the set fixes
 		// the longest value, so the silence about a length claims nothing.
@@ -692,7 +695,7 @@ func toolStatesValueSet(call *ast.CallExpr) bool {
 
 // toolBound reads a MaxLength off a stringSchema call's Constraints
 // argument.
-func toolBound(call *ast.CallExpr) (int, bool) {
+func toolBound(call *ast.CallExpr, consts map[string]int) (int, bool) {
 	for _, arg := range call.Args[1:] {
 		lit, ok := arg.(*ast.CompositeLit)
 		if !ok {
@@ -711,12 +714,47 @@ func toolBound(call *ast.CallExpr) (int, bool) {
 			if !ok || len(inner.Args) != 1 {
 				continue
 			}
-			if n, err := strconv.Atoi(literalText(inner.Args[0])); err == nil && n > 0 {
+			if n, ok := intValue(inner.Args[0], consts); ok && n > 0 {
 				return n, true
 			}
 		}
 	}
 	return 0, false
+}
+
+// intValue reads an integer literal, or an identifier naming one of the
+// package-level integer constants in consts.
+func intValue(expr ast.Expr, consts map[string]int) (int, bool) {
+	if id, ok := expr.(*ast.Ident); ok {
+		n, found := consts[id.Name]
+		return n, found
+	}
+	n, err := strconv.Atoi(literalText(expr))
+	return n, err == nil
+}
+
+// packageIntConsts collects the package-level constants declared with an
+// integer literal value.
+func packageIntConsts(file *ast.File) map[string]int {
+	out := map[string]int{}
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok || len(vs.Names) != len(vs.Values) {
+				continue
+			}
+			for i, name := range vs.Names {
+				if n, err := strconv.Atoi(literalText(vs.Values[i])); err == nil {
+					out[name.Name] = n
+				}
+			}
+		}
+	}
+	return out
 }
 
 // stringLiteral returns the value of a string literal expression, or the

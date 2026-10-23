@@ -426,6 +426,36 @@ func (q *Queries) MarkCalendarEventInviteSent(ctx context.Context, id uint32) er
 	return err
 }
 
+const reassignCalendarEventInvite = `-- name: ReassignCalendarEventInvite :exec
+UPDATE calendar_event_invites
+SET event_id    = ?,
+    attendee_id = ?
+WHERE id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE
+`
+
+type ReassignCalendarEventInviteParams struct {
+	NewEventID    sql.NullInt32 `json:"-"`
+	NewAttendeeID sql.NullInt32 `json:"-"`
+	ID            uint32        `json:"-"`
+	WorkspaceID   uint32        `json:"-"`
+}
+
+// Hand a live invite to the attendee row that continues it on a split
+// series, so accepting the link answers for the occurrences still to come.
+// The token stays: the invite is the same standing grant, and the link the
+// recipient holds has to keep working.
+func (q *Queries) ReassignCalendarEventInvite(ctx context.Context, arg ReassignCalendarEventInviteParams) error {
+	_, err := q.db.ExecContext(ctx, reassignCalendarEventInvite,
+		arg.NewEventID,
+		arg.NewAttendeeID,
+		arg.ID,
+		arg.WorkspaceID,
+	)
+	return err
+}
+
 const reviveCalendarEventInvite = `-- name: ReviveCalendarEventInvite :exec
 UPDATE calendar_event_invites
 SET token_hash = ?,

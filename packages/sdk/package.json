@@ -26,6 +26,13 @@
       "module": "./src/api-error.ts",
       "node": "./dist/api-error.js",
       "default": "./src/api-error.ts"
+    },
+    "./request": {
+      "types": "./src/request.ts",
+      "bun": "./src/request.ts",
+      "module": "./src/request.ts",
+      "node": "./dist/request.js",
+      "default": "./src/request.ts"
     }
   },
   "scripts": {

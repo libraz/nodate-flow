@@ -17,7 +17,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFlowClient, createIdentityClient } from '../src/api.js';
 import { cli } from '../src/index.js';
 
-const emptyPage = { data: { workspaces: [], projects: [], tasks: [], total: 0 } };
+const emptyPage = {
+  response: new Response(null, { status: 200 }),
+  data: { workspaces: [], projects: [], tasks: [], total: 0 },
+};
 
 function createClientStub() {
   return {
@@ -30,6 +33,7 @@ vi.mock('../src/api.js', () => ({
   createFlowClient: vi.fn(() => createClientStub()),
   createIdentityClient: vi.fn(() => createClientStub()),
   extractRefreshTokenFromSetCookie: vi.fn(() => undefined),
+  revokeSession: vi.fn(async () => true),
 }));
 
 /** Collects everything a command writes so it never reaches the console. */

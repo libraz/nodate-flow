@@ -80,7 +80,7 @@ func TotpEnroll(deps Deps) func(context.Context, *TotpEnrollInput) (*TotpEnrollO
 		if row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpAlreadyEnrolled)
 		}
-		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+		if err := verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password); err != nil {
 			return nil, err
 		}
 		secret, err := auth.GenerateTotpSecret()
@@ -137,7 +137,7 @@ func TotpConfirm(deps Deps) func(context.Context, *TotpConfirmInput) (*TotpConfi
 		if row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpAlreadyEnrolled)
 		}
-		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+		if err := verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password); err != nil {
 			return nil, err
 		}
 		var step int64
@@ -215,7 +215,7 @@ func TotpRegenerateRecoveryCodes(deps Deps) func(context.Context, *TotpRegenerat
 		if !row.MfaConfirmedAt.Valid {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
-		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+		if err := verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password); err != nil {
 			return nil, err
 		}
 		codes, err := issueRecoveryCodes(ctx, deps, uid)
@@ -261,7 +261,7 @@ func TotpDisable(deps Deps) func(context.Context, *TotpDisableInput) (*TotpDisab
 		if len(row.MfaSecretCiphertext.String) == 0 {
 			return nil, httpErr(apierrors.AuthTotpNotEnrolled)
 		}
-		if err := verifyLocalIdentityPassword(row, in.Body.Password); err != nil {
+		if err := verifyLocalIdentityPassword(ctx, deps, row, in.Body.Password); err != nil {
 			return nil, err
 		}
 		if err := deps.Queries.ClearIdentityMfa(ctx, row.ID); err != nil {
@@ -310,12 +310,20 @@ func loadLocalIdentity(ctx context.Context, deps Deps, uid uint32) (generated.Fi
 	return row, nil
 }
 
-func verifyLocalIdentityPassword(row generated.FindLocalIdentityByUserIdRow, password string) error {
+// verifyLocalIdentityPassword re-verifies the caller's current password
+// under the same identity lockout as login: a locked identity is refused
+// before the hash is checked, and a mismatch counts against it. Without
+// that, a stolen access token is an unthrottled password oracle.
+func verifyLocalIdentityPassword(ctx context.Context, deps Deps, row generated.FindLocalIdentityByUserIdRow, password string) error {
+	if row.LockedUntilAt.Valid && row.LockedUntilAt.Time.After(time.Now()) {
+		return httpErr(apierrors.AuthLoginAccountLocked)
+	}
 	if !row.PasswordHash.Valid {
 		return httpErr(apierrors.AuthPasswordNoLocalIdentity)
 	}
 	okPw, err := auth.VerifyPassword(row.PasswordHash.String, password)
 	if err != nil || !okPw {
+		bumpFailedByID(ctx, deps, row.ID)
 		return httpErr(apierrors.AuthPasswordCurrentMismatch)
 	}
 	return nil

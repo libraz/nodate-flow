@@ -77,12 +77,7 @@ func main() {
 
 	queries := generated.New(db)
 
-	sessions, closeSessions, err := buildSessionStore(context.Background(), cfg, db, queries, logger)
-	if err != nil {
-		logger.Error("session store init failed", "err", err)
-		os.Exit(1)
-	}
-	defer closeSessions()
+	sessions := buildSessionStore(db, queries, logger)
 
 	var cipher *crypto.Cipher
 	if c, cerr := crypto.NewFromEnv(); cerr == nil {

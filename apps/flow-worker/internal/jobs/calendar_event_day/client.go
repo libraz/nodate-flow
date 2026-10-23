@@ -89,6 +89,11 @@ func NewSignalsClient(baseURL, token, userAgent string, logger *slog.Logger) (*S
 // other unused fields zero-valued (omitempty drops them from the wire).
 type PostSignalBody = signalwire.CreateRequest
 
+// ErrSignalRejected marks a signal flow-api refused with a 4xx: a
+// permanent answer that retrying the same body will not change. Every
+// other PostSignal error is transient and worth a retry.
+var ErrSignalRejected = errors.New("calendar_event_day: flow-api rejected signal")
+
 // PostSignal sends one POST /signals request and translates the
 // response into a Go error.
 //
@@ -98,8 +103,8 @@ type PostSignalBody = signalwire.CreateRequest
 //     the (workspace_id, source, external_id) UNIQUE and returns the
 //     existing (or freshly inserted) row, so a duplicate emit is a 200,
 //     not a 409.
-//   - 4xx (other)         → permanent error: the worker logs at warn
-//     and returns a non-nil error. Retrying on the
+//   - 4xx (other)         → permanent error wrapping [ErrSignalRejected]:
+//     the worker logs at warn. Retrying on the
 //     next tick will not help — the dedupe key
 //     keeps it from compounding, and a bad request
 //     shape is a bug for @api to fix.
@@ -156,7 +161,7 @@ func (c *SignalsClient) PostSignal(ctx context.Context, body PostSignalBody) err
 			slog.String("external_id", body.ExternalID),
 			slog.String("body_preview", string(preview)),
 		)
-		return fmt.Errorf("calendar_event_day: flow-api returned %d: %s", resp.StatusCode, string(preview))
+		return fmt.Errorf("%w: status %d: %s", ErrSignalRejected, resp.StatusCode, string(preview))
 	default:
 		// 5xx and other unexpected statuses — log and bubble up so the
 		// tick is marked failed; next tick will retry and dedupe.

@@ -26,11 +26,6 @@ export const WebhookErrors = {
     status: 422,
     message: "Webhook URL is not an allowed destination",
   },
-  WEBHOOK_SUBSCRIPTION_URL_UNREACHABLE: {
-    code: "WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE",
-    status: 400,
-    message: "Webhook URL is not reachable",
-  },
 } as const;
 
 export type WebhookErrorCode = (typeof WebhookErrors)[keyof typeof WebhookErrors]["code"];

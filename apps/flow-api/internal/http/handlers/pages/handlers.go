@@ -36,6 +36,16 @@ func resolvePageInternal(ctx context.Context, db *sql.DB, wsID uint32, pub types
 	return id, nil
 }
 
+// currentPageLinks returns the stored project_id and parent_page_id of a
+// page so an update that does not name them writes them back unchanged.
+func currentPageLinks(ctx context.Context, db *sql.DB, wsID, pageID uint32) (project, parent sql.NullInt32, err error) {
+	const q = `SELECT project_id, parent_page_id FROM pages WHERE workspace_id = ? AND id = ? LIMIT 1`
+	if err := db.QueryRowContext(ctx, q, wsID, pageID).Scan(&project, &parent); err != nil {
+		return project, parent, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
+	}
+	return project, parent, nil
+}
+
 // checkAncestorDepthAndCircular walks up the ancestor chain from the
 // proposed parent, verifying that:
 //  1. The chain does not exceed MaxPageDepth.
@@ -301,10 +311,17 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.PagePageNotFound, apierrors.InternalUnexpected))
 		}
 
-		// Build update params with COALESCE-compatible nullables.
+		// UpdatePage writes project_id and parent_page_id verbatim, so start
+		// from the stored values and overwrite only what the body names.
+		curProject, curParent, err := currentPageLinks(ctx, deps.DB, ws.ID, existing.ID)
+		if err != nil {
+			return nil, err
+		}
 		updateParams := generated.UpdatePageParams{
-			WorkspaceID: ws.ID,
-			PublicID:    pub,
+			WorkspaceID:  ws.ID,
+			PublicID:     pub,
+			ProjectID:    curProject,
+			ParentPageID: curParent,
 		}
 
 		// Title: send non-null to update, null to keep existing (COALESCE).
@@ -399,7 +416,8 @@ func Update(deps Deps) func(context.Context, *UpdatePageInput) (*UpdatePageOutpu
 }
 
 // Delete handles DELETE /workspaces/{wsId}/pages/{pageId}.
-// Children become root pages (DB handles via ON DELETE SET NULL on parent_page_id).
+// The page is soft-disabled, which hides its whole subtree with it; a repeat
+// delete finds no live page and returns PagePageNotFound.
 func Delete(deps Deps) func(context.Context, *DeletePageInput) (*DeletePageOutput, error) {
 	return func(ctx context.Context, in *DeletePageInput) (*DeletePageOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)

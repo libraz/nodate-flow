@@ -26,8 +26,9 @@ const (
 	MaxCSVRows  = 5000
 )
 
-// Column names accepted in the header row. They are the field names the
-// task export emits, so a file produced by GET /export/tasks can be fed
+// Column names accepted in the header row. Each is also accepted under
+// the label GET /export/tasks writes (the Header* constants, which the
+// exporter uses for its own header row), so an exported file can be fed
 // back in without renaming anything.
 //
 // status is deliberately absent. A task's state is derived from its
@@ -44,6 +45,31 @@ const (
 	colDueOn       = "dueOn"
 	colStartedOn   = "startedOn"
 )
+
+// Header labels of the task export for the columns the importer reads.
+// The exporter writes these and the importer accepts them, so the two
+// cannot drift apart.
+const (
+	HeaderTitle       = "Title"
+	HeaderDescription = "Description"
+	HeaderPriority    = "Priority"
+	HeaderDueDate     = "Due Date"
+	HeaderStartDate   = "Start Date"
+)
+
+// columnByHeader resolves a trimmed header cell to its column name.
+var columnByHeader = map[string]string{
+	colTitle:          colTitle,
+	colDescription:    colDescription,
+	colPriority:       colPriority,
+	colDueOn:          colDueOn,
+	colStartedOn:      colStartedOn,
+	HeaderTitle:       colTitle,
+	HeaderDescription: colDescription,
+	HeaderPriority:    colPriority,
+	HeaderDueDate:     colDueOn,
+	HeaderStartDate:   colStartedOn,
+}
 
 // Row is one parsed CSV line, shaped for taskcreate.Args.
 type Row struct {
@@ -190,9 +216,8 @@ func indexHeader(header []string) (map[string]int, error) {
 		colStartedOn:   -1,
 	}
 	for i, raw := range header {
-		name := strings.TrimSpace(raw)
-		if _, known := index[name]; known {
-			index[name] = i
+		if col, known := columnByHeader[strings.TrimSpace(raw)]; known {
+			index[col] = i
 		}
 	}
 	if index[colTitle] < 0 {

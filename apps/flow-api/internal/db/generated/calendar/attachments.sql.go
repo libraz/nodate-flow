@@ -148,6 +148,57 @@ func (q *Queries) FindCalendarEventAttachmentByPublicId(ctx context.Context, arg
 	return i, err
 }
 
+const listCalendarEventAttachmentRefs = `-- name: ListCalendarEventAttachmentRefs :many
+SELECT
+  a.uploader_id,
+  a.storage_object_id,
+  a.filename
+FROM calendar_event_attachments a
+WHERE a.workspace_id = ?
+  AND a.event_id = ?
+  AND a.enabled = TRUE
+ORDER BY a.created_at ASC, a.id ASC
+LIMIT 1000
+`
+
+type ListCalendarEventAttachmentRefsParams struct {
+	WorkspaceID uint32        `json:"-"`
+	EventID     sql.NullInt32 `json:"-"`
+}
+
+type ListCalendarEventAttachmentRefsRow struct {
+	UploaderID      uint32 `json:"-"`
+	StorageObjectID uint32 `json:"-"`
+	Filename        string `json:"filename"`
+}
+
+// The storage references behind one event's live attachments, for a split
+// that re-attaches the same files to the continuing master. Each copy is a
+// new referencing row, so the caller bumps storage_objects.ref_count for it
+// in the same transaction.
+func (q *Queries) ListCalendarEventAttachmentRefs(ctx context.Context, arg ListCalendarEventAttachmentRefsParams) ([]ListCalendarEventAttachmentRefsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventAttachmentRefs, arg.WorkspaceID, arg.EventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCalendarEventAttachmentRefsRow{}
+	for rows.Next() {
+		var i ListCalendarEventAttachmentRefsRow
+		if err := rows.Scan(&i.UploaderID, &i.StorageObjectID, &i.Filename); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCalendarEventAttachments = `-- name: ListCalendarEventAttachments :many
 SELECT
   a.public_id,

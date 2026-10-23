@@ -55,7 +55,13 @@ func PauseAgent(deps Deps) func(context.Context, *PauseAgentInput) (*PauseAgentO
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if n == 0 {
-			return nil, httpErr(apierrors.AiAgentNotFound)
+			exists, eerr := agentExists(ctx, deps.DB, ws.ID, agentPub)
+			if eerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if !exists {
+				return nil, httpErr(apierrors.AiAgentNotFound)
+			}
 		}
 		kind := eventbus.AiAgentResumed
 		if in.Body.Paused {

@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 )
 
 // mysqlDuplicateEntry is ER_DUP_ENTRY (1062). Checked locally so this
@@ -98,15 +99,11 @@ func Add(ctx context.Context, tx *dbretry.Tx, args Args) (types.PublicID, error)
 	if err != nil {
 		return types.PublicID{}, err
 	}
-	// The locking read produces its own row type. Restating it in the
-	// shape [ClosesCycle] takes keeps one walk for both callers -- this
-	// one and the read-only "would this be rejected" preview -- so the
-	// answer the API previews is the answer the write applies.
-	edges := make([]generated.ListDependencyEdgesForWorkspaceRow, len(locked))
+	edges := make([]Edge, len(locked))
 	for i, e := range locked {
-		edges[i] = generated.ListDependencyEdgesForWorkspaceRow(e)
+		edges[i] = Edge{From: e.FromTaskID, To: e.ToTaskID, Kind: string(e.Kind)}
 	}
-	if ClosesCycle(edges, args.FromTaskID, args.ToTaskID) {
+	if ClosesCycle(edges, args.FromTaskID, args.ToTaskID, string(args.Kind)) {
 		return types.PublicID{}, ErrCycle
 	}
 
@@ -146,17 +143,30 @@ func Add(ctx context.Context, tx *dbretry.Tx, args Args) (types.PublicID, error)
 	return pub, nil
 }
 
-// ClosesCycle reports whether adding from -> to would close a cycle in
-// the edge set. It is exported so callers that need to answer "would
-// this be rejected" without writing can reuse the exact walk [Add]
-// applies.
-func ClosesCycle(edges []generated.ListDependencyEdgesForWorkspaceRow, from, to uint32) bool {
+// Edge is one live dependency edge as the cycle walk sees it.
+type Edge struct {
+	From, To uint32
+	Kind     string
+}
+
+// ClosesCycle reports whether adding from -> to of the given kind would
+// close a cycle among blocking edges. Informational kinds never gate
+// anything, so they neither take part in the walk nor are refused by it.
+// It is exported so callers that need to answer "would this be rejected"
+// without writing can reuse the exact walk [Add] applies.
+func ClosesCycle(edges []Edge, from, to uint32, kind string) bool {
+	if !taskrules.IsBlockingDependencyKind(kind) {
+		return false
+	}
 	if from == to {
 		return true
 	}
 	adj := make(map[uint32][]uint32, len(edges))
 	for _, e := range edges {
-		adj[e.FromTaskID] = append(adj[e.FromTaskID], e.ToTaskID)
+		if !taskrules.IsBlockingDependencyKind(e.Kind) {
+			continue
+		}
+		adj[e.From] = append(adj[e.From], e.To)
 	}
 	visited := make(map[uint32]bool)
 	stack := []uint32{to}

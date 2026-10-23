@@ -309,6 +309,13 @@ UPDATE users
 SET last_login_at = NOW()
 WHERE id = ?;
 
+-- name: MarkUserEmailVerified :exec
+-- Record that the account's email address has been proven, keeping the
+-- first proof's timestamp when one is already set.
+UPDATE users
+SET email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP)
+WHERE id = ?;
+
 -- name: SetMyAvatarURL :exec
 -- Replace the authenticated user's avatar_url column with a non-NULL value.
 -- Used by POST /me/avatar after a successful upload. The COALESCE-style

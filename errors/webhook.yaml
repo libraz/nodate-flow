@@ -24,15 +24,6 @@ resources:
         description: "Returned when the webhook URL is not a valid https URL, embeds credentials, or its host resolves to a private, loopback, link-local, or otherwise non-public address."
         userAction: "Use a public https URL without embedded credentials as the webhook destination."
 
-      url_unreachable:
-        code: WEBHOOK.SUBSCRIPTION.URL_UNREACHABLE
-        status: 400
-        message: "Webhook URL is not reachable"
-        message_ja: "Webhook の URL に接続できません"
-        message_zh: "无法访问 Webhook URL"
-        description: "Returned when a test delivery to the configured webhook URL fails because the endpoint cannot be reached or does not respond with a success status."
-        userAction: "Check the webhook URL is correct, publicly accessible, and returns a 2xx status."
-
       limit_exceeded:
         code: WEBHOOK.SUBSCRIPTION.LIMIT_EXCEEDED
         status: 409

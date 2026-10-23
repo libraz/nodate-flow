@@ -7,6 +7,7 @@ package calendar
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
@@ -26,6 +27,13 @@ type Querier interface {
 	// Dedicated setter that clears expires_at (COALESCE-based patch cannot
 	// distinguish "leave unchanged" from "clear" for nullable columns).
 	ClearPublicShareExpiresAt(ctx context.Context, arg ClearPublicShareExpiresAtParams) (int64, error)
+	// Carry one checklist item onto the continuing master of a split series,
+	// done state included: the list describes the series, not an occurrence.
+	CopyCalendarChecklistItem(ctx context.Context, arg CopyCalendarChecklistItemParams) error
+	// Record a claim already taken for an occurrence under the row that now
+	// carries it. IGNORE because the claim may already be there, which is the
+	// state this exists to reach.
+	CopyCalendarEventReminderClaim(ctx context.Context, arg CopyCalendarEventReminderClaimParams) error
 	// Number of live members, used to pick the next colour from the palette.
 	CountCalendarMembers(ctx context.Context, arg CountCalendarMembersParams) (int64, error)
 	// Live owners of a calendar. Callers check this before demoting or
@@ -171,6 +179,12 @@ type Querier interface {
 	// enabled rows. Reparenting has to carry soft-deleted overrides so a revived
 	// one still names a master that can produce it, while withdrawing a row that
 	// is already withdrawn changes nothing and must not be counted.
+	//
+	// Scoped to the overrides the acting user can see, on the row filter the
+	// range queries carry: a confidential override belonging to somebody else
+	// stays enabled past the truncation and keeps rendering to its owner, since
+	// disabling it would remove an occurrence from a calendar the actor has no
+	// view of.
 	DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error)
 	// Withdraw every time block on one task. `scheduled` is a role a task may
 	// hold several times, so clearing it takes all of them at once.
@@ -234,6 +248,10 @@ type Querier interface {
 	// Resolve a calendar event by UUID v7 within a calendar. The creator
 	// (created_by_user_id) is LEFT JOINed so a soft-disabled creator yields
 	// NULL identity columns rather than dropping the event row.
+	//
+	// recurrence_parent_id is selected so an override's attendance can be read
+	// off its series, whose attendee list it shares. It is internal and never
+	// reaches an API response.
 	FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error)
 	// Resolve a comment by UUID v7.
 	FindCalendarEventCommentByPublicId(ctx context.Context, arg FindCalendarEventCommentByPublicIdParams) (FindCalendarEventCommentByPublicIdRow, error)
@@ -324,6 +342,11 @@ type Querier interface {
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.
 	ListCalendarChecklistItems(ctx context.Context, arg ListCalendarChecklistItemsParams) ([]ListCalendarChecklistItemsRow, error)
+	// The storage references behind one event's live attachments, for a split
+	// that re-attaches the same files to the continuing master. Each copy is a
+	// new referencing row, so the caller bumps storage_objects.ref_count for it
+	// in the same transaction.
+	ListCalendarEventAttachmentRefs(ctx context.Context, arg ListCalendarEventAttachmentRefsParams) ([]ListCalendarEventAttachmentRefsRow, error)
 	// List active attachments for an event with uploader display fields and the
 	// storage_objects metadata flattened in via JOIN. Order is stable by
 	// created_at then public_id.
@@ -395,6 +418,30 @@ type Querier interface {
 	// resurrect duplicates, so it sits far above the number of overrides a
 	// single expansion can meaningfully carry.
 	ListCalendarEventOverriddenStarts(ctx context.Context, arg ListCalendarEventOverriddenStartsParams) ([]ListCalendarEventOverriddenStartsRow, error)
+	// Every override of one master naming an occurrence at or after a point,
+	// soft-deleted ones included, for a write that moves or withdraws them as
+	// the series they name changes shape.
+	//
+	// Not viewer-scoped: this read decides whether a row still names an
+	// occurrence its series produces, which does not depend on who is asking.
+	// Disabled rows are listed because the unique key on (recurrence_parent_id,
+	// recurrence_original_start) counts them, so a move has to know where they
+	// sit.
+	//
+	// The LIMIT is the runaway bound ListCalendarEventOverriddenStarts uses.
+	ListCalendarEventOverridesFromStart(ctx context.Context, arg ListCalendarEventOverridesFromStartParams) ([]ListCalendarEventOverridesFromStartRow, error)
+	// The occurrences of one event whose reminder has already been sent, from
+	// a point onwards.
+	//
+	// Read when a split or an override hands occurrences to a new row id: the
+	// claim is keyed by (event_id, occurrence_start), so without carrying it
+	// across the new row's occurrence looks unreminded and is sent again.
+	ListCalendarEventReminderClaims(ctx context.Context, arg ListCalendarEventReminderClaimsParams) ([]time.Time, error)
+	// The shares one event is published on, for a split that has to publish
+	// the continuing series wherever the original series appeared.
+	// Publication is opt-in per event row, so a continuing master that is not
+	// attached would drop every later occurrence from the share page.
+	ListCalendarEventShareLinks(ctx context.Context, arg ListCalendarEventShareLinksParams) ([]ListCalendarEventShareLinksRow, error)
 	// Cross-calendar query: list events across multiple calendars for a user
 	// within a workspace and time range. Used by the unified calendar view.
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
@@ -531,6 +578,23 @@ type Querier interface {
 	// needs both. The master is identified by public_id so the warning can be
 	// placed on the row the editor already lists without a second lookup.
 	ListUnpublishedShareOverrides(ctx context.Context, arg ListUnpublishedShareOverridesParams) ([]ListUnpublishedShareOverridesRow, error)
+	// ====================================
+	// Series transform
+	//
+	// The statements calendaroccurrence's series transform issues inside its
+	// own transaction while it splits, ends or realigns a series. None of them
+	// serves a viewer: they decide which rows still name an occurrence the
+	// series produces, which does not depend on who is asking, so they carry
+	// no visibility filter and stay out of events.sql, whose list queries do.
+	// ====================================
+	// The series columns of one master, read under a row lock.
+	//
+	// A write that derives a new exception list, a truncation or a continuing
+	// series from these columns has to read them inside its own transaction
+	// and hold them: built from a read taken before it, two concurrent edits
+	// each write a list missing the other's entry, and a cancelled occurrence
+	// comes back.
+	LockCalendarEventSeries(ctx context.Context, arg LockCalendarEventSeriesParams) (LockCalendarEventSeriesRow, error)
 	// Stamp accepted_at when the recipient clicks the magic link
 	// successfully.
 	MarkCalendarEventInviteAccepted(ctx context.Context, id uint32) error
@@ -599,6 +663,16 @@ type Querier interface {
 	PatchCalendarSubscription(ctx context.Context, arg PatchCalendarSubscriptionParams) (int64, error)
 	// Update mutable share fields. NULL arguments leave columns untouched.
 	PatchPublicShare(ctx context.Context, arg PatchPublicShareParams) (int64, error)
+	// Hand a live invite to the attendee row that continues it on a split
+	// series, so accepting the link answers for the occurrences still to come.
+	// The token stays: the invite is the same standing grant, and the link the
+	// recipient holds has to keep working.
+	ReassignCalendarEventInvite(ctx context.Context, arg ReassignCalendarEventInviteParams) error
+	// Point an override at the occurrence it stands for after its series moved:
+	// the same position in the rule, at the instant the rule now gives it.
+	//
+	// recurrence_parent_id IS NOT NULL confines the statement to override rows.
+	RebaseCalendarEventOverride(ctx context.Context, arg RebaseCalendarEventOverrideParams) error
 	// Hand the overrides at or after a split point to the series that continues
 	// past it. A "this and following" edit truncates the master and creates a
 	// new master for the remainder; an override whose recurrence_original_start

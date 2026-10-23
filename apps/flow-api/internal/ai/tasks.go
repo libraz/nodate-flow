@@ -178,7 +178,7 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 	if o == nil || o.Resolver == nil {
 		return nil, ErrNoProvider
 	}
-	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+	if _, err := CheckBudget(ctx, o.Guard, workspaceID); err != nil {
 		return nil, err
 	}
 	prov, err := o.Resolver.Default(ctx, workspaceID)
@@ -223,7 +223,7 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 	if o == nil || o.Resolver == nil {
 		return "", ErrNoProvider
 	}
-	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+	if _, err := CheckBudget(ctx, o.Guard, workspaceID); err != nil {
 		return "", err
 	}
 	prov, err := o.Resolver.Default(ctx, workspaceID)
@@ -335,7 +335,7 @@ func (o *Orchestrator) ProposeSteps(
 	if o == nil || o.Resolver == nil {
 		return nil, ErrNoProvider
 	}
-	if err := o.Guard.Check(ctx, workspaceID); err != nil {
+	if _, err := CheckBudget(ctx, o.Guard, workspaceID); err != nil {
 		return nil, err
 	}
 	prov, err := o.Resolver.Default(ctx, workspaceID)

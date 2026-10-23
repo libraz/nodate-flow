@@ -234,10 +234,7 @@ func TestTruncationPointKeepsAMasterThatAlreadyStopsEarlier(t *testing.T) {
 
 	split := time.Date(2030, 6, 10, 9, 0, 0, 0, time.UTC)
 	earlier := time.Date(2030, 6, 1, 0, 0, 0, 0, time.UTC)
-	master := calendar.FindCalendarEventByPublicIdRow{
-		RecurrenceEnd: sql.NullTime{Time: earlier, Valid: true},
-	}
-	if got := TruncationPoint(master, split); !got.Equal(earlier) {
+	if got := truncationPoint(sql.NullTime{Time: earlier, Valid: true}, split); !got.Equal(earlier) {
 		t.Errorf("truncation = %v, want the master's own %v; a split must not revive a finished series",
 			got, earlier)
 	}
@@ -247,7 +244,7 @@ func TestTruncationPointStopsJustBeforeTheSplit(t *testing.T) {
 	t.Parallel()
 
 	split := time.Date(2030, 6, 10, 9, 0, 0, 0, time.UTC)
-	got := TruncationPoint(calendar.FindCalendarEventByPublicIdRow{}, split)
+	got := truncationPoint(sql.NullTime{}, split)
 	if !got.Before(split) {
 		t.Errorf("truncation = %v, want a bound before the split at %v", got, split)
 	}

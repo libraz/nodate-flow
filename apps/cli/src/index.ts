@@ -11,6 +11,7 @@ import {
   createFlowClient,
   createIdentityClient,
   extractRefreshTokenFromSetCookie,
+  revokeSession,
 } from './api.js';
 import { authErrorMessage, completeLogin } from './auth-login.js';
 import {
@@ -38,7 +39,7 @@ import {
   type TaskListQuery,
   type UpdateOptions as UpdateOptionsInput,
 } from './task-builders.js';
-import { apiErrorMessage } from './util/api-error.js';
+import { apiErrorExitCode, apiErrorMessage, resultError } from './util/api-error.js';
 import { assertYmd, DateValidationError } from './util/date.js';
 import { EXIT_AUTH, EXIT_RUNTIME, EXIT_VALIDATION, isAuthRequiredError } from './util/exit.js';
 import { optionalYmd, resolveDeprecatedFlag } from './util/flags.js';
@@ -72,6 +73,19 @@ interface CliProjectRow {
   identifier: string;
   name: string;
   slug: string;
+}
+
+/**
+ * Reports a failed API call and sets the exit code its status calls for:
+ * EXIT_AUTH for a 401 that survived the refresh, EXIT_RUNTIME otherwise.
+ */
+function reportApiFailure(
+  stderr: { write(chunk: string): unknown },
+  error: unknown,
+  fallback: string,
+): void {
+  stderr.write(c`{red Error}: ${apiErrorMessage(error, fallback)}\n`);
+  process.exitCode = apiErrorExitCode(error);
 }
 
 function asCliTaskRows(tasks: unknown[] | undefined): CliTaskRow[] {
@@ -162,8 +176,17 @@ auth
 auth
   .command('logout')
   .description('Clear stored credentials')
-  .action(({ stdout }) => {
+  .action(async ({ stdout, stderr }) => {
+    const creds = loadCredentials();
+    const revoked = creds?.refreshToken ? await revokeSession(creds) : true;
     clearCredentials();
+    if (!revoked) {
+      stderr.write(
+        c`{yellow Warning}: the server did not confirm the sign-out; the session stays valid until it expires.\n`,
+      );
+      stdout.write('Credentials removed.\n');
+      return;
+    }
     stdout.write('Logged out. Credentials removed.\n');
   });
 
@@ -176,7 +199,9 @@ auth
   .action(({ stdout }) => {
     const creds = loadCredentials();
     if (creds) {
-      stdout.write(c`{green Authenticated}\n`);
+      // Only the file is checked here; whether the server still honours
+      // the session is known on the next request.
+      stdout.write(c`{green Credentials stored}\n`);
       stdout.write(`API: ${creds.apiBaseUrl}\n`);
       stdout.write(`Auth API: ${creds.authApiBaseUrl ?? getAuthApiUrl()}\n`);
     } else {
@@ -222,8 +247,7 @@ workspace
     );
 
     if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list workspaces')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+      reportApiFailure(stderr, error, 'Failed to list workspaces');
       return;
     }
 
@@ -301,8 +325,7 @@ project
     );
 
     if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list projects')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+      reportApiFailure(stderr, error, 'Failed to list projects');
       return;
     }
 
@@ -403,8 +426,7 @@ task
     const { data, error } = await executeTaskListPaginated(client, query);
 
     if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to list tasks')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+      reportApiFailure(stderr, error, 'Failed to list tasks');
       return;
     }
 
@@ -546,11 +568,11 @@ task
     if (dueOn) body.dueOn = dueOn;
     if (startOn) body.startOn = startOn;
 
-    const { data, error } = await client.POST('/tasks', { body });
-
-    if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to create task')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+    const result = await client.POST('/tasks', { body });
+    const error = resultError(result);
+    const data = result.data;
+    if (error || !data) {
+      reportApiFailure(stderr, error, 'Failed to create task');
       return;
     }
 
@@ -670,8 +692,7 @@ task
     const { data, error } = await executeUpdate(client, id, plan);
 
     if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to update task')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+      reportApiFailure(stderr, error, 'Failed to update task');
       return;
     }
 
@@ -769,8 +790,7 @@ task
     const { data, error } = await executeSearchPaginated(client, result);
 
     if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to search tasks')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+      reportApiFailure(stderr, error, 'Failed to search tasks');
       return;
     }
 
@@ -838,13 +858,13 @@ task
       throw err;
     }
 
-    const { data, error } = await client.GET('/tasks/{id}', {
+    const result = await client.GET('/tasks/{id}', {
       params: { path: { id } },
     });
-
-    if (error) {
-      stderr.write(c`{red Error}: ${apiErrorMessage(error, 'Failed to fetch task')}\n`);
-      process.exitCode = EXIT_RUNTIME;
+    const error = resultError(result);
+    const data = result.data;
+    if (error || !data) {
+      reportApiFailure(stderr, error, 'Failed to fetch task');
       return;
     }
 

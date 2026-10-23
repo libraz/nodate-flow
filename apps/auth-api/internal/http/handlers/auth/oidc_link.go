@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/obs"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -57,9 +58,10 @@ type oidcProvisionParams struct {
 //  3. No identity and no user -> provision a fresh user + identity,
 //     gated by RegistrationOpen.
 //
-// Linking in step 2 is safe because the caller proved control of the
-// email via the IdP's email_verified claim; binding a new provider to the
-// matching account cannot hijack an address the signer does not own.
+// The IdP's email_verified claim proves the signer controls the email,
+// but not that whoever set up the matching account did. Step 2 therefore
+// goes through claimUnverifiedAccount when the account's email was never
+// proven, so no credential planted before the proof survives it.
 func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint32, types.PublicID, error) {
 	ident, err := d.Queries.FindIdentityByProviderSubject(ctx, generated.FindIdentityByProviderSubjectParams{
 		Provider: p.Provider,
@@ -70,7 +72,7 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 		// Existing identity: this provider/subject already maps to a user.
 		pub, qerr := d.Queries.FindUserPublicIdById(ctx, ident.UserID)
 		if qerr != nil {
-			return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
+			return 0, types.PublicID{}, httpErr(apierr.SpecForErrNoRows(qerr, apierrors.AuthLoginAccountDisabled, apierrors.InternalUnexpected))
 		}
 		return ident.UserID, pub, nil
 	case errors.Is(err, sql.ErrNoRows):
@@ -82,10 +84,17 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 	if p.AllowEmailLink {
 		// No identity for (provider, subject). Try to link onto an
 		// existing account that already holds this verified email.
-		existing, ferr := d.Queries.FindUserByEmail(ctx, p.Email)
+		existing, ferr := d.Queries.FindUserByEmailIncludingDisabled(ctx, p.Email)
 		switch {
+		case ferr == nil && !existing.Enabled:
+			return 0, types.PublicID{}, httpErr(apierrors.AuthLoginAccountDisabled)
 		case ferr == nil:
 			// Account linking: bind this provider to the existing user.
+			if !existing.EmailVerifiedAt.Valid {
+				if cerr := d.claimUnverifiedAccount(ctx, existing.ID); cerr != nil {
+					return 0, types.PublicID{}, cerr
+				}
+			}
 			if cerr := d.createOIDCIdentity(ctx, existing.ID, p.Provider, p.Subject); cerr != nil {
 				return 0, types.PublicID{}, cerr
 			}
@@ -96,8 +105,10 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 			return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
 		}
 	} else {
-		_, ferr := d.Queries.FindUserByEmail(ctx, p.Email)
+		existing, ferr := d.Queries.FindUserByEmailIncludingDisabled(ctx, p.Email)
 		switch {
+		case ferr == nil && !existing.Enabled:
+			return 0, types.PublicID{}, httpErr(apierrors.AuthLoginAccountDisabled)
 		case ferr == nil:
 			return 0, types.PublicID{}, httpErr(apierrors.AuthOidcIdTokenInvalid)
 		case errors.Is(ferr, sql.ErrNoRows):
@@ -135,6 +146,9 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 	userID := uint32(uid) //#nosec G115 -- LastInsertId for users.id (BIGINT UNSIGNED AUTO_INCREMENT) fits uint32 in any realistic deployment
 	if cerr := d.createOIDCIdentity(ctx, userID, p.Provider, p.Subject); cerr != nil {
 		return 0, types.PublicID{}, cerr
+	}
+	if verr := d.Queries.MarkUserEmailVerified(ctx, userID); verr != nil {
+		return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
 	}
 	// Only this branch registers anyone. The two above resolve a user
 	// that already exists — an identity that logs in, or an account the
@@ -217,6 +231,35 @@ func oidcCompleteURL(accountsWebURL string, fragment url.Values) string {
 		target += "#" + encoded
 	}
 	return target
+}
+
+// claimUnverifiedAccount prepares an account whose email was never proven
+// for its first OIDC link, which is that proof. An account holding a local
+// password or TOTP secret is refused, because either could have been set
+// by someone who registered the address before its owner; otherwise its
+// recovery codes and sessions are revoked and the email is marked verified.
+func (d Deps) claimUnverifiedAccount(ctx context.Context, userID uint32) error {
+	ident, err := d.Queries.FindLocalIdentityByUserId(ctx, userID)
+	switch {
+	case err == nil:
+		if ident.PasswordHash.String != "" || ident.MfaSecretCiphertext.String != "" {
+			return httpErr(apierrors.AuthOidcLinkUnverifiedAccount)
+		}
+	case errors.Is(err, sql.ErrNoRows):
+		// No local identity: nothing that could carry a password or TOTP.
+	default:
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	if err := d.Queries.DeleteAllRecoveryCodesForUser(ctx, userID); err != nil {
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	if err := d.Sessions.RevokeAllForUser(ctx, userID); err != nil {
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	if err := d.Queries.MarkUserEmailVerified(ctx, userID); err != nil {
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	return nil
 }
 
 // createOIDCIdentity inserts an identities row binding an OIDC

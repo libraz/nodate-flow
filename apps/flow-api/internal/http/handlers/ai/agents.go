@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -121,6 +124,57 @@ func ListAgents(deps Deps) func(context.Context, *ListAgentsInput) (*ListAgentsO
 	}
 }
 
+const (
+	// defaultAgentTemperatureX100 is the stored temperature when a create
+	// request omits one.
+	defaultAgentTemperatureX100 uint16 = 100
+	// anthropicMaxTemperatureX100 is the ceiling Anthropic accepts (1.0).
+	anthropicMaxTemperatureX100 uint16 = 100
+)
+
+// agentExists reports whether a live agent row exists in the workspace. An
+// UPDATE that writes the value already stored affects zero rows, so a zero
+// count alone cannot distinguish "unchanged" from "no such agent".
+func agentExists(ctx context.Context, db *sql.DB, workspaceID uint32, agentPub types.PublicID) (bool, error) {
+	var one int
+	err := db.QueryRowContext(ctx,
+		`SELECT 1 FROM ai_agents WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`,
+		workspaceID, agentPub).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// agentTemperature resolves the stored temperature for a create request: an
+// absent value takes the default, an explicit 0 is kept, and a value above
+// what the bound provider kind accepts is refused.
+func agentTemperature(requested *uint16, kind providers.Kind) (uint16, bool) {
+	temp := defaultAgentTemperatureX100
+	if requested != nil {
+		temp = *requested
+	}
+	if kind == providers.KindAnthropic && temp > anthropicMaxTemperatureX100 {
+		return 0, false
+	}
+	return temp, true
+}
+
+// validEventTriggerTypes reports whether every entry is a declared eventbus
+// kind.
+func validEventTriggerTypes(kinds []string) bool {
+	known := make(map[string]struct{}, len(eventbus.Kinds()))
+	for _, k := range eventbus.Kinds() {
+		known[string(k)] = struct{}{}
+	}
+	for _, k := range kinds {
+		if _, ok := known[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func nullTimeUnixPtr(t sql.NullTime) *int64 {
 	if !t.Valid {
 		return nil
@@ -171,7 +225,13 @@ func UpdateAgentSchedule(deps Deps) func(context.Context, *UpdateAgentScheduleIn
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if n == 0 {
-			return nil, httpErr(apierrors.AiAgentNotFound)
+			exists, eerr := agentExists(ctx, deps.DB, ws.ID, agentPub)
+			if eerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if !exists {
+				return nil, httpErr(apierrors.AiAgentNotFound)
+			}
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -197,7 +257,7 @@ type CreateAgentInput struct {
 		Name              string   `json:"name" minLength:"1" maxLength:"255"`
 		Description       string   `json:"description,omitempty" maxLength:"1000"`
 		SystemPrompt      string   `json:"systemPrompt" minLength:"1" maxLength:"16000"`
-		Temperature       uint16   `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100)"`
+		Temperature       *uint16  `json:"temperature,omitempty" minimum:"0" maximum:"200" doc:"Sampling temperature x100 (default 100; at most 100 for Anthropic models)"`
 		ScheduleKind      string   `json:"scheduleKind,omitempty" enum:"disabled,interval,on_event,manual" default:"disabled"`
 		EventTriggerTypes []string `json:"eventTriggerTypes,omitempty" doc:"Eventbus kinds that fire this agent when scheduleKind=on_event"`
 	}
@@ -224,17 +284,22 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		// Resolve the internal model id; the generated CreateAgent
 		// query takes the internal FK.
 		var (
-			modelID   uint32
-			modelName string
+			modelID      uint32
+			modelName    string
+			providerKind string
 		)
-		const q = `SELECT id, name FROM ai_models
-			WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
-		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, modelPub).Scan(&modelID, &modelName); err != nil {
+		const q = `SELECT m.id, m.name, p.kind FROM ai_models m
+			INNER JOIN ai_providers p ON p.id = m.provider_id
+			WHERE m.workspace_id = ? AND m.public_id = ? AND m.enabled = TRUE LIMIT 1`
+		if err := deps.DB.QueryRowContext(ctx, q, ws.ID, modelPub).Scan(&modelID, &modelName, &providerKind); err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AiModelNotFound, apierrors.InternalUnexpected))
 		}
-		temp := in.Body.Temperature
-		if temp == 0 {
-			temp = 100
+		temp, tempOK := agentTemperature(in.Body.Temperature, providers.Kind(providerKind))
+		if !tempOK {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+		if !validEventTriggerTypes(in.Body.EventTriggerTypes) {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
 		scheduleKind := in.Body.ScheduleKind
 		if scheduleKind == "" {
@@ -242,32 +307,43 @@ func CreateAgent(deps Deps) func(context.Context, *CreateAgentInput) (*CreateAge
 		}
 		pub := types.New()
 		descNull := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
-		insertID, err := deps.Queries.CreateAgent(ctx, generated.CreateAgentParams{
-			PublicID:        pub,
-			WorkspaceID:     ws.ID,
-			ModelID:         modelID,
-			Name:            in.Body.Name,
-			Description:     descNull,
-			SystemPrompt:    in.Body.SystemPrompt,
-			Temperature:     temp,
-			MaxOutputTokens: sql.NullInt32{},
-			ToolsJson:       json.RawMessage(`null`),
-			ScheduleKind:    generated.AiAgentsScheduleKind(scheduleKind),
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		// Persist event_trigger_types via raw UPDATE so we don't have to
-		// regenerate the sqlc CreateAgent shape until the column gets a
-		// dedicated path. The id returned above scopes the update to
-		// exactly the freshly inserted row.
+		// The agent row and its event triggers land together: a trigger write
+		// failure must not leave a created agent that never fires.
+		var triggersRaw []byte
 		if len(in.Body.EventTriggerTypes) > 0 {
 			raw, jerr := json.Marshal(in.Body.EventTriggerTypes)
-			if jerr == nil {
-				_, _ = deps.DB.ExecContext(ctx,
-					`UPDATE ai_agents SET event_trigger_types = ? WHERE id = ?`,
-					raw, insertID)
+			if jerr != nil {
+				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 			}
+			triggersRaw = raw
+		}
+		if err := dbretry.InTx(ctx, deps.DB, "ai.CreateAgent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			insertID, err := deps.Queries.WithTx(tx.RawTx()).CreateAgent(ctx, generated.CreateAgentParams{
+				PublicID:        pub,
+				WorkspaceID:     ws.ID,
+				ModelID:         modelID,
+				Name:            in.Body.Name,
+				Description:     descNull,
+				SystemPrompt:    in.Body.SystemPrompt,
+				Temperature:     temp,
+				MaxOutputTokens: sql.NullInt32{},
+				ToolsJson:       json.RawMessage(`null`),
+				ScheduleKind:    generated.AiAgentsScheduleKind(scheduleKind),
+			})
+			if err != nil {
+				return err
+			}
+			if triggersRaw == nil {
+				return nil
+			}
+			// A raw UPDATE keeps the sqlc CreateAgent shape unchanged; the id
+			// returned above scopes it to the freshly inserted row.
+			_, err = tx.RawTx().ExecContext(ctx,
+				`UPDATE ai_agents SET event_trigger_types = ? WHERE id = ?`,
+				triggersRaw, insertID)
+			return err
+		}); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{
@@ -326,6 +402,9 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
+		if !validEventTriggerTypes(in.Body.EventTriggerTypes) {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
 		var raw any
 		if len(in.Body.EventTriggerTypes) == 0 {
 			raw = nil
@@ -348,7 +427,13 @@ func UpdateAgentEventTriggers(deps Deps) func(context.Context, *UpdateAgentEvent
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		if n == 0 {
-			return nil, httpErr(apierrors.AiAgentNotFound)
+			exists, eerr := agentExists(ctx, deps.DB, ws.ID, agentPub)
+			if eerr != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if !exists {
+				return nil, httpErr(apierrors.AiAgentNotFound)
+			}
 		}
 		if actorID, ok := middleware.ActorFromContext(ctx); ok {
 			deps.Audit.Record(ctx, audit.Entry{

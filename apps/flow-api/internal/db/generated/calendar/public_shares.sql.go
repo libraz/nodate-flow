@@ -384,6 +384,53 @@ func (q *Queries) FindPublicShareByTokenHash(ctx context.Context, tokenHash stri
 	return i, err
 }
 
+const listCalendarEventShareLinks = `-- name: ListCalendarEventShareLinks :many
+SELECT share_id, sort_weight
+FROM calendar_public_share_events
+WHERE workspace_id = ?
+  AND event_id = ?
+  AND enabled = TRUE
+ORDER BY id ASC
+LIMIT 1000
+`
+
+type ListCalendarEventShareLinksParams struct {
+	WorkspaceID uint32 `json:"-"`
+	EventID     uint32 `json:"-"`
+}
+
+type ListCalendarEventShareLinksRow struct {
+	ShareID    uint32 `json:"-"`
+	SortWeight int32  `json:"sortWeight"`
+}
+
+// The shares one event is published on, for a split that has to publish
+// the continuing series wherever the original series appeared.
+// Publication is opt-in per event row, so a continuing master that is not
+// attached would drop every later occurrence from the share page.
+func (q *Queries) ListCalendarEventShareLinks(ctx context.Context, arg ListCalendarEventShareLinksParams) ([]ListCalendarEventShareLinksRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarEventShareLinks, arg.WorkspaceID, arg.EventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCalendarEventShareLinksRow{}
+	for rows.Next() {
+		var i ListCalendarEventShareLinksRow
+		if err := rows.Scan(&i.ShareID, &i.SortWeight); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicShareEventsByTokenHash = `-- name: ListPublicShareEventsByTokenHash :many
 SELECT
   ce.id AS event_id,

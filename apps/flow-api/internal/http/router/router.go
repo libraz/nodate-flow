@@ -1020,7 +1020,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/agents",
 			Summary:     "List AI agents for a workspace",
-			Description: "Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.",
+			Description: "Lists the AI agents registered in the workspace, offset-paginated, with each agent's model, schedule kind, paused flag, and event triggers. Backs the Agents panel.",
 			Tags:        []string{"Public"},
 		}, aihandlers.ListAgents(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1028,7 +1028,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/ai/agents",
 			Summary:     "Create a new AI agent",
-			Description: "Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.",
+			Description: "Registers a new AI agent in the workspace with name, prompt, model, schedule kind (default disabled), and event triggers. The agent is created unpaused; with the default disabled schedule and no event triggers nothing runs until one is configured.",
 			Tags:        []string{"Public"},
 		}, aihandlers.CreateAgent(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1036,7 +1036,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/schedule",
 			Summary:     "Update an AI agent's schedule_kind trigger mode",
-			Description: "Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.",
+			Description: "Updates the agent's schedule_kind (disabled / interval / on_event / manual). Takes effect on the next scheduler tick.",
 			Tags:        []string{"Public"},
 		}, aihandlers.UpdateAgentSchedule(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1044,7 +1044,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPatch,
 			Path:        "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers",
 			Summary:     "Replace an AI agent's event_trigger_types list",
-			Description: "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.",
+			Description: "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; interval and manual triggers continue to work.",
 			Tags:        []string{"Public"},
 		}, aihandlers.UpdateAgentEventTriggers(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1116,7 +1116,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/ai/invocations",
 			Summary:     "List redacted LLM call audit rows for the AI reasoning panel",
-			Description: "Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
+			Description: "Returns a limit/offset-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
 			Tags:        []string{"Public"},
 		}, aihandlers.ListInvocations(shared.aiDeps))
 		huma.Register(subAPI, huma.Operation{

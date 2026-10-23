@@ -66,3 +66,16 @@ WHERE public_id = ?
   AND event_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
+
+-- name: CopyCalendarChecklistItem :exec
+-- Carry one checklist item onto the continuing master of a split series,
+-- done state included: the list describes the series, not an occurrence.
+INSERT INTO calendar_event_checklist_items (
+  public_id,
+  workspace_id,
+  event_id,
+  created_by_user_id,
+  title,
+  done,
+  sort_weight
+) VALUES (?, ?, ?, ?, ?, ?, ?);

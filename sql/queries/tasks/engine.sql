@@ -26,6 +26,17 @@ WHERE td.from_task_id = ?
   AND td.workspace_id = ?
   AND td.enabled = TRUE;
 
+-- name: ListDependentTaskIDsForEngine :many
+-- Tasks holding an enabled outgoing edge to the given task. Their
+-- dependency facts (ListDependencyStatesForEngine) read the given task's
+-- derived_state, so a change to it re-opens their constraints.
+SELECT DISTINCT td.from_task_id
+FROM task_dependencies td
+INNER JOIN tasks ft ON ft.id = td.from_task_id AND ft.enabled = TRUE
+WHERE td.to_task_id = ?
+  AND td.workspace_id = ?
+  AND td.enabled = TRUE;
+
 -- name: ListTaskActorRolesForEngine :many
 -- Distinct role names currently attached to the task via
 -- task_actors. Used to populate Facts.ActorRoles.

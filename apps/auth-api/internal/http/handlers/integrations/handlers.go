@@ -126,21 +126,23 @@ func Connect(deps Deps) func(context.Context, *ConnectIntegrationInput) (*Connec
 // Callback handles GET /oauth/callback/{provider}. It is the only
 // endpoint in this package that is NOT behind the auth middleware —
 // the user arrives here from the provider and carries no bearer
-// token. The state row proves who started the flow.
+// token. The state row proves who started the flow. Every outcome is a
+// redirect to the page that renders it, since the browser arrives here
+// by top-level navigation and a JSON error would strand the user on it.
 func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallbackOutput, error) {
 	return func(ctx context.Context, in *OAuthCallbackInput) (*OAuthCallbackOutput, error) {
 		if in.Error != "" || in.Code == "" || in.State == "" {
-			return redirectWithError(deps, "oauth_denied"), nil
+			return redirectWithError(deps, "oauth_denied", sql.NullString{}), nil
 		}
 		if !isSupportedProvider(in.Provider) {
-			return nil, httpErr(apierrors.IntegrationOauthProviderUnsupported)
+			return redirectWithError(deps, "provider_unsupported", sql.NullString{}), nil
 		}
 		provider, err := deps.Registry.Get(in.Provider)
 		if err != nil {
-			return nil, httpErr(apierrors.IntegrationOauthProviderNotConfigured)
+			return redirectWithError(deps, "provider_not_configured", sql.NullString{}), nil
 		}
 		if deps.Cipher == nil {
-			return nil, httpErr(apierrors.IntegrationOauthProviderNotConfigured)
+			return redirectWithError(deps, "provider_not_configured", sql.NullString{}), nil
 		}
 
 		// Opportunistic GC before lookup.
@@ -153,39 +155,39 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 		// same state can never both proceed to the token exchange.
 		row, err := deps.Queries.FindOauthState(ctx, in.State)
 		if err != nil {
-			return redirectWithError(deps, "state_invalid"), nil
+			return redirectWithError(deps, "state_invalid", sql.NullString{}), nil
 		}
 		if row.ExpiresAt.Before(time.Now()) {
-			return redirectWithError(deps, "state_expired"), nil
+			return redirectWithError(deps, "state_expired", row.RedirectTo), nil
 		}
 		claimed, err := deps.Queries.ClaimOauthState(ctx, in.State)
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return redirectWithError(deps, "internal", row.RedirectTo), nil
 		}
 		if claimed == 0 {
 			// Another request consumed the state first (or it expired
 			// between the read and the claim). The payload read above
-			// must not be trusted.
-			return redirectWithError(deps, "state_invalid"), nil
+			// must not be trusted, its return URL included.
+			return redirectWithError(deps, "state_invalid", sql.NullString{}), nil
 		}
 		if string(row.Provider) != in.Provider {
-			return redirectWithError(deps, "state_provider_mismatch"), nil
+			return redirectWithError(deps, "state_provider_mismatch", row.RedirectTo), nil
 		}
 
 		tokens, acc, err := provider.Exchange(ctx, in.Code, callbackURL(deps, in.Provider))
 		if err != nil {
-			return redirectWithError(deps, "exchange_failed"), nil
+			return redirectWithError(deps, "exchange_failed", row.RedirectTo), nil
 		}
 
 		accessBlob, err := deps.Cipher.Encrypt([]byte(tokens.AccessToken))
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return redirectWithError(deps, "internal", row.RedirectTo), nil
 		}
 		var refreshBlob []byte
 		if tokens.RefreshToken != "" {
 			refreshBlob, err = deps.Cipher.Encrypt([]byte(tokens.RefreshToken))
 			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return redirectWithError(deps, "internal", row.RedirectTo), nil
 			}
 		}
 		var expiresAt sql.NullTime
@@ -208,7 +210,7 @@ func Callback(deps Deps) func(context.Context, *OAuthCallbackInput) (*OAuthCallb
 			AccessTokenExpiresAt:   expiresAt,
 			MetadataJson:           acc.Metadata,
 		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return redirectWithError(deps, "internal", row.RedirectTo), nil
 		}
 
 		if deps.Audit != nil {
@@ -331,13 +333,11 @@ func isSameOriginAsWeb(webBase, candidate string) bool {
 	return strings.EqualFold(u.Scheme, base.Scheme) && strings.EqualFold(u.Host, base.Host)
 }
 
-func redirectWithError(deps Deps, reason string) *OAuthCallbackOutput {
-	q := url.Values{}
-	q.Set("integration_error", reason)
-	return &OAuthCallbackOutput{
-		Status:   http.StatusFound,
-		Location: strings.TrimRight(deps.WebBaseURL, "/") + "/settings/security?" + q.Encode(),
-	}
+// redirectWithError sends a failed callback to the page that renders its
+// result, the same one a success lands on. clientRedirect is the stored
+// return URL when the state row was read and trusted, empty otherwise.
+func redirectWithError(deps Deps, reason string, clientRedirect sql.NullString) *OAuthCallbackOutput {
+	return callbackRedirect(deps, clientRedirect, "integration_error", reason)
 }
 
 // revokeAtProvider best-effort invalidates the stored tokens at the
@@ -375,6 +375,13 @@ func revokeAtProvider(ctx context.Context, deps Deps, uid uint32, pubID types.Pu
 }
 
 func redirectOnSuccess(deps Deps, provider string, clientRedirect sql.NullString) *OAuthCallbackOutput {
+	return callbackRedirect(deps, clientRedirect, "connected", provider)
+}
+
+// callbackRedirect builds the 302 for a callback outcome: the stored
+// return URL when it is same-origin with the web app, the integrations
+// settings page otherwise, with the outcome as one query parameter.
+func callbackRedirect(deps Deps, clientRedirect sql.NullString, key, value string) *OAuthCallbackOutput {
 	target := strings.TrimRight(deps.WebBaseURL, "/") + "/settings/integrations"
 	// Defense-in-depth open-redirect guard (CWE-601): Connect already
 	// rejects cross-origin redirect targets before persisting, but we
@@ -389,6 +396,6 @@ func redirectOnSuccess(deps Deps, provider string, clientRedirect sql.NullString
 	}
 	return &OAuthCallbackOutput{
 		Status:   http.StatusFound,
-		Location: target + sep + "connected=" + provider,
+		Location: target + sep + url.Values{key: []string{value}}.Encode(),
 	}
 }

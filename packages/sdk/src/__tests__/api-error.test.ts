@@ -19,6 +19,31 @@ describe('toApiError', () => {
     expect(err.extensions?.['x-i18n-key']).toBe('auth.errors.session_unauthorized');
   });
 
+  it('keeps the location and message of each errors entry', () => {
+    const err = toApiError(
+      {
+        type: 'WS.VALIDATION.FAILED',
+        title: 'Unprocessable Entity',
+        status: 422,
+        errors: [
+          { location: 'body.title', message: 'expected length <= 255', value: 'x' },
+          { message: 'expected a date' },
+          'not an object',
+        ],
+      },
+      'fallback',
+    );
+
+    expect(err.details).toEqual([
+      { location: 'body.title', message: 'expected length <= 255' },
+      { message: 'expected a date' },
+    ]);
+  });
+
+  it('leaves details unset when the envelope has no errors list', () => {
+    expect(toApiError({ type: 'X', detail: 'd' }, 'fallback').details).toBeUndefined();
+  });
+
   it('falls back to the generated catalog i18nKey for known codes', () => {
     const err = toApiError(
       { type: 'AUTH.OIDC.PROVIDER_REJECTED', detail: 'Provider rejected sign-in' },

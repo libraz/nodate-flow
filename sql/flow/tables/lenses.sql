@@ -25,7 +25,7 @@ CREATE TABLE lenses (
   is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether the lens is publicly shared',
   public_token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL COMMENT 'SHA-256 hex of the public share URL token; the plaintext is handed to the publisher once and never stored, so a leak of this table does not yield working share URLs. NULL while the lens is not published. Same shape as calendar_public_shares.token_hash — capability tokens are hashed at rest everywhere.',
   shared_at DATETIME(3) NULL COMMENT 'Timestamp when first shared publicly',
-  safety_checked_at DATETIME(3) NULL COMMENT 'Timestamp of last AI safety check',
+  safety_checked_at DATETIME(3) NULL COMMENT 'Reserved for the timestamp of the last AI safety check; nothing writes it yet',
   archived_at DATETIME(3) NULL COMMENT 'Set when lens is archived (distinct from enabled)',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',

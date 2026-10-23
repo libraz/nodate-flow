@@ -30,12 +30,8 @@ func ChangePassword(deps Deps) func(context.Context, *ChangePasswordInput) (*Cha
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.AuthPasswordNoLocalIdentity, apierrors.InternalUnexpected))
 		}
-		if !row.PasswordHash.Valid {
-			return nil, httpErr(apierrors.AuthPasswordNoLocalIdentity)
-		}
-		okPw, err := auth.VerifyPassword(row.PasswordHash.String, in.Body.CurrentPassword)
-		if err != nil || !okPw {
-			return nil, httpErr(apierrors.AuthPasswordCurrentMismatch)
+		if err := verifyLocalIdentityPassword(ctx, deps, row, in.Body.CurrentPassword); err != nil {
+			return nil, err
 		}
 		newHash, err := auth.HashPassword(in.Body.NewPassword)
 		if err != nil {

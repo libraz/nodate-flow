@@ -9,19 +9,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
-// ProviderResolver is the narrow contract the runner needs to obtain a
-// workspace-default LLM provider client. It mirrors the resolver
-// signature used by [ai.AgentExecutor] so production wiring can pass
-// the same [providers.WorkspaceResolver] instance to both paths.
+// ProviderResolver is the narrow contract the runner needs to obtain the
+// client for the provider that owns the judge agent's model. It mirrors
+// [ai.AgentProviderResolver] so production wiring can pass the same
+// [providers.WorkspaceResolver] instance to both paths.
 type ProviderResolver interface {
-	Default(ctx context.Context, workspaceID uint32) (providers.Provider, error)
+	ForProvider(ctx context.Context, workspaceID uint32, providerPublicID types.PublicID) (providers.Provider, error)
 }
 
 // CostGuard is the narrow contract the runner needs to participate in
@@ -93,6 +95,8 @@ type AgentSnapshot struct {
 	// [airequest.ForAgent]; a zero value means the lookup did not consult
 	// an agent row and the provider's own defaults apply.
 	Settings airequest.AgentSettings
+	// ProviderPublicID is the provider that owns the agent's bound model.
+	ProviderPublicID types.PublicID
 }
 
 // SignalLookup is the narrow surface the runner needs to load the
@@ -217,14 +221,12 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		return result, ErrAgentPaused
 	}
 
-	if r.Guard != nil {
-		if err := r.Guard.Check(ctx, workspaceID); err != nil {
-			// CostCapHit lets the OrchestratorRunner's existing cost_cap
-			// handoff trigger fire for judge runs too, with no new
-			// branching in agentruntime itself.
-			result.CostCapHit = true
-			return result, err
-		}
+	// CostCapHit lets the OrchestratorRunner's existing cost_cap handoff
+	// trigger fire for judge runs too, with no new branching in agentruntime
+	// itself.
+	if capHit, err := ai.CheckBudget(ctx, r.Guard, workspaceID); err != nil {
+		result.CostCapHit = capHit
+		return result, err
 	}
 
 	signal, err := r.Signals.Load(ctx, workspaceID, signalID)
@@ -235,7 +237,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		return result, fmt.Errorf("signaljudge: signal load: %w", err)
 	}
 
-	prov, err := r.Resolver.Default(ctx, workspaceID)
+	prov, err := r.Resolver.ForProvider(ctx, workspaceID, agent.ProviderPublicID)
 	if err != nil {
 		return result, err
 	}
@@ -247,7 +249,7 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 	if systemPrompt == "" {
 		systemPrompt = SystemPrompt()
 	}
-	userPrompt, perr := r.renderUserPrompt(ctx, signal)
+	userPrompt, offered, perr := r.renderUserPrompt(ctx, signal)
 	if perr != nil {
 		return result, fmt.Errorf("signaljudge: compose prompt: %w", perr)
 	}
@@ -391,6 +393,8 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 			PublicID:    signal.PublicID,
 			WorkspaceID: signal.WorkspaceID,
 			Kind:        signal.Kind,
+			// Only tasks the model was shown may become a verdict target.
+			OfferedTasks: offered,
 		}
 		agentRef := AgentRef{InternalID: agentID}
 		runID := uint32(0)
@@ -440,20 +444,22 @@ func (r *Runner) shouldRetry(text string) bool {
 
 // renderUserPrompt builds the user-message body. When the [Runner]
 // has been configured with [PromptDeps] (any non-nil lookup), it
-// invokes [BuildPromptContext] + [RenderUserPrompt] for the full
-// full context window. Otherwise it falls back to the legacy
+// invokes [BuildPromptContext] + [RenderUserPromptOffered] for the full
+// context window, and returns the task ids the body lists. Otherwise it falls back to the legacy
 // [composeJudgePrompt] shape — a JSON-serialised signal
 // snapshot only — so callers that have not yet wired the lookups
 // keep working unchanged.
-func (r *Runner) renderUserPrompt(ctx context.Context, sig SignalSnapshot) (string, error) {
+func (r *Runner) renderUserPrompt(ctx context.Context, sig SignalSnapshot) (string, map[string]struct{}, error) {
 	if r.Prompt.RecentTasks == nil && r.Prompt.LinkedTasks == nil && r.Prompt.JudgeInstructions == nil && r.Prompt.WorkspaceNow == nil {
-		return composeJudgePrompt(sig)
+		prompt, err := composeJudgePrompt(sig)
+		return prompt, nil, err
 	}
 	pc, err := BuildPromptContext(ctx, r.Prompt, sig)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return RenderUserPrompt(pc), nil
+	prompt, offered := RenderUserPromptOffered(pc)
+	return prompt, offered, nil
 }
 
 // applyVerdict parses the LLM response into a [Verdict] and forwards
@@ -568,6 +574,8 @@ func (l *SQLAgentLookup) Load(ctx context.Context, workspaceID, agentID uint32) 
 		Paused:       row.Paused,
 		SystemPrompt: row.SystemPrompt,
 		Settings:     airequest.FromExecRow(row),
+
+		ProviderPublicID: row.ProviderPublicID,
 	}, nil
 }
 

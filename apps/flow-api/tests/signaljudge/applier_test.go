@@ -178,6 +178,11 @@ func stockSig() signaljudge.SignalRef {
 		PublicID:    "00000000-0000-0000-0000-000000000042",
 		WorkspaceID: 7,
 		Kind:        string(signalkinds.Manual),
+		OfferedTasks: map[string]struct{}{
+			"task-public-id":                       {},
+			"source-task":                          {},
+			"00000000-0000-0000-0000-deadbeefdead": {},
+		},
 	}
 }
 
@@ -502,6 +507,40 @@ func TestApplierMissingTargetRejected(t *testing.T) {
 	}
 	if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalRejected}; !equalStrSlice(got, want) {
 		t.Fatalf("event sequence = %v, want %v", got, want)
+	}
+}
+
+// TestApplierRejectsTargetNotOffered asserts a verdict naming a task that
+// exists in the workspace but was not listed in the judge's prompt is
+// rejected on every autonomy level, without resolving or mutating it.
+func TestApplierRejectsTargetNotOffered(t *testing.T) {
+	t.Parallel()
+
+	for _, level := range []signaljudge.AutonomyLevel{signaljudge.AutonomySuggest, signaljudge.AutonomyDraft, signaljudge.AutonomyAuto} {
+		bus := &fakeBus{}
+		mutator := &fakeMutator{}
+		resolver := &fakeResolver{knownPublicID: "unlisted-task", knownInternal: 99}
+		applier := newApplier(t, bus, mutator, resolver, &fakeSignalUpdater{}, level)
+
+		target := "unlisted-task"
+		res, err := applier.Apply(context.Background(), stockSig(), stockAgent(), 8, signaljudge.Verdict{
+			Action:             signaljudge.ActionCompleteTask,
+			TargetTaskPublicID: &target,
+			Confidence:         0.99,
+			ReasoningExcerpt:   "model named a task it was never shown",
+		})
+		if err != nil {
+			t.Fatalf("level %v: Apply: %v", level, err)
+		}
+		if res == nil || !res.Skipped || res.SkipReason != "target_not_offered" {
+			t.Fatalf("level %v: result = %+v, want Skipped with target_not_offered", level, res)
+		}
+		if got, want := kindsOnly(bus.snapshot()), []eventbus.Kind{eventbus.SignalRejected}; !equalStrSlice(got, want) {
+			t.Fatalf("level %v: events = %v, want %v", level, got, want)
+		}
+		if len(mutator.completed) != 0 {
+			t.Fatalf("level %v: task was mutated: %v", level, mutator.completed)
+		}
 	}
 }
 

@@ -254,12 +254,14 @@ WHERE workspace_id = ?
   AND recurrence_parent_id = ?
   AND recurrence_original_start >= ?
   AND enabled = TRUE
+  AND (visibility <> 'confidential' OR owner_user_id = ?)
 `
 
 type DisableCalendarEventOverridesFromStartParams struct {
-	WorkspaceID uint32        `json:"-"`
-	ParentID    sql.NullInt32 `json:"-"`
-	SplitStart  sql.NullTime  `json:"splitStart"`
+	WorkspaceID  uint32        `json:"-"`
+	ParentID     sql.NullInt32 `json:"-"`
+	SplitStart   sql.NullTime  `json:"splitStart"`
+	ViewerUserID uint32        `json:"-"`
 }
 
 // Withdraw the overrides at or after a split point when nothing continues
@@ -278,8 +280,19 @@ type DisableCalendarEventOverridesFromStartParams struct {
 // enabled rows. Reparenting has to carry soft-deleted overrides so a revived
 // one still names a master that can produce it, while withdrawing a row that
 // is already withdrawn changes nothing and must not be counted.
+//
+// Scoped to the overrides the acting user can see, on the row filter the
+// range queries carry: a confidential override belonging to somebody else
+// stays enabled past the truncation and keeps rendering to its owner, since
+// disabling it would remove an occurrence from a calendar the actor has no
+// view of.
 func (q *Queries) DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, disableCalendarEventOverridesFromStart, arg.WorkspaceID, arg.ParentID, arg.SplitStart)
+	result, err := q.db.ExecContext(ctx, disableCalendarEventOverridesFromStart,
+		arg.WorkspaceID,
+		arg.ParentID,
+		arg.SplitStart,
+		arg.ViewerUserID,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -379,6 +392,7 @@ SELECT
   COALESCE(ce.recurrence_exceptions, CAST('null' AS JSON)) AS recurrence_exceptions,
   ce.notification_offset,
   ce.task_id,
+  ce.recurrence_parent_id,
   ce.enabled,
   ce.updated_at,
   ce.created_at
@@ -426,6 +440,7 @@ type FindCalendarEventByPublicIdRow struct {
 	RecurrenceExceptions json.RawMessage           `json:"recurrenceExceptions"`
 	NotificationOffset   sql.NullInt32             `json:"notificationOffset"`
 	TaskID               sql.NullInt32             `json:"-"`
+	RecurrenceParentID   sql.NullInt32             `json:"-"`
 	Enabled              bool                      `json:"enabled"`
 	UpdatedAt            sql.NullTime              `json:"updatedAt"`
 	CreatedAt            time.Time                 `json:"createdAt"`
@@ -434,6 +449,10 @@ type FindCalendarEventByPublicIdRow struct {
 // Resolve a calendar event by UUID v7 within a calendar. The creator
 // (created_by_user_id) is LEFT JOINed so a soft-disabled creator yields
 // NULL identity columns rather than dropping the event row.
+//
+// recurrence_parent_id is selected so an override's attendance can be read
+// off its series, whose attendee list it shares. It is internal and never
+// reaches an API response.
 func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalendarEventByPublicIdParams) (FindCalendarEventByPublicIdRow, error) {
 	row := q.db.QueryRowContext(ctx, findCalendarEventByPublicId, arg.PublicID, arg.CalendarID, arg.WorkspaceID)
 	var i FindCalendarEventByPublicIdRow
@@ -465,6 +484,7 @@ func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalen
 		&i.RecurrenceExceptions,
 		&i.NotificationOffset,
 		&i.TaskID,
+		&i.RecurrenceParentID,
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -772,7 +792,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -923,9 +943,11 @@ SELECT
   ce.task_id,
   ce.updated_at,
   ce.created_at,
+  -- An override shares its series' attendee list, so attendance is read
+  -- off the master as well as off the row itself.
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1068,17 +1090,17 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
-  (SELECT COUNT(*) FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1265,10 +1287,10 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
-  (SELECT COUNT(*) FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.enabled = TRUE) AS attendee_count,
+  (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
-     WHERE a.event_id = ce.id AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
+     WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.user_id = wm.user_id AND a.enabled = TRUE) AS viewer_attending,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -1278,7 +1300,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1462,7 +1484,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1622,7 +1644,7 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id = ce.id
+    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,

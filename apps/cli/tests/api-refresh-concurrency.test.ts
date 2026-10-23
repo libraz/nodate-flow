@@ -265,4 +265,82 @@ describe('createAuthenticatedFetch refresh concurrency', () => {
     }
     expect(retryRequest.headers.get('x-request-id')).toBe('request-1');
   });
+
+  it('adopts tokens another process rotated instead of presenting a stale one', async () => {
+    let accessToken = 'old-access';
+    let refreshToken = 'old-refresh';
+    const presented: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.url === 'http://auth.test/auth/refresh') {
+        presented.push(request.headers.get('cookie') ?? '');
+        return refreshedResponse('unexpected');
+      }
+      return request.headers.get('authorization') === 'Bearer peer-access'
+        ? new Response('ok', { status: 200 })
+        : new Response('expired', { status: 401 });
+    });
+    const authenticatedFetch = createAuthenticatedFetch({
+      authApiBaseUrl: 'http://auth.test',
+      getAccessToken: () => accessToken,
+      getRefreshToken: () => refreshToken,
+      setTokens: vi.fn(),
+      // The shared file already holds what a second process rotated to.
+      adoptStoredTokens: () => {
+        if (refreshToken === 'peer-refresh') return undefined;
+        accessToken = 'peer-access';
+        refreshToken = 'peer-refresh';
+        return accessToken;
+      },
+      fetchImpl,
+    });
+
+    const response = await authenticatedFetch('http://flow.test/tasks');
+
+    expect(response.status).toBe(200);
+    expect(presented).toEqual([]);
+  });
+
+  it('holds the shared lock across the read, the refresh and the save', async () => {
+    const events: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.url === 'http://auth.test/auth/refresh') {
+        events.push('refresh');
+        return new Response(JSON.stringify({ accessToken: 'new-access' }), {
+          status: 200,
+          headers: { 'set-cookie': 'nd_rt=new-refresh; Path=/auth; HttpOnly' },
+        });
+      }
+      return request.headers.get('authorization') === 'Bearer new-access'
+        ? new Response('ok', { status: 200 })
+        : new Response('expired', { status: 401 });
+    });
+    let accessToken = 'old-access';
+    const authenticatedFetch = createAuthenticatedFetch({
+      authApiBaseUrl: 'http://auth.test',
+      getAccessToken: () => accessToken,
+      getRefreshToken: () => 'old-refresh',
+      setTokens: (tokens) => {
+        events.push('save');
+        accessToken = tokens.accessToken;
+      },
+      adoptStoredTokens: () => {
+        events.push('read');
+        return undefined;
+      },
+      lock: async (fn) => {
+        events.push('lock');
+        try {
+          return await fn();
+        } finally {
+          events.push('unlock');
+        }
+      },
+      fetchImpl,
+    });
+
+    expect((await authenticatedFetch('http://flow.test/tasks')).status).toBe(200);
+    expect(events).toEqual(['lock', 'read', 'refresh', 'save', 'unlock']);
+  });
 });

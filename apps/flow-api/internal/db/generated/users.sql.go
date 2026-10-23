@@ -835,6 +835,19 @@ func (q *Queries) FindUserPublicIdById(ctx context.Context, id uint32) (types.Pu
 	return public_id, err
 }
 
+const markUserEmailVerified = `-- name: MarkUserEmailVerified :exec
+UPDATE users
+SET email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP)
+WHERE id = ?
+`
+
+// Record that the account's email address has been proven, keeping the
+// first proof's timestamp when one is already set.
+func (q *Queries) MarkUserEmailVerified(ctx context.Context, id uint32) error {
+	_, err := q.db.ExecContext(ctx, markUserEmailVerified, id)
+	return err
+}
+
 const patchMe = `-- name: PatchMe :exec
 UPDATE users
 SET display_name                   = COALESCE(?, display_name),

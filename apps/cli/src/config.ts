@@ -48,12 +48,67 @@ export function loadCredentials(): Credentials | undefined {
   }
 }
 
-/** Persists credentials to disk, creating the config directory if needed. */
+/**
+ * Persists credentials to disk. The file is written to a private temp
+ * file and renamed over the old one, so a concurrent reader sees either
+ * the previous or the new credentials, never a partial file, and the
+ * tokens never exist at a mode looser than owner-only. The directory and
+ * file modes are reapplied on every save, since `mode` only applies when
+ * a path is created.
+ */
 export function saveCredentials(creds: Credentials): void {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(CREDENTIALS_PATH, `${JSON.stringify(creds, null, 2)}\n`, {
-    mode: 0o600,
-  });
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  fs.chmodSync(CONFIG_DIR, 0o700);
+  const tmpPath = `${CREDENTIALS_PATH}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, `${JSON.stringify(creds, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+    fs.chmodSync(tmpPath, 0o600);
+    fs.renameSync(tmpPath, CREDENTIALS_PATH);
+  } catch (err) {
+    fs.rmSync(tmpPath, { force: true });
+    throw err;
+  }
+}
+
+/** How old a credentials lock may grow before it is presumed abandoned. */
+const LOCK_STALE_MS = 30_000;
+
+/** Delay between attempts to take a held credentials lock. */
+const LOCK_RETRY_MS = 50;
+
+/**
+ * Runs `fn` while holding an exclusive lock on the credentials file,
+ * shared by every `tnk` process on the machine. Token refresh holds it
+ * across reading, refreshing and saving, so two processes can never both
+ * present the same refresh token. A lock left behind by a crashed
+ * process is broken once it is {@link LOCK_STALE_MS} old.
+ */
+export async function withCredentialsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lockPath = `${CREDENTIALS_PATH}.lock`;
+  fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  for (;;) {
+    try {
+      fs.closeSync(fs.openSync(lockPath, 'wx', 0o600));
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+    try {
+      if (Date.now() - fs.statSync(lockPath).mtimeMs > LOCK_STALE_MS) {
+        fs.rmSync(lockPath, { force: true });
+        continue;
+      }
+    } catch {
+      // Released between the attempt and the stat: try again at once.
+      continue;
+    }
+    await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+  }
+  try {
+    return await fn();
+  } finally {
+    fs.rmSync(lockPath, { force: true });
+  }
 }
 
 /** Removes the stored credentials file. */

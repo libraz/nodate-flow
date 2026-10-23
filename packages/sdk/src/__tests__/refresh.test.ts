@@ -61,16 +61,18 @@ describe('createTokenRefresher', () => {
     expect(opts.clearSession).not.toHaveBeenCalled();
   });
 
-  it('calls clearSession and returns null on non-ok response', async () => {
-    const opts = makeOptions();
-    vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse({ error: 'forbidden' }, 403));
+  it.each([429, 500, 502, 503])('keeps the session when the server answers %i', async (status) => {
+    const onSessionExpired = vi.fn();
+    const opts = makeOptions({ onSessionExpired });
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(jsonResponse({ error: 'busy' }, status));
 
     const refresh = createTokenRefresher(opts);
-    const result = await refresh();
 
-    expect(result).toBeNull();
-    expect(opts.clearSession).toHaveBeenCalledOnce();
+    expect(await refresh()).toBeNull();
+    expect(opts.clearSession).not.toHaveBeenCalled();
+    expect(onSessionExpired).not.toHaveBeenCalled();
     expect(opts.setAccessToken).not.toHaveBeenCalled();
+    expect(refresh.lastFailure()).toBe('network');
   });
 
   it('keeps the session when the request never reached the server', async () => {
@@ -309,6 +311,47 @@ describe('createRefreshMiddleware', () => {
     const replayedRequest = vi.mocked(globalThis.fetch).mock.calls[0]?.[0] as Request;
     expect(replayedRequest.headers.get('Authorization')).toBe('Bearer refreshed-token');
     expect(replayedRequest.url).toBe('https://api.example.com/tasks');
+  });
+
+  it('replays a POST with its JSON body and the new bearer after a 401', async () => {
+    const refreshFn = vi.fn().mockResolvedValueOnce('refreshed-token');
+    const mw = createRefreshMiddleware(refreshFn);
+    const replayedResponse = new Response('{"data":"ok"}', { status: 201 });
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(replayedResponse);
+
+    const sent = new Request('https://api.example.com/tasks', {
+      method: 'POST',
+      headers: { authorization: 'Bearer expired-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'Write the report' }),
+    });
+    const forwarded = mw.onRequest({ request: sent, id: 'req-1' });
+    // The transport consumes the body, exactly as fetch does.
+    await forwarded.text();
+    expect(forwarded.bodyUsed).toBe(true);
+
+    const result = await mw.onResponse({
+      request: forwarded,
+      response: new Response('unauthorized', { status: 401 }),
+      id: 'req-1',
+    });
+
+    expect(result).toBe(replayedResponse);
+    const replayed = vi.mocked(globalThis.fetch).mock.calls[0]?.[0] as Request;
+    expect(replayed.method).toBe('POST');
+    expect(replayed.headers.get('Authorization')).toBe('Bearer refreshed-token');
+    expect(replayed.headers.get('content-type')).toBe('application/json');
+    expect(await replayed.json()).toEqual({ title: 'Write the report' });
+  });
+
+  it('returns the 401 rather than throwing when a consumed body has no unsent copy', async () => {
+    const refreshFn = vi.fn().mockResolvedValueOnce('refreshed-token');
+    const mw = createRefreshMiddleware(refreshFn);
+    const request = new Request('https://api.example.com/tasks', { method: 'POST', body: '{}' });
+    await request.text();
+    const response = new Response('unauthorized', { status: 401 });
+
+    await expect(mw.onResponse({ request, response })).resolves.toBe(response);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it('returns original 401 response when refreshFn returns null', async () => {

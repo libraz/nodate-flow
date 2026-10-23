@@ -21,6 +21,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sessionguard"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
@@ -436,11 +437,12 @@ func (r *Reconciler) scanEnabledMismatch(ctx context.Context) {
 		return
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.ExecContext(ctx, "SET @nf_item_projection_engine = 1"); err != nil {
+	disarm, err := sessionguard.Arm(ctx, conn, sessionguard.ItemProjectionEngine)
+	if err != nil {
 		r.logError("arm projection guard failed", err)
 		return
 	}
-	defer func() { _, _ = conn.ExecContext(ctx, "SET @nf_item_projection_engine = NULL") }()
+	defer disarm()
 
 	for _, p := range pairs {
 		if r.Metrics != nil {

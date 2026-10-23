@@ -174,8 +174,8 @@ type GetPageOutput struct {
 type UpdatePageBody struct {
 	Title        *string `json:"title,omitempty" minLength:"1" maxLength:"500"`
 	Body         *string `json:"body,omitempty" maxLength:"100000"`
-	ProjectID    *string `json:"projectId,omitempty" doc:"Project public id; null to unset"`
-	ParentPageID *string `json:"parentPageId,omitempty" doc:"Parent page public id; null to unset"`
+	ProjectID    *string `json:"projectId,omitempty" doc:"Project public id; omit to keep, empty string to unset"`
+	ParentPageID *string `json:"parentPageId,omitempty" doc:"Parent page public id; omit to keep, empty string to unset"`
 }
 
 // UpdatePageInput is the input for PATCH /workspaces/{wsId}/pages/{pageId}.

@@ -155,7 +155,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(taskTitleLimit)}),
 			"description": stringSchema("Optional description.", Constraints{MaxLength: intPtr(50000)}),
 			"priority":    intSchema("Priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -169,7 +169,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId":      stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(taskTitleLimit)}),
 			"description": stringSchema("New description.", Constraints{MaxLength: intPtr(50000)}),
 			"priority":    intSchema("New priority 0..4.", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 			"dueOn":       stringSchema("YYYY-MM-DD.", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -254,7 +254,7 @@ func registerTools(h *Handler) {
 			// states: a call with no steps asks for nothing.
 			"steps": arraySchema("Step definitions to create as child tasks.",
 				objectSchema(map[string]any{
-					"title":       stringSchema("Step title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+					"title":       stringSchema("Step title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(taskTitleLimit)}),
 					"description": stringSchema("Step description (optional).", Constraints{MaxLength: intPtr(50000)}),
 					"priority":    intSchema("Step priority 0..4 (optional).", Constraints{Min: intPtr(0), Max: intPtr(4)}),
 				}, []string{"title"}),
@@ -362,7 +362,7 @@ func registerTools(h *Handler) {
 			// The title bound is the width of pages.title, which is also what
 			// the REST page inputs declare. A narrower bound here would refuse
 			// a title the same column accepts from the other surface.
-			"title":        stringSchema("Page title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":        stringSchema("Page title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(pageTitleLimit)}),
 			"body":         stringSchema("Optional page body content.", Constraints{MaxLength: intPtr(100000)}),
 			"parentPageId": stringSchema("Optional parent page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
 			"projectId":    stringSchema("Optional project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
@@ -375,7 +375,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"pageId": stringSchema("Page public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":  stringSchema("New title (optional).", Constraints{MaxLength: intPtr(500)}),
+			"title":  stringSchema("New title (optional).", Constraints{MaxLength: intPtr(pageTitleLimit)}),
 			"body":   stringSchema("New body content (optional).", Constraints{MaxLength: intPtr(100000)}),
 		}, []string{"pageId"}),
 		run: runUpdatePage,
@@ -404,7 +404,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"projectId":   stringSchema("Project public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":       stringSchema("Task title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(taskTitleLimit)}),
 			"description": stringSchema("Optional task description for better AI analysis.", Constraints{MaxLength: intPtr(50000)}),
 		}, []string{"projectId", "title"}),
 		run: runSmartCreateTask,
@@ -436,7 +436,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"calendarId":  stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":       stringSchema("Event title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":       stringSchema("Event title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(eventTitleLimit)}),
 			"startAt":     intSchema("Start time, unix seconds since epoch (timed events).", Constraints{Min: intPtr(0)}),
 			"endAt":       intSchema("End time, unix seconds since epoch (timed events).", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("Start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -467,7 +467,7 @@ func registerTools(h *Handler) {
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"eventId":     stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
-			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(500)}),
+			"title":       stringSchema("New title.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(eventTitleLimit)}),
 			"startAt":     intSchema("New start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"endAt":       intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
@@ -2895,12 +2895,19 @@ func runUpdatePage(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	return map[string]any{"id": pub.String()}, nil
 }
 
-// generatedPageTitleMaxLen caps the page title this tool produces,
-// whether it came from the caller's description or from the model. The
-// pages.title column is wider; this is the tool's own bound, and it
-// matches the maxLength the create_page and update_page tools declare on
-// a caller-supplied title.
-const generatedPageTitleMaxLen = 200
+// Widths of tasks.title, pages.title and calendar_events.title in
+// characters. They are the maxLength the tool schemas declare and the cut
+// applied to model-produced titles, so the two cannot disagree.
+const (
+	taskTitleLimit  = 500
+	pageTitleLimit  = 500
+	eventTitleLimit = 500
+)
+
+// generatedPageTitleLimit caps, in bytes, the page title this tool
+// produces, whether it came from the caller's description or from the
+// model. It is the tool's own bound, narrower than pageTitleLimit.
+const generatedPageTitleLimit = 200
 
 // generatedPageTitle builds the fallback page title from the caller's
 // context description.
@@ -2911,7 +2918,7 @@ const generatedPageTitleMaxLen = 200
 // STRICT_TRANS_TABLES — the page then fails to create with nothing in
 // the request to explain why.
 func generatedPageTitle(contextDescription string) string {
-	return stringutil.TruncateBytes("Generated: "+contextDescription, generatedPageTitleMaxLen)
+	return stringutil.TruncateBytes("Generated: "+contextDescription, generatedPageTitleLimit)
 }
 
 // runGeneratePage writes a wiki page whose body an LLM drafted from the
@@ -3013,7 +3020,7 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	// reached pages.title unclipped and the insert failed, losing the
 	// body the call had already paid for. The cut is rune-aware for the
 	// same reason as in generatedPageTitle.
-	title := stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleMaxLen)
+	title := stringutil.TruncateBytes(proposed[0].Title, generatedPageTitleLimit)
 	if title == "" {
 		// A page needs a name, and a blank one reaches a NOT NULL column
 		// as an empty string that nothing in a list can be clicked by.
@@ -3065,11 +3072,6 @@ func runGeneratePage(ctx context.Context, deps Deps, s *session, raw json.RawMes
 		"isAiGenerated": true,
 	}, nil
 }
-
-// taskTitleMaxLen is the width of tasks.title. Model-produced titles are
-// cut to it in bytes, which is conservative for a utf8mb4 column counted
-// in characters.
-const taskTitleMaxLen = 255
 
 // runSmartCreateTask creates a parent task and AI-suggested subtasks with
 // assignee recommendations. It delegates to the AI orchestrator's
@@ -3136,7 +3138,7 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	// same drift again.
 	subtaskPriorities := make([]int32, len(proposal.Subtasks))
 	for i := range proposal.Subtasks {
-		proposal.Subtasks[i].Title = stringutil.TruncateBytes(proposal.Subtasks[i].Title, taskTitleMaxLen)
+		proposal.Subtasks[i].Title = stringutil.TruncateRunes(proposal.Subtasks[i].Title, taskTitleLimit)
 		priority, known := handlerutil.PriorityFromLabel(proposal.Subtasks[i].Priority)
 		if !known {
 			// The batch still goes out — one unrankable subtask is not
@@ -3351,6 +3353,20 @@ type mcpCalendarOccurrence struct {
 	dated   bool
 }
 
+// Bounds on one calendar listing: the widest window a call may ask for
+// and the most occurrences it may materialize, series expansions included.
+const (
+	maxCalendarListSpan    = 366 * 24 * time.Hour
+	maxCalendarOccurrences = 5000
+)
+
+// errCalendarWindowTooLarge refuses a window whose events exceed
+// maxCalendarOccurrences, so the caller narrows it rather than receiving a
+// silently truncated list.
+func errCalendarWindowTooLarge() error {
+	return apierrors.Newf(apierrors.McpToolArgumentsInvalid, "the range holds more than %d events; narrow it", maxCalendarOccurrences)
+}
+
 // listCalendarOccurrences returns everything on the caller's calendars
 // between startTime and endTime, with recurring series expanded into
 // their concrete occurrences.
@@ -3383,6 +3399,9 @@ func listCalendarOccurrences(
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 
+	if len(plain) > maxCalendarOccurrences {
+		return nil, errCalendarWindowTooLarge()
+	}
 	out := make([]mcpCalendarOccurrence, 0, len(plain))
 	for _, r := range plain {
 		occ := mcpCalendarOccurrence{row: r}
@@ -3435,6 +3454,9 @@ func listCalendarOccurrences(
 				endAt:   inst.EndAt,
 				dated:   true,
 			})
+			if len(out) > maxCalendarOccurrences {
+				return nil, errCalendarWindowTooLarge()
+			}
 		}
 	}
 
@@ -3568,6 +3590,12 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 		endTime = t
 	default:
 		return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
+	}
+	if !endTime.After(startTime) {
+		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "the range end must be after its start")
+	}
+	if endTime.Sub(startTime) > maxCalendarListSpan {
+		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "the range may not span more than %d days", int(maxCalendarListSpan/(24*time.Hour)))
 	}
 	occurrences, err := listCalendarOccurrences(ctx, deps, s.userID, s.userID, s.workspaceID, startTime, endTime)
 	if err != nil {
@@ -4563,10 +4591,21 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 	}
 	memoPub, err := types.Parse(in.MemoID)
 	if err != nil {
-		return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid memoId")
+		return nil, apierrors.New(apierrors.CalendarMemoNotFound)
 	}
-	// Not an existence check: toggling a memo to the done state it
-	// already holds changes nothing and counts zero.
+	// The update's row count is not an existence check: toggling a memo to
+	// the done state it already holds counts zero. Resolve the memo first,
+	// scoped to the calendar and workspace, as the REST patch does.
+	if _, err := deps.CalendarQueries.FindCalendarMemoByPublicId(ctx, calendar.FindCalendarMemoByPublicIdParams{
+		PublicID:    memoPub,
+		CalendarID:  calID,
+		WorkspaceID: s.workspaceID,
+	}); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return nil, apierrors.New(apierrors.CalendarMemoNotFound)
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
 	if _, err := deps.CalendarQueries.UpdateCalendarMemo(ctx, calendar.UpdateCalendarMemoParams{
 		Done:        sql.NullBool{Bool: *in.Done, Valid: true},
 		PublicID:    memoPub,

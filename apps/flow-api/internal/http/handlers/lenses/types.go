@@ -46,7 +46,7 @@ type SavedLens struct {
 	IsDefault          bool            `json:"isDefault"`
 	IsPublic           bool            `json:"isPublic"`
 	SharedAt           *int64          `json:"sharedAt,omitempty" doc:"Unix seconds when first shared publicly"`
-	SafetyCheckedAt    *int64          `json:"safetyCheckedAt,omitempty" doc:"Unix seconds of last AI safety check"`
+	SafetyCheckedAt    *int64          `json:"safetyCheckedAt,omitempty" doc:"Reserved for an AI safety check that does not run yet; always absent"`
 	SortWeight         int32           `json:"sortWeight"`
 	UpdatedAt          *int64          `json:"updatedAt,omitempty"`
 	CreatedAt          int64           `json:"createdAt"`
@@ -194,7 +194,7 @@ type GetLensOutput struct {
 // UpdateLensBody is the request body for PATCH /workspaces/{wsId}/lenses/{lensId}.
 type UpdateLensBody struct {
 	Name        *string          `json:"name,omitempty" minLength:"1" maxLength:"100"`
-	Description *string          `json:"description,omitempty" maxLength:"500" doc:"Optional public-facing description shown on the share page; pass null to clear"`
+	Description *string          `json:"description,omitempty" maxLength:"500" doc:"Optional public-facing description shown on the share page; omit to keep, empty string to clear"`
 	Filter      *json.RawMessage `json:"filter,omitempty"`
 	Sort        *json.RawMessage `json:"sort,omitempty"`
 	GroupBy     *string          `json:"groupBy,omitempty"`

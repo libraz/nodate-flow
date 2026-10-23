@@ -10,12 +10,8 @@
 // rule — the generated queries package is the single source of truth
 // for SQL.
 //
-// Current tool set: list_projects, list_tasks, get_task, create_task,
-// update_task, add_comment, search_tasks, propose_tasks_from,
-// propose_priority, propose_steps, propose_duplicates, propose_lens,
-// list_timeboxes, create_timebox, add_task_to_timebox, export_tasks,
-// propose_relations, smart_create_task, list_import_jobs,
-// create_import_job. Per-token rate limiting is enforced at 60 req/min.
+// The registered tools are listed by tools/list. Per-token rate limiting is
+// enforced at 60 req/min.
 package mcp
 
 import (

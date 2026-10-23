@@ -5,6 +5,7 @@ import {
   createFlowClient,
   createIdentityClient,
   extractRefreshTokenFromSetCookie,
+  revokeSession,
 } from '../src/api.js';
 import { loadCredentials } from '../src/config.js';
 
@@ -177,5 +178,46 @@ describe('client factories', () => {
 
     expect(() => createIdentityClient()).toThrow();
     expect(() => createFlowClient()).toThrow();
+  });
+});
+
+describe('revokeSession', () => {
+  const creds = { refreshToken: 'stored refresh', authApiBaseUrl: 'https://auth.example.test' };
+
+  beforeEach(() => {
+    vi.stubEnv('NF_AUTH_API_URL', undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('presents the stored refresh token to POST /auth/logout', async () => {
+    const fetchImpl = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+
+    await expect(revokeSession(creds, fetchImpl)).resolves.toBe(true);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://auth.example.test/auth/logout');
+    expect(init.method).toBe('POST');
+    expect(new Headers(init.headers).get('cookie')).toBe('nd_rt=stored%20refresh');
+  });
+
+  it('reports an unconfirmed revocation on a server error or a dropped connection', async () => {
+    await expect(
+      revokeSession(
+        creds,
+        vi.fn(async () => new Response(null, { status: 503 })),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      revokeSession(
+        creds,
+        vi.fn(async () => {
+          throw new TypeError('fetch failed');
+        }),
+      ),
+    ).resolves.toBe(false);
   });
 });

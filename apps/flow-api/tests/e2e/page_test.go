@@ -125,6 +125,48 @@ func TestPageHierarchy(t *testing.T) {
 	require.Equal(t, int64(2), children.Total)
 }
 
+// TestPagePatchKeepsUnnamedLinks verifies that a PATCH naming only the
+// title leaves the page's parent and project untouched.
+func TestPagePatchKeepsUnnamedLinks(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	tt := newTenant(t)
+
+	wsURL := testServerURL + "/workspaces/" + tt.WorkspacePublicID
+
+	var parent struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, wsURL+"/pages", tt.AccessToken,
+		map[string]any{"title": "Parent"}, &parent)
+	type pageLinks struct {
+		ID              string  `json:"id"`
+		Title           string  `json:"title"`
+		ParentPageID    *string `json:"parentPageId"`
+		ProjectPublicID *string `json:"projectId"`
+	}
+	var child pageLinks
+	doJSON(t, http.MethodPost, wsURL+"/pages", tt.AccessToken,
+		map[string]any{"title": "Child", "parentPageId": parent.ID, "projectId": tt.ProjectPublicID}, &child)
+	require.NotNil(t, child.ParentPageID)
+	require.NotNil(t, child.ProjectPublicID)
+
+	var patched pageLinks
+	doJSON(t, http.MethodPatch, wsURL+"/pages/"+child.ID, tt.AccessToken,
+		map[string]any{"title": "Renamed"}, &patched)
+	require.Equal(t, "Renamed", patched.Title)
+	require.NotNil(t, patched.ParentPageID, "a title-only PATCH must not unset the parent")
+	require.Equal(t, parent.ID, *patched.ParentPageID)
+	require.NotNil(t, patched.ProjectPublicID, "a title-only PATCH must not unset the project")
+	require.Equal(t, *child.ProjectPublicID, *patched.ProjectPublicID)
+
+	var cleared pageLinks
+	doJSON(t, http.MethodPatch, wsURL+"/pages/"+child.ID, tt.AccessToken,
+		map[string]any{"parentPageId": ""}, &cleared)
+	require.Nil(t, cleared.ParentPageID, "an empty parentPageId unsets the parent")
+	require.NotNil(t, cleared.ProjectPublicID)
+}
+
 // TestPageSearch verifies that pages are searchable by title.
 func TestPageSearch(t *testing.T) {
 	bootstrap(t)

@@ -16,12 +16,6 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
-// dependencyEdgeClosesCycle is the walk [taskdeps.Add] applies before
-// inserting an edge. Kept as a package-local alias so the reachability
-// cases stay covered by this package's table test while the
-// implementation has a single home.
-var dependencyEdgeClosesCycle = taskdeps.ClosesCycle
-
 // ListDependencies handles GET /tasks/{id}/dependencies. Returns both
 // outgoing edges (this task → other) and incoming edges (other → this).
 func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInput) (*ListTaskDependenciesOutput, error) {

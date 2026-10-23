@@ -359,8 +359,8 @@ func nullableUnix(t sql.NullTime) *int64 {
 	return &secs
 }
 
-// TruncationPoint returns the recurrence_end that stops a series just
-// before a split.
+// truncationPoint returns the recurrence_end that stops a series just
+// before a split, given the series' current recurrence_end.
 //
 // The master is truncated through recurrence_end rather than by rewriting
 // the rule's own until. The expanders read the two as independent upper
@@ -372,10 +372,10 @@ func nullableUnix(t sql.NullTime) *int64 {
 //
 // A master that already stops earlier keeps its own bound, so this never
 // extends a series that a later recurrence_end would revive.
-func TruncationPoint(master calendar.FindCalendarEventByPublicIdRow, splitStart time.Time) time.Time {
+func truncationPoint(end sql.NullTime, splitStart time.Time) time.Time {
 	truncateAt := splitStart.Add(-time.Millisecond)
-	if master.RecurrenceEnd.Valid && master.RecurrenceEnd.Time.Before(truncateAt) {
-		return master.RecurrenceEnd.Time
+	if end.Valid && end.Time.Before(truncateAt) {
+		return end.Time
 	}
 	return truncateAt
 }

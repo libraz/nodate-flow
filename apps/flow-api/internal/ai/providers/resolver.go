@@ -6,10 +6,12 @@ package providers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
 // WorkspaceResolver is the production implementation of
@@ -50,6 +52,12 @@ func (r *MockResolver) Default(_ context.Context, _ uint32) (Provider, error) {
 	return r.Provider, nil
 }
 
+// ForProvider implements ai.AgentProviderResolver. Like Default it returns
+// the fixture provider whatever the arguments.
+func (r *MockResolver) ForProvider(ctx context.Context, workspaceID uint32, _ types.PublicID) (Provider, error) {
+	return r.Default(ctx, workspaceID)
+}
+
 // NewWorkspaceResolver constructs a WorkspaceResolver. Both arguments
 // are required; a nil Decryptor would make Complete fail downstream.
 func NewWorkspaceResolver(q generated.Querier, dec Decryptor) *WorkspaceResolver {
@@ -75,11 +83,23 @@ func (r *WorkspaceResolver) Default(ctx context.Context, workspaceID uint32) (Pr
 	if len(list) == 0 {
 		return nil, ErrNoEnabledProvider
 	}
-	head := list[0]
+	return r.ForProvider(ctx, workspaceID, list[0].PublicID)
+}
+
+// ForProvider implements ai.AgentProviderResolver. It loads the named
+// enabled provider of the workspace, so an agent runs against the provider
+// that owns its model rather than whichever provider is the default.
+func (r *WorkspaceResolver) ForProvider(ctx context.Context, workspaceID uint32, providerPublicID types.PublicID) (Provider, error) {
+	if r == nil || r.Queries == nil {
+		return nil, ErrNoEnabledProvider
+	}
 	row, err := r.Queries.FindProviderForDecrypt(ctx, generated.FindProviderForDecryptParams{
 		WorkspaceID: workspaceID,
-		PublicID:    head.PublicID,
+		PublicID:    providerPublicID,
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoEnabledProvider
+	}
 	if err != nil {
 		return nil, fmt.Errorf("ai/providers: load sealed key: %w", err)
 	}

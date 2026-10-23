@@ -301,3 +301,57 @@ func TestSweeperKeepsAReferencedRow(t *testing.T) {
 	}
 	require.True(t, found, "a live attachment must survive a sweep")
 }
+
+// flakyRemover fails the first RemoveObject call and delegates the rest.
+type flakyRemover struct {
+	inner storagegc.ObjectRemover
+	calls int
+}
+
+func (f *flakyRemover) RemoveObject(ctx context.Context, key string) error {
+	f.calls++
+	if f.calls == 1 {
+		return context.DeadlineExceeded
+	}
+	return f.inner.RemoveObject(ctx, key)
+}
+
+// TestSweeperRetriesABlobWhoseRemovalFailed holds that a failed
+// object-store call leaves the row naming the key, so the next pass
+// removes the blob instead of orphaning it.
+func TestSweeperRetriesABlobWhoseRemovalFailed(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+	lockStorageSweepPass(t)
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "Retry")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 81, G: 82, B: 83, A: 255})
+
+	res := presignAttachment(t, tt.AccessToken, taskID, "retry.png", "image/png", payload)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	old := time.Now().UTC().Add(-2 * time.Hour)
+	_, err := testDB.ExecContext(ctx,
+		`UPDATE storage_objects SET created_at = ?, updated_at = ? WHERE storage_key = ?`,
+		old, old, res.StorageKey)
+	require.NoError(t, err)
+
+	sweeper := newSweeper(t)
+	sweeper.ReservationTTL = time.Hour
+	sweeper.Storage = &flakyRemover{inner: testStorage.Flow}
+
+	_, err = sweeper.RunOnce(ctx)
+	require.NoError(t, err)
+	require.True(t, storageObjectExists(ctx, t, res.StorageKey),
+		"a failed blob removal must keep the row that names the key")
+	testStorage.MustExist(t, res.StorageKey)
+
+	_, err = sweeper.RunOnce(ctx)
+	require.NoError(t, err)
+	require.False(t, storageObjectExists(ctx, t, res.StorageKey))
+	testStorage.MustNotExist(t, res.StorageKey)
+}

@@ -61,9 +61,9 @@ type Engine struct {
 
 // EvaluateTask loads a task's constraints, evaluates each against the
 // task facts, and writes the resulting satisfied/failed marker for
-// every row it evaluated — the write is unconditional, so a row whose
-// outcome is unchanged is written the same values again. The returned
-// slice mirrors the stored order so callers can surface per-constraint
+// every row it evaluated. The store keeps the time a row first reached
+// its current outcome, so re-evaluating an unchanged row moves nothing.
+// The returned slice mirrors the stored order so callers can surface per-constraint
 // feedback in the UI.
 func (e *Engine) EvaluateTask(ctx context.Context, taskID uint32) ([]Outcome, error) {
 	if e.Store == nil {
@@ -101,4 +101,37 @@ func (e *Engine) EvaluateTask(ctx context.Context, taskID uint32) ([]Outcome, er
 		}
 	}
 	return outcomes, nil
+}
+
+// DependentLister is implemented by stores that can name the tasks whose
+// facts read another task's state.
+type DependentLister interface {
+	// ListDependents returns the internal ids of the enabled tasks with
+	// an enabled outgoing dependency edge to taskID.
+	ListDependents(ctx context.Context, taskID uint32) ([]uint32, error)
+}
+
+// EvaluateTaskAndDependents evaluates the task and then every task that
+// depends on it. A task's dependency facts are the derived states of its
+// edge targets, so a change to the task's state or enabled flag moves the
+// outcome of its dependents' constraints, not only its own. Every caller
+// that commits such a change calls this instead of [Engine.EvaluateTask].
+//
+// A failure on one task does not stop the rest; the errors are joined.
+func (e *Engine) EvaluateTaskAndDependents(ctx context.Context, taskID uint32) error {
+	_, err := e.EvaluateTask(ctx, taskID)
+	lister, ok := e.Store.(DependentLister)
+	if !ok {
+		return errors.Join(err, errors.New("engine: Store cannot list dependents"))
+	}
+	ids, lerr := lister.ListDependents(ctx, taskID)
+	if lerr != nil {
+		return errors.Join(err, lerr)
+	}
+	for _, id := range ids {
+		if _, derr := e.EvaluateTask(ctx, id); derr != nil {
+			err = errors.Join(err, derr)
+		}
+	}
+	return err
 }

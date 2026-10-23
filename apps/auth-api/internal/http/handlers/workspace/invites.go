@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -120,11 +121,13 @@ func CreateInvite(deps InviteDeps) func(context.Context, *CreateInviteInput) (*C
 		// email are available.
 		if deps.EmailSender != nil && in.Body.Email != "" {
 			link := InviteAcceptURL(deps.WebURL, plaintext)
-			_ = deps.EmailSender.Send(ctx, email.Message{
+			if err := deps.EmailSender.Send(ctx, email.Message{
 				To:      []string{in.Body.Email},
 				Subject: "You've been invited to a workspace",
 				Body:    "You have been invited to join a workspace. Click the link below to accept:\n\n" + link,
-			})
+			}); err != nil {
+				slog.ErrorContext(ctx, "workspace invite: email delivery failed", slog.Any("err", err))
+			}
 		}
 
 		invite := WorkspaceInvite{
