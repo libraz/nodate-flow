@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -29,7 +30,8 @@ var validFavoriteTargetTypes = map[string]generated.UserFavoritesTargetType{
 }
 
 func runListFavorites(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
-	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
+	wsRole, err := requireWorkspaceMember(ctx, deps, s)
+	if err != nil {
 		return nil, err
 	}
 	var in struct {
@@ -42,11 +44,16 @@ func runListFavorites(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	if in.Limit <= 0 || in.Limit > 50 {
 		in.Limit = 50
 	}
+	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	rows, err := deps.Queries.ListFavoritesForUser(ctx, generated.ListFavoritesForUserParams{
-		WorkspaceID: s.workspaceID,
-		UserID:      s.userID,
-		Limit:       in.Limit,
-		Offset:      in.Offset,
+		WorkspaceID:   s.workspaceID,
+		UserID:        s.userID,
+		IsElevated:    vis.IsElevated,
+		ActorUserID:   vis.ActorUserID,
+		ActorUserID_2: vis.ActorUserID,
+		ActorUserID_3: vis.ActorUserID,
+		Limit:         in.Limit,
+		Offset:        in.Offset,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)

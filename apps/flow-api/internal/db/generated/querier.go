@@ -1489,7 +1489,12 @@ type Querier interface {
 	// reverses_event_id); on the polling hot-path this keeps the per-row
 	// cost to an index-only probe.
 	ListEventsForScopedAgent(ctx context.Context, arg ListEventsForScopedAgentParams) ([]ListEventsForScopedAgentRow, error)
-	// List all favorites for a user within a workspace, ordered by sort weight.
+	// List a user's favorites within a workspace, ordered by sort weight.
+	// Only favorites whose target still exists, is enabled, and is readable by
+	// the caller are returned: a task through the Layer 4 visibility rule
+	// (elevated roles skip it), a page only while every ancestor is enabled,
+	// matching GetPageByPublicId. The favorite row itself is kept, so a target
+	// that becomes readable again reappears.
 	ListFavoritesForUser(ctx context.Context, arg ListFavoritesForUserParams) ([]ListFavoritesForUserRow, error)
 	// List import jobs for a workspace with total count.
 	ListImportJobsForWorkspace(ctx context.Context, arg ListImportJobsForWorkspaceParams) ([]ListImportJobsForWorkspaceRow, error)

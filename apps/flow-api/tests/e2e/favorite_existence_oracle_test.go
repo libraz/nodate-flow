@@ -75,3 +75,60 @@ func TestFavoriteCreateIsNotATaskExistenceOracle(t *testing.T) {
 	require.Equalf(t, http.StatusOK, okStatus,
 		"the task's creator must still be able to favorite it; body=%s", string(okBody))
 }
+
+// TestFavoriteListDropsDeadAndInvisibleTargets proves the favorites list
+// returns only targets that still exist and that the caller can still
+// read: a task deleted after it was favorited, and one made private to
+// someone else, both drop out, while the creator still sees the latter.
+func TestFavoriteListDropsDeadAndInvisibleTargets(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	owner := newTenant(t)
+	member := seedWorkspaceMemberTenant(t, owner)
+	deleted := createTaskWithVisibility(t, owner, "favorite-deleted-"+randomHex(6), "public")
+	hidden := createTaskWithVisibility(t, owner, "favorite-hidden-"+randomHex(6), "public")
+	kept := createTaskWithVisibility(t, owner, "favorite-kept-"+randomHex(6), "public")
+
+	favorite := func(token, targetID string) {
+		t.Helper()
+		status, body := doJSONStatus(t, http.MethodPost, testServerURL+"/me/favorites", token, map[string]any{
+			"workspaceId": owner.WorkspacePublicID,
+			"targetType":  "task",
+			"targetId":    targetID,
+		})
+		require.Equalf(t, http.StatusOK, status, "favorite %s; body=%s", targetID, string(body))
+	}
+	listed := func(token string) map[string]bool {
+		t.Helper()
+		var out struct {
+			Favorites []struct {
+				TargetID string `json:"targetId"`
+			} `json:"favorites"`
+			Total int64 `json:"total"`
+		}
+		doJSON(t, http.MethodGet,
+			testServerURL+"/me/favorites?workspaceId="+owner.WorkspacePublicID, token, nil, &out)
+		got := map[string]bool{}
+		for _, f := range out.Favorites {
+			got[f.TargetID] = true
+		}
+		require.Equal(t, int64(len(out.Favorites)), out.Total, "total counts the filtered list")
+		return got
+	}
+
+	for _, id := range []string{deleted, hidden, kept} {
+		favorite(member.AccessToken, id)
+	}
+	favorite(owner.AccessToken, hidden)
+
+	doJSON(t, http.MethodDelete, testServerURL+"/tasks/"+deleted, owner.AccessToken, nil, nil)
+	doJSON(t, http.MethodPatch, testServerURL+"/tasks/"+hidden, owner.AccessToken,
+		map[string]any{"visibility": "private"}, nil)
+
+	got := listed(member.AccessToken)
+	require.False(t, got[deleted], "a deleted task must drop out of the list")
+	require.False(t, got[hidden], "a task the caller can no longer see must drop out of the list")
+	require.True(t, got[kept], "a live, visible task stays listed")
+	require.True(t, listed(owner.AccessToken)[hidden], "the private task's creator still sees their favorite")
+}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -35,9 +34,6 @@ type Deps struct {
 	// uploads and downloads. Optional: nil causes the presign
 	// endpoints to return INTERNAL.NOT_CONFIGURED.
 	Storage *storage.Client
-	// Audit records audit log entries for task mutations.
-	// Optional: nil disables audit logging.
-	Audit *audit.Recorder
 	// Mutations records a task change on both the timeline and the audit
 	// log; RecordInTx commits the event with the change.
 	Mutations *mutationlog.Recorder

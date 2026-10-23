@@ -5,12 +5,12 @@ import (
 	"database/sql"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -87,12 +87,13 @@ WHERE public_id = ? AND workspace_id = ? AND enabled = TRUE LIMIT 1`
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		deps.Audit.Record(ctx, audit.Entry{
-			Action:       "task.reorder",
-			ActorID:      actorID,
-			WorkspaceID:  prj.WorkspaceID,
+		// Sort order is display state: it has no event kind and no
+		// timeline entry, so only the audit half is recorded.
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: prj.WorkspaceID}, mutationlog.Mutation{
+			AuditAction:  "task.reorder",
 			ResourceType: "project",
 			ResourceID:   prjPub.String(),
+			CallSite:     "tasks.Reorder (display order; no event kind)",
 		})
 
 		out := &ReorderTasksOutput{}

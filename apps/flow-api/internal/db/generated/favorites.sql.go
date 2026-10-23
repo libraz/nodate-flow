@@ -163,6 +163,17 @@ func (q *Queries) FindFavoriteByTarget(ctx context.Context, arg FindFavoriteByTa
 }
 
 const listFavoritesForUser = `-- name: ListFavoritesForUser :many
+WITH RECURSIVE enabled_pages (id) AS (
+  SELECT pages.id FROM pages
+  WHERE pages.workspace_id = ?
+    AND pages.parent_page_id IS NULL
+    AND pages.enabled = TRUE
+  UNION ALL
+  SELECT p.id FROM pages p
+  INNER JOIN enabled_pages ep ON ep.id = p.parent_page_id
+  WHERE p.workspace_id = ?
+    AND p.enabled = TRUE
+)
 SELECT
   uf.public_id,
   uf.target_type,
@@ -175,15 +186,71 @@ FROM user_favorites uf
 WHERE uf.workspace_id = ?
   AND uf.user_id = ?
   AND uf.enabled = TRUE
+  AND (
+    (uf.target_type = 'project' AND EXISTS (
+      SELECT 1 FROM projects pr
+      WHERE pr.workspace_id = uf.workspace_id
+        AND pr.public_id = uf.target_public_id
+        AND pr.enabled = TRUE
+    ))
+    OR (uf.target_type = 'task' AND EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.workspace_id = uf.workspace_id
+        AND t.public_id = uf.target_public_id
+        AND t.enabled = TRUE
+        AND (
+          CAST(? AS SIGNED) = 1
+          OR t.visibility = 'public'
+          OR (t.visibility = 'project' AND EXISTS (
+            SELECT 1 FROM project_members pm_vis
+            WHERE pm_vis.project_id = t.project_id
+              AND pm_vis.user_id = CAST(? AS UNSIGNED)
+              AND pm_vis.enabled = TRUE
+          ))
+          OR (t.visibility = 'private' AND (
+            t.created_by_user_id = CAST(? AS UNSIGNED)
+            OR EXISTS (
+              SELECT 1 FROM task_actors ta_vis
+              WHERE ta_vis.task_id = t.id
+                AND ta_vis.kind = 'user'
+                AND ta_vis.user_id = CAST(? AS UNSIGNED)
+                AND ta_vis.enabled = TRUE
+            )
+          ))
+        )
+    ))
+    OR (uf.target_type = 'page' AND EXISTS (
+      SELECT 1 FROM pages pg
+      WHERE pg.workspace_id = uf.workspace_id
+        AND pg.public_id = uf.target_public_id
+        AND pg.id IN (SELECT id FROM enabled_pages)
+    ))
+    OR (uf.target_type = 'lens' AND EXISTS (
+      SELECT 1 FROM lenses l
+      WHERE l.workspace_id = uf.workspace_id
+        AND l.public_id = uf.target_public_id
+        AND l.enabled = TRUE
+    ))
+    OR (uf.target_type = 'timebox' AND EXISTS (
+      SELECT 1 FROM timeboxes tb
+      WHERE tb.workspace_id = uf.workspace_id
+        AND tb.public_id = uf.target_public_id
+        AND tb.enabled = TRUE
+    ))
+  )
 ORDER BY uf.sort_weight ASC, uf.created_at DESC
 LIMIT ? OFFSET ?
 `
 
 type ListFavoritesForUserParams struct {
-	WorkspaceID uint32 `json:"-"`
-	UserID      uint32 `json:"-"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	WorkspaceID   uint32 `json:"-"`
+	UserID        uint32 `json:"-"`
+	IsElevated    int64  `json:"isElevated"`
+	ActorUserID   int64  `json:"actorUserId"`
+	ActorUserID_2 int64  `json:"actorUserId2"`
+	ActorUserID_3 int64  `json:"actorUserId3"`
+	Limit         int32  `json:"limit"`
+	Offset        int32  `json:"offset"`
 }
 
 type ListFavoritesForUserRow struct {
@@ -196,11 +263,22 @@ type ListFavoritesForUserRow struct {
 	Total          interface{}             `json:"total"`
 }
 
-// List all favorites for a user within a workspace, ordered by sort weight.
+// List a user's favorites within a workspace, ordered by sort weight.
+// Only favorites whose target still exists, is enabled, and is readable by
+// the caller are returned: a task through the Layer 4 visibility rule
+// (elevated roles skip it), a page only while every ancestor is enabled,
+// matching GetPageByPublicId. The favorite row itself is kept, so a target
+// that becomes readable again reappears.
 func (q *Queries) ListFavoritesForUser(ctx context.Context, arg ListFavoritesForUserParams) ([]ListFavoritesForUserRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFavoritesForUser,
 		arg.WorkspaceID,
+		arg.WorkspaceID,
+		arg.WorkspaceID,
 		arg.UserID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID_2,
+		arg.ActorUserID_3,
 		arg.Limit,
 		arg.Offset,
 	)

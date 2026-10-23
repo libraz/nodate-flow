@@ -247,7 +247,9 @@ func (r *Recorder) RecordHandBack(ctx context.Context, tx *dbretry.Tx, a Actor, 
 // What they cannot supply is the audit row, because they are shared
 // across transports and know nothing about which one called them. So
 // this is the one entry point a mutation may reach with EventType
-// empty, and the call site has to name the helper that emitted it.
+// empty, and the call site has to name the helper that emitted it — or,
+// for a change with no event kind at all (a task reorder, which moves
+// display order only), say that it has none.
 //
 // Call it after the helper's transaction has committed. Before that, an
 // audit row can outlive a rollback.

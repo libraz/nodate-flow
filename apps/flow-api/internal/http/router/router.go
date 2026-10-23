@@ -811,7 +811,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlConstraintCompiler: nlConstraintCompiler,
 		nlCommandResolver:    nlCommandResolver,
 		prjDeps:              projects.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Audit: auditRec, Mutations: mutationRec},
+		taskDeps:             tasks.Deps{DB: deps.DB, Queries: deps.Queries, CalendarQueries: deps.CalendarQueries, Embedder: embedClient, NlConstraint: nlConstraintCompiler, Storage: deps.Storage, Mutations: mutationRec},
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},

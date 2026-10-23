@@ -166,11 +166,22 @@ func List(deps Deps) func(context.Context, *ListFavoritesInput) (*ListFavoritesO
 			limit = 50
 		}
 
+		// The list carries only targets the caller can still read, so the
+		// task visibility rule needs the caller's workspace role.
+		wsRole, err := acl.CheckWorkspaceMember(ctx, deps.DB, wsID, actorID, apierrors.WsWorkspaceAccessDenied)
+		if err != nil {
+			return nil, err
+		}
+		vis := acl.ListVisibilityArgs(actorID, wsRole)
 		rows, err := deps.Queries.ListFavoritesForUser(ctx, generated.ListFavoritesForUserParams{
-			WorkspaceID: wsID,
-			UserID:      actorID,
-			Limit:       limit,
-			Offset:      in.Offset,
+			WorkspaceID:   wsID,
+			UserID:        actorID,
+			IsElevated:    vis.IsElevated,
+			ActorUserID:   vis.ActorUserID,
+			ActorUserID_2: vis.ActorUserID,
+			ActorUserID_3: vis.ActorUserID,
+			Limit:         limit,
+			Offset:        in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
