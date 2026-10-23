@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
 )
@@ -83,6 +84,9 @@ func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*Cre
 		// An expiry in the past would mint a token that is dead on
 		// arrival, and the caller would not find out until the first tool
 		// call failed with MCP.TOKEN.EXPIRED.
+		if err := handlerutil.CheckDatetimeField("expiresAt", in.Body.ExpiresAt); err != nil {
+			return nil, err
+		}
 		var expiresAt sql.NullTime
 		if in.Body.ExpiresAt != nil {
 			exp := time.Unix(*in.Body.ExpiresAt, 0).UTC()

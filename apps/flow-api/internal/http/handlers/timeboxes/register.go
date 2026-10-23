@@ -60,7 +60,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/timeboxes/{timeboxId}",
 		Summary:     "Soft-delete a timebox",
-		Description: "Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Idempotent.",
+		Description: "Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Returns 404 TIMEBOX.TIMEBOX.NOT_FOUND when the timebox is already removed.",
 		Tags:        []string{"Tasks"},
 	}, Delete(deps))
 
@@ -78,7 +78,7 @@ func RegisterWorkspaceScoped(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}",
 		Summary:     "Remove a task from a timebox",
-		Description: "Detaches the task from the timebox without affecting the task itself. Idempotent.",
+		Description: "Detaches the task from the timebox without affecting the task itself. Returns 404 TIMEBOX.TASK.NOT_FOUND when the task is not attached.",
 		Tags:        []string{"Tasks"},
 	}, RemoveTask(deps))
 

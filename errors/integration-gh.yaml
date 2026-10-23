@@ -31,24 +31,3 @@ resources:
         message_zh: "不支持的 GitHub Webhook 事件类型"
         description: "Returned when the X-GitHub-Event header indicates an event that this integration does not handle."
         userAction: "Disable unsupported event types in the GitHub webhook configuration."
-
-  api:
-    breadcrumb: "Integration > GitHub > API"
-    errors:
-      rate_limited:
-        code: INTEGRATION.GH.RATE_LIMITED
-        status: 429
-        message: "GitHub API rate limit exceeded"
-        message_ja: "GitHub API のレート制限を超えました"
-        message_zh: "GitHub API 速率限制已超过"
-        description: "Returned when the GitHub REST or GraphQL API rejected the request because the integration token has hit its rate limit."
-        userAction: "Wait for the rate limit window to reset, or use a token with higher quota."
-
-      token_invalid:
-        code: INTEGRATION.GH.TOKEN_INVALID
-        status: 401
-        message: "GitHub API token is invalid"
-        message_ja: "GitHub API トークンが無効です"
-        message_zh: "GitHub API 令牌无效"
-        description: "Returned when GitHub rejects the integration's installation or PAT credentials."
-        userAction: "Re-authorize the GitHub integration."

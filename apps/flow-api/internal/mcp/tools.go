@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
@@ -1828,118 +1827,47 @@ func proposedPriority(ctx context.Context, label, callSite string) int32 {
 	return priority
 }
 
-// Similarity thresholds and bounds, the ADR 0003 defaults the REST
-// duplicate listing uses when ai_settings has no row for the workspace.
-const (
-	defaultDuplicateHigh    = 0.870
-	defaultDuplicateLow     = 0.750
-	duplicateCandidateLimit = 200
-	duplicateResultLimit    = 20
-)
-
-// similarTask is one candidate of a similarity search, ranked by score.
-type similarTask struct {
-	publicID  string
-	title     string
-	score     float64
-	duplicate bool
-}
+// similarResultLimit caps the candidates one similarity tool returns, the
+// same cap the REST duplicate listing applies.
+const similarResultLimit = 20
 
 // rankSimilarTasks is the similarity search behind propose_duplicates and
-// propose_relations: it ranks stored embeddings against the source task via
-// Go-side cosine similarity (MySQL 9.6 Community lacks VEC_DISTANCE_COSINE),
-// over the caller's readable set, with thresholds from ai_settings. A source
-// task with no usable embedding yields no candidates rather than an error.
-func rankSimilarTasks(ctx context.Context, deps Deps, s *session, wsRole acl.WorkspaceRole, taskInternal uint32, title string, description sql.NullString) (string, []similarTask, error) {
-	// The lookup key is the embedder's own model, which is what wrote
-	// every row: see [embed.Client.Model].
-	model := deps.Embedder.Model()
-	high, low := defaultDuplicateHigh, defaultDuplicateLow
-	if settings, serr := deps.Queries.GetAiSettings(ctx, s.workspaceID); serr == nil {
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
-			high = v
-		}
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdLow, 64); perr == nil {
-			low = v
-		}
-	}
-
-	src, err := deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-		TaskID: taskInternal,
-		Model:  model,
-	})
-	if stderrors.Is(err, sql.ErrNoRows) {
-		desc := ""
-		if description.Valid {
-			desc = description.String
-		}
-		if eerr := deps.Embedder.EmbedTask(ctx, s.workspaceID, taskInternal, title, desc); eerr != nil {
-			return model, nil, nil
-		}
-		src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-			TaskID: taskInternal,
-			Model:  model,
-		})
-	}
-	if err != nil {
-		return model, nil, nil
-	}
-	srcVec, err := embed.Decode(toBytes(src.Vector))
-	if err != nil || len(srcVec) == 0 {
-		return model, nil, nil
-	}
-
+// propose_relations, over the caller's readable set. A source task with no
+// usable embedding yields no candidates rather than an error.
+func rankSimilarTasks(ctx context.Context, deps Deps, s *session, wsRole acl.WorkspaceRole, taskInternal uint32, title string, description sql.NullString) (string, []embed.SimilarTask, error) {
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
-	rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID:   s.workspaceID,
-		Model:         model,
-		TaskID:        taskInternal,
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		Limit:         duplicateCandidateLimit,
+	ranked, err := deps.Embedder.RankSimilarTasks(ctx, deps.Queries, embed.SimilarQuery{
+		WorkspaceID: s.workspaceID,
+		TaskID:      taskInternal,
+		SourceText: func(context.Context) (string, string, error) {
+			return title, description.String, nil
+		},
+		IsElevated:  vis.IsElevated,
+		ActorUserID: vis.ActorUserID,
+		ResultLimit: similarResultLimit,
 	})
+	if stderrors.Is(err, embed.ErrNoSourceVector) {
+		return deps.Embedder.Model(), nil, nil
+	}
 	if err != nil {
-		return model, nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		return deps.Embedder.Model(), nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	ranked := make([]similarTask, 0, len(rows))
-	for _, r := range rows {
-		v, derr := embed.Decode(toBytes(r.Vector))
-		if derr != nil || len(v) != len(srcVec) {
-			continue
-		}
-		score := float64(embed.Cosine(srcVec, v))
-		if score < low {
-			continue
-		}
-		ranked = append(ranked, similarTask{
-			publicID:  r.PublicID.String(),
-			title:     r.Title,
-			score:     score,
-			duplicate: score >= high,
-		})
-	}
-	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
-	if len(ranked) > duplicateResultLimit {
-		ranked = ranked[:duplicateResultLimit]
-	}
-	return model, ranked, nil
+	return deps.Embedder.Model(), ranked, nil
 }
 
 // similarTaskCandidates shapes ranked candidates for a tool result, naming
 // the duplicate-or-related verdict under kindKey.
-func similarTaskCandidates(ranked []similarTask, kindKey string) []map[string]any {
+func similarTaskCandidates(ranked []embed.SimilarTask, kindKey string) []map[string]any {
 	out := make([]map[string]any, 0, len(ranked))
 	for _, c := range ranked {
 		kind := "related"
-		if c.duplicate {
+		if c.Duplicate {
 			kind = "duplicate"
 		}
 		out = append(out, map[string]any{
-			"taskId": c.publicID,
-			"title":  c.title,
-			"score":  c.score,
+			"taskId": c.PublicID.String(),
+			"title":  c.Title,
+			"score":  c.Score,
 			kindKey:  kind,
 		})
 	}
@@ -2173,19 +2101,6 @@ func runApplySteps(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 func aiFailure(err error) error {
 	spec, _ := errormodel.AIFailure(err)
 	return apierrors.Wrap(spec, err)
-}
-
-// toBytes coerces an interface{} column (returned by sqlc for VECTOR
-// columns read back through STRING_TO_VECTOR) into a []byte, or nil
-// when the underlying value is neither []byte nor string.
-func toBytes(v any) []byte {
-	switch x := v.(type) {
-	case []byte:
-		return x
-	case string:
-		return []byte(x)
-	}
-	return nil
 }
 
 // runListTimeboxes lists timeboxes in the caller's workspace.
@@ -3981,6 +3896,16 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if timeChanged {
 		params.StartAt = sql.NullTime{Time: newStartAt, Valid: true}
 		params.EndAt = sql.NullTime{Time: newEndAt, Valid: true}
+	}
+	// The row as it will stand, refused here by the rule REST applies
+	// rather than by the CHECK that would answer it as a store failure.
+	shapeKind := string(evt.Kind)
+	if in.Kind != nil {
+		shapeKind = *in.Kind
+	}
+	if refusal := calendarrules.RequireEventShape(shapeKind, timeChanged || evt.StartAt.Valid,
+		calendaroccurrence.HasRule(evt.RecurrenceRule), evt.NotificationOffset.Valid); refusal != nil {
+		return nil, refusal
 	}
 	if in.Kind != nil {
 		params.Kind = calendar.NullCalendarEventsKind{

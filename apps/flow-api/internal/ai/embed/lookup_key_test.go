@@ -129,11 +129,12 @@ func TestEmbeddingLookupsKeyOffTheEmbedder(t *testing.T) {
 	// paths are known and finite, so requiring that they were actually
 	// found turns a renamed sqlc params type from a quiet pass into a
 	// loud failure.
+	// The duplicate listing, the MCP similarity tools and the relation
+	// pipeline reach task_embeddings through [Client.RankSimilarTasks] in
+	// similar.go, so that file is the read path inspected for them.
 	for _, want := range []string{
 		"internal/ai/embed/embed.go",
-		"internal/http/handlers/tasks/duplicates.go",
-		"internal/mcp/tools.go",
-		"internal/ai/relations/pipeline.go",
+		"internal/ai/embed/similar.go",
 	} {
 		if !slices.Contains(inspected, want) {
 			t.Errorf("%s addresses task_embeddings but this guard did not inspect it; "+

@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 )
@@ -190,6 +191,9 @@ func rejectOversizeCalendarAttachment(ctx context.Context, deps Deps, wsID uint3
 	}
 	if affected, _ := gcRes.RowsAffected(); affected == 1 {
 		storageKeyToRemove = fullRow.StorageKey
+		if err := storagegc.Queue(ctx, qtx, storageKeyToRemove); err != nil {
+			return httpErr(apierrors.CalendarAttachmentStoreDeleteInterrupted)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -198,8 +202,8 @@ func rejectOversizeCalendarAttachment(ctx context.Context, deps Deps, wsID uint3
 
 	if storageKeyToRemove != "" && deps.Storage != nil {
 		cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
-		if rmErr := deps.Storage.RemoveObject(cleanupCtx, storageKeyToRemove); rmErr != nil {
-			slog.WarnContext(cleanupCtx, "calendar attachment confirm: oversize cleanup failed",
+		if rmErr := storagegc.RemoveQueued(cleanupCtx, deps.Queries, deps.Storage, storageKeyToRemove); rmErr != nil {
+			slog.WarnContext(cleanupCtx, "calendar attachment confirm: oversize cleanup failed; the sweeper will retry",
 				slog.Any("err", rmErr),
 				slog.String("storage_key", storageKeyToRemove),
 			)

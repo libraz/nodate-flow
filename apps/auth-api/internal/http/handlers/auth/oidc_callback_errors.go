@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // oidcProviderRejection builds the AUTH.OIDC.PROVIDER_REJECTED error
@@ -39,4 +41,15 @@ func oidcProviderRejection(ctx context.Context, provider, errorSlug, errorDescri
 		details["provider_error_description"] = errorDescription
 	}
 	return handlerutil.HTTPErrWithDetails(apierrors.AuthOidcProviderRejected, details)
+}
+
+// oidcExchangeRefusal answers a failed code exchange: a nonce that does
+// not match the request's is AUTH.OIDC.NONCE_MISMATCH, so the caller is
+// told to restart the flow; anything else is an id_token that did not
+// verify.
+func oidcExchangeRefusal(err error) error {
+	if errors.Is(err, authn.ErrNonceMismatch) {
+		return httpErr(apierrors.AuthOidcNonceMismatch)
+	}
+	return httpErr(apierrors.AuthOidcIdTokenInvalid)
 }

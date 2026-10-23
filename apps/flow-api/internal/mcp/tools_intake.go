@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 func runListIntakeItems(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -105,6 +106,9 @@ func runTriageIntakeItem(ctx context.Context, deps Deps, s *session, raw json.Ra
 	if in.Status == "snoozed" {
 		if in.SnoozeUntil == nil || *in.SnoozeUntil <= 0 {
 			return nil, apierrors.New(apierrors.WsIntakeSnoozeDeadlineRequired)
+		}
+		if !dbtype.DatetimeRepresentable(*in.SnoozeUntil) {
+			return nil, apierrors.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", "snoozeUntil")
 		}
 		snoozeUntil = sql.NullTime{Time: time.Unix(*in.SnoozeUntil, 0), Valid: true}
 	}

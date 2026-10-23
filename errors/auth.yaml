@@ -104,15 +104,6 @@ resources:
   totp:
     breadcrumb: "Auth > TOTP"
     errors:
-      code_required:
-        code: AUTH.TOTP.CODE_REQUIRED
-        status: 401
-        message: "Two-factor authentication code is required"
-        message_ja: "二段階認証コードが必要です"
-        message_zh: "需要输入两步验证代码"
-        description: "Returned when the account has 2FA enabled and the login request did not include a TOTP code."
-        userAction: "Submit the 6-digit code from your authenticator app."
-
       code_mismatch:
         code: AUTH.TOTP.CODE_MISMATCH
         status: 401
@@ -277,15 +268,6 @@ resources:
         message_zh: "此魔法链接已被使用"
         description: "Returned when the magic link token has already been consumed to create a session."
         userAction: "Request a new magic link from the login page."
-
-      email_not_found:
-        code: AUTH.MAGIC_LINK.EMAIL_NOT_FOUND
-        status: 404
-        message: "No account found for this email address"
-        message_ja: "このメールアドレスのアカウントが見つかりません"
-        message_zh: "未找到此邮箱对应的账户"
-        description: "Returned when a magic link is requested for an email that is not associated with any account."
-        userAction: "Check the email address for typos, or register a new account."
 
   oidc:
     breadcrumb: "Auth > OIDC"

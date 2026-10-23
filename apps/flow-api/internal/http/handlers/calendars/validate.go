@@ -46,6 +46,24 @@ func requireEventChronology(startAt, endAt *int64) error {
 	return nil
 }
 
+// requireEventShape refuses a row the calendar_events CHECKs reject on
+// its kind, recurrence and reminder against whether it is dated.
+func requireEventShape(kind string, dated, recurring, reminded bool) error {
+	if err := calendarrules.RequireEventShape(kind, dated, recurring, reminded); err != nil {
+		return handlerutil.HTTPErrFromAPIError(err)
+	}
+	return nil
+}
+
+// requireDatetime refuses a unix-seconds body member the DATETIME column
+// cannot hold.
+func requireDatetime(field string, v *int64) error {
+	if err := calendarrules.RequireDatetime(field, v); err != nil {
+		return handlerutil.HTTPErrFromAPIError(err)
+	}
+	return nil
+}
+
 // requireEventStartEndPair rejects a window with one end missing.
 func requireEventStartEndPair(startAt, endAt *int64) error {
 	if err := calendarrules.RequireEventStartEndPair(startAt, endAt); err != nil {

@@ -326,3 +326,39 @@ func TestCalendarCrossDemoteLeavesOneOwner(t *testing.T) {
 		require.Equal(t, 1, owners, "round %d: one owner must remain", round)
 	}
 }
+
+// TestConcurrentOccurrenceEditsShareOneOverride: edits of one occurrence
+// landing together all succeed and leave a single override row, the last
+// one rewriting the first rather than losing the unique key to it.
+func TestConcurrentOccurrenceEditsShareOneOverride(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	calID := createCalendarMut(t, tt, "Occurrence race")
+	first := time.Date(2027, time.September, 6, 10, 0, 0, 0, time.UTC)
+	evtID := createRecurringEventMut(t, tt, calID, "Race sync "+randomHex(4), first, map[string]any{"freq": "weekly"})
+
+	original := first.AddDate(0, 0, 7)
+	url := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/calendars/" + calID + "/events/" + evtID
+	var calls []raceCall
+	for i := 0; i < 4; i++ {
+		moved := original.Add(time.Duration(i+1) * time.Hour)
+		calls = append(calls, raceCall{http.MethodPatch, url, tt.AccessToken, map[string]any{
+			"scope":           "occurrence",
+			"occurrenceStart": original.Unix(),
+			"startAt":         moved.Unix(),
+			"endAt":           moved.Add(time.Hour).Unix(),
+		}})
+	}
+	statuses := raceRequests(t, calls)
+	require.Equal(t, len(calls), countStatus(statuses, http.StatusOK), "every edit of the occurrence succeeds: %v", statuses)
+
+	var n int
+	require.NoError(t, testDB.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM calendar_events o
+		   JOIN calendar_events m ON m.id = o.recurrence_parent_id
+		  WHERE m.public_id = UUID_TO_BIN(?, 0) AND o.recurrence_original_start = ?`,
+		evtID, original).Scan(&n))
+	require.Equal(t, 1, n, "the occurrence has one override row")
+}

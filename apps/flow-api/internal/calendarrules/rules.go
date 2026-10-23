@@ -35,7 +35,9 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
@@ -70,7 +72,16 @@ func RequireEventStartEndPair(startAt, endAt *int64) *apierrors.APIError {
 // passes here still passes after normalisation, and checking first means
 // an all-day request with the days inverted is refused for the reason it
 // is wrong rather than silently collapsing to one day.
+//
+// Every writer reaches this rule, so it also refuses an end the DATETIME
+// column cannot hold, through [RequireDatetime].
 func RequireEventChronology(startAt, endAt *int64) *apierrors.APIError {
+	if err := RequireDatetime("startAt", startAt); err != nil {
+		return err
+	}
+	if err := RequireDatetime("endAt", endAt); err != nil {
+		return err
+	}
 	if startAt == nil || endAt == nil {
 		return nil
 	}
@@ -78,6 +89,35 @@ func RequireEventChronology(startAt, endAt *int64) *apierrors.APIError {
 		return apierrors.New(apierrors.CalendarEventEndBeforeStart)
 	}
 	return nil
+}
+
+// RequireEventShape refuses a row the calendar_events CHECKs reject on
+// columns other than the window: a series or a reminder on an undated
+// event (chk_calendar_events_recurrence_requires_start,
+// chk_calendar_events_notification_requires_start) and a recurring
+// milestone (chk_calendar_events_milestone_no_recurrence). The arguments
+// describe the row as it will be written, after the caller's merge of the
+// request over what is stored.
+func RequireEventShape(kind string, dated, recurring, reminded bool) *apierrors.APIError {
+	switch {
+	case recurring && !dated:
+		return apierrors.New(apierrors.CalendarEventRecurrenceRequiresStart)
+	case reminded && !dated:
+		return apierrors.New(apierrors.CalendarEventNotificationRequiresStart)
+	case recurring && kind == string(calendar.CalendarEventsKindMilestone):
+		return apierrors.New(apierrors.CalendarEventMilestoneRecurrenceNotAllowed)
+	}
+	return nil
+}
+
+// RequireDatetime refuses a unix-seconds member a DATETIME column cannot
+// hold, naming it, so the value is answered as a validation error rather
+// than reaching the write as a store failure. Nil is an omitted member.
+func RequireDatetime(field string, v *int64) *apierrors.APIError {
+	if v == nil || dbtype.DatetimeRepresentable(*v) {
+		return nil
+	}
+	return apierrors.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", field)
 }
 
 // RequireValidTimezone is the single check a client-supplied IANA

@@ -188,11 +188,11 @@ func DeleteTaskEventLink(deps Deps) func(context.Context, *DeleteTaskEventLinkIn
 		})
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return nil, httpErr(apierrors.CalendarEventNotFound)
+			return nil, httpErr(apierrors.WsTaskEventLinkNotFound)
 		case err != nil:
 			return nil, httpErr(apierrors.InternalUnexpected)
 		case link.TaskID != task.ID:
-			return nil, httpErr(apierrors.CalendarEventNotFound)
+			return nil, httpErr(apierrors.WsTaskEventLinkNotFound)
 		}
 
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.DeleteTaskEventLink", nil, func(ctx context.Context, tx *dbretry.Tx) error {
@@ -203,7 +203,7 @@ func DeleteTaskEventLink(deps Deps) func(context.Context, *DeleteTaskEventLinkIn
 			})
 		}); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, httpErr(apierrors.CalendarEventNotFound)
+				return nil, httpErr(apierrors.WsTaskEventLinkNotFound)
 			}
 			return nil, translateItemkitTaskError(err)
 		}

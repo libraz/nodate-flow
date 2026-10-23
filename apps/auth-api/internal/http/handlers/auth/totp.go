@@ -13,10 +13,10 @@
 // login is still single-factor. DELETE /me/totp disables 2FA after
 // password reverification.
 //
-// Login-time 2FA gating (AUTH.TOTP.CODE_REQUIRED on POST /auth/login)
-// is intentionally out of scope for this slice and tracked as a
-// follow-up; enrollment alone is safe because login ignores the
-// secret until the gating lands.
+// Once confirmed, POST /auth/login answers a correct password with
+// step "totp_required" and a short-lived challenge token instead of a
+// session; POST /auth/login/totp exchanges the challenge plus a code
+// for the session (see login.go).
 package auth
 
 import (

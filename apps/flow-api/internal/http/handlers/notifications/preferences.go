@@ -45,7 +45,7 @@ func UpdatePreferences(deps Deps) func(context.Context, *UpdatePreferencesInput)
 			return nil, err
 		}
 		for _, p := range in.Body.Preferences {
-			if !prefs.ValidCategory(p.EventCategory) || !deliverableChannel(p.Channel) {
+			if !prefs.ValidCategory(p.EventCategory) || !prefs.Deliverable(p.Channel) {
 				return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 			}
 		}
@@ -88,25 +88,6 @@ func UpdatePreferences(deps Deps) func(context.Context, *UpdatePreferencesInput)
 		out.Body.Preferences = effectiveMatrix(stored)
 		return out, nil
 	}
-}
-
-// deliverableChannels are the channels a preference may be written for:
-// those with a transport behind them. Only the in-app bell has one; an
-// email or push row would be stored, never sent, and listed in the bell
-// a second time, so a write naming either is refused until a sender
-// exists. The matrix still renders them, at their off default.
-var deliverableChannels = []generated.NotificationsChannel{
-	generated.NotificationsChannelInApp,
-}
-
-// deliverableChannel reports whether s names one of deliverableChannels.
-func deliverableChannel(s string) bool {
-	for _, c := range deliverableChannels {
-		if string(c) == s {
-			return true
-		}
-	}
-	return false
 }
 
 // selfInWorkspace pulls the actor and the resolved workspace out of the

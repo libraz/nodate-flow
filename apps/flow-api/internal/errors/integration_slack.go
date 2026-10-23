@@ -4,10 +4,6 @@ package errors
 
 // Error codes and specs.
 var (
-	// INTEGRATION.SLACK.RATE_LIMITED — Slack API rate limit exceeded
-	IntegrationSlackRateLimited = &Spec{Code: "INTEGRATION.SLACK.RATE_LIMITED", Status: 429, Message: "Slack API rate limit exceeded", Description: "Returned when Slack returns a 429 due to method-level rate limiting.", UserAction: "Wait for the Retry-After interval before retrying."}
-	// INTEGRATION.SLACK.TOKEN_INVALID — Slack API token is invalid
-	IntegrationSlackTokenInvalid = &Spec{Code: "INTEGRATION.SLACK.TOKEN_INVALID", Status: 401, Message: "Slack API token is invalid", Description: "Returned when Slack rejects the integration's bot or user token.", UserAction: "Re-authorize the Slack integration."}
 	// INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE — Slack webhook payload could not be parsed
 	IntegrationSlackWebhookPayloadUnparseable = &Spec{Code: "INTEGRATION.SLACK.WEBHOOK_PAYLOAD_UNPARSEABLE", Status: 400, Message: "Slack webhook payload could not be parsed", Description: "Returned when the Slack event payload is malformed or missing required fields.", UserAction: "Check the Slack app event subscription configuration."}
 	// INTEGRATION.SLACK.WEBHOOK_SIGNATURE_MALFORMED — Slack webhook signature is malformed

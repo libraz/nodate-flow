@@ -161,7 +161,7 @@ export interface paths {
         };
         /**
          * List instance settings
-         * @description Returns every mutable instance-level setting (registration toggles, password policy, etc.) for the admin Settings panel.
+         * @description Returns the stored instance-level settings whose key the server accepts. No key is accepted today: registration, MFA policy and workspace/member limits are governed by deployment configuration, so the list is empty.
          */
         get: operations["admin-list-settings"];
         put?: never;
@@ -171,7 +171,7 @@ export interface paths {
         head?: never;
         /**
          * Update instance settings
-         * @description Patches one or more instance-level settings. Each settings change is recorded in the audit log and takes effect immediately for new requests.
+         * @description Patches instance-level settings whose key the server accepts. No key is accepted today, so any key is refused with 400 INSTANCE.SETTINGS.INVALID_KEY; an accepted change would be recorded in the audit log.
          */
         patch: operations["admin-patch-settings"];
         trace?: never;
@@ -663,7 +663,7 @@ export interface paths {
         put?: never;
         /**
          * Archive an inbox item
-         * @description Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.
+         * @description Removes the named inbox item from the active list. Returns 404 WS.INBOX.NOT_FOUND when the item is already archived or does not exist.
          */
         post: operations["inbox-archive"];
         delete?: never;
@@ -815,7 +815,7 @@ export interface paths {
         put?: never;
         /**
          * Add an item to favorites
-         * @description Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.
+         * @description Pins the supplied target (kind + id) to the caller's favorites list. Returns 409 WS.FAVORITE.ALREADY_EXISTS when the item is already pinned.
          */
         post: operations["favorites-create"];
         delete?: never;
@@ -836,7 +836,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an item from favorites
-         * @description Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.
+         * @description Unpins the named favorite. Returns 404 WS.FAVORITE.NOT_FOUND when the favorite is already unpinned.
          */
         delete: operations["favorites-delete"];
         options?: never;
@@ -1379,7 +1379,7 @@ export interface paths {
         put?: never;
         /**
          * Accept or dismiss a relation suggestion
-         * @description Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Idempotent.
+         * @description Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Returns 409 RELATION.SUGGESTION.ALREADY_RESOLVED when the suggestion was already decided.
          */
         post: operations["relation-suggestions-resolve"];
         delete?: never;
@@ -1490,7 +1490,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-disable a task
-         * @description Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.
+         * @description Marks the task as removed so it disappears from active views without erasing data. Returns 404 WS.TASK.NOT_FOUND once the task is removed. Use /unarchive on archived tasks; this endpoint is the destructive variant.
          */
         delete: operations["tasks-disable"];
         options?: never;
@@ -1538,7 +1538,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an actor from a task
-         * @description Detaches the named actor from the task. Idempotent.
+         * @description Detaches the named actor from the task. Returns 404 WS.TASK_ACTOR.NOT_FOUND when the actor is already detached.
          */
         delete: operations["tasks-actors-remove"];
         options?: never;
@@ -1702,7 +1702,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete an attachment from a task
-         * @description Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.
+         * @description Marks the attachment as removed and best-effort deletes the underlying object. Returns 404 WS.TASK.NOT_FOUND when the attachment is already removed.
          */
         delete: operations["tasks-attachments-delete"];
         options?: never;
@@ -1786,7 +1786,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a comment (author or workspace admin)
-         * @description Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.
+         * @description Removes the named comment. Permitted to the comment author or any workspace admin. Returns 404 WS.COMMENT.NOT_FOUND when the comment is already removed.
          */
         delete: operations["tasks-comments-delete"];
         options?: never;
@@ -2097,7 +2097,7 @@ export interface paths {
         put?: never;
         /**
          * Attach a label to a task
-         * @description Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.
+         * @description Attaches an existing workspace label to the task. Returns 409 WS.LABEL.ALREADY_ATTACHED when the label is already attached.
          */
         post: operations["tasks-labels-add"];
         delete?: never;
@@ -2221,7 +2221,7 @@ export interface paths {
         put?: never;
         /**
          * Add a reaction to a task
-         * @description Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.
+         * @description Records a single emoji reaction from the caller on the task. Returns 409 WS.REACTION.ALREADY_EXISTS when the caller already reacted with that glyph.
          */
         post: operations["tasks-reactions-create"];
         delete?: never;
@@ -2242,7 +2242,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a reaction from a task
-         * @description Removes the caller's reaction from the task. Idempotent: deleting an already-removed reaction returns 200.
+         * @description Removes the caller's reaction from the task. Returns 404 WS.REACTION.NOT_FOUND when the reaction is already removed.
          */
         delete: operations["tasks-reactions-delete"];
         options?: never;
@@ -2431,13 +2431,13 @@ export interface paths {
         };
         /**
          * List AI agents for a workspace
-         * @description Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.
+         * @description Lists the AI agents registered in the workspace, offset-paginated, with each agent's model, schedule kind, paused flag, and event triggers. Backs the Agents panel.
          */
         get: operations["ai-agents-list"];
         put?: never;
         /**
          * Create a new AI agent
-         * @description Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.
+         * @description Registers a new AI agent in the workspace with name, prompt, model, schedule kind (default disabled), and event triggers. The agent is created unpaused; with the default disabled schedule and no event triggers nothing runs until one is configured.
          */
         post: operations["ai-agents-create"];
         delete?: never;
@@ -2461,7 +2461,7 @@ export interface paths {
         head?: never;
         /**
          * Replace an AI agent's event_trigger_types list
-         * @description Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.
+         * @description Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; interval and manual triggers continue to work.
          */
         patch: operations["ai-agent-event-triggers-update"];
         trace?: never;
@@ -2501,7 +2501,7 @@ export interface paths {
         head?: never;
         /**
          * Update an AI agent's schedule_kind trigger mode
-         * @description Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.
+         * @description Updates the agent's schedule_kind (disabled / interval / on_event / manual). Takes effect on the next scheduler tick.
          */
         patch: operations["ai-agent-schedule-update"];
         trace?: never;
@@ -2643,7 +2643,7 @@ export interface paths {
         };
         /**
          * List redacted LLM call audit rows for the AI reasoning panel
-         * @description Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.
+         * @description Returns a limit/offset-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.
          */
         get: operations["ai-invocations-list"];
         put?: never;
@@ -2757,7 +2757,7 @@ export interface paths {
         head?: never;
         /**
          * Rotate an LLM provider API key
-         * @description Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.
+         * @description Encrypts and stores a new API key for the provider. The old key is overwritten in place; nothing else about the provider changes.
          */
         patch: operations["ai-providers-patch"];
         trace?: never;
@@ -3134,7 +3134,7 @@ export interface paths {
         post?: never;
         /**
          * Delete an event
-         * @description Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.
+         * @description Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Returns 404 CALENDAR.EVENT.NOT_FOUND when the event is already removed.
          */
         delete: operations["events-delete"];
         options?: never;
@@ -3198,7 +3198,7 @@ export interface paths {
         post?: never;
         /**
          * Delete an attachment from an event
-         * @description Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.
+         * @description Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Returns 404 CALENDAR.ATTACHMENT.NOT_FOUND when the attachment is already removed.
          */
         delete: operations["attachments-delete"];
         options?: never;
@@ -3386,7 +3386,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a checklist item
-         * @description Removes the named checklist item. Idempotent.
+         * @description Removes the named checklist item. Returns 404 CALENDAR.CHECKLIST.ITEM_NOT_FOUND when the item is already removed.
          */
         delete: operations["checklist-delete"];
         options?: never;
@@ -3570,7 +3570,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a memo
-         * @description Removes the memo. Idempotent.
+         * @description Removes the memo. Returns 404 CALENDAR.MEMO.NOT_FOUND when the memo is already removed.
          */
         delete: operations["memos-delete"];
         options?: never;
@@ -3662,7 +3662,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete a dashboard widget
-         * @description Marks the widget as removed without erasing config so an undo affordance can restore it. Idempotent.
+         * @description Marks the widget as removed without erasing config so an undo affordance can restore it. Returns 404 WS.DASHBOARD_WIDGET.NOT_FOUND when the widget is already removed.
          */
         delete: operations["dashboard-widgets-delete"];
         options?: never;
@@ -3783,13 +3783,13 @@ export interface paths {
         };
         /**
          * List import jobs for the workspace
-         * @description Returns recent import jobs in the workspace with their status (pending, running, succeeded, failed, cancelled). Backs the import history panel.
+         * @description Returns recent import jobs in the workspace with their status (pending, running, completed, failed, cancelled). Backs the import history panel.
          */
         get: operations["imports-list"];
         put?: never;
         /**
          * Create an import job
-         * @description Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.
+         * @description Queues an import job. Only the csv source runs today, with the file content in configJson.csv; github, jira and linear jobs are accepted and finish as failed because they have no connector yet. A job targeting a project needs the project editor role, and a project holds at most one pending or running job (WS.IMPORT.ALREADY_RUNNING otherwise). The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.
          */
         post: operations["imports-create"];
         delete?: never;
@@ -3807,7 +3807,7 @@ export interface paths {
         };
         /**
          * Get a single import job
-         * @description Returns the full state of one import job: progress counters, error log, summary stats. Used by the in-progress poller and the post-run report.
+         * @description Returns the full state of one import job: status, progress counters, error log and start / completion times. Used by the in-progress poller and the post-run report.
          */
         get: operations["imports-get"];
         put?: never;
@@ -3829,7 +3829,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel a pending or running import job
-         * @description Marks the job as cancelled so the worker stops on its next checkpoint. Already-imported rows remain; partial state is documented in the import report.
+         * @description Marks a pending or running job as cancelled so the worker stops at its next checkpoint. Tasks already imported remain; the counters show how far the job got.
          */
         post: operations["imports-cancel"];
         delete?: never;
@@ -4058,7 +4058,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-disable a label
-         * @description Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Idempotent.
+         * @description Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Returns 404 WS.LABEL.NOT_FOUND when the label is already disabled.
          */
         delete: operations["labels-disable"];
         options?: never;
@@ -4117,7 +4117,7 @@ export interface paths {
         head?: never;
         /**
          * Update a saved view
-         * @description Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.
+         * @description Updates a lens's name, description, filter, sort, grouping or default flag. Omitted fields are left unchanged. Re-validates the JSON before persistence so an invalid update cannot wedge the view.
          */
         patch: operations["lenses-update"];
         trace?: never;
@@ -4198,7 +4198,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke an MCP bearer token
-         * @description Marks the token as revoked so future /mcp requests carrying it are rejected. Idempotent.
+         * @description Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.
          */
         delete: operations["mcp-tokens-delete"];
         options?: never;
@@ -4378,14 +4378,14 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete a page
-         * @description Marks the page as deleted so it disappears from the tree without losing content. Idempotent.
+         * @description Marks the page as deleted so it and its descendants disappear from the tree without losing content. Deleting an already-deleted page returns not found.
          */
         delete: operations["pages-delete"];
         options?: never;
         head?: never;
         /**
          * Update a page
-         * @description Updates page title and Markdown body. Optionally re-parents the page within the tree.
+         * @description Updates the named fields of a page: title, Markdown body, project and parent. Omitted fields are left unchanged; an empty projectId or parentPageId unsets the link.
          */
         patch: operations["pages-update"];
         trace?: never;
@@ -4474,7 +4474,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a public share page (admin or owner only)
-         * @description Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.
+         * @description Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Returns 404 SHARE.SHARE.NOT_FOUND when the share is already removed.
          */
         delete: operations["public-shares-delete"];
         options?: never;
@@ -4538,7 +4538,7 @@ export interface paths {
         post?: never;
         /**
          * Detach an event from a public share page
-         * @description Unpublishes the named event from the share page without deleting the event itself. Idempotent.
+         * @description Unpublishes the named event from the share page without deleting the event itself. Returns 404 SHARE.SHARE_EVENT.NOT_FOUND when the event is not on the share.
          */
         delete: operations["public-shares-events-detach"];
         options?: never;
@@ -4706,7 +4706,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-delete a timebox
-         * @description Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Idempotent.
+         * @description Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Returns 404 TIMEBOX.TIMEBOX.NOT_FOUND when the timebox is already removed.
          */
         delete: operations["timeboxes-delete"];
         options?: never;
@@ -4774,7 +4774,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a task from a timebox
-         * @description Detaches the task from the timebox without affecting the task itself. Idempotent.
+         * @description Detaches the task from the timebox without affecting the task itself. Returns 404 TIMEBOX.TASK.NOT_FOUND when the task is not attached.
          */
         delete: operations["timeboxes-remove-task"];
         options?: never;
@@ -4879,7 +4879,7 @@ export interface paths {
         };
         /**
          * List delivery log for a webhook subscription
-         * @description Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.
+         * @description Returns recent delivery attempts for the subscription with event type, status, HTTP status code, attempt counts, and delivered, failed and created timestamps. Used by the webhook detail panel for diagnostics.
          */
         get: operations["webhooks-deliveries-list"];
         put?: never;
@@ -4901,7 +4901,7 @@ export interface paths {
         put?: never;
         /**
          * Send a test ping delivery
-         * @description Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.
+         * @description Queues a test ping delivery for the subscription and returns its delivery id. The worker sends it signed with the subscription's secret; read its outcome from the delivery log.
          */
         post: operations["webhooks-test-delivery"];
         delete?: never;
@@ -5814,7 +5814,7 @@ export interface components {
             systemPrompt: string;
             /**
              * Format: int32
-             * @description Sampling temperature x100 (default 100)
+             * @description Sampling temperature x100 (default 100; at most 100 for Anthropic models)
              */
             temperature?: number;
         };
@@ -6267,7 +6267,7 @@ export interface components {
             readonly $schema?: string;
             /** @description Human-readable description */
             description: string;
-            /** @description JSON array of event type patterns */
+            /** @description JSON array of event kinds matched exactly (for example task.transition.complete), or ["*"] for every kind */
             eventTypes: unknown;
             /** @description Target URL for webhook delivery */
             url: string;
@@ -9235,9 +9235,6 @@ export interface components {
              * @example https://example.com/schemas/Record.json
              */
             readonly $schema?: string;
-            aiReasoning?: string;
-            /** Format: double */
-            aiScore?: number;
             body?: string;
             /** Format: int64 */
             createdAt: number;
@@ -9553,7 +9550,7 @@ export interface components {
             name: string;
             /**
              * Format: int64
-             * @description Unix seconds of last AI safety check
+             * @description Reserved for an AI safety check that does not run yet; always absent
              */
             safetyCheckedAt?: number;
             /**
@@ -10485,7 +10482,7 @@ export interface components {
              * @example https://example.com/schemas/UpdateLensBody.json
              */
             readonly $schema?: string;
-            /** @description Optional public-facing description shown on the share page; pass null to clear */
+            /** @description Optional public-facing description shown on the share page; omit to keep, empty string to clear */
             description?: string;
             filter?: unknown;
             groupBy?: string;
@@ -10551,9 +10548,9 @@ export interface components {
              */
             readonly $schema?: string;
             body?: string;
-            /** @description Parent page public id; null to unset */
+            /** @description Parent page public id; omit to keep, empty string to unset */
             parentPageId?: string;
-            /** @description Project public id; null to unset */
+            /** @description Project public id; omit to keep, empty string to unset */
             projectId?: string;
             title?: string;
         };
@@ -19017,7 +19014,7 @@ export interface operations {
     "intake-list": {
         parameters: {
             query?: {
-                /** @description Filter by triage status: pending, accepted, rejected, snoozed, duplicate */
+                /** @description Filter by triage status: pending, accepted, rejected, snoozed, duplicate. A snoozed item whose snoozeUntil has passed lists under pending. */
                 status?: string;
                 /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
                 cursor?: string;

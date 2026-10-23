@@ -82,8 +82,8 @@ func TestValidateRecurrenceRule(t *testing.T) {
 			if (got != nil) != tt.wantErr {
 				t.Fatalf("validateRecurrenceRule(%v) = %v, wantErr = %v", tt.rule, got, tt.wantErr)
 			}
-			if got != nil && got != apierrors.ValidationBodyFieldInvalid {
-				t.Fatalf("validateRecurrenceRule(%v) = %v, want ValidationBodyFieldInvalid", tt.rule, got)
+			if got != nil && got != apierrors.CalendarEventRecurrenceRuleInvalid {
+				t.Fatalf("validateRecurrenceRule(%v) = %v, want CalendarEventRecurrenceRuleInvalid", tt.rule, got)
 			}
 		})
 	}

@@ -48,6 +48,13 @@ var Channels = []generated.NotificationsChannel{
 	generated.NotificationsChannelPush,
 }
 
+// DeliverableChannels are the channels with a transport behind them, and
+// so the only ones a preference may be written for. An email or push row
+// would be stored and never sent.
+var DeliverableChannels = []generated.NotificationsChannel{
+	generated.NotificationsChannelInApp,
+}
+
 // Pref is one stored notification_preferences row reduced to the two
 // fields channel resolution needs.
 type Pref struct {
@@ -102,6 +109,16 @@ func ValidCategory(s string) bool {
 // ValidChannel reports whether s names a delivery channel.
 func ValidChannel(s string) bool {
 	for _, c := range Channels {
+		if string(c) == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Deliverable reports whether s names one of [DeliverableChannels].
+func Deliverable(s string) bool {
+	for _, c := range DeliverableChannels {
 		if string(c) == s {
 			return true
 		}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -86,6 +87,11 @@ func requireOccurrenceScope(
 	evt calendar.FindCalendarEventByPublicIdRow,
 	parentID sql.NullInt32,
 ) error {
+	if scope != calendaroccurrence.ScopeSeries {
+		if err := calendarrules.RequireDatetime("occurrenceStart", &occurrenceStart); err != nil {
+			return err
+		}
+	}
 	if spec, _ := calendaroccurrence.ScopeRefusal(
 		scope, occurrenceStart,
 		calendaroccurrence.HasRule(evt.RecurrenceRule), parentID.Valid); spec != nil {

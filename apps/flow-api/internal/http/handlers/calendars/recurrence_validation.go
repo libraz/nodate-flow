@@ -14,10 +14,9 @@ import (
 // one route and refused on another is a rule every reader downstream has
 // to treat as the worst case it could be.
 //
-// A rejected rule surfaces as apierrors.ValidationBodyFieldInvalid (422).
-// The catalog has no recurrence-specific code, and the failure is exactly
-// what that one describes: a body field outside the range its schema
-// allows.
+// A rejected rule surfaces as CALENDAR.EVENT.RECURRENCE_RULE_INVALID, the
+// catalog's code for it; a rejected exception list as
+// VALIDATION.BODY.FIELD_INVALID, which has no more specific code.
 
 // recurrenceRuleBytes unwraps the raw body member. A nil pointer and an
 // empty value both mean the field was not sent, which the grammar reads
@@ -33,7 +32,7 @@ func recurrenceRuleBytes(data *json.RawMessage) []byte {
 // act on, before the raw JSON is persisted.
 func validateRecurrenceRule(data *json.RawMessage) *apierrors.Spec {
 	if err := recurrence.ValidateRule(recurrenceRuleBytes(data)); err != nil {
-		return apierrors.ValidationBodyFieldInvalid
+		return apierrors.CalendarEventRecurrenceRuleInvalid
 	}
 	return nil
 }

@@ -211,6 +211,9 @@ func Snooze(deps Deps) func(context.Context, *SnoozeInboxInput) (*SnoozeInboxOut
 		if in.Body.SnoozeUntil <= 0 {
 			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
+		if err := handlerutil.CheckDatetimeField("snoozeUntil", &in.Body.SnoozeUntil); err != nil {
+			return nil, err
+		}
 		until := handlerutil.UnixToTime(in.Body.SnoozeUntil)
 		// Not an existence check: snoozing to the timestamp the item
 		// already carries changes no column and MySQL counts zero.

@@ -41,7 +41,7 @@ func RegisterAuthScoped(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/relation-suggestions/{suggestionId}/resolve",
 		Summary:     "Accept or dismiss a relation suggestion",
-		Description: "Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Idempotent.",
+		Description: "Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Returns 409 RELATION.SUGGESTION.ALREADY_RESOLVED when the suggestion was already decided.",
 		Tags:        []string{"Tasks"},
 	}, Resolve(deps))
 }

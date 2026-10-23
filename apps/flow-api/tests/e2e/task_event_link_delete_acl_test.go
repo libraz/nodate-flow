@@ -91,7 +91,7 @@ func TestDeleteTaskEventLinkIsBoundToThePathTask(t *testing.T) {
 	// carry another task's link.
 	status, body := doJSONStatus(t, http.MethodDelete, linkURL(editableTask, hiddenLink),
 		editor.AccessToken, nil)
-	requireDenied(t, status, body, http.StatusNotFound, "CALENDAR.EVENT.NOT_FOUND",
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK_EVENT_LINK.NOT_FOUND",
 		"unlink of a link on a task the caller may not read, through a task they may write")
 	assert.True(t, linkIsLive(t, hiddenLink),
 		"a refused unlink must leave the link on the table")
@@ -101,7 +101,7 @@ func TestDeleteTaskEventLinkIsBoundToThePathTask(t *testing.T) {
 	// well but did not name in the path.
 	status, body = doJSONStatus(t, http.MethodDelete, linkURL(editableTask, sharedLink),
 		editor.AccessToken, nil)
-	requireDenied(t, status, body, http.StatusNotFound, "CALENDAR.EVENT.NOT_FOUND",
+	requireDenied(t, status, body, http.StatusNotFound, "WS.TASK_EVENT_LINK.NOT_FOUND",
 		"unlink of another readable task's link through the wrong path")
 	assert.True(t, linkIsLive(t, sharedLink),
 		"a link named under the wrong task must survive")
@@ -151,7 +151,7 @@ func TestDeleteTaskEventLinkRefusalMatchesAnUnknownLink(t *testing.T) {
 	require.JSONEq(t, string(unknownBody), string(mismatchBody),
 		"the two refusals must be the same response; body=%s", string(mismatchBody))
 	requireDenied(t, mismatchStatus, mismatchBody, http.StatusNotFound,
-		"CALENDAR.EVENT.NOT_FOUND", "unlink of a link belonging to another task")
+		"WS.TASK_EVENT_LINK.NOT_FOUND", "unlink of a link belonging to another task")
 
 	assert.True(t, linkIsLive(t, otherLink),
 		"the other task's link must survive both refusals")

@@ -49,24 +49,3 @@ resources:
         message_zh: "Slack Webhook 载荷无法解析"
         description: "Returned when the Slack event payload is malformed or missing required fields."
         userAction: "Check the Slack app event subscription configuration."
-
-  api:
-    breadcrumb: "Integration > Slack > API"
-    errors:
-      token_invalid:
-        code: INTEGRATION.SLACK.TOKEN_INVALID
-        status: 401
-        message: "Slack API token is invalid"
-        message_ja: "Slack API トークンが無効です"
-        message_zh: "Slack API 令牌无效"
-        description: "Returned when Slack rejects the integration's bot or user token."
-        userAction: "Re-authorize the Slack integration."
-
-      rate_limited:
-        code: INTEGRATION.SLACK.RATE_LIMITED
-        status: 429
-        message: "Slack API rate limit exceeded"
-        message_ja: "Slack API のレート制限を超えました"
-        message_zh: "Slack API 速率限制已超过"
-        description: "Returned when Slack returns a 429 due to method-level rate limiting."
-        userAction: "Wait for the Retry-After interval before retrying."

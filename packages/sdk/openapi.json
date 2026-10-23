@@ -1920,7 +1920,7 @@
             "type": "string"
           },
           "temperature": {
-            "description": "Sampling temperature x100 (default 100)",
+            "description": "Sampling temperature x100 (default 100; at most 100 for Anthropic models)",
             "format": "int32",
             "maximum": 200,
             "minimum": 0,
@@ -2799,7 +2799,7 @@
             "type": "string"
           },
           "eventTypes": {
-            "description": "JSON array of event type patterns"
+            "description": "JSON array of event kinds matched exactly (for example task.transition.complete), or [\"*\"] for every kind"
           },
           "url": {
             "description": "Target URL for webhook delivery",
@@ -9301,13 +9301,6 @@
             "readOnly": true,
             "type": "string"
           },
-          "aiReasoning": {
-            "type": "string"
-          },
-          "aiScore": {
-            "format": "double",
-            "type": "number"
-          },
           "body": {
             "type": "string"
           },
@@ -9929,7 +9922,7 @@
             "type": "string"
           },
           "safetyCheckedAt": {
-            "description": "Unix seconds of last AI safety check",
+            "description": "Reserved for an AI safety check that does not run yet; always absent",
             "format": "int64",
             "type": "integer"
           },
@@ -12004,7 +11997,7 @@
             "type": "string"
           },
           "description": {
-            "description": "Optional public-facing description shown on the share page; pass null to clear",
+            "description": "Optional public-facing description shown on the share page; omit to keep, empty string to clear",
             "maxLength": 500,
             "type": "string"
           },
@@ -12125,11 +12118,11 @@
             "type": "string"
           },
           "parentPageId": {
-            "description": "Parent page public id; null to unset",
+            "description": "Parent page public id; omit to keep, empty string to unset",
             "type": "string"
           },
           "projectId": {
-            "description": "Project public id; null to unset",
+            "description": "Project public id; omit to keep, empty string to unset",
             "type": "string"
           },
           "title": {
@@ -13509,7 +13502,7 @@
     },
     "/admin/settings": {
       "get": {
-        "description": "Returns every mutable instance-level setting (registration toggles, password policy, etc.) for the admin Settings panel.",
+        "description": "Returns the stored instance-level settings whose key the server accepts. No key is accepted today: registration, MFA policy and workspace/member limits are governed by deployment configuration, so the list is empty.",
         "operationId": "admin-list-settings",
         "responses": {
           "200": {
@@ -13542,7 +13535,7 @@
         "tags": ["Admin"]
       },
       "patch": {
-        "description": "Patches one or more instance-level settings. Each settings change is recorded in the audit log and takes effect immediately for new requests.",
+        "description": "Patches instance-level settings whose key the server accepts. No key is accepted today, so any key is refused with 400 INSTANCE.SETTINGS.INVALID_KEY; an accepted change would be recorded in the audit log.",
         "operationId": "admin-patch-settings",
         "requestBody": {
           "content": {
@@ -15049,7 +15042,7 @@
     },
     "/inbox/{id}/archive": {
       "post": {
-        "description": "Removes the named inbox item from the active list. Idempotent: archiving an already-archived item returns 200.",
+        "description": "Removes the named inbox item from the active list. Returns 404 WS.INBOX.NOT_FOUND when the item is already archived or does not exist.",
         "operationId": "inbox-archive",
         "parameters": [
           {
@@ -15546,7 +15539,7 @@
         "tags": ["Tasks"]
       },
       "post": {
-        "description": "Pins the supplied target (kind + id) to the caller's favorites list. Idempotent: pinning an already-favorited item returns the existing row.",
+        "description": "Pins the supplied target (kind + id) to the caller's favorites list. Returns 409 WS.FAVORITE.ALREADY_EXISTS when the item is already pinned.",
         "operationId": "favorites-create",
         "requestBody": {
           "content": {
@@ -15591,7 +15584,7 @@
     },
     "/me/favorites/{id}": {
       "delete": {
-        "description": "Unpins the named favorite. Idempotent: returns 200 even if the favorite no longer exists.",
+        "description": "Unpins the named favorite. Returns 404 WS.FAVORITE.NOT_FOUND when the favorite is already unpinned.",
         "operationId": "favorites-delete",
         "parameters": [
           {
@@ -17249,7 +17242,7 @@
     },
     "/relation-suggestions/{suggestionId}/resolve": {
       "post": {
-        "description": "Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Idempotent.",
+        "description": "Records the human decision on the suggestion: accept (creates the actual relation row) or dismiss (suppresses it from future listings). Returns 409 RELATION.SUGGESTION.ALREADY_RESOLVED when the suggestion was already decided.",
         "operationId": "relation-suggestions-resolve",
         "parameters": [
           {
@@ -17620,7 +17613,7 @@
     },
     "/tasks/{id}": {
       "delete": {
-        "description": "Marks the task as removed so it disappears from active views without erasing data. Idempotent. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
+        "description": "Marks the task as removed so it disappears from active views without erasing data. Returns 404 WS.TASK.NOT_FOUND once the task is removed. Use /unarchive on archived tasks; this endpoint is the destructive variant.",
         "operationId": "tasks-disable",
         "parameters": [
           {
@@ -17882,7 +17875,7 @@
     },
     "/tasks/{id}/actors/{actorId}": {
       "delete": {
-        "description": "Detaches the named actor from the task. Idempotent.",
+        "description": "Detaches the named actor from the task. Returns 404 WS.TASK_ACTOR.NOT_FOUND when the actor is already detached.",
         "operationId": "tasks-actors-remove",
         "parameters": [
           {
@@ -18404,7 +18397,7 @@
     },
     "/tasks/{id}/attachments/{aid}": {
       "delete": {
-        "description": "Marks the attachment as removed and best-effort deletes the underlying object. Idempotent.",
+        "description": "Marks the attachment as removed and best-effort deletes the underlying object. Returns 404 WS.TASK.NOT_FOUND when the attachment is already removed.",
         "operationId": "tasks-attachments-delete",
         "parameters": [
           {
@@ -18694,7 +18687,7 @@
     },
     "/tasks/{id}/comments/{cid}": {
       "delete": {
-        "description": "Removes the named comment. Permitted to the comment author or any workspace admin. Idempotent.",
+        "description": "Removes the named comment. Permitted to the comment author or any workspace admin. Returns 404 WS.COMMENT.NOT_FOUND when the comment is already removed.",
         "operationId": "tasks-comments-delete",
         "parameters": [
           {
@@ -19616,7 +19609,7 @@
         "tags": ["Labels"]
       },
       "post": {
-        "description": "Attaches an existing workspace label to the task. Idempotent: re-attaching a label is a no-op.",
+        "description": "Attaches an existing workspace label to the task. Returns 409 WS.LABEL.ALREADY_ATTACHED when the label is already attached.",
         "operationId": "tasks-labels-add",
         "parameters": [
           {
@@ -20034,7 +20027,7 @@
         "tags": ["Tasks"]
       },
       "post": {
-        "description": "Records a single emoji reaction from the caller on the task. Idempotent per (task, user, glyph): a duplicate add returns the existing row.",
+        "description": "Records a single emoji reaction from the caller on the task. Returns 409 WS.REACTION.ALREADY_EXISTS when the caller already reacted with that glyph.",
         "operationId": "tasks-reactions-create",
         "parameters": [
           {
@@ -20091,7 +20084,7 @@
     },
     "/tasks/{id}/reactions/{reactionId}": {
       "delete": {
-        "description": "Removes the caller's reaction from the task. Idempotent: deleting an already-removed reaction returns 200.",
+        "description": "Removes the caller's reaction from the task. Returns 404 WS.REACTION.NOT_FOUND when the reaction is already removed.",
         "operationId": "tasks-reactions-delete",
         "parameters": [
           {
@@ -20772,7 +20765,7 @@
     },
     "/workspaces/{wsId}/ai/agents": {
       "get": {
-        "description": "Lists every AI agent registered in the workspace with status, schedule, and last-run summary. Backs the Agents panel.",
+        "description": "Lists the AI agents registered in the workspace, offset-paginated, with each agent's model, schedule kind, paused flag, and event triggers. Backs the Agents panel.",
         "operationId": "ai-agents-list",
         "parameters": [
           {
@@ -20838,7 +20831,7 @@
         "tags": ["Public"]
       },
       "post": {
-        "description": "Registers a new AI agent in the workspace with name, prompt, schedule, and event triggers. The agent starts paused so the operator can review configuration before unpausing.",
+        "description": "Registers a new AI agent in the workspace with name, prompt, model, schedule kind (default disabled), and event triggers. The agent is created unpaused; with the default disabled schedule and no event triggers nothing runs until one is configured.",
         "operationId": "ai-agents-create",
         "parameters": [
           {
@@ -20893,7 +20886,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/event-triggers": {
       "patch": {
-        "description": "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; cron and manual triggers continue to work.",
+        "description": "Replaces the set of event types that automatically wake the agent. Empty list disables event triggering entirely; interval and manual triggers continue to work.",
         "operationId": "ai-agent-event-triggers-update",
         "parameters": [
           {
@@ -21019,7 +21012,7 @@
     },
     "/workspaces/{wsId}/ai/agents/{agentId}/schedule": {
       "patch": {
-        "description": "Updates the agent's schedule_kind (cron / on-event / manual) and any associated cadence settings. Takes effect on the next scheduler tick.",
+        "description": "Updates the agent's schedule_kind (disabled / interval / on_event / manual). Takes effect on the next scheduler tick.",
         "operationId": "ai-agent-schedule-update",
         "parameters": [
           {
@@ -21486,7 +21479,7 @@
     },
     "/workspaces/{wsId}/ai/invocations": {
       "get": {
-        "description": "Returns a cursor-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
+        "description": "Returns a limit/offset-paginated page of redacted ai_invocations rows so the AI reasoning panel can show prompts, models, and costs without leaking secrets.",
         "operationId": "ai-invocations-list",
         "parameters": [
           {
@@ -21898,7 +21891,7 @@
         "tags": ["AI"]
       },
       "patch": {
-        "description": "Re-encrypts and stores a new API key for the provider, optionally updating model defaults at the same time. The old key is overwritten in place.",
+        "description": "Encrypts and stores a new API key for the provider. The old key is overwritten in place; nothing else about the provider changes.",
         "operationId": "ai-providers-patch",
         "parameters": [
           {
@@ -23249,7 +23242,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}": {
       "delete": {
-        "description": "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Idempotent.",
+        "description": "Removes the event. Linked tasks remain but their task_event_link rows are tombstoned so propagation rules stop firing. Returns 404 CALENDAR.EVENT.NOT_FOUND when the event is already removed.",
         "operationId": "events-delete",
         "parameters": [
           {
@@ -23622,7 +23615,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}": {
       "delete": {
-        "description": "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Idempotent.",
+        "description": "Marks the attachment as removed, decrements the storage_objects ref_count, and best-effort deletes the underlying blob if no references remain. Returns 404 CALENDAR.ATTACHMENT.NOT_FOUND when the attachment is already removed.",
         "operationId": "attachments-delete",
         "parameters": [
           {
@@ -24488,7 +24481,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/checklist/{itemId}": {
       "delete": {
-        "description": "Removes the named checklist item. Idempotent.",
+        "description": "Removes the named checklist item. Returns 404 CALENDAR.CHECKLIST.ITEM_NOT_FOUND when the item is already removed.",
         "operationId": "checklist-delete",
         "parameters": [
           {
@@ -25530,7 +25523,7 @@
     },
     "/workspaces/{wsId}/calendars/{calId}/memos/{memoId}": {
       "delete": {
-        "description": "Removes the memo. Idempotent.",
+        "description": "Removes the memo. Returns 404 CALENDAR.MEMO.NOT_FOUND when the memo is already removed.",
         "operationId": "memos-delete",
         "parameters": [
           {
@@ -25917,7 +25910,7 @@
     },
     "/workspaces/{wsId}/dashboard/widgets/{widgetId}": {
       "delete": {
-        "description": "Marks the widget as removed without erasing config so an undo affordance can restore it. Idempotent.",
+        "description": "Marks the widget as removed without erasing config so an undo affordance can restore it. Returns 404 WS.DASHBOARD_WIDGET.NOT_FOUND when the widget is already removed.",
         "operationId": "dashboard-widgets-delete",
         "parameters": [
           {
@@ -26401,7 +26394,7 @@
     },
     "/workspaces/{wsId}/imports": {
       "get": {
-        "description": "Returns recent import jobs in the workspace with their status (pending, running, succeeded, failed, cancelled). Backs the import history panel.",
+        "description": "Returns recent import jobs in the workspace with their status (pending, running, completed, failed, cancelled). Backs the import history panel.",
         "operationId": "imports-list",
         "parameters": [
           {
@@ -26467,7 +26460,7 @@
         "tags": ["Admin"]
       },
       "post": {
-        "description": "Submits an import job (Asana / CSV / etc.) referencing previously uploaded source data. The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.",
+        "description": "Queues an import job. Only the csv source runs today, with the file content in configJson.csv; github, jira and linear jobs are accepted and finish as failed because they have no connector yet. A job targeting a project needs the project editor role, and a project holds at most one pending or running job (WS.IMPORT.ALREADY_RUNNING otherwise). The job runs asynchronously; poll /imports/{importId} for progress. configJson is stored in plaintext and returned by the read endpoints, so it rejects any key that names a credential; connect an external service through its integration settings instead.",
         "operationId": "imports-create",
         "parameters": [
           {
@@ -26522,7 +26515,7 @@
     },
     "/workspaces/{wsId}/imports/{importId}": {
       "get": {
-        "description": "Returns the full state of one import job: progress counters, error log, summary stats. Used by the in-progress poller and the post-run report.",
+        "description": "Returns the full state of one import job: status, progress counters, error log and start / completion times. Used by the in-progress poller and the post-run report.",
         "operationId": "imports-get",
         "parameters": [
           {
@@ -26575,7 +26568,7 @@
     },
     "/workspaces/{wsId}/imports/{importId}/cancel": {
       "post": {
-        "description": "Marks the job as cancelled so the worker stops on its next checkpoint. Already-imported rows remain; partial state is documented in the import report.",
+        "description": "Marks a pending or running job as cancelled so the worker stops at its next checkpoint. Tasks already imported remain; the counters show how far the job got.",
         "operationId": "imports-cancel",
         "parameters": [
           {
@@ -26695,12 +26688,12 @@
             }
           },
           {
-            "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate",
+            "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate. A snoozed item whose snoozeUntil has passed lists under pending.",
             "explode": false,
             "in": "query",
             "name": "status",
             "schema": {
-              "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate",
+              "description": "Filter by triage status: pending, accepted, rejected, snoozed, duplicate. A snoozed item whose snoozeUntil has passed lists under pending.",
               "type": "string"
             }
           },
@@ -27527,7 +27520,7 @@
     },
     "/workspaces/{wsId}/labels/{id}": {
       "delete": {
-        "description": "Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Idempotent.",
+        "description": "Marks the label as disabled so it disappears from pickers without breaking historical task assignments. Returns 404 WS.LABEL.NOT_FOUND when the label is already disabled.",
         "operationId": "labels-disable",
         "parameters": [
           {
@@ -27925,7 +27918,7 @@
         "tags": ["Lens"]
       },
       "patch": {
-        "description": "Updates a lens's name, scope, or Lens JSON. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
+        "description": "Updates a lens's name, description, filter, sort, grouping or default flag. Omitted fields are left unchanged. Re-validates the JSON before persistence so an invalid update cannot wedge the view.",
         "operationId": "lenses-update",
         "parameters": [
           {
@@ -28215,7 +28208,7 @@
     },
     "/workspaces/{wsId}/me/mcp-tokens/{tokenId}": {
       "delete": {
-        "description": "Marks the token as revoked so future /mcp requests carrying it are rejected. Idempotent.",
+        "description": "Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
         "operationId": "mcp-tokens-delete",
         "parameters": [
           {
@@ -28904,7 +28897,7 @@
     },
     "/workspaces/{wsId}/pages/{pageId}": {
       "delete": {
-        "description": "Marks the page as deleted so it disappears from the tree without losing content. Idempotent.",
+        "description": "Marks the page as deleted so it and its descendants disappear from the tree without losing content. Deleting an already-deleted page returns not found.",
         "operationId": "pages-delete",
         "parameters": [
           {
@@ -29006,7 +28999,7 @@
         "tags": ["Public"]
       },
       "patch": {
-        "description": "Updates page title and Markdown body. Optionally re-parents the page within the tree.",
+        "description": "Updates the named fields of a page: title, Markdown body, project and parent. Omitted fields are left unchanged; an empty projectId or parentPageId unsets the link.",
         "operationId": "pages-update",
         "parameters": [
           {
@@ -29368,7 +29361,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}": {
       "delete": {
-        "description": "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Idempotent.",
+        "description": "Removes the share page so its URL stops resolving. Permitted to the share owner or workspace admins. Returns 404 SHARE.SHARE.NOT_FOUND when the share is already removed.",
         "operationId": "public-shares-delete",
         "parameters": [
           {
@@ -29679,7 +29672,7 @@
     },
     "/workspaces/{wsId}/public-shares/{shareId}/events/{evtId}": {
       "delete": {
-        "description": "Unpublishes the named event from the share page without deleting the event itself. Idempotent.",
+        "description": "Unpublishes the named event from the share page without deleting the event itself. Returns 404 SHARE.SHARE_EVENT.NOT_FOUND when the event is not on the share.",
         "operationId": "public-shares-events-detach",
         "parameters": [
           {
@@ -30262,7 +30255,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}": {
       "delete": {
-        "description": "Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Idempotent.",
+        "description": "Marks the timebox as removed. Tasks previously associated stay queryable; the link rows are tombstoned. Returns 404 TIMEBOX.TIMEBOX.NOT_FOUND when the timebox is already removed.",
         "operationId": "timeboxes-delete",
         "parameters": [
           {
@@ -30627,7 +30620,7 @@
     },
     "/workspaces/{wsId}/timeboxes/{timeboxId}/tasks/{taskId}": {
       "delete": {
-        "description": "Detaches the task from the timebox without affecting the task itself. Idempotent.",
+        "description": "Detaches the task from the timebox without affecting the task itself. Returns 404 TIMEBOX.TASK.NOT_FOUND when the task is not attached.",
         "operationId": "timeboxes-remove-task",
         "parameters": [
           {
@@ -31060,7 +31053,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/deliveries": {
       "get": {
-        "description": "Returns recent delivery attempts for the subscription with status code, latency, error reason, and the redacted payload preview. Used by the webhook detail panel for diagnostics.",
+        "description": "Returns recent delivery attempts for the subscription with event type, status, HTTP status code, attempt counts, and delivered, failed and created timestamps. Used by the webhook detail panel for diagnostics.",
         "operationId": "webhooks-deliveries-list",
         "parameters": [
           {
@@ -31140,7 +31133,7 @@
     },
     "/workspaces/{wsId}/webhooks/{webhookId}/test": {
       "post": {
-        "description": "Synchronously sends a test ping payload signed with the subscription's secret so the operator can verify reachability and signature handling without waiting for a real event.",
+        "description": "Queues a test ping delivery for the subscription and returns its delivery id. The worker sends it signed with the subscription's secret; read its outcome from the delivery log.",
         "operationId": "webhooks-test-delivery",
         "parameters": [
           {

@@ -20,11 +20,11 @@
           "symbol": "embedBudgetGuard"
         },
         "duplicate_threshold_high": {
-          "file": "apps/flow-api/internal/ai/relations/pipeline.go",
+          "file": "apps/flow-api/internal/ai/embed/similar.go",
           "symbol": "DuplicateThresholdHigh"
         },
         "duplicate_threshold_low": {
-          "file": "apps/flow-api/internal/ai/relations/pipeline.go",
+          "file": "apps/flow-api/internal/ai/embed/similar.go",
           "symbol": "DuplicateThresholdLow"
         },
         "judge_instructions": {
@@ -111,7 +111,7 @@
         },
         "channel": {
           "file": "apps/flow-api/internal/http/handlers/notifications/preferences.go",
-          "symbol": "deliverableChannels"
+          "symbol": "prefs.Deliverable("
         },
         "is_muted": {
           "file": "apps/flow-api/internal/notification/prefs/prefs.go",

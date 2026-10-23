@@ -206,11 +206,6 @@ export const WsErrors = {
     status: 422,
     message: "Task actor role must be one of: assignee, reviewer, watcher, approver",
   },
-  WS_TASK_ALREADY_ARCHIVED: {
-    code: "WS.TASK.ALREADY_ARCHIVED",
-    status: 409,
-    message: "Task is already archived",
-  },
   WS_TASK_DEPENDENCY_ALREADY_EXISTS: {
     code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS",
     status: 409,
@@ -220,11 +215,6 @@ export const WsErrors = {
     code: "WS.TASK.DEPENDENCY_CYCLE",
     status: 422,
     message: "Adding this dependency would create a cycle",
-  },
-  WS_TASK_NOT_ARCHIVED: {
-    code: "WS.TASK.NOT_ARCHIVED",
-    status: 409,
-    message: "Task is not archived",
   },
   WS_TASK_NOT_FOUND: {
     code: "WS.TASK.NOT_FOUND",

@@ -13,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
@@ -257,6 +258,9 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 
 		subjectID := subjectIDFor(subjectType, subjectInternal)
 
+		if err := handlerutil.CheckDatetimeField("expiresAt", in.Body.ExpiresAt); err != nil {
+			return nil, err
+		}
 		var expiresAt sql.NullTime
 		if in.Body.ExpiresAt != nil {
 			expiresAt = sql.NullTime{Time: time.Unix(*in.Body.ExpiresAt, 0).UTC(), Valid: true}

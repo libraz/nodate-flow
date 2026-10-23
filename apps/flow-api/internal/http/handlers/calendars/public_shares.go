@@ -14,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
 )
@@ -1029,15 +1030,11 @@ func checkShareExpiry(p *int64) error {
 	if *p <= handlerutil.NowUnix() {
 		return httpErr(apierrors.ShareShareExpiresAtNotInFuture)
 	}
-	if *p > maxShareExpiryUnix {
+	if *p > dbtype.MaxDatetimeUnix {
 		return httpErr(apierrors.ShareShareExpiresAtOutOfRange)
 	}
 	return nil
 }
-
-// maxShareExpiryUnix is 9999-12-31T23:59:59Z, the last second a MySQL
-// DATETIME can hold.
-const maxShareExpiryUnix int64 = 253402300799
 
 func nullTimeFromUnixPtr(p *int64) sql.NullTime {
 	if p == nil {

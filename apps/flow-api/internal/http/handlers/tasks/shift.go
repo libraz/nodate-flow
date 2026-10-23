@@ -88,6 +88,9 @@ func ProposeShift(deps Deps) func(context.Context, *ProposeShiftInput) (*Propose
 		if err != nil {
 			return nil, err
 		}
+		if err := handlerutil.CheckDatetimeField("newStartAt", &in.Body.NewStartAt); err != nil {
+			return nil, err
+		}
 		newStart := handlerutil.UnixToTime(in.Body.NewStartAt)
 
 		var proposal itemkit.ShiftProposal
@@ -133,6 +136,9 @@ func ApplyShift(deps Deps) func(context.Context, *ApplyShiftInput) (*ApplyShiftO
 		}
 		eventID, err := resolveShiftableEvent(ctx, deps, ws.ID, actorID, in.EventID)
 		if err != nil {
+			return nil, err
+		}
+		if err := handlerutil.CheckDatetimeField("newStartAt", &in.Body.NewStartAt); err != nil {
 			return nil, err
 		}
 		newStart := handlerutil.UnixToTime(in.Body.NewStartAt)

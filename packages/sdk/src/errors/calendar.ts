@@ -191,6 +191,16 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not retrieve events",
   },
+  CALENDAR_EVENT_MILESTONE_RECURRENCE_NOT_ALLOWED: {
+    code: "CALENDAR.EVENT.MILESTONE_RECURRENCE_NOT_ALLOWED",
+    status: 422,
+    message: "A milestone cannot repeat",
+  },
+  CALENDAR_EVENT_NOTIFICATION_REQUIRES_START: {
+    code: "CALENDAR.EVENT.NOTIFICATION_REQUIRES_START",
+    status: 422,
+    message: "An undated event cannot have a reminder",
+  },
   CALENDAR_EVENT_NOT_FOUND: {
     code: "CALENDAR.EVENT.NOT_FOUND",
     status: 404,
@@ -230,6 +240,11 @@ export const CalendarErrors = {
     code: "CALENDAR.EVENT.RECURRENCE_ON_OCCURRENCE_NOT_ALLOWED",
     status: 422,
     message: "A single occurrence cannot carry its own recurrence rule, recurrence end or exception list",
+  },
+  CALENDAR_EVENT_RECURRENCE_REQUIRES_START: {
+    code: "CALENDAR.EVENT.RECURRENCE_REQUIRES_START",
+    status: 422,
+    message: "An undated event cannot repeat",
   },
   CALENDAR_EVENT_RECURRENCE_RULE_INVALID: {
     code: "CALENDAR.EVENT.RECURRENCE_RULE_INVALID",
@@ -385,11 +400,6 @@ export const CalendarErrors = {
     code: "CALENDAR.TASK_SYNC.TASK_NOT_FOUND",
     status: 404,
     message: "Task not found",
-  },
-  CALENDAR_TASK_SYNC_TIMEZONE_UNRECOGNIZED: {
-    code: "CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED",
-    status: 400,
-    message: "Unrecognized timezone",
   },
   CALENDAR_USER_PROFILE_LOOKUP_INTERRUPTED: {
     code: "CALENDAR.USER_PROFILE.LOOKUP_INTERRUPTED",

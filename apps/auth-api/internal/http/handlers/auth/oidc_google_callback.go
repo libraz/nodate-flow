@@ -33,7 +33,7 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 		}
 		claims, err := deps.OIDC.Exchange(ctx, in.Code, nonce)
 		if err != nil {
-			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+			return nil, oidcExchangeRefusal(err)
 		}
 		// Reject unverified emails. Google OIDC normally returns
 		// email_verified=true, but compromised or misconfigured IdPs

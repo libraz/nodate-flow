@@ -126,7 +126,7 @@ func (c *MicrosoftOIDCClient) Exchange(ctx context.Context, code, expectedNonce 
 		return nil, fmt.Errorf("microsoft: oidc verify: %w", err)
 	}
 	if expectedNonce != "" && subtle.ConstantTimeCompare([]byte(idTok.Nonce), []byte(expectedNonce)) != 1 {
-		return nil, fmt.Errorf("microsoft: oidc nonce mismatch")
+		return nil, fmt.Errorf("microsoft: %w", authn.ErrNonceMismatch)
 	}
 	var claims MicrosoftClaims
 	if err := idTok.Claims(&claims); err != nil {

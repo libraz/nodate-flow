@@ -35,7 +35,7 @@ func OIDCMicrosoftCallback(deps Deps) func(context.Context, *OIDCCallbackInput) 
 		}
 		claims, err := deps.OIDCMicrosoft.Exchange(ctx, in.Code, nonce)
 		if err != nil {
-			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)
+			return nil, oidcExchangeRefusal(err)
 		}
 		if err := internauth.ValidateMicrosoftClaims(claims, deps.MicrosoftAllowedTenantIDs); err != nil {
 			return nil, httpErr(apierrors.AuthOidcIdTokenInvalid)

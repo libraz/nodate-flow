@@ -24,8 +24,6 @@ var (
 	AuthLoginRateLimitedAfterRetries = &Spec{Code: "AUTH.LOGIN.RATE_LIMITED_AFTER_RETRIES", Status: 429, Message: "Too many failed login attempts", Description: "Returned when the login rate limit for the source IP or account has been exceeded.", UserAction: "Wait a few minutes before trying again."}
 	// AUTH.MAGIC_LINK.ALREADY_USED — This magic link has already been used
 	AuthMagicLinkAlreadyUsed = &Spec{Code: "AUTH.MAGIC_LINK.ALREADY_USED", Status: 409, Message: "This magic link has already been used", Description: "Returned when the magic link token has already been consumed to create a session.", UserAction: "Request a new magic link from the login page."}
-	// AUTH.MAGIC_LINK.EMAIL_NOT_FOUND — No account found for this email address
-	AuthMagicLinkEmailNotFound = &Spec{Code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND", Status: 404, Message: "No account found for this email address", Description: "Returned when a magic link is requested for an email that is not associated with any account.", UserAction: "Check the email address for typos, or register a new account."}
 	// AUTH.MAGIC_LINK.EXPIRED — Magic link has expired
 	AuthMagicLinkExpired = &Spec{Code: "AUTH.MAGIC_LINK.EXPIRED", Status: 401, Message: "Magic link has expired", Description: "Returned when the magic link token is past its 15-minute expiration timestamp.", UserAction: "Request a new magic link from the login page; links remain valid for 15 minutes."}
 	// AUTH.MAGIC_LINK.MALFORMED — Magic link token is malformed or unknown
@@ -90,8 +88,6 @@ var (
 	AuthTotpAlreadyEnrolled = &Spec{Code: "AUTH.TOTP.ALREADY_ENROLLED", Status: 409, Message: "Two-factor authentication is already enabled", Description: "Returned when attempting to enroll TOTP for an account that already has it active.", UserAction: "Disable the existing 2FA before enrolling again."}
 	// AUTH.TOTP.CODE_MISMATCH — Two-factor authentication code is incorrect
 	AuthTotpCodeMismatch = &Spec{Code: "AUTH.TOTP.CODE_MISMATCH", Status: 401, Message: "Two-factor authentication code is incorrect", Description: "Returned when the submitted TOTP code does not match the expected value within the allowed time window.", UserAction: "Re-enter the current code from your authenticator app."}
-	// AUTH.TOTP.CODE_REQUIRED — Two-factor authentication code is required
-	AuthTotpCodeRequired = &Spec{Code: "AUTH.TOTP.CODE_REQUIRED", Status: 401, Message: "Two-factor authentication code is required", Description: "Returned when the account has 2FA enabled and the login request did not include a TOTP code.", UserAction: "Submit the 6-digit code from your authenticator app."}
 	// AUTH.TOTP.NOT_CONFIGURED — Two-factor authentication is not available on this server
 	AuthTotpNotConfigured = &Spec{Code: "AUTH.TOTP.NOT_CONFIGURED", Status: 503, Message: "Two-factor authentication is not available on this server", Description: "Returned when the server has no encryption key configured (NF_SECRET_KEY is unset) so TOTP secrets cannot be stored.", UserAction: "Ask the instance administrator to configure NF_SECRET_KEY."}
 	// AUTH.TOTP.NOT_ENROLLED — Two-factor authentication is not enabled

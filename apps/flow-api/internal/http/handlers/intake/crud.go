@@ -260,6 +260,9 @@ func Triage(deps Deps) func(context.Context, *TriageIntakeItemInput) (*TriageInt
 			if in.Body.SnoozeUntil == nil || *in.Body.SnoozeUntil <= 0 {
 				return nil, httpErr(apierrors.WsIntakeSnoozeDeadlineRequired)
 			}
+			if err := handlerutil.CheckDatetimeField("snoozeUntil", in.Body.SnoozeUntil); err != nil {
+				return nil, err
+			}
 			snoozeUntil = sql.NullTime{Time: time.Unix(*in.Body.SnoozeUntil, 0), Valid: true}
 		}
 		// A deadline sent with any other status is dropped rather than

@@ -7,7 +7,13 @@
 // not call [time.Now] / [time.Unix] directly.
 package handlerutil
 
-import "time"
+import (
+	"time"
+
+	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+)
 
 // NowUnix returns the current UTC unix timestamp in seconds. Use this
 // from a handler when you need to stamp a "createdAt" / "updatedAt"
@@ -24,6 +30,17 @@ func NowUnix() int64 {
 // .UTC()?" from the review surface area at every handler.
 func UnixToTime(s int64) time.Time {
 	return time.Unix(s, 0).UTC()
+}
+
+// CheckDatetimeField refuses a supplied unix-seconds body member a
+// DATETIME column cannot hold, as VALIDATION.BODY.FIELD_INVALID naming
+// it, so the value never reaches the write as a store failure. A nil
+// pointer is an omitted member and passes.
+func CheckDatetimeField(field string, v *int64) error {
+	if v == nil || dbtype.DatetimeRepresentable(*v) {
+		return nil
+	}
+	return HTTPErrFromAPIError(apierr.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", field))
 }
 
 // TimeToUnix converts a [time.Time] into unix seconds, returning 0

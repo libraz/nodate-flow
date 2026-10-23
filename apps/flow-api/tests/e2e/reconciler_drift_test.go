@@ -60,6 +60,7 @@ func (r *recordingMetrics) IncError() {
 func TestReconcilerHealsDueOnDrift(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -94,6 +95,7 @@ func TestReconcilerHealsDueOnDrift(t *testing.T) {
 func TestReconcilerHealsEnabledMismatch(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -127,19 +129,11 @@ func TestReconcilerHealsEnabledMismatch(t *testing.T) {
 // requireEveryDriftHealed asserts the reconciler healed every drift the
 // pass detected, for the given kind.
 //
-// The obvious assertion — this pass healed at least one — cannot be
-// made here. The reconciler scans the whole instance, and each test in
-// this file runs its own pass against the same database, so a sibling's
-// pass can reach this test's pair first. The winner counts the heal on
-// its own sink; the pair's owner then finds nothing left to fix and
-// counts nothing, which is indistinguishable from a reconciler that
-// does not record its work at all.
-//
-// What no pass may do is spot a drift and leave it: the heal is skipped
-// on error and only logged, so a detected-but-unhealed pair is exactly
-// the silent failure this suite is here to catch. That relation holds
-// no matter which pass got there first, and the state assertion above
-// covers the invariant itself.
+// The heal is skipped on error and only logged, so a detected-but-unhealed
+// pair is exactly the silent failure this suite is here to catch. The
+// pass is instance-wide, so the tests driving it hold lockReconcilerPass:
+// without it a sibling's pass detects this test's pair as well, loses the
+// heal to this one, and reports a drift it did not close.
 func requireEveryDriftHealed(t *testing.T, sink *recordingMetrics, kind string) {
 	t.Helper()
 	require.GreaterOrEqualf(t, sink.heal[kind], sink.inconsistency[kind],
@@ -154,6 +148,7 @@ func requireEveryDriftHealed(t *testing.T, sink *recordingMetrics, kind string) 
 func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -200,6 +195,7 @@ func TestReconcilerCleanStateLeavesTaskAlone(t *testing.T) {
 func TestReconcilerHealsDueOnDriftInTheEventTimezone(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -242,6 +238,7 @@ func TestReconcilerHealsDueOnDriftInTheEventTimezone(t *testing.T) {
 func TestReconcilerLeavesACorrectZonedDueDateAlone(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })
@@ -279,6 +276,7 @@ func TestReconcilerLeavesACorrectZonedDueDateAlone(t *testing.T) {
 func TestReconcilerReportsAnUnresolvableTimezone(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
+	lockReconcilerPass(t)
 
 	tenant := newTenant(t)
 	t.Cleanup(func() { helpers.PurgeWorkspace(t, testDB, tenant.WorkspacePublicID) })

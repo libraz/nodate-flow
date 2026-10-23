@@ -221,24 +221,6 @@ resources:
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
 
-      already_archived:
-        code: WS.TASK.ALREADY_ARCHIVED
-        status: 409
-        message: "Task is already archived"
-        message_ja: "このタスクは既にアーカイブ済みです"
-        message_zh: "该任务已归档"
-        description: "Returned when attempting to archive a task that is already in the archived state."
-        userAction: "The task is already archived."
-
-      not_archived:
-        code: WS.TASK.NOT_ARCHIVED
-        status: 409
-        message: "Task is not archived"
-        message_ja: "このタスクはアーカイブされていません"
-        message_zh: "该任务尚未归档"
-        description: "Returned when attempting to unarchive a task that is not in the archived state."
-        userAction: "The task is not archived."
-
       actor_role_invalid:
         code: WS.TASK.ACTOR_ROLE_INVALID
         status: 422

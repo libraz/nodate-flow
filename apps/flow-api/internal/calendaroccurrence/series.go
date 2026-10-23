@@ -53,10 +53,23 @@ type Override struct {
 // UpdateCalendarEventOverride is what revives it. What the caller's
 // omissions fall back to is decided by that same lookup.
 //
+// The series lock is taken before the lookup, as the split and the end
+// take it, so two edits of one occurrence serialize: the second reads the
+// override the first committed and updates it, instead of losing the
+// unique key to it. The lock must be the transaction's first read, or the
+// lookup reads a snapshot from before the first edit committed.
+//
 // A refusal the caller can act on comes back as the APIError; any other
 // error is a store failure.
 func WriteOverride(ctx context.Context, q Queries, in Override) (Written, *apierrors.APIError, error) {
-	if refusal := occurrenceRefusal(SeriesStateOf(in.Master), in.OriginalStart); refusal != nil {
+	locked, err := q.Calendar.LockCalendarEventSeries(ctx, calendar.LockCalendarEventSeriesParams{
+		ID:          in.Master.ID,
+		WorkspaceID: in.WorkspaceID,
+	})
+	if err != nil {
+		return Written{}, nil, err
+	}
+	if refusal := occurrenceRefusal(lockedState(in.Master, locked), in.OriginalStart); refusal != nil {
 		return Written{}, refusal, nil
 	}
 	parentID := nullID(in.Master.ID)
@@ -83,6 +96,9 @@ func WriteOverride(ctx context.Context, q Queries, in Override) (Written, *apier
 	// The zone written is whichever survived the merge, so the merged
 	// value is the one checked.
 	if refusal := calendarrules.RequireValidTimezone("timezone", fields.Timezone); refusal != nil {
+		return Written{}, refusal, nil
+	}
+	if refusal := calendarrules.RequireEventShape(string(fields.Kind), fields.StartAt.Valid, false, fields.NotificationOffset.Valid); refusal != nil {
 		return Written{}, refusal, nil
 	}
 
@@ -232,6 +248,9 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 		}
 	}
 	nextEvt, nextOK := next.event()
+	if refusal := calendarrules.RequireEventShape(string(fields.Kind), fields.StartAt.Valid, HasRule(next.Rule), fields.NotificationOffset.Valid); refusal != nil {
+		return Written{}, refusal, nil
+	}
 
 	parentID := nullID(in.Master.ID)
 	overrides, err := q.Calendar.ListCalendarEventOverridesFromStart(ctx, calendar.ListCalendarEventOverridesFromStartParams{

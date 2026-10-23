@@ -6,6 +6,7 @@ import (
 	"time"
 
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 func secs(v int64) *int64 { return &v }
@@ -43,6 +44,77 @@ func TestRequireEventChronology(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("the window was refused with %s", err.Spec.Code)
+			}
+		})
+	}
+}
+
+// TestRequireEventChronologyRefusesValuesTheColumnCannotHold pins that an
+// end past DATETIME's range is answered as a field refusal naming it, on
+// either end and with or without the other end present.
+func TestRequireEventChronologyRefusesValuesTheColumnCannotHold(t *testing.T) {
+	t.Parallel()
+
+	tooLate := dbtype.MaxDatetimeUnix + 1
+	tooEarly := dbtype.MinDatetimeUnix - 1
+	cases := []struct {
+		name  string
+		start *int64
+		end   *int64
+		field string
+	}{
+		{name: "end past the column", start: secs(100), end: &tooLate, field: "endAt"},
+		{name: "start before the column", start: &tooEarly, end: secs(100), field: "startAt"},
+		{name: "half window past the column", start: &tooLate, end: nil, field: "startAt"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := RequireEventChronology(tc.start, tc.end)
+			if err == nil {
+				t.Fatal("accepted a value the DATETIME column cannot hold")
+			}
+			if err.Spec != apierrors.ValidationBodyFieldInvalid || err.Details["field"] != tc.field {
+				t.Errorf("refused with %s %v, want %s naming %q", err.Spec.Code, err.Details, apierrors.ValidationBodyFieldInvalid.Code, tc.field)
+			}
+		})
+	}
+	last := dbtype.MaxDatetimeUnix
+	if err := RequireEventChronology(secs(100), &last); err != nil {
+		t.Fatalf("the last representable second was refused with %s", err.Spec.Code)
+	}
+}
+
+// TestRequireEventShape pins the three CHECK-backed refusals and that a
+// dated recurring event, a dated reminder and a one-off milestone pass.
+func TestRequireEventShape(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                       string
+		kind                       string
+		dated, recurring, reminded bool
+		want                       *apierrors.Spec
+	}{
+		{name: "undated series", kind: "event", recurring: true, want: apierrors.CalendarEventRecurrenceRequiresStart},
+		{name: "undated reminder", kind: "event", reminded: true, want: apierrors.CalendarEventNotificationRequiresStart},
+		{name: "recurring milestone", kind: "milestone", dated: true, recurring: true, want: apierrors.CalendarEventMilestoneRecurrenceNotAllowed},
+		{name: "dated series", kind: "event", dated: true, recurring: true, reminded: true},
+		{name: "one-off milestone", kind: "milestone", dated: true, reminded: true},
+		{name: "undated plain event", kind: "event"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := RequireEventShape(tc.kind, tc.dated, tc.recurring, tc.reminded)
+			if tc.want == nil {
+				if err != nil {
+					t.Fatalf("refused with %s", err.Spec.Code)
+				}
+				return
+			}
+			if err == nil || err.Spec != tc.want {
+				t.Fatalf("got %v, want %s", err, tc.want.Code)
 			}
 		})
 	}

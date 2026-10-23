@@ -263,6 +263,33 @@ resources:
         description: "Returned when a request sets or clears recurrenceRule, recurrenceEnd or recurrenceExceptions on a single occurrence. Those fields describe the series and belong to the recurring event alone."
         userAction: "Send recurrence changes to the recurring event with the series scope."
 
+      recurrence_requires_start:
+        code: CALENDAR.EVENT.RECURRENCE_REQUIRES_START
+        status: 422
+        message: "An undated event cannot repeat"
+        message_ja: "日時未定のイベントは繰り返しにできません"
+        message_zh: "未定日期的事件无法重复"
+        description: "Returned when a write would leave a recurrence rule on an event with no start time. A series repeats from its start, so an undated event has nothing to repeat."
+        userAction: "Give the event a start and end time, or remove the recurrence rule."
+
+      notification_requires_start:
+        code: CALENDAR.EVENT.NOTIFICATION_REQUIRES_START
+        status: 422
+        message: "An undated event cannot have a reminder"
+        message_ja: "日時未定のイベントにはリマインダーを設定できません"
+        message_zh: "未定日期的事件无法设置提醒"
+        description: "Returned when a write would leave a notification offset on an event with no start time. The offset is measured from the start, so without one there is no moment to remind at."
+        userAction: "Give the event a start and end time, or remove the reminder."
+
+      milestone_recurrence_not_allowed:
+        code: CALENDAR.EVENT.MILESTONE_RECURRENCE_NOT_ALLOWED
+        status: 422
+        message: "A milestone cannot repeat"
+        message_ja: "マイルストーンは繰り返しにできません"
+        message_zh: "里程碑无法重复"
+        description: "Returned when a write would leave a recurrence rule on an event of kind milestone. A milestone marks one point in time."
+        userAction: "Remove the recurrence rule, or change the event to another kind."
+
   memo:
     breadcrumb: "Calendar > Memo"
     errors:
@@ -700,15 +727,6 @@ resources:
         message_zh: "taskId 格式无效"
         description: "Returned when the taskId field is not a valid UUID."
         userAction: "Provide a valid UUID for the task."
-
-      timezone_unrecognized:
-        code: CALENDAR.TASK_SYNC.TIMEZONE_UNRECOGNIZED
-        status: 400
-        message: "Unrecognized timezone"
-        message_ja: "タイムゾーンを認識できません"
-        message_zh: "无法识别的时区"
-        description: "Returned when the timezone field is not a valid IANA timezone name."
-        userAction: "Provide a valid IANA timezone (e.g. America/New_York, Asia/Tokyo)."
 
       task_lookup_interrupted:
         code: CALENDAR.TASK_SYNC.TASK_LOOKUP_INTERRUPTED

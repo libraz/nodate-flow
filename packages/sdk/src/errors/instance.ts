@@ -16,11 +16,6 @@ export const InstanceErrors = {
     status: 409,
     message: "Cannot revoke your own administrator privileges",
   },
-  INSTANCE_ADMIN_STATUS_UNAVAILABLE: {
-    code: "INSTANCE.ADMIN.STATUS_UNAVAILABLE",
-    status: 500,
-    message: "Could not determine instance administrator status",
-  },
   INSTANCE_OAUTH_ALLOWLIST_NOT_FOUND: {
     code: "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND",
     status: 404,

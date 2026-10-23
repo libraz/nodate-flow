@@ -51,11 +51,6 @@ export const AuthErrors = {
     status: 409,
     message: "This magic link has already been used",
   },
-  AUTH_MAGIC_LINK_EMAIL_NOT_FOUND: {
-    code: "AUTH.MAGIC_LINK.EMAIL_NOT_FOUND",
-    status: 404,
-    message: "No account found for this email address",
-  },
   AUTH_MAGIC_LINK_EXPIRED: {
     code: "AUTH.MAGIC_LINK.EXPIRED",
     status: 401,
@@ -216,11 +211,6 @@ export const AuthErrors = {
     code: "AUTH.TOTP.CODE_MISMATCH",
     status: 401,
     message: "Two-factor authentication code is incorrect",
-  },
-  AUTH_TOTP_CODE_REQUIRED: {
-    code: "AUTH.TOTP.CODE_REQUIRED",
-    status: 401,
-    message: "Two-factor authentication code is required",
   },
   AUTH_TOTP_NOT_CONFIGURED: {
     code: "AUTH.TOTP.NOT_CONFIGURED",

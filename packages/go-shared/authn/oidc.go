@@ -2,6 +2,8 @@ package authn
 
 import (
 	"context"
+	"crypto/subtle"
+	"errors"
 	"fmt"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -11,6 +13,10 @@ import (
 
 // googleIssuer is the discovery root for Google sign-in.
 const googleIssuer = "https://accounts.google.com"
+
+// ErrNonceMismatch reports an id_token whose nonce claim is not the one
+// the authentication request carried: a replayed or substituted token.
+var ErrNonceMismatch = errors.New("authn: oidc nonce mismatch")
 
 // OIDCConfig configures a Google OIDC client.
 type OIDCConfig struct {
@@ -91,8 +97,8 @@ func (c *OIDCClient) Exchange(ctx context.Context, code, expectedNonce string) (
 	if err != nil {
 		return nil, fmt.Errorf("authn: oidc verify: %w", err)
 	}
-	if expectedNonce != "" && idTok.Nonce != expectedNonce {
-		return nil, fmt.Errorf("authn: oidc nonce mismatch")
+	if expectedNonce != "" && subtle.ConstantTimeCompare([]byte(idTok.Nonce), []byte(expectedNonce)) != 1 {
+		return nil, ErrNonceMismatch
 	}
 	return idTok, nil
 }

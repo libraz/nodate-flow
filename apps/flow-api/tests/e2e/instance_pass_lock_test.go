@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-// Three of the background passes this suite drives are instance-wide:
-// the auto-action executor, the storage sweeper and the calendar
-// reminder tick each walk every workspace in the database, which is
-// what they do in production. Owning a tenant is therefore not enough
-// isolation — a pass raised by one test walks the rows of every other
-// test running beside it.
+// Four of the background passes this suite drives are instance-wide:
+// the auto-action executor, the storage sweeper, the calendar reminder
+// tick and the item reconciler each walk every workspace in the
+// database, which is what they do in production. Owning a tenant is
+// therefore not enough isolation — a pass raised by one test walks the
+// rows of every other test running beside it.
 //
 // That alone would be harmless if a pass decided and acted on a row at
 // the same instant. It does not: each pass reads its whole work set
@@ -39,7 +39,7 @@ import (
 // Each test holds its lock from before it writes any state the pass can
 // see, through to its last assertion.
 //
-// One mutex per pass rather than one for all three: they read disjoint
+// One mutex per pass rather than one for all four: they read disjoint
 // tables and cannot disturb each other, so a shared lock would only
 // cost parallelism. t.Parallel() stays on every one of these tests —
 // they are serialized against their own kind by the lock and still run
@@ -48,6 +48,7 @@ var (
 	autoActionPassMu       sync.Mutex
 	storageSweepPassMu     sync.Mutex
 	calendarReminderPassMu sync.Mutex
+	reconcilerPassMu       sync.Mutex
 )
 
 // lockAutoActionPass serializes tests that drive
@@ -79,4 +80,13 @@ func lockCalendarReminderPass(t *testing.T) {
 	t.Helper()
 	calendarReminderPassMu.Lock()
 	t.Cleanup(calendarReminderPassMu.Unlock)
+}
+
+// lockReconcilerPass serializes tests that drive reconciler.RunOnce.
+// Held from before the drifted pair is seeded: two passes that both read
+// it race for one heal, and the loser counts a drift it did not close.
+func lockReconcilerPass(t *testing.T) {
+	t.Helper()
+	reconcilerPassMu.Lock()
+	t.Cleanup(reconcilerPassMu.Unlock)
 }

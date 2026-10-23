@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +35,9 @@ type errorEntry struct {
 	Description string `yaml:"description"`
 	UserAction  string `yaml:"userAction"`
 	I18nKey     string `yaml:"i18nKey"`
+	// Reserved, when set, says why a code no production source returns
+	// is kept in the catalog; --check refuses an unreturned code without it.
+	Reserved string `yaml:"reserved"`
 }
 
 type resource struct {
@@ -62,6 +66,7 @@ type record struct {
 	Description string
 	UserAction  string
 	I18nKey     string // optional i18next key; empty when YAML omits i18nKey
+	Reserved    string // why an unreturned code is kept; empty for a returned one
 	Breadcrumb  string // resource breadcrumb (fallback to domain)
 }
 
@@ -203,6 +208,7 @@ func run(check bool) (checkResult, error) {
 					Description: e.Description,
 					UserAction:  e.UserAction,
 					I18nKey:     e.I18nKey,
+					Reserved:    e.Reserved,
 					Breadcrumb:  bc,
 				})
 			}
@@ -305,7 +311,7 @@ func run(check bool) (checkResult, error) {
 		if err != nil {
 			return none, err
 		}
-		return res, checkI18nKeys(root, all, localeApps)
+		return res, errors.Join(checkI18nKeys(root, all, localeApps), checkProduced(root, all))
 	}
 
 	paths := make([]string, 0, len(outputs))
@@ -866,4 +872,70 @@ func localeKeyExists(file, dotted string) bool {
 	}
 	str, ok := cur.(string)
 	return ok && strings.TrimSpace(str) != ""
+}
+
+// producerRoots are the trees whose Go sources can return a catalog code.
+var producerRoots = []string{"apps", filepath.Join("packages", "go-shared")}
+
+var (
+	identRe       = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
+	codeLiteralRe = regexp.MustCompile(`"([A-Z][A-Z0-9_]*(?:\.[A-Z][A-Z0-9_]*){1,2})"`)
+)
+
+// checkProduced fails when a code is named by no production Go source,
+// neither as its generated constant nor as its string, and its entry
+// carries no `reserved` reason. Such a code reaches the SDK, the locales
+// and the docs as an answer the product never gives. Tests, testdata and
+// the generated error packages are not producers and are skipped.
+func checkProduced(root string, all []record) error {
+	idents := map[string]bool{}
+	literals := map[string]bool{}
+	for _, dir := range producerRoots {
+		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				switch d.Name() {
+				case "node_modules", "dist", "tests", "testdata", "generated":
+					return filepath.SkipDir
+				case "errors":
+					if filepath.Base(filepath.Dir(path)) == "internal" {
+						return filepath.SkipDir
+					}
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, m := range identRe.FindAll(src, -1) {
+				idents[string(m)] = true
+			}
+			for _, m := range codeLiteralRe.FindAllSubmatch(src, -1) {
+				literals[string(m[1])] = true
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("gen-errors: scan %s: %w", dir, err)
+		}
+	}
+	var bad []string
+	for _, r := range all {
+		if r.Reserved != "" || idents[goConst(r.Code)] || literals[r.Code] {
+			continue
+		}
+		bad = append(bad, r.Code)
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	sort.Strings(bad)
+	return fmt.Errorf("gen-errors: %d code(s) no production source returns:\n  %s\n\nReturn each from the path it describes, delete it from errors/*.yaml, or add `reserved: <why it is kept>` to its entry",
+		len(bad), strings.Join(bad, "\n  "))
 }

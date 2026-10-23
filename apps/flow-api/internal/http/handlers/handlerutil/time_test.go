@@ -3,6 +3,8 @@ package handlerutil
 import (
 	"testing"
 	"time"
+
+	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 func TestNowUnixMonotonic(t *testing.T) {
@@ -68,5 +70,20 @@ func TestTimeToUnixRoundTrip(t *testing.T) {
 	stamp := int64(1735689600) // 2025-01-01 00:00:00 UTC
 	if got := TimeToUnix(UnixToTime(stamp)); got != stamp {
 		t.Errorf("round-trip: got %d want %d", got, stamp)
+	}
+}
+
+func TestCheckDatetimeField(t *testing.T) {
+	t.Parallel()
+	tooLate := dbtype.MaxDatetimeUnix + 1
+	if CheckDatetimeField("startAt", &tooLate) == nil {
+		t.Error("CheckDatetimeField must refuse a value past the column")
+	}
+	last := dbtype.MaxDatetimeUnix
+	if CheckDatetimeField("startAt", &last) != nil {
+		t.Error("CheckDatetimeField must pass the last representable second")
+	}
+	if CheckDatetimeField("startAt", nil) != nil {
+		t.Error("CheckDatetimeField must pass an omitted member")
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/ctxutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -506,10 +507,9 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 
 // DeleteAttachment soft-deletes an event attachment, decrements the
 // underlying storage_objects ref_count, and removes the MinIO blob if
-// no other references remain. The DB updates run in a single
-// transaction; the MinIO RemoveObject call happens after commit and
-// emits a warn log on failure (the GC sweeper will pick up any
-// orphans on a later pass).
+// no other references remain. The DB updates and the blob's
+// storage_blob_removals record commit in one transaction; the removal
+// runs after commit, and on failure the record stays for the sweeper.
 func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
 	return func(ctx context.Context, input *DeleteAttachmentInput) (*DeleteAttachmentOutput, error) {
 		wsID, actorID, err := resolveWorkspace(ctx, deps.Queries, input.WsID)
@@ -599,6 +599,9 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		}
 		if affected, _ := gcRes.RowsAffected(); affected == 1 {
 			storageKeyToRemove = fullRow.StorageKey
+			if err := storagegc.Queue(ctx, qtx, storageKeyToRemove); err != nil {
+				return nil, httpErr(apierrors.CalendarAttachmentStoreDeleteInterrupted)
+			}
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -607,8 +610,8 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 
 		if storageKeyToRemove != "" && deps.Storage != nil {
 			cleanupCtx, cleanupCancel := ctxutil.Cleanup(ctx, 5*time.Second)
-			if rmErr := deps.Storage.RemoveObject(cleanupCtx, storageKeyToRemove); rmErr != nil {
-				slog.WarnContext(cleanupCtx, "calendar attachment delete: orphan cleanup failed",
+			if rmErr := storagegc.RemoveQueued(cleanupCtx, deps.Queries, deps.Storage, storageKeyToRemove); rmErr != nil {
+				slog.WarnContext(cleanupCtx, "calendar attachment delete: orphan cleanup failed; the sweeper will retry",
 					slog.Any("err", rmErr),
 					slog.String("storage_key", storageKeyToRemove),
 				)

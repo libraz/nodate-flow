@@ -11,8 +11,6 @@ import (
 	stderrors "errors"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -24,18 +22,9 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
-// Thresholds for classification (ADR 0003 defaults).
+// Thresholds and the candidate window are [embed.Client.RankSimilarTasks]'s,
+// shared with the interactive duplicate listings.
 const (
-	// DuplicateThreshold is the minimum cosine similarity to suggest
-	// "duplicates".
-	DuplicateThreshold = 0.87
-	// RelatesThreshold is the minimum cosine similarity to suggest
-	// "relates". Scores below this are skipped.
-	RelatesThreshold = 0.75
-	// MaxCandidates is the maximum number of candidate embeddings to
-	// compare against: the most recent tasks by id, so a duplicate of an
-	// older task outside that window is not detected.
-	MaxCandidates = 200
 	// MaxSuggestions is the maximum number of suggestions created per
 	// pipeline run for a single task.
 	MaxSuggestions = 10
@@ -141,60 +130,6 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		return
 	}
 
-	// The lookup key is the embedder's own model, which is what wrote
-	// every row: see [embed.Client.Model]. Thresholds come from
-	// ai_settings, with the ADR 0003 defaults on miss.
-	model := p.Embedder.Model()
-	high := DuplicateThreshold
-	low := RelatesThreshold
-	if settings, err := p.Queries.GetAiSettings(ctx, workspaceID); err == nil {
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdHigh, 64); perr == nil {
-			high = v
-		}
-		if v, perr := strconv.ParseFloat(settings.DuplicateThresholdLow, 64); perr == nil {
-			low = v
-		}
-	}
-
-	// Ensure the task has an embedding.
-	src, err := p.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-		TaskID: taskID,
-		Model:  model,
-	})
-	if stderrors.Is(err, sql.ErrNoRows) {
-		// Embed the task.
-		const taskQuery = `SELECT title, description FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`
-		var title string
-		var desc sql.NullString
-		if err := p.DB.QueryRowContext(ctx, taskQuery, taskID, workspaceID).Scan(&title, &desc); err != nil {
-			slog.Error("relations pipeline: fetch task for embedding", "taskId", taskID, "err", err)
-			return
-		}
-		descStr := ""
-		if desc.Valid {
-			descStr = desc.String
-		}
-		if eerr := p.Embedder.EmbedTask(ctx, workspaceID, taskID, title, descStr); eerr != nil {
-			slog.Error("relations pipeline: embed task", "taskId", taskID, "err", eerr)
-			return
-		}
-		src, err = p.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-			TaskID: taskID,
-			Model:  model,
-		})
-	}
-	if err != nil {
-		slog.Error("relations pipeline: get embedding after upsert", "taskId", taskID, "err", err)
-		return
-	}
-
-	srcVec, err := embed.Decode(toBytes(src.Vector))
-	if err != nil || len(srcVec) == 0 {
-		return
-	}
-
-	// Fetch candidate embeddings.
-	//
 	// This runs off an event, not a request: there is no actor whose
 	// visibility could scope the pool, and the titles it reads go into
 	// relation_suggestions rows rather than onto any wire. The reader is
@@ -202,58 +137,26 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 	// titles carries the Layer 4 rule against both ends -- so the pool
 	// here is the workspace's, and a suggestion between two tasks stays
 	// invisible to anyone who may not see them both.
-	candidates, err := p.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID:   workspaceID,
-		Model:         model,
-		TaskID:        taskID,
-		IsElevated:    1,
-		ActorUserID:   0,
-		ActorUserID_2: 0,
-		ActorUserID_3: 0,
-		Limit:         MaxCandidates,
+	matches, err := p.Embedder.RankSimilarTasks(ctx, p.Queries, embed.SimilarQuery{
+		WorkspaceID: workspaceID,
+		TaskID:      taskID,
+		SourceText: func(ctx context.Context) (string, string, error) {
+			const taskQuery = `SELECT title, description FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`
+			var title string
+			var desc sql.NullString
+			if err := p.DB.QueryRowContext(ctx, taskQuery, taskID, workspaceID).Scan(&title, &desc); err != nil {
+				return "", "", err
+			}
+			return title, desc.String, nil
+		},
+		IsElevated:  1,
+		ActorUserID: 0,
+		ResultLimit: MaxSuggestions,
 	})
 	if err != nil {
-		slog.Error("relations pipeline: list candidates", "err", err)
+		slog.ErrorContext(ctx, "relations pipeline: rank similar tasks", "taskId", taskID, "err", err)
 		return
 	}
-
-	// Score and filter.
-	type scored struct {
-		taskID   uint32
-		publicID types.PublicID
-		score    float64
-		kind     generated.RelationSuggestionsSuggestedKind
-	}
-	var matches []scored
-	for _, c := range candidates {
-		v, derr := embed.Decode(toBytes(c.Vector))
-		if derr != nil || len(v) != len(srcVec) {
-			continue
-		}
-		score := float64(embed.Cosine(srcVec, v))
-		if score < low {
-			continue
-		}
-		kind := generated.RelationSuggestionsSuggestedKindRelates
-		if score >= high {
-			kind = generated.RelationSuggestionsSuggestedKindDuplicates
-		}
-		matches = append(matches, scored{
-			taskID:   c.ID,
-			publicID: c.PublicID,
-			score:    score,
-			kind:     kind,
-		})
-	}
-
-	// Sort by score descending and cap.
-	sort.SliceStable(matches, func(i, j int) bool {
-		return matches[i].score > matches[j].score
-	})
-	if len(matches) > MaxSuggestions {
-		matches = matches[:MaxSuggestions]
-	}
-
 	if len(matches) == 0 {
 		return
 	}
@@ -267,7 +170,7 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 	// Create suggestion rows.
 	for _, m := range matches {
 		pub := types.New()
-		conf := fmt.Sprintf("%.4f", m.score)
+		conf := fmt.Sprintf("%.4f", m.Score)
 		srcID := int64(taskID)
 		// The suggestion row and the event announcing it go in together.
 		// This pass runs detached from the request that triggered it (a
@@ -284,8 +187,8 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 				PublicID:      pub,
 				WorkspaceID:   workspaceID,
 				SourceTaskID:  taskID,
-				TargetTaskID:  m.taskID,
-				SuggestedKind: m.kind,
+				TargetTaskID:  m.ID,
+				SuggestedKind: suggestedKind(m),
 				Confidence:    conf,
 			}); err != nil {
 				return err
@@ -297,9 +200,9 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 				Payload: map[string]any{
 					"suggestionId": pub.String(),
 					"sourceTaskId": srcPub.String(),
-					"targetTaskId": m.publicID.String(),
-					"kind":         string(m.kind),
-					"confidence":   m.score,
+					"targetTaskId": m.PublicID.String(),
+					"kind":         string(suggestedKind(m)),
+					"confidence":   m.Score,
 				},
 			})
 		}); err != nil {
@@ -309,7 +212,7 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 			slog.DebugContext(ctx, "relations pipeline: suggestion skipped",
 				"workspace_id", workspaceID,
 				"source_task_id", taskID,
-				"target_task_id", m.taskID,
+				"target_task_id", m.ID,
 				"err", err,
 			)
 			continue
@@ -340,15 +243,10 @@ func (p *Pipeline) sourceTaskPublicID(ctx context.Context, workspaceID, taskID u
 	return pub, nil
 }
 
-// toBytes coerces an interface{} column (returned by sqlc for VECTOR
-// columns read back through STRING_TO_VECTOR) into a []byte, or nil
-// when the underlying value is neither []byte nor string.
-func toBytes(v any) []byte {
-	switch x := v.(type) {
-	case []byte:
-		return x
-	case string:
-		return []byte(x)
+// suggestedKind maps a ranked candidate onto the suggestion vocabulary.
+func suggestedKind(m embed.SimilarTask) generated.RelationSuggestionsSuggestedKind {
+	if m.Duplicate {
+		return generated.RelationSuggestionsSuggestedKindDuplicates
 	}
-	return nil
+	return generated.RelationSuggestionsSuggestedKindRelates
 }

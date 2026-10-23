@@ -471,6 +471,14 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
 			return nil, err
 		}
+		if err := requireDatetime("recurrenceEnd", input.Body.RecurrenceEnd); err != nil {
+			return nil, err
+		}
+		if err := requireEventShape(input.Body.Kind, input.Body.StartAt != nil,
+			input.Body.RecurrenceRule != nil && calendaroccurrence.HasRule(*input.Body.RecurrenceRule),
+			input.Body.NotificationOffset != nil); err != nil {
+			return nil, err
+		}
 
 		// An explicit timezone has to resolve, or the row is stored with a
 		// zone no grid can place the event in; an omitted one falls back
@@ -705,6 +713,12 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		if err := requireEventChronology(input.Body.StartAt, input.Body.EndAt); err != nil {
 			return nil, err
 		}
+		if err := requireDatetime("recurrenceEnd", input.Body.RecurrenceEnd); err != nil {
+			return nil, err
+		}
+		if err := requireDatetime("occurrenceStart", input.Body.OccurrenceStart); err != nil {
+			return nil, err
+		}
 		if input.Body.Timezone != nil {
 			if err := requireValidTimezone("timezone", *input.Body.Timezone); err != nil {
 				return nil, err
@@ -801,6 +815,31 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		cleared, cerr := parseClearFields(input.Body.Clear)
 		if cerr != nil {
 			return nil, cerr
+		}
+		// The row as it will stand: what the request sends or clears over
+		// what is stored. An unlinked event stays dated or undated here; a
+		// linked one's times move through itemkit, which keeps it dated.
+		shapeKind := string(evt.Kind)
+		if input.Body.Kind != nil {
+			shapeKind = *input.Body.Kind
+		}
+		shapeRecurring := calendaroccurrence.HasRule(evt.RecurrenceRule)
+		switch {
+		case cleared.recurrenceRule == 1:
+			shapeRecurring = false
+		case input.Body.RecurrenceRule != nil:
+			shapeRecurring = calendaroccurrence.HasRule(*input.Body.RecurrenceRule)
+		}
+		shapeReminded := evt.NotificationOffset.Valid
+		switch {
+		case cleared.notificationOffset == 1:
+			shapeReminded = false
+		case input.Body.NotificationOffset != nil:
+			shapeReminded = true
+		}
+		if err := requireEventShape(shapeKind, input.Body.StartAt != nil || evt.StartAt.Valid,
+			shapeRecurring, shapeReminded); err != nil {
+			return nil, err
 		}
 		params := calendar.PatchCalendarEventParams{
 			PublicID:    types.FromUUID(evtUID),
@@ -1179,6 +1218,10 @@ func DeleteEvent(deps Deps) func(context.Context, *DeleteEventInput) (*DeleteEve
 		}
 		if err := requireDeleteOccurrenceScope(scope, input.OccurrenceStart, evt, parentID); err != nil {
 			return nil, err
+		}
+		if !dbtype.DatetimeRepresentable(input.OccurrenceStart) {
+			return nil, handlerutil.HTTPErrFromAPIError(
+				apierrors.New(apierrors.ValidationQueryFieldInvalid).WithDetail("field", "occurrenceStart"))
 		}
 
 		if scope != scopeSeries {

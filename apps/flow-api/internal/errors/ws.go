@@ -86,14 +86,10 @@ var (
 	WsTaskAccessDenied = &Spec{Code: "WS.TASK.ACCESS_DENIED", Status: 403, Message: "You do not have access to this task", Description: "Returned when the actor lacks the required project role to read or modify the task.", UserAction: "Ask a project lead to grant you access."}
 	// WS.TASK.ACTOR_ROLE_INVALID — Task actor role must be one of: assignee, reviewer, watcher, approver
 	WsTaskActorRoleInvalid = &Spec{Code: "WS.TASK.ACTOR_ROLE_INVALID", Status: 422, Message: "Task actor role must be one of: assignee, reviewer, watcher, approver", Description: "Returned when a task create or update payload includes an `actors[].role` value outside the allowed enum. The persisted column is `task_actors.role ENUM('assignee','reviewer','watcher','approver')`, so any other string is rejected at the validation boundary before the SQL layer.", UserAction: "Set each actor's role to one of: assignee, reviewer, watcher, approver."}
-	// WS.TASK.ALREADY_ARCHIVED — Task is already archived
-	WsTaskAlreadyArchived = &Spec{Code: "WS.TASK.ALREADY_ARCHIVED", Status: 409, Message: "Task is already archived", Description: "Returned when attempting to archive a task that is already in the archived state.", UserAction: "The task is already archived."}
 	// WS.TASK.DEPENDENCY_ALREADY_EXISTS — This dependency already exists
 	WsTaskDependencyAlreadyExists = &Spec{Code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS", Status: 409, Message: "This dependency already exists", Description: "Returned when a new task dependency edge has the same source, target and kind as an edge that already exists.", UserAction: "The dependency is already in place; no change is needed."}
 	// WS.TASK.DEPENDENCY_CYCLE — Adding this dependency would create a cycle
 	WsTaskDependencyCycle = &Spec{Code: "WS.TASK.DEPENDENCY_CYCLE", Status: 422, Message: "Adding this dependency would create a cycle", Description: "Returned when a new task dependency edge would close a cycle in the workspace dependency graph (directly or transitively). The dependency graph must remain a DAG so blocked-by computation and topological scheduling terminate.", UserAction: "Remove the conflicting dependency on the other task before adding this edge."}
-	// WS.TASK.NOT_ARCHIVED — Task is not archived
-	WsTaskNotArchived = &Spec{Code: "WS.TASK.NOT_ARCHIVED", Status: 409, Message: "Task is not archived", Description: "Returned when attempting to unarchive a task that is not in the archived state.", UserAction: "The task is not archived."}
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state

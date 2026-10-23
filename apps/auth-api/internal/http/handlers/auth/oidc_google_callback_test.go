@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	internauth "github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // fakeGoogleExchanger captures the inputs supplied to Exchange and
@@ -63,6 +65,24 @@ func TestOIDCGoogleCallback_PassesNonceFromState(t *testing.T) {
 	assert.Equal(t, apierrors.AuthOidcIdTokenInvalid.Code, problem.Type)
 	assert.Equal(t, "auth-code", g.gotCode)
 	assert.Equal(t, wantNonce, g.gotNonce)
+}
+
+// TestOIDCGoogleCallback_NonceMismatchHasItsOwnCode asserts a replayed
+// id_token is answered with AUTH.OIDC.NONCE_MISMATCH, not the generic
+// verification failure.
+func TestOIDCGoogleCallback_NonceMismatchHasItsOwnCode(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+	g := &fakeGoogleExchanger{err: fmt.Errorf("google: %w", authn.ErrNonceMismatch)}
+	deps := Deps{JWT: jwt, OIDC: g, Audit: audit.NoopSink{}}
+	state, stateCookie := signedGoogleState(t, &deps)
+	_, err = OIDCGoogleCallback(deps)(context.Background(), &OIDCCallbackInput{
+		Code: "auth-code", State: state, StateCookie: stateCookie,
+	})
+
+	problem := problemFor(t, err)
+	assert.Equal(t, apierrors.AuthOidcNonceMismatch.Code, problem.Type)
 }
 
 // TestOIDCGoogleCallback_RejectsUnverifiedEmail asserts an id_token whose

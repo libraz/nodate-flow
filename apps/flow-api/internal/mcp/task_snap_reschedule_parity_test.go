@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -292,7 +293,7 @@ func TestTaskRescheduleThroughToolAndRequestStoreTheSameRow(t *testing.T) {
 
 	t.Run("request", func(t *testing.T) {
 		reqCtx := snapParityRequestContext(t, db, fx.userID, fx.restTaskPub)
-		handler := tasks.Patch(tasks.Deps{DB: db, Queries: queries, Audit: audit.New(queries), Mutations: mutationlog.New(db, queries)})
+		handler := tasks.Patch(tasks.Deps{DB: db, Queries: queries, Audit: audit.New(queries), Mutations: mutationlog.New(db, queries), Embedder: embed.New(embed.NewMockProvider(), queries)})
 		due := requested
 		_, err := handler(reqCtx, &tasks.PatchTaskInput{
 			ID:   fx.restTaskPub.String(),

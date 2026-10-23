@@ -4,10 +4,6 @@ package errors
 
 // Error codes and specs.
 var (
-	// INTEGRATION.GH.RATE_LIMITED — GitHub API rate limit exceeded
-	IntegrationGhRateLimited = &Spec{Code: "INTEGRATION.GH.RATE_LIMITED", Status: 429, Message: "GitHub API rate limit exceeded", Description: "Returned when the GitHub REST or GraphQL API rejected the request because the integration token has hit its rate limit.", UserAction: "Wait for the rate limit window to reset, or use a token with higher quota."}
-	// INTEGRATION.GH.TOKEN_INVALID — GitHub API token is invalid
-	IntegrationGhTokenInvalid = &Spec{Code: "INTEGRATION.GH.TOKEN_INVALID", Status: 401, Message: "GitHub API token is invalid", Description: "Returned when GitHub rejects the integration's installation or PAT credentials.", UserAction: "Re-authorize the GitHub integration."}
 	// INTEGRATION.GH.WEBHOOK_EVENT_UNSUPPORTED — GitHub webhook event type is not supported
 	IntegrationGhWebhookEventUnsupported = &Spec{Code: "INTEGRATION.GH.WEBHOOK_EVENT_UNSUPPORTED", Status: 400, Message: "GitHub webhook event type is not supported", Description: "Returned when the X-GitHub-Event header indicates an event that this integration does not handle.", UserAction: "Disable unsupported event types in the GitHub webhook configuration."}
 	// INTEGRATION.GH.WEBHOOK_INVALID_SIGNATURE — GitHub webhook signature is invalid

@@ -102,3 +102,23 @@ func TestCategoriesCoverEveryRoutedCategory(t *testing.T) {
 		t.Fatal("ValidChannel must reject undeclared channels")
 	}
 }
+
+// TestDeliverableIsTheTransportSet pins the one list the preference write
+// validates against: only in_app has a sender, and every deliverable
+// channel is also a declared one.
+func TestDeliverableIsTheTransportSet(t *testing.T) {
+	t.Parallel()
+	if !Deliverable(string(inApp)) {
+		t.Fatal("in_app must be deliverable")
+	}
+	for _, ch := range []string{string(mail), string(push), "sms"} {
+		if Deliverable(ch) {
+			t.Errorf("Deliverable(%q) = true, but no transport sends it", ch)
+		}
+	}
+	for _, ch := range DeliverableChannels {
+		if !ValidChannel(string(ch)) {
+			t.Errorf("deliverable channel %q is not in Channels", ch)
+		}
+	}
+}

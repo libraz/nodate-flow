@@ -2,10 +2,7 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"sort"
-	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
@@ -15,14 +12,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 )
 
-// Default thresholds mirror ADR 0003 §4. Used when ai_settings has no
-// row for the workspace yet.
-const (
-	defaultDuplicateHigh    = 0.870
-	defaultDuplicateLow     = 0.750
-	duplicateCandidateLimit = 200
-	duplicateResultLimit    = 20
-)
+// duplicateResultLimit caps the candidates one listing returns.
+const duplicateResultLimit = 20
 
 // ListDuplicatesInput is the Huma input for GET /tasks/{id}/duplicates.
 type ListDuplicatesInput struct {
@@ -60,88 +51,48 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
-		// The lookup key is the embedder's own model, which is what
-		// wrote every row: see [embed.Client.Model].
-		model := deps.Embedder.Model()
-		high, low := resolveThresholds(ctx, deps.Queries, ws.ID)
-
-		// Fetch the source embedding; if missing, try a write-time
-		// upsert using the current task text so the first call after a
-		// cold start is still useful.
-		src, err := deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-			TaskID: task.ID,
-			Model:  model,
-		})
-		if errors.Is(err, sql.ErrNoRows) && deps.Embedder != nil {
-			row, ferr := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-				WorkspaceID: ws.ID,
-				PublicID:    types.FromUUID(task.PublicID),
-			})
-			if ferr != nil {
-				return emptyDuplicates(model), nil
-			}
-			if eerr := deps.Embedder.EmbedTask(ctx, ws.ID, task.ID, row.Title, nullStr(row.Description)); eerr != nil {
-				return emptyDuplicates(model), nil
-			}
-			src, err = deps.Queries.GetTaskEmbedding(ctx, generated.GetTaskEmbeddingParams{
-				TaskID: task.ID,
-				Model:  model,
-			})
-		}
-		if err != nil {
-			return emptyDuplicates(model), nil
-		}
-
-		srcVec, err := embed.Decode(vectorBytes(src.Vector))
-		if err != nil || len(srcVec) == 0 {
-			return emptyDuplicates(model), nil
-		}
-
 		// Each candidate's title is returned to the caller, so the pool
 		// is the actor's readable set rather than the workspace's.
 		actorID, _ := middleware.ActorFromContext(ctx)
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
-		rows, err := deps.Queries.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-			WorkspaceID:   ws.ID,
-			Model:         model,
-			TaskID:        task.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         duplicateCandidateLimit,
+		model := deps.Embedder.Model()
+		ranked, err := deps.Embedder.RankSimilarTasks(ctx, deps.Queries, embed.SimilarQuery{
+			WorkspaceID: ws.ID,
+			TaskID:      task.ID,
+			SourceText: func(ctx context.Context) (string, string, error) {
+				row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+					WorkspaceID: ws.ID,
+					PublicID:    types.FromUUID(task.PublicID),
+				})
+				if err != nil {
+					return "", "", err
+				}
+				return row.Title, nullStr(row.Description), nil
+			},
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			ResultLimit: duplicateResultLimit,
 		})
+		if errors.Is(err, embed.ErrNoSourceVector) {
+			return emptyDuplicates(model), nil
+		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := emptyDuplicates(model)
 		out.Body.Source = task.PublicID.String()
-		for _, r := range rows {
-			v, derr := embed.Decode(vectorBytes(r.Vector))
-			if derr != nil || len(v) != len(srcVec) {
-				continue
-			}
-			score := float64(embed.Cosine(srcVec, v))
-			if score < low {
-				continue
-			}
+		for _, c := range ranked {
 			classification := "related"
-			if score >= high {
+			if c.Duplicate {
 				classification = "duplicate"
 			}
 			out.Body.Candidates = append(out.Body.Candidates, DuplicateCandidate{
-				TaskID:         r.PublicID.String(),
-				Title:          r.Title,
-				Score:          score,
+				TaskID:         c.PublicID.String(),
+				Title:          c.Title,
+				Score:          c.Score,
 				Classification: classification,
 			})
-		}
-		sort.SliceStable(out.Body.Candidates, func(i, j int) bool {
-			return out.Body.Candidates[i].Score > out.Body.Candidates[j].Score
-		})
-		if len(out.Body.Candidates) > duplicateResultLimit {
-			out.Body.Candidates = out.Body.Candidates[:duplicateResultLimit]
 		}
 		return out, nil
 	}
@@ -152,33 +103,4 @@ func emptyDuplicates(model string) *ListDuplicatesOutput {
 	out.Body.Model = model
 	out.Body.Candidates = []DuplicateCandidate{}
 	return out
-}
-
-func resolveThresholds(ctx context.Context, q *generated.Queries, wsID uint32) (float64, float64) {
-	s, err := q.GetAiSettings(ctx, wsID)
-	if err != nil {
-		return defaultDuplicateHigh, defaultDuplicateLow
-	}
-	high, lerr := strconv.ParseFloat(s.DuplicateThresholdHigh, 64)
-	if lerr != nil {
-		high = defaultDuplicateHigh
-	}
-	low, lerr := strconv.ParseFloat(s.DuplicateThresholdLow, 64)
-	if lerr != nil {
-		low = defaultDuplicateLow
-	}
-	return high, low
-}
-
-// vectorBytes coerces an interface{} VECTOR column to []byte. sqlc
-// exposes STRING_TO_VECTOR-wrapped VECTOR reads as interface{}; the
-// underlying value is []byte (MySQL binary protocol) or string.
-func vectorBytes(v any) []byte {
-	switch x := v.(type) {
-	case []byte:
-		return x
-	case string:
-		return []byte(x)
-	}
-	return nil
 }
