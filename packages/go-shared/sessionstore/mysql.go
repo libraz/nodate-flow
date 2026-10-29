@@ -210,7 +210,8 @@ func (s *MySQLStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 	defer tx.Rollback() //nolint:errcheck // rollback after commit is no-op
 
 	// Lock the row to prevent concurrent rotation of the same refresh hash.
-	const lockQ = `SELECT id FROM sessions WHERE refresh_hash = ? AND enabled = TRUE AND revoked_at IS NULL FOR UPDATE`
+	// audience: this application refreshes only its own rows.
+	const lockQ = `SELECT id FROM sessions WHERE audience = 'flow' AND refresh_hash = ? AND enabled = TRUE AND revoked_at IS NULL FOR UPDATE`
 	var id uint32
 	if err := tx.QueryRowContext(ctx, lockQ, oldHash).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -229,7 +230,7 @@ func (s *MySQLStore) RotateRefreshHash(ctx context.Context, oldHash, newHash str
 	                        rotated_from_hash = ?,
 	                        expires_at = ?,
 	                        last_used_at = CURRENT_TIMESTAMP
-	                  WHERE id = ?`
+	                  WHERE id = ? AND audience = 'flow'`
 	if _, err := tx.ExecContext(ctx, updateQ, newHash, oldHash, expiresAt, id); err != nil {
 		return fmt.Errorf("sessionstore/mysql: rotate update: %w", err)
 	}

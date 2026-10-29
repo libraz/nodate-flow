@@ -1,5 +1,6 @@
 -- name: AdminListUserSessions :many
--- List all sessions for a user by their internal user_id.
+-- List all sessions for a user by their internal user_id, across every
+-- audience: an operator sees (and may revoke) sessions of any application.
 SELECT
   s.public_id,
   s.user_agent,

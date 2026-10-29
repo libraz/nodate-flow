@@ -81,7 +81,8 @@ func (r *JWTResolver) Resolve(ctx context.Context, token string) (uint32, dbtype
 		const sessionQ = `
 SELECT id
 FROM sessions
-WHERE public_id = ?
+WHERE audience = 'flow'
+  AND public_id = ?
   AND user_id = ?
   AND enabled = TRUE
   AND revoked_at IS NULL

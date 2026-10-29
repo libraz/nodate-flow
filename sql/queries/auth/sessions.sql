@@ -1,13 +1,16 @@
 -- name: CreateSession :execlastid
--- Insert a new refresh-token session for a user.
+-- Insert a new refresh-token session for a user. audience is the SQL
+-- literal 'flow' (not a parameter) so the generated signature is stable.
+-- Every read below scopes to it; the revoke-all queries deliberately do not.
 INSERT INTO sessions (
   public_id,
   user_id,
   refresh_hash,
   user_agent,
   ip_address,
-  expires_at
-) VALUES (?, ?, ?, ?, ?, ?);
+  expires_at,
+  audience
+) VALUES (?, ?, ?, ?, ?, ?, 'flow');
 
 -- name: FindSessionByRefreshHash :one
 -- Resolve a session from its SHA-256 refresh hash. Caller validates expiry.
@@ -26,7 +29,8 @@ SELECT
   updated_at,
   created_at
 FROM sessions
-WHERE refresh_hash = ?
+WHERE audience = 'flow'
+  AND refresh_hash = ?
   AND enabled = TRUE
   AND revoked_at IS NULL
 LIMIT 1;
@@ -48,7 +52,8 @@ SELECT
   enabled,
   created_at
 FROM sessions
-WHERE refresh_hash = ?
+WHERE audience = 'flow'
+  AND refresh_hash = ?
 LIMIT 1;
 
 -- name: FindSessionByRotatedFromHash :one
@@ -73,7 +78,8 @@ SELECT
   enabled,
   created_at
 FROM sessions
-WHERE rotated_from_hash = ?
+WHERE audience = 'flow'
+  AND rotated_from_hash = ?
 LIMIT 1;
 
 -- name: RevokeSession :execrows
@@ -87,9 +93,9 @@ WHERE user_id = ?
   AND revoked_at IS NULL;
 
 -- name: RevokeAllSessionsForUser :exec
--- Revoke every active session for a user. Used by the refresh-reuse
--- detector to tear down the entire session family when a rotated /
--- revoked refresh token is replayed.
+-- Revoke every active session for a user, whatever its audience. Used by
+-- the refresh-reuse detector to tear down the entire session family when
+-- a rotated / revoked refresh token is replayed.
 --
 -- affected-rows: not-applicable — it revokes a set whose size is not known
 -- in advance and nobody named a session. What the caller asked for is that
@@ -113,7 +119,8 @@ SELECT
   created_at,
   COUNT(*) OVER() AS total
 FROM sessions
-WHERE user_id = ?
+WHERE audience = 'flow'
+  AND user_id = ?
   AND enabled = TRUE
   AND revoked_at IS NULL
 ORDER BY created_at DESC, public_id DESC
@@ -130,7 +137,8 @@ SELECT
   revoked_at,
   enabled
 FROM sessions
-WHERE public_id = ?
+WHERE audience = 'flow'
+  AND public_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
