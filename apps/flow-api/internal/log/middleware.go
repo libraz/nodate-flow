@@ -32,6 +32,23 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// Flush delegates to the underlying writer if it implements http.Flusher.
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap returns the original ResponseWriter so middleware such as
+// http.ResponseController can access it.
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
+// ensure interface compliance at compile time.
+var _ http.ResponseWriter = (*statusRecorder)(nil)
+var _ http.Flusher = (*statusRecorder)(nil)
+
 // RequestLogger returns an HTTP middleware that assigns a UUID v7
 // request_id, injects a request-scoped logger into the context, and logs
 // one structured line per request when it finishes.

@@ -139,3 +139,20 @@ func (s *statusCapture) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
 }
+
+// Flush delegates to the underlying writer if it implements http.Flusher.
+func (s *statusCapture) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap returns the original ResponseWriter so middleware such as
+// http.ResponseController can access it.
+func (s *statusCapture) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
+// ensure interface compliance at compile time.
+var _ http.ResponseWriter = (*statusCapture)(nil)
+var _ http.Flusher = (*statusCapture)(nil)

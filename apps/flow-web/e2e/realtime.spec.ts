@@ -25,7 +25,7 @@
  * no provider, so this version runs everywhere the suite runs.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Request, test } from '@playwright/test';
 
 import { cleanupTenant, createTask, createTestTenant, injectAuth } from './fixtures/tenant';
 
@@ -37,8 +37,21 @@ test.describe('realtime stream', () => {
       await createTask(tenant, seededTitle);
 
       await injectAuth(page.context(), tenant);
+      // Track stream requests that are still alive (the dev double-mount
+      // aborts the first one). Playwright never emits a `response` event
+      // for the routed SSE request, and networkidle never settles while
+      // the stream is open, so a live request is the subscription signal.
+      // The server flushes headers and buffers events before subscribing,
+      // so anything created after the request is sent is not lost.
+      const streamPath = `/workspaces/${tenant.workspaceId}/stream`;
+      const liveStreams = new Set<Request>();
+      page.on('request', (req) => {
+        if (req.url().endsWith(streamPath)) liveStreams.add(req);
+      });
+      page.on('requestfailed', (req) => liveStreams.delete(req));
+
       await page.goto(`/projects/${tenant.projectId}/tasks`);
-      await page.waitForLoadState('networkidle');
+      await expect.poll(() => liveStreams.size, { timeout: 15_000 }).toBeGreaterThan(0);
 
       // The pull path works, so the list is subscribed to ['tasks'].
       await expect(page.getByText(seededTitle).first()).toBeVisible({ timeout: 15_000 });
