@@ -834,9 +834,9 @@ func TestRecurringPastRecurrenceEndDoesNotFire(t *testing.T) {
 }
 
 // TestEndedSeriesIsNotReadByTheScan keeps a series whose recurrence_end
-// passed before the scanned day out of the read altogether. Its rule is
-// one the expander cannot step, so a scan that still read it would log the
-// row as malformed; one that does not read it says nothing about it.
+// passed before the scanned day out of the read altogether. Its exception
+// list is malformed, so a scan that still read it would log the row; one
+// that does not read it says nothing about it.
 func TestEndedSeriesIsNotReadByTheScan(t *testing.T) {
 	t.Parallel()
 	h := getHarness(t)
@@ -848,7 +848,7 @@ func TestEndedSeriesIsNotReadByTheScan(t *testing.T) {
 	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
 	eventPublicID := createEventViaAPI(t, tt, calID, base, base.Add(time.Hour), "UTC", "Ended Series")
 	ended := time.Date(2026, time.August, 2, 12, 0, 0, 0, time.UTC)
-	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"unsupported"}`, "", &ended)
+	setEventRecurrence(t, h.db, eventPublicID, `{"freq":"daily"}`, `{"not":"a list"}`, &ended)
 
 	var logged bytes.Buffer
 	scanner := &calendar_event_day.Scanner{DB: h.db, Logger: slog.New(slog.NewJSONHandler(&logged, nil))}
@@ -870,7 +870,7 @@ func TestMalformedRecurrenceDoesNotBlockWorkspaceScan(t *testing.T) {
 	base := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.UTC)
 	badEventPublicID := createEventViaAPI(t, tt, calID, base, base.Add(time.Hour), "UTC", "Bad Rule")
 	badEventInternalID := resolveEventInternalID(t, h.db, badEventPublicID)
-	setEventRecurrence(t, h.db, badEventPublicID, `{"freq":"unsupported"}`, "", nil)
+	setEventRecurrence(t, h.db, badEventPublicID, `{"freq":"daily"}`, `{"not":"a list"}`, nil)
 
 	goodStart := time.Date(2026, time.August, 4, 10, 0, 0, 0, time.UTC)
 	goodEventPublicID := createEventViaAPI(t, tt, calID, goodStart, goodStart.Add(time.Hour), "UTC", "Good Event")
