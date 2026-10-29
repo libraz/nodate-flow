@@ -421,3 +421,28 @@ jobs:
           files: apps/auth-api/coverage.out
           flags: auth-api
           fail_ci_if_error: false
+
+  images:
+    name: Images (prod compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate compose.prod.yml
+        run: docker compose -f compose.prod.yml --env-file ci/compose-prod.env config -q
+
+      # A required secret that is missing must stop the stack from
+      # rendering, and the error must name it.
+      - name: Missing secret is rejected
+        run: |
+          tmp=$(mktemp)
+          grep -v '^NF_SECRET_KEY=' ci/compose-prod.env > "$tmp"
+          if out=$(docker compose -f compose.prod.yml --env-file "$tmp" config -q 2>&1); then
+            echo "config succeeded without NF_SECRET_KEY" >&2
+            exit 1
+          fi
+          echo "$out"
+          grep -q NF_SECRET_KEY <<<"$out"
+
+      - name: Build images
+        run: docker compose -f compose.prod.yml --env-file ci/compose-prod.env --profile presence-discord build
