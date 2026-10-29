@@ -23,10 +23,10 @@ we will credit you in the release notes (unless you prefer anonymity).
 nodate-flow has not yet reached a stable release. Security fixes are applied
 to the development branch (`main`) as they are discovered.
 
-| Version | Supported |
-|---|---|
-| `main` (development) | Yes |
-| Pre-release tags | Best effort |
+| Version              | Supported   |
+| -------------------- | ----------- |
+| `main` (development) | Yes         |
+| Pre-release tags     | Best effort |
 
 Once v1.0.0 ships, this table will be updated with a formal support window.
 

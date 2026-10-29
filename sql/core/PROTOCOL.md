@@ -13,11 +13,11 @@ either side reading the other's source.
 
 ## What is in here
 
-| Directory | Contents |
-| --- | --- |
-| `tables/` | Every table shared across implementations. |
-| `triggers/` | The invariants that cannot be expressed as constraints. |
-| `conformance/` | A runnable suite that checks an implementation. |
+| Directory      | Contents                                                |
+| -------------- | ------------------------------------------------------- |
+| `tables/`      | Every table shared across implementations.              |
+| `triggers/`    | The invariants that cannot be expressed as constraints. |
+| `conformance/` | A runnable suite that checks an implementation.         |
 
 A product adds its own tables in a sibling layer — this repository keeps
 its own under `sql/flow/`. Layers compose: a deployment applies core, then
@@ -91,16 +91,16 @@ realtime delivery, and audit all read the log rather than polling tables.
 
 Column semantics:
 
-| Column | Meaning |
-| --- | --- |
-| `id` | `BIGINT UNSIGNED AUTO_INCREMENT`. Monotonic, so a consumer tails with `WHERE id > last_seen`. |
-| `public_id` | UUID v7, `BINARY(16)`. The only identifier that may appear in an API response. |
-| `workspace_id` | Scope. Required. |
-| `type` | Dotted kind, e.g. `calendar.event.created`. Consumers match on prefix, so a new kind is additive. |
-| `payload_json` | The change. Unknown keys must be preserved by anything that round-trips a row. |
-| `occurred_at` | Logical time, millisecond precision. Ties break by `id`. |
-| `actor_user_id` | Acting user, or NULL for a system action. |
-| `calendar_id` | The calendar the change is about, or NULL. Present so a feed for one calendar reads the log rather than a second history table. |
+| Column          | Meaning                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | `BIGINT UNSIGNED AUTO_INCREMENT`. Monotonic, so a consumer tails with `WHERE id > last_seen`.                                   |
+| `public_id`     | UUID v7, `BINARY(16)`. The only identifier that may appear in an API response.                                                  |
+| `workspace_id`  | Scope. Required.                                                                                                                |
+| `type`          | Dotted kind, e.g. `calendar.event.created`. Consumers match on prefix, so a new kind is additive.                               |
+| `payload_json`  | The change. Unknown keys must be preserved by anything that round-trips a row.                                                  |
+| `occurred_at`   | Logical time, millisecond precision. Ties break by `id`.                                                                        |
+| `actor_user_id` | Acting user, or NULL for a system action.                                                                                       |
+| `calendar_id`   | The calendar the change is about, or NULL. Present so a feed for one calendar reads the log rather than a second history table. |
 
 The table is append-only. Corrections are new rows, never an `UPDATE` or
 `DELETE` of an existing one.
@@ -124,8 +124,8 @@ A guard that could not be lifted would make the owning layer unable to write
 its own rows. Each guard therefore has an opt-in session variable, and the
 component that legitimately owns those rows sets it around its write.
 
-| Variable | Lifts |
-| --- | --- |
+| Variable                     | Lifts                                   |
+| ---------------------------- | --------------------------------------- |
 | `@nf_item_projection_engine` | The `calendar_events` projection guard. |
 
 Three rules make the opt-in safe:
@@ -163,7 +163,7 @@ pulled from a provider feed — and how many people can reach a calendar is
 already a count of `calendar_members` rows. Encoding the same fact twice
 gives the two encodings a way to disagree, and the disagreement is not
 cosmetic: `calendars.owner_user_id` cascades on delete, so a calendar
-carrying a `shared` label *and* an owner still vanishes when that one person
+carrying a `shared` label _and_ an owner still vanishes when that one person
 is removed. A calendar a group shares leaves `owner_user_id` NULL; that is
 the whole difference, and it is the difference that has teeth.
 
@@ -180,7 +180,7 @@ feed its own notifier. No broker and no shared code is involved.
 
 One detail decides whether a tailer is correct. `AUTO_INCREMENT` assigns an
 id when the `INSERT` runs, but the row stays invisible until its transaction
-commits — so a row can appear *below* an id that has already been read. A
+commits — so a row can appear _below_ an id that has already been read. A
 cursor that jumps straight to the highest id it has seen steps over that row
 and never delivers it. A tailer must therefore keep re-reading from below
 its high-water mark until a row has had time to commit, and suppress the

@@ -23,19 +23,19 @@ make dev                       # runs Go API + React frontend in parallel
 
 `make help` lists all available targets. The most common ones:
 
-| Command | What it does |
-|---|---|
-| `make dev` | Start MySQL (compose) + API + web in parallel |
-| `make dev-api` | Run Go API only |
-| `make dev-web` | Run Vite dev server only |
-| `make lint` | Run all linters (golangci-lint + biome) |
-| `make check` | Static guards only -- lint, formatting, typecheck, `go vet`, locale and token guards |
-| `make test-unit` | Every suite that needs no container (Go + TS) |
-| `make test` | Run all tests, including the container-backed suites |
-| `make gen-errors` | Regenerate Go + TS error code files from `errors/*.yaml` |
-| `make gen-sqlc` | Regenerate sqlc Go types from `sql/` |
-| `make gen-sdk` | Regenerate TypeScript SDK from OpenAPI spec |
-| `make verify-codegen` | Fail when the schema and its generated code disagree |
+| Command               | What it does                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `make dev`            | Start MySQL (compose) + API + web in parallel                                        |
+| `make dev-api`        | Run Go API only                                                                      |
+| `make dev-web`        | Run Vite dev server only                                                             |
+| `make lint`           | Run all linters (golangci-lint + biome)                                              |
+| `make check`          | Static guards only -- lint, formatting, typecheck, `go vet`, locale and token guards |
+| `make test-unit`      | Every suite that needs no container (Go + TS)                                        |
+| `make test`           | Run all tests, including the container-backed suites                                 |
+| `make gen-errors`     | Regenerate Go + TS error code files from `errors/*.yaml`                             |
+| `make gen-sqlc`       | Regenerate sqlc Go types from `sql/`                                                 |
+| `make gen-sdk`        | Regenerate TypeScript SDK from OpenAPI spec                                          |
+| `make verify-codegen` | Fail when the schema and its generated code disagree                                 |
 
 ## Design order
 
@@ -127,11 +127,11 @@ make test-web          # frontend tests only
 
 The suites come in tiers, and the tier decides where each one can run:
 
-| Tier | What it is | Where it runs |
-|---|---|---|
-| `make check` | Static guards. Reads the sources, runs no behaviour. | Locally, and step by step in CI |
-| `make test-unit` | Every suite that needs no container. No `-race`, and `-short` skips the whole-module source scanners. | Locally, and in the pre-commit hook, narrowed to the staged changes |
-| `make test` | The above plus the suites that boot MySQL and MinIO. Minutes, and they contend for the container reaper. | Locally on demand, and in full in CI |
+| Tier             | What it is                                                                                               | Where it runs                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `make check`     | Static guards. Reads the sources, runs no behaviour.                                                     | Locally, and step by step in CI                                     |
+| `make test-unit` | Every suite that needs no container. No `-race`, and `-short` skips the whole-module source scanners.    | Locally, and in the pre-commit hook, narrowed to the staged changes |
+| `make test`      | The above plus the suites that boot MySQL and MinIO. Minutes, and they contend for the container reaper. | Locally on demand, and in full in CI                                |
 
 Nothing a faster tier skips is skipped everywhere: CI runs every suite
 with `-race` and without `-short`. The tiers exist to move the fast half

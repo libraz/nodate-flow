@@ -8,14 +8,14 @@ locally for faster feedback.
 
 ## Tools Overview
 
-| Tool | Purpose | Covers (OWASP 2021) |
-|---|---|---|
-| **Semgrep** | Static analysis (SAST) on Go and TypeScript | A03 Injection, A07 Auth Failures, A02 Crypto Failures |
-| **Trivy** | Dependency vulnerability scanning (SCA) | A06 Vulnerable Components |
-| **govulncheck** | Go-specific vulnerability database check | A06 Vulnerable Components |
-| **ZAP** | Dynamic baseline scan (DAST, passive) | A01 Broken Access Control, A05 Security Misconfiguration |
-| **gitleaks** (planned) | Secret detection in git history | A07 Auth Failures |
-| **npm-audit / bun audit** | JS dependency audit | A06 Vulnerable Components |
+| Tool                      | Purpose                                     | Covers (OWASP 2021)                                      |
+| ------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| **Semgrep**               | Static analysis (SAST) on Go and TypeScript | A03 Injection, A07 Auth Failures, A02 Crypto Failures    |
+| **Trivy**                 | Dependency vulnerability scanning (SCA)     | A06 Vulnerable Components                                |
+| **govulncheck**           | Go-specific vulnerability database check    | A06 Vulnerable Components                                |
+| **ZAP**                   | Dynamic baseline scan (DAST, passive)       | A01 Broken Access Control, A05 Security Misconfiguration |
+| **gitleaks** (planned)    | Secret detection in git history             | A07 Auth Failures                                        |
+| **npm-audit / bun audit** | JS dependency audit                         | A06 Vulnerable Components                                |
 
 ---
 
@@ -170,9 +170,9 @@ bunx npm-audit --production
 
 ## Configuration Files
 
-| File | Purpose |
-|---|---|
-| `infra/security/zap-baseline.conf` | ZAP passive scan rules and exclusions |
-| `infra/security/.semgrep.yml` | Custom Semgrep rules for nodate-flow patterns |
-| `.trivyignore` | Accepted CVE exceptions with documented reasons |
-| `.github/workflows/ci.yml` (security job) | CI integration for Trivy, Semgrep, govulncheck |
+| File                                      | Purpose                                         |
+| ----------------------------------------- | ----------------------------------------------- |
+| `infra/security/zap-baseline.conf`        | ZAP passive scan rules and exclusions           |
+| `infra/security/.semgrep.yml`             | Custom Semgrep rules for nodate-flow patterns   |
+| `.trivyignore`                            | Accepted CVE exceptions with documented reasons |
+| `.github/workflows/ci.yml` (security job) | CI integration for Trivy, Semgrep, govulncheck  |

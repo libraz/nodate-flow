@@ -129,7 +129,7 @@ resources:
         message_ja: "入力をフィルタに変換できませんでした"
         message_zh: "无法将其转换为筛选条件"
         description: "Returned when the NL query compiler could not produce a valid Lens JSON from the user's prose, either because the upstream LLM emitted malformed output or because the result failed schema validation against the closed Lens grammar (ADR 0004)."
-        userAction: "Rephrase the request — e.g. \"blocked tasks due this week\"."
+        userAction: 'Rephrase the request — e.g. "blocked tasks due this week".'
 
   agent:
     breadcrumb: "AI > Agent"

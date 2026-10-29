@@ -11,7 +11,7 @@ A single monorepo ships two products served by **one combined backend** (`flow-a
 - **nodate-flow** — task management driven by constraints, events, and AI agents.
 - **nodate-time** — a calendar that blends TimeTree's shared-calendar simplicity with Google Calendar's permission model.
 
-> **About the name:** a pun on *"no date"* (work free from deadline pressure) and Japanese **野点 (nodate)** — preparing tea outdoors, unhurried.
+> **About the name:** a pun on _"no date"_ (work free from deadline pressure) and Japanese **野点 (nodate)** — preparing tea outdoors, unhurried.
 
 **Status:** alpha | **License:** [AGPL-3.0](./LICENSE) | **Stack:** Go · MySQL 9.6 · React 19 · OpenAPI 3.1
 
@@ -19,26 +19,26 @@ A single monorepo ships two products served by **one combined backend** (`flow-a
 
 ## nodate-flow
 
-| Feature | Detail |
-|---|---|
-| **Views** | Board, timeline, Gantt, dashboard, custom lenses |
-| **Constraints** | Dependencies, auto-evaluation, derived state — no manual status toggling |
-| **AI** | Priority & state suggestions, smart create, embedding-based duplicate detection |
-| **MCP** | Built-in server — GitHub, Slack, and external tools live in the same workspace |
-| **Pages** | Lightweight wiki / docs |
-| **Notifications** | Inbox with weekly digest |
-| **Webhooks** | Outbound event delivery |
-| **Auth** | Password (Argon2id) · OIDC · TOTP 2FA · recovery codes |
-| **Multi-tenant** | Workspaces with role-based access control |
+| Feature           | Detail                                                                          |
+| ----------------- | ------------------------------------------------------------------------------- |
+| **Views**         | Board, timeline, Gantt, dashboard, custom lenses                                |
+| **Constraints**   | Dependencies, auto-evaluation, derived state — no manual status toggling        |
+| **AI**            | Priority & state suggestions, smart create, embedding-based duplicate detection |
+| **MCP**           | Built-in server — GitHub, Slack, and external tools live in the same workspace  |
+| **Pages**         | Lightweight wiki / docs                                                         |
+| **Notifications** | Inbox with weekly digest                                                        |
+| **Webhooks**      | Outbound event delivery                                                         |
+| **Auth**          | Password (Argon2id) · OIDC · TOTP 2FA · recovery codes                          |
+| **Multi-tenant**  | Workspaces with role-based access control                                       |
 
 ## nodate-time
 
-| Feature | Detail |
-|---|---|
-| **Calendars** | Shared & personal, per-member visibility control |
-| **Events** | Attendees, invites, checklists, comments, attachments |
-| **Sync** | Two-way task sync with nodate-flow |
-| **Holidays** | Locale-aware holiday scheduling |
+| Feature       | Detail                                                |
+| ------------- | ----------------------------------------------------- |
+| **Calendars** | Shared & personal, per-member visibility control      |
+| **Events**    | Attendees, invites, checklists, comments, attachments |
+| **Sync**      | Two-way task sync with nodate-flow                    |
+| **Holidays**  | Locale-aware holiday scheduling                       |
 
 ## Why not Asana / Plane / Linear?
 

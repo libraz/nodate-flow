@@ -11,7 +11,7 @@
  * layer that hides them. Going through MSW means the assertions see
  * the URL, the headers, and the body that would have gone to the API.
  *
- * `onUnhandledRequest: 'error'` is deliberate: a request no handler
+ * `onUnhandledFrame: 'error'` is deliberate: a request no handler
  * covers is a hole in the test, not something to answer with a default.
  *
  * Handlers are registered per test with `server.use(...)`; this module
@@ -36,7 +36,7 @@ export const AUTH_API_URL = 'http://localhost:8082';
  */
 export function useMockApi(): void {
   beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'error' });
+    server.listen({ onUnhandledFrame: 'error' });
   });
   afterEach(() => {
     server.resetHandlers();

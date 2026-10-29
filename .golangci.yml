@@ -35,27 +35,27 @@ linters:
         crypto-flow-api:
           list-mode: lax
           files:
-            - '**/apps/flow-api/**'
-            - '!**/apps/flow-api/internal/ai/**'
-            - '!**/apps/flow-api/internal/http/handlers/ai/**'
-            - '!**/apps/flow-api/internal/http/router/**'
-            - '!**/apps/flow-api/cmd/secrets-rotate/**'
-            - '!**/apps/flow-api/cmd/api/**'
-            - '!**/apps/flow-api/tests/**'
+            - "**/apps/flow-api/**"
+            - "!**/apps/flow-api/internal/ai/**"
+            - "!**/apps/flow-api/internal/http/handlers/ai/**"
+            - "!**/apps/flow-api/internal/http/router/**"
+            - "!**/apps/flow-api/cmd/secrets-rotate/**"
+            - "!**/apps/flow-api/cmd/api/**"
+            - "!**/apps/flow-api/tests/**"
           deny:
             - pkg: github.com/libraz/nodate-flow/packages/go-shared/crypto
               desc: crypto package may only be imported from internal/ai, internal/http/handlers/ai, internal/http/router, cmd/api, cmd/secrets-rotate, and tests
         crypto-auth-api:
           list-mode: lax
           files:
-            - '**/apps/auth-api/**'
-            - '!**/apps/auth-api/internal/http/handlers/auth/**'
-            - '!**/apps/auth-api/internal/http/handlers/integrations/**'
-            - '!**/apps/auth-api/internal/http/router/**'
-            - '!**/apps/auth-api/internal/integrations/**'
-            - '!**/apps/auth-api/cmd/api/**'
-            - '!**/apps/auth-api/tests/**'
-            - '!**/apps/auth-api/testutil/**'
+            - "**/apps/auth-api/**"
+            - "!**/apps/auth-api/internal/http/handlers/auth/**"
+            - "!**/apps/auth-api/internal/http/handlers/integrations/**"
+            - "!**/apps/auth-api/internal/http/router/**"
+            - "!**/apps/auth-api/internal/integrations/**"
+            - "!**/apps/auth-api/cmd/api/**"
+            - "!**/apps/auth-api/tests/**"
+            - "!**/apps/auth-api/testutil/**"
           deny:
             - pkg: github.com/libraz/nodate-flow/packages/go-shared/crypto
               desc: crypto package may only be imported from internal/http/handlers/auth, internal/http/handlers/integrations, internal/http/router, internal/integrations, cmd/api, testutil, and tests
@@ -67,9 +67,9 @@ linters:
         crypto-elsewhere:
           list-mode: lax
           files:
-            - '!**/apps/flow-api/**'
-            - '!**/apps/auth-api/**'
-            - '!**/packages/go-shared/crypto/**'
+            - "!**/apps/flow-api/**"
+            - "!**/apps/auth-api/**"
+            - "!**/packages/go-shared/crypto/**"
           deny:
             - pkg: github.com/libraz/nodate-flow/packages/go-shared/crypto
               desc: crypto belongs to the services that hold secret material; a module that needs it states the boundary in this file first

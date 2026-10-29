@@ -5,24 +5,29 @@
 # resolution. Anything held back below a published minor is pinned exactly in
 # the package.json that declares it.
 reject:
-  # v9 rewrites the table API around feature maps: `Row` and `Table` no longer
-  # carry the selection/sorting methods unless the feature is declared, and the
-  # generic parameter now means something else. The data-grid primitive and
-  # every view built on it have to move together.
+  # 3.14.21 and later render no rows under jsdom: the flow-web test
+  # task-spreadsheet-edit-identity finds none of its cells (3.14.20 passes;
+  # 3.14.21, 3.14.22 and 3.14.23 fail). Pinned exactly at 3.14.20 in the
+  # package.json files that declare it until the test setup is adapted.
+  - "@tanstack/react-virtual"
+
+  # v9 (9.3.1 re-measured) rewrites the table API around feature maps: `Row`
+  # and `Table` no longer carry the selection/sorting methods unless the feature
+  # is declared, and the generic parameter now means something else; raising it
+  # leaves ~110 type errors across flow-web. The data-grid primitive and every
+  # view built on it have to move together.
   - "@tanstack/react-table"
 
-  # v8 depends on @babel/types v8 while @babel/core stays on 7.x, so the tree
-  # ends up with two copies of the AST types and a parsed Program no longer
-  # matches the Node the traversal helpers expect.
-  - "@babel/parser"
-
-  # 20.14.0 sends a CORS preflight for cross-origin fetch. The unhandled OPTIONS
-  # request trips the `onUnhandledRequest: 'error'` strategy the API mocks run
-  # under, so component queries fail before any handler is consulted.
+  # 20.14.0 and 21.x (21.0.4 re-measured) send a CORS preflight for cross-origin
+  # fetch. The unhandled OPTIONS request trips the `onUnhandledFrame: 'error'`
+  # strategy the API mocks run under ("Cannot bypass a request when using the
+  # error strategy"), so component queries fail before any handler is consulted
+  # (8 flow-web and 1 accounts-web test failures on 21.0.4).
   - "happy-dom"
 
-  # 1.4.x renders an option's value placeholder from the camelCase destination
-  # instead of the flag name, so help output reads `--workspace-id <workspaceId>`.
+  # 1.4.x (1.4.2 re-measured) renders an option's value placeholder from the
+  # camelCase destination instead of the flag name, so help output reads
+  # `--workspace-id <workspaceId>`.
   - "@libraz/node-cli"
 
   # An alias for the TypeScript copy the SDK generator runs on. openapi-typescript
@@ -30,3 +35,5 @@ reject:
   # of the compiler exposes, so this edge has to stay on a 5.x release even as the
   # workspaces move their own `typescript` forward.
   - "typescript-5x"
+
+packageManager: bun

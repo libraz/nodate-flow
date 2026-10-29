@@ -12,7 +12,7 @@ resources:
         message_ja: "このユーザーを削除するには確認が必要です。confirm=true を付けて再送信してください。"
         message_zh: "删除此用户需要确认。请将 confirm=true 一并重新发送。"
         description: "Returned by `DELETE /admin/users/{userId}` when the request body is missing or has confirm=false. The endpoint immediately purges the user account including avatar storage objects and any task / calendar attachment blobs whose ref_count drops to zero, so the API requires explicit confirmation."
-        userAction: "Resend the request with `{\"confirm\": true}` after acknowledging that the action is irreversible."
+        userAction: 'Resend the request with `{"confirm": true}` after acknowledging that the action is irreversible.'
       self_not_allowed:
         code: USER.DELETE.SELF_NOT_ALLOWED
         status: 400

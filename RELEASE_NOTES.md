@@ -167,20 +167,20 @@ with AI-suggested initial layouts.
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Backend | Go 1.23+, Huma (chi router), sqlc, `database/sql` |
-| Database | MySQL 9.6 |
-| Frontend | TypeScript, React 19, Vite, Tailwind v4, TanStack (Router, Query, Table, Virtual) |
-| State management | Zustand |
-| Forms | React Hook Form + Zod |
-| i18n | i18next with ICU message format |
-| API boundary | OpenAPI 3.1 (auto-generated), TypeScript SDK |
-| Auth | EdDSA JWT, OIDC, Argon2id, TOTP 2FA |
-| Encryption | AES-256-GCM |
-| Observability | OpenTelemetry, Prometheus, Grafana |
-| Testing | testify, testcontainers-go, Vitest, Playwright |
-| Linting | golangci-lint, Biome |
+| Layer            | Technology                                                                        |
+| ---------------- | --------------------------------------------------------------------------------- |
+| Backend          | Go 1.23+, Huma (chi router), sqlc, `database/sql`                                 |
+| Database         | MySQL 9.6                                                                         |
+| Frontend         | TypeScript, React 19, Vite, Tailwind v4, TanStack (Router, Query, Table, Virtual) |
+| State management | Zustand                                                                           |
+| Forms            | React Hook Form + Zod                                                             |
+| i18n             | i18next with ICU message format                                                   |
+| API boundary     | OpenAPI 3.1 (auto-generated), TypeScript SDK                                      |
+| Auth             | EdDSA JWT, OIDC, Argon2id, TOTP 2FA                                               |
+| Encryption       | AES-256-GCM                                                                       |
+| Observability    | OpenTelemetry, Prometheus, Grafana                                                |
+| Testing          | testify, testcontainers-go, Vitest, Playwright                                    |
+| Linting          | golangci-lint, Biome                                                              |
 
 ---
 
