@@ -1,3 +1,4 @@
+import './zod-config';
 import ConfirmProvider from '@nodate-flow/ui/primitives/confirm';
 import ToastProvider from '@nodate-flow/ui/primitives/toast';
 import { RouterProvider } from '@tanstack/react-router';
