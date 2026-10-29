@@ -56,7 +56,8 @@ type Querier interface {
 	AdminListInstanceAuditLogs(ctx context.Context, arg AdminListInstanceAuditLogsParams) ([]AdminListInstanceAuditLogsRow, error)
 	// List all instance settings.
 	AdminListInstanceSettings(ctx context.Context) ([]AdminListInstanceSettingsRow, error)
-	// List all sessions for a user by their internal user_id.
+	// List all sessions for a user by their internal user_id, across every
+	// audience: an operator sees (and may revoke) sessions of any application.
 	AdminListUserSessions(ctx context.Context, arg AdminListUserSessionsParams) ([]AdminListUserSessionsRow, error)
 	// Paginated user list for instance admin panel.
 	// search: pass '' to skip, otherwise matches email or display_name.
@@ -200,7 +201,9 @@ type Querier interface {
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
 	// Insert a new personal access token. Plain token is shown to the user once.
 	CreatePat(ctx context.Context, arg CreatePatParams) (int64, error)
-	// Insert a new refresh-token session for a user.
+	// Insert a new refresh-token session for a user. audience is the SQL
+	// literal 'flow' (not a parameter) so the generated signature is stable.
+	// Every read below scopes to it; the revoke-all queries deliberately do not.
 	CreateSession(ctx context.Context, arg CreateSessionParams) (int64, error)
 	// Insert a stub user for invitations: no identity row, display_name defaults to email.
 	CreateStubUser(ctx context.Context, arg CreateStubUserParams) (int64, error)
@@ -263,15 +266,17 @@ type Querier interface {
 	// answers the caller, and an empty set is the ordinary case.
 	DeleteCalendarEventAttachmentsByWorkspace(ctx context.Context, workspaceID uint32) error
 	// The calendar-side mirror of DeleteAttachmentsForStorageObject; the
-	// same RESTRICT edge exists from calendar_event_attachments.
+	// same RESTRICT edge exists from calendar_event_attachments. A retired
+	// attachment is history another product keeps, so it is left in place
+	// and its RESTRICT edge makes the sweeper skip the object.
 	DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error)
 	// Drop a queued removal once its blob is gone from object storage.
 	DeleteStorageBlobRemoval(ctx context.Context, id uint32) (int64, error)
 	// Drop the queued removals for keys a teardown has just removed from
 	// object storage itself.
 	DeleteStorageBlobRemovalsByKey(ctx context.Context, storageKeys []string) (int64, error)
-	// Remove a reclaimed row. Restricted to rows nothing references so a
-	// concurrent upload that adopted the row between listing and deleting
+	// Remove a reclaimed row, guarded on the predicate that selected it, so
+	// a concurrent upload that adopted the row between listing and deleting
 	// is left alone.
 	DeleteStorageObjectByID(ctx context.Context, id uint32) (int64, error)
 	// Hard-delete a storage object row only if no referencing rows remain.
@@ -444,6 +449,10 @@ type Querier interface {
 	// Fetch just the timezone and country columns by internal id. Used by the
 	// calendar layer when resolving the effective timezone for a request.
 	FindWorkspaceTimezoneCountryById(ctx context.Context, id uint32) (FindWorkspaceTimezoneCountryByIdRow, error)
+	// The bucket recorded by the first drainer to start against this
+	// database, read regardless of enabled so a disabled row still blocks a
+	// drainer pointed elsewhere.
+	GetStorageLocation(ctx context.Context) (string, error)
 	// Resolve internal workspace id from public_id; ignored if workspace is disabled.
 	// Direct table lookup (no view) because this is a single-column id resolution
 	// used on hot paths in task handlers; v_workspaces would project unused columns.
@@ -505,6 +514,10 @@ type Querier interface {
 	IncrementStorageObjectRefCount(ctx context.Context, id uint32) error
 	// Insert a hashed recovery code for a user.
 	InsertRecoveryCode(ctx context.Context, arg InsertRecoveryCodeParams) error
+	// Record the bucket this database's blobs live in, unless a drainer has
+	// already recorded one. The unique key on setting_key makes the first
+	// writer win; a later writer's value is not applied.
+	InsertStorageLocationIfAbsent(ctx context.Context, arg InsertStorageLocationIfAbsentParams) error
 	// Create a brand new storage object row with ref_count = 1, representing
 	// the first reference (the just-inserted attachment / avatar). Caller
 	// supplies a UUID v7 public_id and either workspace_id OR owner_user_id
@@ -626,12 +639,20 @@ type Querier interface {
 	// column is stamped at exactly the moment a URL is handed out. That is
 	// the clock DefaultReservationTTL is described against: the lifetime of
 	// the presigned URL the row is currently serving.
+	//
+	// Paged by id: the sweeper passes the last id it saw, so objects another
+	// layer holds, skipped on every pass, cannot fill every page.
 	ListUnconfirmedStorageObjects(ctx context.Context, arg ListUnconfirmedStorageObjectsParams) ([]ListUnconfirmedStorageObjectsRow, error)
 	// Rows nothing points at any more. The delete paths drop these inline,
 	// so anything showing up here is the residue of a delete that got part
 	// way — an object-store call that failed, a workspace teardown that
 	// died — and would otherwise sit in the bucket forever.
-	ListUnreferencedStorageObjects(ctx context.Context, limit int32) ([]ListUnreferencedStorageObjectsRow, error)
+	//
+	// Confirmed rows only. An unconfirmed row at ref_count = 0 may be another
+	// product's reservation still waiting for its upload, and a reservation
+	// is reclaimed by age alone, through ListUnconfirmedStorageObjects.
+	// Paged by id for the same reason as that query.
+	ListUnreferencedStorageObjects(ctx context.Context, arg ListUnreferencedStorageObjectsParams) ([]ListUnreferencedStorageObjectsRow, error)
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
@@ -709,9 +730,9 @@ type Querier interface {
 	RemoveWorkspaceMemberByUserId(ctx context.Context, arg RemoveWorkspaceMemberByUserIdParams) error
 	// Clear failed login counter and lockout after a successful authentication.
 	ResetIdentityFailedAttempts(ctx context.Context, id uint32) error
-	// Revoke every active session for a user. Used by the refresh-reuse
-	// detector to tear down the entire session family when a rotated /
-	// revoked refresh token is replayed.
+	// Revoke every active session for a user, whatever its audience. Used by
+	// the refresh-reuse detector to tear down the entire session family when
+	// a rotated / revoked refresh token is replayed.
 	//
 	// affected-rows: not-applicable — it revokes a set whose size is not known
 	// in advance and nobody named a session. What the caller asked for is that

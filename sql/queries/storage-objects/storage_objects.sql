@@ -146,6 +146,9 @@ WHERE id = sqlc.arg(id)
 -- column is stamped at exactly the moment a URL is handed out. That is
 -- the clock DefaultReservationTTL is described against: the lifetime of
 -- the presigned URL the row is currently serving.
+--
+-- Paged by id: the sweeper passes the last id it saw, so objects another
+-- layer holds, skipped on every pass, cannot fill every page.
 SELECT
   id,
   public_id,
@@ -157,7 +160,8 @@ FROM storage_objects
 WHERE uploaded_at IS NULL
   AND updated_at < sqlc.arg(cutoff)
   AND enabled = TRUE
-ORDER BY updated_at ASC
+  AND id > sqlc.arg(after_id)
+ORDER BY id ASC
 LIMIT ?;
 
 -- name: ListUnreferencedStorageObjects :many
@@ -165,6 +169,11 @@ LIMIT ?;
 -- so anything showing up here is the residue of a delete that got part
 -- way — an object-store call that failed, a workspace teardown that
 -- died — and would otherwise sit in the bucket forever.
+--
+-- Confirmed rows only. An unconfirmed row at ref_count = 0 may be another
+-- product's reservation still waiting for its upload, and a reservation
+-- is reclaimed by age alone, through ListUnconfirmedStorageObjects.
+-- Paged by id for the same reason as that query.
 SELECT
   id,
   public_id,
@@ -174,8 +183,10 @@ SELECT
   created_at
 FROM storage_objects
 WHERE ref_count = 0
+  AND uploaded_at IS NOT NULL
   AND enabled = TRUE
-ORDER BY created_at ASC
+  AND id > sqlc.arg(after_id)
+ORDER BY id ASC
 LIMIT ?;
 
 -- name: DeleteAttachmentsForStorageObject :execrows
@@ -189,17 +200,21 @@ WHERE storage_object_id = ?;
 
 -- name: DeleteCalendarEventAttachmentsForStorageObject :execrows
 -- The calendar-side mirror of DeleteAttachmentsForStorageObject; the
--- same RESTRICT edge exists from calendar_event_attachments.
+-- same RESTRICT edge exists from calendar_event_attachments. A retired
+-- attachment is history another product keeps, so it is left in place
+-- and its RESTRICT edge makes the sweeper skip the object.
 DELETE FROM calendar_event_attachments
-WHERE storage_object_id = ?;
+WHERE storage_object_id = ?
+  AND retired_at IS NULL;
 
 -- name: DeleteStorageObjectByID :execrows
--- Remove a reclaimed row. Restricted to rows nothing references so a
--- concurrent upload that adopted the row between listing and deleting
+-- Remove a reclaimed row, guarded on the predicate that selected it, so
+-- a concurrent upload that adopted the row between listing and deleting
 -- is left alone.
 DELETE FROM storage_objects
 WHERE id = sqlc.arg(id)
-  AND ref_count = 0;
+  AND ref_count = 0
+  AND uploaded_at IS NOT NULL;
 
 -- name: DeleteUnconfirmedStorageObjectByID :execrows
 -- Remove a reservation whose upload never arrived, guarded on the same

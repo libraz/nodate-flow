@@ -11,6 +11,8 @@ import (
 const (
 	mysqlDuplicateEntry           uint16 = 1062 // ER_DUP_ENTRY
 	mysqlDuplicateKeyMessageToken        = " for key '"
+	mysqlRowIsReferenced          uint16 = 1217 // ER_ROW_IS_REFERENCED
+	mysqlRowIsReferenced2         uint16 = 1451 // ER_ROW_IS_REFERENCED_2
 )
 
 // IsDuplicateEntry reports whether err is a unique-key violation
@@ -22,6 +24,14 @@ const (
 func IsDuplicateEntry(err error) bool {
 	me, ok := mysqlError(err)
 	return ok && me.Number == mysqlDuplicateEntry
+}
+
+// IsForeignKeyRestrict reports whether err is a delete or update of a
+// parent row refused because a RESTRICT foreign key still references it,
+// however deeply it is wrapped.
+func IsForeignKeyRestrict(err error) bool {
+	me, ok := mysqlError(err)
+	return ok && (me.Number == mysqlRowIsReferenced2 || me.Number == mysqlRowIsReferenced)
 }
 
 // DuplicateKey returns the name of the unique key a duplicate-entry error

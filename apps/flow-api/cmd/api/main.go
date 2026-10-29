@@ -654,6 +654,9 @@ func main() {
 	var storageSweeper *storagegc.Sweeper
 	if storageClient != nil {
 		storageSweeper = storagegc.New(db, queries, storageClient, logger)
+		// A bucket other than the one recorded for this database stops
+		// only the sweeper; each refused pass logs an error.
+		storageSweeper.Location = storagegc.Location(cfg.S3Endpoint, cfg.S3Bucket)
 		storageSweeper.Start(context.Background())
 	} else {
 		logger.Warn("storage sweeper disabled: no object store configured")

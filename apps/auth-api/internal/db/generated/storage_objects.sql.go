@@ -49,10 +49,13 @@ func (q *Queries) DeleteAttachmentsForStorageObject(ctx context.Context, storage
 const deleteCalendarEventAttachmentsForStorageObject = `-- name: DeleteCalendarEventAttachmentsForStorageObject :execrows
 DELETE FROM calendar_event_attachments
 WHERE storage_object_id = ?
+  AND retired_at IS NULL
 `
 
 // The calendar-side mirror of DeleteAttachmentsForStorageObject; the
-// same RESTRICT edge exists from calendar_event_attachments.
+// same RESTRICT edge exists from calendar_event_attachments. A retired
+// attachment is history another product keeps, so it is left in place
+// and its RESTRICT edge makes the sweeper skip the object.
 func (q *Queries) DeleteCalendarEventAttachmentsForStorageObject(ctx context.Context, storageObjectID uint32) (int64, error) {
 	result, err := q.db.ExecContext(ctx, deleteCalendarEventAttachmentsForStorageObject, storageObjectID)
 	if err != nil {
@@ -65,10 +68,11 @@ const deleteStorageObjectByID = `-- name: DeleteStorageObjectByID :execrows
 DELETE FROM storage_objects
 WHERE id = ?
   AND ref_count = 0
+  AND uploaded_at IS NOT NULL
 `
 
-// Remove a reclaimed row. Restricted to rows nothing references so a
-// concurrent upload that adopted the row between listing and deleting
+// Remove a reclaimed row, guarded on the predicate that selected it, so
+// a concurrent upload that adopted the row between listing and deleting
 // is left alone.
 func (q *Queries) DeleteStorageObjectByID(ctx context.Context, id uint32) (int64, error) {
 	result, err := q.db.ExecContext(ctx, deleteStorageObjectByID, id)
@@ -382,13 +386,15 @@ FROM storage_objects
 WHERE uploaded_at IS NULL
   AND updated_at < ?
   AND enabled = TRUE
-ORDER BY updated_at ASC
+  AND id > ?
+ORDER BY id ASC
 LIMIT ?
 `
 
 type ListUnconfirmedStorageObjectsParams struct {
-	Cutoff sql.NullTime `json:"cutoff"`
-	Limit  int32        `json:"limit"`
+	Cutoff  sql.NullTime `json:"cutoff"`
+	AfterID uint32       `json:"-"`
+	Limit   int32        `json:"limit"`
 }
 
 type ListUnconfirmedStorageObjectsRow struct {
@@ -418,8 +424,11 @@ type ListUnconfirmedStorageObjectsRow struct {
 // column is stamped at exactly the moment a URL is handed out. That is
 // the clock DefaultReservationTTL is described against: the lifetime of
 // the presigned URL the row is currently serving.
+//
+// Paged by id: the sweeper passes the last id it saw, so objects another
+// layer holds, skipped on every pass, cannot fill every page.
 func (q *Queries) ListUnconfirmedStorageObjects(ctx context.Context, arg ListUnconfirmedStorageObjectsParams) ([]ListUnconfirmedStorageObjectsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUnconfirmedStorageObjects, arg.Cutoff, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listUnconfirmedStorageObjects, arg.Cutoff, arg.AfterID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -458,10 +467,17 @@ SELECT
   created_at
 FROM storage_objects
 WHERE ref_count = 0
+  AND uploaded_at IS NOT NULL
   AND enabled = TRUE
-ORDER BY created_at ASC
+  AND id > ?
+ORDER BY id ASC
 LIMIT ?
 `
+
+type ListUnreferencedStorageObjectsParams struct {
+	AfterID uint32 `json:"-"`
+	Limit   int32  `json:"limit"`
+}
 
 type ListUnreferencedStorageObjectsRow struct {
 	ID          uint32         `json:"-"`
@@ -476,8 +492,13 @@ type ListUnreferencedStorageObjectsRow struct {
 // so anything showing up here is the residue of a delete that got part
 // way — an object-store call that failed, a workspace teardown that
 // died — and would otherwise sit in the bucket forever.
-func (q *Queries) ListUnreferencedStorageObjects(ctx context.Context, limit int32) ([]ListUnreferencedStorageObjectsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUnreferencedStorageObjects, limit)
+//
+// Confirmed rows only. An unconfirmed row at ref_count = 0 may be another
+// product's reservation still waiting for its upload, and a reservation
+// is reclaimed by age alone, through ListUnconfirmedStorageObjects.
+// Paged by id for the same reason as that query.
+func (q *Queries) ListUnreferencedStorageObjects(ctx context.Context, arg ListUnreferencedStorageObjectsParams) ([]ListUnreferencedStorageObjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreferencedStorageObjects, arg.AfterID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
