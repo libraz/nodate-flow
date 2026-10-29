@@ -11,6 +11,7 @@
  * branded retry page.
  */
 
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Calendar as CalendarIcon, Globe } from 'lucide-react';
 import type { ReactElement } from 'react';
@@ -154,7 +155,7 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
         }}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--nf-space-1)' }}>
-          <Globe size={12} />
+          <Globe size={12} aria-hidden="true" />
           {pageTimezone}
         </span>
         {page.showHolidaysCountry ? (
@@ -173,15 +174,7 @@ export default function PublicShareCalPage({ token }: PublicShareCalPageProps): 
       beforeMain={titleHeader}
     >
       {events.length === 0 ? (
-        <p
-          style={{
-            padding: 'var(--nf-space-12) 0',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-subtle)',
-          }}
-        >
-          {t('share.no_upcoming_events')}
-        </p>
+        <EmptyState titleAs="p" title={t('share.no_upcoming_events')} />
       ) : (
         <ShareMonthGrid
           events={events}

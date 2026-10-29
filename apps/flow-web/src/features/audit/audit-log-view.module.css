@@ -1,0 +1,64 @@
+/* Audit log: filter bar, results (dimmed while a new page loads), pagination. */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+}
+
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.filterLabel {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+}
+
+.filterWide {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 12rem;
+}
+
+.filterNarrow {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 10rem;
+}
+
+.clear {
+  margin-inline-start: auto;
+}
+
+.results {
+  transition: opacity var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.results[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.metadataCell {
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 16rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-4);
+}
+
+.pageOf {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}

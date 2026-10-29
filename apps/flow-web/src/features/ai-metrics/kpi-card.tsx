@@ -25,7 +25,10 @@ export default function KpiCard({ label, value }: KpiCardProps): ReactElement {
   return (
     <Card className={styles.kpiCard}>
       <span className={styles.kpiLabel}>{label}</span>
-      <span className={styles.kpiValue}>{formatted}</span>
+      {/* Keyed on the figure so a changed value settles in rather than swapping in place. */}
+      <span key={formatted} className={styles.kpiValue}>
+        {formatted}
+      </span>
     </Card>
   );
 }

@@ -41,8 +41,7 @@
     "applied": "已更新为 {priority}。",
     "applyFailed": "无法更新优先级。",
     "dismissed": "暂时已忽略。",
-    "undone": "已撤销。",
-    "undo": "撤销"
+    "undone": "已撤销。"
   },
   "error": {
     "fetchFailed": "无法加载优先级建议。",

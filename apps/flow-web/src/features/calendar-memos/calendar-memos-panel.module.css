@@ -1,6 +1,6 @@
 /**
  * Calendar memos panel — body styling for the per-calendar memo
- * surface mounted inside the Calendar Settings Drawer. Tokens only.
+ * surface mounted inside the calendars rail's memo drawer. Tokens only.
  */
 
 .body {
@@ -17,6 +17,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-1);
+  --presence-gap: var(--nf-space-1);
 }
 
 .row {
@@ -27,11 +28,14 @@
   border: 1px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-surface);
-  transition: background var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.row:hover {
-  background: var(--nf-color-bg);
+.row:hover,
+.row:focus-within {
+  border-color: var(--nf-color-border-strong);
 }
 
 .checkbox {
@@ -70,6 +74,7 @@
   padding: 0;
   font-family: inherit;
   line-height: var(--nf-leading-tight);
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .expandToggle {
@@ -87,12 +92,12 @@
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   transition:
-    background var(--nf-duration-fast),
-    color var(--nf-duration-fast);
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .expandToggle:hover:not(:disabled) {
-  background: var(--nf-color-bg);
+  background: var(--nf-color-surface-hover);
   color: var(--nf-color-fg);
 }
 
@@ -121,8 +126,11 @@
   background: var(--nf-color-accent);
 }
 
-.bodyTextarea {
+.bodyCollapse {
   margin-block-start: var(--nf-space-1);
+}
+
+.bodyTextarea {
   font-size: var(--nf-text-sm);
   min-block-size: var(--nf-space-16);
 }
@@ -180,11 +188,4 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .row,
-  .expandToggle {
-    transition: none;
-  }
 }

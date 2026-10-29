@@ -9,14 +9,18 @@
  * list) rather than offset paging.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import Button from '@nodate-flow/ui/primitives/button';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import { Activity as ActivityIcon } from 'lucide-react';
 import { type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 
+import styles from './activity.module.css';
 import ActivityRow from './activity-row';
 import {
   ACTIVITY_SOURCES,
@@ -24,6 +28,7 @@ import {
   type ActivitySourceFilter,
   useActivityFeedQuery,
 } from './api';
+import { sourceLabel } from './labels';
 
 export interface ActivityFeedProps {
   workspaceId: string;
@@ -32,6 +37,8 @@ export interface ActivityFeedProps {
 }
 
 const FILTER_VALUES: readonly ActivitySourceFilter[] = ['all', ...ACTIVITY_SOURCES];
+
+const SKELETON_ROWS = ['a', 'b', 'c', 'd', 'e'] as const;
 
 /** Source chip filter. Single-select; `'all'` clears the stream filter. */
 function SourceFilter({
@@ -43,37 +50,28 @@ function SourceFilter({
 }): ReactElement {
   const { t } = useTranslation('activity');
   return (
-    <div
-      role="group"
-      aria-label={t('filter.source_label')}
-      style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-1-5)' }}
-    >
-      {FILTER_VALUES.map((v) => {
-        const active = v === value;
-        const label = v === 'all' ? t('filter.all_sources') : t(`source.${v}`);
-        return (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(v)}
-            style={{
-              padding: 'var(--nf-space-1) var(--nf-space-3)',
-              borderRadius: 'var(--nf-radius-pill)',
-              border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
-              background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
-              color: active ? 'var(--nf-color-accent-fg)' : 'var(--nf-color-fg)',
-              fontSize: 'var(--nf-text-supporting)',
-              cursor: 'pointer',
-              transition:
-                'border-color var(--nf-duration-fast) ease, background-color var(--nf-duration-fast) ease',
-            }}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
+    <ToggleChipGroup label={t('filter.source_label')}>
+      {FILTER_VALUES.map((v) => (
+        <ToggleChip key={v} pressed={v === value} onPressedChange={() => onChange(v)}>
+          {v === 'all' ? t('filter.all_sources') : sourceLabel(v, t)}
+        </ToggleChip>
+      ))}
+    </ToggleChipGroup>
+  );
+}
+
+/** Placeholder rows shaped like the feed so the list does not jump on load. */
+function FeedSkeleton(): ReactElement {
+  const { t } = useTranslation('activity');
+  return (
+    <ul className={styles.skeletonList} aria-busy="true" aria-label={t('view.loading')}>
+      {SKELETON_ROWS.map((key) => (
+        <li key={key} className={styles.skeletonRow}>
+          <Skeleton className={styles.skeletonAvatar} />
+          <Skeleton className={styles.skeletonLine} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -90,6 +88,7 @@ function FeedWithActors({
   const nameById = new Map(users.map((u) => [u.id, u.displayName]));
 
   const query = useActivityFeedQuery(workspaceId, { source });
+  const stagger = useFirstLoadStagger();
   const {
     data,
     error,
@@ -104,7 +103,7 @@ function FeedWithActors({
   // Auto-load the next page when a sentinel near the list end scrolls into
   // view. Falls back to the explicit "load more" button when IntersectionObserver
   // is unavailable or the user prefers it.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLLIElement | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-arm observer when page count or fetch state changes
   useEffect(() => {
     const node = sentinelRef.current;
@@ -125,35 +124,19 @@ function FeedWithActors({
   }, [hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages.length]);
 
   if (isLoading) {
-    return (
-      <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
-        <Spinner label={t('view.loading')} />
-      </div>
-    );
+    return <FeedSkeleton />;
   }
 
   if (error) {
     return (
-      <div
-        role="alert"
-        style={{
-          padding: 'var(--nf-space-8) var(--nf-space-4)',
-          textAlign: 'center',
-          color: 'var(--nf-color-danger-fg)',
-          border: '1px solid var(--nf-color-danger)',
-          borderRadius: 'var(--nf-radius-lg)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-3)',
-          alignItems: 'center',
-        }}
-      >
+      <div role="alert" className={styles.error}>
         <span>{formatApiError(error, t, 'view.error')}</span>
         <Button
           type="button"
           variant="default"
           onClick={() => void refetch()}
           disabled={isRefetching}
+          aria-busy={isRefetching}
         >
           {t('view.retry')}
         </Button>
@@ -165,55 +148,37 @@ function FeedWithActors({
 
   if (entries.length === 0) {
     return (
-      <div
-        style={{
-          padding: 'var(--nf-space-12) var(--nf-space-4)',
-          textAlign: 'center',
-          color: 'var(--nf-color-fg-muted)',
-          border: '1px dashed var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-lg)',
-          background: 'var(--nf-color-bg-sunken)',
-          fontSize: 'var(--nf-text-sm)',
-        }}
-      >
-        {source === 'all' ? t('view.empty') : t('view.empty_filtered')}
-      </div>
+      <EmptyState
+        className={styles.empty}
+        icon={<ActivityIcon size={40} strokeWidth={1.25} aria-hidden="true" />}
+        title={source === 'all' ? t('view.empty') : t('view.empty_filtered')}
+        titleAs="p"
+      />
     );
   }
 
   return (
     <>
-      <ul
-        aria-label={t('view.list_label')}
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          // nf-token-override: component dimension, not a spacing step
-          maxBlockSize: '40rem',
-          overflowY: 'auto',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-lg)',
-          background: 'var(--nf-color-surface)',
-        }}
-      >
-        {entries.map((entry) => (
+      <ul aria-label={t('view.list_label')} className={styles.list}>
+        {entries.map((entry, index) => (
           <ActivityRow
             key={entry.publicId}
             entry={entry}
+            enterStyle={stagger(index)}
             actorName={entry.actorUserPublicId ? nameById.get(entry.actorUserPublicId) : undefined}
           />
         ))}
-        <div ref={sentinelRef} aria-hidden="true" style={{ blockSize: '1px' }} />
+        <li ref={sentinelRef} aria-hidden="true" className={styles.sentinel} />
       </ul>
 
       {hasNextPage ? (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className={styles.loadMore}>
           <Button
             type="button"
             variant="default"
             onClick={() => void fetchNextPage()}
             disabled={isFetchingNextPage}
+            aria-busy={isFetchingNextPage}
           >
             {isFetchingNextPage ? t('view.loading_more') : t('view.load_more')}
           </Button>
@@ -228,24 +193,10 @@ export default function ActivityFeed({
   source,
   onSourceChange,
 }: ActivityFeedProps): ReactElement {
-  const { t } = useTranslation('activity');
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
-        minBlockSize: 0,
-      }}
-    >
+    <div className={styles.feed}>
       <SourceFilter value={source} onChange={onSourceChange} />
-      <Suspense
-        fallback={
-          <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
-            <Spinner label={t('view.loading')} />
-          </div>
-        }
-      >
+      <Suspense fallback={<FeedSkeleton />}>
         <FeedWithActors workspaceId={workspaceId} source={source} />
       </Suspense>
     </div>

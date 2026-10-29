@@ -47,12 +47,14 @@
   background-clip: content-box;
   background-origin: content-box;
   transition:
-    transform var(--nf-duration-fast),
-    border-color var(--nf-duration-fast);
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
+/* A ring rather than a grow on hover: the swatches sit in a tight row,
+   and one that scales up overlaps its neighbour. */
 .swatch:hover {
-  transform: scale(1.08);
+  border-color: var(--nf-color-border-strong);
 }
 
 .swatch:focus-visible {

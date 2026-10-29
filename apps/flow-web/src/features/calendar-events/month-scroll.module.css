@@ -113,6 +113,9 @@
  */
 .dayCol {
   display: flex;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
   flex-direction: column;
   align-items: stretch;
   /* nf-token-override: component dimension, not a spacing step */
@@ -213,8 +216,11 @@
   block-size: 1.125rem;
   margin-block: var(--nf-space-px);
   padding-inline: var(--nf-space-1);
-  border-inline-start: 2px solid transparent;
+  /* `--chip-hue` is the kind colour, set inline per chip. A full hairline
+     and a light tint, never a one-sided stripe on a rounded chip. */
+  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 40%, transparent);
   border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--chip-hue) 14%, transparent);
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
   overflow: hidden;
@@ -263,8 +269,9 @@
   display: flex;
   align-items: center;
   padding-inline: var(--nf-space-1);
-  border-inline-start: 2px solid transparent;
+  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 45%, transparent);
   border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--chip-hue) 18%, transparent);
   font-size: var(--nf-cal-text-cell);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg);
@@ -273,6 +280,8 @@
   overflow: hidden;
 }
 
+/* A bar that continues past the row edge leaves that side open, so it
+   reads as running on into the next week rather than ending here. */
 .bar--clipStart {
   border-start-start-radius: 0;
   border-end-start-radius: 0;
@@ -282,6 +291,7 @@
 .bar--clipEnd {
   border-start-end-radius: 0;
   border-end-end-radius: 0;
+  border-inline-end-color: transparent;
 }
 
 .barTitle {
@@ -354,8 +364,8 @@
    the lifted state at the end of it, so the wait reads as the gesture
    working rather than as nothing happening. */
 .pill--holding {
-  transform: scale(0.94);
-  transition: transform var(--nf-duration-slow) var(--nf-ease-standard);
+  scale: var(--nf-motion-scale);
+  transition: scale var(--nf-duration-slow) var(--nf-ease-standard);
 }
 
 /* The source keeps its place in the day while the moving copy is out —
@@ -363,13 +373,7 @@
    day it came from stays readable. */
 .pill--lifted {
   opacity: 0.35;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pill--holding {
-    transition: none;
-    transform: none;
-  }
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 /* ───── phone density ───── */

@@ -19,26 +19,47 @@
  *
  * Data fetching uses the existing non-suspense `useRemindersQuery`
  * (60s polling, tolerant of failures) so the dock + this page share a
- * cache. On query error we render an inline retry surface instead of
- * throwing — same posture as the dock.
+ * cache. While the first fetch is pending the page shows row-shaped
+ * skeletons rather than the empty state; on query error it renders an
+ * inline retry surface instead of throwing — same posture as the dock.
  *
  * Hooks consumed (in `./api.ts`):
  *   - {@link useRemindersQuery} — list reminders (poll-friendly useQuery)
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { type ReactElement, useMemo } from 'react';
+import { type CSSProperties, type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { type TaskReminder, useRemindersQuery } from './api';
 import styles from './reminders-page.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/reminders');
 
 type BucketId = 'overdue' | 'today' | 'soon' | 'later';
+
+const BUCKET_KEY: Record<BucketId, string> = {
+  overdue: 'reminders.bucket.overdue',
+  today: 'reminders.bucket.today',
+  soon: 'reminders.bucket.soon',
+  later: 'reminders.bucket.later',
+};
+
+/** Engine kinds with a label; an unknown kind shows its raw name. */
+const KIND_KEY = new Map<string, string>([
+  ['overdue', 'reminders.kind.overdue'],
+  ['due_today', 'reminders.kind.due_today'],
+  ['due_soon', 'reminders.kind.due_soon'],
+]);
+
+const SKELETON_ROWS = ['a', 'b', 'c'] as const;
 
 interface Bucket {
   id: BucketId;
@@ -97,9 +118,10 @@ function formatDueOn(dueOn: string, locale: string): string {
 interface ReminderRowProps {
   reminder: TaskReminder;
   locale: string;
+  style: CSSProperties | undefined;
 }
 
-function ReminderRow({ reminder, locale }: ReminderRowProps): ReactElement {
+function ReminderRow({ reminder, locale, style }: ReminderRowProps): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const days = reminder.daysUntilDue;
   let daysText: string;
@@ -111,13 +133,12 @@ function ReminderRow({ reminder, locale }: ReminderRowProps): ReactElement {
     daysText = t('reminders.days.future', { count: days });
   }
   const dueDate = formatDueOn(reminder.dueOn, locale);
+  const kindKey = KIND_KEY.get(reminder.kind);
   return (
-    <li className={styles.row}>
+    <li className={cx(styles.row, motion.enter)} style={style}>
       <div className={styles.rowMain}>
         <div className={styles.rowHeader}>
-          <Badge tone="accent">
-            {t(`reminders.kind.${reminder.kind}`, { defaultValue: reminder.kind })}
-          </Badge>
+          <Badge tone="accent">{kindKey ? t(kindKey) : reminder.kind}</Badge>
           <Link
             to="/tasks/$taskId"
             params={{ taskId: reminder.taskId }}
@@ -139,24 +160,74 @@ function ReminderRow({ reminder, locale }: ReminderRowProps): ReactElement {
 interface BucketSectionProps {
   bucket: Bucket;
   locale: string;
+  /** Page-wide index of the bucket's first row, so the stagger runs down the page. */
+  offset: number;
+  staggerFor: (index: number) => CSSProperties | undefined;
 }
 
-function BucketSection({ bucket, locale }: BucketSectionProps): ReactElement {
+function BucketSection({ bucket, locale, offset, staggerFor }: BucketSectionProps): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   return (
-    <section className={styles.group} aria-label={t(`reminders.bucket.${bucket.id}`)}>
+    <section className={styles.group} aria-label={t(BUCKET_KEY[bucket.id])}>
       <header className={styles.groupHeader}>
         <h2 className={styles.groupTitle}>
-          <Badge tone={bucket.tone}>{t(`reminders.bucket.${bucket.id}`)}</Badge>
+          <Badge tone={bucket.tone}>{t(BUCKET_KEY[bucket.id])}</Badge>
         </h2>
         <span className={styles.groupCount}>{bucket.items.length}</span>
       </header>
       <ul className={styles.list}>
-        {bucket.items.map((r) => (
-          <ReminderRow key={r.taskId} reminder={r} locale={locale} />
+        {bucket.items.map((r, i) => (
+          <ReminderRow key={r.taskId} reminder={r} locale={locale} style={staggerFor(offset + i)} />
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Mounted once data is in, so the first-load stagger starts with the rows. */
+function ReminderGroups({
+  buckets,
+  locale,
+}: {
+  buckets: readonly Bucket[];
+  locale: string;
+}): ReactElement {
+  const staggerFor = useFirstLoadStagger();
+  let offset = 0;
+  return (
+    <div className={styles.groups}>
+      {buckets.map((bucket) => {
+        const start = offset;
+        offset += bucket.items.length;
+        return (
+          <BucketSection
+            key={bucket.id}
+            bucket={bucket}
+            locale={locale}
+            offset={start}
+            staggerFor={staggerFor}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function RemindersSkeleton(): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <ul className={styles.list} aria-busy="true" aria-label={t('common.loading')}>
+      {SKELETON_ROWS.map((id) => (
+        <li key={id} className={styles.row}>
+          <div className={styles.rowMain}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '1.25rem', inlineSize: '55%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '0.875rem', inlineSize: '35%' }} />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -175,9 +246,13 @@ export default function RemindersPage(): ReactElement {
       <div className={styles.header}>
         <h1 className={styles.title}>{t('reminders.page_title')}</h1>
         <p className={styles.subtitle}>{t('reminders.page_subtitle')}</p>
-        <p className={styles.count}>{t('reminders.count', { count: total })}</p>
+        <p className={styles.count}>
+          {remindersQuery.isPending ? null : t('reminders.count', { count: total })}
+        </p>
       </div>
-      {remindersQuery.isError ? (
+      {remindersQuery.isPending ? (
+        <RemindersSkeleton />
+      ) : remindersQuery.isError ? (
         <Card>
           <div className={styles.errorBox}>
             <p className={styles.errorMessage}>{t('reminders.error')}</p>
@@ -194,13 +269,9 @@ export default function RemindersPage(): ReactElement {
           </div>
         </Card>
       ) : buckets.length === 0 ? (
-        <p className={styles.empty}>{t('reminders.empty')}</p>
+        <EmptyState className={styles.empty} titleAs="p" title={t('reminders.empty')} />
       ) : (
-        <div className={styles.groups}>
-          {buckets.map((bucket) => (
-            <BucketSection key={bucket.id} bucket={bucket} locale={locale} />
-          ))}
-        </div>
+        <ReminderGroups buckets={buckets} locale={locale} />
       )}
     </section>
   );

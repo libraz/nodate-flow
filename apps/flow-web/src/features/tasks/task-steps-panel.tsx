@@ -5,15 +5,18 @@
  * then apply selected steps as real subtasks.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Input from '@nodate-flow/ui/primitives/input';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type ReactElement, useState } from 'react';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { type CSSProperties, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
 import {
@@ -22,6 +25,16 @@ import {
   useApplySteps,
   useProposeSteps,
 } from './steps-api';
+import css from './task-steps-panel.module.css';
+
+const GRANULARITY_KEY: Record<StepGranularity, string> = {
+  coarse: 'tasks.steps.granularity_coarse',
+  standard: 'tasks.steps.granularity_standard',
+  fine: 'tasks.steps.granularity_fine',
+};
+
+/** Proposed steps arrive together; items past this index enter with the last staggered one. */
+const STAGGER_LIMIT = 8;
 
 interface StepItemProps {
   step: StepProposalUI;
@@ -43,23 +56,17 @@ function StepItem({
   const { t } = useTranslation('common');
   const [expanded, setExpanded] = useState(false);
   const checkboxId = `step-check-${String(index)}`;
+  const descriptionId = useId();
 
   return (
     <li
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-        padding: 'var(--nf-space-2) var(--nf-space-3)',
-        borderRadius: 'var(--nf-radius-sm)',
-        background: checked ? 'var(--nf-color-bg-sunken)' : 'transparent',
-        opacity: checked ? 1 : 0.6,
-      }}
+      data-checked={checked}
+      className={cx(css.step, motion.enter)}
+      style={{ '--stagger-index': Math.min(index, STAGGER_LIMIT) } as CSSProperties}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
-        <input
+      <div className={css.stepRow}>
+        <Checkbox
           id={checkboxId}
-          type="checkbox"
           checked={checked}
           onChange={() => {
             onToggle(index);
@@ -72,46 +79,29 @@ function StepItem({
             onTitleChange(index, e.target.value);
           }}
           aria-label={t('tasks.steps.edit_title')}
-          style={{ flex: 1, fontWeight: 500 }}
+          className={css.stepTitle}
         />
         <Badge tone={PRIORITY_TONE[step.priority] ?? 'neutral'}>
           {t(PRIORITY_KEY[step.priority] ?? 'tasks.priority.none')}
         </Badge>
       </div>
       {step.description.length > 0 ? (
-        // Indent the description under the checkbox. The original 1.75rem
-        // offset is reproduced as `space-6 + space-1` (1.5rem + 0.25rem)
-        // so the value still flows through the spacing scale.
-        <div style={{ marginInlineStart: 'calc(var(--nf-space-6) + var(--nf-space-1))' }}>
+        // Indented under the checkbox (space-6 + space-1).
+        <div className={css.details}>
           <button
             type="button"
+            aria-expanded={expanded}
+            aria-controls={descriptionId}
             onClick={() => {
               setExpanded((prev) => !prev);
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-xs)',
-              textDecoration: 'underline',
-            }}
+            className={css.toggle}
           >
             {expanded ? t('tasks.steps.collapse') : t('tasks.steps.expand')}
           </button>
-          {expanded ? (
-            <p
-              style={{
-                margin: 'var(--nf-space-1) 0 0',
-                fontSize: 'var(--nf-text-xs)',
-                color: 'var(--nf-color-fg)',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {step.description}
-            </p>
-          ) : null}
+          <Collapse open={expanded} id={descriptionId}>
+            <p className={css.description}>{step.description}</p>
+          </Collapse>
         </div>
       ) : null}
     </li>
@@ -192,98 +182,43 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
   const selectedCount = checked.filter(Boolean).length;
 
   return (
-    <Card
-      style={{
-        padding: 'var(--nf-space-4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
-      }}
-    >
-      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('tasks.steps.title')}</h2>
+    <Card className={css.card}>
+      <h2 className={css.title}>{t('tasks.steps.title')}</h2>
 
       {!hasProposed ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+        <div key="form" className={cx(css.form, css.stage)}>
           <div>
-            <span
-              style={{
-                display: 'block',
-                fontSize: 'var(--nf-text-xs)',
-                color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: 'var(--nf-space-1)',
-              }}
-            >
-              {t('tasks.steps.granularity_label')}
-            </span>
-            <div style={{ display: 'inline-flex', gap: 'var(--nf-space-1)' }}>
-              {(['coarse', 'standard', 'fine'] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => {
-                    setGranularity(g);
-                  }}
-                  style={{
-                    background: granularity === g ? 'var(--nf-color-accent)' : 'transparent',
-                    color:
-                      granularity === g ? 'var(--nf-color-fg-on-accent)' : 'var(--nf-color-fg)',
-                    border: '1px solid var(--nf-color-border)',
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--nf-text-xs)',
-                    borderRadius: 'var(--nf-radius-xs)',
-                  }}
-                >
-                  {t(`tasks.steps.granularity_${g}`)}
-                </button>
-              ))}
-            </div>
+            <span className={css.fieldLabel}>{t('tasks.steps.granularity_label')}</span>
+            <SegmentedControl<StepGranularity>
+              ariaLabel={t('tasks.steps.granularity_label')}
+              size="sm"
+              value={granularity}
+              disabled={propose.isPending}
+              onChange={setGranularity}
+              options={(['coarse', 'standard', 'fine'] as const).map((g) => ({
+                value: g,
+                label: t(GRANULARITY_KEY[g]),
+              }))}
+            />
           </div>
-          {propose.isPending ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 'var(--nf-space-4)',
-              }}
-            >
-              <Spinner label={t('tasks.steps.proposing')} />
-            </div>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => {
-                void handlePropose();
-              }}
-            >
-              {t('tasks.steps.propose_button')}
-            </Button>
-          )}
+          {/* The button stays in place while the proposal runs, so the panel does not jump. */}
+          <Button
+            type="button"
+            disabled={propose.isPending}
+            aria-busy={propose.isPending}
+            onClick={() => {
+              void handlePropose();
+            }}
+          >
+            {propose.isPending ? t('tasks.steps.proposing') : t('tasks.steps.propose_button')}
+          </Button>
         </div>
       ) : (
-        <>
+        <div key="proposal" className={cx(css.proposal, css.stage)}>
           {steps.length === 0 ? (
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
-            >
-              {t('tasks.steps.empty')}
-            </p>
+            <p className={css.empty}>{t('tasks.steps.empty')}</p>
           ) : (
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--nf-space-2)',
-              }}
-            >
+            <ul className={css.list}>
               {steps.map((step, i) => (
                 <StepItem
                   key={step.uiId}
@@ -298,13 +233,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
             </ul>
           )}
 
-          <div
-            style={{
-              display: 'flex',
-              gap: 'var(--nf-space-2)',
-              justifyContent: 'flex-end',
-            }}
-          >
+          <div className={css.actions}>
             <Button
               type="button"
               variant="ghost"
@@ -327,7 +256,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
               {apply.isPending ? t('tasks.steps.applying') : t('tasks.steps.apply_button')}
             </Button>
           </div>
-        </>
+        </div>
       )}
     </Card>
   );

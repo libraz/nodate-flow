@@ -40,7 +40,8 @@
   "task": {
     "add": "添加标签",
     "remove": "移除标签",
-    "none": "无标签"
+    "none": "无标签",
+    "count": "{count, plural, other {{count} 个标签}}"
   },
   "filters": {
     "label": "标签",

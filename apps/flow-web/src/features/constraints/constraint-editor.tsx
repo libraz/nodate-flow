@@ -15,6 +15,8 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { confirmAction } from '../../lib/confirm-action';
+
 import {
   type ConstraintKind,
   type ConstraintOutcome,
@@ -24,6 +26,7 @@ import {
   useExplainConstraint,
   useRemoveConstraint,
 } from './api';
+import styles from './constraints.module.css';
 
 const KINDS: ConstraintKind[] = ['deadline', 'dependency', 'approval', 'signal', 'custom'];
 
@@ -43,6 +46,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
   const [explanation, setExplanation] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ConstraintOutcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const addMut = useAddConstraint();
   const evalMut = useEvaluateConstraints();
@@ -50,14 +54,23 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
   const explainMut = useExplainConstraint();
   const removeMut = useRemoveConstraint();
 
-  const onRemove = (constraintId: string): void => {
+  // The row cannot be re-created from an outcome, so removal asks first.
+  const onRemove = async (constraintId: string): Promise<void> => {
     setError(null);
+    const confirmed = await confirmAction({
+      title: t('editor.removeConfirmTitle'),
+      message: t('editor.removeConfirm'),
+      confirmLabel: t('editor.remove'),
+    });
+    if (!confirmed) return;
+    setRemovingId(constraintId);
     removeMut.mutate(
       { taskId, constraintId },
       {
         onError: () => setError(t('editor.errors.removeFailed')),
         onSuccess: () =>
           setOutcomes((prev) => (prev ? prev.filter((o) => o.id !== constraintId) : prev)),
+        onSettled: () => setRemovingId(null),
       },
     );
   };
@@ -132,23 +145,15 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           type="button"
           onClick={handleCompile}
           disabled={compileMut.isPending || !nlPrompt.trim()}
+          aria-busy={compileMut.isPending || undefined}
         >
-          {compileMut.isPending ? t('editor.generating') : t('editor.generate')}
+          {t('editor.generate')}
         </Button>
       </div>
 
       <form onSubmit={onSubmit}>
-        <details style={{ marginBlockEnd: 'var(--nf-space-2)' }} open={expression.length > 0}>
-          <summary
-            style={{
-              cursor: 'pointer',
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-supporting)',
-              marginBlockEnd: 'var(--nf-space-1-5)',
-            }}
-          >
-            {t('editor.advanced')}
-          </summary>
+        <details className={styles.advanced} open={expression.length > 0}>
+          <summary className={styles.advancedSummary}>{t('editor.advanced')}</summary>
           <FormField label={t('editor.kind')}>
             {(control) => (
               <Select
@@ -184,15 +189,21 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
             {t('editor.add')}
           </Button>
-          <Button type="button" onClick={onEvaluate} disabled={evalMut.isPending}>
+          <Button
+            type="button"
+            onClick={onEvaluate}
+            disabled={evalMut.isPending}
+            aria-busy={evalMut.isPending || undefined}
+          >
             {t('editor.evaluate')}
           </Button>
           <Button
             type="button"
             onClick={handleExplain}
             disabled={explainMut.isPending || !expression.trim()}
+            aria-busy={explainMut.isPending || undefined}
           >
-            {explainMut.isPending ? t('editor.explaining') : t('editor.explain')}
+            {t('editor.explain')}
           </Button>
         </div>
       </form>
@@ -218,7 +229,12 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
                   : o.satisfied
                     ? t('editor.satisfied')
                     : t('editor.failed')}{' '}
-                <Button type="button" onClick={() => onRemove(o.id)} disabled={removeMut.isPending}>
+                <Button
+                  type="button"
+                  onClick={() => void onRemove(o.id)}
+                  disabled={removeMut.isPending}
+                  aria-busy={removingId === o.id || undefined}
+                >
                   {t('editor.remove')}
                 </Button>
               </li>

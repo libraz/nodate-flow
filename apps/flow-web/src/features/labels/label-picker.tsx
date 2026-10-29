@@ -63,14 +63,16 @@ export default function LabelPicker({
                     <button
                       type="button"
                       onClick={() => onToggle(label.id, !active)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--nf-color-surface-hover)]"
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-[var(--nf-duration-instant)] ease-[var(--nf-ease-standard)] hover:bg-[var(--nf-color-surface-hover)] focus-visible:bg-[var(--nf-color-surface-hover)] focus-visible:outline-none focus-visible:[box-shadow:var(--nf-shadow-focus)]"
                     >
                       <span
                         className="inline-block h-3 w-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: label.color }}
                         aria-hidden="true"
                       />
-                      <span className="flex-1 text-left">{label.name}</span>
+                      <span className="flex-1 truncate text-start" title={label.name}>
+                        {label.name}
+                      </span>
                       {active ? (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

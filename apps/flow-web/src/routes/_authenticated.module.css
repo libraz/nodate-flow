@@ -1,0 +1,53 @@
+/*
+ * Bootstrap placeholder: invisible for the first beat so a fast session
+ * probe never flashes it, then fades in.
+ */
+.boot {
+  block-size: 100dvh;
+  background: var(--nf-color-bg);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out) 200ms backwards;
+}
+
+.hint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 20rem;
+}
+
+.hintText {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.hintActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}
+
+.offline {
+  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-6);
+  text-align: center;
+  background: var(--nf-color-bg);
+  color: var(--nf-color-fg);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.offlineTitle {
+  margin: 0;
+  font-family: var(--nf-font-display);
+}
+
+.offlineText {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  max-inline-size: var(--nf-measure-narrow);
+}

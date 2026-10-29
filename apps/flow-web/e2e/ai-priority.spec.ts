@@ -67,7 +67,7 @@ const copy = {
   // ICU-interpolated at runtime, so we match on the static prefix the
   // page always renders before the placeholder.
   toastAppliedPrefix: enAiPriority.toast.applied.split('{')[0]?.trim() ?? 'Updated to',
-  toastUndo: enAiPriority.toast.undo,
+  toastUndo: enCommon.common.undo,
   // The list-fetch error path now renders through the page's own
   // `PriorityError` fallback (wrapped in a local ErrorBoundary). We
   // still keep `fatalTitle` around so case D can assert the root

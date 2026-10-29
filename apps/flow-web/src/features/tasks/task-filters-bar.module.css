@@ -26,30 +26,30 @@
   inline-size: 12rem;
 }
 
+.filterGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.groupLabel {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  white-space: nowrap;
+}
+
+.lensSkeleton {
+  /* nf-token-override: matches the lens trigger button footprint */
+  inline-size: 5rem;
+  /* nf-token-override: same footprint as the inline size above */
+  block-size: 2rem;
+}
+
 .toggleGroup {
   display: inline-flex;
   gap: var(--nf-space-2);
   flex-wrap: wrap;
-}
-
-.toggleChip {
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-3);
-  border-radius: var(--nf-radius-pill);
-  border: 1px solid var(--nf-color-border);
-  background: transparent;
-  color: var(--nf-color-fg-muted);
-  font: inherit;
-  font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-regular);
-  cursor: pointer;
-}
-
-.toggleChipActive {
-  border-color: var(--nf-color-accent);
-  background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent-fg);
-  font-weight: var(--nf-weight-semibold);
 }
 
 .divider {
@@ -63,15 +63,6 @@
 
 .clearButton {
   margin-inline-start: auto;
-  background: none;
-  border: none;
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-2);
-  color: var(--nf-color-fg-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--nf-text-sm);
-  text-decoration: underline;
 }
 
 .chipsRow {
@@ -79,4 +70,5 @@
   gap: var(--nf-space-2);
   flex-wrap: wrap;
   align-items: center;
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
 }

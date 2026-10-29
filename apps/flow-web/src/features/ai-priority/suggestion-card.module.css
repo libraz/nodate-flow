@@ -11,19 +11,13 @@
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-surface);
   transition:
-    opacity var(--nf-duration-base) var(--nf-ease-standard),
-    transform var(--nf-duration-base) var(--nf-ease-standard);
-  list-style: none;
+    background-color var(--nf-duration-fast) var(--nf-ease-out),
+    border-color var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .card:hover {
   background: var(--nf-color-surface-hover);
-}
-
-.exiting {
-  opacity: 0;
-  transform: translateY(calc(var(--nf-space-1) * -1));
-  pointer-events: none;
+  border-color: var(--nf-color-border-strong);
 }
 
 .body {

@@ -13,9 +13,7 @@
     "parseError": "パースエラー",
     "nlPrompt": "制約を自然言語で記述…",
     "generate": "生成",
-    "generating": "生成中…",
     "explain": "説明",
-    "explaining": "説明中…",
     "explanation": "説明",
     "advanced": "詳細設定（種類・JSON 式）",
     "errors": {
@@ -31,7 +29,9 @@
       "approval": "承認",
       "signal": "シグナル",
       "custom": "カスタム"
-    }
+    },
+    "removeConfirmTitle": "制約を削除しますか？",
+    "removeConfirm": "この制約による待機は解除されます。ここからは元に戻せません。"
   },
   "replay": {
     "title": "リプレイ",

@@ -17,6 +17,16 @@
     "integrations": "連携",
     "auto_actions": "自動アクション"
   },
+  "nav_group": {
+    "workspace": "ワークスペース",
+    "integrations": "連携",
+    "ai": "AI",
+    "reports": "レポート"
+  },
+  "save_status": {
+    "saved": "保存しました",
+    "unsaved": "未保存の変更があります"
+  },
   "integrations": {
     "title": "連携",
     "description": "個人の GitHub / Slack / Google カレンダー / Discord アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
@@ -111,7 +121,10 @@
     "overdue_open": "期限超過",
     "empty_completed": "直近 7 日間で完了したタスクはありません。",
     "empty_overdue": "期限超過のタスクはありません。",
-    "markdown": "Markdown"
+    "markdown": "Markdown",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "copy_failed": "クリップボードにコピーできませんでした。"
   },
   "profile": {
     "title": "プロフィール",
@@ -149,8 +162,6 @@
     "theme_glass_light": "グラス ライト",
     "theme_glass_dark": "グラス ダーク",
     "save": "保存",
-    "saving": "保存中…",
-    "saved": "保存しました",
     "avatar": {
       "label": "プロフィール画像",
       "description": "JPEG / PNG / WebP / GIF (5 MB まで)",
@@ -166,7 +177,8 @@
       "replace_aria": "プロフィール画像を変更",
       "delete_aria": "プロフィール画像を削除",
       "upload_error": "プロフィール画像をアップロードできませんでした。もう一度お試しください。",
-      "remove_error": "プロフィール画像を削除できませんでした。もう一度お試しください。"
+      "remove_error": "プロフィール画像を削除できませんでした。もう一度お試しください。",
+      "remove_confirm": "プロフィール画像を削除しますか？"
     },
     "validation": {
       "display_name_required": "表示名は必須です。",
@@ -175,13 +187,14 @@
     },
     "errors": {
       "update_failed": "プロフィールを更新できませんでした。もう一度お試しください。"
-    }
+    },
+    "section_identity": "基本情報",
+    "section_appearance": "外観",
+    "section_appearance_help": "テーマの変更はすぐに反映され、保存ボタンの対象には含まれません。"
   },
   "notifications": {
     "title": "通知",
     "save": "保存",
-    "saving": "保存中…",
-    "saved": "通知設定を更新しました",
     "workspace_label": "ワークスペース",
     "no_workspaces": "通知を設定するにはワークスペースに参加してください。",
     "channel_note": "アプリ内の通知ベルに対する設定です。メールとプッシュの配信はまだ利用できません。",
@@ -224,7 +237,6 @@
       "next": "新しいパスワード",
       "confirm": "新しいパスワード（確認）",
       "save": "パスワードを変更",
-      "saving": "保存中…",
       "changed": "パスワードを変更しました。他の {count} 件のセッションがサインアウトされました。",
       "validation": {
         "too_short": "新しいパスワードは 8 文字以上で入力してください。",
@@ -249,9 +261,7 @@
       "enable": "二要素認証を有効にする",
       "resume_enroll": "登録をやり直す",
       "confirm": "確認",
-      "confirming": "確認中…",
       "disable": "無効化",
-      "disabling": "無効化中…",
       "disable_confirm": "二要素認証を無効にしますか？アカウントはパスワードのみで保護されます。",
       "copy": "コピー",
       "secret_copied": "シークレットをコピーしました",
@@ -302,7 +312,8 @@
       "errors": {
         "revoke_failed": "セッションを失効できませんでした。もう一度お試しください。",
         "revoke_all_failed": "他のセッションを失効できませんでした。もう一度お試しください。"
-      }
+      },
+      "revoke_all_help": "このデバイス以外のすべてのデバイスからサインアウトします。"
     }
   },
   "workspace": {
@@ -317,8 +328,6 @@
         "icon_url": "アイコン URL"
       },
       "save": "変更を保存",
-      "saving": "保存中…",
-      "saved": "ワークスペースを更新しました",
       "validation": {
         "name_required": "名前は必須です。",
         "slug_required": "スラッグは必須です。",
@@ -332,7 +341,6 @@
         "title": "危険な操作",
         "description": "取り消せない操作です。ワークスペースを削除すると、すべてのプロジェクト、タスク、メンバー、添付ファイル、アップロード済みのデータが完全に消去されます。元に戻せません。",
         "delete": "ワークスペースを削除",
-        "deleting": "削除中…",
         "confirm": {
           "title": "{name} を削除しますか?",
           "warning": "ワークスペース、すべてのプロジェクトとタスク、コメントと添付ファイル、オブジェクトストレージ上のアップロード済みファイルを完全に削除します。",
@@ -404,7 +412,6 @@
         "empty_events": "まだイベントが登録されていません。ワークスペースのイベントを追加して公開してください。",
         "add_events": "イベントを追加",
         "detach": "外す",
-        "detach_confirm": "「{title}」をこのシェアページから外しますか？ 公開ページには表示されなくなります。",
         "detached": "イベントを外しました",
         "event_undated": "日付なし",
         "event_all_day": "終日",
@@ -435,8 +442,7 @@
           "select": "選択",
           "attach": "{count} 件を追加",
           "attached_toast": "{attached} 件追加、{skipped} 件スキップ",
-          "cancel": "キャンセル",
-          "attaching": "追加中..."
+          "cancel": "キャンセル"
         },
         "errors": {
           "detach_failed": "イベントを外せませんでした。もう一度お試しください。",
@@ -523,8 +529,6 @@
         "high": "保守的"
       },
       "save": "保存",
-      "saving": "保存中…",
-      "saved": "自動アクション設定を更新しました",
       "rules": {
         "title": "ルール設定",
         "description": "個別のルールを有効/無効にし、感度を調整します。",
@@ -552,8 +556,6 @@
         },
         "idle_na": "N/A（期限ベース）",
         "save": "ルールを保存",
-        "saving": "保存中…",
-        "saved": "ルール設定を更新しました",
         "errors": {
           "load_failed": "ルール設定を読み込めませんでした。",
           "update_failed": "ルール設定を更新できませんでした。もう一度お試しください。"
@@ -629,7 +631,9 @@
           "submit": "インポート開始",
           "success": "インポートジョブを開始しました",
           "error": "インポートの開始に失敗しました"
-        }
+        },
+        "load_error": "インポートジョブを読み込めませんでした。",
+        "retry": "再試行"
       }
     },
     "webhooks": {
@@ -718,7 +722,9 @@
           "failed": "失敗",
           "dead": "破棄"
         }
-      }
+      },
+      "load_error": "Webhook を読み込めませんでした。",
+      "retry": "再試行"
     }
   }
 }

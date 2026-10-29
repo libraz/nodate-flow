@@ -17,6 +17,16 @@
     "integrations": "Integrations",
     "auto_actions": "Auto-actions"
   },
+  "nav_group": {
+    "workspace": "Workspace",
+    "integrations": "Integrations",
+    "ai": "AI",
+    "reports": "Reports"
+  },
+  "save_status": {
+    "saved": "Saved",
+    "unsaved": "Unsaved changes"
+  },
   "integrations": {
     "title": "Integrations",
     "description": "Connect your personal GitHub, Slack, Google Calendar, and Discord accounts so nodate-flow can act on your behalf. Tokens are encrypted at rest.",
@@ -111,7 +121,10 @@
     "overdue_open": "Overdue",
     "empty_completed": "Nothing completed in the last seven days.",
     "empty_overdue": "No overdue tasks.",
-    "markdown": "Markdown"
+    "markdown": "Markdown",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copy_failed": "Could not copy to the clipboard."
   },
   "profile": {
     "title": "Profile",
@@ -149,8 +162,6 @@
     "theme_glass_light": "Glass Light",
     "theme_glass_dark": "Glass Dark",
     "save": "Save",
-    "saving": "Saving...",
-    "saved": "Saved",
     "avatar": {
       "label": "Profile picture",
       "description": "JPEG, PNG, WebP, or GIF. Max 5 MB.",
@@ -166,7 +177,8 @@
       "replace_aria": "Replace profile picture",
       "delete_aria": "Remove profile picture",
       "upload_error": "Could not upload the profile picture. Please try again.",
-      "remove_error": "Could not remove the profile picture. Please try again."
+      "remove_error": "Could not remove the profile picture. Please try again.",
+      "remove_confirm": "Remove your profile picture?"
     },
     "validation": {
       "display_name_required": "Display name is required.",
@@ -175,13 +187,14 @@
     },
     "errors": {
       "update_failed": "Could not update your profile. Please try again."
-    }
+    },
+    "section_identity": "Profile details",
+    "section_appearance": "Appearance",
+    "section_appearance_help": "Theme changes apply immediately and are not part of Save."
   },
   "notifications": {
     "title": "Notifications",
     "save": "Save",
-    "saving": "Saving...",
-    "saved": "Notification preferences updated",
     "workspace_label": "Workspace",
     "no_workspaces": "Join a workspace to set up notifications.",
     "channel_note": "These control the in-app notification bell. Email and push delivery are not available yet.",
@@ -224,7 +237,6 @@
       "next": "New password",
       "confirm": "Confirm new password",
       "save": "Change password",
-      "saving": "Saving...",
       "changed": "Password changed. {count} other session(s) were signed out.",
       "validation": {
         "too_short": "New password must be at least 8 characters.",
@@ -249,9 +261,7 @@
       "enable": "Enable two-factor authentication",
       "resume_enroll": "Restart enrollment",
       "confirm": "Confirm",
-      "confirming": "Confirming...",
       "disable": "Disable",
-      "disabling": "Disabling...",
       "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
       "copy": "Copy",
       "secret_copied": "Secret copied",
@@ -302,7 +312,8 @@
       "errors": {
         "revoke_failed": "Could not revoke the session. Please try again.",
         "revoke_all_failed": "Could not revoke the other sessions. Please try again."
-      }
+      },
+      "revoke_all_help": "Sign out every device except this one."
     }
   },
   "workspace": {
@@ -317,8 +328,6 @@
         "icon_url": "Icon URL"
       },
       "save": "Save changes",
-      "saving": "Saving...",
-      "saved": "Workspace updated",
       "validation": {
         "name_required": "Name is required.",
         "slug_required": "Slug is required.",
@@ -332,7 +341,6 @@
         "title": "Danger zone",
         "description": "Irreversible actions. Deleting a workspace permanently destroys all of its projects, tasks, members, attachments, and uploaded files. This cannot be undone.",
         "delete": "Delete workspace",
-        "deleting": "Deleting...",
         "confirm": {
           "title": "Delete {name}?",
           "warning": "This will permanently delete the workspace, all of its projects and tasks, every comment and attachment, and irreversibly remove every uploaded file from object storage.",
@@ -404,7 +412,6 @@
         "empty_events": "No events yet. Add events from this workspace to publish them.",
         "add_events": "Add events",
         "detach": "Remove",
-        "detach_confirm": "Remove \"{title}\" from this share page? It will no longer appear on the public page.",
         "detached": "Event removed",
         "event_undated": "No date",
         "event_all_day": "All day",
@@ -435,8 +442,7 @@
           "select": "Select",
           "attach": "Attach {count, plural, one {# event} other {# events}}",
           "attached_toast": "{attached} attached, {skipped} skipped",
-          "cancel": "Cancel",
-          "attaching": "Attaching..."
+          "cancel": "Cancel"
         },
         "errors": {
           "detach_failed": "Could not remove the event. Please try again.",
@@ -523,8 +529,6 @@
         "high": "Conservative"
       },
       "save": "Save",
-      "saving": "Saving...",
-      "saved": "Auto-action settings updated",
       "rules": {
         "title": "Rule configuration",
         "description": "Enable or disable individual rules and adjust their sensitivity.",
@@ -552,8 +556,6 @@
         },
         "idle_na": "N/A (uses due date)",
         "save": "Save rules",
-        "saving": "Saving...",
-        "saved": "Rule settings updated",
         "errors": {
           "load_failed": "Could not load rule settings.",
           "update_failed": "Could not update rule settings. Please try again."
@@ -629,7 +631,9 @@
           "submit": "Start import",
           "success": "Import job started",
           "error": "Failed to start import"
-        }
+        },
+        "load_error": "Could not load import jobs.",
+        "retry": "Try again"
       }
     },
     "webhooks": {
@@ -718,7 +722,9 @@
           "failed": "Failed",
           "dead": "Dead"
         }
-      }
+      },
+      "load_error": "Could not load webhooks.",
+      "retry": "Try again"
     }
   }
 }

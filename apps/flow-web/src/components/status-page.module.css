@@ -1,0 +1,61 @@
+/* Shared layout for the 404 / 403 status pages. */
+
+.root {
+  min-block-size: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-5);
+  padding-block: var(--nf-space-12);
+  padding-inline: var(--nf-space-8);
+  text-align: center;
+}
+
+.code {
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-status-glyph);
+  line-height: 1;
+  font-weight: var(--nf-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-subtle);
+  animation: global(nf-scale-in) var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+.title {
+  font-family: var(--nf-font-display);
+  margin: 0;
+  font-size: var(--nf-text-2xl);
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 28rem;
+  color: var(--nf-color-fg-muted);
+}
+
+.home {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-5);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  text-decoration: none;
+  font-weight: var(--nf-weight-medium);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.home:hover {
+  background: var(--nf-color-accent-hover);
+}
+
+.home:active {
+  scale: var(--nf-motion-press-scale);
+}

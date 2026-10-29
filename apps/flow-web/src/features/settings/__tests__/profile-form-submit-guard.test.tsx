@@ -10,8 +10,8 @@
  * These are behavioral assertions against the rendered button, not a
  * source-text check: each case drives `useUpdateMe`/form submission
  * into one of the two "in flight" states and asserts the button is
- * disabled and shows the saving label, then asserts the button is
- * enabled and shows the normal label once both flags are false.
+ * disabled and marked aria-busy, then asserts the button is enabled
+ * and idle once both flags are false.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -90,7 +90,7 @@ function Wrapper({ children }: { children: ReactNode }): ReactElement {
 }
 
 function saveButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: /profile\.(save|saving)/ }) as HTMLButtonElement;
+  return screen.getByRole('button', { name: 'profile.save' }) as HTMLButtonElement;
 }
 
 describe('profile-form save button submit guard', () => {
@@ -99,7 +99,7 @@ describe('profile-form save button submit guard', () => {
     apiMocks.isPending = false;
   });
 
-  it('enables the button and shows the save label when neither flag is set', () => {
+  it('enables the button and leaves it idle when neither flag is set', () => {
     render(
       <Wrapper>
         <ProfileForm />
@@ -108,10 +108,10 @@ describe('profile-form save button submit guard', () => {
 
     const button = saveButton();
     expect(button.disabled).toBe(false);
-    expect(button.textContent).toBe('profile.save');
+    expect(button.getAttribute('aria-busy')).toBe('false');
   });
 
-  it('disables the button and shows the saving label while update.isPending is true, even though the form was never submitted', () => {
+  it('disables the button and marks it busy while update.isPending is true, even though the form was never submitted', () => {
     apiMocks.isPending = true;
 
     render(
@@ -126,10 +126,10 @@ describe('profile-form save button submit guard', () => {
     // enabled, reproducing the double-submit bug.
     const button = saveButton();
     expect(button.disabled).toBe(true);
-    expect(button.textContent).toBe('profile.saving');
+    expect(button.getAttribute('aria-busy')).toBe('true');
   });
 
-  it('disables the button and shows the saving label while the submit handler is still in flight, even though update.isPending never flips', async () => {
+  it('disables the button and marks it busy while the submit handler is still in flight, even though update.isPending never flips', async () => {
     // update.isPending stays false for the whole test: the mutation is
     // mocked out entirely, so only react-hook-form's isSubmitting flag
     // can be driving the disabled state here.
@@ -153,7 +153,7 @@ describe('profile-form save button submit guard', () => {
     await waitFor(() => {
       expect(saveButton().disabled).toBe(true);
     });
-    expect(saveButton().textContent).toBe('profile.saving');
+    expect(saveButton().getAttribute('aria-busy')).toBe('true');
 
     // Let the in-flight submission settle so the test does not leak a
     // dangling timer/promise into the next case.

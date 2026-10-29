@@ -19,7 +19,7 @@ import { getOrCreateProvider } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -140,6 +140,15 @@ export default function ShareMonthGrid({
 
   const [monthAnchor, setMonthAnchor] = useState(() => initialMonthAnchor(events, timezone));
   const [selected, setSelected] = useState<ShareEvent | null>(null);
+  // Null until the first navigation, so the month a visitor lands on
+  // does not slide in; afterwards the grid enters from the side it came from.
+  const [navDirection, setNavDirection] = useState<'prev' | 'next' | null>(null);
+
+  const goToMonth = (next: string): void => {
+    if (next === monthAnchor) return;
+    setNavDirection(next < monthAnchor ? 'prev' : 'next');
+    setMonthAnchor(next);
+  };
 
   const visibleEvents = expandShareEventsForMonth(monthAnchor, events, timezone, weekStart);
   const grid = buildMonthGrid(monthAnchor, visibleEvents, timezone, weekStart);
@@ -162,12 +171,14 @@ export default function ShareMonthGrid({
   return (
     <div className={styles.root} data-embed={embed ? 'true' : 'false'}>
       <div className={styles.toolbar}>
-        <p className={styles.monthLabel}>{monthLabel}</p>
+        <p className={styles.monthLabel} aria-live="polite">
+          {monthLabel}
+        </p>
         <div className={styles.navGroup}>
           <button
             type="button"
             className={styles.todayButton}
-            onClick={() => setMonthAnchor(`${monthKeyOf(todayKey(timezone))}-01`)}
+            onClick={() => goToMonth(`${monthKeyOf(todayKey(timezone))}-01`)}
           >
             {t('share.grid.today')}
           </button>
@@ -175,7 +186,7 @@ export default function ShareMonthGrid({
             type="button"
             className={styles.navButton}
             aria-label={t('share.grid.prev_month')}
-            onClick={() => setMonthAnchor((a) => shiftMonthAnchor(a, -1))}
+            onClick={() => goToMonth(shiftMonthAnchor(monthAnchor, -1))}
           >
             <ChevronLeft size={18} aria-hidden="true" />
           </button>
@@ -183,7 +194,7 @@ export default function ShareMonthGrid({
             type="button"
             className={styles.navButton}
             aria-label={t('share.grid.next_month')}
-            onClick={() => setMonthAnchor((a) => shiftMonthAnchor(a, 1))}
+            onClick={() => goToMonth(shiftMonthAnchor(monthAnchor, 1))}
           >
             <ChevronRight size={18} aria-hidden="true" />
           </button>
@@ -206,7 +217,20 @@ export default function ShareMonthGrid({
           ))}
         </div>
 
-        <div role="grid" aria-label={t('share.grid.aria_label', { month: monthLabel })}>
+        {/* Keyed by month so a navigation mounts a fresh grid that
+            slides in from the side it came from. */}
+        <div
+          key={monthAnchor}
+          role="grid"
+          aria-label={t('share.grid.aria_label', { month: monthLabel })}
+          className={
+            navDirection === 'prev'
+              ? styles['slide--fromPrev']
+              : navDirection === 'next'
+                ? styles['slide--fromNext']
+                : undefined
+          }
+        >
           {grid.weeks.map((week) => (
             <ShareWeekRow
               key={week.key}
@@ -294,13 +318,14 @@ function ShareWeekRow({
                   p.continuesLeft && styles['bar--clipStart'],
                   p.continuesRight && styles['bar--clipEnd'],
                 )}
-                style={{
-                  insetInlineStart: insetStart,
-                  inlineSize: width,
-                  insetBlockStart: `${p.track * TRACK_REM}rem`,
-                  background: `color-mix(in oklch, ${markerColorForKind(p.event.kind)} 22%, transparent)`,
-                  borderInlineStartColor: markerColorForKind(p.event.kind),
-                }}
+                style={
+                  {
+                    insetInlineStart: insetStart,
+                    inlineSize: width,
+                    insetBlockStart: `${p.track * TRACK_REM}rem`,
+                    '--chip-hue': markerColorForKind(p.event.kind),
+                  } as CSSProperties
+                }
                 title={p.event.title}
                 aria-label={t('share.grid.event_label', { title: p.event.title })}
                 onClick={() => onEventOpen(p.event)}
@@ -381,10 +406,7 @@ function ShareWeekRow({
                       key={tc.key}
                       type="button"
                       className={styles.chip}
-                      style={{
-                        background: `color-mix(in oklch, ${markerColorForKind(evt.kind)} 18%, transparent)`,
-                        borderInlineStartColor: markerColorForKind(evt.kind),
-                      }}
+                      style={{ '--chip-hue': markerColorForKind(evt.kind) } as CSSProperties}
                       title={evt.title}
                       aria-label={t('share.grid.event_label', { title: evt.title })}
                       onClick={() => onEventOpen(evt)}

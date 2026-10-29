@@ -1,0 +1,216 @@
+/* List view — DataGrid cells, bulk bar and row reorder affordances. */
+
+.grid {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 20rem;
+}
+
+/* A reorder or re-sort slides rows to their new place instead of teleporting. */
+.grid :global([role="row"][aria-selected]),
+.grid :global([role="row"][aria-rowindex]) {
+  transition:
+    inset-block-start var(--nf-duration-base) var(--nf-ease-standard),
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* The dragged row sits lifted and dim where it was picked up. */
+.grid :global([role="row"][data-dragging="true"]) {
+  opacity: 0.6;
+  scale: var(--nf-motion-scale);
+  box-shadow: var(--nf-shadow-md);
+}
+
+/* Insertion point: a bold leading line plus a tint on the target row. */
+.grid :global([role="row"][data-drop-target="true"]) {
+  box-shadow: inset 0 var(--nf-space-1) 0 var(--nf-color-accent);
+  background-color: var(--nf-color-accent-subtle);
+}
+
+/* ── Bulk action bar ────────────────────────────────────────── */
+
+.bulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  margin-block-end: var(--nf-space-2);
+  border: var(--nf-space-px) solid
+    color-mix(in oklab, var(--nf-color-accent) 30%, var(--nf-color-border));
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* PresenceItem collapses the slot on exit; the bar itself needs no extra rule. */
+
+.bulkBarCount {
+  flex: none;
+  font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bulkBarSpacer {
+  flex: 1;
+}
+
+/* Select is inline-size: 100% by default; keep it intrinsic and bounded. */
+.bulkBar .bulkBarSelect {
+  flex: none;
+  inline-size: auto;
+  max-inline-size: calc(var(--nf-space-24) * 2);
+}
+
+.bulkBar button {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ── Cells ──────────────────────────────────────────────────── */
+
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 1.5rem;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-subtle);
+  cursor: grab;
+  user-select: none;
+  transition:
+    color var(--nf-duration-instant) var(--nf-ease-standard),
+    background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.dragHandle:hover {
+  color: var(--nf-color-fg);
+  background: var(--nf-color-surface-hover);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  transition:
+    color var(--nf-duration-base) var(--nf-ease-standard),
+    text-decoration-color var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.title:hover {
+  color: var(--nf-color-accent-fg);
+}
+
+.title:focus-visible {
+  outline: none;
+  border-radius: var(--nf-radius-xs);
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* Done / cancelled: the strike fades in rather than snapping on. */
+.title[data-closed="true"] {
+  color: var(--nf-color-fg-muted);
+  text-decoration-color: currentColor;
+}
+
+.titleInput {
+  inline-size: 100%;
+  font-size: inherit;
+  font-weight: var(--nf-weight-medium);
+  padding: var(--nf-space-0-5) var(--nf-space-1);
+  margin: calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1);
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.editTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  max-inline-size: 100%;
+  padding: var(--nf-space-0-5) var(--nf-space-1);
+  margin: calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1);
+  border-radius: var(--nf-radius-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.editTrigger:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.editTrigger:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.editTrigger[data-overdue="true"] {
+  color: var(--nf-color-danger-fg);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.prioritySwatch {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.375rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.75rem;
+  /* nf-token-override: the corner of a 6x12px colour swatch. --nf-radius-xs spans 0 to 6px across the themes, which on a swatch this small is the difference between a square and a lozenge; a data legend has to read the same in every theme */
+  border-radius: 0.125rem;
+  flex-shrink: 0;
+}
+
+.prioritySelect {
+  inline-size: 100%;
+  font-size: var(--nf-text-supporting);
+  padding: var(--nf-space-0-5) var(--nf-space-1);
+  margin: calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1);
+}
+
+.muted {
+  color: var(--nf-color-fg-muted);
+}
+
+.blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  color: var(--nf-color-danger-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.updated {
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+  padding: var(--nf-space-3);
+}
+
+.sentinel {
+  inline-size: 100%;
+  block-size: var(--nf-space-px);
+}

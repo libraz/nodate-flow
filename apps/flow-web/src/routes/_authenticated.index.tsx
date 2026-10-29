@@ -7,7 +7,11 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import {
@@ -29,68 +33,53 @@ import { useWorkspacesQuery } from '../features/workspaces/api';
 import { apiRequest } from '../lib/api';
 import { todayKey } from '../lib/date-utils';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
+import styles from './_authenticated.index.module.css';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
 /* ── Stat card ─────────────────────────────────────────────── */
 
+type StatTone = 'accent' | 'danger' | 'warning' | 'success';
+
+const STAT_TONE_CLASS: Record<StatTone, string | undefined> = {
+  accent: undefined,
+  danger: styles.statIconDanger,
+  warning: styles.statIconWarning,
+  success: styles.statIconSuccess,
+};
+
 function StatCard({
   icon,
   label,
   value,
-  accent,
+  tone,
 }: {
   icon: LucideIcon;
   label: string;
   value: number;
-  accent?: string;
+  tone: StatTone;
 }): ReactElement {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--nf-space-3)',
-        padding: 'var(--nf-space-4) var(--nf-space-5)',
-        borderRadius: 'var(--nf-radius-lg)',
-        background: 'var(--nf-color-surface)',
-        border: '1px solid var(--nf-color-border)',
-        flex: '1 1 0',
-        // nf-token-override: component dimension, not a spacing step
-        minWidth: '10rem',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          // nf-token-override: component dimension, not a spacing step
-          width: '2.5rem',
-          // nf-token-override: component dimension, not a spacing step
-          height: '2.5rem',
-          borderRadius: 'var(--nf-radius-md)',
-          background: accent ?? 'var(--nf-color-accent)',
-          color: 'white',
-          flexShrink: 0,
-        }}
-      >
+    <div className={styles.stat}>
+      <div className={cx(styles.statIcon, STAT_TONE_CLASS[tone])}>
         <Icon icon={icon} decorative />
       </div>
-      <div>
-        <div style={{ fontSize: 'var(--nf-text-2xl)', fontWeight: 700, lineHeight: 1.1 }}>
-          {value}
-        </div>
-        <div
-          style={{
-            fontSize: 'var(--nf-text-xs)',
-            color: 'var(--nf-color-fg-muted)',
-            marginTop: 'var(--nf-space-0-5)',
-          }}
-        >
-          {label}
-        </div>
+      <div className={styles.statText}>
+        <div className={styles.statValue}>{value}</div>
+        <div className={styles.statLabel}>{label}</div>
       </div>
+    </div>
+  );
+}
+
+/** Reserves the stat row and the list heading while the summary loads. */
+function TaskSummarySkeleton(): ReactElement {
+  return (
+    <div className={styles.stats} aria-busy="true">
+      <Skeleton className={styles.statSkeleton} />
+      <Skeleton className={styles.statSkeleton} />
+      <Skeleton className={styles.statSkeleton} />
+      <Skeleton className={styles.statSkeleton} />
     </div>
   );
 }
@@ -99,6 +88,7 @@ function StatCard({
 
 function TaskSummary(): ReactElement {
   const { t } = useTranslation('common');
+  const stagger = useFirstLoadStagger();
   // "Overdue" and "due today" are calendar-day questions, so they are
   // read in the effective zone — the same one the calendar files the
   // same tasks under. Read from the browser, the two counts disagreed
@@ -144,107 +134,55 @@ function TaskSummary(): ReactElement {
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3)', flexWrap: 'wrap' }}>
+      <div className={cx(styles.stats, styles.statsEnter)}>
         <StatCard
           icon={FolderKanban}
           label={t('home.stat_open')}
           value={counts.open}
-          accent="var(--nf-color-accent)"
+          tone="accent"
         />
         <StatCard
           icon={Clock}
           label={t('home.stat_overdue')}
           value={counts.overdue}
-          accent="var(--nf-color-danger)"
+          tone="danger"
         />
         <StatCard
           icon={CalendarDays}
           label={t('home.stat_due_today')}
           value={counts.dueToday}
-          accent="var(--nf-color-warning)"
+          tone="warning"
         />
         <StatCard
           icon={CheckCircle2}
           label={t('home.stat_done')}
           value={counts.done}
-          accent="var(--nf-color-success)"
+          tone="success"
         />
       </div>
 
       {recentTasks.length > 0 && (
         <section>
-          <h2
-            style={{
-              margin: '0 0 var(--nf-space-3)',
-              fontSize: 'var(--nf-text-supporting)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('home.recent_tasks')}
-          </h2>
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-1)',
-            }}
-          >
-            {recentTasks.map((task) => (
-              <li
-                key={task.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--nf-space-3)',
-                  padding: 'var(--nf-space-2-5) var(--nf-space-3)',
-                  borderRadius: 'var(--nf-radius-md)',
-                  background: 'var(--nf-color-surface)',
-                }}
-              >
+          <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
+          <ul className={styles.taskList}>
+            {recentTasks.map((task, index) => (
+              <li key={task.id} className={motion.enter} style={stagger(index)}>
                 <Link
                   to="/tasks/$taskId"
                   params={{ taskId: task.id }}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    color: 'inherit',
-                    textDecoration: 'none',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                  className={cx(styles.taskRow, 'nf-focus-ring')}
                 >
-                  {task.title}
+                  <span className={styles.taskTitle}>{task.title}</span>
+                  {task.projectName ? (
+                    <span className={styles.taskProject}>{task.projectName}</span>
+                  ) : null}
                 </Link>
-                <span
-                  style={{
-                    fontSize: 'var(--nf-text-xs)',
-                    color: 'var(--nf-color-fg-muted)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {task.projectName ?? ''}
-                </span>
               </li>
             ))}
           </ul>
-          <div style={{ marginTop: 'var(--nf-space-2)' }}>
-            <Link
-              to="/today"
-              style={{
-                fontSize: 'var(--nf-text-supporting)',
-                color: 'var(--nf-color-accent-fg)',
-                textDecoration: 'none',
-              }}
-            >
-              {t('home.view_all_tasks')}
-            </Link>
-          </div>
+          <Link to="/today" className={cx(styles.viewAll, 'nf-focus-ring')}>
+            {t('home.view_all_tasks')}
+          </Link>
         </section>
       )}
     </>
@@ -259,32 +197,9 @@ function WorkspaceLinks(): ReactElement {
 
   if (workspaces.length === 0) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          gap: 'var(--nf-space-3)',
-        }}
-      >
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('workspaces.empty')}
-        </p>
-        <Link
-          to="/setup"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) var(--nf-space-3-5)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-accent)',
-            color: 'var(--nf-color-fg-on-accent)',
-            textDecoration: 'none',
-            fontSize: 'var(--nf-text-sm)',
-            fontWeight: 600,
-          }}
-        >
+      <div className={styles.workspacesEmpty}>
+        <p className={styles.mutedText}>{t('workspaces.empty')}</p>
+        <Link to="/setup" className={cx(styles.action, styles.actionPrimary, 'nf-focus-ring')}>
           <Icon icon={Plus} decorative />
           {t('workspaces.setup.submit')}
         </Link>
@@ -293,29 +208,28 @@ function WorkspaceLinks(): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexWrap: 'wrap' }}>
+    <div className={styles.workspaces}>
       {workspaces.map((ws) => (
         <Link
           key={ws.id}
           to="/workspaces/$id"
           params={{ id: ws.id }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-surface)',
-            border: '1px solid var(--nf-color-border)',
-            color: 'inherit',
-            textDecoration: 'none',
-            fontSize: 'var(--nf-text-sm)',
-          }}
+          className={cx(styles.workspaceLink, 'nf-focus-ring')}
         >
           <Icon icon={FolderKanban} decorative />
-          {ws.name}
+          <span className={styles.workspaceName}>{ws.name}</span>
         </Link>
       ))}
+    </div>
+  );
+}
+
+/** Reserves one row of workspace chips while the list loads. */
+function WorkspaceLinksSkeleton(): ReactElement {
+  return (
+    <div className={styles.workspaces} aria-busy="true">
+      <Skeleton className={styles.workspaceSkeleton} />
+      <Skeleton className={styles.workspaceSkeleton} />
     </div>
   );
 }
@@ -338,159 +252,49 @@ function HomePage(): ReactElement {
     ? t('home.greeting_name', { name: user.displayName })
     : t('landing.hello');
 
+  // Both buttons open the shared command palette; the layout listens for the event.
+  const openPalette = (): void => {
+    window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+  };
+
   return (
-    <section
-      style={{
-        minBlockSize: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-8)',
-        paddingBlock: 'var(--nf-space-8)',
-        // nf-token-override: upper bound of a fluid range; the gutter stops widening here so the dashboard columns keep their measure
-        paddingInline: 'clamp(var(--nf-space-6), 6vw, 3.5rem)',
-        // nf-token-override: component dimension, not a spacing step
-        maxInlineSize: '72rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      {/* Header */}
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display)',
-            fontOpticalSizing: 'auto',
-            fontWeight: 400,
-            // nf-token-override: the dashboard greeting is the one heading set in the display face over the wordmark gradient, and it is sized against that gradient rather than against the page-title step
-            fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
-            lineHeight: 1.1,
-            letterSpacing: '-0.02em',
-            margin: 0,
-            backgroundImage: 'var(--nf-gradient-wordmark)',
-            backgroundClip: 'text',
-            // biome-ignore lint/style/useNamingConvention: React PascalCase for vendor-prefixed CSS
-            WebkitBackgroundClip: 'text',
-            color: 'transparent',
-            // biome-ignore lint/style/useNamingConvention: React PascalCase for vendor-prefixed CSS
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          {greeting}
-        </h1>
-        <p
-          style={{
-            fontFamily: 'var(--nf-font-mono)',
-            fontSize: 'var(--nf-text-micro)',
-            letterSpacing: '0.18em',
-            color: 'var(--nf-color-fg-muted)',
-            margin: 0,
-          }}
-        >
-          {t('landing.tagline')}
-        </p>
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <h1 className={styles.greeting}>{greeting}</h1>
+        <p className={styles.tagline}>{t('landing.tagline')}</p>
       </header>
 
-      {/* Quick actions */}
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexWrap: 'wrap' }}>
+      <div className={styles.quickActions}>
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-accent)',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 'var(--nf-text-sm)',
-            fontWeight: 500,
-          }}
+          onClick={openPalette}
+          className={cx(styles.action, styles.actionPrimary, 'nf-focus-ring')}
         >
           <Icon icon={Plus} decorative />
           {t('home.quick_create')}
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            const btn = document.querySelector<HTMLButtonElement>('[data-search-trigger]');
-            btn?.click();
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'transparent',
-            color: 'var(--nf-color-fg)',
-            border: '1px solid var(--nf-color-border)',
-            cursor: 'pointer',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <button type="button" onClick={openPalette} className={cx(styles.action, 'nf-focus-ring')}>
           <Icon icon={Search} decorative />
           {t('home.quick_search')}
         </button>
-        <Link
-          to="/inbox"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-2) var(--nf-space-4)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'transparent',
-            color: 'var(--nf-color-fg)',
-            border: '1px solid var(--nf-color-border)',
-            textDecoration: 'none',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <Link to="/inbox" className={cx(styles.action, 'nf-focus-ring')}>
           <Icon icon={Inbox} decorative />
           {t('nav.inbox')}
         </Link>
       </div>
 
-      {/* Task summary */}
-      <Suspense
-        fallback={
-          <div
-            style={{
-              padding: 'var(--nf-space-8)',
-              textAlign: 'center',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('common.loading')}
-          </div>
-        }
-      >
+      <Suspense fallback={<TaskSummarySkeleton />}>
         <TaskSummary />
       </Suspense>
 
-      {/* Workspaces */}
       <section>
-        <h2
-          style={{
-            margin: '0 0 var(--nf-space-3)',
-            fontSize: 'var(--nf-text-supporting)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('nav.workspaces')}
-        </h2>
-        <Suspense fallback={null}>
+        <h2 className={styles.sectionTitle}>{t('nav.workspaces')}</h2>
+        <Suspense fallback={<WorkspaceLinksSkeleton />}>
           <WorkspaceLinks />
         </Suspense>
       </section>
 
-      {/* Dashboard widgets */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<Skeleton className={styles.dashboardSkeleton} />}>
         <HomeDashboard />
       </Suspense>
     </section>

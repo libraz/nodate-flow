@@ -1,0 +1,72 @@
+/* AI provider list: one bordered row per provider, actions on the inline end. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  --presence-gap: var(--nf-space-3);
+}
+
+.arrived {
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+  padding: var(--nf-space-4) var(--nf-space-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  border-color: var(--nf-color-border-strong);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.name {
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.meta {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.baseUrl {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-micro);
+  color: var(--nf-color-fg-muted);
+}
+
+.invalid {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-danger-fg);
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-2);
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 5.5rem;
+  inline-size: 100%;
+}

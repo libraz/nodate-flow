@@ -1,7 +1,6 @@
 /**
  * ArchivedBulkActionBar — slide-up bottom bar shown when n > 0 rows
- * are selected. The slide-up animation is CSS-driven and respects
- * `prefers-reduced-motion` (see archived.module.css).
+ * are selected. The slide-up is CSS-driven (see archived.module.css).
  *
  * The bar is keyboard-reachable (Tab order through cancel + primary
  * action), labelled as a `<region>` so AT users can locate it through

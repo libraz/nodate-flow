@@ -1,9 +1,12 @@
 /**
- * TaskAttachments — file upload (presigned PUT), download, and delete for task attachments.
+ * TaskAttachments — file upload (API-signed URL), download, and delete for task attachments.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
@@ -16,6 +19,7 @@ import {
   useListAttachments,
   usePresignUpload,
 } from './api';
+import css from './task-attachments.module.css';
 
 interface TaskAttachmentsProps {
   taskId: string;
@@ -62,34 +66,12 @@ function AttachmentRow({
   };
 
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--nf-space-3)',
-        paddingBlock: 'var(--nf-space-1-5)',
-      }}
-    >
-      <div style={{ flex: 1, minInlineSize: 0, display: 'flex', flexDirection: 'column' }}>
-        <span
-          style={{
-            fontWeight: 500,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+    <div className={css.row}>
+      <div className={css.rowBody}>
+        <span title={attachment.filename} className={css.filename}>
           {attachment.filename}
         </span>
-        <span
-          style={{
-            fontSize: 'var(--nf-text-supporting)',
-            color: 'var(--nf-color-fg-muted)',
-            display: 'flex',
-            gap: 'var(--nf-space-2)',
-            flexWrap: 'wrap',
-          }}
-        >
+        <span className={css.meta}>
           <span>{formatBytes(attachment.byteSize, locale, t)}</span>
           <span>{attachment.contentType}</span>
           <span>
@@ -124,7 +106,7 @@ function AttachmentRow({
           ? t('tasks.attachments.deleting')
           : t('tasks.attachments.delete')}
       </Button>
-    </li>
+    </div>
   );
 }
 
@@ -135,6 +117,7 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   const locale = i18n.resolvedLanguage ?? 'en';
   const presignUpload = usePresignUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { entries, onExited } = usePresenceList(attachments, (a) => a.id);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
@@ -154,14 +137,14 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.attachments.title')}</h2>
+    <section className={css.section}>
+      <div className={css.header}>
+        <h2 className={css.title}>{t('tasks.attachments.title')}</h2>
         <div>
           <input
             ref={fileInputRef}
             type="file"
-            style={{ display: 'none' }}
+            hidden
             onChange={(e) => {
               void handleFileChange(e);
             }}
@@ -179,23 +162,20 @@ export default function TaskAttachments({ taskId }: TaskAttachmentsProps): React
           </Button>
         </div>
       </div>
-      {attachments.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>
-          {t('tasks.attachments.empty')}
-        </p>
+      {entries.length === 0 ? (
+        <p className={css.empty}>{t('tasks.attachments.empty')}</p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-1)',
-          }}
-        >
-          {attachments.map((a) => (
-            <AttachmentRow key={a.id} attachment={a} taskId={taskId} locale={locale} />
+        <ul className={css.list}>
+          {entries.map(({ key, item: a, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+            >
+              <AttachmentRow attachment={a} taskId={taskId} locale={locale} />
+            </PresenceItem>
           ))}
         </ul>
       )}

@@ -24,7 +24,7 @@
 
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useState } from 'react';
@@ -159,12 +159,24 @@ function EventHeader({ workspaceId, calendarId, eventId }: EventHeaderProps): Re
   );
 }
 
-/** Suspense fallback shared by the page-level boundary and tab panes. */
-function PaneFallback(): ReactElement {
-  const { t } = useTranslation('common');
+/** Header-card shaped placeholder, so the title block does not jump when the event resolves. */
+function HeaderFallback(): ReactElement {
   return (
-    <div className={styles.fallback}>
-      <Spinner label={t('common.loading')} />
+    <div className={styles.headerCard} aria-busy="true">
+      <Skeleton className={styles.skeletonTitle} />
+      <Skeleton className={styles.skeletonMeta} />
+      <Skeleton className={styles.skeletonMeta} />
+    </div>
+  );
+}
+
+/** Suspense fallback for the tab panes: a few row-shaped placeholders. */
+function PaneFallback(): ReactElement {
+  return (
+    <div className={styles.fallback} aria-busy="true">
+      <Skeleton className={styles.skeletonRow} />
+      <Skeleton className={styles.skeletonRow} />
+      <Skeleton className={styles.skeletonRow} />
     </div>
   );
 }
@@ -234,7 +246,7 @@ export default function EventDetailPage(): ReactElement {
       <Link to="/calendar" className={`${styles.back} nf-focus-ring`}>
         {t('event.detail.back')}
       </Link>
-      <Suspense fallback={<PaneFallback />}>
+      <Suspense fallback={<HeaderFallback />}>
         <EventHeader workspaceId={workspaceId} calendarId={calendarId} eventId={eventId} />
       </Suspense>
       <Tabs items={tabs} defaultValue="attendees" aria-label={t('event.detail.tab.attendees')} />

@@ -1,6 +1,10 @@
 .shell {
+  /* nf-token-override: sidebar rail widths, mirrored by sidebar.module.css */
+  --nf-shell-sidebar-inline-size: 16rem;
+  /* Height of the floating dock plus its offset: main scrolls clear of it. */
+  --nf-shell-dock-clearance: calc(var(--nf-space-24) + var(--nf-space-6));
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: var(--nf-shell-sidebar-inline-size) minmax(0, 1fr);
   /*
    * Three rows: top-bar (auto), optional active-timebox bar (auto, collapses to
    * 0 when the bar component returns `null`), main content (flex). Putting the
@@ -15,7 +19,13 @@
   font-family: var(--nf-font-sans);
 }
 
+.shell:has([data-collapsed]) {
+  /* nf-token-override: sidebar rail width, mirrored by sidebar.module.css */
+  --nf-shell-sidebar-inline-size: 4rem;
+}
+
 .sidebarSlot {
+  position: relative;
   grid-column: 1;
   grid-row: 1 / span 3;
   min-block-size: 0;
@@ -51,13 +61,28 @@
   min-inline-size: 0;
   min-block-size: 0;
   /*
-   * Reserve vertical room for the fixed glass-dock / FAB bar pinned to
-   * `inset-block-end: var(--nf-space-6)` (see `glass-dock.module.css`).
-   * Without this padding the dock overlaps trailing content (e.g. the
-   * dashboard section heading) on narrow viewports where the dock spans
-   * the full inline axis.
+   * The fixed glass dock and AI pill float over the viewport; this end
+   * clearance lets the last content (and focus targets) scroll clear of them.
    */
-  padding-block-end: var(--nf-space-24);
+  padding-block-end: var(--nf-shell-dock-clearance);
+  scroll-padding-block-end: var(--nf-shell-dock-clearance);
+}
+
+/*
+ * Route enter on <main> itself, using the shared keyframes. The two classes
+ * list the same pair in opposite order: a changed animation-name list
+ * restarts the animation without remounting the routed subtree.
+ */
+.mainEnterA {
+  animation:
+    global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out),
+    global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.mainEnterB {
+  animation:
+    global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out),
+    global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring-inset` utility (added in JSX). */

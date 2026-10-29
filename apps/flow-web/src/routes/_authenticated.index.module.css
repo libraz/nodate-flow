@@ -1,0 +1,294 @@
+/* Authenticated home — greeting, quick actions, task summary, workspaces, widgets. */
+
+.page {
+  min-block-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-8);
+  padding-block: var(--nf-space-8);
+  /* nf-token-override: upper bound of a fluid range; the gutter stops widening here so the dashboard columns keep their measure */
+  padding-inline: clamp(var(--nf-space-6), 6vw, 3.5rem);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.greeting {
+  font-family: var(--nf-font-display);
+  font-optical-sizing: auto;
+  font-weight: var(--nf-weight-regular);
+  /* nf-token-override: the dashboard greeting is the one heading set in the display face, sized as a fluid range rather than against the page-title step */
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: var(--nf-leading-tight);
+  letter-spacing: -0.02em;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--nf-color-fg);
+}
+
+.tagline {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-micro);
+  letter-spacing: 0.18em;
+  color: var(--nf-color-fg-muted);
+  margin: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 var(--nf-space-3);
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+}
+
+/* ── Quick actions ─────────────────────────────── */
+
+.quickActions {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: transparent;
+  color: var(--nf-color-fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--nf-text-sm);
+  text-decoration: none;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.action:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
+}
+
+.action:active {
+  scale: var(--nf-motion-press-scale);
+}
+
+.actionPrimary {
+  border-color: var(--nf-color-accent);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  font-weight: var(--nf-weight-medium);
+}
+
+.actionPrimary:hover {
+  border-color: var(--nf-color-accent-hover);
+  background: var(--nf-color-accent-hover);
+}
+
+/* ── Stats ─────────────────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--nf-space-3);
+}
+
+/* Replays the swap from the skeleton row to the real cards. */
+.statsEnter {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-4);
+  padding-inline: var(--nf-space-5);
+  border-radius: var(--nf-radius-lg);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+}
+
+/* Full hairline border plus a light tint, in the tone's own colour. */
+.statIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 2.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 2.5rem;
+  flex-shrink: 0;
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid color-mix(in oklch, currentColor 25%, transparent);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+}
+
+.statIconDanger {
+  background: var(--nf-color-danger-subtle);
+  color: var(--nf-color-danger-fg);
+}
+
+.statIconWarning {
+  background: var(--nf-color-warning-subtle);
+  color: var(--nf-color-warning-fg);
+}
+
+.statIconSuccess {
+  background: var(--nf-color-success-subtle);
+  color: var(--nf-color-success-fg);
+}
+
+.statText {
+  min-inline-size: 0;
+}
+
+.statValue {
+  font-size: var(--nf-text-2xl);
+  font-weight: var(--nf-weight-bold);
+  line-height: var(--nf-leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  margin-block-start: var(--nf-space-0-5);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.statSkeleton {
+  /* nf-token-override: placeholder sized to the stat card it stands in for */
+  block-size: 4.625rem;
+  border-radius: var(--nf-radius-lg);
+}
+
+/* Holds the dashboard's place so the page does not grow when it resolves. */
+.dashboardSkeleton {
+  /* nf-token-override: placeholder sized to the dashboard it stands in for */
+  block-size: 12rem;
+  border-radius: var(--nf-radius-lg);
+}
+
+/* ── Recent tasks ──────────────────────────────── */
+
+.taskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid transparent;
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.taskRow:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+}
+
+.taskTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskProject {
+  flex-shrink: 1;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.viewAll {
+  display: inline-block;
+  margin-block-start: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-accent-fg);
+  text-decoration: none;
+  text-underline-offset: 0.2em;
+}
+
+.viewAll:hover {
+  text-decoration: underline;
+}
+
+/* ── Workspaces ────────────────────────────────── */
+
+.workspaces {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.workspaceLink {
+  composes: action;
+  background: var(--nf-color-surface);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 20rem;
+}
+
+.workspaceName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceSkeleton {
+  block-size: var(--nf-control-height);
+  /* nf-token-override: placeholder sized to the workspace chip it stands in for */
+  inline-size: 9rem;
+  border-radius: var(--nf-radius-md);
+}
+
+.workspacesEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-3);
+}
+
+.mutedText {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}

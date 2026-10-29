@@ -1,7 +1,6 @@
 /**
- * /settings/security — user security settings (lazy). Currently
- * shows the active sessions panel; password change and TOTP 2FA land
- * in follow-up PRs.
+ * /settings/security — user security settings (lazy): password change,
+ * TOTP 2FA, and the active sessions list, one bordered section each.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
@@ -11,55 +10,50 @@ import { useTranslation } from 'react-i18next';
 
 import PasswordPanel from '../features/settings/password-panel';
 import SessionsPanel from '../features/settings/sessions-panel';
+import ui from '../features/settings/settings-ui.module.css';
 import TotpPanel from '../features/settings/totp-panel';
-
-const sectionStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--nf-space-3-5)',
-  padding: 'var(--nf-space-5) var(--nf-space-6)',
-  borderRadius: 'var(--nf-radius-lg)',
-  border: '1px solid var(--nf-color-border)',
-  background: 'var(--nf-color-surface)',
-} as const;
-
-const sectionHeadingStyle = {
-  margin: 0,
-  fontSize: 'var(--nf-text-base)',
-  fontWeight: 600,
-  color: 'var(--nf-color-fg)',
-  paddingBlockEnd: 'var(--nf-space-3)',
-  borderBlockEnd: '1px solid var(--nf-color-border)',
-} as const;
+import styles from './_authenticated.settings.security.module.css';
 
 function SecurityRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
-      <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('security.title')}</h1>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <h1 className={ui.title}>{t('security.title')}</h1>
+      </header>
 
-      <section style={sectionStyle}>
-        <h2 style={sectionHeadingStyle}>{t('security.password.title')}</h2>
+      <section className={ui.section} aria-labelledby="security-password-title">
+        <h2 id="security-password-title" className={ui.sectionTitle}>
+          {t('security.password.title')}
+        </h2>
         <PasswordPanel />
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={sectionHeadingStyle}>{t('security.totp.title')}</h2>
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+      <section className={ui.section} aria-labelledby="security-totp-title">
+        <h2 id="security-totp-title" className={ui.sectionTitle}>
+          {t('security.totp.title')}
+        </h2>
+        <Suspense
+          fallback={
+            <div className={ui.skeletonStack} aria-hidden="true">
+              <Skeleton className={styles.skeletonLine} />
+              <Skeleton className={styles.skeletonField} />
+            </div>
+          }
+        >
           <TotpPanel />
         </Suspense>
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={sectionHeadingStyle}>{t('security.sessions.title')}</h2>
+      <section className={ui.section} aria-labelledby="security-sessions-title">
+        <h2 id="security-sessions-title" className={ui.sectionTitle}>
+          {t('security.sessions.title')}
+        </h2>
         <Suspense
           fallback={
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-              <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-              <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+            <div className={ui.skeletonStack} aria-hidden="true">
+              <Skeleton className={styles.skeletonRow} />
+              <Skeleton className={styles.skeletonRow} />
             </div>
           }
         >

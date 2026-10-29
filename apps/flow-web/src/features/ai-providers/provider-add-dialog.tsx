@@ -207,7 +207,7 @@ export default function ProviderAddDialog({
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('providers.action.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
+          <Button type="submit" variant="primary" disabled={submitting} aria-busy={submitting}>
             {t('providers.action.save')}
           </Button>
         </div>

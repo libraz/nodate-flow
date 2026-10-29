@@ -18,45 +18,25 @@ import { useTranslation } from 'react-i18next';
 
 import InboxList from '../features/inbox/inbox-list';
 import IntakeList from '../features/inbox/intake/intake-list';
+import styles from './_authenticated.inbox.module.css';
 
 function InboxRoute(): ReactElement {
   const { t } = useTranslation('inbox');
 
   const fallback = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-      <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+    <div className={styles.fallback} aria-busy="true">
+      <Skeleton className={styles.fallbackToolbar} />
+      <Skeleton className={styles.fallbackRow} />
+      <Skeleton className={styles.fallbackRow} />
+      <Skeleton className={styles.fallbackRow} />
     </div>
   );
 
   return (
-    <section
-      style={{
-        padding: 'var(--nf-space-page)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        // nf-token-override: component dimension, not a spacing step
-        maxInlineSize: '60rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-page-title)',
-          }}
-        >
-          {t('view.title')}
-        </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('view.subtitle')}</p>
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>{t('view.title')}</h1>
+        <p className={styles.subtitle}>{t('view.subtitle')}</p>
       </header>
       <Tabs
         aria-label={t('view.title')}

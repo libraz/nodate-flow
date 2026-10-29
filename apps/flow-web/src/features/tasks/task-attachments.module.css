@@ -1,0 +1,66 @@
+/* Task attachments panel. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-lg);
+}
+
+.empty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-sm);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.rowBody {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.filename {
+  font-weight: var(--nf-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}

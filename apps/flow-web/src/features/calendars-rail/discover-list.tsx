@@ -143,13 +143,15 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
           <Skeleton style={{ blockSize: '3rem' }} />
         </div>
       ) : error ? (
-        <p className={styles.discoverError} role="alert">
+        <p key="error" className={`${styles.discoverError} ${styles.discoverState}`} role="alert">
           {formatApiError(error, t, 'calendars_rail.discover.load_error')}
         </p>
       ) : filtered.length === 0 ? (
-        <p className={styles.empty}>{t('calendars_rail.discover.empty')}</p>
+        <p key="empty" className={`${styles.empty} ${styles.discoverState}`}>
+          {t('calendars_rail.discover.empty')}
+        </p>
       ) : (
-        <ul className={styles.discoverList}>
+        <ul key="list" className={`${styles.discoverList} ${styles.discoverState}`}>
           {filtered.map((row) => (
             <li key={row.id} className={styles.discoverRow}>
               <Avatar
@@ -179,6 +181,9 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
                 size="sm"
                 onClick={() => handleSubscribe(row.id)}
                 disabled={subscribe.isPending}
+                aria-busy={
+                  (subscribe.isPending && subscribe.variables?.calId === row.id) || undefined
+                }
               >
                 {t('calendars_rail.discover.subscribe')}
               </Button>

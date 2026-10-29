@@ -1,0 +1,73 @@
+/**
+ * /invite/$token — card body chrome for the accept page and its error view.
+ * Tokens only.
+ */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.main--center {
+  align-items: center;
+  gap: var(--nf-space-4);
+  text-align: center;
+}
+
+.title {
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-2xl);
+  margin: 0;
+}
+
+.title--semibold {
+  font-weight: var(--nf-weight-semibold);
+}
+
+.errorIcon {
+  color: var(--nf-color-danger-fg);
+}
+
+.text {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.textSm {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.alert {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-danger-fg);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-3);
+}
+
+/* Card-shaped placeholder while the session probe settles. */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.skeletonLine {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1rem;
+  inline-size: 100%;
+}
+
+.skeletonAction {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 2.5rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 40%;
+}

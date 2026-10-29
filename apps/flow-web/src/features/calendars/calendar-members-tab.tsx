@@ -10,13 +10,16 @@
  * also rejects this state with a 409, so the guard is double-defense.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -55,6 +58,7 @@ export default function CalendarMembersTab({
   const removeMember = useRemoveCalendarMemberMutation();
   const addMember = useAddCalendarMemberMutation();
 
+  const { entries, onExited } = usePresenceList(members, (m) => m.userId);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<AddableRole>('editor');
 
@@ -127,58 +131,66 @@ export default function CalendarMembersTab({
 
   return (
     <div className={styles.body}>
-      {members.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('calendar.settings.members.empty')}</p>
       ) : (
         <ul className={styles.list}>
-          {members.map((member) => {
+          {entries.map(({ key, item: member, present }) => {
             const tone = ROLE_TONE[member.role] ?? 'neutral';
             const lockOwner = isLastOwner(member);
             return (
-              <li key={member.userId} className={styles.row}>
-                <Avatar
-                  alt={member.displayName}
-                  initials={member.displayName.slice(0, 2).toUpperCase()}
-                  size="sm"
-                  {...(member.avatarUrl ? { src: member.avatarUrl } : {})}
-                />
-                <div className={styles.identity}>
-                  <span className={styles.displayName}>{member.displayName}</span>
-                  <Badge tone={tone}>
-                    {t(`calendar.settings.members.role.${member.role}` as const, {
-                      defaultValue: member.role,
-                    })}
-                  </Badge>
-                </div>
-                <div className={styles.actions}>
-                  <Select
-                    value={member.role}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-                      handleRoleChange(member, e.target.value as UpdatableRole);
-                    }}
-                    aria-label={t('calendar.settings.members.role_select_label', {
-                      name: member.displayName,
-                    })}
-                    disabled={lockOwner || updateRole.isPending}
-                  >
-                    <option value="owner">{t('calendar.settings.members.role.owner')}</option>
-                    <option value="manager">{t('calendar.settings.members.role.manager')}</option>
-                    <option value="editor">{t('calendar.settings.members.role.editor')}</option>
-                    <option value="viewer">{t('calendar.settings.members.role.viewer')}</option>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => onExited(key)}
+                className={motion.enter}
+              >
+                <div className={styles.row}>
+                  <Avatar
+                    alt={member.displayName}
+                    initials={member.displayName.slice(0, 2).toUpperCase()}
                     size="sm"
-                    onClick={() => {
-                      void handleRemove(member);
-                    }}
-                    disabled={lockOwner || removeMember.isPending}
-                  >
-                    {t('calendar.settings.members.remove')}
-                  </Button>
+                    {...(member.avatarUrl ? { src: member.avatarUrl } : {})}
+                  />
+                  <div className={styles.identity}>
+                    <span className={styles.displayName}>{member.displayName}</span>
+                    <Badge tone={tone}>
+                      {t(`calendar.settings.members.role.${member.role}` as const, {
+                        defaultValue: member.role,
+                      })}
+                    </Badge>
+                  </div>
+                  <div className={styles.actions}>
+                    <Select
+                      value={member.role}
+                      onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                        handleRoleChange(member, e.target.value as UpdatableRole);
+                      }}
+                      aria-label={t('calendar.settings.members.role_select_label', {
+                        name: member.displayName,
+                      })}
+                      disabled={lockOwner || updateRole.isPending}
+                    >
+                      <option value="owner">{t('calendar.settings.members.role.owner')}</option>
+                      <option value="manager">{t('calendar.settings.members.role.manager')}</option>
+                      <option value="editor">{t('calendar.settings.members.role.editor')}</option>
+                      <option value="viewer">{t('calendar.settings.members.role.viewer')}</option>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        void handleRemove(member);
+                      }}
+                      disabled={lockOwner || removeMember.isPending}
+                    >
+                      {t('calendar.settings.members.remove')}
+                    </Button>
+                  </div>
                 </div>
-              </li>
+              </PresenceItem>
             );
           })}
         </ul>
@@ -220,6 +232,7 @@ export default function CalendarMembersTab({
           variant="primary"
           size="sm"
           disabled={email.trim().length === 0 || addMember.isPending}
+          aria-busy={addMember.isPending || undefined}
         >
           {t('calendar.settings.members.add')}
         </Button>

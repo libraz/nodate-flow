@@ -1,0 +1,22 @@
+/* Loading placeholders for /settings/security, sized to the panels they stand in for. */
+
+.skeletonLine {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 20rem;
+  max-inline-size: 100%;
+}
+
+.skeletonField {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 28rem;
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 4.5rem;
+  inline-size: 100%;
+}

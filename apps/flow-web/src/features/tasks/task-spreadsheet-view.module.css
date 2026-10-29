@@ -36,7 +36,7 @@
   grid-template-columns: 2.5rem 1fr 7rem 6rem 8rem 7.5rem 7.5rem;
   position: sticky;
   inset-block-start: 0;
-  z-index: 2;
+  z-index: var(--nf-z-sticky);
   background: var(--nf-color-bg-elevated);
   border-block-end: 2px solid var(--nf-color-border);
 }
@@ -79,10 +79,11 @@
 }
 
 .bodyRow:hover {
-  background: var(--nf-color-accent-subtle);
+  background: var(--nf-color-surface-hover);
 }
 
-.bodyRowSelected {
+.bodyRowSelected,
+.bodyRowSelected:hover {
   background: var(--nf-color-accent-subtle);
 }
 
@@ -117,17 +118,44 @@
 
 .cellEditable {
   cursor: pointer;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .cellEditable:hover {
   background: var(--nf-color-bg-sunken);
 }
 
+.cellEditable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 var(--nf-space-0-5) var(--nf-color-focus-ring);
+}
+
+.titleText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  transition:
+    color var(--nf-duration-base) var(--nf-ease-standard),
+    text-decoration-color var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.titleText[data-closed="true"] {
+  color: var(--nf-color-fg-muted);
+  text-decoration-color: currentColor;
+}
+
+.cellInput,
+.cellSelect,
+.cellDateInput {
+  animation: global(nf-fade-in) var(--nf-duration-instant) var(--nf-ease-out);
+}
+
 .cellActive {
   outline: 2px solid var(--nf-color-accent);
   outline-offset: -2px;
-  border-radius: 2px;
-  z-index: 1;
+  border-radius: var(--nf-radius-xs);
+  z-index: calc(var(--nf-z-base) + 1);
 }
 
 .cellEditing {
@@ -204,7 +232,8 @@
   inline-size: 0.25rem;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.75rem;
-  border-radius: 1px;
+  /* nf-token-override: corner of a 4x12px data swatch; must read the same in every theme */
+  border-radius: 0.0625rem;
   flex-shrink: 0;
   margin-inline-end: var(--nf-space-2);
 }
@@ -222,53 +251,41 @@
 
 .bulkBar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--nf-space-3);
+  gap: var(--nf-space-2);
   padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-4);
+  padding-inline: var(--nf-space-3);
+  border: var(--nf-space-px) solid
+    color-mix(in oklab, var(--nf-color-accent) 30%, var(--nf-color-border));
   border-radius: var(--nf-radius-md);
-  background: var(--nf-color-accent);
-  color: var(--nf-color-fg-on-accent);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-fg);
   font-size: var(--nf-text-sm);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .bulkBarCount {
+  flex: none;
   font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .bulkBarSpacer {
   flex: 1;
 }
 
-.bulkBtn {
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-3);
-  border-radius: var(--nf-radius-sm);
-  border: 1px solid var(--nf-color-border);
-  background: var(--nf-color-bg);
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-xs);
-  cursor: pointer;
+/* Select is inline-size: 100% by default; keep it intrinsic and bounded. */
+.bulkBar .bulkBarSelect {
+  flex: none;
+  inline-size: auto;
+  max-inline-size: calc(var(--nf-space-24) * 2);
 }
 
-.bulkBtn:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.bulkBtnDanger {
-  composes: bulkBtn;
-  color: var(--nf-color-danger-fg);
-}
-
-.bulkBtnClear {
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: var(--nf-text-xs);
-  cursor: pointer;
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-2);
+.bulkBar button {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* ── Virtual scroll container ───────────────────────────────── */

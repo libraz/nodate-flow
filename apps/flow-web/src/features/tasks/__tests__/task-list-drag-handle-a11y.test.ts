@@ -10,7 +10,7 @@ describe('TaskListView drag handle accessibility', () => {
       'utf8',
     );
 
-    expect(source).toContain('onKeyDown={(e) => handleReorderKeyDown(e, row.index)}');
+    expect(source).toContain('onKeyDown={(e) => cell.reorderKeyDown(e, index)}');
     expect(source).toContain('aria-keyshortcuts="ArrowUp ArrowDown"');
     expect(source).toContain("e.key === 'ArrowUp'");
     expect(source).toContain("e.key === 'ArrowDown'");

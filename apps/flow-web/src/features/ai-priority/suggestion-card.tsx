@@ -3,9 +3,8 @@
  *
  * Renders a before/after view (current → suggested) with priority badges,
  * a five-dot confidence indicator, the reason text, and Apply / Dismiss
- * affordances. Keeps its own per-card busy state while the parent's
- * mutation is in flight; dismissal is delegated to the parent so it can
- * coordinate the optimistic fade-out and toast.
+ * affordances. The parent owns the list item, the busy state and the
+ * exit, so it can coordinate the optimistic removal and toast.
  */
 
 import { cx } from '@nodate-flow/ui/lib/cx';
@@ -78,17 +77,16 @@ export interface SuggestionCardProps {
   suggestion: PrioritySuggestion;
   /** True while either Apply or Dismiss is mid-flight for this row. */
   busy?: boolean;
-  /** True once the row has been marked for fade-out (post-apply / dismiss). */
-  exiting?: boolean;
   onApply: (suggestion: PrioritySuggestion) => void;
   onDismiss: (suggestion: PrioritySuggestion) => void;
 }
 
 /** Single card used by the priority suggestions list. */
 export default function SuggestionCard(props: SuggestionCardProps): ReactElement {
-  const { suggestion, busy, exiting, onApply, onDismiss } = props;
+  const { suggestion, busy, onApply, onDismiss } = props;
   const { t } = useTranslation('aiPriority');
   const reasonId = useId();
+  const titleId = useId();
 
   const current = clampPriority(suggestion.currentPriority);
   const suggested = clampPriority(suggestion.suggestedPriority);
@@ -97,10 +95,15 @@ export default function SuggestionCard(props: SuggestionCardProps): ReactElement
   const confidencePct = Math.round(Math.max(0, Math.min(1, suggestion.confidence)) * 100);
 
   return (
-    <li className={cx(styles.card, exiting && styles.exiting)} data-testid="ai-priority-card">
+    <article className={styles.card} data-testid="ai-priority-card" aria-labelledby={titleId}>
       <div className={styles.body}>
         <div className={styles.titleRow}>
-          <Link to="/tasks/$taskId" params={{ taskId: suggestion.taskId }} className={styles.title}>
+          <Link
+            id={titleId}
+            to="/tasks/$taskId"
+            params={{ taskId: suggestion.taskId }}
+            className={styles.title}
+          >
             {suggestion.title}
           </Link>
         </div>
@@ -162,7 +165,8 @@ export default function SuggestionCard(props: SuggestionCardProps): ReactElement
           variant="primary"
           size="sm"
           onClick={() => onApply(suggestion)}
-          disabled={busy || exiting}
+          disabled={busy}
+          aria-busy={busy || undefined}
           aria-label={t('card.applyAria', { title: suggestion.title })}
         >
           {t('card.apply')}
@@ -172,12 +176,12 @@ export default function SuggestionCard(props: SuggestionCardProps): ReactElement
           variant="ghost"
           size="sm"
           onClick={() => onDismiss(suggestion)}
-          disabled={busy || exiting}
+          disabled={busy}
           aria-label={t('card.dismissAria', { title: suggestion.title })}
         >
           {t('card.dismiss')}
         </Button>
       </div>
-    </li>
+    </article>
   );
 }

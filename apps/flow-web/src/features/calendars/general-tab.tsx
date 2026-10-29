@@ -187,6 +187,7 @@ export default function GeneralTab({
           variant="primary"
           size="sm"
           disabled={isReadonly || !dirty || update.isPending}
+          aria-busy={update.isPending || undefined}
         >
           {t('calendar.settings.general.save')}
         </Button>

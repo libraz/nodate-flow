@@ -146,6 +146,7 @@ export default function PublicPageLayout({
         >
           <a
             href="/"
+            className="nf-focus-ring"
             style={{
               display: 'inline-flex',
               alignItems: 'center',

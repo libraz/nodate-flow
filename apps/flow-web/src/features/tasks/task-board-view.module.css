@@ -3,9 +3,12 @@
 .board {
   display: grid;
   grid-auto-flow: column;
-  grid-template-columns: repeat(var(--col-count, 5), minmax(12rem, 1fr));
+  /* nf-token-override: column min size keeps Japanese card titles on a readable measure */
+  grid-template-columns: repeat(var(--col-count, 5), minmax(17rem, 1fr));
   gap: var(--nf-space-4);
   overflow-x: auto;
+  scroll-snap-type: inline proximity;
+  scroll-padding-inline: var(--nf-space-1);
   padding-block-end: var(--nf-space-4);
   max-inline-size: 100%;
 }
@@ -14,6 +17,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
+  scroll-snap-align: start;
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 24rem;
 }
@@ -26,7 +30,7 @@
 }
 
 .columnHeaderLabel {
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
 }
 
 .columnHeaderCount {
@@ -35,22 +39,18 @@
 }
 
 .dropZone {
+  --presence-gap: var(--nf-space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-3);
+  gap: var(--presence-gap);
   padding: var(--nf-space-1);
-  border: 2px dashed transparent;
   border-radius: var(--nf-radius-md);
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 6rem;
-  transition: border-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.dropZoneHover {
-  border-color: var(--nf-color-accent);
 }
 
 .emptyColumn {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   margin: 0;
   padding: var(--nf-space-5) var(--nf-space-3);
   text-align: center;
@@ -84,6 +84,7 @@
     grid-auto-flow: row;
     grid-template-columns: 1fr;
     overflow-x: visible;
+    scroll-snap-type: none;
   }
 
   .column {

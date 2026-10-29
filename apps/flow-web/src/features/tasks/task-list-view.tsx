@@ -11,14 +11,18 @@ import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
+import { GripVertical, Lock } from 'lucide-react';
 import {
+  createContext,
   type DragEvent,
   type KeyboardEvent,
   type ReactElement,
+  use,
   useCallback,
   useEffect,
   useMemo,
@@ -26,8 +30,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
@@ -48,6 +52,7 @@ import {
   STATE_KEY,
   STATE_TEXT_COLOR,
 } from './constants';
+import css from './task-list-view.module.css';
 import { useInlineEdit } from './use-inline-edit';
 import { useTaskFilters } from './use-task-filters';
 
@@ -100,6 +105,12 @@ function BulkActionBar({
   );
 
   const handleBulkDelete = useCallback(async () => {
+    const confirmed = await confirmAction({
+      title: t('tasks.bulk.delete_confirm_title', { count: selectedIds.length }),
+      message: t('tasks.bulk.delete_confirm', { count: selectedIds.length }),
+      confirmLabel: t('tasks.bulk.delete'),
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
       const results = await Promise.allSettled(selectedIds.map((id) => deleteTask.mutateAsync(id)));
@@ -125,25 +136,14 @@ function BulkActionBar({
   }, [selectedIds, deleteTask, onClear, t]);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--nf-space-2)',
-        padding: 'var(--nf-space-2) var(--nf-space-3)',
-        borderRadius: 'var(--nf-radius-md)',
-        background: 'var(--nf-color-accent)',
-        color: 'var(--nf-color-fg-on-accent)',
-        fontSize: 'var(--nf-text-sm)',
-        marginBottom: 'var(--nf-space-2)',
-      }}
-    >
-      <span style={{ fontWeight: 600 }}>
+    <div className={css.bulkBar}>
+      <span className={css.bulkBarCount}>
         {t('tasks.bulk.selected', { count: selectedIds.length })}
       </span>
-      <span style={{ flex: 1 }} />
+      <span className={css.bulkBarSpacer} />
 
       <Select
+        className={css.bulkBarSelect}
         aria-label={t('tasks.bulk.set_priority')}
         disabled={busy}
         defaultValue=""
@@ -186,6 +186,28 @@ function BulkActionBar({
         {t('tasks.bulk.clear')}
       </Button>
     </div>
+  );
+}
+
+/**
+ * Mounts the bulk bar while anything is selected and collapses it on
+ * clear. The last non-empty selection stays rendered during the exit.
+ */
+function BulkBarSlot({
+  selectedIds,
+  onClear,
+}: {
+  selectedIds: string[];
+  onClear: () => void;
+}): ReactElement {
+  const [shown, setShown] = useState(selectedIds);
+  if (selectedIds.length > 0 && shown.join('\0') !== selectedIds.join('\0')) {
+    setShown(selectedIds);
+  }
+  return (
+    <PresenceItem present={selectedIds.length > 0} onExited={() => undefined}>
+      <BulkActionBar selectedIds={shown} onClear={onClear} />
+    </PresenceItem>
   );
 }
 
@@ -259,13 +281,7 @@ function InlineTitleCell({
           }
           onStopEdit();
         }}
-        style={{
-          width: '100%',
-          fontSize: 'inherit',
-          fontWeight: 500,
-          padding: 'var(--nf-space-0-5) var(--nf-space-1)',
-          margin: 'calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1)',
-        }}
+        className={css.titleInput}
       />
     );
   }
@@ -289,11 +305,9 @@ function InlineTitleCell({
         }
         onStartEdit();
       }}
-      style={{
-        color: 'var(--nf-color-fg)',
-        textDecoration: 'none',
-        fontWeight: 500,
-      }}
+      title={task.title}
+      data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
+      className={css.title}
     >
       {task.title}
     </Link>
@@ -342,12 +356,7 @@ function InlinePriorityCell({
           }
         }}
         onBlur={() => onStopEdit()}
-        style={{
-          width: '100%',
-          fontSize: 'var(--nf-text-supporting)',
-          padding: 'var(--nf-space-0-5) var(--nf-space-1)',
-          margin: 'calc(var(--nf-space-0-5) * -1) calc(var(--nf-space-1) * -1)',
-        }}
+        className={css.prioritySelect}
       >
         <option value="0">{t('tasks.priority.none')}</option>
         <option value="1">{t('tasks.priority.low')}</option>
@@ -372,27 +381,10 @@ function InlinePriorityCell({
           onStartEdit();
         }
       }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 'var(--nf-space-1-5)',
-        fontSize: 'var(--nf-text-supporting)',
-        cursor: 'pointer',
-      }}
+      className={css.editTrigger}
+      style={{ fontSize: 'var(--nf-text-supporting)' }}
     >
-      <span
-        aria-hidden
-        style={{
-          // nf-token-override: component dimension, not a spacing step
-          width: '0.375rem',
-          // nf-token-override: component dimension, not a spacing step
-          height: '0.75rem',
-          // nf-token-override: the corner of a 6x12px colour swatch. --nf-radius-xs spans 0 to 6px across the themes, which on a swatch this small is the difference between a square and a lozenge; a data legend has to read the same in every theme
-          borderRadius: '0.125rem',
-          background: color,
-          flexShrink: 0,
-        }}
-      />
+      <span aria-hidden className={css.prioritySwatch} style={{ background: color }} />
       {label}
     </span>
   );
@@ -467,18 +459,126 @@ function InlineDueCell({
           onStartEdit();
         }
       }}
-      style={{
-        color: overdue ? 'var(--nf-color-danger-fg)' : undefined,
-        fontWeight: overdue ? 600 : undefined,
-        cursor: 'pointer',
-      }}
+      data-overdue={overdue}
+      className={css.editTrigger}
     >
       {displayDate}
     </span>
   );
 }
 
+/* ── Per-render cell state ─────────────────────────────────── */
+
+type InlinePatch = { title?: string; priority?: TaskPriority; dueOn?: string | null };
+type EditColumn = 'title' | 'due' | 'priority';
+
+/**
+ * Everything a cell needs that changes from render to render. It travels
+ * through context rather than through the column definitions: TanStack
+ * renders each `cell` function as a component type, so a column model
+ * rebuilt on every render remounts every cell — dropping the focus of an
+ * open inline editor and replaying entrance animations.
+ */
+interface ListCellState {
+  isEditing: (taskId: string, column: EditColumn) => boolean;
+  startEdit: (taskId: string, column: EditColumn) => void;
+  stopEdit: () => void;
+  save: (taskId: string, patch: InlinePatch) => void;
+  openTask: (taskId: string) => void;
+  reorderKeyDown: (e: KeyboardEvent, index: number) => void;
+}
+
+const ListCellContext = createContext<ListCellState | null>(null);
+
+function useListCell(): ListCellState {
+  const state = use(ListCellContext);
+  if (!state) throw new Error('TaskListView cells must render inside ListCellContext');
+  return state;
+}
+
+function TitleCell({ task }: { task: TaskListItem }): ReactElement {
+  const cell = useListCell();
+  return (
+    <InlineTitleCell
+      task={task}
+      editing={cell.isEditing(task.id, 'title')}
+      onStartEdit={() => cell.startEdit(task.id, 'title')}
+      onStopEdit={cell.stopEdit}
+      onSave={(title) => cell.save(task.id, { title })}
+      onNavigate={() => cell.openTask(task.id)}
+    />
+  );
+}
+
+function DueCell({ task, locale }: { task: TaskListItem; locale: string }): ReactElement {
+  const cell = useListCell();
+  return (
+    <InlineDueCell
+      task={task}
+      editing={cell.isEditing(task.id, 'due')}
+      onStartEdit={() => cell.startEdit(task.id, 'due')}
+      onStopEdit={cell.stopEdit}
+      onSave={(dueOn) => cell.save(task.id, { dueOn })}
+      locale={locale}
+    />
+  );
+}
+
+function PriorityCell({ task }: { task: TaskListItem }): ReactElement {
+  const cell = useListCell();
+  return (
+    <InlinePriorityCell
+      task={task}
+      editing={cell.isEditing(task.id, 'priority')}
+      onStartEdit={() => cell.startEdit(task.id, 'priority')}
+      onStopEdit={cell.stopEdit}
+      onSave={(priority) => cell.save(task.id, { priority })}
+    />
+  );
+}
+
+function DragHandle({
+  index,
+  onDragStart,
+  onDragEnd,
+}: {
+  index: number;
+  onDragStart: (e: DragEvent, index: number) => void;
+  onDragEnd: () => void;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const cell = useListCell();
+  return (
+    <span
+      draggable
+      role="button"
+      tabIndex={0}
+      aria-label={t('tasks.reorder.drag_handle')}
+      title={t('tasks.reorder.drag_handle')}
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragEnd={onDragEnd}
+      onKeyDown={(e) => cell.reorderKeyDown(e, index)}
+      aria-keyshortcuts="ArrowUp ArrowDown"
+      className={css.dragHandle}
+    >
+      <GripVertical size={14} aria-hidden />
+    </span>
+  );
+}
+
 /* ── Main list view ─────────────────────────────────────────── */
+
+/** How far ahead of the list's end the next page starts loading. */
+const LOAD_AHEAD_PX = 200;
+
+/** The nearest ancestor that scrolls vertically, or null for the viewport. */
+function scrollParentOf(node: HTMLElement): HTMLElement | null {
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') return el;
+  }
+  return null;
+}
 
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -492,7 +592,8 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   );
   const tasks = data.pages.flatMap((p) => p.tasks);
   const { data: edges } = useProjectDependenciesQuery(projectId);
-  const blockedByOpen = computeBlockedByOpen(edges);
+  // Memoised for the stable column model below; `edges` is the query's own reference.
+  const blockedByOpen = useMemo(() => computeBlockedByOpen(edges), [edges]);
   const locale = i18n.resolvedLanguage ?? 'en';
   const updateTask = useUpdateTask();
   const reorderTasks = useReorderTasks();
@@ -501,27 +602,31 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const gridRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Auto-fetch the next page when the sentinel below the grid enters the
-  // grid's own scroll viewport. The sentinel is placed inside the same
-  // scroll container so a stable IntersectionObserver root suffices.
+  // Auto-fetch the next page as the end of the list nears. The sentinel sits
+  // below the grid, so it is observed against the ancestor that actually
+  // scrolls it (the page); a grid whose own viewport scrolls is watched
+  // through its scroll position instead.
   useEffect(() => {
-    if (!hasNextPage) return;
-    const root = gridRef.current;
+    if (!hasNextPage || isFetchingNextPage) return;
+    const grid = gridRef.current;
     const sentinel = sentinelRef.current;
-    if (!root || !sentinel) return;
+    if (!grid || !sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-            void fetchNextPage();
-          }
-        }
+        if (entries.some((entry) => entry.isIntersecting)) void fetchNextPage();
       },
-      { root, rootMargin: '200px 0px', threshold: 0 },
+      { root: scrollParentOf(sentinel), rootMargin: `${LOAD_AHEAD_PX}px 0px`, threshold: 0 },
     );
     observer.observe(sentinel);
+    const handleGridScroll = (): void => {
+      if (grid.scrollHeight - grid.scrollTop - grid.clientHeight <= LOAD_AHEAD_PX) {
+        void fetchNextPage();
+      }
+    };
+    grid.addEventListener('scroll', handleGridScroll, { passive: true });
     return () => {
       observer.disconnect();
+      grid.removeEventListener('scroll', handleGridScroll);
     };
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -552,6 +657,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const handleDragStart = useCallback((e: DragEvent, idx: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(idx));
+    // Drag the whole row, not just the 14px grip.
+    const row = (e.currentTarget as HTMLElement).closest('[role="row"]');
+    if (row) e.dataTransfer.setDragImage(row, 0, row.clientHeight / 2);
     setDragIdx(idx);
   }, []);
 
@@ -569,7 +677,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     setDropIdx(null);
   }, []);
 
-  const handleDragLeave = useCallback(() => {
+  // Moving between a row's own cells fires dragleave too; only leaving the row clears it.
+  const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setDropIdx(null);
   }, []);
 
@@ -657,9 +767,10 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
    * dependency. If it is ever adopted, this memo becomes redundant and
    * can go.
    *
-   * The dependency list is every value the cells close over. It is long
-   * because the cells are rich, not because the memo is doing something
-   * unusual.
+   * Every dependency must be stable across ordinary renders: a cell
+   * function's identity is its component type, so a rebuilt model
+   * remounts every cell. Per-render state (edit mode, mutations, the
+   * current task order) reaches the cells through ListCellContext.
    */
   const columns: ColumnDef<TaskListItem, unknown>[] = useMemo(
     () => [
@@ -669,34 +780,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         enableSorting: false,
         header: () => null,
         cell: ({ row }) => (
-          <span
-            draggable
-            role="button"
-            tabIndex={0}
-            aria-label={t('tasks.reorder.drag_handle')}
-            title={t('tasks.reorder.drag_handle')}
-            onDragStart={(e) => handleDragStart(e, row.index)}
-            onDragOver={(e) => handleDragOver(e, row.index)}
-            onDragLeave={handleDragLeave}
-            onDragEnd={handleDragEnd}
-            onDrop={(e) => handleDrop(e, row.index)}
-            onKeyDown={(e) => handleReorderKeyDown(e, row.index)}
-            aria-keyshortcuts="ArrowUp ArrowDown"
-            style={{
-              cursor: 'grab',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              userSelect: 'none',
-              opacity: dragIdx === row.index ? 0.4 : 1,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-xs)',
-              lineHeight: 1,
-            }}
-          >
-            ⠿
-          </span>
+          <DragHandle index={row.index} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />
         ),
       },
       {
@@ -704,18 +788,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         accessorKey: 'title',
         size: 320,
         header: () => t('tasks.columns.title'),
-        cell: ({ row }) => (
-          <InlineTitleCell
-            task={row.original}
-            editing={inlineEdit.isEditing(row.original.id, 'title')}
-            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'title')}
-            onStopEdit={inlineEdit.stopEdit}
-            onSave={(title) => handleInlineSave(row.original.id, { title })}
-            onNavigate={() =>
-              void navigate({ to: '/tasks/$taskId', params: { taskId: row.original.id } })
-            }
-          />
-        ),
+        cell: ({ row }) => <TitleCell task={row.original} />,
       },
       {
         id: 'status',
@@ -768,19 +841,16 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         header: () => t('tasks.columns.deps'),
         cell: ({ row }) => {
           const count = blockedByOpen.get(row.original.id) ?? 0;
-          if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
+          if (count === 0) return <span className={css.muted}>—</span>;
           return (
             <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-1)',
-                color: 'var(--nf-color-danger-fg)',
-                fontVariantNumeric: 'tabular-nums',
-              }}
+              role="img"
+              className={css.blocked}
               title={t('tasks.card.blockedBy', { count })}
+              aria-label={t('tasks.card.blockedBy', { count })}
             >
-              {`\u{1F512} ${count}`}
+              <Lock size={12} aria-hidden />
+              {count}
             </span>
           );
         },
@@ -792,7 +862,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         header: () => t('tasks.columns.assignee'),
         cell: ({ row }) => {
           const count = row.original.assigneeCount;
-          if (count === 0) return <span style={{ color: 'var(--nf-color-fg-muted)' }}>—</span>;
+          if (count === 0) return <span className={css.muted}>—</span>;
           return (
             <span
               style={{
@@ -823,31 +893,14 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         accessorKey: 'dueOn',
         size: 100,
         header: () => t('tasks.columns.due'),
-        cell: ({ row }) => (
-          <InlineDueCell
-            task={row.original}
-            editing={inlineEdit.isEditing(row.original.id, 'due')}
-            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'due')}
-            onStopEdit={inlineEdit.stopEdit}
-            onSave={(dueOn) => handleInlineSave(row.original.id, { dueOn })}
-            locale={locale}
-          />
-        ),
+        cell: ({ row }) => <DueCell task={row.original} locale={locale} />,
       },
       {
         id: 'priority',
         accessorKey: 'priority',
         size: 90,
         header: () => t('tasks.columns.priority'),
-        cell: ({ row }) => (
-          <InlinePriorityCell
-            task={row.original}
-            editing={inlineEdit.isEditing(row.original.id, 'priority')}
-            onStartEdit={() => inlineEdit.startEdit(row.original.id, 'priority')}
-            onStopEdit={inlineEdit.stopEdit}
-            onSave={(priority) => handleInlineSave(row.original.id, { priority })}
-          />
-        ),
+        cell: ({ row }) => <PriorityCell task={row.original} />,
       },
       {
         id: 'updated',
@@ -855,69 +908,58 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         size: 110,
         header: () => t('tasks.columns.updated'),
         cell: ({ row }) => (
-          <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-            {formatEpoch(row.original.updatedAt, locale) ?? '—'}
-          </span>
+          <span className={css.updated}>{formatEpoch(row.original.updatedAt, locale) ?? '—'}</span>
         ),
       },
     ],
-    [
-      t,
-      locale,
-      navigate,
-      inlineEdit,
-      blockedByOpen,
-      dragIdx,
-      handleDragEnd,
-      handleDragLeave,
-      handleDragOver,
-      handleDragStart,
-      handleDrop,
-      handleInlineSave,
-      handleReorderKeyDown,
-    ],
+    [t, locale, blockedByOpen, handleDragEnd, handleDragStart],
   );
+
+  const cellState: ListCellState = {
+    isEditing: inlineEdit.isEditing,
+    startEdit: inlineEdit.startEdit,
+    stopEdit: inlineEdit.stopEdit,
+    save: handleInlineSave,
+    openTask: (taskId) => void navigate({ to: '/tasks/$taskId', params: { taskId } }),
+    reorderKeyDown: handleReorderKeyDown,
+  };
 
   return (
     <>
-      {selectedIds.length > 0 && (
-        <BulkActionBar selectedIds={selectedIds} onClear={handleClearSelection} />
-      )}
-      <DataGrid<TaskListItem>
-        ref={gridRef}
-        aria-label={t('tasks.title')}
-        columns={columns}
-        data={tasks}
-        getRowId={(row) => row.id}
-        emptyContent={t('tasks.empty')}
-        enableRowSelection
-        rowSelection={rowSelection}
-        onRowSelectionChange={setRowSelection}
-        selectAllRowsLabel={t('tasks.list.select_all')}
-        selectRowLabel={(index) => t('tasks.list.select_row', { index })}
-        // nf-token-override: component dimension, not a spacing step
-        style={{ minBlockSize: '20rem' }}
-      />
+      <BulkBarSlot selectedIds={selectedIds} onClear={handleClearSelection} />
+      <ListCellContext value={cellState}>
+        <DataGrid<TaskListItem>
+          ref={gridRef}
+          aria-label={t('tasks.title')}
+          columns={columns}
+          data={tasks}
+          getRowId={(row) => row.id}
+          emptyContent={t('tasks.empty')}
+          enableRowSelection
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
+          selectAllRowsLabel={t('tasks.list.select_all')}
+          selectRowLabel={(index) => t('tasks.list.select_row', { index })}
+          className={css.grid ?? ''}
+          // The whole row is the drop target; dragging starts only from the handle.
+          getRowProps={(row) => ({
+            'data-dragging': dragIdx === row.index || undefined,
+            'data-drop-target': (dropIdx === row.index && dragIdx !== row.index) || undefined,
+            onDragOver: (e) => handleDragOver(e, row.index),
+            onDragLeave: handleDragLeave,
+            onDrop: (e) => handleDrop(e, row.index),
+          })}
+        />
+      </ListCellContext>
       {/*
-        Sentinel + manual fallback. The IntersectionObserver above watches
-        this div inside the grid's own scroll viewport so we trigger the
-        next page when the user scrolls within ~200px of the end.
-        The button is shown as a fallback for keyboard users / when the
-        observer doesn't fire (e.g. very short lists).
+        Sentinel + manual fallback. The observer above loads the next page
+        when this div comes within LOAD_AHEAD_PX of its scroll container's
+        viewport; the button stays for keyboard users and for any case the
+        observer misses.
       */}
       {hasNextPage ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            padding: 'var(--nf-space-3)',
-          }}
-        >
-          <div
-            ref={sentinelRef}
-            aria-hidden="true"
-            style={{ inlineSize: '100%', blockSize: '1px' }}
-          />
+        <div className={css.loadMore}>
+          <div ref={sentinelRef} aria-hidden="true" className={css.sentinel} />
           <Button
             type="button"
             variant="ghost"

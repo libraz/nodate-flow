@@ -6,9 +6,8 @@
  * listbox is tracked by `aria-activedescendant`. ArrowDown / ArrowUp
  * cycle through enabled rows (skipping rows whose event is already
  * linked), Enter commits the active row with the currently-selected
- * `LinkKind`, and Escape closes the popover. Tab moves focus from the
- * input to the kind selector in the footer; Shift+Tab from the input
- * closes the popover.
+ * `LinkKind`. Tab moves focus from the input to the kind selector in the
+ * footer.
  *
  * Search is debounced at 200ms locally and forwarded to
  * `useEventSearch` which handles the workspace `/calendar-events`
@@ -16,16 +15,18 @@
  * returns the upcoming-window default suggestion list. Past events are
  * grouped under a `pastDivider` so the listbox stays scannable.
  *
- * The popover positions itself absolutely under the `popoverHost`
- * wrapper and the section header's "Link event" trigger. Outside-click
- * dismissal is handled by a single `mousedown` listener registered on
- * the document while the popover is open.
+ * The panel is the shared Popover primitive wrapped around the section
+ * header's "Link event" trigger, which owns positioning, enter / exit,
+ * Escape and outside-click dismissal, and returning focus to the
+ * trigger. The panel body mounts with the popover, so each opening
+ * starts from an empty query.
  */
 
+import Popover from '@nodate-flow/ui/primitives/popover';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import {
   type KeyboardEvent,
   type ReactElement,
-  type RefObject,
   useEffect,
   useId,
   useMemo,
@@ -47,11 +48,11 @@ export interface EventPickerProps {
   taskId: string;
   alreadyLinkedEventIds: ReadonlySet<string>;
   locale: string;
-  /** Element the popover anchors to; used for outside-click detection. */
-  anchorRef: RefObject<HTMLElement | null>;
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onLink: (args: { event: CalendarEventListItem; kind: LinkKind }) => void;
+  /** The trigger button; the popover anchors to it and returns focus to it. */
+  children: ReactElement;
 }
 
 interface PickerEntry {
@@ -91,13 +92,52 @@ export default function EventPicker({
   workspaceId,
   alreadyLinkedEventIds,
   locale,
-  anchorRef,
-  isOpen,
-  onClose,
+  open,
+  onOpenChange,
   onLink,
-}: EventPickerProps): ReactElement | null {
+  children,
+}: EventPickerProps): ReactElement {
   const { t } = useTranslation('linkedEvents');
-  const popoverRef = useRef<HTMLDivElement | null>(null);
+  return (
+    <Popover
+      open={open}
+      onOpenChange={onOpenChange}
+      placement="bottom-end"
+      ariaLabel={t('trigger.linkEvent')}
+      // nf-token-override: component dimension, not a spacing step
+      minInlineSize="20rem"
+      content={
+        <PickerPanel
+          workspaceId={workspaceId}
+          alreadyLinkedEventIds={alreadyLinkedEventIds}
+          locale={locale}
+          active={open}
+          onLink={onLink}
+        />
+      }
+    >
+      {children}
+    </Popover>
+  );
+}
+
+interface PickerPanelProps {
+  workspaceId: string;
+  alreadyLinkedEventIds: ReadonlySet<string>;
+  locale: string;
+  /** False while the popover plays its exit; the search stops then. */
+  active: boolean;
+  onLink: (args: { event: CalendarEventListItem; kind: LinkKind }) => void;
+}
+
+function PickerPanel({
+  workspaceId,
+  alreadyLinkedEventIds,
+  locale,
+  active,
+  onLink,
+}: PickerPanelProps): ReactElement {
+  const { t } = useTranslation('linkedEvents');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listboxId = useId();
   const optionIdPrefix = useId();
@@ -109,34 +149,26 @@ export default function EventPicker({
 
   // Debounce the input -> hook query argument (200ms).
   useEffect(() => {
-    if (!isOpen) return;
     const id = window.setTimeout(() => {
       setDebouncedQuery(query.trim());
     }, DEBOUNCE_MS);
     return () => {
       window.clearTimeout(id);
     };
-  }, [query, isOpen]);
+  }, [query]);
 
-  // Reset transient state every time the popover (re-)opens so the
-  // user starts from a clean slate.
+  // Focus the input on the next frame so the panel finishes mounting
+  // (and the popover's focus manager settles) before the caret moves.
   useEffect(() => {
-    if (!isOpen) return;
-    setQuery('');
-    setDebouncedQuery('');
-    setKind('contributes_to');
-    setActiveId(null);
-    // Focus the input on the next frame so the popover finishes
-    // mounting before we move the caret.
     const handle = window.requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
     return () => {
       window.cancelAnimationFrame(handle);
     };
-  }, [isOpen]);
+  }, []);
 
-  const search = useEventSearch(workspaceId, debouncedQuery, isOpen);
+  const search = useEventSearch(workspaceId, debouncedQuery, active);
   const { upcoming, past, selectableIds } = useMemo(
     () => buildEntries(search.data?.events ?? [], alreadyLinkedEventIds),
     [search.data, alreadyLinkedEventIds],
@@ -151,24 +183,6 @@ export default function EventPicker({
     if (activeId !== null && selectableIds.includes(activeId)) return;
     setActiveId(selectableIds[0] ?? null);
   }, [selectableIds, activeId]);
-
-  // Close on outside click (mousedown so we beat focus loss).
-  useEffect(() => {
-    if (!isOpen) return;
-    const onMouseDown = (event: MouseEvent): void => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (popoverRef.current?.contains(target)) return;
-      if (anchorRef.current?.contains(target)) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', onMouseDown);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-    };
-  }, [isOpen, onClose, anchorRef]);
-
-  if (!isOpen) return null;
 
   const allEntries: PickerEntry[] = [...upcoming, ...past];
   const optionIdFor = (eventId: string): string => `${optionIdPrefix}-${eventId}`;
@@ -187,15 +201,6 @@ export default function EventPicker({
     onLink({ event: entry.event, kind });
   };
 
-  // Restore focus to the popover's anchor (the section header trigger)
-  // when the user dismisses via keyboard. Outside-click dismissal lets
-  // the browser's default focus rules apply so we don't steal focus
-  // from wherever the user just clicked.
-  const closeAndRestoreFocus = (): void => {
-    onClose();
-    anchorRef.current?.focus();
-  };
-
   const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     switch (event.key) {
       case 'ArrowDown':
@@ -210,18 +215,7 @@ export default function EventPicker({
         event.preventDefault();
         commitActive();
         break;
-      case 'Escape':
-        event.preventDefault();
-        closeAndRestoreFocus();
-        break;
       default:
-    }
-  };
-
-  const handlePopoverKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeAndRestoreFocus();
     }
   };
 
@@ -231,14 +225,7 @@ export default function EventPicker({
   const showEmptyHint = hasNoMatches && debouncedQuery.length === 0;
 
   return (
-    <div
-      ref={popoverRef}
-      className={styles.popover}
-      role="dialog"
-      aria-modal="false"
-      aria-label={t('trigger.linkEvent')}
-      onKeyDown={handlePopoverKeyDown}
-    >
+    <div className={styles.popover}>
       <div className={styles.popoverInputRow}>
         <svg
           className={styles.popoverInputIcon}
@@ -274,7 +261,13 @@ export default function EventPicker({
         />
       </div>
 
-      {isLoading ? <p className={styles.resultsHint}>{t('picker.loading')}</p> : null}
+      {isLoading ? (
+        <div className={styles.resultsSkeleton} role="status" aria-label={t('picker.loading')}>
+          <Skeleton className={styles.resultsSkeletonRow} />
+          <Skeleton className={styles.resultsSkeletonRow} />
+          <Skeleton className={styles.resultsSkeletonRow} />
+        </div>
+      ) : null}
       {showNoResultsCopy ? (
         <p className={styles.resultsHint}>{t('picker.noResults', { q: debouncedQuery })}</p>
       ) : null}

@@ -36,6 +36,8 @@
  * mirroring the inbox / today list pattern.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   type KeyboardEvent,
@@ -52,6 +54,14 @@ import type { TaskListItem } from '../api';
 import styles from './archived.module.css';
 import ArchivedRow from './archived-row';
 import type { ChapterGroup, ChapterId } from './hooks/use-time-strata';
+
+const CHAPTER_KEY: Record<ChapterId, string> = {
+  thisWeek: 'chapter.thisWeek',
+  earlierThisMonth: 'chapter.earlierThisMonth',
+  thisQuarter: 'chapter.thisQuarter',
+  thisYear: 'chapter.thisYear',
+  older: 'chapter.older',
+};
 
 const ROW_HEIGHT = 48;
 const CHAPTER_HEIGHT = 40;
@@ -122,11 +132,14 @@ export default function ArchivedList({
 }: ArchivedListProps): ReactElement {
   const { t } = useTranslation('archive');
   const parentRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [stickyChapter, setStickyChapter] = useState<ChapterId | null>(groups[0]?.id ?? null);
 
-  const items = useMemo(() => flatten(groups), [groups]);
+  const flatItems = useMemo(() => flatten(groups), [groups]);
+  // A removed row stays in `entries` until its collapse has played.
+  const { entries, onExited } = usePresenceList(flatItems, (item) => item.key);
+  const items = useMemo(() => entries.map((entry) => entry.item), [entries]);
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -183,7 +196,7 @@ export default function ArchivedList({
 
   const setRowRef = useCallback(
     (id: string) =>
-      (node: HTMLLIElement | null): void => {
+      (node: HTMLDivElement | null): void => {
         const map = rowRefs.current;
         if (node === null) {
           map.delete(id);
@@ -257,7 +270,7 @@ export default function ArchivedList({
     setFocusedId(id);
   }, []);
 
-  const stickyLabel = stickyChapter ? t(`chapter.${stickyChapter}`) : '';
+  const stickyLabel = stickyChapter ? t(CHAPTER_KEY[stickyChapter]) : '';
   const stickyCount =
     stickyChapter !== null ? (groups.find((g) => g.id === stickyChapter)?.rows.length ?? 0) : 0;
 
@@ -278,8 +291,9 @@ export default function ArchivedList({
 
       <ul className={styles.virtualInner} style={{ blockSize: `${virtualizer.getTotalSize()}px` }}>
         {virtualItems.map((vi) => {
-          const item = items[vi.index];
-          if (!item) return null;
+          const entry = entries[vi.index];
+          if (!entry) return null;
+          const { item, present } = entry;
           if (item.kind === 'chapter') {
             return (
               <li
@@ -289,10 +303,12 @@ export default function ArchivedList({
                 className={styles.virtualRowWrap}
                 style={{ transform: `translateY(${vi.start}px)` }}
               >
-                <div className={styles.chapterHeader}>
-                  <h2 className={styles.chapterTitle}>{t(`chapter.${item.chapterId}`)}</h2>
-                  <span className={styles.chapterCount}>{item.count}</span>
-                </div>
+                <PresenceItem present={present} onExited={() => onExited(entry.key)}>
+                  <div className={styles.chapterHeader}>
+                    <h2 className={styles.chapterTitle}>{t(CHAPTER_KEY[item.chapterId])}</h2>
+                    <span className={styles.chapterCount}>{item.count}</span>
+                  </div>
+                </PresenceItem>
               </li>
             );
           }
@@ -312,20 +328,22 @@ export default function ArchivedList({
               className={styles.virtualRowWrap}
               style={{ transform: `translateY(${vi.start}px)` }}
             >
-              <ArchivedRow
-                task={item.task}
-                selected={selected.has(item.task.id)}
-                removing={removing.has(item.task.id)}
-                focused={focusedId === item.task.id}
-                locale={locale}
-                {...(archiverName !== undefined ? { archiverName } : {})}
-                {...(archiverAvatarUrl !== undefined ? { archiverAvatarUrl } : {})}
-                onToggleSelect={onToggleSelect}
-                onUnarchive={onUnarchive}
-                onActivate={onActivate}
-                onFocus={handleRowFocus}
-                rowRef={setRowRef(item.task.id)}
-              />
+              <PresenceItem present={present} onExited={() => onExited(entry.key)}>
+                <ArchivedRow
+                  task={item.task}
+                  selected={selected.has(item.task.id)}
+                  removing={removing.has(item.task.id)}
+                  focused={focusedId === item.task.id}
+                  locale={locale}
+                  {...(archiverName !== undefined ? { archiverName } : {})}
+                  {...(archiverAvatarUrl !== undefined ? { archiverAvatarUrl } : {})}
+                  onToggleSelect={onToggleSelect}
+                  onUnarchive={onUnarchive}
+                  onActivate={onActivate}
+                  onFocus={handleRowFocus}
+                  rowRef={setRowRef(item.task.id)}
+                />
+              </PresenceItem>
             </li>
           );
         })}

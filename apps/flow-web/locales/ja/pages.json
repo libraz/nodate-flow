@@ -15,7 +15,7 @@
   "project_none": "ワークスペース全体",
   "confirm_delete": "このページを削除しますか？",
   "ai_generate": "AIで生成",
-  "ai_generating": "生成中...",
+  "ai_badge": "AI",
   "generate": {
     "dialog_title": "AIでページを生成",
     "context_label": "ページタイトル",
@@ -23,7 +23,6 @@
     "prompt_placeholder": "このページで扱う内容、対象読者、主要なセクション、トーンなど、AIに伝えたい情報を入力してください。",
     "prompt_help": "上のページタイトルをコンテキストとし、入力した指示に従って生成します。",
     "submit": "生成",
-    "submitting": "生成中...",
     "cancel": "キャンセル",
     "error": "ページの生成に失敗しました。再度お試しください。"
   },

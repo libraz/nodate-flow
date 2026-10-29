@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
+import CopyButton from '../settings/copy-button';
 import { usePublishLens, useUnpublishLens } from './api';
 import styles from './sharing.module.css';
 
@@ -113,17 +114,10 @@ export default function ShareLensDialog({
     }
   };
 
-  const handleCopyLink = async (): Promise<void> => {
-    if (!currentToken) return;
-    const url = buildPublicUrl(currentToken);
-    try {
-      await navigator.clipboard.writeText(url);
-      toaster.show({ tone: 'success', message: t('link_copied') });
-      linkRef.current?.select();
-    } catch {
-      // Fallback: select the text so the user can copy manually
-      linkRef.current?.select();
-    }
+  // Selecting the link after a copy shows what was copied, and after a
+  // failed write leaves it ready for a manual copy.
+  const selectLink = (): void => {
+    linkRef.current?.select();
   };
 
   return (
@@ -142,7 +136,7 @@ export default function ShareLensDialog({
           <>
             {currentToken ? (
               /* Public link display */
-              <div className={styles.linkSection}>
+              <div className={`${styles.linkSection} ${styles.linkReveal}`}>
                 <span className={styles.linkLabel}>{t('public_link')}</span>
                 <div className={styles.linkRow}>
                   <input
@@ -153,15 +147,13 @@ export default function ShareLensDialog({
                     readOnly
                     aria-label={t('public_link')}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      void handleCopyLink();
-                    }}
-                  >
-                    {t('copy_link')}
-                  </Button>
+                  <CopyButton
+                    value={buildPublicUrl(currentToken)}
+                    label={t('copy_link')}
+                    copiedLabel={t('link_copied')}
+                    onCopied={selectLink}
+                    onError={selectLink}
+                  />
                 </div>
               </div>
             ) : (
@@ -191,6 +183,7 @@ export default function ShareLensDialog({
                       void handleUnpublish();
                     }}
                     disabled={isPending}
+                    aria-busy={unpublishMutation.isPending}
                   >
                     {t('unpublish')}
                   </Button>
@@ -219,6 +212,7 @@ export default function ShareLensDialog({
                   void handlePublish();
                 }}
                 disabled={isPending}
+                aria-busy={publishMutation.isPending}
               >
                 {t('publish')}
               </Button>

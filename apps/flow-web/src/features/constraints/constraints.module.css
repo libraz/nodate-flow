@@ -1,0 +1,80 @@
+/*
+ * State graph nodes: hover and keyboard focus for the clickable task nodes.
+ */
+
+.node {
+  cursor: pointer;
+  outline: none;
+}
+
+.nodeBox {
+  transition: stroke-width var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.node:hover .nodeBox {
+  stroke-width: 2.5;
+}
+
+.nodeFocus {
+  fill: none;
+  stroke: var(--nf-color-focus-ring);
+  stroke-width: 2;
+  opacity: 0;
+}
+
+.node:focus-visible .nodeFocus {
+  opacity: 1;
+}
+
+.edge {
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-out),
+    stroke var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* Hovering a node lifts the edges that touch it out of the tangle. */
+.graph[data-hovering] .edge {
+  opacity: 0.25;
+}
+
+.graph[data-hovering] .edge[data-active] {
+  opacity: 1;
+  stroke: var(--nf-color-fg-muted);
+}
+
+.figure {
+  margin: 0;
+  overflow: auto;
+  /* nf-token-override: keeps the canvas from collapsing while the graph is sparse */
+  min-block-size: 18.75rem;
+}
+
+.caption {
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  margin-block-end: var(--nf-space-3);
+}
+
+.captionNote {
+  font-weight: var(--nf-weight-regular);
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+  margin-inline-start: var(--nf-space-3);
+}
+
+.advanced {
+  margin-block-end: var(--nf-space-2);
+}
+
+.advancedSummary {
+  cursor: pointer;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  margin-block-end: var(--nf-space-1-5);
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.advancedSummary:hover {
+  color: var(--nf-color-fg);
+}

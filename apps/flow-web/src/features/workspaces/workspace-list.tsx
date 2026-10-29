@@ -7,6 +7,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
@@ -15,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { formatEpoch } from '../../lib/format';
 import { useWorkspacesQuery, type Workspace } from './api';
 import WorkspaceCreateDialog from './workspace-create-dialog';
+import styles from './workspaces.module.css';
 
 export default function WorkspaceList(): ReactElement {
   const { t, i18n } = useTranslation('common');
@@ -22,6 +24,10 @@ export default function WorkspaceList(): ReactElement {
   const [createOpen, setCreateOpen] = useState(false);
 
   const locale = i18n.resolvedLanguage ?? 'en';
+
+  const handleCreate = (): void => {
+    setCreateOpen(true);
+  };
 
   const columns: ColumnDef<Workspace, unknown>[] = [
     {
@@ -32,11 +38,8 @@ export default function WorkspaceList(): ReactElement {
         <Link
           to="/workspaces/$id"
           params={{ id: row.original.id }}
-          style={{
-            color: 'var(--nf-color-fg)',
-            textDecoration: 'none',
-            fontWeight: 500,
-          }}
+          className={styles.nameLink}
+          title={row.original.name}
         >
           {row.original.name}
         </Link>
@@ -46,57 +49,33 @@ export default function WorkspaceList(): ReactElement {
       id: 'slug',
       accessorKey: 'slug',
       header: () => t('workspaces.columns.slug'),
-      cell: ({ row }) => <code>{row.original.slug}</code>,
+      cell: ({ row }) => <code title={row.original.slug}>{row.original.slug}</code>,
     },
     {
       id: 'members',
       accessorKey: 'memberCount',
       header: () => t('workspaces.columns.members'),
       cell: ({ row }) => (
-        <span>{new Intl.NumberFormat(locale).format(row.original.memberCount)}</span>
+        <span className={styles.numeric}>
+          {new Intl.NumberFormat(locale).format(row.original.memberCount)}
+        </span>
       ),
     },
     {
       id: 'created',
       accessorKey: 'createdAt',
       header: () => t('workspaces.columns.created'),
-      cell: ({ row }) => <span>{formatEpoch(row.original.createdAt, locale) ?? '—'}</span>,
+      cell: ({ row }) => (
+        <span className={styles.numeric}>{formatEpoch(row.original.createdAt, locale) ?? '—'}</span>
+      ),
     },
   ];
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        padding: 'var(--nf-space-page)',
-        blockSize: '100%',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--nf-space-4)',
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-page-title)',
-            margin: 0,
-          }}
-        >
-          {t('workspaces.title')}
-        </h1>
-        <Button
-          variant="primary"
-          onClick={() => {
-            setCreateOpen(true);
-          }}
-        >
+    <section className={styles.page}>
+      <header className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>{t('workspaces.title')}</h1>
+        <Button variant="primary" onClick={handleCreate}>
           {t('workspaces.new')}
         </Button>
       </header>
@@ -105,9 +84,19 @@ export default function WorkspaceList(): ReactElement {
         aria-label={t('workspaces.title')}
         columns={columns}
         data={workspaces}
-        emptyContent={t('workspaces.empty')}
-        // nf-token-override: component dimension, not a spacing step
-        style={{ minBlockSize: '20rem' }}
+        getRowId={(row) => row.id}
+        emptyContent={
+          <EmptyState
+            titleAs="p"
+            title={t('workspaces.empty')}
+            action={
+              <Button variant="default" onClick={handleCreate}>
+                {t('workspaces.new')}
+              </Button>
+            }
+          />
+        }
+        className={styles.grid}
       />
 
       <WorkspaceCreateDialog

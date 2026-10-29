@@ -67,7 +67,8 @@
         "paused_option": "{name}（一時停止中）",
         "remove": "{name} の割り当てを解除",
         "failed": "エージェントの割り当てに失敗しました",
-        "remove_failed": "エージェントの割り当て解除に失敗しました"
+        "remove_failed": "エージェントの割り当て解除に失敗しました",
+        "removed": "{name} をこのタスクから外しました。"
       }
     }
   },

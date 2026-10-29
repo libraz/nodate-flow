@@ -3,30 +3,23 @@
  * channel toggles (lazy).
  */
 
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import NotificationsForm from '../features/settings/notifications-form';
+import NotificationsForm, {
+  NotificationsFormSkeleton,
+} from '../features/settings/notifications-form';
+import ui from '../features/settings/settings-ui.module.css';
 
 function NotificationsRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('notifications.title')}</h1>
-      <Suspense
-        fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '3rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '3rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '3rem', inlineSize: '100%' }} />
-          </div>
-        }
-      >
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <h1 className={ui.title}>{t('notifications.title')}</h1>
+      </header>
+      <Suspense fallback={<NotificationsFormSkeleton />}>
         <NotificationsForm />
       </Suspense>
     </div>

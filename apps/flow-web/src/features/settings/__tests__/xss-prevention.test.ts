@@ -35,19 +35,20 @@ describe('totp-panel XSS prevention', () => {
     expect(source).toContain("startsWith('otpauth:')");
   });
 
-  it('clipboard writeText has error handling', () => {
+  it('clipboard writes go through CopyButton with a failure handler', () => {
     // navigator.clipboard.writeText can reject if permission is denied.
-    // Each .then() must use the two-argument form .then(onFulfilled, onRejected)
-    // or be followed by .catch(). The two-argument form is:
-    //   .then(() => success, () => error)
-    const clipboardCalls = source.match(/clipboard\.writeText/g);
-    expect(clipboardCalls).not.toBeNull();
-
-    // There should be no bare "void navigator.clipboard" (fire-and-forget)
-    expect(source).not.toMatch(/void\s+navigator\.clipboard/);
-
-    // Every .then() on clipboard calls must have a second argument (rejection handler)
-    // or a subsequent .catch(). Check for 'copy_failed' error messages as evidence.
+    // The panel delegates every write to CopyButton and hands it an
+    // onError that reports the failure.
+    expect(source).not.toMatch(/clipboard\.writeText/);
+    expect(source).toContain('<CopyButton');
+    expect(source).toContain('onError=');
     expect(source).toContain('copy_failed');
+  });
+
+  it('CopyButton catches a rejected clipboard write', () => {
+    const button = readFileSync(resolve(__dirname, '../copy-button.tsx'), 'utf-8');
+    expect(button).toContain('await navigator.clipboard.writeText(value)');
+    expect(button).toContain('catch (err)');
+    expect(button).not.toMatch(/void\s+navigator\.clipboard/);
   });
 });

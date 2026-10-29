@@ -4,6 +4,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Switch from '@nodate-flow/ui/primitives/switch';
@@ -17,8 +18,10 @@ import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
+import listStyles from '../workspaces/workspaces.module.css';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectMembersTable from './project-members-table';
+import styles from './projects.module.css';
 
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
 
@@ -116,7 +119,12 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
             )}
           </FormField>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="submit" variant="primary" disabled={renameDisabled}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={renameDisabled}
+              aria-busy={submitting || undefined}
+            >
               {t('projects.settings.rename')}
             </Button>
           </div>
@@ -180,20 +188,8 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
 
   if (tasks.length === 0) {
     return (
-      <Card style={{ padding: 'var(--nf-space-6)' }}>
-        <p
-          style={{
-            margin: 0,
-            padding: 'var(--nf-space-8) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          {t('projects.detail.overview_empty')}
-        </p>
+      <Card>
+        <EmptyState titleAs="p" title={t('projects.detail.overview_empty')} />
       </Card>
     );
   }
@@ -214,110 +210,46 @@ function OverviewPanel({ id, workspaceId }: { id: string; workspaceId: string })
   const pct = total > 0 ? Math.round((counts.done / total) * 100) : 0;
 
   return (
-    <Card
-      style={{
-        padding: 'var(--nf-space-6)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-5)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 'var(--nf-space-4)',
-          flexWrap: 'wrap',
-        }}
-      >
+    <Card className={styles.overview}>
+      <div className={styles.summary}>
         <div>
-          {/* nf-token-override: a counter read as a figure, not as prose — it pairs with the supporting caption below it and is sized against that pairing */}
-          <div style={{ fontSize: '2rem', fontWeight: 600, lineHeight: 1 }}>{active}</div>
-          <div style={{ fontSize: 'var(--nf-text-supporting)', color: 'var(--nf-color-fg-muted)' }}>
-            {t('projects.detail.active_tasks')}
-          </div>
+          <div className={styles.activeCount}>{active}</div>
+          <div className={styles.caption}>{t('projects.detail.active_tasks')}</div>
         </div>
-        <div
-          style={{
-            marginInlineStart: 'auto',
-            fontSize: 'var(--nf-text-sm)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('projects.detail.progress', { pct })}
-        </div>
+        <div className={styles.progress}>{t('projects.detail.progress', { pct })}</div>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          // nf-token-override: component dimension, not a spacing step
-          blockSize: '0.5rem',
-          borderRadius: 'var(--nf-radius-pill)',
-          overflow: 'hidden',
-          background: 'var(--nf-color-surface)',
-        }}
-      >
-        {STATE_ORDER.map((s) =>
-          counts[s] > 0 ? (
-            <div
-              key={s}
-              title={`${t(`tasks.status.${s}`)}: ${counts[s]}`}
-              style={{
-                flex: `${counts[s]} 1 0`,
-                background: STATE_COLOR[s],
-              }}
-            />
-          ) : null,
-        )}
-      </div>
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <div className={styles.bar}>
+        {/* Every state keeps its segment (at zero width when empty) so a count change animates. */}
         {STATE_ORDER.map((s) => (
-          <li
+          <div
             key={s}
-            style={{
-              padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: 'var(--nf-radius-md)',
-              background: 'var(--nf-color-surface)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-0-5)',
-            }}
-          >
-            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
+            className={styles.segment}
+            title={`${t(`tasks.status.${s}`)}: ${counts[s]}`}
+            style={{ flex: `${counts[s]} 1 0`, background: STATE_COLOR[s] }}
+          />
+        ))}
+      </div>
+      <ul className={styles.states}>
+        {STATE_ORDER.map((s) => (
+          <li key={s} className={styles.state}>
+            <span className={styles.stateLabel}>
+              <span
+                aria-hidden
+                className={styles.stateDot}
+                style={{ background: STATE_COLOR[s] }}
+              />
               {t(`tasks.status.${s}`)}
             </span>
-            <span
-              style={{
-                fontSize: 'var(--nf-text-xl)',
-                fontWeight: 600,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {counts[s]}
-            </span>
+            <span className={styles.stateCount}>{counts[s]}</span>
           </li>
         ))}
       </ul>
       <Link
         to="/workspaces/$id/projects/$projectId/tasks"
         params={{ id: workspaceId, projectId: id }}
-        style={{
-          alignSelf: 'flex-start',
-          fontSize: 'var(--nf-text-sm)',
-          color: 'var(--nf-color-accent-fg)',
-          textDecoration: 'none',
-        }}
+        className={listStyles.viewAll}
       >
-        {t('projects.detail.view_all_tasks')} →
+        {t('projects.detail.view_all_tasks')} <span aria-hidden>→</span>
       </Link>
     </Card>
   );
@@ -358,14 +290,7 @@ export default function ProjectDetail({ id, tab, onTabChange }: ProjectDetailPro
   ];
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        padding: 'var(--nf-space-page)',
-      }}
-    >
+    <section className={styles.detail}>
       <Tabs
         items={items}
         value={tab}

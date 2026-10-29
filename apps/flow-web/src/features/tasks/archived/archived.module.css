@@ -7,9 +7,7 @@
  * the four themes (aurora / dotline / glass-light / glass-dark) inherit
  * the right accent without per-theme overrides.
  *
- * The slide-up bulk-action bar and the row shake-out animation both
- * branch on `prefers-reduced-motion`: motion ships only when the user
- * has not asked the OS for reduced animation.
+ * Motion durations come from the tokens, which reduced motion zeroes.
  */
 
 .page {
@@ -86,51 +84,11 @@
 }
 
 .filterGroup label {
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   white-space: nowrap;
 }
 
 /* ── Range pills (radiogroup) ────────────────────────────────── */
-
-.rangeGroup {
-  display: inline-flex;
-  gap: var(--nf-space-1);
-  padding: var(--nf-space-1);
-  border-radius: var(--nf-radius-pill);
-  border: 1px solid var(--nf-color-hairline);
-  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
-}
-
-.rangePill {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-xs);
-  font-weight: 500;
-  padding: var(--nf-space-1) var(--nf-space-3);
-  border-radius: var(--nf-radius-pill);
-  cursor: pointer;
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.rangePill:hover {
-  background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
-  color: var(--nf-color-fg);
-}
-
-.rangePill[aria-checked="true"] {
-  background: var(--nf-color-bg-elevated);
-  color: var(--nf-color-fg);
-  box-shadow: var(--nf-shadow-sm);
-}
-
-.rangePill:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
 
 /* ── List + chapter ─────────────────────────────────────────── */
 
@@ -166,7 +124,7 @@
 .chapterTitle {
   margin: 0;
   font-size: var(--nf-text-xs);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nf-color-fg-subtle);
@@ -199,8 +157,7 @@
   cursor: default;
   transition:
     background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    transform var(--nf-duration-base) var(--nf-ease-standard),
-    opacity var(--nf-duration-base) var(--nf-ease-standard);
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:hover {
@@ -222,48 +179,22 @@
   border-block-end-color: transparent;
 }
 
+/* Unarchive in flight; the row collapses out once the data catches up. */
 .row[data-removing="true"] {
-  animation: shake-out var(--nf-duration-base) var(--nf-ease-standard) forwards;
-}
-
-@keyframes shake-out {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  35% {
-    transform: translateX(0.5rem);
-    opacity: 0.8;
-  }
-  70% {
-    transform: translateX(0);
-    opacity: 0.4;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .row {
-    transition: none;
-  }
-  .row[data-removing="true"] {
-    animation: none;
-    opacity: 0;
-  }
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 .rowTitle {
   display: block;
   color: var(--nf-color-fg);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-inline-size: 0;
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .rowTitle:hover,
@@ -302,9 +233,33 @@
   opacity: 1;
 }
 
-@media (prefers-reduced-motion: reduce) {
+/* A link dressed as the ghost button beside it; a button inside a link is invalid. */
+.rowActionLink {
+  display: inline-flex;
+  align-items: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 1.75rem;
+  padding: 0 var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  text-decoration: none;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.rowActionLink:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.rowActionLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* Without hover there is no reveal, so the actions stay visible. */
+@media (hover: none) {
   .rowActions {
-    transition: none;
+    opacity: 1;
   }
 }
 
@@ -317,11 +272,14 @@
   display: flex;
   justify-content: center;
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--nf-z-sticky);
 }
 
 .bulkBar {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-inline-size: calc(100% - var(--nf-space-8));
   align-items: center;
   gap: var(--nf-space-3);
   padding: var(--nf-space-2) var(--nf-space-4);
@@ -330,33 +288,19 @@
   color: var(--nf-color-fg-on-accent);
   box-shadow: var(--nf-shadow-lg);
   pointer-events: auto;
-  animation: slide-up var(--nf-duration-base) var(--nf-ease-emphasized);
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(1.5rem);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bulkBar {
-    animation: none;
-  }
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .bulkBarCount {
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   font-size: var(--nf-text-sm);
   font-variant-numeric: tabular-nums;
+  flex: none;
+  white-space: nowrap;
 }
 
 .bulkBarSep {
+  flex: none;
   inline-size: 1px;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 1.25rem;
@@ -364,6 +308,8 @@
 }
 
 .bulkBarBtn {
+  flex: none;
+  white-space: nowrap;
   appearance: none;
   border: 0;
   background: transparent;
@@ -371,7 +317,7 @@
   padding: var(--nf-space-1) var(--nf-space-3);
   border-radius: var(--nf-radius-pill);
   font-size: var(--nf-text-sm);
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   cursor: pointer;
   transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }

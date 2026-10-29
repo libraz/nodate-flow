@@ -8,12 +8,14 @@
  * force-directed physics. Designed to handle up to 100 tasks smoothly.
  */
 
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import { useNavigate } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useProjectDependenciesQuery } from '../projects/api';
 import { TASK_STATES, type TaskDerivedState, type TaskListItem, useTasksQuery } from '../tasks/api';
+import styles from './constraints.module.css';
 
 export interface ProjectStateGraphProps {
   projectId: string;
@@ -161,6 +163,8 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
   const navigate = useNavigate();
   const { data: tasks } = useTasksQuery(projectId);
   const { data: edges } = useProjectDependenciesQuery(projectId);
+  // Node under the pointer; its edges stay at full strength while the rest recede.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   if (tasks.length === 0) {
     return (
@@ -172,10 +176,9 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           justifyContent: 'center',
           // nf-token-override: component dimension, not a spacing step
           minBlockSize: '300px',
-          color: 'var(--nf-color-fg-muted)',
         }}
       >
-        <p>{t('constraints:stateGraph.noTasks')}</p>
+        <EmptyState titleAs="p" title={t('constraints:stateGraph.noTasks')} />
       </div>
     );
   }
@@ -195,35 +198,17 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
   }
 
   return (
-    <figure
-      aria-label={t('constraints:stateGraph.projectTitle')}
-      // nf-token-override: component dimension, not a spacing step
-      style={{ margin: 0, overflow: 'auto', minBlockSize: '300px' }}
-    >
-      <figcaption
-        style={{
-          fontFamily: 'var(--nf-font-display)',
-          fontSize: 'var(--nf-text-base)',
-          fontWeight: 600,
-          marginBlockEnd: 'var(--nf-space-3)',
-        }}
-      >
+    <figure aria-label={t('constraints:stateGraph.projectTitle')} className={styles.figure}>
+      <figcaption className={styles.caption}>
         {t('constraints:stateGraph.projectTitle')}
         {visibleEdges.length === 0 && tasks.length > 0 && (
-          <span
-            style={{
-              fontWeight: 400,
-              fontSize: 'var(--nf-text-supporting)',
-              color: 'var(--nf-color-fg-muted)',
-              marginInlineStart: 'var(--nf-space-3)',
-            }}
-          >
-            {t('constraints:stateGraph.noDependencies')}
-          </span>
+          <span className={styles.captionNote}>{t('constraints:stateGraph.noDependencies')}</span>
         )}
       </figcaption>
       <svg
-        role="img"
+        role="group"
+        className={styles.graph}
+        data-hovering={hoveredId !== null || undefined}
         aria-label={t('constraints:stateGraph.projectTitle')}
         viewBox={`0 0 ${width} ${height}`}
         width={width}
@@ -260,6 +245,12 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
             <path
               key={edge.id}
               d={edgePath(from.x, from.y, to.x, to.y)}
+              className={styles.edge}
+              data-active={
+                hoveredId !== null && (edge.fromTaskId === hoveredId || edge.toTaskId === hoveredId)
+                  ? true
+                  : undefined
+              }
               fill="none"
               stroke="var(--nf-color-border)"
               strokeWidth={1.5}
@@ -275,10 +266,12 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
           return (
             <g
               key={task.id}
-              style={{ cursor: 'pointer' }}
+              className={styles.node}
               role="button"
               tabIndex={0}
               aria-label={task.title}
+              onPointerEnter={() => setHoveredId(task.id)}
+              onPointerLeave={() => setHoveredId(null)}
               onClick={() => {
                 handleNodeClick(task.id);
               }}
@@ -289,12 +282,22 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
                 }
               }}
             >
+              <title>{task.title}</title>
+              <rect
+                x={x - 3}
+                y={y - 3}
+                width={NODE_WIDTH + 6}
+                height={NODE_HEIGHT + 6}
+                rx={11}
+                className={styles.nodeFocus}
+              />
               <rect
                 x={x}
                 y={y}
                 width={NODE_WIDTH}
                 height={NODE_HEIGHT}
                 rx={8}
+                className={styles.nodeBox}
                 fill={STATE_BG[state]}
                 stroke={STATE_BORDER[state]}
                 strokeWidth={1.5}

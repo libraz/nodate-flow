@@ -9,8 +9,11 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Card from '@nodate-flow/ui/primitives/card';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar as CalendarIcon, Clock, MapPin } from 'lucide-react';
 import type { ReactElement } from 'react';
@@ -112,35 +115,33 @@ function InviteRow({ invite }: InviteCardProps): ReactElement {
   }
 
   return (
-    <li className={styles.inviteListItem}>
-      <Card>
-        <p className={styles.eventTitle}>{invite.eventTitle}</p>
+    <Card>
+      <p className={styles.eventTitle}>{invite.eventTitle}</p>
 
+      <p className={styles.metaLine}>
+        <Clock size={12} aria-hidden="true" />
+        <span>{whenLabel}</span>
+      </p>
+
+      {invite.eventLocation ? (
         <p className={styles.metaLine}>
-          <Clock size={12} aria-hidden="true" />
-          <span>{whenLabel}</span>
+          <MapPin size={12} aria-hidden="true" />
+          <span>{invite.eventLocation}</span>
         </p>
+      ) : null}
 
-        {invite.eventLocation ? (
-          <p className={styles.metaLine}>
-            <MapPin size={12} aria-hidden="true" />
-            <span>{invite.eventLocation}</span>
-          </p>
-        ) : null}
+      <p className={styles.calendarLine}>
+        <CalendarIcon size={12} aria-hidden="true" />
+        <span>
+          {t('invites.inbox.calendar_workspace', {
+            calendar: invite.calendarName,
+            workspace: invite.workspaceName,
+          })}
+        </span>
+      </p>
 
-        <p className={styles.calendarLine}>
-          <CalendarIcon size={12} aria-hidden="true" />
-          <span>
-            {t('invites.inbox.calendar_workspace', {
-              calendar: invite.calendarName,
-              workspace: invite.workspaceName,
-            })}
-          </span>
-        </p>
-
-        <p className={styles.expiresLine}>{expiresLabel}</p>
-      </Card>
-    </li>
+      <p className={styles.expiresLine}>{expiresLabel}</p>
+    </Card>
   );
 }
 
@@ -170,6 +171,7 @@ function PanelHeader({ count }: { count: number | null }): ReactElement {
 export default function PendingInvitesPanel(): ReactElement {
   const { t } = useTranslation('common');
   const { data, isLoading, error } = useMyInvitesQuery();
+  const { entries, onExited } = usePresenceList(data ?? [], (invite) => invite.id);
 
   if (isLoading) {
     return (
@@ -201,7 +203,7 @@ export default function PendingInvitesPanel(): ReactElement {
     <aside aria-label={t('invites.inbox.title')} className={styles.panel}>
       <PanelHeader count={invites.length} />
 
-      {invites.length === 0 ? (
+      {entries.length === 0 ? (
         <Card>
           <p className={styles.emptyMessage}>{t('invites.inbox.empty')}</p>
         </Card>
@@ -209,8 +211,16 @@ export default function PendingInvitesPanel(): ReactElement {
         <>
           <p className={styles.rsvpHint}>{t('invites.inbox.rsvp_hint')}</p>
           <ul className={styles.inviteList}>
-            {invites.map((invite) => (
-              <InviteRow key={invite.id} invite={invite} />
+            {entries.map(({ key, item, present }) => (
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => onExited(key)}
+                className={motion.enter}
+              >
+                <InviteRow invite={item} />
+              </PresenceItem>
             ))}
           </ul>
         </>

@@ -22,26 +22,37 @@ interface State {
 
 const EMPTY: State = { current: '', next: '', confirm: '' };
 
+/** Which field a validation or server error belongs to; `form` has no single owner. */
+interface FieldError {
+  field: keyof State | 'form';
+  message: string;
+}
+
 export default function PasswordPanel(): ReactElement {
   const { t } = useTranslation('settings');
   const change = useChangePassword();
   const [state, setState] = useState<State>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<FieldError | null>(null);
 
   const update = (key: keyof State, value: string): void => {
     setState((prev) => ({ ...prev, [key]: value }));
+    // Editing the field an error points at retracts it.
+    if (fieldError?.field === key) setFieldError(null);
   };
+
+  const errorFor = (field: keyof State): { error?: string } =>
+    fieldError?.field === field ? { error: fieldError.message } : {};
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setFieldError(null);
     if (state.next.length < 8) {
-      setFieldError(t('security.password.validation.too_short'));
+      setFieldError({ field: 'next', message: t('security.password.validation.too_short') });
       return;
     }
     if (state.next !== state.confirm) {
-      setFieldError(t('security.password.validation.mismatch'));
+      setFieldError({ field: 'confirm', message: t('security.password.validation.mismatch') });
       return;
     }
     setSubmitting(true);
@@ -58,9 +69,15 @@ export default function PasswordPanel(): ReactElement {
     } catch (err) {
       const apiErr = err as SettingsApiError;
       if (apiErr.code === 'AUTH.PASSWORD.CURRENT_MISMATCH') {
-        setFieldError(t('security.password.errors.current_mismatch'));
+        setFieldError({
+          field: 'current',
+          message: t('security.password.errors.current_mismatch'),
+        });
       } else if (apiErr.code === 'AUTH.PASSWORD.NO_LOCAL_IDENTITY') {
-        setFieldError(t('security.password.errors.no_local_identity'));
+        setFieldError({
+          field: 'form',
+          message: t('security.password.errors.no_local_identity'),
+        });
       } else {
         toaster.show({ tone: 'danger', message: t('security.password.errors.generic') });
       }
@@ -77,7 +94,7 @@ export default function PasswordPanel(): ReactElement {
       className={styles.form}
     >
       <p className={styles.description}>{t('security.password.description')}</p>
-      <FormField label={t('security.password.current')} required>
+      <FormField label={t('security.password.current')} required {...errorFor('current')}>
         {(control) => (
           <Input
             {...control}
@@ -91,7 +108,12 @@ export default function PasswordPanel(): ReactElement {
           />
         )}
       </FormField>
-      <FormField label={t('security.password.next')} required>
+      <FormField
+        label={t('security.password.next')}
+        description={t('security.password.validation.too_short')}
+        required
+        {...errorFor('next')}
+      >
         {(control) => (
           <Input
             {...control}
@@ -106,7 +128,7 @@ export default function PasswordPanel(): ReactElement {
           />
         )}
       </FormField>
-      <FormField label={t('security.password.confirm')} required>
+      <FormField label={t('security.password.confirm')} required {...errorFor('confirm')}>
         {(control) => (
           <Input
             {...control}
@@ -121,14 +143,12 @@ export default function PasswordPanel(): ReactElement {
           />
         )}
       </FormField>
-      {fieldError != null && (
-        <p className={styles.error} role="alert">
-          {fieldError}
-        </p>
-      )}
+      <div aria-live="polite">
+        {fieldError?.field === 'form' && <p className={styles.error}>{fieldError.message}</p>}
+      </div>
       <div className={styles.actions}>
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? t('security.password.saving') : t('security.password.save')}
+        <Button type="submit" variant="primary" disabled={submitting} aria-busy={submitting}>
+          {t('security.password.save')}
         </Button>
       </div>
     </form>

@@ -5,7 +5,9 @@
  * from a share is handled elsewhere (event editor).
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
@@ -35,6 +37,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
   const { data: shares } = usePublicSharesQuery(workspaceId);
   const deleteShare = useDeletePublicShare(workspaceId);
   const rotate = useRotatePublicShareToken(workspaceId);
+  const { entries, onExited } = usePresenceList(shares, (share) => share.id);
   const [createOpen, setCreateOpen] = useState(false);
   const [rotatedShare, setRotatedShare] = useState<PublicShareWithToken | null>(null);
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -90,7 +93,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
         </Button>
       </header>
 
-      {shares.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('workspace.public_shares.empty')}</p>
       ) : (
         <div className={styles.tableWrap}>
@@ -111,8 +114,13 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
               </tr>
             </thead>
             <tbody>
-              {shares.map((share) => (
-                <tr key={share.id} className={styles.row}>
+              {entries.map(({ key, item: share, present }) => (
+                <PresenceRow
+                  key={key}
+                  present={present}
+                  onExited={() => onExited(key)}
+                  className={styles.row}
+                >
                   <td className={styles.cell}>
                     <div className={styles.titleCellInner}>
                       <Link
@@ -140,6 +148,8 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                       type="button"
                       variant="ghost"
                       data-testid="public-share-rotate"
+                      disabled={rotate.isPending}
+                      aria-busy={(rotate.isPending && rotate.variables === share.id) || undefined}
                       onClick={() => {
                         void handleRotate(share);
                       }}
@@ -150,6 +160,10 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                       type="button"
                       variant="ghost"
                       data-testid="public-share-delete"
+                      disabled={deleteShare.isPending}
+                      aria-busy={
+                        (deleteShare.isPending && deleteShare.variables === share.id) || undefined
+                      }
                       onClick={() => {
                         void handleDelete(share);
                       }}
@@ -157,7 +171,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                       {t('workspace.public_shares.delete')}
                     </Button>
                   </td>
-                </tr>
+                </PresenceRow>
               ))}
             </tbody>
           </table>

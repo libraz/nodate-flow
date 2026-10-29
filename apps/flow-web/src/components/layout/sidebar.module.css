@@ -6,6 +6,14 @@
   inline-size: 16rem;
   background: var(--nf-color-bg-elevated);
   border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+  /*
+   * The grid slot snaps to the final width (app-shell.module.css) while the
+   * aside overlays it and animates, so <main> never reflows per frame.
+   */
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: var(--nf-z-dropdown);
   transition: inline-size var(--nf-duration-base) var(--nf-ease-standard);
   overflow: hidden;
 }
@@ -20,28 +28,23 @@
 @media (max-width: 767px) {
   .sidebar {
     position: fixed;
-    inset-block: 0;
-    inset-inline-start: 0;
     z-index: var(--nf-z-overlay);
     /* nf-token-override: component dimension, not a spacing step */
     inline-size: 16rem;
-    transform: translateX(-100%);
-    transition: transform var(--nf-duration-base) var(--nf-ease-standard);
+    /* Off-canvas toward inline-start; the sign flips under RTL. */
+    translate: calc(-100% * var(--nf-motion-inline-sign, 1)) 0;
+    transition: translate var(--nf-duration-base) var(--nf-ease-in);
     box-shadow: var(--nf-shadow-lg);
   }
 
   .sidebar.mobileOpen {
-    transform: translateX(0);
+    translate: 0 0;
+    transition-timing-function: var(--nf-ease-out);
   }
 
   .collapsed {
     /* nf-token-override: component dimension, not a spacing step */
     inline-size: 16rem;
-    transform: translateX(-100%);
-  }
-
-  .collapsed.mobileOpen {
-    transform: translateX(0);
   }
 }
 
@@ -92,6 +95,8 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-3);
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 2.25rem;
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
   border-radius: var(--nf-radius-sm);
@@ -104,6 +109,9 @@
   border: none;
   cursor: pointer;
   text-align: start;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .item:hover {
@@ -111,11 +119,22 @@
   color: var(--nf-color-fg);
 }
 
+.item > svg {
+  flex-shrink: 0;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
-.itemActive {
+.itemActive,
+.itemActive:hover {
   background: var(--nf-color-accent-subtle);
   color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.itemActive > svg {
+  color: var(--nf-color-accent-fg);
 }
 
 .itemDisabled {
@@ -128,11 +147,20 @@
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
+.brandLabel {
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/*
+ * Labels fade rather than disappear so the rail narrows under them; the
+ * links keep their `aria-label`, so the hidden text is not needed by AT.
+ */
 .collapsed .label,
 .collapsed .brandLabel {
-  display: none;
+  opacity: 0;
 }
 
 .section {
@@ -141,6 +169,7 @@
   gap: var(--nf-space-1);
   padding-block-start: var(--nf-space-1);
   padding-inline-start: var(--nf-space-4);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .sectionLabel {
@@ -152,15 +181,13 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--nf-color-fg-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .subItem {
   font-size: var(--nf-text-xs);
-}
-
-.collapsed .section,
-.collapsed .sectionLabel {
-  display: none;
 }
 
 .footer {
@@ -179,6 +206,9 @@
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .toggle:hover {
@@ -206,6 +236,12 @@
     inset: 0;
     z-index: calc(var(--nf-z-overlay) - 1);
     background: var(--nf-color-overlay);
+    animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+  }
+
+  .backdrop[data-state="closed"] {
+    pointer-events: none;
+    animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
   }
 
   .mobileMenuBtn {
@@ -223,6 +259,14 @@
     color: var(--nf-color-fg-muted);
     cursor: pointer;
     box-shadow: var(--nf-shadow-sm);
+    animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+    transition:
+      background-color var(--nf-duration-fast) var(--nf-ease-standard),
+      color var(--nf-duration-fast) var(--nf-ease-standard);
+  }
+
+  .mobileMenuBtn[data-state="closed"] {
+    animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
   }
 
   .mobileMenuBtn:hover {

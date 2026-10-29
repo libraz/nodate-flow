@@ -5,9 +5,12 @@
  * re-queries on change.
  */
 
+import Button from '@nodate-flow/ui/primitives/button';
 import Chip from '@nodate-flow/ui/primitives/chip';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import ToggleChip from '@nodate-flow/ui/primitives/toggle-chip';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
@@ -127,42 +130,48 @@ export default function TaskFiltersBar({
             aria-label={t('tasks.filters.search_placeholder')}
           />
         </div>
-        <div role="group" aria-label={t('tasks.filters.status')} className={styles.toggleGroup}>
-          {TASK_STATES.map((state) => {
-            const active = selectedStates.has(state);
-            return (
-              <button
-                key={state}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  toggleState(state);
-                }}
-                className={`${styles.toggleChip} ${active ? styles.toggleChipActive : ''}`.trim()}
-              >
-                {t(STATE_KEY[state])}
-              </button>
-            );
-          })}
+        <div role="group" aria-label={t('tasks.filters.status')} className={styles.filterGroup}>
+          <span aria-hidden className={styles.groupLabel}>
+            {t('tasks.filters.status')}
+          </span>
+          <div className={styles.toggleGroup}>
+            {TASK_STATES.map((state) => {
+              const active = selectedStates.has(state);
+              return (
+                <ToggleChip
+                  key={state}
+                  pressed={active}
+                  onPressedChange={() => {
+                    toggleState(state);
+                  }}
+                >
+                  {t(STATE_KEY[state])}
+                </ToggleChip>
+              );
+            })}
+          </div>
         </div>
         <span aria-hidden className={styles.divider} />
-        <div role="group" aria-label={t('tasks.filters.priority')} className={styles.toggleGroup}>
-          {TASK_PRIORITIES.map((p) => {
-            const active = selectedPriorities.has(p);
-            return (
-              <button
-                key={p}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  togglePriority(p);
-                }}
-                className={`${styles.toggleChip} ${active ? styles.toggleChipActive : ''}`.trim()}
-              >
-                {t(PRIORITY_KEY[p])}
-              </button>
-            );
-          })}
+        <div role="group" aria-label={t('tasks.filters.priority')} className={styles.filterGroup}>
+          <span aria-hidden className={styles.groupLabel}>
+            {t('tasks.filters.priority')}
+          </span>
+          <div className={styles.toggleGroup}>
+            {TASK_PRIORITIES.map((p) => {
+              const active = selectedPriorities.has(p);
+              return (
+                <ToggleChip
+                  key={p}
+                  pressed={active}
+                  onPressedChange={() => {
+                    togglePriority(p);
+                  }}
+                >
+                  {t(PRIORITY_KEY[p])}
+                </ToggleChip>
+              );
+            })}
+          </div>
         </div>
         {workspaceId !== undefined ? (
           <Suspense
@@ -185,18 +194,20 @@ export default function TaskFiltersBar({
           </div>
         )}
         {hasActiveFilter ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => {
               resetTaskFilters(projectId);
             }}
             className={styles.clearButton}
           >
             {t('tasks.filters.clear')}
-          </button>
+          </Button>
         ) : null}
         {workspaceId !== undefined ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<Skeleton className={styles.lensSkeleton} />}>
             <LensPicker workspaceId={workspaceId} projectId={projectId} />
           </Suspense>
         ) : null}

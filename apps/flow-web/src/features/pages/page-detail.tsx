@@ -13,6 +13,7 @@ import {
 } from '@nodate-flow/ui/primitives/breadcrumb';
 import Button from '@nodate-flow/ui/primitives/button';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
@@ -45,7 +46,12 @@ function ChildPagesSection({
       <ul className={styles.childrenList}>
         {children.map((child) => (
           <li key={child.id}>
-            <Link to="/pages/$pageId" params={{ pageId: child.id }} className={styles.childLink}>
+            <Link
+              to="/pages/$pageId"
+              params={{ pageId: child.id }}
+              className={styles.childLink}
+              title={child.title}
+            >
               <FileText size={14} aria-hidden />
               {child.title}
             </Link>
@@ -125,7 +131,7 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
       <PageBreadcrumb page={page} />
 
       <header className={styles.detailHeader}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div className={styles.detailTitleRow}>
           <h1 className={styles.detailTitle}>{page.title}</h1>
           <div className={styles.detailActions}>
             <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
@@ -138,6 +144,7 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
               size="sm"
               onClick={() => void handleDelete()}
               disabled={deleteMutation.isPending}
+              aria-busy={deleteMutation.isPending || undefined}
             >
               <Trash2 size={14} aria-hidden />
               {t('delete')}
@@ -146,11 +153,11 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
         </div>
         <div className={styles.detailMeta}>
           <span>{createdByLabel}</span>
-          <span>{updatedLabel}</span>
+          <span className={styles.numeric}>{updatedLabel}</span>
           {page.isAiGenerated && (
             <span className={styles.aiBadge}>
-              <Sparkles size={12} aria-hidden style={{ marginInlineEnd: 'var(--nf-space-1)' }} />
-              AI
+              <Sparkles size={12} aria-hidden className={styles.aiBadgeIcon} />
+              {t('ai_badge')}
             </span>
           )}
           {page.projectName && <span>{page.projectName}</span>}
@@ -163,7 +170,7 @@ export default function PageDetail({ workspaceId, pageId, onEdit }: PageDetailPr
         </div>
       ) : null}
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<Skeleton className={styles.childrenSkeleton} />}>
         <ChildPagesSection workspaceId={workspaceId} pageId={pageId} />
       </Suspense>
     </article>

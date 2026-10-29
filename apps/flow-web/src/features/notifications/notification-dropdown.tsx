@@ -4,14 +4,17 @@
  * a Suspense boundary by NotificationBell.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
-import { Archive, Check } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { Archive, BellOff, Check } from 'lucide-react';
+import { type ReactElement, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import {
@@ -127,8 +130,8 @@ function NotificationRow({
   };
 
   return (
-    <li
-      className={cx(styles.notifItem, isUnread && styles.unread)}
+    <div
+      className={cx(styles.notifItem, isUnread && styles.unread, 'nf-focus-ring-inset')}
       onClick={handleRowClick}
       role="button"
       tabIndex={0}
@@ -167,11 +170,13 @@ function NotificationRow({
             void handleArchive(e);
           }}
           aria-label={t('action.archive')}
+          disabled={archive.isPending}
+          aria-busy={archive.isPending || undefined}
         >
           <Icon icon={Archive} decorative />
         </button>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -184,10 +189,19 @@ export default function NotificationDropdown({
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useNotificationsInfiniteQuery();
   // Flat-map cached pages into a single ordered list. TanStack threads
   // the cursor through `pageParam` so the order is stable across loads.
-  const items = data.pages.flatMap((p) => p.notifications);
+  // Memoised because the presence list below diffs on array identity.
+  const items = useMemo(() => data.pages.flatMap((p) => p.notifications), [data.pages]);
+  const { entries, onExited } = usePresenceList(items, (item) => item.id);
+  const stagger = useFirstLoadStagger();
   const wsId = useCurrentWorkspaceId();
   const markAll = useMarkAllRead(wsId);
   const navigate = useNavigate();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Move focus into the panel so arrow/Tab/Escape act on it right away.
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
 
   const handleNavigate = (href: string): void => {
     onClose();
@@ -216,7 +230,20 @@ export default function NotificationDropdown({
     <>
       {/* Invisible backdrop to capture outside clicks */}
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <div id={id} className={styles.dropdown} role="dialog" aria-label={t('view.title')}>
+      <div
+        ref={panelRef}
+        id={id}
+        className={styles.dropdown}
+        role="dialog"
+        aria-label={t('view.title')}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
         <div className={styles.dropdownHeader}>
           <h2 className={styles.dropdownTitle}>{t('view.title')}</h2>
           <button
@@ -230,17 +257,24 @@ export default function NotificationDropdown({
             {t('view.mark_all_read')}
           </button>
         </div>
-        {items.length === 0 ? (
-          <div className={styles.empty}>{t('view.empty')}</div>
+        {entries.length === 0 ? (
+          <div className={styles.empty}>
+            <Icon icon={BellOff} decorative />
+            <span>{t('view.empty')}</span>
+          </div>
         ) : (
           <ul className={styles.notifList}>
-            {items.map((item) => (
-              <NotificationRow
-                key={item.id}
-                item={item}
-                locale={locale}
-                onNavigate={handleNavigate}
-              />
+            {entries.map((entry, index) => (
+              <PresenceItem
+                key={entry.key}
+                as="li"
+                present={entry.present}
+                onExited={() => onExited(entry.key)}
+                className={motion.enter}
+                style={stagger(index)}
+              >
+                <NotificationRow item={entry.item} locale={locale} onNavigate={handleNavigate} />
+              </PresenceItem>
             ))}
           </ul>
         )}

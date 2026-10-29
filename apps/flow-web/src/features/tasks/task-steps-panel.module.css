@@ -1,0 +1,124 @@
+/* AI step proposal panel. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-base);
+}
+
+.stage {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.fieldLabel {
+  display: block;
+  margin-block-end: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg-sunken);
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* An unchecked step stays legible; it reads as set aside, not disabled. */
+.step[data-checked="false"] {
+  background: transparent;
+  border-color: var(--nf-color-hairline);
+  opacity: 0.6;
+}
+
+.step[data-checked="false"]:focus-within,
+.step[data-checked="false"]:hover {
+  opacity: 0.85;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.stepTitle {
+  flex: 1;
+  font-weight: var(--nf-weight-medium);
+}
+
+.details {
+  margin-inline-start: calc(var(--nf-space-6) + var(--nf-space-1));
+}
+
+.toggle {
+  all: unset;
+  border-radius: var(--nf-radius-xs);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.toggle:hover {
+  color: var(--nf-color-fg);
+}
+
+.toggle:focus-visible {
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.description {
+  margin: var(--nf-space-1) 0 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg);
+  white-space: pre-wrap;
+}
+
+.empty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-2);
+  justify-content: flex-end;
+}

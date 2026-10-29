@@ -55,7 +55,9 @@
   border-radius: var(--nf-radius-md);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
-  transition: background var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .navButton:hover {
@@ -80,7 +82,7 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
   cursor: pointer;
-  transition: background var(--nf-duration-fast);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .todayButton:hover {
@@ -90,6 +92,16 @@
 .todayButton:focus-visible {
   outline: none;
   box-shadow: var(--nf-shadow-focus);
+}
+
+/* ───── month navigation motion ───── */
+
+.slide--fromPrev {
+  animation: global(nf-slide-in-from-inline-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.slide--fromNext {
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 /* ───── grid frame ───── */
@@ -247,12 +259,20 @@
   block-size: 1.125rem;
   margin-block: var(--nf-space-px);
   padding-inline: var(--nf-space-1);
-  border-inline-start: 2px solid transparent;
+  /* `--chip-hue` is the kind colour, set inline per chip: a full
+     hairline and a light tint, never a one-sided stripe. */
+  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 40%, transparent);
   border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--chip-hue) 14%, transparent);
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-fg);
   cursor: pointer;
   overflow: hidden;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.chip:hover {
+  background: color-mix(in oklch, var(--chip-hue) 24%, transparent);
 }
 
 .chip:focus-visible {
@@ -288,14 +308,20 @@
   display: flex;
   align-items: center;
   padding-inline: var(--nf-space-1);
-  border-inline-start: 2px solid transparent;
+  border: var(--nf-space-px) solid color-mix(in oklch, var(--chip-hue) 45%, transparent);
   border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--chip-hue) 18%, transparent);
   font-size: var(--nf-cal-text-cell);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg);
   cursor: pointer;
   pointer-events: auto;
   overflow: hidden;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.bar:hover {
+  background: color-mix(in oklch, var(--chip-hue) 28%, transparent);
 }
 
 .bar:focus-visible {
@@ -303,6 +329,7 @@
   box-shadow: var(--nf-shadow-focus);
 }
 
+/* A bar that continues past the row edge leaves that side open. */
 .bar--clipStart {
   border-start-start-radius: 0;
   border-end-start-radius: 0;
@@ -312,6 +339,7 @@
 .bar--clipEnd {
   border-start-end-radius: 0;
   border-end-end-radius: 0;
+  border-inline-end-color: transparent;
 }
 
 .barTitle {
@@ -328,8 +356,11 @@
 
 /* ───── read-only event popover ───── */
 
+/* Centred by the modal dialog's own `margin: auto`; settles in rather
+   than appearing, over a backdrop that fades. */
 .popover {
-  margin: 0;
+  margin: auto;
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   box-shadow: var(--nf-shadow-lg);
@@ -342,6 +373,7 @@
 
 .popover::backdrop {
   background: color-mix(in oklch, var(--nf-color-fg) 30%, transparent);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .popoverHeader {
@@ -372,7 +404,9 @@
   border-radius: var(--nf-radius-md);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
-  transition: background var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .popoverClose:hover {
@@ -391,6 +425,7 @@
   gap: var(--nf-space-2);
   margin-block-start: var(--nf-space-2);
   font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg-muted);
 }
 
@@ -405,12 +440,4 @@
   padding-block: var(--nf-space-12);
   text-align: center;
   color: var(--nf-color-fg-subtle);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .navButton,
-  .todayButton,
-  .popoverClose {
-    transition: none;
-  }
 }

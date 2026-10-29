@@ -3,11 +3,11 @@
  * `severity`, `actorKind`) and dotted `action` codes into localized,
  * human-readable strings.
  *
- * Mirrors the timeline `event_kind` idiom: dotted codes are normalized to
- * an underscore slug and looked up under a fixed i18n catalog
- * (`activity:action.<slug>`); anything outside the catalog falls back to a
- * humanized form of the raw code so newly-added backend actions still read
- * sensibly instead of rendering nothing.
+ * Every key is a literal in a static map, so the catalog is greppable and
+ * a code outside it never becomes a key. Dotted action codes are
+ * normalized to an underscore slug before the lookup; anything outside the
+ * catalog falls back to a humanized form of the raw code so newly-added
+ * backend actions still read sensibly instead of rendering nothing.
  */
 
 import type { TFunction } from 'i18next';
@@ -36,44 +36,129 @@ export function humanizeAction(action: string): string {
   return [lead, ...rest].join(' ');
 }
 
+const ACTION_KEY: ReadonlyMap<string, string> = new Map([
+  ['ai_agent_create', 'action.ai_agent_create'],
+  ['ai_agent_pause', 'action.ai_agent_pause'],
+  ['ai_agent_update_schedule', 'action.ai_agent_update_schedule'],
+  ['ai_agent_update_triggers', 'action.ai_agent_update_triggers'],
+  ['ai_command_resolve', 'action.ai_command_resolve'],
+  ['ai_invocation', 'action.ai_invocation'],
+  ['ai_provider_create', 'action.ai_provider_create'],
+  ['ai_provider_delete', 'action.ai_provider_delete'],
+  ['ai_provider_update', 'action.ai_provider_update'],
+  ['attachment_create', 'action.attachment_create'],
+  ['attachment_delete', 'action.attachment_delete'],
+  ['auth_login', 'action.auth_login'],
+  ['auth_login_failed', 'action.auth_login_failed'],
+  ['auth_login_oidc', 'action.auth_login_oidc'],
+  ['auth_login_totp', 'action.auth_login_totp'],
+  ['auth_login_totp_failed', 'action.auth_login_totp_failed'],
+  ['auth_logout', 'action.auth_logout'],
+  ['auth_recovery_code_used', 'action.auth_recovery_code_used'],
+  ['calendar_event_create', 'action.calendar_event_create'],
+  ['calendar_event_update', 'action.calendar_event_update'],
+  ['calendar_event_delete', 'action.calendar_event_delete'],
+  ['comment_create', 'action.comment_create'],
+  ['comment_delete', 'action.comment_delete'],
+  ['comment_update', 'action.comment_update'],
+  ['description_version_restore', 'action.description_version_restore'],
+  ['export_create', 'action.export_create'],
+  ['favorite_create', 'action.favorite_create'],
+  ['favorite_delete', 'action.favorite_delete'],
+  ['import_cancel', 'action.import_cancel'],
+  ['import_create', 'action.import_create'],
+  ['intake_convert', 'action.intake_convert'],
+  ['intake_create', 'action.intake_create'],
+  ['intake_triage', 'action.intake_triage'],
+  ['label_create', 'action.label_create'],
+  ['label_disable', 'action.label_disable'],
+  ['label_update', 'action.label_update'],
+  ['lens_create', 'action.lens_create'],
+  ['lens_delete', 'action.lens_delete'],
+  ['lens_publish', 'action.lens_publish'],
+  ['lens_unpublish', 'action.lens_unpublish'],
+  ['lens_update', 'action.lens_update'],
+  ['mcp_invocation', 'action.mcp_invocation'],
+  ['mcp_token_create', 'action.mcp_token_create'],
+  ['mcp_token_delete', 'action.mcp_token_delete'],
+  ['notification_archive', 'action.notification_archive'],
+  ['notification_read', 'action.notification_read'],
+  ['page_create', 'action.page_create'],
+  ['page_delete', 'action.page_delete'],
+  ['page_update', 'action.page_update'],
+  ['project_create', 'action.project_create'],
+  ['project_delete', 'action.project_delete'],
+  ['project_update', 'action.project_update'],
+  ['reaction_create', 'action.reaction_create'],
+  ['reaction_delete', 'action.reaction_delete'],
+  ['signal_create', 'action.signal_create'],
+  ['task_apply_steps', 'action.task_apply_steps'],
+  ['task_archived', 'action.task_archived'],
+  ['task_create', 'action.task_create'],
+  ['task_delete', 'action.task_delete'],
+  ['task_reorder', 'action.task_reorder'],
+  ['task_smart_create', 'action.task_smart_create'],
+  ['task_transition', 'action.task_transition'],
+  ['task_unarchived', 'action.task_unarchived'],
+  ['task_update', 'action.task_update'],
+  ['timebox_create', 'action.timebox_create'],
+  ['timebox_delete', 'action.timebox_delete'],
+  ['timebox_status', 'action.timebox_status'],
+  ['timebox_update', 'action.timebox_update'],
+  ['user_update', 'action.user_update'],
+  ['workspace_create', 'action.workspace_create'],
+  ['workspace_delete', 'action.workspace_delete'],
+  ['workspace_update', 'action.workspace_update'],
+]);
+
 /**
- * Resolve a localized label for a raw `action` code. Consults the fixed
+ * Resolve a localized label for a raw `action` code. Consults the
  * `activity:action.*` catalog and falls back to {@link humanizeAction} for
  * unknown codes so the row never renders an empty or broken label.
  */
 export function actionLabel(action: string, t: TFunction): string {
-  const slug = actionSlug(action);
-  return t(`action.${slug}`, { defaultValue: humanizeAction(action) });
+  const key = ACTION_KEY.get(actionSlug(action));
+  return key === undefined ? humanizeAction(action) : t(key);
 }
 
-const KNOWN_SOURCES: readonly ActivitySource[] = ['audit', 'ai', 'mcp'];
+const SOURCE_KEY: Readonly<Record<ActivitySource, string>> = {
+  audit: 'source.audit',
+  ai: 'source.ai',
+  mcp: 'source.mcp',
+};
 
 function isKnownSource(value: string): value is ActivitySource {
-  return (KNOWN_SOURCES as readonly string[]).includes(value);
+  return Object.hasOwn(SOURCE_KEY, value);
 }
 
 /** Localized label for an originating stream (`audit` | `ai` | `mcp`). */
 export function sourceLabel(source: string, t: TFunction): string {
-  if (isKnownSource(source)) return t(`source.${source}`);
-  return t(`source.${source}`, { defaultValue: humanizeAction(source) });
+  return isKnownSource(source) ? t(SOURCE_KEY[source]) : humanizeAction(source);
 }
 
-const KNOWN_KINDS: readonly ActivityActorKind[] = ['user', 'agent', 'system'];
+const ACTOR_KIND_KEY: Readonly<Record<ActivityActorKind, string>> = {
+  user: 'actor_kind.user',
+  agent: 'actor_kind.agent',
+  system: 'actor_kind.system',
+};
 
 function isKnownKind(value: string): value is ActivityActorKind {
-  return (KNOWN_KINDS as readonly string[]).includes(value);
+  return Object.hasOwn(ACTOR_KIND_KEY, value);
 }
 
 /** Localized label for an actor classification. */
 export function actorKindLabel(actorKind: string, t: TFunction): string {
-  if (isKnownKind(actorKind)) return t(`actor_kind.${actorKind}`);
-  return t(`actor_kind.${actorKind}`, { defaultValue: humanizeAction(actorKind) });
+  return isKnownKind(actorKind) ? t(ACTOR_KIND_KEY[actorKind]) : humanizeAction(actorKind);
 }
 
-const KNOWN_SEVERITIES: readonly ActivitySeverity[] = ['info', 'warn', 'error'];
+const SEVERITY_KEY: Readonly<Record<ActivitySeverity, string>> = {
+  info: 'severity.info',
+  warn: 'severity.warn',
+  error: 'severity.error',
+};
 
 function isKnownSeverity(value: string): value is ActivitySeverity {
-  return (KNOWN_SEVERITIES as readonly string[]).includes(value);
+  return Object.hasOwn(SEVERITY_KEY, value);
 }
 
 /** Normalize a raw severity into the closed `ActivitySeverity` set. */
@@ -83,7 +168,7 @@ export function normalizeSeverity(severity: string): ActivitySeverity {
 
 /** Localized label for a severity (`info` | `warn` | `error`). */
 export function severityLabel(severity: string, t: TFunction): string {
-  return t(`severity.${normalizeSeverity(severity)}`);
+  return t(SEVERITY_KEY[normalizeSeverity(severity)]);
 }
 
 /**

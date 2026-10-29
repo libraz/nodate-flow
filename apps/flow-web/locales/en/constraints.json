@@ -11,11 +11,9 @@
     "satisfied": "satisfied",
     "failed": "failed",
     "parseError": "Parse error",
-    "nlPrompt": "Describe constraint in natural language\u2026",
+    "nlPrompt": "Describe constraint in natural language…",
     "generate": "Generate",
-    "generating": "Generating\u2026",
     "explain": "Explain",
-    "explaining": "Explaining\u2026",
     "explanation": "Explanation",
     "advanced": "Advanced (kind & JSON expression)",
     "errors": {
@@ -31,7 +29,9 @@
       "approval": "Approval",
       "signal": "Signal",
       "custom": "Custom"
-    }
+    },
+    "removeConfirmTitle": "Remove constraint?",
+    "removeConfirm": "The engine will stop blocking on this constraint. It cannot be restored from here."
   },
   "replay": {
     "title": "Replay",

@@ -57,6 +57,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  --presence-gap: var(--nf-space-1);
 }
 
 .row {
@@ -67,6 +68,15 @@
   border-radius: var(--nf-radius-md);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-bg);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover,
+.row:focus-within {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
 }
 
 .identity {

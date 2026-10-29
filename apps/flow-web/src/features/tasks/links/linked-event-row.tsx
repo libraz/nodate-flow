@@ -7,12 +7,10 @@
  * accent dot to the inline-start when the event lies on the local
  * "today" so the eye can scan for what is happening now.
  *
- * Removal is animated: clicking the unlink button flips
- * `data-removing="true"` on the row to drive the `nf-link-shake-out`
- * keyframes in the section CSS, then calls `onUnlink` ~200ms later so
- * the optimistic removal lines up with the animation. The row never
- * waits on the network — `useUnlinkEvent` removes the link from the
- * cache before the request fires.
+ * Unlinking calls `onUnlink` at once; `useUnlinkEvent` removes the link
+ * from the cache before the request fires, and the section's presence
+ * list plays the row's exit after the fact, so neither the network nor
+ * the animation holds the other up.
  *
  * Optimistic rows (those whose id starts with `optimistic-`) have the
  * unlink control disabled because the server-issued id is not yet
@@ -26,7 +24,8 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import { Link } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useActiveWorkspaceId } from '../../../lib/use-current-workspace';
@@ -34,8 +33,6 @@ import LinkedEventGlyph from './linked-event-glyph';
 import LinkedEventTime, { isToday } from './linked-event-time';
 import styles from './linked-events.module.css';
 import type { LinkKind, LinkRelation, TaskEventLink } from './types';
-
-const REMOVE_ANIMATION_MS = 200;
 
 export interface LinkedEventRowProps {
   link: TaskEventLink;
@@ -63,19 +60,6 @@ export default function LinkedEventRow({
 }: LinkedEventRowProps): ReactElement {
   const { t } = useTranslation('linkedEvents');
   const workspaceId = useActiveWorkspaceId();
-  const [isRemoving, setIsRemoving] = useState(false);
-  const timerRef = useRef<number | null>(null);
-
-  // External-clock cleanup is the canonical Effects-as-sync surface:
-  // we own a window timer and have to cancel it on unmount.
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) {
-        window.clearTimeout(timerRef.current);
-      }
-    },
-    [],
-  );
 
   const kind = relationToKind(link.relation as LinkRelation);
   const title = link.eventTitle ?? '';
@@ -93,14 +77,11 @@ export default function LinkedEventRow({
 
   const handleUnlinkClick = (): void => {
     if (isOptimistic) return;
-    setIsRemoving(true);
-    timerRef.current = window.setTimeout(() => {
-      onUnlink(link.id);
-    }, REMOVE_ANIMATION_MS);
+    onUnlink(link.id);
   };
 
   return (
-    <li className={styles.row} data-removing={isRemoving ? 'true' : undefined}>
+    <div className={styles.row}>
       <span className={styles.glyphCell} data-today={today ? 'true' : undefined}>
         <LinkedEventGlyph kind={kind} />
         {/* visually-hidden description so screen readers hear the relation kind */}
@@ -149,8 +130,8 @@ export default function LinkedEventRow({
         disabled={isOptimistic}
         onClick={handleUnlinkClick}
       >
-        ×
+        <X size={14} aria-hidden />
       </Button>
-    </li>
+    </div>
   );
 }

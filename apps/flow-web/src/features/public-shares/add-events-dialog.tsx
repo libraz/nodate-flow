@@ -233,13 +233,12 @@ function PickerBody({
           type="button"
           variant="primary"
           disabled={selected.size === 0 || attach.isPending}
+          aria-busy={attach.isPending || undefined}
           onClick={() => {
             void handleAttach();
           }}
         >
-          {attach.isPending
-            ? t('workspace.public_shares.detail.picker.attaching')
-            : t('workspace.public_shares.detail.picker.attach', { count: selected.size })}
+          {t('workspace.public_shares.detail.picker.attach', { count: selected.size })}
         </Button>
       </div>
     </>

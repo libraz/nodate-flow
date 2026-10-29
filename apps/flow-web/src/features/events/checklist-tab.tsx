@@ -22,10 +22,14 @@
  * Wrap in a `<Suspense>` boundary at the call site.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type KeyboardEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -98,7 +102,7 @@ function ChecklistRow({ workspaceId, calendarId, eventId, item }: ChecklistRowPr
   };
 
   return (
-    <li className={styles.checklistRow}>
+    <div className={styles.checklistRow}>
       <Checkbox
         checked={item.done}
         onChange={() => {
@@ -123,7 +127,7 @@ function ChecklistRow({ workspaceId, calendarId, eventId, item }: ChecklistRowPr
       >
         {t('event.checklist.delete')}
       </Button>
-    </li>
+    </div>
   );
 }
 
@@ -138,6 +142,8 @@ export default function ChecklistTab({
   const { t } = useTranslation('calendar-events');
   const { data: items } = useEventChecklistQuery(workspaceId, calendarId, eventId);
   const addMutation = useAddEventChecklistItemMutation();
+  const { entries, onExited } = usePresenceList(items, (item) => item.id);
+  const staggerFor = useFirstLoadStagger();
 
   const [draft, setDraft] = useState('');
   const trimmed = draft.trim();
@@ -179,18 +185,26 @@ export default function ChecklistTab({
           </span>
         </div>
       ) : null}
-      {items.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('event.checklist.empty')}</p>
       ) : (
         <ul className={styles.itemList}>
-          {items.map((item) => (
-            <ChecklistRow
-              key={item.id}
-              workspaceId={workspaceId}
-              calendarId={calendarId}
-              eventId={eventId}
-              item={item}
-            />
+          {entries.map(({ key, item, present }, index) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+              style={staggerFor(index)}
+            >
+              <ChecklistRow
+                workspaceId={workspaceId}
+                calendarId={calendarId}
+                eventId={eventId}
+                item={item}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}

@@ -1,0 +1,317 @@
+/*
+ * Workspace and project list surfaces: the list pages, the workspace
+ * overview's project cards, and the section sub-nav shared by the
+ * workspace and project layouts.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding: var(--nf-space-page);
+  block-size: 100%;
+}
+
+/* A list page nested in a layout that already pads the page. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  block-size: 100%;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nf-space-4);
+  min-block-size: var(--nf-control-height);
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+}
+
+.grid {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 20rem;
+}
+
+/* --- Name link inside a grid cell --- */
+
+.nameLink {
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+  text-decoration: none;
+  border-radius: var(--nf-radius-xs);
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.nameLink:hover {
+  color: var(--nf-color-accent-fg);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.nameLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--nf-color-fg-muted);
+}
+
+/* --- Section sub-nav (workspace and project layouts) --- */
+
+.subNav {
+  display: flex;
+  gap: var(--nf-space-1);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  padding-block-end: var(--nf-space-2);
+  overflow-x: auto;
+}
+
+.subNavLink {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--nf-space-2) var(--nf-space-3-5);
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-out),
+    color var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.subNavLink:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.subNavLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.subNavLink[aria-current="page"] {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+/* --- Workspace overview: project cards --- */
+
+.overviewCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-6);
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.projectList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+}
+
+.projectLink {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  min-block-size: var(--nf-control-height);
+  padding: var(--nf-space-2-5) var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-hairline);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-out),
+    border-color var(--nf-duration-fast) var(--nf-ease-out),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.projectLink:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+}
+
+.projectLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.projectLink:active {
+  scale: var(--nf-motion-press-scale);
+}
+
+.projectDot {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.6rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.6rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-fg-muted);
+  flex-shrink: 0;
+}
+
+.projectName {
+  font-weight: var(--nf-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-inline-size: 0;
+  flex-shrink: 1;
+}
+
+.projectDescription {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectChevron {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  color: var(--nf-color-fg-subtle);
+  transition: translate var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.projectLink:hover .projectChevron {
+  translate: calc(var(--nf-motion-shift-sm) * var(--nf-motion-inline-sign, 1)) 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.viewAll {
+  align-self: flex-start;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-accent-fg);
+  text-decoration: none;
+  border-radius: var(--nf-radius-xs);
+}
+
+.viewAll:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.viewAll:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* --- Skeletons --- */
+
+.skeletonTitle {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 2rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 12rem;
+}
+
+.skeletonButton {
+  block-size: var(--nf-control-height);
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 8rem;
+}
+
+.skeletonGrid {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  min-block-size: 20rem;
+  inline-size: 100%;
+}
+
+/* --- Not-found call to action --- */
+
+.ctaLink {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--nf-control-height);
+  padding: var(--nf-space-2) var(--nf-space-5);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  text-decoration: none;
+  font-weight: var(--nf-weight-medium);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.ctaLink:hover {
+  background: var(--nf-color-accent-hover);
+}
+
+.ctaLink:active {
+  background: var(--nf-color-accent-active);
+}
+
+.ctaLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* Active invite links under the members table. */
+.invitesSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.invitesTitle {
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-base);
+  margin: 0;
+}
+
+.panelSkeleton {
+  /* nf-token-override: placeholder sized to the panel it stands in for */
+  block-size: 16rem;
+}
+
+/* Workspace detail header. */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.detailTitle {
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+  margin: 0;
+}
+
+.detailDescription {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}

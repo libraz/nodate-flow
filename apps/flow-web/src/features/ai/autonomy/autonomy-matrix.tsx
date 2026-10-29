@@ -28,7 +28,6 @@
 
 import { lookupSignalKind, SIGNAL_KINDS, type SignalKindDefinition } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +43,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../../lib/api';
 import { formatApiError } from '../../../lib/api-error';
+import ui from '../../settings/settings-ui.module.css';
 import {
   type AutoActionRule,
   type AutoActionRuleKind,
@@ -283,21 +283,21 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
   const signalKindCount: number = SIGNAL_KINDS.length;
   if (signalKindCount === 0) {
     return (
-      <Card style={styles.card}>
-        <header style={styles.header}>
-          <h2 style={styles.title}>{t('ai:autonomy.matrix.title')}</h2>
-          <p style={styles.description}>{t('ai:autonomy.matrix.description')}</p>
+      <section className={ui.section}>
+        <header className={ui.sectionHeader}>
+          <h2 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h2>
+          <p className={ui.sectionDescription}>{t('ai:autonomy.matrix.description')}</p>
         </header>
         <p style={styles.empty}>{t('ai:autonomy.matrix.empty')}</p>
-      </Card>
+      </section>
     );
   }
 
   return (
-    <Card style={styles.card}>
-      <header style={styles.header}>
-        <h2 style={styles.title}>{t('ai:autonomy.matrix.title')}</h2>
-        <p style={styles.description}>{t('ai:autonomy.matrix.description')}</p>
+    <section className={ui.section}>
+      <header className={ui.sectionHeader}>
+        <h2 className={ui.sectionTitle}>{t('ai:autonomy.matrix.title')}</h2>
+        <p className={ui.sectionDescription}>{t('ai:autonomy.matrix.description')}</p>
       </header>
 
       <div style={styles.scrollRegion}>
@@ -365,7 +365,7 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
             })
           : ''}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -462,30 +462,6 @@ function toneFor(level: AutonomyLevel): 'neutral' | 'warning' | 'success' {
 /* ------------------------------------------------------------------ */
 
 const styles = {
-  card: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--nf-space-4)',
-    padding: 'var(--nf-space-4)',
-  } satisfies CSSProperties,
-  header: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--nf-space-1)',
-  } satisfies CSSProperties,
-  title: {
-    margin: 0,
-    fontSize: 'var(--nf-text-xl)',
-    fontWeight: 'var(--nf-weight-semibold)',
-    color: 'var(--nf-color-fg)',
-    lineHeight: 'var(--nf-leading-tight)',
-  } satisfies CSSProperties,
-  description: {
-    margin: 0,
-    fontSize: 'var(--nf-text-sm)',
-    color: 'var(--nf-color-fg-muted)',
-    lineHeight: 'var(--nf-leading-normal)',
-  } satisfies CSSProperties,
   scrollRegion: {
     maxBlockSize: '60vh',
     overflowY: 'auto',

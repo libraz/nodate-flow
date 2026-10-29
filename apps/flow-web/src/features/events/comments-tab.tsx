@@ -24,10 +24,14 @@
  * itself does not fall back.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -144,7 +148,7 @@ function EventCommentRow({
   };
 
   return (
-    <li className={styles.commentCard}>
+    <div className={styles.commentCard}>
       <header className={styles.commentHeader}>
         <span className={styles.commentAuthor}>
           {comment.displayName || t('common:common.deactivated_user')}
@@ -210,7 +214,7 @@ function EventCommentRow({
           </Button>
         </div>
       ) : null}
-    </li>
+    </div>
   );
 }
 
@@ -228,6 +232,8 @@ export default function CommentsTab({
 
   const { data: comments } = useEventCommentsQuery(workspaceId, calendarId, eventId);
   const addMutation = useAddEventCommentMutation();
+  const { entries, onExited } = usePresenceList(comments, (c) => c.id);
+  const staggerFor = useFirstLoadStagger();
 
   const [draft, setDraft] = useState('');
   const trimmed = draft.trim();
@@ -250,20 +256,28 @@ export default function CommentsTab({
 
   return (
     <div className={styles.tabPanel}>
-      {comments.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('event.comments.empty')}</p>
       ) : (
         <ul className={styles.itemList}>
-          {comments.map((comment) => (
-            <EventCommentRow
-              key={comment.id}
-              workspaceId={workspaceId}
-              calendarId={calendarId}
-              eventId={eventId}
-              comment={comment}
-              currentUserId={currentUser?.id}
-              locale={locale}
-            />
+          {entries.map(({ key, item, present }, index) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+              style={staggerFor(index)}
+            >
+              <EventCommentRow
+                workspaceId={workspaceId}
+                calendarId={calendarId}
+                eventId={eventId}
+                comment={item}
+                currentUserId={currentUser?.id}
+                locale={locale}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}

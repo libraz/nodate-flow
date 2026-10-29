@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   del: vi.fn(),
   toastShow: vi.fn(),
+  confirm: vi.fn(),
   currentUserId: 'user-lead',
 }));
 
@@ -31,6 +32,10 @@ vi.mock('../../../lib/sdk', () => ({
 
 vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: mocks.toastShow },
+}));
+
+vi.mock('../../../lib/confirm-action', () => ({
+  confirmAction: mocks.confirm,
 }));
 
 vi.mock('../../auth/auth-store', () => ({
@@ -105,6 +110,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ error: null, response: new Response(null, { status: 200 }) });
   mocks.toastShow.mockReset();
+  mocks.confirm.mockReset().mockResolvedValue(true);
   mocks.currentUserId = 'user-lead';
 });
 
@@ -128,6 +134,20 @@ describe('ProjectMembersTable removal', () => {
     const [path, init] = mocks.del.mock.calls[0] as [string, { params: unknown }];
     expect(path).toBe('/projects/{prjId}/members/{userId}');
     expect(init.params).toEqual({ path: { prjId: 'prj-1', userId: 'user-editor' } });
+  });
+
+  it('asks before removing, and removes nothing when declined', async () => {
+    const user = userEvent.setup();
+    mocks.confirm.mockResolvedValue(false);
+    serveMembers([member('user-lead', 'lead'), member('user-editor', 'editor')]);
+    renderTable();
+
+    await user.click(await screen.findByRole('button', { name: 'projects.members.remove' }));
+
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'projects.members.remove_confirm', tone: 'danger' }),
+    );
+    expect(mocks.del).not.toHaveBeenCalled();
   });
 
   it('hides the action from a member who cannot use it', async () => {

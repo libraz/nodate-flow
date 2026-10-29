@@ -32,7 +32,7 @@
 /* 12-column CSS Grid layout */
 .grid {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--nf-space-4);
   align-content: start;
 }
@@ -44,8 +44,13 @@
   }
 }
 
-/* Widget card */
+/* Widget card. Spans come from `--widget-cols` / `--widget-rows` so the
+   single-column breakpoint below can override them. */
 .widget {
+  composes: enter from "@nodate-flow/ui/styles/list-motion.module.css";
+  position: relative;
+  grid-column: span var(--widget-cols, 4);
+  grid-row: span var(--widget-rows, 1);
   display: flex;
   flex-direction: column;
   background: var(--nf-color-bg-elevated);
@@ -57,11 +62,30 @@
   min-block-size: 10rem;
   transition:
     box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.widget:hover {
-  box-shadow: var(--nf-shadow-md);
+/* A removed widget fades and shrinks out before it leaves the grid. */
+.widget[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-scale-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+/* Placeholder spans a third of the grid, the default widget width. */
+.widgetSkeleton {
+  grid-column: span 4;
+  /* nf-token-override: placeholder sized to the widget card it stands in for */
+  min-block-size: 10rem;
+  border-radius: var(--nf-radius-md);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .widget,
+  .widgetSkeleton {
+    grid-column: auto;
+  }
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
@@ -71,6 +95,11 @@
   border-style: dashed;
   border-color: var(--nf-color-accent);
   cursor: grab;
+}
+
+/* Only a draggable widget lifts; a static card that moved would promise an action. */
+.widgetEditing:hover {
+  box-shadow: var(--nf-shadow-md);
 }
 
 .widgetEditing:active {
@@ -131,11 +160,16 @@
   color: var(--nf-color-danger-fg);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.removeButton:hover {
+.removeButton:hover:not(:disabled) {
   background: var(--nf-color-danger-subtle);
+}
+
+.removeButton:disabled {
+  opacity: 0.5;
+  cursor: progress;
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */

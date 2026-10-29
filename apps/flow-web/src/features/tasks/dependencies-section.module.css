@@ -42,13 +42,18 @@
   color: var(--nf-color-fg-muted);
 }
 
+.groupCount {
+  font-variant-numeric: tabular-nums;
+}
+
 .groupList {
+  --presence-gap: var(--nf-space-1);
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--presence-gap);
 }
 
 .groupItem {
@@ -59,6 +64,11 @@
   padding-inline: var(--nf-space-3);
   border-radius: var(--nf-radius-sm);
   background: var(--nf-color-surface);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.groupItem:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .groupLink {
@@ -69,9 +79,21 @@
   white-space: nowrap;
   color: inherit;
   text-decoration: none;
+  border-radius: var(--nf-radius-xs);
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.groupLink:hover {
+  color: var(--nf-color-accent-fg);
+}
+
+.groupLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .picker {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
@@ -101,10 +123,18 @@
   font-size: var(--nf-text-sm);
 }
 
+.pickerBody {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
 .pickerLoadingRow {
   display: flex;
-  justify-content: center;
-  padding: var(--nf-space-2);
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.pickerSkeletonRow {
+  block-size: var(--nf-space-8);
 }
 
 .pickerResults {
@@ -133,11 +163,19 @@
   cursor: pointer;
   color: inherit;
   font: inherit;
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    border-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .pickerResultButton:hover,
 .pickerResultButton:focus-visible {
   background: var(--nf-color-surface-hover);
+}
+
+.pickerResultButton:focus-visible {
+  outline: none;
+  border-color: var(--nf-color-border-strong);
 }
 
 .pickerResultTitle {

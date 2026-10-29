@@ -89,14 +89,12 @@
         "title": "Save repeating event",
         "legend": "Which events should this change apply to?",
         "confirm": "Save",
-        "pending": "Saving…",
         "slow": "Still waiting for the server. You can cancel — the change may still go through, so check the calendar afterwards."
       },
       "delete": {
         "title": "Delete repeating event",
         "legend": "Which events should be deleted?",
         "confirm": "Delete",
-        "pending": "Deleting…",
         "slow": "Still waiting for the server. You can cancel — the deletion may still go through, so check the calendar afterwards."
       },
       "cancel": "Cancel",
@@ -141,8 +139,6 @@
     "submit": {
       "create": "Create",
       "edit": "Save changes",
-      "creating": "Creating…",
-      "saving": "Saving…",
       "slow": "Still waiting for the server. You can cancel — the change may still go through, so check the calendar afterwards."
     },
     "cancel": "Cancel",
@@ -205,7 +201,9 @@
         "rsvp_failed": "Could not save your response",
         "can_edit_failed": "Could not change the edit permission",
         "remove_failed": "Could not remove the attendee"
-      }
+      },
+      "removed_toast": "Removed {name}",
+      "leave_confirm": "Remove yourself from this event?"
     },
     "creator": {
       "label": "Created by",
@@ -262,7 +260,6 @@
       "delete_success": "Attachment deleted",
       "delete_error": "Failed to delete attachment",
       "upload": "Upload",
-      "uploading": "Uploading…",
       "upload_success": "Attachment uploaded",
       "upload_dedup_success": "Attachment already on file — linked instantly",
       "upload_error": "Upload failed",
@@ -316,7 +313,6 @@
         "conflict_hint": "These tasks would clash with other items if shifted.",
         "row_time": "{old} → {new}",
         "apply": "Apply shift",
-        "applying": "Applying…",
         "success": "Shifted by {delta} ({count} tasks)",
         "error": "Failed to apply shift",
         "delta_seconds": "{seconds}s",

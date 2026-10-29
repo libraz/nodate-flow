@@ -289,6 +289,7 @@ export default function SignalGroup({
               size="sm"
               onClick={handleReverseClick}
               disabled={reverseMut.isPending}
+              aria-busy={reverseMut.isPending || undefined}
             >
               {t('signal.reverse')}
             </Button>
@@ -371,6 +372,7 @@ export default function SignalGroup({
             size="sm"
             onClick={handleReverseClick}
             disabled={reverseMut.isPending}
+            aria-busy={reverseMut.isPending || undefined}
           >
             {t('signal.reverse')}
           </Button>

@@ -25,5 +25,6 @@
   "config": {
     "timebox_label": "タイムボックス",
     "project_label": "プロジェクト"
-  }
+  },
+  "remove_widget_confirm": "このウィジェットをダッシュボードから削除しますか？"
 }

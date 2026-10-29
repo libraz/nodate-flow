@@ -1,0 +1,213 @@
+/*
+ * Shared layout vocabulary for every settings screen (account and
+ * workspace): page header, bordered sections, a footer that pairs the
+ * save status with the one primary action, the danger zone, and the
+ * list table. One rhythm across screens is the point; a screen adds
+ * its own module only for what is genuinely specific to it.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  min-inline-size: 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  min-inline-size: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-2xl);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  color: var(--nf-color-fg);
+}
+
+.lede {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+  max-inline-size: var(--nf-measure-content);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  padding: var(--nf-space-5) var(--nf-space-6);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  min-inline-size: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.sectionDescription {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+/* Save status on the inline-start side of the one primary action. */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+/* Full border plus a faint tint; never a one-sided stripe on a rounded box. */
+.dangerZone {
+  composes: section;
+  border-color: color-mix(in oklch, var(--nf-color-danger) 35%, var(--nf-color-border));
+  background: color-mix(in oklch, var(--nf-color-danger-subtle) 45%, var(--nf-color-surface));
+}
+
+.dangerTitle {
+  composes: sectionTitle;
+  color: var(--nf-color-danger-fg);
+}
+
+.dangerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.skeletonStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.empty {
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+}
+
+/* Lists rendered as tables. */
+.tableWrap {
+  overflow-x: auto;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+}
+
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--nf-text-sm);
+}
+
+.table th {
+  padding: var(--nf-space-2-5) var(--nf-space-4);
+  text-align: start;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+  background: var(--nf-color-bg-sunken);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.table td {
+  padding: var(--nf-space-3) var(--nf-space-4);
+  vertical-align: middle;
+  color: var(--nf-color-fg);
+}
+
+.table tbody tr + tr td {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.table tbody tr {
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.table tbody tr:hover,
+.table tbody tr:focus-within {
+  background: var(--nf-color-surface-hover);
+}
+
+.table .alignEnd {
+  text-align: end;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+}
+
+.muted {
+  color: var(--nf-color-fg-muted);
+}
+
+/* A row that arrives after first paint (created token, added hook). */
+.rowEnter {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* Shown-once secret panel. */
+.secretPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) solid
+    color-mix(in oklch, var(--nf-color-warning) 40%, var(--nf-color-border));
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-warning-subtle);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.secretWarning {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-warning-fg);
+}
+
+.secretRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.secretValue {
+  flex: 1;
+  min-inline-size: 0;
+  font-family: var(--nf-font-mono);
+}

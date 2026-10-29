@@ -2,15 +2,22 @@
  * WorkspaceDetail — header + tabs (Overview / Members / Settings).
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
+import motionStyles from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
-import { type ReactElement, Suspense, useId } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { useProjectsQuery } from '../projects/api';
+import ProjectCreateDialog from '../projects/project-create-dialog';
 import { useWorkspaceQuery } from './api';
 import WorkspaceMembersTable from './workspace-members-table';
+import styles from './workspaces.module.css';
 
 /** Identifiers for the workspace-detail tab panels. */
 export type WorkspaceDetailTab = 'overview' | 'members';
@@ -23,109 +30,81 @@ export interface WorkspaceDetailProps {
   onTabChange: (tab: WorkspaceDetailTab) => void;
 }
 
+/** The overview lists this many projects; the Projects section holds the rest. */
+const OVERVIEW_LIMIT = 8;
+
 function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('common');
   const { data: projects } = useProjectsQuery(workspaceId);
+  const [createOpen, setCreateOpen] = useState(false);
+  const staggerStyle = useFirstLoadStagger();
   const active = projects.filter((p) => !p.isArchived);
+
+  const createDialog = (
+    <ProjectCreateDialog
+      workspaceId={workspaceId}
+      open={createOpen}
+      onClose={() => {
+        setCreateOpen(false);
+      }}
+    />
+  );
 
   if (active.length === 0) {
     return (
-      <Card style={{ padding: 'var(--nf-space-6)' }}>
-        <p
-          style={{
-            margin: 0,
-            padding: 'var(--nf-space-8) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          {t('workspaces.detail.overview_empty')}
-        </p>
+      <Card>
+        <EmptyState
+          titleAs="p"
+          title={t('workspaces.detail.overview_empty')}
+          action={
+            <Button
+              variant="primary"
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+            >
+              {t('projects.new')}
+            </Button>
+          }
+        />
+        {createDialog}
       </Card>
     );
   }
 
   return (
-    <Card
-      style={{
-        padding: 'var(--nf-space-6)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-4)',
-      }}
-    >
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-supporting)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
+    <Card className={styles.overviewCard}>
+      <h2 className={styles.sectionHeading}>
         {t('workspaces.nav.projects')} ({active.length})
       </h2>
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-1-5)',
-        }}
-      >
-        {active.slice(0, 8).map((p) => (
-          <li key={p.id}>
+      <ul className={styles.projectList}>
+        {active.slice(0, OVERVIEW_LIMIT).map((p, index) => (
+          <li key={p.id} className={motionStyles.enter} style={staggerStyle(index)}>
             <Link
               to="/workspaces/$id/projects/$projectId"
               params={{ id: workspaceId, projectId: p.id }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-3)',
-                padding: 'var(--nf-space-2-5) var(--nf-space-3)',
-                borderRadius: 'var(--nf-radius-md)',
-                background: 'var(--nf-color-surface)',
-                color: 'inherit',
-                textDecoration: 'none',
-              }}
+              className={styles.projectLink}
+              title={p.description ? `${p.name}\n${p.description}` : p.name}
             >
               <span
                 aria-hidden
-                style={{
-                  // nf-token-override: component dimension, not a spacing step
-                  inlineSize: '0.6rem',
-                  // nf-token-override: component dimension, not a spacing step
-                  blockSize: '0.6rem',
-                  borderRadius: 'var(--nf-radius-pill)',
-                  background: p.color ?? 'var(--nf-color-fg-muted)',
-                  flexShrink: 0,
-                }}
+                className={styles.projectDot}
+                style={p.color ? { background: p.color } : undefined}
               />
-              <span style={{ fontWeight: 500 }}>{p.name}</span>
+              <span className={styles.projectName}>{p.name}</span>
               {p.description ? (
-                <span
-                  style={{
-                    color: 'var(--nf-color-fg-muted)',
-                    fontSize: 'var(--nf-text-supporting)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  {p.description}
-                </span>
+                <span className={styles.projectDescription}>{p.description}</span>
               ) : null}
+              <ChevronRight aria-hidden size={16} className={styles.projectChevron} />
             </Link>
           </li>
         ))}
       </ul>
+      {active.length > OVERVIEW_LIMIT ? (
+        <Link to="/workspaces/$id/projects" params={{ id: workspaceId }} className={styles.viewAll}>
+          {t('workspaces.nav.projects')} <span aria-hidden>→</span>
+        </Link>
+      ) : null}
     </Card>
   );
 }
@@ -147,7 +126,7 @@ export default function WorkspaceDetail({
       value: 'overview',
       label: t('workspaces.detail.tabs.overview'),
       content: (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Skeleton className={styles.panelSkeleton} />}>
           <OverviewPanel workspaceId={id} />
         </Suspense>
       ),
@@ -156,7 +135,7 @@ export default function WorkspaceDetail({
       value: 'members',
       label: t('workspaces.detail.tabs.members'),
       content: (
-        <Suspense fallback={null}>
+        <Suspense fallback={<Skeleton className={styles.panelSkeleton} />}>
           <WorkspaceMembersTable workspaceId={id} />
         </Suspense>
       ),
@@ -166,28 +145,13 @@ export default function WorkspaceDetail({
   const headingId = useId();
 
   return (
-    <article
-      aria-labelledby={headingId}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        padding: 'var(--nf-space-page)',
-      }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h1
-          id={headingId}
-          style={{
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-page-title)',
-            margin: 0,
-          }}
-        >
+    <article aria-labelledby={headingId} className={styles.detail}>
+      <header className={styles.detailHeader}>
+        <h1 id={headingId} className={styles.detailTitle}>
           {workspace.name}
         </h1>
         {workspace.description ? (
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{workspace.description}</p>
+          <p className={styles.detailDescription}>{workspace.description}</p>
         ) : null}
       </header>
 

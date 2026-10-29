@@ -44,7 +44,6 @@
   "toast": {
     "linked": "Linked \"{title}\".",
     "unlinked": "Unlinked \"{title}\".",
-    "undo": "Undo",
     "linkFailed": "Couldn't link event. Please retry.",
     "unlinkFailed": "Couldn't unlink. Please retry.",
     "alreadyLinkedError": "This event is already linked."

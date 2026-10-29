@@ -13,25 +13,6 @@
   inline-size: 100%;
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-section-title);
-  color: var(--nf-color-fg);
-}
-
-.description {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-}
-
 .windowBar {
   display: flex;
   align-items: center;
@@ -42,6 +23,18 @@
 .windowLabel {
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
+}
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* The previous window's figures, kept on screen while the next one loads. */
+.dashboard[data-stale] {
+  opacity: 0.6;
 }
 
 .kpiGrid {
@@ -79,6 +72,8 @@
   line-height: 1.1;
   color: var(--nf-color-fg);
   font-variant-numeric: tabular-nums;
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+  --nf-motion-shift: var(--nf-motion-shift-sm);
 }
 
 .acceptanceCard {
@@ -106,6 +101,7 @@
   line-height: 1.1;
   color: var(--nf-color-fg);
   font-variant-numeric: tabular-nums;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .acceptanceTrack {
@@ -121,7 +117,13 @@
   block-size: 100%;
   background: var(--nf-color-accent);
   border-radius: inherit;
-  transition: inline-size var(--nf-duration-base) ease;
+  /* Scaled from the logical start; the card sets `scale` to the ratio. */
+  transform-origin: 0 50%;
+  transition: scale var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+[dir="rtl"] .acceptanceFill {
+  transform-origin: 100% 50%;
 }
 
 .acceptanceHint {
@@ -145,7 +147,7 @@
 .outboundTitle {
   margin: 0;
   font-size: var(--nf-text-lg);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
 }
 
@@ -174,7 +176,7 @@
   padding: var(--nf-space-3) var(--nf-space-4);
   background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg-muted);
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   border-block-end: 1px solid var(--nf-color-border);
   white-space: nowrap;
 }

@@ -7,22 +7,14 @@
  * and silently hid `/public-shares/$shareId`.
  */
 
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute, Outlet } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 
+import SettingsListSkeleton from '../features/settings/settings-list-skeleton';
+
 function WorkspacePublicSharesLayout(): ReactElement {
   return (
-    <Suspense
-      fallback={
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />
-        </div>
-      }
-    >
+    <Suspense fallback={<SettingsListSkeleton />}>
       <Outlet />
     </Suspense>
   );

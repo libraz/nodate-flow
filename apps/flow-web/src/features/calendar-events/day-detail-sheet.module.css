@@ -4,9 +4,8 @@
  * All visual values resolve from design tokens (`--nf-color-*`,
  * `--nf-space-*`, `--nf-radius-*`, `--nf-text-*`). No hardcoded colours
  * so the four-theme switcher keeps working, and logical properties
- * throughout for RTL safety. Nothing here animates, so there is no
- * motion for a reduced-motion reader to opt out of — the Drawer
- * primitive this sits in does not animate either.
+ * throughout for RTL safety. The Drawer primitive owns the sheet's own
+ * motion; rows only ease their hover fill.
  */
 
 .heading {
@@ -49,6 +48,7 @@
   border-radius: var(--nf-radius-md);
   color: var(--nf-color-fg);
   cursor: pointer;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:hover {
@@ -61,8 +61,8 @@
 }
 
 /*
- * The same accent the grid chip carries on its inline-start border, so a
- * reader can tie a row here back to the chip they tapped.
+ * The hue of the chip the row came from, so a reader can tie a row here
+ * back to the chip they tapped.
  */
 .marker {
   flex-shrink: 0;

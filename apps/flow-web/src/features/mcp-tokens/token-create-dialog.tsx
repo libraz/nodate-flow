@@ -22,6 +22,8 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
+import CopyButton from '../settings/copy-button';
+import ui from '../settings/settings-ui.module.css';
 import { useCreateMcpToken } from './api';
 import { DEFAULT_MCP_TOKEN_SCOPES, MCP_TOKEN_SCOPE_OPTIONS, type McpTokenScope } from './scopes';
 
@@ -47,7 +49,6 @@ export default function TokenCreateDialog({
   const [scopesError, setScopesError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [plaintext, setPlaintext] = useState('');
-  const [copied, setCopied] = useState(false);
 
   const reset = (): void => {
     setStage('form');
@@ -55,7 +56,6 @@ export default function TokenCreateDialog({
     setScopes(DEFAULT_MCP_TOKEN_SCOPES);
     setScopesError('');
     setSubmitting(false);
-    setCopied(false);
   };
 
   const toggleScope = (scope: McpTokenScope, on: boolean): void => {
@@ -106,16 +106,6 @@ export default function TokenCreateDialog({
     }
   };
 
-  const handleCopy = async (): Promise<void> => {
-    if (plaintext === '') return;
-    try {
-      await navigator.clipboard.writeText(plaintext);
-      setCopied(true);
-    } catch {
-      // Clipboard may be unavailable; ignore — user can still select manually.
-    }
-  };
-
   const title =
     stage === 'form'
       ? t('workspace.mcp_tokens.dialog.create_title')
@@ -135,6 +125,7 @@ export default function TokenCreateDialog({
               <Input
                 {...control}
                 value={name}
+                autoComplete="off"
                 placeholder={t('workspace.mcp_tokens.dialog.field.name_placeholder')}
                 onChange={(e) => {
                   setName(e.target.value);
@@ -201,48 +192,45 @@ export default function TokenCreateDialog({
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('workspace.mcp_tokens.dialog.cancel')}
             </Button>
-            <Button type="submit" variant="primary" disabled={submitting || name.trim() === ''}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={submitting || name.trim() === ''}
+              aria-busy={submitting}
+            >
               {t('workspace.mcp_tokens.dialog.submit')}
             </Button>
           </div>
         </form>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-          <p
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-warning-fg)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('workspace.mcp_tokens.dialog.reveal_warning')}
-          </p>
-          <FormField label={t('workspace.mcp_tokens.dialog.token_label')}>
-            {(control) => (
-              <Input
-                {...control}
-                value={plaintext}
-                readOnly
-                spellCheck={false}
-                onFocus={(e) => {
-                  e.currentTarget.select();
-                }}
-                style={{ fontFamily: 'var(--nf-font-mono, monospace)' }}
-              />
-            )}
-          </FormField>
+          <div className={ui.secretPanel}>
+            <p className={ui.secretWarning}>{t('workspace.mcp_tokens.dialog.reveal_warning')}</p>
+            <FormField label={t('workspace.mcp_tokens.dialog.token_label')}>
+              {(control) => (
+                <div className={ui.secretRow}>
+                  <Input
+                    {...control}
+                    className={ui.secretValue}
+                    value={plaintext}
+                    readOnly
+                    spellCheck={false}
+                    autoComplete="off"
+                    onFocus={(e) => {
+                      e.currentTarget.select();
+                    }}
+                  />
+                  {/* A failed write is left silent: the field stays selectable for a manual copy. */}
+                  <CopyButton
+                    value={plaintext}
+                    label={t('workspace.mcp_tokens.dialog.copy')}
+                    copiedLabel={t('workspace.mcp_tokens.dialog.copied')}
+                  />
+                </div>
+              )}
+            </FormField>
+          </div>
           <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied
-                ? t('workspace.mcp_tokens.dialog.copied')
-                : t('workspace.mcp_tokens.dialog.copy')}
-            </Button>
             <Button type="button" variant="primary" onClick={handleClose}>
               {t('workspace.mcp_tokens.dialog.done')}
             </Button>

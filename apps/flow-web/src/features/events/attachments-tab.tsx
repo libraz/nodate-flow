@@ -11,8 +11,8 @@
  *   2. We compute its SHA-256 client-side and POST the digest +
  *      metadata to `/events/{evtId}/attachments/presign`.
  *   3. If the response carries `deduplicated: true`, we skip the PUT
- *      entirely (the byte stream already exists in object storage).
- *      Otherwise we stream the file straight to the presigned PUT URL.
+ *      entirely (the byte stream already exists in storage).
+ *      Otherwise we PUT the file to the signed upload URL served by the API.
  *
  * Hooks consumed:
  *   - {@link useEventAttachmentsQuery}                — suspense list read
@@ -23,8 +23,12 @@
  * Wrap in a `<Suspense>` boundary at the call site.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ChangeEvent, type ReactElement, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -131,7 +135,7 @@ function AttachmentRow({
   const created = formatEpochDateTime(attachment.createdAt, locale) ?? '';
 
   return (
-    <li className={styles.attachmentRow}>
+    <div className={styles.attachmentRow}>
       <div className={styles.attachmentIdentity}>
         <span className={styles.attachmentName}>{attachment.filename}</span>
         <span className={styles.attachmentMeta}>
@@ -165,7 +169,7 @@ function AttachmentRow({
           {t('event.attachments.delete')}
         </Button>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -181,6 +185,8 @@ export default function AttachmentsTab({
   const locale = i18n.resolvedLanguage ?? 'en';
   const { data: attachments } = useEventAttachmentsQuery(workspaceId, calendarId, eventId);
   const presignUpload = usePresignEventAttachmentMutation();
+  const { entries, onExited } = usePresenceList(attachments, (a) => a.id);
+  const staggerFor = useFirstLoadStagger();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -219,7 +225,7 @@ export default function AttachmentsTab({
           <input
             ref={fileInputRef}
             type="file"
-            style={{ display: 'none' }}
+            hidden
             onChange={(e) => {
               void handleFileChange(e);
             }}
@@ -229,27 +235,34 @@ export default function AttachmentsTab({
             variant="default"
             size="sm"
             disabled={presignUpload.isPending}
+            aria-busy={presignUpload.isPending || undefined}
             onClick={() => fileInputRef.current?.click()}
           >
-            {presignUpload.isPending
-              ? t('event.attachments.uploading')
-              : t('event.attachments.upload')}
+            {t('event.attachments.upload')}
           </Button>
         </div>
       </div>
-      {attachments.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('event.attachments.empty')}</p>
       ) : (
         <ul className={styles.itemList}>
-          {attachments.map((attachment) => (
-            <AttachmentRow
-              key={attachment.id}
-              workspaceId={workspaceId}
-              calendarId={calendarId}
-              eventId={eventId}
-              attachment={attachment}
-              locale={locale}
-            />
+          {entries.map(({ key, item, present }, index) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+              style={staggerFor(index)}
+            >
+              <AttachmentRow
+                workspaceId={workspaceId}
+                calendarId={calendarId}
+                eventId={eventId}
+                attachment={item}
+                locale={locale}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}

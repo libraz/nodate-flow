@@ -15,8 +15,8 @@
  * 5. On accept, navigate to the joined workspace
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute, getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import { useAcceptInvite, useInviteInfoQuery } from '../features/workspaces/invi
 import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
 import { formatEpochDateTime } from '../lib/format';
 import { useSubmitGuard } from '../lib/use-submit-guard';
+import styles from './invite.module.css';
 
 type InviteRole = 'owner' | 'admin' | 'member' | 'guest';
 const KNOWN_ROLES: ReadonlySet<InviteRole> = new Set(['owner', 'admin', 'member', 'guest']);
@@ -50,19 +51,8 @@ function InviteAuthCardBody({
   const title = t('workspaces.invites.join_title', { workspace: workspaceName });
   return (
     <AuthCard>
-      <main
-        aria-label={title}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
-      >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-sans)',
-            fontSize: 'var(--nf-text-2xl)',
-            margin: 0,
-          }}
-        >
-          {title}
-        </h1>
+      <main aria-label={title} className={styles.main}>
+        <h1 className={styles.title}>{title}</h1>
         {children}
       </main>
     </AuthCard>
@@ -87,7 +77,11 @@ function InviteAcceptPage(): ReactElement {
   if (!isAuthenticated && authStatus === 'loading') {
     return (
       <InviteAuthCardBody workspaceName={info.workspaceName}>
-        <Spinner label={t('common.loading')} />
+        <div className={styles.skeleton} aria-busy="true">
+          <Skeleton className={styles.skeletonLine} />
+          <Skeleton className={styles.skeletonLine} />
+          <Skeleton className={styles.skeletonAction} />
+        </div>
       </InviteAuthCardBody>
     );
   }
@@ -96,22 +90,11 @@ function InviteAcceptPage(): ReactElement {
   if (!isAuthenticated) {
     return (
       <InviteAuthCardBody workspaceName={info.workspaceName}>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('workspaces.invites.login_required')}
-        </p>
+        <p className={styles.text}>{t('workspaces.invites.login_required')}</p>
         <Link
           to="/login"
           search={{ returnTo: `/invite/${token}` }}
-          style={{
-            display: 'inline-block',
-            padding: 'var(--nf-space-2-5) var(--nf-space-5)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-accent)',
-            color: 'var(--nf-color-fg-on-accent)',
-            textDecoration: 'none',
-            textAlign: 'center',
-            fontWeight: 500,
-          }}
+          className={buttonClassName({ variant: 'primary' })}
         >
           {t('workspaces.invites.go_to_login')}
         </Link>
@@ -148,56 +131,32 @@ function InviteAcceptPage(): ReactElement {
 
   return (
     <InviteAuthCardBody workspaceName={info.workspaceName}>
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
+      <p className={styles.text}>
         {t('workspaces.invites.join_description', {
           workspace: info.workspaceName,
           role: roleLabel(info.role),
         })}
       </p>
       {info.expiresAt ? (
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
+        <p className={styles.textSm}>
           {t('workspaces.invites.expires_at', {
             date: formatEpochDateTime(info.expiresAt, i18n.resolvedLanguage ?? 'en'),
           })}
         </p>
       ) : null}
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <p role="alert" className={styles.alert}>
           {error}
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
-        <Link
-          to="/"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            padding: 'var(--nf-space-2-5) var(--nf-space-5)',
-            borderRadius: 'var(--nf-radius-md)',
-            border: '1px solid var(--nf-color-border)',
-            background: 'transparent',
-            color: 'var(--nf-color-fg)',
-            textDecoration: 'none',
-          }}
-        >
+      <div className={styles.actions}>
+        <Link to="/" className={buttonClassName()}>
           {t('workspaces.form.cancel')}
         </Link>
         <Button
           variant="primary"
           disabled={submitGuard.submitting}
+          aria-busy={submitGuard.submitting || undefined}
           onClick={() => {
             void handleAccept();
           }}

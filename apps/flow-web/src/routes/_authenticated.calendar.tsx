@@ -28,12 +28,16 @@
 import { getOrCreateProvider, type HolidayEntry } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { expandAllRecurrences, type RecurrenceRule } from '@nodate-flow/ui/calendar';
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Zone } from '@nodate-flow/ui/time';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import {
@@ -46,10 +50,19 @@ import {
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { CalendarRange, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { DateTime } from 'luxon';
-import { type ReactElement, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-
 import {
   type PatchEventInput,
   type RecurrenceScope,
@@ -62,8 +75,12 @@ import EventDialog, {
 } from '../features/calendar-events/event-dialog';
 import type { CalendarDragPayload } from '../features/calendar-events/lib/drag-payload';
 import { eventDayKeys } from '../features/calendar-events/lib/event-days';
-import { usePointerDrag } from '../features/calendar-events/lib/pointer-drag';
+import {
+  type PointerDragHandle,
+  usePointerDrag,
+} from '../features/calendar-events/lib/pointer-drag';
 import { shiftEventDays } from '../features/calendar-events/lib/shift-event';
+import { useSlowPending } from '../features/calendar-events/lib/use-slow-pending';
 import MonthScroll from '../features/calendar-events/month-scroll';
 import RecurringScopeDialog from '../features/calendar-events/recurring-scope-dialog';
 import PendingInvitesPanel from '../features/calendar-invites/pending-invites-panel';
@@ -80,6 +97,9 @@ import { dateKey, endOfDayIso, startOfDayIso, todayKey } from '../lib/date-utils
 import { useActiveWorkspaceId } from '../lib/use-current-workspace';
 import { resolveEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.calendar.module.css';
+
+/** A refetch shorter than this draws no progress cue, so a fast load never flashes one. */
+const FETCH_CUE_DELAY_MS = 300;
 
 /**
  * Error code emitted by the backend when a PATCH /tasks request would
@@ -284,17 +304,17 @@ export function buildCalendarRange(
 /**
  * Differentiate calendar-event pills by kind. Returns inline style
  * fragments merged into the pill button, plus the 45-degree marker
- * colour rendered inside it.
+ * colour rendered inside it. Every kind carries a full 1px border in its
+ * own hue, so a rounded pill never ends in a one-sided stripe.
  *
- * - event: flat subtle fill.
- * - block: subtle fill + diagonal stripe (via repeating gradient).
+ * - event: subtle fill.
+ * - block: subtle fill + diagonal hatch (via repeating gradient).
  * - free: subtle fill + dashed border.
- * - milestone: transparent background + bottom border only.
+ * - milestone: subtle fill + a stronger border.
  */
 function pillStyleForKind(kind: string): {
   background?: string;
   border?: string;
-  borderBlockEnd?: string;
   backgroundImage?: string;
   markerColor: string;
 } {
@@ -302,6 +322,7 @@ function pillStyleForKind(kind: string): {
     case 'block':
       return {
         background: 'var(--nf-cal-block-subtle)',
+        border: '1px solid color-mix(in oklch, var(--nf-cal-block-color) 30%, transparent)',
         // The hatch has to darken a light canvas and lighten a dark one,
         // so it is mixed from the theme's foreground rather than written
         // as black: a flat 4% black is invisible on the dark themes.
@@ -317,13 +338,14 @@ function pillStyleForKind(kind: string): {
       };
     case 'milestone':
       return {
-        background: 'transparent',
-        borderBlockEnd: '2px solid var(--nf-cal-milestone-color)',
+        background: 'var(--nf-cal-milestone-subtle)',
+        border: '1px solid color-mix(in oklch, var(--nf-cal-milestone-color) 55%, transparent)',
         markerColor: 'var(--nf-cal-milestone-color)',
       };
     default:
       return {
         background: 'var(--nf-cal-event-subtle)',
+        border: '1px solid color-mix(in oklch, var(--nf-cal-event-color) 30%, transparent)',
         markerColor: 'var(--nf-cal-event-color)',
       };
   }
@@ -458,6 +480,62 @@ function dayDeltaBetweenKeys(fromKey: string, toKey: string): number {
   return Math.round((to - from) / 86_400_000);
 }
 
+/** Which way the month grid last moved, for the direction it slides in from. */
+type NavDirection = 'prev' | 'next';
+
+/** Direction from the month at `from` to the month at `to`, or null when they match. */
+function directionBetween(
+  from: { year: number; month: number },
+  to: { year: number; month: number },
+): NavDirection | null {
+  const delta = to.year * 12 + to.month - (from.year * 12 + from.month);
+  if (delta === 0) return null;
+  return delta < 0 ? 'prev' : 'next';
+}
+
+/**
+ * Day offset an arrow / Home / End key moves the grid focus by, or null
+ * for a key the grid does not handle. Inline arrows follow the writing
+ * direction; Home and End stay within the focused cell's week row.
+ */
+function keyDayDelta(key: string, dowIndex: number, rtl: boolean): number | null {
+  switch (key) {
+    case 'ArrowLeft':
+      return rtl ? 1 : -1;
+    case 'ArrowRight':
+      return rtl ? -1 : 1;
+    case 'ArrowUp':
+      return -7;
+    case 'ArrowDown':
+      return 7;
+    case 'Home':
+      return -dowIndex;
+    case 'End':
+      return 6 - dowIndex;
+    default:
+      return null;
+  }
+}
+
+/** Pills a desktop cell draws before its first measurement. */
+const DEFAULT_PILL_SLOTS = 5;
+
+/**
+ * Whole pill lines that fit in a cell's pill list, or null when the list
+ * has no layout to read. One line is `--cal-pill-block-size` (rem) plus
+ * the list's own row gap.
+ */
+function pillSlotsFor(list: HTMLElement): number | null {
+  const height = list.clientHeight;
+  if (height <= 0) return null;
+  const style = getComputedStyle(list);
+  const remPx = Number.parseFloat(getComputedStyle(list.ownerDocument.documentElement).fontSize);
+  const pillPx = Number.parseFloat(style.getPropertyValue('--cal-pill-block-size')) * remPx;
+  const gapPx = Number.parseFloat(style.rowGap) || 0;
+  if (!(pillPx > 0)) return null;
+  return Math.max(0, Math.floor((height + gapPx) / (pillPx + gapPx)));
+}
+
 /**
  * useIsMobile — true when the viewport is below the `md` breakpoint.
  * Mirrors the sidebar drawer hook so the calendar switches to the
@@ -542,16 +620,45 @@ function CalendarRoute(): ReactElement {
   const isMobile = useIsMobile();
   const [railOpen, setRailOpen] = useState(false);
   /**
-   * The day the mobile view has open, as `YYYY-MM-DD`, or null.
+   * The day whose full list is open, as `YYYY-MM-DD`, or null.
    *
-   * Only the phone view opens one: its chips are too small to press, so
-   * the day sheet is where an event or a task is opened and where a new
-   * event is created. The desktop grid operates on its cells directly
-   * and never sets this.
+   * The phone view opens it for every tap: its chips are too small to
+   * press, so the day sheet is where an event or a task is opened and
+   * where a new event is created. The desktop grid operates on its cells
+   * directly and opens it only from a day's "+N more", which is the one
+   * way to reach the items a cell had no room to draw.
    */
   const [openDayKey, setOpenDayKey] = useState<string | null>(null);
   // Bumped by the "Today" button so the mobile month-scroll re-centers.
   const [scrollToTodaySignal, setScrollToTodaySignal] = useState(0);
+  // Null until the first navigation, so the month drawn on arrival does
+  // not slide in; afterwards the grid enters from the side it came from.
+  const [navDirection, setNavDirection] = useState<NavDirection | null>(null);
+  /** The desktop cell that holds the grid's single tab stop. */
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const cellNodes = useRef(new Map<string, HTMLDivElement>());
+  /**
+   * How many pills one desktop cell draws. Cells have a fixed height
+   * derived from the viewport, so the budget is read off one cell's pill
+   * list and shared by all of them. The default holds until the first
+   * measurement, and is what a DOM without layout keeps.
+   */
+  const [pillSlots, setPillSlots] = useState(DEFAULT_PILL_SLOTS);
+  // Stable so the observer is attached once per mounted list, not once per render.
+  const pillListRef = useCallback((el: HTMLUListElement | null): (() => void) | undefined => {
+    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = (): void => {
+      const slots = pillSlotsFor(el);
+      if (slots !== null) setPillSlots(slots);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  // A cell keyboard navigation moved to, focused once it has rendered —
+  // after a month change that is a cell of the next grid.
+  const pendingFocusKey = useRef<string | null>(null);
 
   // Close the mobile rail drawer when growing past the breakpoint
   // (the Drawer primitive owns Escape / focus-trap while it is open).
@@ -559,13 +666,19 @@ function CalendarRoute(): ReactElement {
     if (!isMobile) setRailOpen(false);
   }, [isMobile]);
 
-  // Same for the day sheet: grown past the breakpoint the grid behind it
-  // is the desktop one, which the sheet has no place over.
-  useEffect(() => {
-    if (!isMobile) setOpenDayKey(null);
-  }, [isMobile]);
-
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  // The overlays below stay mounted on what they last showed while they
+  // animate out, so closing one plays its exit instead of cutting it.
+  // Each new opening remounts the dialog (by `dialogSeq`) so it starts
+  // from the target it was opened for.
+  const [shownEditTarget, setShownEditTarget] = useState<EditTarget | null>(null);
+  const [dialogSeq, setDialogSeq] = useState(0);
+  if (editTarget !== null && editTarget !== shownEditTarget) {
+    setShownEditTarget(editTarget);
+    setDialogSeq((n) => n + 1);
+  }
+  const [shownDayKey, setShownDayKey] = useState<string | null>(null);
+  if (openDayKey !== null && openDayKey !== shownDayKey) setShownDayKey(openDayKey);
   const [layers, setLayers] = useState<LayerFlags>({
     tasksDue: true,
     events: true,
@@ -747,6 +860,8 @@ function CalendarRoute(): ReactElement {
   const updateEventMut = useUpdateEvent();
 
   const [pendingMove, setPendingMove] = useState<PendingRecurringMove | null>(null);
+  const [shownPendingMove, setShownPendingMove] = useState<PendingRecurringMove | null>(null);
+  if (pendingMove !== null && pendingMove !== shownPendingMove) setShownPendingMove(pendingMove);
 
   /**
    * Send the event move.
@@ -991,23 +1106,106 @@ function CalendarRoute(): ReactElement {
   const loadErrorMessage = loadFailed
     ? t('calendar.load_error.message', { month: monthLabel })
     : null;
+  // The banner keeps its last message through its exit.
+  const [shownLoadError, setShownLoadError] = useState(loadErrorMessage);
+  if (loadErrorMessage !== null && loadErrorMessage !== shownLoadError) {
+    setShownLoadError(loadErrorMessage);
+  }
+  const loadErrorPresence = usePresence<HTMLDivElement>(loadErrorMessage !== null);
+  const isRefetching = tasksQuery.isFetching || eventsQuery.isFetching;
+  const fetchPresence = usePresence<HTMLDivElement>(
+    useSlowPending(isRefetching, FETCH_CUE_DELAY_MS),
+  );
 
   const goPrev = (): void => {
+    setNavDirection('prev');
     setCursor((c) => {
       const m = c.month - 1;
       return m < 0 ? { year: c.year - 1, month: 11 } : { year: c.year, month: m };
     });
   };
   const goNext = (): void => {
+    setNavDirection('next');
     setCursor((c) => {
       const m = c.month + 1;
       return m > 11 ? { year: c.year + 1, month: 0 } : { year: c.year, month: m };
     });
   };
   const goToday = (): void => {
-    setCursor({ year: today.getFullYear(), month: today.getMonth() });
+    const target = { year: today.getFullYear(), month: today.getMonth() };
+    const direction = directionBetween(cursor, target);
+    if (direction !== null) setNavDirection(direction);
+    setCursor(target);
     // Re-center the mobile month-scroll on today's week.
     setScrollToTodaySignal((n) => n + 1);
+  };
+
+  /**
+   * The cell that is the grid's tab stop: the last one keyboard focus
+   * reached while it is still on screen, else today, else the first day
+   * of the month. One stop rather than thirty keeps Tab moving through
+   * the page; the arrow keys move between days.
+   */
+  const inMonthKeys = cells.filter((c) => c.inMonth).map((c) => c.key);
+  const firstInMonthCell = cells.find((c) => c.inMonth);
+  const tabStopKey =
+    focusKey !== null && inMonthKeys.includes(focusKey)
+      ? focusKey
+      : inMonthKeys.includes(todayKeyValue)
+        ? todayKeyValue
+        : (inMonthKeys[0] ?? null);
+
+  const cellRef =
+    (key: string) =>
+    (el: HTMLDivElement | null): void => {
+      pointerDrag.dropCellRef(key)(el);
+      if (el) cellNodes.current.set(key, el);
+      else cellNodes.current.delete(key);
+    };
+
+  // Focus is the DOM's, so moving it to a cell that only exists after
+  // this render is a synchronisation with something outside React.
+  useLayoutEffect(() => {
+    const key = pendingFocusKey.current;
+    if (key === null) return;
+    const node = cellNodes.current.get(key);
+    if (!node) return;
+    pendingFocusKey.current = null;
+    node.focus();
+  });
+
+  const handleCellKeyDown = (e: KeyboardEvent<HTMLDivElement>, cell: MonthCell): void => {
+    // Keys pressed on a pill inside the cell belong to the pill: Enter on
+    // an event pill opens that event, not a new one on its day.
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
+      return;
+    }
+    let target: Date;
+    if (e.key === 'PageUp' || e.key === 'PageDown') {
+      const step = e.key === 'PageUp' ? -1 : 1;
+      const first = new Date(cell.date.getFullYear(), cell.date.getMonth() + step, 1);
+      const day = Math.min(cell.date.getDate(), daysInMonth(first.getFullYear(), first.getMonth()));
+      target = new Date(first.getFullYear(), first.getMonth(), day);
+    } else {
+      const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+      const delta = keyDayDelta(e.key, dowFromStart(cell.date, weekStart), rtl);
+      if (delta === null) return;
+      target = new Date(cell.date);
+      target.setDate(target.getDate() + delta);
+    }
+    e.preventDefault();
+    const targetKey = dateKey(target);
+    const targetMonth = { year: target.getFullYear(), month: target.getMonth() };
+    const direction = directionBetween(cursor, targetMonth);
+    if (direction !== null) {
+      setNavDirection(direction);
+      setCursor(targetMonth);
+    }
+    setFocusKey(targetKey);
+    pendingFocusKey.current = targetKey;
   };
 
   /**
@@ -1037,8 +1235,29 @@ function CalendarRoute(): ReactElement {
     () => new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', weekday: 'short' }),
     [locale],
   );
+  const cellDayFormat = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'full' }),
+    [locale],
+  );
+  const monthKey = `${cursor.year}-${cursor.month}`;
+  const slideClass =
+    navDirection === 'prev'
+      ? styles['slide--fromPrev']
+      : navDirection === 'next'
+        ? styles['slide--fromNext']
+        : undefined;
 
   const dragPayload = pointerDrag.drag?.payload ?? null;
+  // The copy outlives the gesture by one exit, so it keeps the last payload.
+  const [proxyPayload, setProxyPayload] = useState(dragPayload);
+  if (dragPayload !== null && dragPayload !== proxyPayload) setProxyPayload(dragPayload);
+  const proxyPresence = usePresence<HTMLDivElement>(dragPayload !== null);
+  const presenceRef = proxyPresence.ref;
+  const proxyRef = pointerDrag.proxyRef;
+  const setProxyNode = (node: HTMLDivElement | null): void => {
+    proxyRef.current = node;
+    presenceRef(node);
+  };
   /**
    * What the moving copy says about where it would land. A finger covers
    * part of the grid, so the day the drop would reach is named on the
@@ -1089,7 +1308,13 @@ function CalendarRoute(): ReactElement {
           >
             <ChevronLeft size={16} aria-hidden />
           </Button>
-          <h2 className={styles.monthLabel}>{monthLabel}</h2>
+          <h2 className={styles.monthLabel} aria-live="polite">
+            {/* Keyed so the label settles in with the grid rather than
+                swapping under it. */}
+            <span key={monthKey} className={cx(styles.monthLabel__text, slideClass)}>
+              {monthLabel}
+            </span>
+          </h2>
           <Button
             type="button"
             variant="ghost"
@@ -1169,16 +1394,31 @@ function CalendarRoute(): ReactElement {
         </div>
       ) : null}
 
-      <div className={calendarLayoutStyles.layout}>
+      <div className={cx(calendarLayoutStyles.layout, styles.layoutFill)}>
         {isMobile ? null : <CalendarsRail workspaces={railWorkspaces} selfUserId={selfUserId} />}
         <div className={styles.gridColumn}>
           {/* Above the grid rather than in a toast: the window is
               refetched on every month the scroll crosses, so a dead
               network would raise one toast per crossing. It goes away
               on its own the moment a refetch returns. */}
-          {loadErrorMessage !== null ? (
-            <div className={styles.loadError} role="status">
-              <p className={styles.loadError__message}>{loadErrorMessage}</p>
+          {fetchPresence.mounted ? (
+            <div
+              ref={fetchPresence.ref}
+              data-state={fetchPresence.state}
+              className={styles.fetchBar}
+              aria-hidden
+            >
+              <div className={styles.fetchBar__runner} />
+            </div>
+          ) : null}
+          {loadErrorPresence.mounted && shownLoadError !== null ? (
+            <div
+              ref={loadErrorPresence.ref}
+              data-state={loadErrorPresence.state}
+              className={styles.loadError}
+              role="status"
+            >
+              <p className={styles.loadError__message}>{shownLoadError}</p>
               <Button
                 type="button"
                 variant="default"
@@ -1221,12 +1461,29 @@ function CalendarRoute(): ReactElement {
                   </div>
                 ))}
               </div>
-              <div className={styles.grid}>
+              {/* Keyed by month, so a navigation mounts a fresh grid that
+                  slides in from the side it came from. A refetch keeps
+                  the key, and the arrival month has no direction yet. */}
+              <div
+                key={monthKey}
+                className={cx(styles.grid, slideClass)}
+                // The week count sets the row tracks the remaining height is shared by.
+                style={{ '--cal-weeks': cells.length / 7 } as CSSProperties}
+                aria-busy={tasksQuery.isPending || eventsQuery.isPending || undefined}
+              >
                 {cells.map((cell) => {
                   const dayTasks = byDate.get(cell.key) ?? [];
                   const dayEvents = eventsByDate.get(cell.key) ?? [];
                   const dayHolidays = holidaysByDate.get(cell.key) ?? [];
                   const totalCount = dayTasks.length + dayEvents.length;
+                  // The cell draws as many pills as its fixed height holds,
+                  // tasks first; the rest fold into the header's "+N more".
+                  const visibleTasks = dayTasks.slice(0, pillSlots);
+                  const visibleEvents = dayEvents.slice(
+                    0,
+                    Math.max(0, pillSlots - visibleTasks.length),
+                  );
+                  const hiddenCount = totalCount - visibleTasks.length - visibleEvents.length;
                   const isToday = cell.key === todayKeyValue;
                   const isDragOver = dragOverKey === cell.key;
                   // Render only the first holiday label on the cell (rare
@@ -1245,6 +1502,7 @@ function CalendarRoute(): ReactElement {
                     // and so cannot see the one the day cells get, and it
                     // is right about the filler ones either way.
                     // biome-ignore lint/a11y/noStaticElementInteractions: role is conditional on `cell.inMonth`; the handlers below are inert for the cells that have none.
+                    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: same — the label is set only alongside the conditional `button` role.
                     <div
                       key={cell.key}
                       // Registers the cell as a drop target: the gesture
@@ -1252,7 +1510,7 @@ function CalendarRoute(): ReactElement {
                       // what is under the pointer, which a finger — whose
                       // events stay aimed at the element it started on —
                       // would answer wrongly.
-                      ref={pointerDrag.dropCellRef(cell.key)}
+                      ref={cellRef(cell.key)}
                       // data-cell-key exposes the YYYY-MM-DD cell address for
                       // E2E drag-target selection (otherwise CSS-module hashes
                       // make cells un-addressable).
@@ -1261,14 +1519,27 @@ function CalendarRoute(): ReactElement {
                         if ((e.target as HTMLElement).closest('a, button')) return;
                         if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          if (cell.inMonth) handleCellClick(cell.key, e.shiftKey);
-                        }
+                      onKeyDown={(e) => handleCellKeyDown(e, cell)}
+                      onFocus={(e) => {
+                        if (e.target === e.currentTarget && cell.inMonth) setFocusKey(cell.key);
                       }}
                       role={cell.inMonth ? 'button' : undefined}
-                      tabIndex={cell.inMonth ? 0 : undefined}
+                      tabIndex={cell.inMonth ? (cell.key === tabStopKey ? 0 : -1) : undefined}
+                      aria-label={
+                        cell.inMonth
+                          ? primaryHoliday
+                            ? t('calendar.month_scroll.day_label_holiday', {
+                                date: cellDayFormat.format(cell.date),
+                                holiday: primaryHoliday.name,
+                                count: totalCount,
+                              })
+                            : t('calendar.month_scroll.day_label', {
+                                date: cellDayFormat.format(cell.date),
+                                count: totalCount,
+                              })
+                          : undefined
+                      }
+                      aria-current={isToday ? 'date' : undefined}
                       className={cx(
                         styles.cell,
                         cell.inMonth && styles['cell--inMonth'],
@@ -1296,137 +1567,36 @@ function CalendarRoute(): ReactElement {
                                 })
                               : primaryHoliday.name}
                           </span>
-                        ) : totalCount > 0 ? (
+                        ) : null}
+                        {/* In the header rather than on a line of its own, so
+                            every line below it is a pill. One count for what
+                            the cell had no room for, and a way to reach it:
+                            the day sheet lists the whole day. */}
+                        {hiddenCount > 0 ? (
+                          <button
+                            type="button"
+                            className={styles.morePill}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDayKey(cell.key);
+                            }}
+                          >
+                            {t('calendar.more', { count: hiddenCount })}
+                          </button>
+                        ) : primaryHoliday === null && totalCount > 0 ? (
                           <Badge tone="neutral" className={styles.countBadge}>
                             {totalCount}
                           </Badge>
                         ) : null}
                       </div>
-                      <ul className={styles.pillList}>
-                        {dayTasks.slice(0, 3).map((task) => {
-                          const sourceKey = `task-${task.id}@${cell.key}`;
-                          const dotColor =
-                            STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                            'var(--nf-color-fg-muted)';
-                          return (
-                            <li key={task.id}>
-                              <Link
-                                to="/tasks/$taskId"
-                                params={{ taskId: task.id }}
-                                title={`${task.title} · ${task.workspaceName}`}
-                                // The browser drags a link's URL of its own
-                                // accord, which would run alongside this
-                                // gesture and drop a hyperlink somewhere.
-                                draggable={false}
-                                onPointerDown={(e) => {
-                                  pointerDrag.pressSource(e, sourceKey, {
-                                    type: 'task',
-                                    taskId: task.id,
-                                    fromDate: cell.key,
-                                    label: task.title,
-                                    dotColor,
-                                  });
-                                }}
-                                className={cx(
-                                  styles.taskPill,
-                                  pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
-                                  pointerDrag.drag?.sourceKey === sourceKey &&
-                                    styles['pill--lifted'],
-                                )}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // The release that ended a drag becomes a
-                                  // click on the source; navigating on it
-                                  // would take the user off the calendar
-                                  // every time they moved a task.
-                                  if (pointerDrag.wasDragged()) e.preventDefault();
-                                }}
-                              >
-                                <span
-                                  aria-hidden
-                                  className={styles.taskPill__dot}
-                                  style={{ background: dotColor }}
-                                />
-                                <span className={styles.taskPill__title}>{task.title}</span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                        {dayTasks.length > 3 ? (
-                          <li className={styles.morePill}>
-                            {t('calendar.more', { count: dayTasks.length - 3 })}
-                          </li>
-                        ) : null}
-                        {dayEvents.slice(0, 2).map((ev) => {
-                          const pill = pillStyleForKind(ev.kind);
-                          const sourceKey = `ev-${ev.id}@${cell.key}`;
-                          return (
-                            <li key={`ev-${ev.id}`}>
-                              <button
-                                type="button"
-                                title={`${ev.title} · ${ev.workspaceName}`}
-                                aria-label={t('calendar.event_detail.open_label', {
-                                  title: ev.title,
-                                  workspace: ev.workspaceName,
-                                })}
-                                onPointerDown={(e) => {
-                                  pointerDrag.pressSource(e, sourceKey, {
-                                    type: 'event',
-                                    event: ev,
-                                    fromDate: cell.key,
-                                    label: ev.title,
-                                    dotColor: pill.markerColor,
-                                  });
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // A drag ends in a click on the pill it
-                                  // started from; opening the dialog then
-                                  // would bury the move under a form.
-                                  if (pointerDrag.wasDragged()) return;
-                                  handleEventOpen(ev);
-                                }}
-                                className={cx(
-                                  styles.eventPill,
-                                  ev.viewerAttending && styles['eventPill--viewerAttending'],
-                                  styles['eventPill--draggable'],
-                                  pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
-                                  pointerDrag.drag?.sourceKey === sourceKey &&
-                                    styles['pill--lifted'],
-                                )}
-                                style={pill}
-                              >
-                                <span
-                                  aria-hidden
-                                  className={styles.eventPill__marker}
-                                  style={{ background: pill.markerColor }}
-                                />
-                                <span className={styles.eventPill__title}>{ev.title}</span>
-                                {ev.attendeeCount > 0 ? (
-                                  <span
-                                    role="img"
-                                    className={styles.eventPill__attendees}
-                                    aria-label={t('calendar.event_attendee_count', {
-                                      count: ev.attendeeCount,
-                                    })}
-                                  >
-                                    <Users
-                                      aria-hidden
-                                      className={styles.eventPill__attendeesIcon}
-                                    />
-                                    {ev.attendeeCount}
-                                  </span>
-                                ) : null}
-                              </button>
-                            </li>
-                          );
-                        })}
-                        {dayEvents.length > 2 ? (
-                          <li className={styles.morePill}>
-                            {t('calendar.more', { count: dayEvents.length - 2 })}
-                          </li>
-                        ) : null}
-                      </ul>
+                      <DayPillList
+                        tasks={visibleTasks}
+                        events={visibleEvents}
+                        cellKey={cell.key}
+                        drag={pointerDrag}
+                        onEventOpen={handleEventOpen}
+                        {...(cell === firstInMonthCell ? { listRef: pillListRef } : {})}
+                      />
                     </div>
                   );
                 })}
@@ -1440,9 +1610,9 @@ function CalendarRoute(): ReactElement {
 
       {/* Mobile calendars-rail drawer — reuses the Drawer primitive for
           focus trap, overlay lock, Escape, and backdrop a11y. */}
-      {isMobile && railOpen ? (
+      {isMobile ? (
         <Drawer
-          open
+          open={railOpen}
           onClose={() => setRailOpen(false)}
           title={t('calendars_rail.title')}
           side="inline-end"
@@ -1451,17 +1621,19 @@ function CalendarRoute(): ReactElement {
         </Drawer>
       ) : null}
 
-      {/* The day the phone view has open. Each handler closes it first:
+      {/* The day open in full. Each handler closes it first:
           what it opens is a dialog or another route, and a sheet left
           standing behind either is a surface nobody asked to keep. */}
-      {isMobile && openDayKey !== null ? (
+      {shownDayKey !== null ? (
         <DayDetailSheet
-          dateKey={openDayKey}
+          open={openDayKey !== null}
+          side={isMobile ? 'block-end' : 'inline-end'}
+          dateKey={shownDayKey}
           locale={locale}
           zone={zone}
-          events={eventsByDate.get(openDayKey) ?? EMPTY_EVENTS}
-          tasks={byDate.get(openDayKey) ?? EMPTY_TASKS}
-          holidays={holidaysByDate.get(openDayKey) ?? EMPTY_HOLIDAYS}
+          events={eventsByDate.get(shownDayKey) ?? EMPTY_EVENTS}
+          tasks={byDate.get(shownDayKey) ?? EMPTY_TASKS}
+          holidays={holidaysByDate.get(shownDayKey) ?? EMPTY_HOLIDAYS}
           stateColor={stateColor}
           onClose={() => setOpenDayKey(null)}
           onEventOpen={(event) => {
@@ -1479,15 +1651,16 @@ function CalendarRoute(): ReactElement {
         />
       ) : null}
 
-      {editTarget !== null ? (
+      {shownEditTarget !== null ? (
         <EventDialog
-          open
+          key={dialogSeq}
+          open={editTarget !== null}
           zone={zone}
           workspaceId={
-            editTarget.mode === 'edit' ? editTarget.event.workspaceId : (activeWsId ?? '')
+            shownEditTarget.mode === 'edit' ? shownEditTarget.event.workspaceId : (activeWsId ?? '')
           }
           projects={allProjects}
-          mode={toDialogMode(editTarget)}
+          mode={toDialogMode(shownEditTarget)}
           onClose={() => setEditTarget(null)}
           onSaved={handleSaved}
         />
@@ -1497,13 +1670,16 @@ function CalendarRoute(): ReactElement {
           the edit dialog asks before it saves. Cancelling sends nothing:
           the pill never left its day, because nothing here moves until
           the server has agreed. */}
-      {pendingMove !== null ? (
+      {shownPendingMove !== null ? (
         <RecurringScopeDialog
-          open
+          // Remounted per move, so each question starts from its default.
+          key={`${shownPendingMove.event.id}@${shownPendingMove.occurrenceStart}:${shownPendingMove.delta}`}
+          open={pendingMove !== null}
           action="save"
           pending={updateEventMut.isPending}
           onCancel={() => setPendingMove(null)}
           onConfirm={(scope) => {
+            if (pendingMove === null) return;
             moveEvent(pendingMove.event, pendingMove.delta, {
               scope,
               occurrenceStart: pendingMove.occurrenceStart,
@@ -1516,21 +1692,26 @@ function CalendarRoute(): ReactElement {
           clips its own overflow, and positioned by the gesture itself so
           a pointer that moves every frame does not re-render the month
           every frame. */}
-      {dragPayload !== null
+      {proxyPresence.mounted && proxyPayload !== null
         ? createPortal(
-            <div ref={pointerDrag.proxyRef} className={styles.dragProxy} aria-hidden>
+            <div
+              ref={setProxyNode}
+              data-state={proxyPresence.state}
+              className={styles.dragProxy}
+              aria-hidden
+            >
               <span
                 className={cx(
                   styles.dragProxy__marker,
                   // A task is marked by a dot and an event by a diamond
                   // on the grid; the copy keeps whichever it came from,
                   // so what is moving stays recognisable.
-                  dragPayload.type === 'task' && styles['dragProxy__marker--dot'],
+                  proxyPayload.type === 'task' && styles['dragProxy__marker--dot'],
                 )}
-                style={{ background: dragPayload.dotColor }}
+                style={{ background: proxyPayload.dotColor }}
               />
-              <span className={styles.dragProxy__title}>{dragPayload.label}</span>
-              {dragTargetLabel !== null ? (
+              <span className={styles.dragProxy__title}>{proxyPayload.label}</span>
+              {dragPayload !== null && dragTargetLabel !== null ? (
                 <span className={styles.dragProxy__target}>{dragTargetLabel}</span>
               ) : null}
             </div>,
@@ -1542,6 +1723,162 @@ function CalendarRoute(): ReactElement {
       </p>
     </section>
   );
+}
+
+/** One pill a desktop cell draws: a task due that day, or an event covering it. */
+type DayPill = { kind: 'task'; task: CalendarTask } | { kind: 'event'; event: CalendarEvent };
+
+interface DayPillListProps {
+  cellKey: string;
+  /** The tasks the cell has room for, already cut to fit. */
+  tasks: CalendarTask[];
+  /** The events the cell has room for, already cut to fit. */
+  events: CalendarEvent[];
+  drag: PointerDragHandle<CalendarDragPayload>;
+  onEventOpen: (event: CalendarEvent) => void;
+  /** Set on one cell only: the list the grid measures to size every cell's pill budget. */
+  listRef?: (el: HTMLUListElement | null) => (() => void) | undefined;
+}
+
+/**
+ * The pills of one desktop cell.
+ *
+ * Rendered through {@link usePresenceList}, so a pill that leaves the day
+ * — deleted, moved by a drop, hidden by a layer or calendar toggle —
+ * collapses and fades instead of vanishing, and one that arrives slides
+ * in. A refetch with the same members keeps every node and plays nothing.
+ */
+function DayPillList({
+  cellKey,
+  tasks,
+  events,
+  drag: pointerDrag,
+  onEventOpen,
+  listRef,
+}: DayPillListProps): ReactElement {
+  const { t } = useTranslation('common');
+  const pills: DayPill[] = [
+    ...tasks.map((task): DayPill => ({ kind: 'task', task })),
+    ...events.map((event): DayPill => ({ kind: 'event', event })),
+  ];
+  const { entries, onExited } = usePresenceList(pills, (p) =>
+    p.kind === 'task' ? `task-${p.task.id}` : `ev-${p.event.id}`,
+  );
+
+  return (
+    <ul ref={listRef} className={styles.pillList}>
+      {entries.map(({ key, item, present }) => (
+        <PresenceItem
+          key={key}
+          as="li"
+          present={present}
+          onExited={() => onExited(key)}
+          className={motion.enter}
+        >
+          {item.kind === 'task' ? renderTaskPill(item.task) : renderEventPill(item.event)}
+        </PresenceItem>
+      ))}
+    </ul>
+  );
+
+  function renderTaskPill(task: CalendarTask): ReactElement {
+    const sourceKey = `task-${task.id}@${cellKey}`;
+    const dotColor =
+      STATE_COLOR[task.derivedState as TaskDerivedState] ?? 'var(--nf-color-fg-muted)';
+    return (
+      <Link
+        to="/tasks/$taskId"
+        params={{ taskId: task.id }}
+        title={`${task.title} · ${task.workspaceName}`}
+        // The browser drags a link's URL of its own
+        // accord, which would run alongside this
+        // gesture and drop a hyperlink somewhere.
+        draggable={false}
+        onPointerDown={(e) => {
+          pointerDrag.pressSource(e, sourceKey, {
+            type: 'task',
+            taskId: task.id,
+            fromDate: cellKey,
+            label: task.title,
+            dotColor,
+          });
+        }}
+        className={cx(
+          styles.taskPill,
+          pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
+          pointerDrag.drag?.sourceKey === sourceKey && styles['pill--lifted'],
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          // The release that ended a drag becomes a
+          // click on the source; navigating on it
+          // would take the user off the calendar
+          // every time they moved a task.
+          if (pointerDrag.wasDragged()) e.preventDefault();
+        }}
+      >
+        <span aria-hidden className={styles.taskPill__dot} style={{ background: dotColor }} />
+        <span className={styles.taskPill__title}>{task.title}</span>
+      </Link>
+    );
+  }
+
+  function renderEventPill(ev: CalendarEvent): ReactElement {
+    const pill = pillStyleForKind(ev.kind);
+    const sourceKey = `ev-${ev.id}@${cellKey}`;
+    return (
+      <button
+        type="button"
+        title={`${ev.title} · ${ev.workspaceName}`}
+        aria-label={t('calendar.event_detail.open_label', {
+          title: ev.title,
+          workspace: ev.workspaceName,
+        })}
+        onPointerDown={(e) => {
+          pointerDrag.pressSource(e, sourceKey, {
+            type: 'event',
+            event: ev,
+            fromDate: cellKey,
+            label: ev.title,
+            dotColor: pill.markerColor,
+          });
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          // A drag ends in a click on the pill it
+          // started from; opening the dialog then
+          // would bury the move under a form.
+          if (pointerDrag.wasDragged()) return;
+          onEventOpen(ev);
+        }}
+        className={cx(
+          styles.eventPill,
+          ev.viewerAttending && styles['eventPill--viewerAttending'],
+          styles['eventPill--draggable'],
+          pointerDrag.holdingKey === sourceKey && styles['pill--holding'],
+          pointerDrag.drag?.sourceKey === sourceKey && styles['pill--lifted'],
+        )}
+        style={pill}
+      >
+        <span
+          aria-hidden
+          className={styles.eventPill__marker}
+          style={{ background: pill.markerColor }}
+        />
+        <span className={styles.eventPill__title}>{ev.title}</span>
+        {ev.attendeeCount > 0 ? (
+          <span
+            role="img"
+            className={styles.eventPill__attendees}
+            aria-label={t('calendar.event_attendee_count', { count: ev.attendeeCount })}
+          >
+            <Users aria-hidden className={styles.eventPill__attendeesIcon} />
+            {ev.attendeeCount}
+          </span>
+        ) : null}
+      </button>
+    );
+  }
 }
 
 /** Convert the route-local EditTarget shape to EventDialog's mode prop. */

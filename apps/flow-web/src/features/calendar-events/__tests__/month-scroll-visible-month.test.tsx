@@ -33,6 +33,13 @@ const ROW_PX = 140;
 const HEADER_PX = 24;
 
 /**
+ * The view lays out a year either side of today, so which month a given
+ * offset lands in depends on the date. Pinned, the scroll offsets below
+ * hit the same rows on every run.
+ */
+const NOW = new Date(2026, 9, 29, 12, 0, 0);
+
+/**
  * The fixtures carry no times, so the host zone keeps this file about
  * the scroll position rather than about day boundaries.
  */
@@ -243,6 +250,8 @@ async function scrollTo(container: HTMLElement, top: number): Promise<void> {
 let consoleError: Mock<typeof console.error>;
 
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   stubElementMetrics();
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -250,6 +259,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 /**
@@ -309,19 +319,34 @@ describe('MonthScroll visible month', () => {
     onVisibleMonthChange.mockClear();
 
     const start = scrollBody(container).scrollTop;
-    await scrollTo(container, start + 2400);
-    const first = pinnedMonth(container);
+    const rested: string[] = [];
+    const rest = async (top: number): Promise<string | null> => {
+      await scrollTo(container, top);
+      const month = pinnedMonth(container);
+      if (month !== null && month !== rested[rested.length - 1]) rested.push(month);
+      return month;
+    };
 
-    // Coming to rest at the same offset: the view has not moved to
-    // another month, so there is nothing further to report.
-    await scrollTo(container, start + 2400);
-    expect(onVisibleMonthChange).toHaveBeenCalledTimes(1);
+    const first = await rest(start + 2400);
+    expect(onVisibleMonthChange.mock.calls.map((c) => c[0])).toEqual([first]);
 
-    await scrollTo(container, start + 4800);
-    const second = pinnedMonth(container);
+    // The rows that mounted at the destination are measured by now, and
+    // they are taller than the estimates the first landing was laid out
+    // with, so the same offset can name the month before. That is a real
+    // crossing and is reported once, as the month actually pinned.
+    await rest(start + 2400);
+    expect(onVisibleMonthChange.mock.calls.map((c) => c[0])).toEqual(rested);
+
+    // With the layout measured, coming to rest at the same offset again
+    // is not a move to another month: nothing further to report.
+    const reported = onVisibleMonthChange.mock.calls.length;
+    await rest(start + 2400);
+    expect(onVisibleMonthChange).toHaveBeenCalledTimes(reported);
+
+    const second = await rest(start + 4800);
     expect(second).not.toBe(first);
-    expect(onVisibleMonthChange).toHaveBeenCalledTimes(2);
-    expect(onVisibleMonthChange.mock.calls.map((c) => c[0])).toEqual([first, second]);
+    expect(onVisibleMonthChange).toHaveBeenCalledTimes(reported + 1);
+    expect(onVisibleMonthChange.mock.calls.map((c) => c[0])).toEqual(rested);
   });
 
   it('collapses a run of crossings into the month it came to rest on', async () => {

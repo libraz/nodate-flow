@@ -24,13 +24,16 @@
  * reserved for genuinely fatal failures elsewhere on the page.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
-import { type ReactElement, useRef, useState } from 'react';
+import { type ReactElement, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
-
 import { ApiError, formatApiError } from '../../../lib/api-error';
 import EventPicker from './event-picker';
 import { useCollapsibleState } from './hooks/use-collapsible-state';
@@ -95,11 +98,12 @@ function LinkedEventsSectionImpl({
   const { data } = useLinkedEventsQuery(taskId);
   const link = useLinkEvent();
   const unlink = useUnlinkEvent();
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const links = data.links;
   const total = data.total;
+  // Keyed by event: an optimistic row keeps its identity when the server id replaces it.
+  const { entries, onExited } = usePresenceList(links, (entry) => entry.eventId ?? entry.id);
   const initialCollapsed = links.length > COLLAPSE_THRESHOLD;
   const { collapsed, toggle } = useCollapsibleState(COLLAPSE_KEY, initialCollapsed);
 
@@ -143,7 +147,51 @@ function LinkedEventsSectionImpl({
       { taskId, linkId },
       {
         onSuccess: () => {
-          toaster.show({ tone: 'success', message: t('toast.unlinked', { title }) });
+          const kind: LinkKind | null =
+            removed?.relation === 'blocks' || removed?.relation === 'contributes_to'
+              ? removed.relation
+              : null;
+          const eventId = removed?.eventId;
+          if (removed === undefined || kind === null || !eventId) {
+            toaster.show({ tone: 'success', message: t('toast.unlinked', { title }) });
+            return;
+          }
+          toaster.show({
+            tone: 'info',
+            message: t('toast.unlinked', { title }),
+            action: {
+              label: t('common:common.undo'),
+              onAction: () => {
+                link.mutate(
+                  {
+                    taskId,
+                    eventId,
+                    kind,
+                    preview: {
+                      title,
+                      ...(removed.calendarId !== undefined
+                        ? { calendarId: removed.calendarId }
+                        : {}),
+                      ...(removed.eventStartAt !== undefined
+                        ? { eventStartAt: removed.eventStartAt }
+                        : {}),
+                      ...(removed.eventAllDay !== undefined
+                        ? { eventAllDay: removed.eventAllDay }
+                        : {}),
+                    },
+                  },
+                  {
+                    onError: (relinkErr) => {
+                      toaster.show({
+                        tone: 'danger',
+                        message: formatApiError(relinkErr, t, 'toast.linkFailed'),
+                      });
+                    },
+                  },
+                );
+              },
+            },
+          });
         },
         onError: (err) => {
           toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.unlinkFailed') });
@@ -154,7 +202,7 @@ function LinkedEventsSectionImpl({
 
   const titleId = `${COLLAPSE_KEY}-title`;
   const bodyId = `${COLLAPSE_KEY}-body`;
-  const isEmpty = links.length === 0;
+  const isEmpty = entries.length === 0;
 
   return (
     <section className={styles.section} aria-labelledby={titleId}>
@@ -185,36 +233,24 @@ function LinkedEventsSectionImpl({
           </h3>
           <span className={styles.count}>{t('section.count', { count: total })}</span>
         </button>
-        <div className={styles.headerActions} style={{ position: 'relative' }}>
-          <Button
-            ref={triggerRef}
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-haspopup="dialog"
-            aria-expanded={pickerOpen}
-            onClick={() => {
-              setPickerOpen((prev) => !prev);
-            }}
-          >
-            {t('trigger.linkEvent')}
-          </Button>
+        <div className={styles.headerActions}>
           <EventPicker
             workspaceId={workspaceId}
             taskId={taskId}
             alreadyLinkedEventIds={linkedEventIds}
             locale={locale}
-            anchorRef={triggerRef}
-            isOpen={pickerOpen}
-            onClose={() => {
-              setPickerOpen(false);
-            }}
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
             onLink={handleLink}
-          />
+          >
+            <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog">
+              {t('trigger.linkEvent')}
+            </Button>
+          </EventPicker>
         </div>
       </div>
 
-      <div id={bodyId} className={styles.body} hidden={collapsed}>
+      <Collapse open={!collapsed} id={bodyId}>
         {isEmpty ? (
           <LinkedEventsEmpty
             onTriggerClick={() => {
@@ -223,18 +259,25 @@ function LinkedEventsSectionImpl({
           />
         ) : (
           <ul className={styles.list}>
-            {links.map((entry) => (
-              <LinkedEventRow
-                key={entry.id}
-                link={entry}
-                locale={locale}
-                onUnlink={handleUnlink}
-                isOptimistic={entry.id.startsWith('optimistic-')}
-              />
+            {entries.map(({ key, item: entry, present }) => (
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => onExited(key)}
+                className={motion.enter}
+              >
+                <LinkedEventRow
+                  link={entry}
+                  locale={locale}
+                  onUnlink={handleUnlink}
+                  isOptimistic={entry.id.startsWith('optimistic-')}
+                />
+              </PresenceItem>
             ))}
           </ul>
         )}
-      </div>
+      </Collapse>
     </section>
   );
 }

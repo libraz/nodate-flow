@@ -1,12 +1,18 @@
 {
   "common": {
+    "loading": "加载中…",
     "breadcrumb": "面包屑导航",
     "unknown_role": "未知角色",
     "deactivated_user": "已停用的用户",
     "network_error": "网络错误。请检查您的连接并重试。",
     "date": {
-      "placeholder": "请选择日期"
-    }
+      "placeholder": "请选择日期",
+      "clear": "清除",
+      "monthYear": "{year, number, ::group-off}年{month}月",
+      "weekdays": ["一", "二", "三", "四", "五", "六", "日"]
+    },
+    "undo": "撤销",
+    "cancel": "取消"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -356,6 +362,10 @@
     "errors": {
       "visibility_failed": "无法切换日历的显示状态",
       "leave_failed": "无法退出该日历"
+    },
+    "leave_confirm": {
+      "title": "要退出该日历吗？",
+      "message": "要退出“{name}”吗？在他人重新添加你之前将无法访问。"
     }
   },
   "not_found": {
@@ -392,7 +402,6 @@
       "slug": "标识",
       "description": "描述",
       "submit": "保存",
-      "submitting": "保存中…",
       "cancel": "取消",
       "close": "关闭"
     },
@@ -489,7 +498,8 @@
       "go_to_login": "前往登录",
       "error_title": "邀请不可用",
       "error_network": "无法检查此邀请。请检查网络连接后重试。",
-      "error_back": "返回首页"
+      "error_back": "返回首页",
+      "revoke_confirm": "要撤销此邀请链接吗？尚未使用的人将无法再通过该链接加入。"
     },
     "roles": {
       "owner": "所有者",
@@ -522,8 +532,7 @@
       "name_placeholder": "Acme、个人、Team Nova…",
       "slug_placeholder": "acme",
       "slug_hint": "仅可使用小写字母、数字和连字符。",
-      "submit": "创建工作区",
-      "submitting": "创建中…"
+      "submit": "创建工作区"
     }
   },
   "projects": {
@@ -561,7 +570,6 @@
       "description": "描述",
       "visibility": "可见性",
       "submit": "保存",
-      "submitting": "保存中…",
       "cancel": "取消"
     },
     "visibility": {
@@ -591,7 +599,8 @@
       "empty": "暂无成员。",
       "remove": "移除",
       "removed": "已移除成员",
-      "remove_failed": "移除成员失败"
+      "remove_failed": "移除成员失败",
+      "remove_confirm": "将 {name} 从此项目移除？"
     },
     "roles": {
       "lead": "负责人",
@@ -738,7 +747,9 @@
       "update_partial": "{total} 项任务中有 {failed} 项更新失败。",
       "deleted": "已删除任务。",
       "delete_failed": "删除任务失败。",
-      "delete_partial": "{total} 项任务中有 {failed} 项删除失败。"
+      "delete_partial": "{total} 项任务中有 {failed} 项删除失败。",
+      "delete_confirm_title": "删除 {count} 个任务？",
+      "delete_confirm": "所选的 {count} 个任务将被永久删除，此操作无法撤销。"
     },
     "inline": {
       "edit_title": "编辑标题",
@@ -833,7 +844,8 @@
         "searchEmpty": "无匹配结果。",
         "searchHint": "输入以搜索本工作区的任务。",
         "addError": "添加依赖失败。",
-        "removeError": "移除依赖失败。"
+        "removeError": "移除依赖失败。",
+        "removed": "已移除与“{title}”的依赖关系。"
       },
       "infer_state": {
         "title": "建议的下一步",
@@ -1001,7 +1013,9 @@
           "body": "草稿将被归档，原始任务与信号保持不变。",
           "confirm": "丢弃",
           "cancel": "取消"
-        }
+        },
+        "prev_page": "上一页",
+        "next_page": "下一页"
       }
     }
   },

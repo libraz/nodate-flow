@@ -28,13 +28,18 @@
   padding-inline-end: var(--nf-space-1);
 }
 
+/* Overflow scrolls; it must never squeeze a child (the kind picker). */
+.bodyScroll > * {
+  flex-shrink: 0;
+}
+
 /*
  * Wrapper around the kind-specific morph zone. Each kind ('task',
  * 'event', 'block', 'free', 'milestone') renders a different field set
  * with substantially different intrinsic heights — task needs project +
  * priority, event needs showAs + location, block needs preset chips +
  * optional custom label. Without a fixed `min-block-size` on the
- * wrapper, the whole dialog body reflows during the 180 ms fade as the
+ * wrapper, the whole dialog body reflows during the enter animation as the
  * outgoing block collapses to 0 and the incoming block expands from 0.
  *
  * The value below is sized for the tallest variant (Block, when the
@@ -50,24 +55,7 @@
 }
 
 .kindBlock {
-  animation: morphIn var(--nf-duration-base) var(--nf-ease-emphasized);
-}
-
-@keyframes morphIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kindBlock {
-    animation: none;
-  }
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .timeRow {
@@ -121,6 +109,15 @@
   font-size: var(--nf-text-xs);
   line-height: var(--nf-leading-relaxed);
   color: var(--nf-color-fg-muted);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.pendingNotice[data-state="closed"] {
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.blockCustomInput {
+  margin-block-start: var(--nf-space-2);
 }
 
 .footerActions {

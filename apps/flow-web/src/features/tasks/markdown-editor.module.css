@@ -1,0 +1,56 @@
+/* MarkdownEditor — toolbar and preview pane. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1);
+  align-items: center;
+}
+
+/* Square icon buttons: the aspect ratio gives every glyph an equal hit target. */
+.toolButton {
+  aspect-ratio: 1;
+  padding: var(--nf-space-1);
+}
+
+.toolBold {
+  font-weight: var(--nf-weight-bold);
+}
+
+.toolItalic {
+  font-style: italic;
+}
+
+.toolMono {
+  font-family: var(--nf-font-mono);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Write and preview swap on toggle; the keyed pane replays a short fade. */
+.write,
+.preview {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.preview {
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  padding: var(--nf-space-3);
+  /* Keeps the pane as tall as the textarea it replaces. */
+  min-block-size: calc(var(--nf-space-6) * var(--editor-rows, 6));
+  background: var(--nf-color-surface);
+}
+
+.previewEmpty {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}

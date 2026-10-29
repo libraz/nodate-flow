@@ -64,10 +64,16 @@
 
 .row {
   border-block-start: 1px solid var(--nf-color-border);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .cell {
   padding: var(--nf-space-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .cellActions {

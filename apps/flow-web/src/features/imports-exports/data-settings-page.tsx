@@ -33,11 +33,12 @@
 import { WsErrors } from '@nodate-flow/sdk';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import FormField from '@nodate-flow/ui/primitives/form-field';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Select from '@nodate-flow/ui/primitives/select';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { getRouteApi, Link } from '@tanstack/react-router';
@@ -47,6 +48,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type Project, useProjectsQuery } from '../projects/api';
+import ui from '../settings/settings-ui.module.css';
 import {
   type ExportFormat,
   type ImportJob,
@@ -157,7 +159,7 @@ function ProgressBar({ processed, total }: ProgressBarProps): ReactElement {
         aria-valuemax={safeTotal || 1}
         aria-valuenow={processed}
       >
-        <div className={styles.progressFill} style={{ inlineSize: `${pct}%` }} />
+        <div className={styles.progressFill} style={{ scale: `${pct / 100} 1` }} />
       </div>
       <span className={styles.progressLabel}>
         {processed} / {safeTotal}
@@ -170,14 +172,24 @@ interface ImportRowProps {
   job: ImportJob;
   locale: string;
   cancelPending: boolean;
+  cancelling: boolean;
+  /** True for a row that arrived after the list first painted. */
+  arrived: boolean;
   onCancel: (job: ImportJob) => void;
 }
 
-function ImportRow({ job, locale, cancelPending, onCancel }: ImportRowProps): ReactElement {
+function ImportRow({
+  job,
+  locale,
+  cancelPending,
+  cancelling,
+  arrived,
+  onCancel,
+}: ImportRowProps): ReactElement {
   const { t } = useTranslation('settings');
   const isInflight = job.status === 'pending' || job.status === 'running';
   return (
-    <tr>
+    <tr className={arrived ? ui.rowEnter : undefined}>
       <td>
         <Badge tone="neutral">{t(sourceLabelKey(job.source))}</Badge>
       </td>
@@ -193,7 +205,7 @@ function ImportRow({ job, locale, cancelPending, onCancel }: ImportRowProps): Re
       <td>
         <ProgressBar processed={job.processedItems} total={job.totalItems} />
       </td>
-      <td>{job.failedItems}</td>
+      <td className={ui.numeric}>{job.failedItems}</td>
       <td className={styles.timestamp}>{formatTimestamp(job.startedAt, locale)}</td>
       <td className={styles.timestamp}>{formatTimestamp(job.completedAt, locale)}</td>
       <td className={styles.actionsCell}>
@@ -204,6 +216,7 @@ function ImportRow({ job, locale, cancelPending, onCancel }: ImportRowProps): Re
             size="sm"
             onClick={() => onCancel(job)}
             disabled={cancelPending}
+            aria-busy={cancelling}
           >
             {t('settings.data.imports.cancel')}
           </Button>
@@ -405,7 +418,13 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
         )}
       </FormField>
       <div className={styles.createActions}>
-        <Button type="submit" variant="primary" size="sm" disabled={submitDisabled}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          disabled={submitDisabled}
+          aria-busy={create.isPending}
+        >
           {t('settings.data.imports.create.submit')}
         </Button>
       </div>
@@ -419,12 +438,17 @@ interface ImportsCardProps {
 
 function ImportsCard({ workspaceId }: ImportsCardProps): ReactElement {
   const { t, i18n } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   const importsQuery = useImportsQuery(workspaceId);
   const cancel = useCancelImportMutation();
+  const cancellingId = cancel.isPending ? cancel.variables?.importId : undefined;
 
   const [createOpen, setCreateOpen] = useState(false);
+  // Jobs present when the list first loaded; anything else fades in as it arrives.
+  const [initialIds, setInitialIds] = useState<ReadonlySet<string> | null>(null);
+  if (initialIds === null && importsQuery.data !== undefined) {
+    setInitialIds(new Set(importsQuery.data.map((job) => job.id)));
+  }
 
   const handleCancelImport = (job: ImportJob): void => {
     void (async (): Promise<void> => {
@@ -458,69 +482,84 @@ function ImportsCard({ workspaceId }: ImportsCardProps): ReactElement {
   const jobs = sortByCreatedDesc(importsQuery.data ?? []);
 
   return (
-    <Card>
-      <section className={styles.section}>
-        <div className={styles.toolbar}>
-          <h2 className={styles.sectionTitle}>{t('settings.data.imports.title')}</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setCreateOpen((prev) => !prev)}
-            aria-expanded={createOpen}
-          >
-            {t('settings.data.imports.new')}
-          </Button>
+    <section className={ui.section} aria-labelledby="data-imports-title">
+      <div className={styles.toolbar}>
+        <h2 id="data-imports-title" className={ui.sectionTitle}>
+          {t('settings.data.imports.title')}
+        </h2>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => setCreateOpen((prev) => !prev)}
+          aria-expanded={createOpen}
+        >
+          {t('settings.data.imports.new')}
+        </Button>
+      </div>
+
+      {createOpen ? (
+        <Suspense fallback={<Skeleton className={styles.skeletonForm} />}>
+          <ImportCreateForm workspaceId={workspaceId} />
+        </Suspense>
+      ) : null}
+
+      {importsQuery.isPending ? (
+        <div className={ui.skeletonStack} aria-hidden="true">
+          <Skeleton className={styles.skeletonRow} />
+          <Skeleton className={styles.skeletonRow} />
+          <Skeleton className={styles.skeletonRow} />
         </div>
-
-        {createOpen ? (
-          <Suspense
-            fallback={
-              <div className={styles.spinnerRow}>
-                <Spinner label={tCommon('common.loading')} />
-              </div>
-            }
-          >
-            <ImportCreateForm workspaceId={workspaceId} />
-          </Suspense>
-        ) : null}
-
-        {importsQuery.isLoading ? (
-          <div className={styles.spinnerRow}>
-            <Spinner label={tCommon('common.loading')} />
-          </div>
-        ) : jobs.length === 0 ? (
-          <p className={styles.empty}>{t('settings.data.imports.empty')}</p>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>{t('settings.data.imports.col.source')}</th>
-                  <th>{t('settings.data.imports.col.status')}</th>
-                  <th>{t('settings.data.imports.col.progress')}</th>
-                  <th>{t('settings.data.imports.col.failed')}</th>
-                  <th>{t('settings.data.imports.col.started')}</th>
-                  <th>{t('settings.data.imports.col.completed')}</th>
-                  <th className={styles.actionsCell}>{t('settings.data.imports.col.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <ImportRow
-                    key={job.id}
-                    job={job}
-                    locale={locale}
-                    cancelPending={cancel.isPending}
-                    onCancel={handleCancelImport}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </Card>
+      ) : importsQuery.isError ? (
+        <EmptyState
+          titleAs="p"
+          title={t('settings.data.imports.load_error')}
+          className={ui.empty}
+          action={
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void importsQuery.refetch();
+              }}
+              aria-busy={importsQuery.isFetching}
+            >
+              {t('settings.data.imports.retry')}
+            </Button>
+          }
+        />
+      ) : jobs.length === 0 ? (
+        <EmptyState titleAs="p" title={t('settings.data.imports.empty')} className={ui.empty} />
+      ) : (
+        <div className={ui.tableWrap}>
+          <table className={ui.table}>
+            <thead>
+              <tr>
+                <th>{t('settings.data.imports.col.source')}</th>
+                <th>{t('settings.data.imports.col.status')}</th>
+                <th>{t('settings.data.imports.col.progress')}</th>
+                <th>{t('settings.data.imports.col.failed')}</th>
+                <th>{t('settings.data.imports.col.started')}</th>
+                <th>{t('settings.data.imports.col.completed')}</th>
+                <th className={ui.alignEnd}>{t('settings.data.imports.col.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((job) => (
+                <ImportRow
+                  key={job.id}
+                  job={job}
+                  locale={locale}
+                  cancelPending={cancel.isPending}
+                  cancelling={cancellingId === job.id}
+                  arrived={initialIds !== null && !initialIds.has(job.id)}
+                  onCancel={handleCancelImport}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -570,49 +609,39 @@ function ExportsCard({ workspaceId }: ExportsCardProps): ReactElement {
     );
   };
 
-  const handleFormatChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setFormat(event.target.value as ExportFormat);
-  };
-
   return (
-    <Card>
-      <form className={styles.section} onSubmit={handleSubmit}>
-        <h2 className={styles.sectionTitle}>{t('settings.data.export.title')}</h2>
-        <p className={styles.sectionDescription}>{t('settings.data.export.description')}</p>
-        <div className={styles.exportRow}>
-          <fieldset className={styles.formatGroup}>
-            <legend className={styles.formatLegend}>
-              {t('settings.data.export.format.label')}
-            </legend>
-            <div className={styles.formatChoices}>
-              <label className={styles.formatLabel}>
-                <input
-                  type="radio"
-                  name="export-format"
-                  value="csv"
-                  checked={format === 'csv'}
-                  onChange={handleFormatChange}
-                />
-                {t('settings.data.export.format.csv')}
-              </label>
-              <label className={styles.formatLabel}>
-                <input
-                  type="radio"
-                  name="export-format"
-                  value="json"
-                  checked={format === 'json'}
-                  onChange={handleFormatChange}
-                />
-                {t('settings.data.export.format.json')}
-              </label>
-            </div>
-          </fieldset>
-          <Button type="submit" variant="primary" size="sm" disabled={exportTasks.isPending}>
-            {t('settings.data.export.submit')}
-          </Button>
+    <form className={ui.section} onSubmit={handleSubmit} aria-labelledby="data-export-title">
+      <div className={ui.sectionHeader}>
+        <h2 id="data-export-title" className={ui.sectionTitle}>
+          {t('settings.data.export.title')}
+        </h2>
+        <p className={ui.sectionDescription}>{t('settings.data.export.description')}</p>
+      </div>
+      <div className={styles.exportRow}>
+        <div className={styles.formatGroup}>
+          <span className={styles.formatLegend} id="data-export-format">
+            {t('settings.data.export.format.label')}
+          </span>
+          <SegmentedControl<ExportFormat>
+            value={format}
+            onChange={setFormat}
+            options={[
+              { value: 'csv', label: t('settings.data.export.format.csv') },
+              { value: 'json', label: t('settings.data.export.format.json') },
+            ]}
+            ariaLabel={t('settings.data.export.format.label')}
+          />
         </div>
-      </form>
-    </Card>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={exportTasks.isPending}
+          aria-busy={exportTasks.isPending}
+        >
+          {t('settings.data.export.submit')}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -622,13 +651,15 @@ export default function DataSettingsPage(): ReactElement {
   const { id } = routeApi.useParams();
 
   return (
-    <section className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('settings.data.title')}</h1>
-        <p className={styles.description}>{t('settings.data.description')}</p>
-      </div>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('settings.data.title')}</h1>
+          <p className={ui.lede}>{t('settings.data.description')}</p>
+        </div>
+      </header>
       <ExportsCard workspaceId={id} />
       <ImportsCard workspaceId={id} />
-    </section>
+    </div>
   );
 }

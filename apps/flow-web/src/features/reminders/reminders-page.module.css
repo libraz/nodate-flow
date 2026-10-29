@@ -30,6 +30,8 @@
 }
 
 .count {
+  /* Holds its line while loading so the header does not grow when data lands. */
+  min-block-size: 1lh;
   margin: 0;
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
@@ -57,7 +59,7 @@
 .groupTitle {
   margin: 0;
   font-size: var(--nf-text-base);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
 }
 
@@ -77,6 +79,7 @@
 }
 
 .row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--nf-space-3);
@@ -84,6 +87,17 @@
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-surface);
+  transition:
+    border-color var(--nf-duration-instant) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  border-color: var(--nf-color-border-strong);
+}
+
+.row:has(.rowTitle:focus-visible) {
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .rowMain {
@@ -103,14 +117,27 @@
 
 .rowTitle {
   font-size: var(--nf-text-sm);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.rowTitle:hover {
-  text-decoration: underline;
+/* The whole card is the hit area; meta text stays above it for selection. */
+.rowTitle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.rowTitle:focus-visible {
+  outline: none;
+}
+
+.row:hover .rowTitle {
+  color: var(--nf-color-accent-fg);
 }
 
 .rowMessage {
@@ -133,13 +160,9 @@
 }
 
 .empty {
-  margin: 0;
-  padding: var(--nf-space-5);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
   border: var(--nf-space-px) dashed var(--nf-color-border);
   border-radius: var(--nf-radius-md);
-  text-align: center;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .errorBox {
@@ -147,10 +170,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--nf-space-2);
-  padding: var(--nf-space-4);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  background: var(--nf-color-surface);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .errorMessage {

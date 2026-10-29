@@ -25,6 +25,10 @@
   background: var(--nf-color-surface-hover);
 }
 
+.menuItem:focus-visible {
+  box-shadow: inset 0 0 0 var(--nf-space-px) var(--nf-color-border-strong);
+}
+
 .menuItemLanding {
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-xs);
@@ -36,19 +40,32 @@
   align-items: center;
   justify-content: center;
   /* nf-token-override: component dimension, not a spacing step */
-  width: 1.5rem;
+  inline-size: 1.75rem;
   /* nf-token-override: component dimension, not a spacing step */
-  height: 1.5rem;
+  block-size: 1.75rem;
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-instant) var(--nf-ease-standard),
+    color var(--nf-duration-instant) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.trigger:active {
+  scale: var(--nf-motion-press-scale);
+}
+
 .trigger:focus-visible {
   background: var(--nf-color-surface-hover);
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .menuDivider {

@@ -3,7 +3,7 @@
  * percentage plus a single horizontal bar for at-a-glance comparison.
  *
  * `acceptanceRate` from the API is in the [0, 1] range; the bar fill
- * width is clamped before being applied as `inline-size: <pct>%`.
+ * width is clamped before being applied as an inline-axis `scale`.
  */
 
 import Card from '@nodate-flow/ui/primitives/card';
@@ -54,7 +54,9 @@ export default function AcceptanceCard({
     <Card className={styles.acceptanceCard}>
       <div className={styles.acceptanceHeader}>
         <span className={styles.acceptanceLabel}>{t('kpi.acceptanceRate')}</span>
-        <span className={styles.acceptanceValue}>{percentLabel}</span>
+        <span key={percentLabel} className={styles.acceptanceValue}>
+          {percentLabel}
+        </span>
       </div>
       <div
         className={styles.acceptanceTrack}
@@ -64,7 +66,7 @@ export default function AcceptanceCard({
         aria-valuemax={100}
         aria-valuenow={Math.round(ratio * 100)}
       >
-        <div className={styles.acceptanceFill} style={{ inlineSize: `${ratio * 100}%` }} />
+        <div className={styles.acceptanceFill} style={{ scale: `${ratio} 1` }} />
       </div>
       <span className={styles.acceptanceHint}>{hint}</span>
     </Card>

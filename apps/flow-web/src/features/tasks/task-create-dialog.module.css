@@ -28,6 +28,7 @@
 /* ── Smart-create AI Assist section ─────────────────────────────────── */
 
 .smartSection {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
   border: 1px solid var(--nf-color-border);
   border-radius: var(--nf-radius-sm);
   padding: var(--nf-space-4);
@@ -36,20 +37,35 @@
   gap: var(--nf-space-3);
 }
 
+.smartStage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
 .smartLoading {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--nf-space-2);
 }
 
-.smartSpinner {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 1rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1rem;
+.smartLoadingLabel {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.smartSkeletonLine,
+.smartSkeletonLineShort {
+  block-size: var(--nf-space-4);
+}
+
+.smartSkeletonLineShort {
+  inline-size: 60%;
 }
 
 .smartError {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   color: var(--nf-color-danger-fg);
   margin: 0;
   font-size: var(--nf-text-sm);
@@ -74,14 +90,30 @@
 }
 
 .smartEmpty {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   margin: 0;
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
 }
 
 .smartApplyRow {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   display: flex;
   justify-content: flex-end;
+}
+
+.assigneeRow,
+.subtaskRow {
+  padding-inline: var(--nf-space-2);
+  margin-inline: calc(var(--nf-space-2) * -1);
+  border-radius: var(--nf-radius-sm);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.assigneeRow:hover,
+.subtaskRow:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .assigneeRow {

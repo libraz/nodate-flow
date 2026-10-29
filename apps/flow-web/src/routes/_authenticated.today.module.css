@@ -1,0 +1,152 @@
+/* /today — cross-workspace focus list grouped by due date. */
+
+.page {
+  padding: var(--nf-space-page);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 60rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.empty {
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-bg-sunken);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-1-5);
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+}
+
+.sectionTitleOverdue {
+  color: var(--nf-color-danger-fg);
+}
+
+.sectionCount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--nf-weight-regular);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+/* The whole row is the link, so the hit target matches what looks clickable. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid transparent;
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+}
+
+/* Overdue: full hairline border plus a light tint, never an edge stripe. */
+.rowOverdue {
+  background: var(--nf-color-danger-subtle);
+  border-color: color-mix(in oklch, var(--nf-color-danger) 30%, transparent);
+}
+
+.rowOverdue:hover {
+  border-color: var(--nf-color-danger);
+}
+
+.stateDot {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--state-tone, var(--nf-color-fg-muted));
+}
+
+.taskTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.due {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 5.5rem;
+  text-align: end;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .context {
+    display: none;
+  }
+}

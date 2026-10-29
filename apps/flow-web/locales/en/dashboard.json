@@ -25,5 +25,6 @@
   "config": {
     "timebox_label": "Timebox",
     "project_label": "Project"
-  }
+  },
+  "remove_widget_confirm": "Remove this widget from the dashboard?"
 }

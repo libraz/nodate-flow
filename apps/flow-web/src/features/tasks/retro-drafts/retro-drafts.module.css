@@ -47,11 +47,24 @@
   gap: var(--nf-space-3);
 }
 
+.rows {
+  --presence-gap: var(--nf-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--presence-gap);
+}
+
 .row {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
   padding: var(--nf-space-4);
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* In flight: the row stays readable but visibly waits on the server. */
+.row[aria-busy="true"] {
+  opacity: 0.6;
 }
 
 .rowTopRow {
@@ -70,6 +83,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .rowTitle:hover,
@@ -91,6 +105,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-inline-size: 100%;
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .rowLinkedTo:hover,

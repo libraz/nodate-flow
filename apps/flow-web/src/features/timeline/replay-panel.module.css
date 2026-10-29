@@ -1,0 +1,71 @@
+/* Replay panel: recomputed vs stored derived state. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-3-5);
+  padding-inline: var(--nf-space-4);
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+}
+
+/* Keyed by state so each swap replays the fade. */
+.body {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(5rem, max-content) 1fr;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.label {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.value {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to a replay row */
+  block-size: 2rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--nf-color-danger-fg);
+}

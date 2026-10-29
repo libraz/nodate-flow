@@ -30,6 +30,8 @@ import {
   useTotpEnroll,
   useTotpStatusQuery,
 } from './api';
+import CopyButton from './copy-button';
+import ui from './settings-ui.module.css';
 import styles from './totp-panel.module.css';
 import { usePanelSubmission } from './use-panel-submission';
 
@@ -41,12 +43,6 @@ function RecoveryCodesView({
   onDismiss: () => void;
 }): ReactElement {
   const { t } = useTranslation('settings');
-  const handleCopyAll = (): void => {
-    navigator.clipboard.writeText(codes.join('\n')).then(
-      () => toaster.show({ tone: 'success', message: t('security.totp.recovery.copied') }),
-      () => toaster.show({ tone: 'danger', message: t('security.totp.recovery.copy_failed') }),
-    );
-  };
   const handleDownload = (): void => {
     const blob = new Blob([`${codes.join('\n')}\n`], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -57,21 +53,26 @@ function RecoveryCodesView({
     URL.revokeObjectURL(url);
   };
   return (
-    <div className={styles.column}>
-      <p className={styles.bareParagraph}>{t('security.totp.recovery.description')}</p>
+    <div className={ui.secretPanel}>
+      <p className={ui.secretWarning}>{t('security.totp.recovery.description')}</p>
       <ul className={styles.recoveryList}>
         {codes.map((c) => (
           <li key={c}>{c}</li>
         ))}
       </ul>
       <div className={styles.buttonRow}>
-        <Button type="button" variant="ghost" onClick={handleCopyAll}>
-          {t('security.totp.recovery.copy_all')}
-        </Button>
+        <CopyButton
+          value={codes.join('\n')}
+          label={t('security.totp.recovery.copy_all')}
+          copiedLabel={t('security.totp.recovery.copied')}
+          onError={() => {
+            toaster.show({ tone: 'danger', message: t('security.totp.recovery.copy_failed') });
+          }}
+        />
         <Button type="button" variant="ghost" onClick={handleDownload}>
           {t('security.totp.recovery.download')}
         </Button>
-        <Button type="button" variant="primary" onClick={onDismiss}>
+        <Button type="button" variant="primary" onClick={onDismiss} className={styles.dismiss}>
           {t('security.totp.recovery.saved')}
         </Button>
       </div>
@@ -129,19 +130,12 @@ function EnrollmentForm({
     );
   };
 
-  const handleCopy = (): void => {
-    navigator.clipboard.writeText(enrollment.secret).then(
-      () => toaster.show({ tone: 'success', message: t('security.totp.secret_copied') }),
-      () => toaster.show({ tone: 'danger', message: t('security.totp.secret_copy_failed') }),
-    );
-  };
-
   return (
     <form
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      className={styles.column}
+      className={styles.enrollment}
     >
       <p className={styles.bareParagraph}>{t('security.totp.enroll_instructions')}</p>
       {qrDataUrl ? (
@@ -156,9 +150,16 @@ function EnrollmentForm({
       <div className={styles.secretRow}>
         <span className={styles.secretLabel}>{t('security.totp.secret_label')}</span>
         <code className={styles.secretCode}>{enrollment.secret}</code>
-        <Button type="button" variant="ghost" onClick={handleCopy}>
-          {t('security.totp.copy')}
-        </Button>
+        <CopyButton
+          value={enrollment.secret}
+          variant="ghost"
+          size="sm"
+          label={t('security.totp.copy')}
+          copiedLabel={t('security.totp.secret_copied')}
+          onError={() => {
+            toaster.show({ tone: 'danger', message: t('security.totp.secret_copy_failed') });
+          }}
+        />
       </div>
       <p className={styles.helpParagraph}>
         <a href={enrollment.otpauthUrl.startsWith('otpauth:') ? enrollment.otpauthUrl : undefined}>
@@ -200,8 +201,9 @@ function EnrollmentForm({
           type="submit"
           variant="primary"
           disabled={submitting || code.length !== 6 || password === ''}
+          aria-busy={submitting}
         >
-          {submitting ? t('security.totp.confirming') : t('security.totp.confirm')}
+          {t('security.totp.confirm')}
         </Button>
       </div>
     </form>
@@ -235,7 +237,7 @@ function StartEnrollmentForm({
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      className={styles.column}
+      className={styles.formNarrow}
     >
       <p className={styles.bareParagraph}>
         {t(isPending ? 'security.totp.pending_description' : 'security.totp.disabled_description')}
@@ -254,11 +256,12 @@ function StartEnrollmentForm({
           />
         )}
       </FormField>
-      <div>
+      <div className={styles.endActions}>
         <Button
           type="submit"
           variant="primary"
           disabled={disabled || submitting || password === ''}
+          aria-busy={submitting}
         >
           {t(isPending ? 'security.totp.resume_enroll' : 'security.totp.enable')}
         </Button>
@@ -288,7 +291,13 @@ function EnabledPanel(): ReactElement {
 
   const handleRegenerate = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!(await confirmAction({ message: t('security.totp.recovery.regenerate_confirm') }))) return;
+    if (
+      !(await confirmAction({
+        message: t('security.totp.recovery.regenerate_confirm'),
+        confirmLabel: t('security.totp.recovery.regenerate'),
+      }))
+    )
+      return;
     await run(
       async () => {
         const result = await regenerate.mutateAsync(password);
@@ -312,9 +321,8 @@ function EnabledPanel(): ReactElement {
 
   return (
     <div className={styles.columnGapMd}>
-      <DisableForm />
-      <hr className={styles.divider} />
-      <div>
+      <p className={styles.enabledNote}>{t('security.totp.enabled_description')}</p>
+      <div className={styles.column}>
         <h3 className={styles.recoveryHeading}>{t('security.totp.recovery.title')}</h3>
         <p className={styles.recoveryRemaining}>
           {t('security.totp.recovery.remaining', { count: remaining })}
@@ -340,12 +348,18 @@ function EnabledPanel(): ReactElement {
             )}
           </FormField>
           <div className={styles.endActions}>
-            <Button type="submit" variant="default" disabled={submitting || password === ''}>
+            <Button
+              type="submit"
+              variant="default"
+              disabled={submitting || password === ''}
+              aria-busy={submitting}
+            >
               {t('security.totp.recovery.regenerate')}
             </Button>
           </div>
         </form>
       </div>
+      <DisableForm />
     </div>
   );
 }
@@ -358,7 +372,13 @@ function DisableForm(): ReactElement {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!(await confirmAction({ message: t('security.totp.disable_confirm') }))) return;
+    if (
+      !(await confirmAction({
+        message: t('security.totp.disable_confirm'),
+        confirmLabel: t('security.totp.disable'),
+      }))
+    )
+      return;
     await run(
       async () => {
         await disable.mutateAsync(password);
@@ -381,27 +401,34 @@ function DisableForm(): ReactElement {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      className={styles.formNarrow}
+      className={ui.dangerZone}
     >
-      <p className={styles.bareParagraph}>{t('security.totp.enabled_description')}</p>
-      <FormField label={t('security.totp.password_label')} required>
-        {(control) => (
-          <Input
-            {...control}
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-            }}
-            required
-          />
-        )}
-      </FormField>
-      <div className={styles.endActions}>
-        <Button type="submit" variant="danger" disabled={submitting || password === ''}>
-          {submitting ? t('security.totp.disabling') : t('security.totp.disable')}
-        </Button>
+      <h3 className={ui.dangerTitle}>{t('security.totp.disable')}</h3>
+      <div className={styles.formNarrow}>
+        <FormField label={t('security.totp.password_label')} required>
+          {(control) => (
+            <Input
+              {...control}
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+              }}
+              required
+            />
+          )}
+        </FormField>
+        <div className={styles.endActions}>
+          <Button
+            type="submit"
+            variant="danger"
+            disabled={submitting || password === ''}
+            aria-busy={submitting}
+          >
+            {t('security.totp.disable')}
+          </Button>
+        </div>
       </div>
     </form>
   );

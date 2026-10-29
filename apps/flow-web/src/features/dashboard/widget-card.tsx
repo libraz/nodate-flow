@@ -5,6 +5,7 @@
  * In edit mode, shows a remove button and visual resize indicator.
  */
 
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import {
   AlertTriangle,
@@ -16,7 +17,7 @@ import {
   SquareKanban,
   X,
 } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { type CSSProperties, type ReactElement, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WidgetItem, WidgetType } from './api';
@@ -74,6 +75,13 @@ export interface WidgetCardProps {
   widget: WidgetItem;
   editing: boolean;
   dragging?: boolean | undefined;
+  /** First-load stagger style from the grid (`--stagger-index`). */
+  enterStyle?: CSSProperties | undefined;
+  /** False once the widget is removed; the card plays its exit, then calls `onExited`. */
+  present?: boolean | undefined;
+  onExited?: (() => void) | undefined;
+  /** True while the delete request for this widget is in flight. */
+  removing?: boolean | undefined;
   onRemove?: (() => void) | undefined;
   onMouseDown?: ((e: React.MouseEvent<HTMLDivElement>) => void) | undefined;
 }
@@ -86,10 +94,21 @@ export default function WidgetCard({
   widget,
   editing,
   dragging,
+  enterStyle,
+  present = true,
+  onExited,
+  removing,
   onRemove,
   onMouseDown,
-}: WidgetCardProps): ReactElement {
+}: WidgetCardProps): ReactElement | null {
   const { t } = useTranslation('dashboard');
+  const presence = usePresence<HTMLDivElement>(present);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once per completed exit; onExited is recreated every render
+  useEffect(() => {
+    if (!presence.mounted) onExited?.();
+  }, [presence.mounted]);
+
   const TypeIcon = widgetIconMap.get(widget.widgetType) ?? SquareKanban;
 
   const classNames = [
@@ -101,15 +120,22 @@ export default function WidgetCard({
     .filter(Boolean)
     .join(' ');
 
+  if (!presence.mounted) return null;
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: container only takes a pointer-drag affordance while editing; all real actions live on focusable child buttons.
     <div
+      ref={presence.ref}
+      data-state={presence.state}
+      inert={!present}
       className={classNames}
-      style={{
-        gridColumn: `span ${String(widget.width)}`,
-        gridRow: `span ${String(widget.height)}`,
-        position: 'relative',
-      }}
+      style={
+        {
+          '--widget-cols': widget.width,
+          '--widget-rows': widget.height,
+          ...enterStyle,
+        } as CSSProperties
+      }
       onMouseDown={editing ? onMouseDown : undefined}
     >
       <div className={styles.widgetHeader}>
@@ -126,6 +152,8 @@ export default function WidgetCard({
               onRemove();
             }}
             aria-label={t('remove_widget')}
+            disabled={removing}
+            aria-busy={removing || undefined}
           >
             <Icon icon={X} decorative size={14} />
           </button>

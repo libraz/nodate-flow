@@ -60,19 +60,6 @@
   min-inline-size: 0;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 14rem;
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-2);
-  font: inherit;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg);
-  background: var(--nf-color-surface);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-sm);
-  cursor: pointer;
-}
-
-.workspaceSelect:hover {
-  background: var(--nf-color-surface-hover);
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
@@ -102,6 +89,7 @@
 .breadcrumb {
   max-inline-size: 100%;
   min-inline-size: 0;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 /*
@@ -143,9 +131,14 @@
   font-size: var(--nf-text-sm);
   text-align: start;
   min-inline-size: 0;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .searchButton:hover {
+  border-color: var(--nf-color-border-strong);
   background: var(--nf-color-surface-hover);
   color: var(--nf-color-fg);
 }
@@ -161,6 +154,11 @@
 
 .searchButtonShortcut {
   margin-inline-start: auto;
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-surface);
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
@@ -207,9 +205,22 @@
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   flex: 0 0 auto;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .iconButton:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.iconButton:active {
+  scale: var(--nf-motion-press-scale);
+}
+
+.iconButton[aria-expanded="true"] {
   background: var(--nf-color-surface-hover);
   color: var(--nf-color-fg);
 }
@@ -234,11 +245,19 @@
   font-weight: var(--nf-weight-semibold);
   cursor: pointer;
   flex: 0 0 auto;
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
-.avatarTrigger:hover {
+.avatarTrigger:hover,
+.avatarTrigger[aria-expanded="true"] {
   background: var(--nf-color-accent-subtle);
-  border-color: var(--nf-color-border);
+  border-color: var(--nf-color-border-strong);
+}
+
+.avatarTrigger:active {
+  scale: var(--nf-motion-press-scale);
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
@@ -315,6 +334,7 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   text-align: start;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .userMenuItem:hover {

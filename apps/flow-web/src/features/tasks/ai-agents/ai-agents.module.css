@@ -9,8 +9,7 @@
  * so the four themes (aurora / dotline / glass-light / glass-dark)
  * inherit the right accent without per-theme overrides.
  *
- * Motion respects `prefers-reduced-motion`: caret rotation is
- * skipped, error-detail expansion becomes a flat opacity step.
+ * Motion durations come from the tokens, which reduced motion zeroes.
  */
 
 /* ── Section ─────────────────────────────────────────────────── */
@@ -72,16 +71,10 @@
   transform: rotate(90deg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .caret {
-    transition: none;
-  }
-}
-
 .title {
   margin: 0;
   font-size: var(--nf-text-base);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
 }
 
@@ -95,6 +88,7 @@
 .body {
   display: flex;
   flex-direction: column;
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .body[hidden] {
@@ -126,6 +120,7 @@
   padding: var(--nf-space-3) var(--nf-space-4);
   border-block-end: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-sm);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:last-child {
@@ -245,6 +240,7 @@
   font-size: var(--nf-text-xs);
   white-space: pre-wrap;
   word-break: break-word;
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 /* ── Skeleton ────────────────────────────────────────────────── */
@@ -282,7 +278,7 @@
   padding: 0 var(--nf-space-2);
   border-radius: var(--nf-radius-pill);
   font-size: var(--nf-text-xs);
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   line-height: 1.5rem;
   white-space: nowrap;
   border: 1px solid transparent;

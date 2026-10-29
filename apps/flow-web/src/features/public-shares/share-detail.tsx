@@ -29,16 +29,18 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, GripVertical, Plus } from 'lucide-react';
 import { type CSSProperties, type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
-import { confirmAction } from '../../lib/confirm-action';
 import AddEventsDialog from './add-events-dialog';
 import {
   type ShareEvent,
@@ -108,6 +110,8 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
   useEffect(() => {
     setOrderedEvents(serverEvents);
   }, [serverOrderKey]);
+
+  const { entries, onExited } = usePresenceList(orderedEvents, (e) => e.linkId);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -180,17 +184,31 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
     },
   };
 
+  // Detaching is undone by attaching the event again, so it acts at once.
   const handleDetach = async (event: ShareEvent): Promise<void> => {
-    if (
-      !(await confirmAction({
-        message: t('workspace.public_shares.detail.detach_confirm', { title: event.title }),
-      }))
-    ) {
-      return;
-    }
     try {
       await detach.mutateAsync(event.eventId);
-      toaster.show({ tone: 'success', message: t('workspace.public_shares.detail.detached') });
+      toaster.show({
+        tone: 'info',
+        message: t('workspace.public_shares.detail.detached'),
+        action: {
+          label: t('common:common.undo'),
+          onAction: () => {
+            attach.mutate([event.eventId], {
+              onError: (err) => {
+                toaster.show({
+                  tone: 'danger',
+                  message: formatApiError(
+                    err,
+                    t,
+                    'workspace.public_shares.detail.errors.attach_failed',
+                  ),
+                });
+              },
+            });
+          },
+        },
+      });
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -271,7 +289,7 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
         </p>
       </div>
 
-      {orderedEvents.length > 0 ? (
+      {entries.length > 0 ? (
         <div
           className={`${styles.tableWrap} ${reordering ? styles.tableWrapBusy : ''}`.trim()}
           aria-busy={reordering || undefined}
@@ -311,10 +329,12 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
                 strategy={verticalListSortingStrategy}
               >
                 <tbody>
-                  {orderedEvents.map((event) => (
+                  {entries.map(({ key, item: event, present }) => (
                     <SortableRow
-                      key={event.linkId}
+                      key={key}
                       event={event}
+                      present={present}
+                      onExited={() => onExited(key)}
                       locale={locale}
                       allDayLabel={allDayLabel}
                       undatedLabel={t('workspace.public_shares.detail.event_undated')}
@@ -322,6 +342,7 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
                       handleLabel={dragHandleLabel}
                       disabled={reordering}
                       attaching={attach.isPending}
+                      detaching={detach.isPending}
                       onDetach={handleDetach}
                       onAttachOverride={handleAttachOverride}
                     />
@@ -358,6 +379,9 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
 
 interface SortableRowProps {
   event: ShareEvent;
+  /** False while the row plays its exit after the event left the list. */
+  present: boolean;
+  onExited: () => void;
   locale: string;
   allDayLabel: string;
   undatedLabel: string;
@@ -365,6 +389,7 @@ interface SortableRowProps {
   handleLabel: string;
   disabled: boolean;
   attaching: boolean;
+  detaching: boolean;
   onDetach: (event: ShareEvent) => Promise<void>;
   onAttachOverride: (warning: ShareOverrideWarning) => Promise<void>;
 }
@@ -381,6 +406,8 @@ interface SortableRowProps {
  */
 function SortableRow({
   event,
+  present,
+  onExited,
   locale,
   allDayLabel,
   undatedLabel,
@@ -388,24 +415,29 @@ function SortableRow({
   handleLabel,
   disabled,
   attaching,
+  detaching,
   onDetach,
   onAttachOverride,
-}: SortableRowProps): ReactElement {
+}: SortableRowProps): ReactElement | null {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: event.linkId,
-    disabled,
+    disabled: disabled || !present,
   });
+  const presence = usePresence<HTMLTableRowElement>(present);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires once per completed exit; onExited is recreated every render
+  useEffect(() => {
+    if (!presence.mounted) onExited();
+  }, [presence.mounted]);
+  const setRowRef = (node: HTMLTableRowElement | null): void => {
+    setNodeRef(node);
+    presence.ref(node);
+  };
 
-  // The row uses inline style strictly for the dnd-kit-driven dynamic
-  // transform / transition / drag highlight; visual rules (borders,
-  // padding, etc.) live in the CSS module.
+  // Inline style carries only the dnd-kit-driven transform / transition;
+  // the drag highlight lives in the CSS module.
   const rowStyle: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    backgroundColor: isDragging ? 'var(--nf-color-surface-hover)' : undefined,
-    boxShadow: isDragging ? 'var(--nf-shadow-sm)' : undefined,
-    position: isDragging ? 'relative' : undefined,
-    zIndex: isDragging ? 1 : undefined,
   };
 
   // `unpublishedOverrides` is absent on a series with nothing wrong, so the
@@ -413,9 +445,17 @@ function SortableRow({
   // being present.
   const warnings = event.unpublishedOverrides ?? [];
 
+  if (!presence.mounted) return null;
+
   return (
     <>
-      <tr ref={setNodeRef} className={styles.row} style={rowStyle}>
+      <tr
+        ref={setRowRef}
+        data-state={presence.state}
+        inert={!present}
+        className={`${styles.row}${isDragging ? ` ${styles['row--dragging']}` : ''}${present ? '' : ` ${motion.exitRow}`}`}
+        style={rowStyle}
+      >
         <td className={styles.handleCell}>
           <button
             type="button"
@@ -440,6 +480,7 @@ function SortableRow({
           <Button
             type="button"
             variant="ghost"
+            disabled={detaching}
             onClick={() => {
               void onDetach(event);
             }}
@@ -448,7 +489,7 @@ function SortableRow({
           </Button>
         </td>
       </tr>
-      {warnings.length > 0 ? (
+      {present && warnings.length > 0 ? (
         <ShareOverrideNotice
           warnings={warnings}
           allDay={event.allDay}

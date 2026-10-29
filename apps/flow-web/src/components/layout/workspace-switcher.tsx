@@ -16,11 +16,11 @@
  * `useCurrentWorkspaceId` reader so downstream workspace-keyed queries
  * move with it.
  *
- * Shares `styles.workspaceSelect` with the topbar so the visual
- * treatment is consistent across the two mount points.
+ * Built on the shared `Select` primitive; `styles.workspaceSelect` only
+ * constrains its width per mount point.
  */
 
-import { cx } from '@nodate-flow/ui/lib/cx';
+import Select from '@nodate-flow/ui/primitives/select';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
@@ -44,9 +44,9 @@ export default function WorkspaceSwitcher(): ReactElement {
   const currentId = routeWsId || (workspaces.length === 1 ? (workspaces[0]?.id ?? '') : '');
 
   return (
-    <select
+    <Select
       aria-label={t('topbar.workspace.switcher')}
-      className={cx(styles.workspaceSelect, 'nf-focus-ring')}
+      className={styles.workspaceSelect}
       value={currentId}
       onChange={(e) => {
         const id = e.target.value;
@@ -74,6 +74,6 @@ export default function WorkspaceSwitcher(): ReactElement {
           {w.name}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

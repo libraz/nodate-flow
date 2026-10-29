@@ -1,0 +1,168 @@
+/*
+ * AI suggestions dock — the collapsed pill and the expanded panel share
+ * the same inline-end/block-end anchor, so the panel grows out of the
+ * spot the pill occupied.
+ */
+
+.pill {
+  position: fixed;
+  inset-block-end: var(--nf-space-4);
+  inset-inline-end: var(--nf-space-4);
+  z-index: var(--nf-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3-5);
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg);
+  box-shadow: var(--nf-shadow-lg);
+  cursor: pointer;
+  font-family: var(--nf-font-sans);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.pill:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
+}
+
+.pill:active {
+  scale: var(--nf-motion-press-scale);
+}
+
+.pillLabel {
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-semibold);
+}
+
+/* Remounted on every count change (keyed in JSX), so this replays. */
+.count {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.panel {
+  position: fixed;
+  inset-block-end: var(--nf-space-4);
+  inset-inline-end: var(--nf-space-4);
+  z-index: var(--nf-z-sticky);
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: min(22.5rem, calc(100vw - var(--nf-space-8)));
+  max-block-size: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--nf-color-bg-elevated);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  box-shadow: var(--nf-shadow-lg);
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-3-5);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 2rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.close:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.list {
+  --presence-gap: var(--nf-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+}
+
+.suggestionCard {
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+}
+
+.suggestionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+}
+
+.suggestionMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.suggestionAction {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.suggestionReasoning {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.message {
+  margin: 0;
+  padding: var(--nf-space-4);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  text-align: center;
+  /* Keyed in JSX, so each status/empty swap replays the fade. */
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}

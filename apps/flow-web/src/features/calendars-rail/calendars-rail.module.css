@@ -30,6 +30,11 @@
   gap: var(--nf-space-1);
 }
 
+/* Back from discover: the list swaps in with a fade rather than a cut. */
+.section--swapped {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
 .sectionHeader {
   font-size: var(--nf-text-xs);
   text-transform: uppercase;
@@ -46,6 +51,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-px);
+  /* A removed row collapses its share of the gap with it. */
+  --presence-gap: var(--nf-space-px);
 }
 
 .row {
@@ -58,15 +65,33 @@
   padding-block: var(--nf-space-1);
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg);
-  transition: background var(--nf-duration-fast);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-base) var(--nf-ease-standard);
 }
 
-.row:hover {
-  background: var(--nf-color-bg);
+.row:hover,
+.row:focus-within {
+  background: var(--nf-color-surface-hover);
 }
 
+/* A hidden calendar dims and its swatch empties to an outline (set
+   inline by the row), so the state reads from the colour key as well as
+   the eye icon. */
 .row--hidden {
   opacity: 0.55;
+}
+
+.rowSkeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.rowSkeleton {
+  /* nf-token-override: matches the row's min-block-size */
+  block-size: 2rem;
+  border-radius: var(--nf-radius-sm);
 }
 
 .dot {
@@ -77,6 +102,9 @@
   block-size: 0.625rem;
   border-radius: var(--nf-radius-pill);
   border: 1px solid var(--nf-color-border);
+  transition:
+    background var(--nf-duration-base) var(--nf-ease-standard),
+    border-color var(--nf-duration-base) var(--nf-ease-standard);
 }
 
 .name {
@@ -111,8 +139,8 @@
   border-radius: var(--nf-radius-sm);
   cursor: pointer;
   transition:
-    background var(--nf-duration-fast),
-    color var(--nf-duration-fast);
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .iconButton:hover:not(:disabled) {
@@ -151,10 +179,18 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
   cursor: pointer;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.menuItem:hover {
-  background: var(--nf-color-bg);
+.menuItem:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+}
+
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .menuItem:focus-visible {
@@ -215,8 +251,8 @@
   border-radius: var(--nf-radius-sm);
   cursor: pointer;
   transition:
-    background var(--nf-duration-fast),
-    color var(--nf-duration-fast);
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .backButton:hover {
@@ -252,6 +288,7 @@
   flex-direction: column;
   gap: var(--nf-space-3);
   min-block-size: 0;
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .discoverSearch {
@@ -283,6 +320,11 @@
   border-radius: var(--nf-radius-md);
   border: 1px solid var(--nf-color-border);
   background: var(--nf-color-surface);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.discoverRow:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .discoverIdentity {
@@ -325,6 +367,10 @@
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
   border: 1px solid var(--nf-color-border);
+}
+
+.discoverState {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .discoverError {

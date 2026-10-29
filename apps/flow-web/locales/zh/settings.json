@@ -17,6 +17,16 @@
     "integrations": "集成",
     "auto_actions": "自动操作"
   },
+  "nav_group": {
+    "workspace": "工作区",
+    "integrations": "集成",
+    "ai": "AI",
+    "reports": "报告"
+  },
+  "save_status": {
+    "saved": "已保存",
+    "unsaved": "有未保存的更改"
+  },
   "integrations": {
     "title": "集成",
     "description": "连接你的 GitHub、Slack、Google 日历和 Discord 个人账户，让 nodate-flow 可以代你执行操作。令牌将以加密形式存储。",
@@ -111,7 +121,10 @@
     "overdue_open": "已逾期",
     "empty_completed": "过去七天没有完成的事项。",
     "empty_overdue": "暂无逾期任务。",
-    "markdown": "Markdown"
+    "markdown": "Markdown",
+    "copy": "复制",
+    "copied": "已复制",
+    "copy_failed": "无法复制到剪贴板。"
   },
   "profile": {
     "title": "个人资料",
@@ -149,8 +162,6 @@
     "theme_glass_light": "Glass 浅色",
     "theme_glass_dark": "Glass 深色",
     "save": "保存",
-    "saving": "保存中…",
-    "saved": "已保存",
     "avatar": {
       "label": "头像",
       "description": "支持 JPEG、PNG、WebP 或 GIF，最大 5 MB。",
@@ -166,7 +177,8 @@
       "replace_aria": "更换头像",
       "delete_aria": "删除头像",
       "upload_error": "上传头像失败，请重试。",
-      "remove_error": "移除头像失败，请重试。"
+      "remove_error": "移除头像失败，请重试。",
+      "remove_confirm": "要删除你的头像吗？"
     },
     "validation": {
       "display_name_required": "请填写显示名称。",
@@ -175,13 +187,14 @@
     },
     "errors": {
       "update_failed": "更新个人资料失败，请重试。"
-    }
+    },
+    "section_identity": "基本信息",
+    "section_appearance": "外观",
+    "section_appearance_help": "主题更改会立即生效，不需要点击保存。"
   },
   "notifications": {
     "title": "通知",
     "save": "保存",
-    "saving": "保存中…",
-    "saved": "已更新通知设置",
     "workspace_label": "工作区",
     "no_workspaces": "加入工作区后即可设置通知。",
     "channel_note": "以下设置作用于应用内的通知铃铛。邮件与推送投递尚未开放。",
@@ -224,7 +237,6 @@
       "next": "新密码",
       "confirm": "确认新密码",
       "save": "更改密码",
-      "saving": "保存中…",
       "changed": "密码已更改。{count} 个其他会话已被注销。",
       "validation": {
         "too_short": "新密码至少 8 位。",
@@ -249,9 +261,7 @@
       "enable": "启用两步验证",
       "resume_enroll": "重新开始注册",
       "confirm": "确认",
-      "confirming": "确认中…",
       "disable": "禁用",
-      "disabling": "禁用中…",
       "disable_confirm": "禁用两步验证？账户将仅由密码保护。",
       "copy": "复制",
       "secret_copied": "已复制密钥",
@@ -302,7 +312,8 @@
       "errors": {
         "revoke_failed": "无法撤销该会话，请重试。",
         "revoke_all_failed": "无法撤销其他会话，请重试。"
-      }
+      },
+      "revoke_all_help": "将除本设备外的所有设备退出登录。"
     }
   },
   "workspace": {
@@ -317,8 +328,6 @@
         "icon_url": "图标 URL"
       },
       "save": "保存更改",
-      "saving": "保存中…",
-      "saved": "已更新工作区",
       "validation": {
         "name_required": "请填写名称。",
         "slug_required": "请填写标识。",
@@ -332,7 +341,6 @@
         "title": "危险操作",
         "description": "不可逆操作。删除工作区将永久销毁其所有项目、任务、成员、附件以及已上传的文件，且无法恢复。",
         "delete": "删除工作区",
-        "deleting": "删除中…",
         "confirm": {
           "title": "删除 {name}？",
           "warning": "这将永久删除工作区、其所有项目和任务、全部评论与附件，并不可逆地从对象存储中清除每一份已上传的文件。",
@@ -404,7 +412,6 @@
         "empty_events": "暂无事件。从此工作区添加事件以发布。",
         "add_events": "添加事件",
         "detach": "移除",
-        "detach_confirm": "从此分享页移除「{title}」？它将不再出现在公开页面上。",
         "detached": "已移除事件",
         "event_undated": "无日期",
         "event_all_day": "全天",
@@ -435,8 +442,7 @@
           "select": "选择",
           "attach": "添加 {count, plural, other {# 个事件}}",
           "attached_toast": "已添加 {attached} 个，跳过 {skipped} 个",
-          "cancel": "取消",
-          "attaching": "添加中…"
+          "cancel": "取消"
         },
         "errors": {
           "detach_failed": "无法移除事件，请重试。",
@@ -523,8 +529,6 @@
         "high": "保守"
       },
       "save": "保存",
-      "saving": "保存中…",
-      "saved": "已更新自动操作设置",
       "rules": {
         "title": "规则配置",
         "description": "启用或禁用单个规则并调整其灵敏度。",
@@ -552,8 +556,6 @@
         },
         "idle_na": "不适用（使用截止日期）",
         "save": "保存规则",
-        "saving": "保存中…",
-        "saved": "已更新规则设置",
         "errors": {
           "load_failed": "无法加载规则设置。",
           "update_failed": "无法更新规则设置，请重试。"
@@ -629,7 +631,9 @@
           "submit": "开始导入",
           "success": "已开始导入任务",
           "error": "开始导入失败"
-        }
+        },
+        "load_error": "无法加载导入任务。",
+        "retry": "重试"
       }
     },
     "webhooks": {
@@ -718,7 +722,9 @@
           "failed": "失败",
           "dead": "已死亡"
         }
-      }
+      },
+      "load_error": "无法加载 Webhook。",
+      "retry": "重试"
     }
   }
 }

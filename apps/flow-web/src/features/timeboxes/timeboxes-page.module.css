@@ -45,10 +45,23 @@
 .sections {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-6);
 }
 
+/* Spacing lives inside the collapsing section so it closes with it. */
 .section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  --presence-gap: var(--nf-space-3);
+  padding-block-end: var(--nf-space-6);
+}
+
+.archiveCollapse {
+  margin-block-start: calc(var(--nf-space-3) * -1);
+}
+
+.archiveList {
+  padding-block-start: var(--nf-space-3);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
@@ -91,6 +104,21 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   align-self: flex-start;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* One chevron that turns, rather than two icons swapped on toggle. */
+.disclosureIcon {
+  flex-shrink: 0;
+  transition: rotate var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+[aria-expanded="true"] > .disclosureIcon {
+  rotate: 90deg;
+}
+
+[dir="rtl"] [aria-expanded="false"] > .disclosureIcon {
+  rotate: 180deg;
 }
 
 .archiveToggle:hover {
@@ -109,16 +137,25 @@
   background: var(--nf-color-bg-elevated);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
-  transition: box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-base) var(--nf-ease-standard),
+    background var(--nf-duration-base) var(--nf-ease-standard),
+    opacity var(--nf-duration-base) var(--nf-ease-standard);
+  /* A card that appears — created, moved to another section by a status
+     change, or revealed with the archive — settles in place. */
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .card:hover {
   box-shadow: var(--nf-shadow-sm);
 }
 
+/* The running box: a full accent hairline and a light tint, rather than
+   a one-sided stripe on a rounded card. */
 .cardActive {
-  border-inline-start: 3px solid var(--nf-color-accent);
-  background: var(--nf-color-bg-elevated);
+  border-color: color-mix(in oklch, var(--nf-color-accent) 55%, var(--nf-color-border));
+  background: color-mix(in oklch, var(--nf-color-accent-subtle) 45%, var(--nf-color-bg-elevated));
 }
 
 .cardArchived {
@@ -191,7 +228,13 @@
   block-size: 100%;
   background: var(--nf-color-accent);
   border-radius: var(--nf-radius-pill);
-  transition: inline-size var(--nf-duration-slow) var(--nf-ease-standard);
+  /* Scaled from the logical start; the page sets `scale` to done / total. */
+  transform-origin: 0 50%;
+  transition: scale var(--nf-duration-slow) var(--nf-ease-standard);
+}
+
+[dir="rtl"] .progressFill {
+  transform-origin: 100% 50%;
 }
 
 .progressLabel {
@@ -208,7 +251,13 @@
 }
 
 /* Inline tasks list (active card expanded) */
+.tasksCollapse {
+  /* Cancels the card gap so it does not vanish when the panel unmounts. */
+  margin-block-start: calc(var(--nf-space-3) * -1);
+}
+
 .tasks {
+  margin-block-start: var(--nf-space-3);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
@@ -232,6 +281,7 @@
   background: var(--nf-color-bg);
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-sm);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .taskTitle {
@@ -268,29 +318,9 @@
   margin: 0;
 }
 
-/* Empty state */
+/* Empty state — the primitive draws it; the page only gives it room. */
 .empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--nf-space-2);
   padding-block: var(--nf-space-16);
-  padding-inline: var(--nf-space-4);
-  color: var(--nf-color-fg-muted);
-  text-align: center;
-}
-
-.emptyTitle {
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-medium);
-  margin: 0;
-  color: var(--nf-color-fg);
-}
-
-.emptyDescription {
-  font-size: var(--nf-text-sm);
-  margin: 0;
 }
 
 /* Dialog form layout */

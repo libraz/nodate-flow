@@ -17,12 +17,14 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Chip from '@nodate-flow/ui/primitives/chip';
-import type { CSSProperties, ReactElement } from 'react';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TaskDerivedState } from '../tasks/api';
 import { STATE_KEY } from '../tasks/constants';
 import { useTaskReplayQuery } from './replay-api';
+import styles from './replay-panel.module.css';
 
 export interface ReplayPanelProps {
   taskId: string;
@@ -42,111 +44,71 @@ function useStateLabel(): (raw: string) => string {
   };
 }
 
-/**
- * Style for a single label/value row. Uses a CSS grid so the two chips
- * align vertically regardless of label width, and a top hairline so the
- * rows read as a list.
- */
-const rowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(5rem, max-content) 1fr',
-  alignItems: 'center',
-  gap: 'var(--nf-space-3)',
-  paddingBlock: 'var(--nf-space-2)',
-  borderBlockStart: '1px solid var(--nf-color-border)',
-};
-
-const labelStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 'var(--nf-text-xs)',
-  fontWeight: 500,
-  color: 'var(--nf-color-fg-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.02em',
-};
-
-const valueStyle: CSSProperties = {
-  margin: 0,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--nf-space-1-5)',
-};
-
 export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement {
   const { t } = useTranslation('constraints');
   const labelFor = useStateLabel();
   const q = useTaskReplayQuery(taskId);
   const drift = q.data != null && !q.data.equivalent;
 
+  const bodyState = q.data ? 'data' : q.error ? 'error' : 'loading';
+
   return (
-    <section
-      aria-label={t('replay.title')}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
-        padding: 'var(--nf-space-3-5) var(--nf-space-4)',
-        borderRadius: 'var(--nf-radius-md)',
-        border: '1px solid var(--nf-color-border)',
-        background: 'var(--nf-color-surface)',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--nf-space-3)',
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 'var(--nf-text-base)', fontWeight: 600 }}>
-          {t('replay.title')}
-        </h3>
+    <section aria-label={t('replay.title')} className={styles.panel}>
+      <header className={styles.header}>
+        <h3 className={styles.title}>{t('replay.title')}</h3>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => void q.refetch()}
           disabled={q.isFetching}
+          aria-busy={q.isFetching || undefined}
         >
           {t('replay.refresh')}
         </Button>
       </header>
-      {q.isLoading ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('replay.loading')}</p>
-      ) : null}
-      {q.error ? (
-        <p role="alert" style={{ margin: 0, color: 'var(--nf-color-danger-fg)' }}>
-          {t('replay.error')}
-        </p>
-      ) : null}
-      {q.data ? (
-        <dl style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={rowStyle}>
-            <dt style={labelStyle}>{t('replay.derived')}</dt>
-            <dd style={valueStyle}>
-              <Chip tone="neutral">{labelFor(q.data.derivedState)}</Chip>
-            </dd>
+      <div key={bodyState} className={styles.body}>
+        {q.isLoading ? (
+          <div aria-busy="true">
+            <span className="sr-only">{t('replay.loading')}</span>
+            <Skeleton className={styles.skeletonRow} />
+            <Skeleton className={styles.skeletonRow} />
+            <Skeleton className={styles.skeletonRow} />
           </div>
-          <div style={rowStyle}>
-            <dt style={labelStyle}>{t('replay.stored')}</dt>
-            <dd style={valueStyle}>
-              <Chip tone={drift ? 'warning' : 'neutral'}>{labelFor(q.data.stored)}</Chip>
-            </dd>
-          </div>
-          <div style={rowStyle}>
-            <dt style={labelStyle}>
-              {q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}
-            </dt>
-            <dd style={valueStyle} aria-live="polite">
-              <Chip tone={q.data.equivalent ? 'success' : 'danger'}>
-                <span aria-hidden="true">{q.data.equivalent ? '✓' : '⚠'}</span>
-                <span>{q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}</span>
-              </Chip>
-            </dd>
-          </div>
-        </dl>
-      ) : null}
+        ) : null}
+        {q.error ? (
+          <p role="alert" className={styles.error}>
+            {t('replay.error')}
+          </p>
+        ) : null}
+        {q.data ? (
+          <dl className={styles.list}>
+            <div className={styles.row}>
+              <dt className={styles.label}>{t('replay.derived')}</dt>
+              <dd className={styles.value}>
+                <Chip tone="neutral">{labelFor(q.data.derivedState)}</Chip>
+              </dd>
+            </div>
+            <div className={styles.row}>
+              <dt className={styles.label}>{t('replay.stored')}</dt>
+              <dd className={styles.value}>
+                <Chip tone={drift ? 'warning' : 'neutral'}>{labelFor(q.data.stored)}</Chip>
+              </dd>
+            </div>
+            <div className={styles.row}>
+              <dt className={styles.label}>
+                {q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}
+              </dt>
+              <dd className={styles.value} aria-live="polite">
+                <Chip tone={q.data.equivalent ? 'success' : 'danger'}>
+                  <span aria-hidden="true">{q.data.equivalent ? '✓' : '⚠'}</span>
+                  <span>{q.data.equivalent ? t('replay.equivalent') : t('replay.drift')}</span>
+                </Chip>
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -18,6 +18,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import ThemePicker, {
   DEFAULT_THEME_PREVIEWS,
   type ThemeFamilyEntry,
@@ -34,6 +35,9 @@ import { formatApiError } from '../../lib/api-error';
 import { useTheme } from '../../providers/theme-provider';
 import { type Me, type PatchMeInput, useMeQuery, useUpdateMe } from './api';
 import AvatarUpload from './avatar-upload';
+import styles from './profile-form.module.css';
+import SaveStatus, { useSaveStatus } from './save-status';
+import ui from './settings-ui.module.css';
 
 const LOCALES: readonly SupportedLanguage[] = ['en', 'ja', 'zh'] as const;
 
@@ -162,7 +166,8 @@ export default function ProfileForm(): ReactElement {
     handleSubmit,
     getValues,
     setValue,
-    formState: { errors, isSubmitting },
+    reset,
+    formState: { errors, isSubmitting, isDirty },
   } = useZodForm<ProfileFormValues>(profileSchema, {
     displayName: me.displayName,
     locale: (me.locale as ProfileFormValues['locale']) ?? 'en',
@@ -170,6 +175,9 @@ export default function ProfileForm(): ReactElement {
     country: me.country ?? '',
     weekStart: (me.weekStart as WeekStart) ?? (me.locale === 'ja' ? 'mon' : 'sun'),
   });
+
+  const saveStatus = useSaveStatus(isDirty);
+  const pending = isSubmitting || update.isPending;
 
   // Apply a locale change immediately so the rest of the form (country
   // names via Intl.DisplayNames, validation messages, etc.) reflects the
@@ -258,7 +266,9 @@ export default function ProfileForm(): ReactElement {
       if ((LOCALES as readonly string[]).includes(values.locale)) {
         setLanguage(values.locale);
       }
-      toaster.show({ tone: 'success', message: t('profile.saved') });
+      // The saved values become the new baseline, so the next edit reads as dirty.
+      reset(values);
+      saveStatus.markSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -268,138 +278,163 @@ export default function ProfileForm(): ReactElement {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        // Cap the form's reading-line at the narrow single-column measure
-        // (32rem ~ 512px). `--nf-space-16` is 4rem (step 16 in the spacing
-        // scale, not 16rem), so the previous `calc(var(--nf-space-16) * 2)`
-        // resolved to 8rem and crushed the form to 128px.
-        maxInlineSize: 'var(--nf-measure-narrow)',
-      }}
-    >
-      <AvatarUpload user={me} />
-      <form
-        onSubmit={(e) => {
-          void handleSubmit(onSubmit)(e);
-        }}
-        noValidate
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-4)',
-        }}
-      >
-        <FormField
-          label={t('profile.display_name')}
-          required
-          {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
-        >
-          {(control2) => {
-            const { ref, ...field } = register('displayName');
-            return <Input {...control2} {...field} ref={ref} />;
+    <div className={styles.stack}>
+      <section className={ui.section} aria-labelledby="profile-identity-title">
+        <h2 id="profile-identity-title" className={ui.sectionTitle}>
+          {t('profile.section_identity')}
+        </h2>
+        <AvatarUpload user={me} />
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
           }}
-        </FormField>
-
-        <FormField label={t('profile.locale.label')}>
-          {() => (
-            <Controller
-              name="locale"
-              control={control}
-              render={({ field }) => (
-                <SegmentedControl<SupportedLanguage>
-                  fullWidth
-                  value={field.value}
-                  onChange={handleLocaleChange}
-                  options={localeOptions}
-                  ariaLabel={t('profile.locale.label')}
-                />
-              )}
-            />
-          )}
-        </FormField>
-
-        <FormField label={t('profile.week_start.label')} description={t('profile.week_start.help')}>
-          {() => (
-            <Controller
-              name="weekStart"
-              control={control}
-              render={({ field }) => (
-                <SegmentedControl<WeekStart>
-                  fullWidth
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={weekStartOptions}
-                  ariaLabel={t('profile.week_start.label')}
-                />
-              )}
-            />
-          )}
-        </FormField>
-
-        <FormField
-          label={t('profile.timezone')}
-          {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
+          noValidate
+          className={styles.form}
         >
-          {(control2) => (
-            <Controller
-              name="timezone"
-              control={control}
-              render={({ field }) => (
-                <Combobox
-                  id={control2.id}
-                  options={timezoneOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  aria-label={t('profile.timezone')}
-                />
-              )}
-            />
-          )}
-        </FormField>
+          <FormField
+            label={t('profile.display_name')}
+            required
+            {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
+          >
+            {(control2) => {
+              const { ref, ...field } = register('displayName');
+              return <Input {...control2} {...field} ref={ref} autoComplete="name" />;
+            }}
+          </FormField>
 
-        <FormField
-          label={t('profile.country')}
-          description={t('profile.country_help')}
-          {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
-        >
-          {(control2) => (
-            <Controller
-              name="country"
-              control={control}
-              render={({ field }) => (
-                <Combobox
-                  id={control2.id}
-                  options={countryOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  aria-label={t('profile.country')}
-                />
-              )}
-            />
-          )}
-        </FormField>
+          <FormField label={t('profile.locale.label')}>
+            {() => (
+              <Controller
+                name="locale"
+                control={control}
+                render={({ field }) => (
+                  <SegmentedControl<SupportedLanguage>
+                    fullWidth
+                    value={field.value}
+                    onChange={handleLocaleChange}
+                    options={localeOptions}
+                    ariaLabel={t('profile.locale.label')}
+                  />
+                )}
+              />
+            )}
+          </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="submit" variant="primary" disabled={isSubmitting || update.isPending}>
-            {isSubmitting || update.isPending ? t('profile.saving') : t('profile.save')}
-          </Button>
-        </div>
-      </form>
+          <FormField
+            label={t('profile.week_start.label')}
+            description={t('profile.week_start.help')}
+          >
+            {() => (
+              <Controller
+                name="weekStart"
+                control={control}
+                render={({ field }) => (
+                  <SegmentedControl<WeekStart>
+                    fullWidth
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={weekStartOptions}
+                    ariaLabel={t('profile.week_start.label')}
+                  />
+                )}
+              />
+            )}
+          </FormField>
+
+          <FormField
+            label={t('profile.timezone')}
+            {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
+          >
+            {(control2) => (
+              <Controller
+                name="timezone"
+                control={control}
+                render={({ field }) => (
+                  <Combobox
+                    id={control2.id}
+                    options={timezoneOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    aria-label={t('profile.timezone')}
+                  />
+                )}
+              />
+            )}
+          </FormField>
+
+          <FormField
+            label={t('profile.country')}
+            description={t('profile.country_help')}
+            {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
+          >
+            {(control2) => (
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <Combobox
+                    id={control2.id}
+                    options={countryOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    aria-label={t('profile.country')}
+                  />
+                )}
+              />
+            )}
+          </FormField>
+
+          <div className={ui.actions}>
+            <SaveStatus saved={saveStatus.saved} dirty={isDirty} />
+            <Button type="submit" variant="primary" disabled={pending} aria-busy={pending}>
+              {t('profile.save')}
+            </Button>
+          </div>
+        </form>
+      </section>
 
       {/* Theme picker — changes apply immediately (synced to server via ThemeProvider). */}
-      <ThemePicker
-        themes={themeEntries}
-        selectedTheme={family}
-        colorModes={colorModeEntries}
-        selectedColorMode={colorMode}
-        onThemeChange={handleFamilyChange}
-        onColorModeChange={handleColorModeChange}
-        themeLabel={t('profile.theme')}
-        colorModeLabel={t('profile.color_mode')}
-      />
+      <section className={ui.section} aria-labelledby="profile-appearance-title">
+        <div className={ui.sectionHeader}>
+          <h2 id="profile-appearance-title" className={ui.sectionTitle}>
+            {t('profile.section_appearance')}
+          </h2>
+          <p className={ui.sectionDescription}>{t('profile.section_appearance_help')}</p>
+        </div>
+        <ThemePicker
+          themes={themeEntries}
+          selectedTheme={family}
+          colorModes={colorModeEntries}
+          selectedColorMode={colorMode}
+          onThemeChange={handleFamilyChange}
+          onColorModeChange={handleColorModeChange}
+          themeLabel={t('profile.theme')}
+          colorModeLabel={t('profile.color_mode')}
+        />
+      </section>
+    </div>
+  );
+}
+
+/** Placeholder with the form's own shape, shown while `useMeQuery` suspends. */
+export function ProfileFormSkeleton(): ReactElement {
+  return (
+    <div className={styles.stack} aria-hidden="true">
+      <div className={ui.section}>
+        <Skeleton className={styles.skeletonTitle} />
+        <div className={styles.skeletonAvatarRow}>
+          <Skeleton className={styles.skeletonAvatar} />
+          <Skeleton className={styles.skeletonLine} />
+        </div>
+        <Skeleton className={styles.skeletonField} />
+        <Skeleton className={styles.skeletonField} />
+        <Skeleton className={styles.skeletonField} />
+        <Skeleton className={styles.skeletonField} />
+      </div>
+      <div className={ui.section}>
+        <Skeleton className={styles.skeletonTitle} />
+        <Skeleton className={styles.skeletonBlock} />
+      </div>
     </div>
   );
 }

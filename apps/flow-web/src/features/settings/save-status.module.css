@@ -1,0 +1,36 @@
+/* Inline save state beside a settings form's primary action. */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.region {
+  display: inline-flex;
+}
+
+.unsaved {
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-success-fg);
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.saved[data-state="closed"] {
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.icon {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  flex-shrink: 0;
+}

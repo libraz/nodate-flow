@@ -4,14 +4,17 @@
  * (mouse events, no external library) and widget removal.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
 import Button from '@nodate-flow/ui/primitives/button';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { LayoutDashboard, Pencil, Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import AddWidgetDialog from './add-widget-dialog';
 import { useDeleteWidget, useUpdateWidgetPosition, useWidgetsQuery, type WidgetItem } from './api';
 import styles from './dashboard.module.css';
@@ -32,6 +35,8 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
   const { data: widgets } = useWidgetsQuery(wsId);
   const deleteWidget = useDeleteWidget(wsId);
   const updatePosition = useUpdateWidgetPosition(wsId);
+  const stagger = useFirstLoadStagger();
+  const presence = usePresenceList(widgets, (widget) => widget.id);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragStartRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
@@ -109,13 +114,21 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleRemove = (widgetId: string): void => {
-    void deleteWidget.mutateAsync(widgetId).catch((err: unknown) => {
-      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'delete_widget_error') });
+  const handleRemove = async (widgetId: string): Promise<void> => {
+    const confirmed = await confirmAction({
+      message: t('remove_widget_confirm'),
+      confirmLabel: t('remove_widget'),
+      tone: 'danger',
     });
+    if (!confirmed) return;
+    try {
+      await deleteWidget.mutateAsync(widgetId);
+    } catch (err) {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, 'delete_widget_error') });
+    }
   };
 
-  if (widgets.length === 0) {
+  if (presence.entries.length === 0) {
     return (
       <div className={styles.empty}>
         <div className={styles.widgetBodyIcon}>
@@ -133,17 +146,23 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
 
   return (
     <div className={styles.grid}>
-      {widgets.map((widget) => (
+      {presence.entries.map((entry, index) => (
         <WidgetCard
-          key={widget.id}
-          widget={widget}
+          key={entry.key}
+          widget={entry.item}
+          present={entry.present}
+          onExited={() => {
+            presence.onExited(entry.key);
+          }}
+          enterStyle={stagger(index)}
           editing={editing}
-          dragging={draggingId === widget.id}
+          dragging={draggingId === entry.key}
+          removing={deleteWidget.isPending && deleteWidget.variables === entry.key}
           onRemove={() => {
-            handleRemove(widget.id);
+            void handleRemove(entry.key);
           }}
           onMouseDown={(e) => {
-            handleMouseDown(widget, e);
+            handleMouseDown(entry.item, e);
           }}
         />
       ))}
@@ -196,14 +215,10 @@ export default function DashboardView({ workspaceId }: DashboardViewProps): Reac
 
       <Suspense
         fallback={
-          <div
-            style={{
-              padding: 'var(--nf-space-8)',
-              textAlign: 'center',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('title')}
+          <div className={styles.grid} aria-busy="true">
+            <Skeleton className={styles.widgetSkeleton} />
+            <Skeleton className={styles.widgetSkeleton} />
+            <Skeleton className={styles.widgetSkeleton} />
           </div>
         }
       >

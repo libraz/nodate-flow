@@ -16,7 +16,9 @@
 
 import type { components } from '@nodate-flow/sdk';
 import type { RecurrenceRule } from '@nodate-flow/ui/calendar/types';
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Button from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
@@ -37,6 +39,7 @@ import {
   type KeyboardEvent,
   type ReactElement,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -886,6 +889,8 @@ export default function EventDialog({
   const isPending =
     createEvent.isPending || updateEvent.isPending || deleteEvent.isPending || createTask.isPending;
   const slow = useSlowPending(isPending);
+  const noticePresence = usePresence<HTMLParagraphElement>(slow && scopePrompt === null);
+  const disclosureId = useId();
   const refreshCalendar = useRefreshCalendar();
 
   /**
@@ -1242,8 +1247,6 @@ export default function EventDialog({
     onClose();
   }
 
-  if (!open) return null;
-
   /* ── render ─── */
 
   const showCalendar = kind !== 'task';
@@ -1585,7 +1588,7 @@ export default function EventDialog({
                               markDirty('blockCustomLabel');
                               setBlockCustomLabel(e.currentTarget.value);
                             }}
-                            style={{ marginBlockStart: 'var(--nf-space-2)' }}
+                            className={styles.blockCustomInput}
                           />
                         ) : null}
                       </>
@@ -1603,10 +1606,11 @@ export default function EventDialog({
               onClick={() => setExpanded((s) => !s)}
               className={styles.disclosureToggle}
               aria-expanded={expanded}
+              aria-controls={disclosureId}
             >
               {t('action.moreOptions')}
             </Button>
-            {expanded ? (
+            <Collapse open={expanded} id={disclosureId}>
               <div className={styles.disclosurePanel}>
                 <FormField label={t('field.recurrence')}>
                   {(control) => (
@@ -1698,7 +1702,7 @@ export default function EventDialog({
                   )}
                 </FormField>
               </div>
-            ) : null}
+            </Collapse>
           </div>
 
           {mode.kind === 'edit' &&
@@ -1736,8 +1740,14 @@ export default function EventDialog({
              * same news twice to a screen reader while only one of them
              * is visible.
              */}
-            {slow && scopePrompt === null ? (
-              <p className={styles.pendingNotice} role="status" aria-live="polite">
+            {noticePresence.mounted ? (
+              <p
+                ref={noticePresence.ref}
+                data-state={noticePresence.state}
+                className={styles.pendingNotice}
+                role="status"
+                aria-live="polite"
+              >
                 {t('action.submit.slow')}
               </p>
             ) : null}
@@ -1752,10 +1762,13 @@ export default function EventDialog({
               >
                 {t('action.cancel')}
               </Button>
-              <Button type="submit" disabled={isPending} aria-busy={isPending || undefined}>
-                {isPending
-                  ? t(isCreate ? 'action.submit.creating' : 'action.submit.saving')
-                  : t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isPending}
+                aria-busy={isPending || undefined}
+              >
+                {t(isCreate ? 'action.submit.create' : 'action.submit.edit')}
               </Button>
             </div>
           </div>
@@ -1768,7 +1781,7 @@ export default function EventDialog({
        * the form's submit or its Cmd+Enter handler. Mounted only while
        * the question stands, so each ask starts from the default answer.
        */}
-      {scopePrompt !== null ? (
+      {open && scopePrompt !== null ? (
         <RecurringScopeDialog
           open
           action={scopePrompt.action}

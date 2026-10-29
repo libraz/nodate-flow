@@ -1,9 +1,11 @@
 .dock {
   position: fixed;
   inset-block-end: var(--nf-space-6);
-  inset-inline-start: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
+  /* Centred without a transform so it holds under RTL and leaves `translate` to the enter animation. */
+  inset-inline: 0;
+  margin-inline: auto;
+  inline-size: fit-content;
+  display: flex;
   align-items: center;
   gap: var(--nf-space-2);
   padding-block: var(--nf-space-2);
@@ -15,6 +17,7 @@
   border-radius: var(--nf-radius-lg);
   box-shadow: var(--nf-shadow-lg);
   z-index: var(--nf-z-sticky);
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out) both;
 }
 
 .button {
@@ -31,15 +34,18 @@
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   transition:
-    background var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
     color var(--nf-duration-fast) var(--nf-ease-standard),
-    transform var(--nf-duration-fast) var(--nf-ease-standard);
+    scale var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .button:hover {
   background: var(--nf-color-surface-hover);
   color: var(--nf-color-fg);
-  transform: translateY(-2px);
+}
+
+.button:active {
+  scale: var(--nf-motion-press-scale);
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
@@ -55,7 +61,12 @@
 .shortcut {
   display: inline-flex;
   align-items: center;
-  padding-inline: var(--nf-space-3);
+  margin-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg-elevated);
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-subtle);

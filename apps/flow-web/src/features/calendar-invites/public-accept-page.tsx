@@ -173,6 +173,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="primary"
               disabled={mutation.isPending}
+              aria-busy={(mutation.isPending && mutation.variables === 'accepted') || undefined}
               onClick={() => {
                 submit('accepted');
               }}
@@ -183,6 +184,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="default"
               disabled={mutation.isPending}
+              aria-busy={(mutation.isPending && mutation.variables === 'tentative') || undefined}
               onClick={() => {
                 submit('tentative');
               }}
@@ -193,6 +195,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
               type="button"
               variant="ghost"
               disabled={mutation.isPending}
+              aria-busy={(mutation.isPending && mutation.variables === 'declined') || undefined}
               onClick={() => {
                 submit('declined');
               }}
@@ -203,6 +206,7 @@ function AcceptInviteForm({ token }: AcceptInviteFormProps): ReactElement {
 
           {mutation.isPending ? (
             <p
+              role="status"
               style={{
                 margin: 0,
                 fontSize: 'var(--nf-text-sm)',

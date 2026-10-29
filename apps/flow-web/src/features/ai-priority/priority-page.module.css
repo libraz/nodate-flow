@@ -65,6 +65,7 @@
 }
 
 .list {
+  --presence-gap: var(--nf-space-3);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
@@ -73,33 +74,24 @@
   padding: 0;
 }
 
-.empty {
-  margin: 0;
-  padding: var(--nf-space-5);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-  text-align: center;
+.skeletonTitle {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1.75rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 14rem;
 }
 
-.toastBody {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-3);
+.skeletonLine {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1.25rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 18rem;
+  max-inline-size: 100%;
 }
 
-.toastUndo {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-weight: var(--nf-weight-semibold);
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.toastUndo:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
-  border-radius: var(--nf-radius-sm);
+.skeletonCard {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 8.5rem;
+  inline-size: 100%;
+  border-radius: var(--nf-radius-md);
 }

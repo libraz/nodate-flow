@@ -361,6 +361,12 @@ async function installAuthCorsShim(context: BrowserContext): Promise<void> {
   await context.route(
     (url) => url.origin === authOrigin || url.origin === apiOrigin,
     async (route, request) => {
+      // SSE streams never end, so route.fetch() would hang until the test
+      // times out; the API allows the dev origin, so no shim is needed.
+      if (request.headers().accept?.includes('text/event-stream')) {
+        await route.fallback();
+        return;
+      }
       const origin = request.headers().origin ?? '*';
       // Preflight: respond locally with the headers the browser needs.
       if (request.method() === 'OPTIONS') {
@@ -403,7 +409,7 @@ async function installAuthCorsShim(context: BrowserContext): Promise<void> {
         // real test outcome. Anything else gets re-thrown so genuine
         // bugs in the shim still fail loudly.
         const msg = err instanceof Error ? err.message : String(err);
-        if (!/closed|disposed|Frame was detached/i.test(msg)) throw err;
+        if (!/closed|disposed|Frame was detached|Test ended|Test timeout/i.test(msg)) throw err;
       }
     },
   );

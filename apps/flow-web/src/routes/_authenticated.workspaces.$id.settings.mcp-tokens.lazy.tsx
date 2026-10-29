@@ -2,12 +2,12 @@
  * /workspaces/$id/settings/mcp-tokens — manage MCP personal access tokens (lazy).
  */
 
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 
 import TokenList from '../features/mcp-tokens/token-list';
+import SettingsListSkeleton from '../features/settings/settings-list-skeleton';
 import AccessRestricted from '../features/workspaces/access-restricted';
 import { ApiError } from '../lib/api-error';
 
@@ -28,16 +28,7 @@ function WorkspaceMcpTokensRoute(): ReactElement {
   const { id } = routeApi.useParams();
   return (
     <ErrorBoundary FallbackComponent={SettingsErrorFallback}>
-      <Suspense
-        fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />
-          </div>
-        }
-      >
+      <Suspense fallback={<SettingsListSkeleton />}>
         <TokenList workspaceId={id} />
       </Suspense>
     </ErrorBoundary>

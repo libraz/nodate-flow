@@ -19,6 +19,9 @@
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .meter:hover {

@@ -71,19 +71,17 @@ const ACTION_KEYS = {
     title: 'recurrence.scope.save.title',
     legend: 'recurrence.scope.save.legend',
     confirm: 'recurrence.scope.save.confirm',
-    pending: 'recurrence.scope.save.pending',
     slow: 'recurrence.scope.save.slow',
   },
   delete: {
     title: 'recurrence.scope.delete.title',
     legend: 'recurrence.scope.delete.legend',
     confirm: 'recurrence.scope.delete.confirm',
-    pending: 'recurrence.scope.delete.pending',
     slow: 'recurrence.scope.delete.slow',
   },
 } as const satisfies Record<
   RecurringScopeAction,
-  Record<'title' | 'legend' | 'confirm' | 'pending' | 'slow', string>
+  Record<'title' | 'legend' | 'confirm' | 'slow', string>
 >;
 
 export interface RecurringScopeDialogProps {
@@ -195,7 +193,7 @@ export default function RecurringScopeDialog({
               onConfirm(scope);
             }}
           >
-            {t(ACTION_KEYS[action][pending ? 'pending' : 'confirm'])}
+            {t(ACTION_KEYS[action].confirm)}
           </Button>
         </div>
       </div>

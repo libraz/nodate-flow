@@ -5,13 +5,19 @@
  * AI triage button that requests inbox suggestions for the active workspace.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
+import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import ToggleChip from '@nodate-flow/ui/primitives/toggle-chip';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
 import { Inbox as InboxIcon } from 'lucide-react';
-import { type ChangeEvent, type ReactElement, useState } from 'react';
+import { type ChangeEvent, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { useApplyAiSuggestion, useDismissAiSuggestion } from '../ai-suggestions/api';
 import EditSuggestionDialog, {
@@ -25,6 +31,7 @@ import {
 } from '../ai-suggestions/store';
 import { useWorkspacesQuery } from '../workspaces/api';
 import { useArchiveInboxItem, useInboxQuery, useSnoozeInboxItem } from './api';
+import styles from './inbox.module.css';
 import InboxItemRow from './inbox-item-row';
 import { useInboxTriageMutation } from './triage-api';
 import TriageSuggestionRow from './triage-suggestion-row';
@@ -51,6 +58,12 @@ export default function InboxList(): ReactElement {
   const applySuggestion = useApplyAiSuggestion(triageWorkspaceId);
   const dismissSuggestion = useDismissAiSuggestion(triageWorkspaceId);
   const suggestions = useSuggestions(selectSuggestions);
+  // Both lists keep a removed row mounted for its exit; the filters apply to
+  // the entries afterwards so the hook always sees the stable cached arrays.
+  const itemPresence = usePresenceList(items, (item) => item.id);
+  const suggestionPresence = usePresenceList(suggestions, (s) => s.inboxItemId);
+  const stagger = useFirstLoadStagger();
+  const workspaceSelectId = useId();
 
   const handleArchive = (id: string): void => {
     archive.mutate(id, {
@@ -167,47 +180,22 @@ export default function InboxList(): ReactElement {
     setEditingSuggestion(null);
   };
 
-  const workspaceFiltered =
-    selectedWorkspaceId === 'all'
-      ? items
-      : items.filter((item) => item.workspaceId === selectedWorkspaceId);
-  const filteredItems = handoffOnly
-    ? workspaceFiltered.filter((item) => item.kind === HANDOFF_KIND)
-    : workspaceFiltered;
+  const visibleEntries = itemPresence.entries.filter(
+    ({ item }) =>
+      (selectedWorkspaceId === 'all' || item.workspaceId === selectedWorkspaceId) &&
+      (!handoffOnly || item.kind === HANDOFF_KIND),
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 'var(--nf-space-3)',
-          flexWrap: 'wrap',
-        }}
-      >
-        <label
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-1-5)',
-            fontSize: 'var(--nf-text-sm)',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
+    <div className={styles.body}>
+      <div className={styles.toolbar}>
+        <label className={styles.workspaceField} htmlFor={workspaceSelectId}>
           {t('filter.workspace_label')}
-          <select
+          <Select
+            id={workspaceSelectId}
             value={selectedWorkspaceId}
             onChange={handleWorkspaceChange}
-            style={{
-              padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: 'var(--nf-radius-md)',
-              border: '1px solid var(--nf-color-border)',
-              background: 'var(--nf-color-surface)',
-              color: 'var(--nf-color-fg)',
-              fontSize: 'var(--nf-text-base)',
-              // nf-token-override: component dimension, not a spacing step
-              maxInlineSize: '20rem',
-            }}
+            className={styles.workspaceSelect}
           >
             <option value="all">{t('filter.workspace_all')}</option>
             {workspaces.map((workspace) => (
@@ -215,113 +203,69 @@ export default function InboxList(): ReactElement {
                 {workspace.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <Button
-          type="button"
-          variant={handoffOnly ? 'primary' : 'default'}
-          size="sm"
-          aria-pressed={handoffOnly}
-          onClick={() => {
-            setHandoffOnly((prev) => !prev);
-          }}
-        >
+        <ToggleChip pressed={handoffOnly} onPressedChange={setHandoffOnly}>
           {t('filter.handoff')}
-        </Button>
+        </ToggleChip>
         <Button
           type="button"
           variant="primary"
           size="sm"
+          className={styles.toolbarEnd}
           onClick={handleTriageClick}
           disabled={!triageWorkspaceId || triage.isPending || items.length === 0}
+          aria-busy={triage.isPending}
         >
           {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
         </Button>
       </div>
 
-      {suggestions.length > 0 ? (
-        <section
-          aria-label={tAi('triage.result_title')}
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 'var(--nf-text-sm)',
-              fontWeight: 600,
-              color: 'var(--nf-color-fg-muted)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            {tAi('triage.result_title')}
-          </h2>
-          <ul
-            style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-2)',
-            }}
-          >
-            {suggestions.map((suggestion) => (
-              <li key={suggestion.inboxItemId}>
+      {suggestionPresence.entries.length > 0 ? (
+        <section aria-label={tAi('triage.result_title')} className={styles.suggestions}>
+          <h2 className={styles.sectionTitle}>{tAi('triage.result_title')}</h2>
+          <ul className={styles.list}>
+            {suggestionPresence.entries.map((entry, index) => (
+              <PresenceItem
+                key={entry.key}
+                as="li"
+                present={entry.present}
+                onExited={() => suggestionPresence.onExited(entry.key)}
+                className={motion.enter}
+                style={stagger(index)}
+              >
                 <TriageSuggestionRow
-                  suggestion={suggestion}
+                  suggestion={entry.item}
                   onApply={handleApplySuggestion}
                   onDismiss={handleDismissSuggestion}
                   onEdit={handleEditSuggestion}
                 />
-              </li>
+              </PresenceItem>
             ))}
           </ul>
         </section>
       ) : null}
 
-      {filteredItems.length === 0 ? (
-        <div
-          style={{
-            padding: 'var(--nf-space-12) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-lg)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 'var(--nf-space-3)',
-            }}
-          >
-            <InboxIcon
-              size={48}
-              strokeWidth={1}
-              style={{ color: 'var(--nf-color-fg-muted)', opacity: 0.5 }}
-            />
-            {t('view.empty')}
-          </div>
-        </div>
+      {visibleEntries.length === 0 ? (
+        <EmptyState
+          className={styles.empty}
+          icon={<InboxIcon size={40} strokeWidth={1.25} aria-hidden="true" />}
+          title={t('view.empty')}
+          titleAs="p"
+        />
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-3)',
-          }}
-        >
-          {filteredItems.map((item) => (
-            <li key={item.id}>
-              <InboxItemRow item={item} onArchive={handleArchive} onSnooze={handleSnooze} />
-            </li>
+        <ul className={styles.list}>
+          {visibleEntries.map((entry, index) => (
+            <PresenceItem
+              key={entry.key}
+              as="li"
+              present={entry.present}
+              onExited={() => itemPresence.onExited(entry.key)}
+              className={motion.enter}
+              style={stagger(index)}
+            >
+              <InboxItemRow item={entry.item} onArchive={handleArchive} onSnooze={handleSnooze} />
+            </PresenceItem>
           ))}
         </ul>
       )}

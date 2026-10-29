@@ -8,16 +8,19 @@
  * `draggable` back to the underlying Card.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
 import { Link } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import { Lock, Tag } from 'lucide-react';
+import type { CSSProperties, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate, isOverdue } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import type { TaskDerivedState, TaskListItem, TaskPriority, TransitionName } from './api';
 import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
+import css from './task-card.module.css';
 import TaskMoveMenu from './task-move-menu';
 
 export interface TaskCardProps {
@@ -31,6 +34,9 @@ export interface TaskCardProps {
     transition: TransitionName,
     landingState: TaskDerivedState,
   ) => void;
+  /** Extra class on the card root, e.g. the board's entrance motion. */
+  className?: string | undefined;
+  style?: CSSProperties | undefined;
 }
 
 export default function TaskCard({
@@ -38,6 +44,8 @@ export default function TaskCard({
   blockedByOpenCount = 0,
   onSelect,
   onTransition,
+  className,
+  style,
 }: TaskCardProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const zone = useEffectiveZone();
@@ -51,6 +59,7 @@ export default function TaskCard({
   const priority = (task.priority as TaskPriority) ?? 0;
   const tone = PRIORITY_TONE[priority] ?? 'neutral';
   const priorityLabel = t(PRIORITY_KEY[priority] ?? 'tasks.priority.none');
+  const closed = task.derivedState === 'done' || task.derivedState === 'cancelled';
 
   return (
     <Card
@@ -60,11 +69,13 @@ export default function TaskCard({
         // clicks that reach here come from the card's padding / badges.
         onSelect(task.id);
       }}
-      className="flex flex-col gap-2 p-3.5"
+      data-closed={closed}
+      className={cx(css.card, className)}
+      style={style}
     >
-      <div className="flex items-start gap-1">
+      <div className={css.top}>
         {ext.projectIdentifier && ext.taskNumber ? (
-          <span className="shrink-0 rounded bg-[var(--nf-color-bg-sunken)] px-1.5 py-0.5 text-xs font-mono text-[var(--nf-color-fg-muted)]">
+          <span className={css.ref}>
             {ext.projectIdentifier}-{ext.taskNumber}
           </span>
         ) : null}
@@ -83,7 +94,7 @@ export default function TaskCard({
             e.stopPropagation();
             onSelect(task.id);
           }}
-          className="flex-1 font-semibold text-[var(--nf-color-fg)] leading-[1.3] break-words no-underline"
+          className={css.title}
         >
           {task.title}
         </Link>
@@ -95,7 +106,7 @@ export default function TaskCard({
           }
         />
       </div>
-      <div className="flex gap-2 items-center flex-wrap">
+      <div className={css.meta}>
         {priority > 0 ? <Badge tone={tone}>{priorityLabel}</Badge> : null}
         {task.dueOn ? (
           <Badge
@@ -117,25 +128,18 @@ export default function TaskCard({
             aria-label={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
             title={t('tasks.card.blockedBy', { count: blockedByOpenCount })}
           >
-            {`\u{1F512} ${blockedByOpenCount}`}
+            <span className={css.metaIcon}>
+              <Lock size={12} aria-hidden />
+              {blockedByOpenCount}
+            </span>
           </Badge>
         ) : null}
         {ext.labelCount && ext.labelCount > 0 ? (
-          <Badge tone="neutral" aria-label={`${ext.labelCount} labels`}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              className="h-3 w-3"
-              aria-hidden="true"
-            >
-              <path
-                fillRule="evenodd"
-                d="M4.5 2A2.5 2.5 0 0 0 2 4.5v2.879a2.5 2.5 0 0 0 .732 1.767l4.5 4.5a2.5 2.5 0 0 0 3.536 0l2.878-2.878a2.5 2.5 0 0 0 0-3.536l-4.5-4.5A2.5 2.5 0 0 0 7.38 2H4.5ZM5 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-                clipRule="evenodd"
-              />
-            </svg>
-            {ext.labelCount}
+          <Badge tone="neutral" aria-label={t('labels:task.count', { count: ext.labelCount })}>
+            <span className={css.metaIcon}>
+              <Tag size={12} aria-hidden />
+              {ext.labelCount}
+            </span>
           </Badge>
         ) : null}
       </div>

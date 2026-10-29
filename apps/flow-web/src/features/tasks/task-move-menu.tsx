@@ -36,6 +36,16 @@ const LANDING_STATE: Record<TransitionName, TaskDerivedState> = {
   cancel: 'cancelled',
 };
 
+const TRANSITION_LABEL_KEY: Record<TransitionName, string> = {
+  start: 'tasks.transitions.start',
+  block: 'tasks.transitions.block',
+  unblock: 'tasks.transitions.unblock',
+  submit: 'tasks.transitions.submit',
+  complete: 'tasks.transitions.complete',
+  reopen: 'tasks.transitions.reopen',
+  cancel: 'tasks.transitions.cancel',
+};
+
 export interface TaskMoveMenuProps {
   /** Current derived state of the task. */
   state: TaskDerivedState;
@@ -67,6 +77,14 @@ export default function TaskMoveMenu({
     onTransition(transition, LANDING_STATE[transition]);
   };
 
+  // mutateAsync: the menu (and its card) may be gone by the time Undo is pressed.
+  const undoWith = (reverse: typeof archiveMutation, errorKey: string): void => {
+    if (!taskId) return;
+    reverse.mutateAsync(taskId).catch((err: unknown) => {
+      toaster.show({ tone: 'danger', message: formatApiError(err, t, errorKey) });
+    });
+  };
+
   const handleArchive = () => {
     if (!taskId) return;
     setOpen(false);
@@ -74,7 +92,14 @@ export default function TaskMoveMenu({
     if (isArchived) {
       unarchiveMutation.mutate(taskId, {
         onSuccess: () => {
-          toaster.show({ tone: 'success', message: t('archive.unarchived', { ns: 'labels' }) });
+          toaster.show({
+            tone: 'info',
+            message: t('archive.unarchived', { ns: 'labels' }),
+            action: {
+              label: t('common.undo'),
+              onAction: () => undoWith(archiveMutation, 'labels:archive.error_archive'),
+            },
+          });
         },
         onError: (err) => {
           toaster.show({
@@ -86,7 +111,14 @@ export default function TaskMoveMenu({
     } else {
       archiveMutation.mutate(taskId, {
         onSuccess: () => {
-          toaster.show({ tone: 'success', message: t('archive.archived', { ns: 'labels' }) });
+          toaster.show({
+            tone: 'info',
+            message: t('archive.archived', { ns: 'labels' }),
+            action: {
+              label: t('common.undo'),
+              onAction: () => undoWith(unarchiveMutation, 'labels:archive.error_unarchive'),
+            },
+          });
         },
         onError: (err) => {
           toaster.show({
@@ -148,7 +180,7 @@ export default function TaskMoveMenu({
                 onClick={() => handleSelect(name)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
               >
-                <span>{t(`tasks.transitions.${name}`)}</span>
+                <span>{t(TRANSITION_LABEL_KEY[name])}</span>
                 <span className={styles.menuItemLanding}>→ {t(STATE_KEY[landing])}</span>
               </button>
             );

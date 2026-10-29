@@ -41,8 +41,7 @@
     "applied": "Updated to {priority}.",
     "applyFailed": "Couldn't update priority.",
     "dismissed": "Dismissed for now.",
-    "undone": "Undone.",
-    "undo": "Undo"
+    "undone": "Undone."
   },
   "error": {
     "fetchFailed": "Failed to load priority suggestions.",

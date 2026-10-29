@@ -12,6 +12,8 @@ import { type ReactElement, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import IntegrationsPanel from '../features/settings/integrations-panel';
+import panelStyles from '../features/settings/integrations-panel.module.css';
+import ui from '../features/settings/settings-ui.module.css';
 
 function IntegrationsRoute(): ReactElement {
   const { t } = useTranslation('settings');
@@ -46,17 +48,16 @@ function IntegrationsRoute(): ReactElement {
   }, [router, t]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('integrations.title')}</h1>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <h1 className={ui.title}>{t('integrations.title')}</h1>
+      </header>
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '5rem', inlineSize: '100%' }} />
+          <div className={ui.skeletonStack} aria-hidden="true">
+            <Skeleton className={panelStyles.skeletonRow} />
+            <Skeleton className={panelStyles.skeletonRow} />
+            <Skeleton className={panelStyles.skeletonRow} />
           </div>
         }
       >

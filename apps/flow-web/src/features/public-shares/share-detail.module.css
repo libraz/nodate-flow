@@ -15,6 +15,11 @@
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
   text-decoration: none;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.backLink:hover {
+  color: var(--nf-color-fg);
 }
 
 .header {
@@ -58,7 +63,7 @@
 
 .tableWrap {
   overflow-x: auto;
-  transition: opacity var(--nf-duration-fast) ease;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .tableWrapBusy {
@@ -97,13 +102,34 @@
   color: var(--nf-color-fg-muted);
 }
 
+.row {
+  border-block-start: 1px solid var(--nf-color-border);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+/* The row being dragged lifts off the table. dnd-kit owns the transform. */
+.row--dragging {
+  position: relative;
+  z-index: 1;
+  background: var(--nf-color-surface-hover);
+  box-shadow: var(--nf-shadow-sm);
+}
+
 .handleCell {
-  padding: var(--nf-space-1) var(--nf-space-1) var(--nf-space-1) var(--nf-space-2);
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2) var(--nf-space-1);
   vertical-align: middle;
 }
 
 .cell {
   padding: var(--nf-space-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .cellActions {
@@ -136,6 +162,23 @@
   cursor: grab;
   touch-action: none;
   border-radius: var(--nf-radius-sm);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.dragHandle:hover:not(:disabled) {
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+}
+
+.dragHandle:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .dragHandle:disabled {

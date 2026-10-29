@@ -18,6 +18,7 @@
  */
 
 import Input from '@nodate-flow/ui/primitives/input';
+import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Select from '@nodate-flow/ui/primitives/select';
 import { type ChangeEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,13 @@ import styles from './archived.module.css';
 import type { ArchiveRange } from './hooks/use-archive-filters';
 
 const RANGES: readonly ArchiveRange[] = ['7d', '30d', '90d', 'all'] as const;
+
+const RANGE_KEY: Record<ArchiveRange, string> = {
+  '7d': 'filters.range.7d',
+  '30d': 'filters.range.30d',
+  '90d': 'filters.range.90d',
+  all: 'filters.range.all',
+};
 const SEARCH_DEBOUNCE_MS = 200;
 
 export interface ArchivedFiltersProps {
@@ -93,22 +101,13 @@ export default function ArchivedFilters({
         onChange={handleSearch}
       />
 
-      <div role="radiogroup" aria-label={t('filters.range.all')} className={styles.rangeGroup}>
-        {RANGES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={range === value}
-            className={styles.rangePill}
-            onClick={() => {
-              onRangeChange(value);
-            }}
-          >
-            {t(`filters.range.${value}`)}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl<ArchiveRange>
+        ariaLabel={t('filters.range.all')}
+        size="sm"
+        value={range}
+        onChange={onRangeChange}
+        options={RANGES.map((value) => ({ value, label: t(RANGE_KEY[value]) }))}
+      />
 
       <div className={styles.filterGroup}>
         <label htmlFor="archive-project-filter">{t('filters.project')}</label>

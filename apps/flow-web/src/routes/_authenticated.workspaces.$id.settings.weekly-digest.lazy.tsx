@@ -6,11 +6,10 @@
  * markdown body. Read-only.
  */
 
-import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
-
+import SettingsListSkeleton from '../features/settings/settings-list-skeleton';
 import DigestView from '../features/weekly-digest/digest-view';
 import AccessRestricted from '../features/workspaces/access-restricted';
 import { ApiError } from '../lib/api-error';
@@ -31,31 +30,11 @@ function SettingsErrorFallback({ error }: FallbackProps): ReactElement {
 function WeeklyDigestRoute(): ReactElement {
   const { id } = routeApi.useParams();
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        inlineSize: '100%',
-      }}
-    >
-      <ErrorBoundary FallbackComponent={SettingsErrorFallback}>
-        <Suspense
-          fallback={
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-              <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
-              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-              <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
-              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-              <Skeleton style={{ blockSize: '10rem', inlineSize: '100%' }} />
-            </div>
-          }
-        >
-          <DigestView workspaceId={id} />
-        </Suspense>
-      </ErrorBoundary>
-    </section>
+    <ErrorBoundary FallbackComponent={SettingsErrorFallback}>
+      <Suspense fallback={<SettingsListSkeleton />}>
+        <DigestView workspaceId={id} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

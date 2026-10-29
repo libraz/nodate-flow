@@ -5,21 +5,20 @@
  * this in <Suspense> (Suspense-mode query).
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { TFunction } from 'i18next';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import {
-  type SessionSummary,
-  useMySessionsQuery,
-  useRevokeAllOtherSessions,
-  useRevokeSession,
-} from './api';
+import { useMySessionsQuery, useRevokeAllOtherSessions, useRevokeSession } from './api';
 import styles from './sessions-panel.module.css';
+import ui from './settings-ui.module.css';
 
 type BrowserId = 'edge' | 'firefox' | 'chrome' | 'safari' | 'unknown';
 type OsId = 'windows' | 'macos' | 'android' | 'ios' | 'linux' | 'unknown';
@@ -141,6 +140,8 @@ export default function SessionsPanel(): ReactElement {
   const revokeAll = useRevokeAllOtherSessions();
 
   const hasOthers = sessions.some((s) => !s.current);
+  const { entries, onExited } = usePresenceList(sessions, (s) => s.id);
+  const revokingId = revokeOne.isPending ? revokeOne.variables : undefined;
 
   const handleRevoke = async (id: string): Promise<void> => {
     try {
@@ -155,7 +156,11 @@ export default function SessionsPanel(): ReactElement {
   };
 
   const handleRevokeAll = async (): Promise<void> => {
-    if (!(await confirmAction({ message: t('security.sessions.revoke_all_confirm') }))) return;
+    const confirmed = await confirmAction({
+      message: t('security.sessions.revoke_all_confirm'),
+      confirmLabel: t('security.sessions.revoke_all'),
+    });
+    if (!confirmed) return;
     try {
       const { revoked } = await revokeAll.mutateAsync();
       toaster.show({
@@ -171,72 +176,90 @@ export default function SessionsPanel(): ReactElement {
   };
 
   return (
-    <section className={styles.section}>
+    <div className={styles.section}>
       <p className={styles.description}>{t('security.sessions.description')}</p>
 
       {sessions.length === 0 ? (
-        <p className={styles.empty}>{t('security.sessions.empty')}</p>
+        <EmptyState titleAs="p" title={t('security.sessions.empty')} className={ui.empty} />
       ) : (
         <ul className={styles.list}>
-          {sessions.map((s: SessionSummary) => (
-            <li key={s.id} className={`${styles.row} ${s.current ? styles.rowCurrent : ''}`.trim()}>
-              <div className={styles.identity}>
-                <span className={styles.deviceLine} title={s.userAgent || undefined}>
-                  {s.userAgent
-                    ? formatDevice(s.userAgent, tSystem)
-                    : t('security.sessions.unknown_device')}
-                  {s.current && (
-                    <span className={styles.currentBadge}>
-                      {t('security.sessions.current_badge')}
-                    </span>
-                  )}
-                </span>
-                <span className={styles.metaPrimary}>
-                  {s.ipAddress || t('security.sessions.unknown_ip')}
-                </span>
-                <span className={styles.metaSecondary}>
-                  {t('security.sessions.created_at', {
-                    time: formatUnix(s.createdAt, i18n.language),
-                  })}
-                  {s.lastUsedAt != null && (
-                    <>
-                      {' · '}
-                      {t('security.sessions.last_used_at', {
-                        time: formatUnix(s.lastUsedAt, i18n.language),
-                      })}
-                    </>
-                  )}
-                </span>
+          {entries.map(({ key, item: s, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => {
+                onExited(key);
+              }}
+              className={styles.item}
+            >
+              <div className={cx(styles.row, s.current && styles.rowCurrent)}>
+                <div className={styles.identity}>
+                  <span className={styles.deviceLine} title={s.userAgent || undefined}>
+                    {s.userAgent
+                      ? formatDevice(s.userAgent, tSystem)
+                      : t('security.sessions.unknown_device')}
+                    {s.current && (
+                      <span className={styles.currentBadge}>
+                        {t('security.sessions.current_badge')}
+                      </span>
+                    )}
+                  </span>
+                  <span className={styles.metaPrimary}>
+                    {s.ipAddress || t('security.sessions.unknown_ip')}
+                  </span>
+                  <span className={styles.metaSecondary}>
+                    {t('security.sessions.created_at', {
+                      time: formatUnix(s.createdAt, i18n.language),
+                    })}
+                    {s.lastUsedAt != null && (
+                      <>
+                        {' · '}
+                        {t('security.sessions.last_used_at', {
+                          time: formatUnix(s.lastUsedAt, i18n.language),
+                        })}
+                      </>
+                    )}
+                  </span>
+                </div>
+                {/* The current session cannot be revoked here; sign out instead. */}
+                {!s.current && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={revokeOne.isPending}
+                    aria-busy={revokingId === s.id}
+                    onClick={() => {
+                      void handleRevoke(s.id);
+                    }}
+                  >
+                    {t('security.sessions.revoke')}
+                  </Button>
+                )}
               </div>
-              <Button
-                type="button"
-                variant="danger"
-                disabled={s.current || revokeOne.isPending}
-                onClick={() => {
-                  void handleRevoke(s.id);
-                }}
-              >
-                {t('security.sessions.revoke')}
-              </Button>
-            </li>
+            </PresenceItem>
           ))}
         </ul>
       )}
 
       {hasOthers && (
-        <div className={styles.actions}>
-          <Button
-            type="button"
-            variant="danger"
-            disabled={revokeAll.isPending}
-            onClick={() => {
-              void handleRevokeAll();
-            }}
-          >
-            {t('security.sessions.revoke_all')}
-          </Button>
+        <div className={ui.dangerZone}>
+          <div className={ui.dangerRow}>
+            <p className={ui.sectionDescription}>{t('security.sessions.revoke_all_help')}</p>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={revokeAll.isPending}
+              aria-busy={revokeAll.isPending}
+              onClick={() => {
+                void handleRevokeAll();
+              }}
+            >
+              {t('security.sessions.revoke_all')}
+            </Button>
+          </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }

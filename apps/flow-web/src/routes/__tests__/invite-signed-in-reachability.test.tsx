@@ -99,7 +99,8 @@ describe('/invite/$token when a session already exists', () => {
     renderInvitePage();
 
     expect(screen.queryByText('workspaces.invites.login_required')).toBeNull();
-    expect(screen.getByRole('status')).toBeDefined();
+    // The card body holds a busy placeholder rather than a spinner.
+    expect(document.body.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
   it('points a genuinely signed-out visitor at login once the probe answers', () => {

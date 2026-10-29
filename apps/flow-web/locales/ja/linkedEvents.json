@@ -44,7 +44,6 @@
   "toast": {
     "linked": "「{title}」を紐付けました。",
     "unlinked": "「{title}」の紐付けを解除しました。",
-    "undo": "元に戻す",
     "linkFailed": "イベントを紐付けできませんでした。もう一度お試しください。",
     "unlinkFailed": "紐付けを解除できませんでした。もう一度お試しください。",
     "alreadyLinkedError": "このイベントはすでに紐付けられています。"

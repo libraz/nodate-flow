@@ -24,6 +24,16 @@
   /* nf-token-override: popup dimensions, not spacing steps */
   max-inline-size: 22rem;
   overflow-y: auto;
+  transform-origin: var(--mention-origin, top left);
+}
+
+.list[data-state="open"] {
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.list[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .option {
@@ -35,6 +45,7 @@
   border-radius: var(--nf-radius-sm);
   font-size: var(--nf-text-sm);
   cursor: pointer;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .optionActive {
@@ -68,4 +79,18 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
   cursor: default;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.statusSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  padding-inline: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.statusSkeletonRow {
+  block-size: var(--nf-space-4);
 }

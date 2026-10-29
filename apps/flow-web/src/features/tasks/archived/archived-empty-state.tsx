@@ -11,7 +11,7 @@
  * `action`.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
@@ -47,10 +47,12 @@ export default function ArchivedEmptyState({ workspaceId }: ArchivedEmptyStatePr
       title={t('empty.noneTitle')}
       description={t('empty.noneBody')}
       action={
-        <Link to="/workspaces/$id/projects" params={{ id: workspaceId }}>
-          <Button type="button" variant="primary">
-            {t('empty.noneCta')}
-          </Button>
+        <Link
+          to="/workspaces/$id/projects"
+          params={{ id: workspaceId }}
+          className={buttonClassName({ variant: 'primary' })}
+        >
+          {t('empty.noneCta')}
         </Link>
       }
     />

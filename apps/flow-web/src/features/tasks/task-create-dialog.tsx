@@ -15,7 +15,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useId, useState } from 'react';
@@ -415,88 +415,91 @@ function SmartCreateSection({
 
   return (
     <section aria-label={t('tasks.smart_create.assist_button')} className={styles.smartSection}>
-      {/* Propose button / loading */}
-      {!proposal && !proposing && (
-        <Button type="button" variant="ghost" disabled={disabled} onClick={onPropose}>
-          {t('tasks.smart_create.assist_button')}
-        </Button>
-      )}
+      <div key={proposing ? 'loading' : proposal ? 'result' : 'idle'} className={styles.smartStage}>
+        {/* Propose button / loading */}
+        {!proposal && !proposing && (
+          <Button type="button" variant="ghost" disabled={disabled} onClick={onPropose}>
+            {t('tasks.smart_create.assist_button')}
+          </Button>
+        )}
 
-      {proposing && (
-        <div className={styles.smartLoading} role="status" aria-live="polite">
-          <Spinner label={t('tasks.smart_create.suggesting')} className={styles.smartSpinner} />
-          <span>{t('tasks.smart_create.suggesting')}</span>
-        </div>
-      )}
+        {proposing && (
+          <div className={styles.smartLoading} role="status" aria-live="polite">
+            <span className={styles.smartLoadingLabel}>{t('tasks.smart_create.suggesting')}</span>
+            <Skeleton className={styles.smartSkeletonLine} />
+            <Skeleton className={styles.smartSkeletonLineShort} />
+          </div>
+        )}
 
-      {/* Error state */}
-      {proposalError && !proposing && (
-        <p role="alert" className={styles.smartError}>
-          {t('tasks.smart_create.error')}
-        </p>
-      )}
+        {/* Error state */}
+        {proposalError && !proposing && (
+          <p role="alert" className={styles.smartError}>
+            {t('tasks.smart_create.error')}
+          </p>
+        )}
 
-      {/* Proposal results */}
-      {proposal && (
-        <>
-          {/* Suggested assignees */}
-          {proposal.suggestedAssignees.length > 0 && (
-            <fieldset className={styles.smartFieldset}>
-              <legend className={styles.smartLegend}>
-                {t('tasks.smart_create.assignee_section')}
-              </legend>
-              <ul className={styles.smartList}>
-                {proposal.suggestedAssignees.map((a) => (
-                  <AssigneeSuggestionRow
-                    key={a.userPublicId}
-                    assignee={a}
-                    checked={selectedAssignees.has(a.userPublicId)}
-                    onToggle={() => {
-                      onToggleAssignee(a.userPublicId);
-                    }}
-                  />
-                ))}
-              </ul>
-            </fieldset>
-          )}
+        {/* Proposal results */}
+        {proposal && (
+          <>
+            {/* Suggested assignees */}
+            {proposal.suggestedAssignees.length > 0 && (
+              <fieldset className={styles.smartFieldset}>
+                <legend className={styles.smartLegend}>
+                  {t('tasks.smart_create.assignee_section')}
+                </legend>
+                <ul className={styles.smartList}>
+                  {proposal.suggestedAssignees.map((a) => (
+                    <AssigneeSuggestionRow
+                      key={a.userPublicId}
+                      assignee={a}
+                      checked={selectedAssignees.has(a.userPublicId)}
+                      onToggle={() => {
+                        onToggleAssignee(a.userPublicId);
+                      }}
+                    />
+                  ))}
+                </ul>
+              </fieldset>
+            )}
 
-          {/* Suggested subtasks */}
-          {proposal.subtasks.length > 0 && (
-            <fieldset className={styles.smartFieldset}>
-              <legend className={styles.smartLegend}>
-                {t('tasks.smart_create.subtask_section')}
-              </legend>
-              <ul className={styles.smartList}>
-                {proposal.subtasks.map((st, idx) => (
-                  <SubtaskProposalRow
-                    key={`${st.title}-${String(idx)}`}
-                    index={idx}
-                    subtask={st}
-                    checked={selectedSubtasks.has(idx)}
-                    onToggle={() => {
-                      onToggleSubtask(idx);
-                    }}
-                  />
-                ))}
-              </ul>
-            </fieldset>
-          )}
+            {/* Suggested subtasks */}
+            {proposal.subtasks.length > 0 && (
+              <fieldset className={styles.smartFieldset}>
+                <legend className={styles.smartLegend}>
+                  {t('tasks.smart_create.subtask_section')}
+                </legend>
+                <ul className={styles.smartList}>
+                  {proposal.subtasks.map((st, idx) => (
+                    <SubtaskProposalRow
+                      key={`${st.title}-${String(idx)}`}
+                      index={idx}
+                      subtask={st}
+                      checked={selectedSubtasks.has(idx)}
+                      onToggle={() => {
+                        onToggleSubtask(idx);
+                      }}
+                    />
+                  ))}
+                </ul>
+              </fieldset>
+            )}
 
-          {/* No suggestions */}
-          {proposal.suggestedAssignees.length === 0 && proposal.subtasks.length === 0 && (
-            <p className={styles.smartEmpty}>{t('tasks.smart_create.no_suggestions')}</p>
-          )}
+            {/* No suggestions */}
+            {proposal.suggestedAssignees.length === 0 && proposal.subtasks.length === 0 && (
+              <p className={styles.smartEmpty}>{t('tasks.smart_create.no_suggestions')}</p>
+            )}
 
-          {/* Apply button */}
-          {(proposal.suggestedAssignees.length > 0 || proposal.subtasks.length > 0) && (
-            <div className={styles.smartApplyRow}>
-              <Button type="button" variant="primary" disabled={applying} onClick={onApply}>
-                {t('tasks.smart_create.apply')}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+            {/* Apply button */}
+            {(proposal.suggestedAssignees.length > 0 || proposal.subtasks.length > 0) && (
+              <div className={styles.smartApplyRow}>
+                <Button type="button" variant="primary" disabled={applying} onClick={onApply}>
+                  {t('tasks.smart_create.apply')}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

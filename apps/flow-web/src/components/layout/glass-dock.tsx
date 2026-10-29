@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import CommandPalette from './command-palette';
 import styles from './glass-dock.module.css';
+import { paletteShortcutLabel } from './palette-shortcut';
 
 type DockActionKey = 'new_task' | 'quick_capture' | 'ai_assist';
 type DockActionTarget =
@@ -129,7 +130,7 @@ export default function GlassDock(): ReactElement {
           );
         })}
         <span className={styles.divider} aria-hidden="true" />
-        <span className={styles.shortcut}>Cmd+K</span>
+        <kbd className={styles.shortcut}>{paletteShortcutLabel()}</kbd>
       </div>
       <CommandPalette
         open={paletteOpen}

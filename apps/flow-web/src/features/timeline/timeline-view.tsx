@@ -4,8 +4,9 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import type { Zone } from '@nodate-flow/ui/time';
-import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactElement, useMemo, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eventDateKey } from '../../lib/date-utils';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
@@ -41,7 +42,15 @@ interface InnerProps {
   total: number;
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
+  /** True while the next filter or page is loading behind the current one. */
+  pending: boolean;
   workspaceId?: string;
+}
+
+interface Accumulated {
+  events: TimelineEvent[];
+  filters: TimelineFilters;
+  list: TimelineEvent[];
 }
 
 /**
@@ -98,6 +107,7 @@ function TimelineInner({
   total,
   filters,
   onChange,
+  pending,
   workspaceId,
 }: InnerProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
@@ -105,27 +115,22 @@ function TimelineInner({
   const zone = useEffectiveZone();
 
   // Accumulate events across pages. When filters change (kind, actor)
-  // we reset; when only offset advances we append the new page.
-  const [accumulated, setAccumulated] = useState<TimelineEvent[]>([]);
-  const prevFiltersRef = useRef(filters);
-
-  useEffect(() => {
-    const prev = prevFiltersRef.current;
+  // we reset; when only offset advances we append the new page. The merge
+  // runs during render so the first paint already carries the events.
+  const [accumulated, setAccumulated] = useState<Accumulated>({ events, filters, list: events });
+  let allEvents = accumulated.list;
+  if (accumulated.events !== events || accumulated.filters !== filters) {
+    const prev = accumulated.filters;
     const filtersChanged =
       prev.kind !== filters.kind || prev.actor !== filters.actor || prev.limit !== filters.limit;
     if (filtersChanged || (filters.offset ?? 0) === 0) {
-      setAccumulated(events);
+      allEvents = events;
     } else {
-      setAccumulated((acc) => {
-        const existingIds = new Set(acc.map((e) => e.id));
-        const newEvents = events.filter((e) => !existingIds.has(e.id));
-        return [...acc, ...newEvents];
-      });
+      const existingIds = new Set(accumulated.list.map((e) => e.id));
+      allEvents = [...accumulated.list, ...events.filter((e) => !existingIds.has(e.id))];
     }
-    prevFiltersRef.current = filters;
-  }, [events, filters]);
-
-  const allEvents = accumulated;
+    setAccumulated({ events, filters, list: allEvents });
+  }
 
   /** Group events by local-time day, preserving server order. */
   const groups = useMemo<{ key: string; label: string; items: TimelineEvent[] }[]>(() => {
@@ -163,6 +168,7 @@ function TimelineInner({
 
   return (
     <div
+      aria-busy={pending || undefined}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -177,18 +183,7 @@ function TimelineInner({
       />
 
       {allEvents.length === 0 ? (
-        <div
-          style={{
-            padding: 'var(--nf-space-12) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-lg)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          {t('view.empty')}
-        </div>
+        <EmptyState titleAs="p" title={t('view.empty')} />
       ) : (
         <div
           style={{
@@ -199,6 +194,9 @@ function TimelineInner({
             flexDirection: 'column',
             gap: 'var(--nf-space-5)',
             paddingInlineEnd: 'var(--nf-space-2)',
+            // The previous result stays readable, dimmed, while the next one loads.
+            opacity: pending ? 0.6 : 1,
+            transition: 'opacity var(--nf-duration-fast) var(--nf-ease-out)',
           }}
         >
           {groups.map((g) => (
@@ -218,7 +216,8 @@ function TimelineInner({
                   borderBlockEnd: '1px solid var(--nf-color-border)',
                 }}
               >
-                {g.label} · {g.items.length}
+                {g.label} ·{' '}
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{g.items.length}</span>
               </h3>
               <div
                 style={{
@@ -262,7 +261,13 @@ function TimelineInner({
 
       {hasMore ? (
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <Button type="button" variant="default" onClick={handleLoadMore}>
+          <Button
+            type="button"
+            variant="default"
+            onClick={handleLoadMore}
+            aria-busy={pending || undefined}
+            disabled={pending}
+          >
             {t('view.load_more')}
           </Button>
         </div>
@@ -275,10 +280,11 @@ interface ScopedProps {
   id: string;
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
+  pending: boolean;
   workspaceId?: string;
 }
 
-function TaskTimeline({ id, filters, onChange, workspaceId }: ScopedProps): ReactElement {
+function TaskTimeline({ id, filters, onChange, pending, workspaceId }: ScopedProps): ReactElement {
   const { data } = useTaskTimelineQuery(id, filters);
   return (
     <TimelineInner
@@ -286,12 +292,19 @@ function TaskTimeline({ id, filters, onChange, workspaceId }: ScopedProps): Reac
       total={data.total}
       filters={filters}
       onChange={onChange}
+      pending={pending}
       {...(workspaceId !== undefined ? { workspaceId } : {})}
     />
   );
 }
 
-function ProjectTimeline({ id, filters, onChange, workspaceId }: ScopedProps): ReactElement {
+function ProjectTimeline({
+  id,
+  filters,
+  onChange,
+  pending,
+  workspaceId,
+}: ScopedProps): ReactElement {
   const { data } = useProjectTimelineQuery(id, filters);
   return (
     <TimelineInner
@@ -299,12 +312,13 @@ function ProjectTimeline({ id, filters, onChange, workspaceId }: ScopedProps): R
       total={data.total}
       filters={filters}
       onChange={onChange}
+      pending={pending}
       {...(workspaceId !== undefined ? { workspaceId } : {})}
     />
   );
 }
 
-function WorkspaceTimeline({ id, filters, onChange }: ScopedProps): ReactElement {
+function WorkspaceTimeline({ id, filters, onChange, pending }: ScopedProps): ReactElement {
   const { data } = useWorkspaceTimelineQuery(id, filters);
   return (
     <TimelineInner
@@ -312,6 +326,7 @@ function WorkspaceTimeline({ id, filters, onChange }: ScopedProps): ReactElement
       total={data.total}
       filters={filters}
       onChange={onChange}
+      pending={pending}
       workspaceId={id}
     />
   );
@@ -325,13 +340,22 @@ export default function TimelineView({
   const [filters, setFilters] = useState<TimelineFilters>(
     initialFilters ?? { limit: 50, offset: 0 },
   );
+  // A transition keeps the current events on screen while the next filter
+  // or page suspends, instead of dropping back to the route's fallback.
+  const [pending, startTransition] = useTransition();
+  const handleChange = (next: TimelineFilters): void => {
+    startTransition(() => {
+      setFilters(next);
+    });
+  };
 
   if (scope.kind === 'task') {
     return (
       <TaskTimeline
         id={scope.id}
         filters={filters}
-        onChange={setFilters}
+        onChange={handleChange}
+        pending={pending}
         {...(workspaceId !== undefined ? { workspaceId } : {})}
       />
     );
@@ -341,10 +365,13 @@ export default function TimelineView({
       <ProjectTimeline
         id={scope.id}
         filters={filters}
-        onChange={setFilters}
+        onChange={handleChange}
+        pending={pending}
         {...(workspaceId !== undefined ? { workspaceId } : {})}
       />
     );
   }
-  return <WorkspaceTimeline id={scope.id} filters={filters} onChange={setFilters} />;
+  return (
+    <WorkspaceTimeline id={scope.id} filters={filters} onChange={handleChange} pending={pending} />
+  );
 }

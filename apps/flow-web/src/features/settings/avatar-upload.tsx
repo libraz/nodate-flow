@@ -25,6 +25,7 @@ import { type ChangeEvent, type ReactElement, useEffect, useId, useRef, useState
 import { useTranslation } from 'react-i18next';
 
 import { type ApiError, formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { authStore } from '../auth/auth-store';
 import { type Me, settingsKeys } from './api';
 import { deleteAvatar, uploadAvatar } from './avatar-api';
@@ -151,6 +152,15 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
     inputRef.current?.click();
   };
 
+  const handleRemove = async (): Promise<void> => {
+    const confirmed = await confirmAction({
+      message: t('settings:profile.avatar.remove_confirm'),
+      confirmLabel: t('settings:profile.avatar.remove'),
+      tone: 'danger',
+    });
+    if (confirmed) removeMut.mutate();
+  };
+
   const primaryLabel = hasImage
     ? t('settings:profile.avatar.change')
     : t('settings:profile.avatar.upload');
@@ -221,8 +231,11 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
             <Button
               type="button"
               variant="ghost"
-              onClick={() => removeMut.mutate()}
+              onClick={() => {
+                void handleRemove();
+              }}
               disabled={busy}
+              aria-busy={removeMut.isPending || undefined}
             >
               {t('settings:profile.avatar.remove')}
             </Button>

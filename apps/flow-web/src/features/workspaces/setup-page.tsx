@@ -181,8 +181,13 @@ export default function SetupPage(): ReactElement {
             )}
           </FormField>
 
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? t('workspaces.setup.submitting') : t('workspaces.setup.submit')}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {t('workspaces.setup.submit')}
           </Button>
         </form>
       </div>

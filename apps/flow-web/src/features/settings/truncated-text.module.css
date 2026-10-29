@@ -1,0 +1,10 @@
+/* Single-line clip; the parent sets the width budget. */
+
+.root {
+  display: block;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

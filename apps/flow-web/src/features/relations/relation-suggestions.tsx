@@ -7,13 +7,15 @@
  * visual footprint when inactive.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
 import { Check, X } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import {
   type RelationSuggestion,
@@ -22,6 +24,8 @@ import {
   useResolveSuggestion,
 } from './api';
 import styles from './relations.module.css';
+
+const NO_SUGGESTIONS: readonly RelationSuggestion[] = [];
 
 const KIND_CLASS: Record<RelationSuggestion['suggestedKind'], string | undefined> = {
   blocks: styles.kindBlocks,
@@ -51,8 +55,9 @@ export default function RelationSuggestions({
   const { t } = useTranslation('relations');
   const { data: suggestions, isLoading } = useRelationSuggestionsForTask(taskId);
   const resolve = useResolveSuggestion();
+  const { entries, onExited } = usePresenceList(suggestions ?? NO_SUGGESTIONS, (s) => s.id);
 
-  if (isLoading || !suggestions || suggestions.length === 0) {
+  if (isLoading || entries.length === 0) {
     return null;
   }
 
@@ -75,16 +80,24 @@ export default function RelationSuggestions({
     <section className={styles.section} aria-label={t('suggestions')}>
       <header className={styles.header}>
         <h3 className={styles.title}>{t('suggestions')}</h3>
-        <span className={styles.count}>{suggestions.length}</span>
+        <span className={styles.count}>{suggestions?.length ?? 0}</span>
       </header>
       <ul className={styles.list}>
-        {suggestions.map((suggestion) => (
-          <SuggestionRow
-            key={suggestion.id}
-            suggestion={suggestion}
-            taskId={taskId}
-            onResolve={handleResolve}
-          />
+        {entries.map(({ key, item: suggestion, present }) => (
+          <PresenceItem
+            key={key}
+            as="li"
+            present={present}
+            onExited={() => onExited(key)}
+            className={motion.enter}
+          >
+            <SuggestionRow
+              suggestion={suggestion}
+              taskId={taskId}
+              pending={resolve.isPending && resolve.variables?.suggestionId === suggestion.id}
+              onResolve={handleResolve}
+            />
+          </PresenceItem>
         ))}
       </ul>
     </section>
@@ -94,10 +107,12 @@ export default function RelationSuggestions({
 function SuggestionRow({
   suggestion,
   taskId,
+  pending,
   onResolve,
 }: {
   suggestion: RelationSuggestion;
   taskId: string;
+  pending: boolean;
   onResolve: (suggestionId: string, action: ResolveAction) => void;
 }): ReactElement {
   const { t } = useTranslation('relations');
@@ -120,11 +135,16 @@ function SuggestionRow({
   };
 
   return (
-    <li className={styles.row}>
+    <div className={styles.row}>
       <span className={`${styles.kindBadge} ${KIND_CLASS[suggestion.suggestedKind]}`}>
         {t(KIND_I18N_KEY[suggestion.suggestedKind])}
       </span>
-      <Link to="/tasks/$taskId" params={{ taskId: otherTaskId }} className={styles.taskLink}>
+      <Link
+        to="/tasks/$taskId"
+        params={{ taskId: otherTaskId }}
+        className={styles.taskLink}
+        title={otherTaskTitle}
+      >
         {otherTaskTitle}
       </Link>
       <span className={styles.confidence}>
@@ -135,6 +155,8 @@ function SuggestionRow({
           type="button"
           className={`${styles.actionButton} ${styles.acceptButton} nf-focus-ring`}
           onClick={handleAccept}
+          disabled={pending}
+          aria-busy={pending || undefined}
           aria-label={t('action.accept')}
         >
           <Icon icon={Check} decorative />
@@ -143,11 +165,13 @@ function SuggestionRow({
           type="button"
           className={`${styles.actionButton} ${styles.dismissButton} nf-focus-ring`}
           onClick={handleDismiss}
+          disabled={pending}
+          aria-busy={pending || undefined}
           aria-label={t('action.dismiss')}
         >
           <Icon icon={X} decorative />
         </button>
       </div>
-    </li>
+    </div>
   );
 }

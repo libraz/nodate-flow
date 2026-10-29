@@ -10,6 +10,7 @@
 @import "@nodate-flow/ui/themes/glass-dark.css";
 
 @import "@nodate-flow/ui/styles/focus-ring.css";
+@import "@nodate-flow/ui/styles/motion.css";
 
 /*
  * The scheme to use before a theme is applied — the first paint, and any

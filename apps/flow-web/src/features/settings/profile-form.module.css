@@ -1,0 +1,55 @@
+/* Profile settings: identity form and appearance, plus their skeleton. */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  /* Narrow single-column measure keeps the form's reading line short. */
+  max-inline-size: var(--nf-measure-narrow);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.skeletonTitle {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1.25rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 8rem;
+}
+
+.skeletonAvatarRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-4);
+}
+
+.skeletonAvatar {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 4rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 4rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.skeletonLine {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 10rem;
+}
+
+.skeletonField {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3.75rem;
+  inline-size: 100%;
+}
+
+.skeletonBlock {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 8rem;
+  inline-size: 100%;
+}

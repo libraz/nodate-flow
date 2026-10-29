@@ -7,6 +7,9 @@
  * title / priority / due edits go through `useUpdateTask`.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import {
   Breadcrumb,
@@ -20,13 +23,15 @@ import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
+import { X } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { selectUser, useAuth } from '../features/auth/auth-store';
@@ -75,6 +80,7 @@ import { formatApiError } from '../lib/api-error';
 import { formatDate } from '../lib/format';
 import { formatDueDate } from '../lib/format-date';
 import { useWeekStart } from '../lib/use-week-start';
+import css from './_authenticated.tasks.$taskId.module.css';
 
 const routeApi = getRouteApi('/_authenticated/tasks/$taskId');
 
@@ -136,6 +142,33 @@ const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
 
 interface TaskDetailPanelProps {
   id: string;
+}
+
+/** Placeholder for a sidebar card body: two text lines, sized like the content. */
+function SectionSkeleton(): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <div className={css.sectionSkeleton} role="status" aria-label={t('common.loading')}>
+      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+      <Skeleton style={{ blockSize: '1rem', inlineSize: '70%' }} />
+      {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+      <Skeleton style={{ blockSize: '1rem', inlineSize: '45%' }} />
+    </div>
+  );
+}
+
+/**
+ * The state badge settles each time the state changes after mount, so a
+ * transition reads as the result of the click; the first paint is still.
+ */
+function StateBadge({ state }: { state: TaskDerivedState }): ReactElement {
+  const { t } = useTranslation('common');
+  const [initial] = useState(state);
+  return (
+    <span key={state} className={cx(css.stateBadge, state !== initial && motion.settle)}>
+      <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
+    </span>
+  );
 }
 
 /**
@@ -232,7 +265,7 @@ function TitleEditor({
         }}
       >
         <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
-        <Suspense fallback={null}>
+        <Suspense fallback={<Skeleton className={css.starSkeleton} />}>
           <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
         </Suspense>
         <Button
@@ -286,7 +319,10 @@ function TitleEditor({
     >
       {/* Preserve the page-level heading landmark while editing. */}
       <h1 style={headingHiddenStyle}>{initial}</h1>
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', alignItems: 'center' }}>
+      <div
+        className={css.editorEnter}
+        style={{ display: 'flex', gap: 'var(--nf-space-2)', alignItems: 'center' }}
+      >
         <Input
           value={value}
           onChange={(e) => {
@@ -381,21 +417,9 @@ function DescriptionEditor({
                 }
               : undefined
           }
-          style={{
-            color: isEmpty ? 'var(--nf-color-fg-muted)' : 'var(--nf-color-fg)',
-            // nf-token-override: component dimension, not a spacing step
-            minBlockSize: '3rem',
-            inlineSize: '100%',
-            ...(isEmpty
-              ? {
-                  border: '1px dashed var(--nf-color-border)',
-                  borderRadius: 'var(--nf-radius-md)',
-                  padding: 'var(--nf-space-4)',
-                  cursor: 'pointer',
-                  textAlign: 'center' as const,
-                }
-              : {}),
-          }}
+          className={isEmpty ? css.descriptionEmpty : undefined}
+          // nf-token-override: component dimension, not a spacing step
+          style={isEmpty ? undefined : { minBlockSize: '3rem', inlineSize: '100%' }}
         >
           {isEmpty ? t('tasks.detail.description_empty') : <Markdown>{initial}</Markdown>}
         </div>
@@ -423,7 +447,10 @@ function DescriptionEditor({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+    <div
+      className={css.editorEnter}
+      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
+    >
       <MarkdownEditor
         value={value}
         onChange={setValue}
@@ -570,6 +597,8 @@ function CommentsFeed({
   const currentUser = useAuth(selectUser);
   const [body, setBody] = useState('');
   const locale = i18n.resolvedLanguage ?? 'en';
+  const { entries, onExited } = usePresenceList(comments, (c) => c.id);
+  const staggerFor = useFirstLoadStagger();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -589,30 +618,33 @@ function CommentsFeed({
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
       <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>{t('tasks.comments.title')}</h2>
-      {comments.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>{t('tasks.comments.empty')}</p>
+      {entries.length === 0 ? (
+        <p className={css.editorEnter} style={{ color: 'var(--nf-color-fg-muted)', margin: 0 }}>
+          {t('tasks.comments.empty')}
+        </p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-3)',
-          }}
-        >
-          {comments.map((c) => (
-            <li key={c.id}>
-              <CommentRow
-                taskId={taskId}
-                workspaceId={workspaceId}
-                comment={c}
-                currentUserId={currentUser?.id}
-                locale={locale}
-              />
-            </li>
-          ))}
+        <ul className={css.commentList}>
+          {entries.map(({ key, item: c, present }, index) => {
+            const stagger = staggerFor(index);
+            return (
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => onExited(key)}
+                className={motion.enter}
+                {...(stagger ? { style: stagger } : {})}
+              >
+                <CommentRow
+                  taskId={taskId}
+                  workspaceId={workspaceId}
+                  comment={c}
+                  currentUserId={currentUser?.id}
+                  locale={locale}
+                />
+              </PresenceItem>
+            );
+          })}
         </ul>
       )}
       <form
@@ -665,6 +697,7 @@ function AssigneesSection({
   const [picking, setPicking] = useState(false);
 
   const assignees = actors.filter((a) => a.role === 'assignee');
+  const { entries, onExited } = usePresenceList(assignees, (a) => a.id);
   const assignedUserIds = new Set(assignees.map((a) => a.userId));
   const available = members.filter((m) => !assignedUserIds.has(m.userId));
 
@@ -694,39 +727,37 @@ function AssigneesSection({
 
   return (
     <>
-      {assignees.length === 0 ? (
+      {entries.length === 0 ? (
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
           {t('tasks.detail.assignees.empty')}
         </p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-1-5)',
-          }}
-        >
-          {assignees.map((a) => (
-            <li
-              key={a.id}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        <ul className={css.plainList}>
+          {entries.map(({ key, item: a, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
             >
-              <span>{a.displayName}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={t('tasks.detail.assignees.remove', { name: a.displayName })}
-                onClick={() => {
-                  void handleRemove(a.id);
-                }}
-              >
-                ×
-              </Button>
-            </li>
+              <div className={css.assigneeRow}>
+                <span className={css.assigneeName} title={a.displayName}>
+                  {a.displayName}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('tasks.detail.assignees.remove', { name: a.displayName })}
+                  onClick={() => {
+                    void handleRemove(a.id);
+                  }}
+                >
+                  <X size={14} aria-hidden />
+                </Button>
+              </div>
+            </PresenceItem>
           ))}
         </ul>
       )}
@@ -875,7 +906,7 @@ function Sidebar({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('tasks.detail.state_label')}</span>
-          <Badge tone={STATE_TONE[state]}>{t(STATE_KEY[state])}</Badge>
+          <StateBadge state={state} />
         </div>
         <Separator />
         {/*
@@ -1004,15 +1035,7 @@ function Sidebar({
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.assignees.title')}
         </h2>
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
       </Card>
@@ -1028,15 +1051,7 @@ function Sidebar({
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {tAgents('task_detail.agent.assign.title')}
         </h2>
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <AgentAssignSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
       </Card>
@@ -1049,15 +1064,7 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <StateGraphSection taskId={id} current={state} />
         </Suspense>
       </Card>
@@ -1070,15 +1077,7 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <ConstraintEditor taskId={id} />
         </Suspense>
       </Card>
@@ -1091,15 +1090,7 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <ReplayPanel taskId={id} />
         </Suspense>
       </Card>
@@ -1115,26 +1106,12 @@ function Sidebar({
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.infer_state.title')}
         </h2>
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <InferStateSection taskId={id} />
         </Suspense>
       </Card>
 
-      <Suspense
-        fallback={
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}>
-            <Spinner label={t('common.loading')} />
-          </div>
-        }
-      >
+      <Suspense fallback={<SectionSkeleton />}>
         <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
       </Suspense>
 
@@ -1149,15 +1126,7 @@ function Sidebar({
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.duplicates.title')}
         </h2>
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <RelatedTasksSection taskId={id} />
         </Suspense>
       </Card>
@@ -1173,15 +1142,7 @@ function Sidebar({
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {t('tasks.detail.activity.title')}
         </h2>
-        <Suspense
-          fallback={
-            <div
-              style={{ display: 'flex', justifyContent: 'center', padding: 'var(--nf-space-2)' }}
-            >
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<SectionSkeleton />}>
           <TaskMiniTimeline taskId={id} />
         </Suspense>
       </Card>
@@ -1200,46 +1161,22 @@ function RelatedTasksSection({ taskId }: { taskId: string }): ReactElement {
     );
   }
   return (
-    <ul
-      style={{
-        listStyle: 'none',
-        padding: 0,
-        margin: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-      }}
-    >
+    <ul className={css.plainList}>
       {data.candidates.map((c) => {
         const isDup = c.classification === 'duplicate';
         return (
           <li key={c.taskId}>
-            <a
-              href={`/tasks/${c.taskId}`}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-2)',
-                color: 'var(--nf-color-fg)',
-                textDecoration: 'none',
-              }}
-            >
+            <Link to="/tasks/$taskId" params={{ taskId: c.taskId }} className={css.relatedLink}>
               <Badge tone={isDup ? 'danger' : 'warning'}>
-                {t(`tasks.detail.duplicates.${isDup ? 'duplicate' : 'related'}`)}
+                {isDup
+                  ? t('tasks.detail.duplicates.duplicate')
+                  : t('tasks.detail.duplicates.related')}
               </Badge>
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span className={css.relatedTitle} title={c.title}>
                 {c.title}
               </span>
-              <span
-                style={{
-                  fontFamily: 'var(--nf-font-mono)',
-                  fontSize: 'var(--nf-text-xs)',
-                  color: 'var(--nf-color-fg-muted)',
-                }}
-              >
-                {c.score.toFixed(2)}
-              </span>
-            </a>
+              <span className={css.score}>{c.score.toFixed(2)}</span>
+            </Link>
           </li>
         );
       })}
@@ -1389,6 +1326,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
 
   return (
     <section
+      className={css.panel}
       style={{
         padding: 'var(--nf-space-page)',
         display: 'grid',
@@ -1404,7 +1342,7 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           minInlineSize: 0,
         }}
       >
-        <Suspense fallback={null}>
+        <Suspense fallback={<Skeleton className={css.breadcrumbSkeleton} />}>
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
@@ -1463,18 +1401,21 @@ function TaskDetailRoute(): ReactElement {
   return (
     <Suspense
       fallback={
-        <div
-          style={{
-            padding: 'var(--nf-space-8)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-4)',
-          }}
-        >
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
+        <div className={css.fallback}>
+          <div className={css.fallbackColumn}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '1rem', inlineSize: '12rem' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '2.25rem', inlineSize: '60%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '10rem', inlineSize: '100%' }} />
+          </div>
+          <div className={css.fallbackColumn}>
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '14rem', inlineSize: '100%' }} />
+            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+            <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
+          </div>
         </div>
       }
     >

@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .header {
@@ -26,12 +27,13 @@
 }
 
 .list {
+  --presence-gap: var(--nf-space-1);
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--presence-gap);
 }
 
 .row {
@@ -43,6 +45,7 @@
   border-radius: var(--nf-radius-sm);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-bg-elevated);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:hover {
@@ -58,6 +61,7 @@
   color: var(--nf-color-fg);
   text-decoration: none;
   font-size: var(--nf-text-sm);
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .taskLink:hover {
@@ -110,11 +114,19 @@
   gap: var(--nf-space-1);
   flex-shrink: 0;
   opacity: 0;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row:hover .actions,
 .row:focus-within .actions {
   opacity: 1;
+}
+
+/* Without hover there is no reveal, so the actions stay visible. */
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
 }
 
 .actionButton {
@@ -131,21 +143,35 @@
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   font-size: var(--nf-text-xs);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
-.actionButton:hover {
+.actionButton:hover:not(:disabled) {
   background: var(--nf-color-surface-hover);
   color: var(--nf-color-fg);
 }
 
+.actionButton:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
+}
+
+.actionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
-.acceptButton:hover {
+.acceptButton:hover:not(:disabled) {
   color: var(--nf-color-success-fg);
   border-color: var(--nf-color-success-fg);
 }
 
-.dismissButton:hover {
+.dismissButton:hover:not(:disabled) {
   color: var(--nf-color-danger-fg);
   border-color: var(--nf-color-danger-fg);
 }

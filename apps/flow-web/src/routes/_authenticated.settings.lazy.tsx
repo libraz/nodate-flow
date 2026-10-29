@@ -3,9 +3,10 @@
  * sub-nav and an outlet for the active settings page. On viewports
  * < 768px the sub-nav collapses into a horizontally scrollable tab strip
  * stacked above the outlet (see `_authenticated.settings.module.css`).
+ * The outlet is keyed on the path so each sub-page fades in on arrival.
  */
 
-import { createLazyFileRoute, Link, Outlet } from '@tanstack/react-router';
+import { createLazyFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,6 +30,7 @@ const SUB_NAV: readonly SubNavItem[] = [
 
 function SettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   const labelKeyFor = (
     key: SubNavItem['key'],
@@ -59,7 +61,7 @@ function SettingsLayout(): ReactElement {
           </Link>
         ))}
       </nav>
-      <div>
+      <div key={pathname} className={styles.outlet}>
         <Outlet />
       </div>
     </section>

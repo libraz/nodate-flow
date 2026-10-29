@@ -58,13 +58,13 @@
   isolation: isolate;
   box-shadow: var(--nf-shadow-sm);
   transition:
-    transform var(--nf-duration-fast) ease,
-    box-shadow var(--nf-duration-fast) ease;
+    translate var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
   flex: 0 0 auto;
 }
 
 .preview:hover:not(:disabled) {
-  transform: translateY(-1px);
+  translate: 0 -1px;
   box-shadow: var(--nf-shadow-md);
 }
 
@@ -111,8 +111,7 @@
   color: var(--nf-color-bg);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--nf-duration-fast) ease;
-  z-index: 1;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .preview:hover:not(:disabled) .overlay,
@@ -140,7 +139,6 @@
   align-items: center;
   justify-content: center;
   background: var(--nf-color-overlay);
-  z-index: 2;
 }
 
 .actions {

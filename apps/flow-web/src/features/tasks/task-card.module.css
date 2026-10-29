@@ -1,0 +1,90 @@
+/* Board card — the whole card is the target; the title link carries keyboard focus. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3) var(--nf-space-3-5);
+  cursor: pointer;
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.card:hover {
+  border-color: var(--nf-color-border-strong);
+  box-shadow: var(--nf-shadow-md);
+}
+
+.card:active {
+  box-shadow: var(--nf-shadow-sm);
+}
+
+.card:has(.title:focus-visible) {
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.card[data-closed="true"] {
+  opacity: 0.72;
+}
+
+.card[data-closed="true"]:hover,
+.card[data-closed="true"]:focus-within {
+  opacity: 1;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-1);
+}
+
+.ref {
+  flex-shrink: 0;
+  padding: var(--nf-space-0-5) var(--nf-space-1-5);
+  border-radius: var(--nf-radius-xs);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-semibold);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  transition:
+    color var(--nf-duration-base) var(--nf-ease-standard),
+    text-decoration-color var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.title:focus-visible {
+  outline: none;
+}
+
+.card[data-closed="true"] .title {
+  color: var(--nf-color-fg-muted);
+  text-decoration-color: currentColor;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.metaIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}

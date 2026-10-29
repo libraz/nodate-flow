@@ -1,0 +1,173 @@
+/*
+ * Inbox tab — signal list, triage suggestions, and the row card. The
+ * route shell owns the page gutters; this file owns everything inside
+ * the tab panel.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.workspaceField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.workspaceSelect {
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 20rem;
+}
+
+.toolbarEnd {
+  margin-inline-start: auto;
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  /* Lets an exiting row collapse the list gap along with itself. */
+  --presence-gap: var(--nf-space-2);
+}
+
+.empty {
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-bg-sunken);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* ── Row ───────────────────────────────────────── */
+
+.row {
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover,
+.row:focus-within {
+  border-color: var(--nf-color-border-strong);
+}
+
+.rowInner {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3-5);
+}
+
+.sourceIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 2rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  min-inline-size: 0;
+}
+
+.kind {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+.time {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.taskLink {
+  align-self: flex-start;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+  text-decoration: none;
+  text-underline-offset: 0.2em;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.taskLink:hover {
+  color: var(--nf-color-accent-fg);
+  text-decoration: underline;
+}
+
+.actions {
+  display: flex;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 479px) {
+  .rowInner {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    inline-size: 100%;
+    justify-content: flex-end;
+  }
+}

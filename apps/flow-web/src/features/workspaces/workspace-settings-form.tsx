@@ -1,8 +1,11 @@
 /**
  * WorkspaceSettingsForm — edit name, slug, description, and icon URL.
  *
- * Suspense-ready: reads the workspace via `useWorkspaceQuery` (suspense mode).
- * Validation is performed inline (no Zod dependency in this small form).
+ * Suspense-ready: reads the workspace via `useWorkspaceQuery` (suspense mode);
+ * {@link WorkspaceSettingsSkeleton} is the matching fallback. Validation is
+ * performed inline (no Zod dependency in this small form). A successful save
+ * makes the submitted values the new baseline, so the inline save status
+ * tracks unsaved edits against what the server holds.
  *
  * Owner-only Danger zone renders below the main form. Deletion is a single
  * destructive step (no two-leg soft-delete-then-purge flow): the API call
@@ -16,15 +19,18 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useNavigate } from '@tanstack/react-router';
-import { type FormEvent, Fragment, type ReactElement, useState } from 'react';
+import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { selectUser, useAuth } from '../auth/auth-store';
+import SaveStatus, { useSaveStatus } from '../settings/save-status';
+import ui from '../settings/settings-ui.module.css';
 import {
   type PatchWorkspaceInput,
   useDeleteWorkspace,
@@ -39,6 +45,49 @@ export interface WorkspaceSettingsFormProps {
 }
 
 const SLUG_RE = /^[a-z0-9-]+$/;
+
+interface GeneralValues {
+  name: string;
+  slug: string;
+  description: string;
+  iconUrl: string;
+}
+
+function valuesOf(workspace: Workspace): GeneralValues {
+  return {
+    name: workspace.name,
+    slug: workspace.slug,
+    description: workspace.description ?? '',
+    iconUrl: workspace.iconUrl ?? '',
+  };
+}
+
+/** Suspense fallback shaped like the header, the general section and its footer. */
+export function WorkspaceSettingsSkeleton(): ReactElement {
+  return (
+    <div className={ui.page} aria-busy="true">
+      <div className={ui.headerText}>
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Skeleton style={{ blockSize: '1.25rem', inlineSize: '24rem', maxInlineSize: '100%' }} />
+      </div>
+      <div className={ui.section}>
+        <div className={ui.skeletonStack}>
+          <Skeleton style={{ blockSize: 'var(--nf-control-height)', inlineSize: '100%' }} />
+          <Skeleton style={{ blockSize: 'var(--nf-control-height)', inlineSize: '100%' }} />
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+          <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
+          <Skeleton style={{ blockSize: 'var(--nf-control-height)', inlineSize: '100%' }} />
+        </div>
+        <div className={ui.actions}>
+          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+          <Skeleton style={{ blockSize: 'var(--nf-control-height)', inlineSize: '6rem' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function isValidUrl(value: string): boolean {
   try {
@@ -177,10 +226,13 @@ function DeleteWorkspaceDialog({
           <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
             {t('workspace.general.danger.confirm.cancel')}
           </Button>
-          <Button type="submit" variant="danger" disabled={!matches || pending}>
-            {pending
-              ? t('workspace.general.danger.deleting')
-              : t('workspace.general.danger.confirm.submit')}
+          <Button
+            type="submit"
+            variant="danger"
+            disabled={!matches || pending}
+            aria-busy={pending || undefined}
+          >
+            {t('workspace.general.danger.confirm.submit')}
           </Button>
         </div>
       </form>
@@ -202,11 +254,19 @@ export default function WorkspaceSettingsForm({
   const currentMember = members.find((m) => m.userId === currentUser?.id);
   const isOwner = currentMember?.role === 'owner';
 
-  const [name, setName] = useState(workspace.name);
-  const [slug, setSlug] = useState(workspace.slug);
-  const [description, setDescription] = useState(workspace.description ?? '');
-  const [iconUrl, setIconUrl] = useState(workspace.iconUrl ?? '');
+  // The values the server holds; the form is dirty while any field differs.
+  const [baseline, setBaseline] = useState<GeneralValues>(() => valuesOf(workspace));
+  const [name, setName] = useState(baseline.name);
+  const [slug, setSlug] = useState(baseline.slug);
+  const [description, setDescription] = useState(baseline.description);
+  const [iconUrl, setIconUrl] = useState(baseline.iconUrl);
   const [submitting, setSubmitting] = useState(false);
+  const dirty =
+    name !== baseline.name ||
+    slug !== baseline.slug ||
+    description !== baseline.description ||
+    iconUrl !== baseline.iconUrl;
+  const saveStatus = useSaveStatus(dirty);
   const [errors, setErrors] = useState<{
     name?: string;
     slug?: string;
@@ -266,7 +326,19 @@ export default function WorkspaceSettingsForm({
     };
     try {
       await update.mutateAsync({ id: workspaceId, patch });
-      toaster.show({ tone: 'success', message: t('workspace.general.saved') });
+      // The trimmed values become both the fields and the new baseline.
+      const saved: GeneralValues = {
+        name: patch.name ?? '',
+        slug: patch.slug ?? '',
+        description: trimmedDesc,
+        iconUrl: trimmedIcon,
+      };
+      setName(saved.name);
+      setSlug(saved.slug);
+      setDescription(saved.description);
+      setIconUrl(saved.iconUrl);
+      setBaseline(saved);
+      saveStatus.markSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -278,24 +350,21 @@ export default function WorkspaceSettingsForm({
   };
 
   return (
-    <Fragment>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('workspace.general.title')}</h1>
+          <p className={ui.lede}>{t('workspace.general.description')}</p>
+        </div>
+      </header>
+
       <form
         onSubmit={(e) => {
           void handleSubmit(e);
         }}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+        className={ui.section}
+        noValidate
       >
-        <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
-            {t('workspace.general.title')}
-          </h1>
-          <p
-            style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
-          >
-            {t('workspace.general.description')}
-          </p>
-        </header>
-
         <FormField
           label={t('workspace.general.field.name')}
           required
@@ -362,49 +431,28 @@ export default function WorkspaceSettingsForm({
           )}
         </FormField>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? t('workspace.general.saving') : t('workspace.general.save')}
+        <div className={ui.actions}>
+          <SaveStatus saved={saveStatus.saved} dirty={dirty} />
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {t('workspace.general.save')}
           </Button>
         </div>
       </form>
 
       {isOwner ? (
-        <section
-          aria-labelledby="workspace-danger-zone-heading"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-4)',
-            marginBlockStart: 'var(--nf-space-8)',
-            padding: 'var(--nf-space-5)',
-            border: '1px solid var(--nf-color-danger)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
-          }}
-        >
-          <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <h2
-              id="workspace-danger-zone-heading"
-              style={{
-                margin: 0,
-                fontSize: 'var(--nf-text-xl)',
-                color: 'var(--nf-color-danger-fg)',
-              }}
-            >
-              {t('workspace.general.danger.title')}
-            </h2>
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
-            >
-              {t('workspace.general.danger.description')}
-            </p>
-          </header>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <section aria-labelledby="workspace-danger-zone-heading" className={ui.dangerZone}>
+          <div className={ui.dangerRow}>
+            <div className={ui.sectionHeader}>
+              <h2 id="workspace-danger-zone-heading" className={ui.dangerTitle}>
+                {t('workspace.general.danger.title')}
+              </h2>
+              <p className={ui.sectionDescription}>{t('workspace.general.danger.description')}</p>
+            </div>
             <Button
               type="button"
               variant="danger"
@@ -430,6 +478,6 @@ export default function WorkspaceSettingsForm({
           />
         </section>
       ) : null}
-    </Fragment>
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import {
@@ -62,7 +63,13 @@ export default function WorkspaceMembersTable({
     }
   };
 
-  const handleRemove = async (userId: string): Promise<void> => {
+  const handleRemove = async (member: WorkspaceMember): Promise<void> => {
+    const confirmed = await confirmAction({
+      message: t('workspaces.members.remove_confirm', { name: member.email }),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    const { userId } = member;
     try {
       await removeMember.mutateAsync({ wsId: workspaceId, userId });
       toaster.show({ tone: 'success', message: t('workspaces.members.removed') });
@@ -94,7 +101,7 @@ export default function WorkspaceMembersTable({
       id: 'email',
       accessorKey: 'email',
       header: () => t('workspaces.members.email'),
-      cell: ({ row }) => <span>{row.original.email}</span>,
+      cell: ({ row }) => <span title={row.original.email}>{row.original.email}</span>,
     },
     {
       id: 'role',
@@ -131,7 +138,11 @@ export default function WorkspaceMembersTable({
       cell: ({ row }) => {
         const formatted =
           formatEpoch(row.original.joinedAt, locale) ?? formatEpoch(row.original.createdAt, locale);
-        return <span>{formatted ?? t('workspaces.members.pending')}</span>;
+        return (
+          <span style={formatted ? { fontVariantNumeric: 'tabular-nums' } : undefined}>
+            {formatted ?? t('workspaces.members.pending')}
+          </span>
+        );
       },
     },
     ...(isAdmin
@@ -143,13 +154,17 @@ export default function WorkspaceMembersTable({
               const member = row.original;
               const isSelf = member.userId === currentUser?.id;
               if (isSelf || member.role === 'owner') return null;
+              // Only the row being removed waits; the others stay actionable.
+              const removing =
+                removeMember.isPending && removeMember.variables?.userId === member.userId;
               return (
                 <Button
                   variant="danger"
                   size="sm"
-                  disabled={removeMember.isPending}
+                  disabled={removing}
+                  aria-busy={removing || undefined}
                   onClick={() => {
-                    void handleRemove(member.userId);
+                    void handleRemove(member);
                   }}
                 >
                   {t('workspaces.members.remove')}
@@ -202,6 +217,7 @@ export default function WorkspaceMembersTable({
         aria-label={t('workspaces.members.title')}
         columns={columns}
         data={members}
+        getRowId={(row) => row.userId}
         // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '16rem' }}
       />

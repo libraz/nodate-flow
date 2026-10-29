@@ -13,6 +13,7 @@ import NotificationBell from '../../features/notifications/notification-bell';
 import { authApiRequest } from '../../lib/api';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import CommandPalette from './command-palette';
+import { paletteShortcutLabel } from './palette-shortcut';
 import styles from './top-bar.module.css';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
 import WorkspaceSwitcher from './workspace-switcher';
@@ -134,15 +135,14 @@ export default function TopBar(): ReactElement {
                 className={cx(styles.searchButton, 'nf-focus-ring')}
                 aria-label={t('topbar.search.placeholder')}
                 data-search-trigger
+                aria-keyshortcuts="Meta+K Control+K"
                 onClick={() => {
                   setPaletteOpen(true);
                 }}
               >
                 <Icon icon={Search} decorative />
                 <span className={styles.searchLabel}>{t('topbar.search.placeholder')}</span>
-                <span className={styles.searchButtonShortcut} aria-hidden="true">
-                  Cmd+K
-                </span>
+                <kbd className={styles.searchButtonShortcut}>{paletteShortcutLabel()}</kbd>
               </button>
             </div>
           </div>
@@ -164,6 +164,7 @@ export default function TopBar(): ReactElement {
                 className={cx(styles.avatarTrigger, 'nf-focus-ring')}
                 aria-label={t('topbar.user_menu.open')}
                 aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
                 title={user?.displayName ?? ''}
               >
                 <Avatar

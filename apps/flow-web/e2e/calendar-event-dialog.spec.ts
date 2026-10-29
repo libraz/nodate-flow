@@ -295,10 +295,9 @@ test.describe('calendar event dialog', () => {
     const pill = eventPill(page, title);
     await expect(pill).toBeVisible({ timeout: 10_000 });
 
-    // Milestone pills are styled with a border-block-end accent and no
-    // solid background. Check both properties — the route's
-    // pillStyleForKind('milestone') sets background:'transparent'
-    // + borderBlockEnd:'2px solid var(--nf-cal-milestone-color)'.
+    // Milestone pills are styled with a subtle fill and a 1px solid
+    // border. Check both properties, plus the absence of the block
+    // kind's stripe gradient.
     const pillStyle = await pill.evaluate((el) => {
       const cs = getComputedStyle(el);
       return {
@@ -308,8 +307,8 @@ test.describe('calendar event dialog', () => {
         backgroundImage: cs.backgroundImage,
       };
     });
-    // 'transparent' resolves to rgba(0, 0, 0, 0) in computed style.
-    expect(pillStyle.background).toBe('rgba(0, 0, 0, 0)');
+    // The subtle fill must not resolve to fully transparent.
+    expect(pillStyle.background).not.toBe('rgba(0, 0, 0, 0)');
     expect(pillStyle.borderBottom).toBe('solid');
     // The stripe gradient (block kind) must not appear.
     expect(pillStyle.backgroundImage).not.toContain('repeating-linear-gradient');

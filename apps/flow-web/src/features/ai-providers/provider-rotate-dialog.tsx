@@ -88,7 +88,12 @@ export default function ProviderRotateDialog({
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('providers.action.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting || apiKey.length < 8}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting || apiKey.length < 8}
+            aria-busy={submitting}
+          >
             {t('providers.rotate_dialog.submit')}
           </Button>
         </div>

@@ -7,23 +7,24 @@
  *   - paused kill switch   (POST  /ai/agents/{id}/pause)
  *   - manual trigger       (POST  /ai/agents/{id}/trigger)
  *
- * Creation goes through a dialog that reads the workspace model
+ * Creation goes through an inline form that reads the workspace model
  * inventory from GET /ai/models and POSTs /ai/agents.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
-import { type ReactElement, Suspense, useState } from 'react';
+import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
+import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -35,47 +36,56 @@ import {
   useUpdateAgentEventTriggers,
   useUpdateAgentSchedule,
 } from '../features/ai-providers/agents-api';
+import SaveStatus, { useSaveStatus } from '../features/settings/save-status';
+import ui from '../features/settings/settings-ui.module.css';
 import { formatApiError } from '../lib/api-error';
+import styles from './_authenticated.workspaces.$id.settings.ai-agents.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai-agents');
 
-function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
+function AgentsList({
+  workspaceId,
+  onCreate,
+}: {
+  workspaceId: string;
+  onCreate: () => void;
+}): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const { data } = useAgentsQuery(workspaceId);
   const pauseMut = usePauseAgent();
   const scheduleMut = useUpdateAgentSchedule();
   const triggerMut = useTriggerAgent();
   const eventMut = useUpdateAgentEventTriggers();
+  const { entries, onExited } = usePresenceList(data.agents, (agent) => agent.id);
+  // Agents present at first paint; one created afterwards rises in.
+  const [initialIds] = useState<ReadonlySet<string>>(
+    () => new Set(data.agents.map((agent) => agent.id)),
+  );
+
+  // Each control reports pending only for the agent it was used on.
+  const pausingId = pauseMut.isPending ? pauseMut.variables?.agentId : undefined;
+  const schedulingId = scheduleMut.isPending ? scheduleMut.variables?.agentId : undefined;
+  const triggeringId = triggerMut.isPending ? triggerMut.variables?.agentId : undefined;
+  const savingEventsId = eventMut.isPending ? eventMut.variables?.agentId : undefined;
 
   if (data.agents.length === 0) {
     return (
-      <div
-        style={{
-          padding: 'var(--nf-space-12) var(--nf-space-4)',
-          textAlign: 'center',
-          color: 'var(--nf-color-fg-muted)',
-          border: '1px dashed var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-lg)',
-          background: 'var(--nf-color-bg-sunken)',
-        }}
-      >
-        {t('agents.empty')}
-      </div>
+      <EmptyState
+        titleAs="p"
+        title={t('agents.empty')}
+        className={ui.empty}
+        action={
+          <Button type="button" onClick={onCreate}>
+            {t('agents.create.open')}
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <ul
-      style={{
-        listStyle: 'none',
-        padding: 0,
-        margin: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
-      }}
-    >
-      {data.agents.map((agent) => {
+    <ul className={styles.list}>
+      {entries.map(({ key, item: agent, present }) => {
         const handleScheduleChange = async (next: AgentScheduleKind): Promise<void> => {
           try {
             await scheduleMut.mutateAsync({
@@ -115,80 +125,41 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
             });
           }
         };
+        const scheduleId = `agent-schedule-${agent.id}`;
         return (
-          <li key={agent.id}>
-            <Card
-              style={{
-                padding: 'var(--nf-space-4)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--nf-space-3)',
-              }}
-            >
-              <header
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 'var(--nf-space-2)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
-                  <strong>{agent.name}</strong>
+          <PresenceItem
+            key={key}
+            as="li"
+            present={present}
+            onExited={() => {
+              onExited(key);
+            }}
+            className={initialIds.has(agent.id) ? undefined : styles.arrived}
+          >
+            <article className={styles.card} aria-labelledby={`agent-name-${agent.id}`}>
+              <header className={styles.cardHeader}>
+                <div className={styles.cardTitle}>
+                  <strong id={`agent-name-${agent.id}`}>{agent.name}</strong>
                   <Badge tone={agent.paused ? 'warning' : 'success'}>
                     {agent.paused ? t('agents.status.paused') : t('agents.status.active')}
                   </Badge>
                 </div>
-                <code
-                  style={{
-                    fontSize: 'var(--nf-text-xs)',
-                    color: 'var(--nf-color-fg-muted)',
-                    fontFamily: 'var(--nf-font-mono)',
-                  }}
-                >
-                  {agent.modelName}
-                </code>
+                <code className={styles.model}>{agent.modelName}</code>
               </header>
-              {agent.description ? (
-                <p
-                  style={{
-                    margin: 0,
-                    color: 'var(--nf-color-fg-muted)',
-                    fontSize: 'var(--nf-text-sm)',
-                  }}
-                >
-                  {agent.description}
-                </p>
-              ) : null}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 'var(--nf-space-3)',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 'var(--nf-space-2)',
-                    alignItems: 'center',
-                    fontSize: 'var(--nf-text-sm)',
-                  }}
-                >
-                  <label
-                    htmlFor={`agent-schedule-${agent.id}`}
-                    style={{ color: 'var(--nf-color-fg-muted)' }}
-                  >
+              {agent.description ? <p className={styles.description}>{agent.description}</p> : null}
+              <div className={styles.controls}>
+                <div className={styles.inlineField}>
+                  <label htmlFor={scheduleId} className={styles.inlineLabel}>
                     {t('agents.scheduleKind.label')}
                   </label>
                   <Select
-                    id={`agent-schedule-${agent.id}`}
+                    id={scheduleId}
                     value={agent.scheduleKind}
                     onChange={(e) => {
                       void handleScheduleChange(e.target.value as AgentScheduleKind);
                     }}
-                    disabled={scheduleMut.isPending}
+                    disabled={schedulingId === agent.id}
+                    aria-busy={schedulingId === agent.id}
                   >
                     {AGENT_SCHEDULE_KINDS.map((kind) => (
                       <option key={kind} value={kind}>
@@ -197,34 +168,39 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                     ))}
                   </Select>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    void handleTogglePause();
-                  }}
-                  disabled={pauseMut.isPending}
-                >
-                  {agent.paused ? t('agents.resume') : t('agents.pause')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    void handleTrigger();
-                  }}
-                  disabled={triggerMut.isPending || agent.paused}
-                >
-                  {t('agents.trigger.label')}
-                </Button>
+                <div className={styles.controlActions}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      void handleTogglePause();
+                    }}
+                    disabled={pausingId === agent.id}
+                    aria-busy={pausingId === agent.id}
+                    aria-pressed={agent.paused}
+                  >
+                    {agent.paused ? t('agents.resume') : t('agents.pause')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      void handleTrigger();
+                    }}
+                    disabled={triggeringId === agent.id || agent.paused}
+                    aria-busy={triggeringId === agent.id}
+                  >
+                    {t('agents.trigger.label')}
+                  </Button>
+                </div>
               </div>
               {agent.scheduleKind === 'on_event' ? (
                 <EventTriggersEditor
                   workspaceId={workspaceId}
                   agentId={agent.id}
                   initial={agent.eventTriggerTypes ?? []}
-                  pending={eventMut.isPending}
+                  pending={savingEventsId === agent.id}
                   onSave={async (kinds) => {
                     try {
                       await eventMut.mutateAsync({
@@ -232,21 +208,19 @@ function AgentsList({ workspaceId }: { workspaceId: string }): ReactElement {
                         agentId: agent.id,
                         eventTriggerTypes: kinds,
                       });
-                      toaster.show({
-                        tone: 'success',
-                        message: t('agents.eventTriggers.saved'),
-                      });
+                      return true;
                     } catch (err) {
                       toaster.show({
                         tone: 'danger',
                         message: formatApiError(err, t, 'agents.eventTriggers.failed'),
                       });
+                      return false;
                     }
                   }}
                 />
               ) : null}
-            </Card>
-          </li>
+            </article>
+          </PresenceItem>
         );
       })}
     </ul>
@@ -269,48 +243,54 @@ function EventTriggersEditor({
   agentId: string;
   initial: string[];
   pending: boolean;
-  onSave: (kinds: string[]) => Promise<void>;
+  /** Resolves true once the triggers are stored. */
+  onSave: (kinds: string[]) => Promise<boolean>;
 }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const [value, setValue] = useState(initial.join(', '));
+  const [baseline, setBaseline] = useState(value);
+  const dirty = value !== baseline;
+  const saveStatus = useSaveStatus(dirty);
+  const inputId = `agent-events-${agentId}`;
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    const kinds = value
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
+    if (await onSave(kinds)) {
+      setBaseline(value);
+      saveStatus.markSaved();
+    }
+  };
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 'var(--nf-space-2)',
-        alignItems: 'center',
-        fontSize: 'var(--nf-text-sm)',
+    <form
+      className={styles.eventsForm}
+      onSubmit={(e) => {
+        void handleSubmit(e);
       }}
     >
-      <label htmlFor={`agent-events-${agentId}`} style={{ color: 'var(--nf-color-fg-muted)' }}>
+      <label htmlFor={inputId} className={styles.inlineLabel}>
         {t('agents.eventTriggers.label')}
       </label>
       <Input
-        id={`agent-events-${agentId}`}
+        id={inputId}
         value={value}
         placeholder={t('agents.eventTriggers.placeholder')}
+        autoComplete="off"
+        spellCheck={false}
         onChange={(e) => {
           setValue(e.target.value);
         }}
-        // nf-token-override: component dimension, not a spacing step
-        style={{ flex: 1, minInlineSize: '16rem' }}
+        className={styles.eventsInput}
       />
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        disabled={pending}
-        onClick={() => {
-          const kinds = value
-            .split(',')
-            .map((k) => k.trim())
-            .filter((k) => k.length > 0);
-          void onSave(kinds);
-        }}
-      >
+      <SaveStatus saved={saveStatus.saved} dirty={dirty} />
+      <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
         {t('agents.eventTriggers.save')}
       </Button>
-    </div>
+    </form>
   );
 }
 
@@ -336,20 +316,30 @@ function CreateAgentForm({
   const [systemPrompt, setSystemPrompt] = useState('');
   const [scheduleKind, setScheduleKind] = useState<AgentScheduleKind>('disabled');
   const [eventTriggers, setEventTriggers] = useState('');
+  const [missing, setMissing] = useState(false);
 
   if (models.models.length === 0) {
     return (
-      <Card style={{ padding: 'var(--nf-space-4)' }}>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t('agents.create.noModels')}
-        </p>
-      </Card>
+      <EmptyState
+        titleAs="p"
+        title={t('agents.create.noModels')}
+        className={ui.empty}
+        action={
+          <Link to="/workspaces/$id/settings/ai-providers" params={{ id: workspaceId }}>
+            {t('settings:nav.ai_providers')}
+          </Link>
+        }
+      />
     );
   }
 
-  const handleSubmit = async (): Promise<void> => {
+  const nameMissing = missing && name.trim().length === 0;
+  const promptMissing = missing && systemPrompt.trim().length === 0;
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
     if (!modelId || name.trim().length === 0 || systemPrompt.trim().length === 0) {
-      toaster.show({ tone: 'warning', message: t('agents.create.missingFields') });
+      setMissing(true);
       return;
     }
     try {
@@ -373,20 +363,27 @@ function CreateAgentForm({
   };
 
   return (
-    <Card
-      style={{
-        padding: 'var(--nf-space-4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
+    <form
+      className={styles.createForm}
+      aria-labelledby="agent-create-title"
+      noValidate
+      onSubmit={(e) => {
+        void handleSubmit(e);
       }}
     >
-      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('agents.create.title')}</h2>
-      <FormField label={t('agents.create.name')}>
+      <h2 id="agent-create-title" className={ui.sectionTitle}>
+        {t('agents.create.title')}
+      </h2>
+      <FormField
+        label={t('agents.create.name')}
+        required
+        {...(nameMissing ? { error: t('agents.create.missingFields') } : {})}
+      >
         {(control) => (
           <Input
             {...control}
             value={name}
+            autoComplete="off"
             onChange={(e) => {
               setName(e.target.value);
             }}
@@ -394,7 +391,7 @@ function CreateAgentForm({
           />
         )}
       </FormField>
-      <FormField label={t('agents.create.model')}>
+      <FormField label={t('agents.create.model')} required>
         {(control) => (
           <Select
             {...control}
@@ -411,7 +408,11 @@ function CreateAgentForm({
           </Select>
         )}
       </FormField>
-      <FormField label={t('agents.create.systemPrompt')}>
+      <FormField
+        label={t('agents.create.systemPrompt')}
+        required
+        {...(promptMissing ? { error: t('agents.create.missingFields') } : {})}
+      >
         {(control) => (
           <Textarea
             {...control}
@@ -446,6 +447,8 @@ function CreateAgentForm({
             <Input
               {...control}
               value={eventTriggers}
+              autoComplete="off"
+              spellCheck={false}
               onChange={(e) => {
                 setEventTriggers(e.target.value);
               }}
@@ -454,21 +457,20 @@ function CreateAgentForm({
           )}
         </FormField>
       ) : null}
-      <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
+      <div className={ui.actions}>
         <Button type="button" variant="ghost" onClick={onDone}>
           {t('agents.create.cancel')}
         </Button>
         <Button
-          type="button"
-          onClick={() => {
-            void handleSubmit();
-          }}
+          type="submit"
+          variant="primary"
           disabled={createMut.isPending}
+          aria-busy={createMut.isPending}
         >
           {t('agents.create.submit')}
         </Button>
       </div>
-    </Card>
+    </form>
   );
 }
 
@@ -476,40 +478,24 @@ function AiAgentsRoute(): ReactElement {
   const { id } = routeApi.useParams();
   const { t } = useTranslation('ai-suggestions');
   const [creating, setCreating] = useState(false);
+  const openCreate = (): void => {
+    setCreating(true);
+  };
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        inlineSize: '100%',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)' }}>{t('agents.title')}</h1>
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('agents.subtitle')}</p>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('agents.title')}</h1>
+          <p className={ui.lede}>{t('agents.subtitle')}</p>
         </div>
         {creating ? null : (
-          <Button
-            type="button"
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
+          <Button type="button" variant="primary" onClick={openCreate}>
             {t('agents.create.open')}
           </Button>
         )}
       </header>
-      {creating ? ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-        <Suspense fallback={<Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />}>
+      {creating ? (
+        <Suspense fallback={<Skeleton className={styles.skeletonForm} />}>
           <CreateAgentForm
             workspaceId={id}
             onDone={() => {
@@ -520,17 +506,15 @@ function AiAgentsRoute(): ReactElement {
       ) : null}
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
+          <div className={ui.skeletonStack} aria-hidden="true">
+            <Skeleton className={styles.skeletonCard} />
+            <Skeleton className={styles.skeletonCard} />
           </div>
         }
       >
-        <AgentsList workspaceId={id} />
+        <AgentsList workspaceId={id} onCreate={openCreate} />
       </Suspense>
-    </section>
+    </div>
   );
 }
 

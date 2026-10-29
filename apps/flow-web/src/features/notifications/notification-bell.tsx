@@ -3,10 +3,11 @@
  * notification count and toggles the notification dropdown.
  */
 
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import { Bell } from 'lucide-react';
-import { type MouseEvent, type ReactElement, Suspense, useId, useState } from 'react';
+import { type MouseEvent, type ReactElement, Suspense, useId, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
@@ -21,6 +22,8 @@ function NotificationBellImpl(): ReactElement {
   const { data: unreadCount } = useUnreadCountQuery();
   const count = unreadCount ?? 0;
   const dropdownId = useId();
+  const presence = usePresence<HTMLDivElement>(open);
+  const badgeText = count > 99 ? '99+' : String(count);
 
   const handleToggle = (event: MouseEvent<HTMLButtonElement>): void => {
     // Defensive stopPropagation: the dropdown's backdrop is a fixed
@@ -31,13 +34,17 @@ function NotificationBellImpl(): ReactElement {
     setOpen((prev) => !prev);
   };
 
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
   const handleClose = (): void => {
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
   return (
     <div className={styles.bellWrapper}>
       <button
+        ref={triggerRef}
         type="button"
         className={cx(topBarStyles.iconButton, 'nf-focus-ring')}
         onClick={handleToggle}
@@ -47,16 +54,24 @@ function NotificationBellImpl(): ReactElement {
         aria-controls={dropdownId}
       >
         <Icon icon={Bell} decorative />
+        {/* Keyed on the shown text so a count change replays the pop-in. */}
         {count > 0 && (
-          <span className={styles.badge} aria-hidden="true">
-            {count > 99 ? '99+' : count}
+          <span key={badgeText} className={styles.badge} aria-hidden="true">
+            {badgeText}
           </span>
         )}
       </button>
-      {open && (
-        <Suspense fallback={null}>
-          <NotificationDropdown id={dropdownId} onClose={handleClose} />
-        </Suspense>
+      {presence.mounted && (
+        <div
+          ref={presence.ref}
+          data-state={presence.state}
+          inert={!open}
+          className={styles.dropdownPresence}
+        >
+          <Suspense fallback={null}>
+            <NotificationDropdown id={dropdownId} onClose={handleClose} />
+          </Suspense>
+        </div>
       )}
     </div>
   );

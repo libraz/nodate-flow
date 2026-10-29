@@ -55,7 +55,8 @@ function row(workspaceId: string, idx: number): NotifRow {
     workspaceId,
     actorId: null,
     actorDisplayName: null,
-    eventType: 'task.created',
+    // Unmapped type: known types render a translated sentence, not the stored title.
+    eventType: 'seed.unmapped',
     resourceType: 'task',
     resourceId: null,
     title: `Seed notif #${idx}`,

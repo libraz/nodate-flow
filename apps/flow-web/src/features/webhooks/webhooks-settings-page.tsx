@@ -28,16 +28,18 @@
  *   - {@link useTestWebhookMutation}       — POST webhooks/{id}/test
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import Chip from '@nodate-flow/ui/primitives/chip';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Popover from '@nodate-flow/ui/primitives/popover';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -45,9 +47,11 @@ import { getRouteApi } from '@tanstack/react-router';
 import { MoreHorizontal } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
+import CopyButton from '../settings/copy-button';
+import ui from '../settings/settings-ui.module.css';
+import TruncatedText from '../settings/truncated-text';
 import {
   useCreateWebhookMutation,
   useDeleteWebhookMutation,
@@ -128,7 +132,14 @@ function formatTimestamp(epochSec: number | undefined | null, locale: string): s
 
 interface WebhookRowProps {
   webhook: Webhook;
+  /** The state the switch shows: an in-flight toggle's target, else the stored value. */
+  active: boolean;
   togglePending: boolean;
+  /** True for a row that arrived after the list first painted. */
+  arrived: boolean;
+  /** False once the webhook is gone and the row is playing its exit. */
+  present: boolean;
+  onExited: () => void;
   onToggle: (webhook: Webhook, next: boolean) => void;
   onDelete: (webhook: Webhook) => void;
   onTest: (webhook: Webhook) => void;
@@ -139,7 +150,11 @@ interface WebhookRowProps {
 /** Single row in the webhooks table. */
 function WebhookRow({
   webhook,
+  active,
   togglePending,
+  arrived,
+  present,
+  onExited,
   onToggle,
   onDelete,
   onTest,
@@ -156,12 +171,12 @@ function WebhookRow({
   };
 
   return (
-    <tr>
-      <td className={styles.urlCell} title={webhook.url}>
-        {webhook.url}
+    <PresenceRow present={present} onExited={onExited} arrived={arrived}>
+      <td>
+        <TruncatedText text={webhook.url} className={`${styles.urlCell} ${ui.mono}`} />
       </td>
-      <td className={styles.descriptionCell} title={webhook.description}>
-        {webhook.description}
+      <td>
+        <TruncatedText text={webhook.description} className={styles.descriptionCell} />
       </td>
       <td>
         <div className={styles.eventTypesCell}>
@@ -178,13 +193,14 @@ function WebhookRow({
       </td>
       <td className={styles.activeCell}>
         <Switch
-          checked={webhook.isActive}
+          checked={active}
           disabled={togglePending}
+          aria-busy={togglePending}
           onCheckedChange={(next) => {
             onToggle(webhook, next);
           }}
           aria-label={
-            webhook.isActive
+            active
               ? t('settings.webhooks.toggle.deactivate')
               : t('settings.webhooks.toggle.activate')
           }
@@ -263,7 +279,7 @@ function WebhookRow({
           </button>
         </Popover>
       </td>
-    </tr>
+    </PresenceRow>
   );
 }
 
@@ -292,7 +308,6 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
   const [eventTypesText, setEventTypesText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [secret, setSecret] = useState('');
-  const [copied, setCopied] = useState(false);
 
   const reset = (): void => {
     setStage('form');
@@ -301,7 +316,6 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
     setEventTypesText('');
     setSubmitting(false);
     setSecret('');
-    setCopied(false);
   };
 
   const handleClose = (): void => {
@@ -349,26 +363,6 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
     );
   };
 
-  const handleCopy = async (): Promise<void> => {
-    if (secret === '') return;
-    try {
-      await navigator.clipboard.writeText(secret);
-      setCopied(true);
-      toaster.show({
-        tone: 'success',
-        message: t('settings.webhooks.create.secret.copied'),
-      });
-    } catch {
-      // error-toast-exempt: the clipboard write never reaches the API. What it
-      // rejects with is a browser DOMException whose message is untranslated UA
-      // text, so surfacing it would be worse than the localized fallback.
-      toaster.show({
-        tone: 'danger',
-        message: t('settings.webhooks.create.secret.copy_failed'),
-      });
-    }
-  };
-
   const submitDisabled = submitting || url.trim() === '' || description.trim() === '';
 
   const title =
@@ -385,6 +379,9 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
               <Input
                 {...control}
                 type="url"
+                inputMode="url"
+                autoComplete="off"
+                spellCheck={false}
                 value={url}
                 placeholder={t('settings.webhooks.create.url.placeholder')}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -398,6 +395,7 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
               <Input
                 {...control}
                 value={description}
+                autoComplete="off"
                 placeholder={t('settings.webhooks.create.description.placeholder')}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                   setDescription(e.target.value);
@@ -424,42 +422,21 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
             <Button type="button" variant="ghost" onClick={handleClose}>
               {t('settings.webhooks.create.cancel')}
             </Button>
-            <Button type="submit" variant="primary" disabled={submitDisabled}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={submitDisabled}
+              aria-busy={submitting}
+            >
               {t('settings.webhooks.create.submit')}
             </Button>
           </div>
         </form>
       ) : (
         <div className={styles.dialogForm}>
-          <div className={styles.secretPanel}>
-            <p className={styles.secretWarning}>{t('settings.webhooks.create.secret.warning')}</p>
-            <FormField label={t('settings.webhooks.create.secret.label')}>
-              {(control) => (
-                <Input
-                  {...control}
-                  className={styles.secretValue}
-                  value={secret}
-                  readOnly
-                  spellCheck={false}
-                  onFocus={(e) => {
-                    e.currentTarget.select();
-                  }}
-                />
-              )}
-            </FormField>
-            <div className={styles.secretRow}>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  void handleCopy();
-                }}
-              >
-                {copied
-                  ? t('settings.webhooks.create.secret.copied')
-                  : t('settings.webhooks.create.secret.copy')}
-              </Button>
-            </div>
+          <div className={ui.secretPanel}>
+            <p className={ui.secretWarning}>{t('settings.webhooks.create.secret.warning')}</p>
+            <SecretField secret={secret} />
           </div>
           <div className={styles.dialogActions}>
             <Button type="button" variant="primary" onClick={handleClose}>
@@ -469,6 +446,44 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
         </div>
       )}
     </Dialog>
+  );
+}
+
+/** Read-only secret with an inline copy action; selecting the field selects it whole. */
+function SecretField({ secret }: { secret: string }): ReactElement {
+  const { t } = useTranslation('settings');
+  return (
+    <FormField label={t('settings.webhooks.create.secret.label')}>
+      {(control) => (
+        <div className={ui.secretRow}>
+          <Input
+            {...control}
+            className={ui.secretValue}
+            value={secret}
+            readOnly
+            spellCheck={false}
+            autoComplete="off"
+            onFocus={(e) => {
+              e.currentTarget.select();
+            }}
+          />
+          <CopyButton
+            value={secret}
+            label={t('settings.webhooks.create.secret.copy')}
+            copiedLabel={t('settings.webhooks.create.secret.copied')}
+            onError={() => {
+              // error-toast-exempt: the clipboard write never reaches the API. What it
+              // rejects with is a browser DOMException whose message is untranslated UA
+              // text, so surfacing it would be worse than the localized fallback.
+              toaster.show({
+                tone: 'danger',
+                message: t('settings.webhooks.create.secret.copy_failed'),
+              });
+            }}
+          />
+        </div>
+      )}
+    </FormField>
   );
 }
 
@@ -491,73 +506,19 @@ function ShowSecretDialog({
   onClose,
 }: ShowSecretDialogProps): ReactElement {
   const { t } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
   const detailQuery = useWebhookQuery(workspaceId, open ? webhookId : '');
-  const [copied, setCopied] = useState(false);
 
   const handleClose = (): void => {
-    setCopied(false);
     onClose();
-  };
-
-  const handleCopy = async (): Promise<void> => {
-    const secret = detailQuery.data?.secret;
-    if (!secret) return;
-    try {
-      await navigator.clipboard.writeText(secret);
-      setCopied(true);
-      toaster.show({
-        tone: 'success',
-        message: t('settings.webhooks.create.secret.copied'),
-      });
-    } catch {
-      // error-toast-exempt: the clipboard write never reaches the API. What it
-      // rejects with is a browser DOMException whose message is untranslated UA
-      // text, so surfacing it would be worse than the localized fallback.
-      toaster.show({
-        tone: 'danger',
-        message: t('settings.webhooks.create.secret.copy_failed'),
-      });
-    }
   };
 
   return (
     <Dialog open={open} onClose={handleClose} title={t('settings.webhooks.show_secret.title')}>
       <div className={styles.dialogForm}>
         {detailQuery.isLoading || !detailQuery.data ? (
-          <div className={styles.spinnerRow}>
-            <Spinner label={tCommon('common.loading')} />
-          </div>
+          <Skeleton className={styles.skeletonSecret} aria-hidden="true" />
         ) : (
-          <div className={styles.secretPanel}>
-            <FormField label={t('settings.webhooks.create.secret.label')}>
-              {(control) => (
-                <Input
-                  {...control}
-                  className={styles.secretValue}
-                  value={detailQuery.data.secret}
-                  readOnly
-                  spellCheck={false}
-                  onFocus={(e) => {
-                    e.currentTarget.select();
-                  }}
-                />
-              )}
-            </FormField>
-            <div className={styles.secretRow}>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  void handleCopy();
-                }}
-              >
-                {copied
-                  ? t('settings.webhooks.create.secret.copied')
-                  : t('settings.webhooks.create.secret.copy')}
-              </Button>
-            </div>
-          </div>
+          <SecretField secret={detailQuery.data.secret} />
         )}
         <div className={styles.dialogActions}>
           <Button type="button" variant="primary" onClick={handleClose}>
@@ -621,7 +582,6 @@ function DeliveriesDrawer({
   onClose,
 }: DeliveriesDrawerProps): ReactElement {
   const { t, i18n } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
   const locale = i18n.resolvedLanguage ?? 'en';
   const deliveriesQuery = useDeliveriesQuery(workspaceId, open ? webhookId : '');
 
@@ -633,11 +593,17 @@ function DeliveriesDrawer({
       side="inline-end"
     >
       {deliveriesQuery.isLoading ? (
-        <div className={styles.spinnerRow}>
-          <Spinner label={tCommon('common.loading')} />
+        <div className={ui.skeletonStack} aria-hidden="true">
+          <Skeleton className={styles.skeletonDelivery} />
+          <Skeleton className={styles.skeletonDelivery} />
+          <Skeleton className={styles.skeletonDelivery} />
         </div>
       ) : (deliveriesQuery.data ?? []).length === 0 ? (
-        <p className={styles.deliveriesEmpty}>{t('settings.webhooks.deliveries.empty')}</p>
+        <EmptyState
+          titleAs="p"
+          title={t('settings.webhooks.deliveries.empty')}
+          className={ui.empty}
+        />
       ) : (
         <ul className={styles.deliveriesList}>
           {(deliveriesQuery.data ?? []).map((delivery) => (
@@ -652,7 +618,6 @@ function DeliveriesDrawer({
 /** Page component mounted by the lazy route. */
 export default function WebhooksSettingsPage(): ReactElement {
   const { t } = useTranslation('settings');
-  const { t: tCommon } = useTranslation('common');
   const { id: workspaceId } = routeApi.useParams();
 
   const webhooksQuery = useWebhooksQuery(workspaceId);
@@ -664,21 +629,40 @@ export default function WebhooksSettingsPage(): ReactElement {
   const [secretWebhookId, setSecretWebhookId] = useState<string | null>(null);
   const [deliveriesWebhookId, setDeliveriesWebhookId] = useState<string | null>(null);
 
+  // Switch targets held until the refetched list agrees, so a toggle
+  // reads as done on click rather than after the round trip.
+  const [pendingActive, setPendingActive] = useState<Readonly<Record<string, boolean>>>({});
+  // Webhooks present when the list first loaded; anything else fades in as it arrives.
+  const [initialIds, setInitialIds] = useState<ReadonlySet<string> | null>(null);
+
   const webhooks = webhooksQuery.data ?? [];
 
+  if (initialIds === null && webhooksQuery.data !== undefined) {
+    setInitialIds(new Set(webhooksQuery.data.map((webhook) => webhook.id)));
+  }
+  // Derived-state update during render: drop targets the server now reports.
+  const settledIds = webhooks
+    .filter((webhook) => pendingActive[webhook.id] === webhook.isActive && !toggle.isPending)
+    .map((webhook) => webhook.id);
+  if (settledIds.length > 0) {
+    setPendingActive((prev) => {
+      const next = { ...prev };
+      for (const id of settledIds) delete next[id];
+      return next;
+    });
+  }
+
   const handleToggle = (webhook: Webhook, next: boolean): void => {
+    setPendingActive((prev) => ({ ...prev, [webhook.id]: next }));
     toggle.mutate(
       { wsId: workspaceId, webhookId: webhook.id, isActive: next },
       {
-        onSuccess: () => {
-          toaster.show({
-            tone: 'success',
-            message: next
-              ? t('settings.webhooks.toggle.activate')
-              : t('settings.webhooks.toggle.deactivate'),
-          });
-        },
         onError: (err) => {
+          setPendingActive((prev) => {
+            const rest = { ...prev };
+            delete rest[webhook.id];
+            return rest;
+          });
           toaster.show({
             tone: 'danger',
             message: formatApiError(err, t, 'settings.webhooks.toggle.error'),
@@ -693,6 +677,7 @@ export default function WebhooksSettingsPage(): ReactElement {
       const ok = await confirmAction({
         title: t('settings.webhooks.delete.confirm.title'),
         message: t('settings.webhooks.delete.confirm.message'),
+        confirmLabel: t('settings.webhooks.action.delete'),
         tone: 'danger',
       });
       if (!ok) return;
@@ -745,63 +730,94 @@ export default function WebhooksSettingsPage(): ReactElement {
     setDeliveriesWebhookId(webhook.id);
   };
 
+  const togglingId = toggle.isPending ? toggle.variables?.webhookId : undefined;
+  const { entries, onExited } = usePresenceList(webhooks, (webhook) => webhook.id);
+
+  const openCreate = (): void => {
+    setCreateOpen(true);
+  };
+
   return (
-    <section className={styles.page}>
-      <div className={styles.header}>
-        <div className={styles.headerText}>
-          <h1 className={styles.title}>{t('settings.webhooks.title')}</h1>
-          <p className={styles.description}>{t('settings.webhooks.description')}</p>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('settings.webhooks.title')}</h1>
+          <p className={ui.lede}>{t('settings.webhooks.description')}</p>
         </div>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => {
-            setCreateOpen(true);
-          }}
-        >
+        <Button type="button" variant="primary" onClick={openCreate}>
           {t('settings.webhooks.new')}
         </Button>
-      </div>
+      </header>
 
-      <Card>
-        <section className={styles.section}>
-          {webhooksQuery.isLoading ? (
-            <div className={styles.spinnerRow}>
-              <Spinner label={tCommon('common.loading')} />
-            </div>
-          ) : webhooks.length === 0 ? (
-            <p className={styles.deliveriesEmpty}>{t('settings.webhooks.empty')}</p>
-          ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>{t('settings.webhooks.col.url')}</th>
-                    <th>{t('settings.webhooks.col.description')}</th>
-                    <th>{t('settings.webhooks.col.event_types')}</th>
-                    <th>{t('settings.webhooks.col.active')}</th>
-                    <th className={styles.actionsCell}>{t('settings.webhooks.col.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {webhooks.map((webhook) => (
-                    <WebhookRow
-                      key={webhook.id}
-                      webhook={webhook}
-                      togglePending={toggle.isPending}
-                      onToggle={handleToggle}
-                      onDelete={handleDelete}
-                      onTest={handleTest}
-                      onShowSecret={handleShowSecret}
-                      onViewDeliveries={handleViewDeliveries}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </Card>
+      {webhooksQuery.isPending ? (
+        <div className={ui.skeletonStack} aria-hidden="true">
+          <Skeleton className={styles.skeletonRow} />
+          <Skeleton className={styles.skeletonRow} />
+          <Skeleton className={styles.skeletonRow} />
+        </div>
+      ) : webhooksQuery.isError ? (
+        <EmptyState
+          titleAs="p"
+          title={t('settings.webhooks.load_error')}
+          className={ui.empty}
+          action={
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void webhooksQuery.refetch();
+              }}
+              aria-busy={webhooksQuery.isFetching}
+            >
+              {t('settings.webhooks.retry')}
+            </Button>
+          }
+        />
+      ) : webhooks.length === 0 ? (
+        <EmptyState
+          title={t('settings.webhooks.empty')}
+          className={ui.empty}
+          action={
+            <Button type="button" onClick={openCreate}>
+              {t('settings.webhooks.new')}
+            </Button>
+          }
+        />
+      ) : (
+        <div className={ui.tableWrap}>
+          <table className={ui.table}>
+            <thead>
+              <tr>
+                <th>{t('settings.webhooks.col.url')}</th>
+                <th>{t('settings.webhooks.col.description')}</th>
+                <th>{t('settings.webhooks.col.event_types')}</th>
+                <th>{t('settings.webhooks.col.active')}</th>
+                <th className={ui.alignEnd}>{t('settings.webhooks.col.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(({ key, item: webhook, present }) => (
+                <WebhookRow
+                  key={key}
+                  webhook={webhook}
+                  present={present}
+                  onExited={() => {
+                    onExited(key);
+                  }}
+                  active={pendingActive[webhook.id] ?? webhook.isActive}
+                  togglePending={togglingId === webhook.id}
+                  arrived={initialIds !== null && !initialIds.has(webhook.id)}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                  onTest={handleTest}
+                  onShowSecret={handleShowSecret}
+                  onViewDeliveries={handleViewDeliveries}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <CreateWebhookDialog
         workspaceId={workspaceId}
@@ -828,6 +844,6 @@ export default function WebhooksSettingsPage(): ReactElement {
           setDeliveriesWebhookId(null);
         }}
       />
-    </section>
+    </div>
   );
 }

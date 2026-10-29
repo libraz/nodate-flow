@@ -6,19 +6,24 @@
  * PATCH on "Save" click. Disables interval and threshold inputs when
  * the feature is toggled off.
  *
- * The lower half renders a per-rule configuration table backed by
- * `useAutoActionRulesQuery` / `useUpdateAutoActionRules`.
+ * Below it, a per-rule configuration table backed by
+ * `useAutoActionRulesQuery` / `useUpdateAutoActionRules` saves on its
+ * own. Each section keeps a baseline of what the server holds, so its
+ * inline save status reflects unsaved edits and resets after a save.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
+import SaveStatus, { useSaveStatus } from '../settings/save-status';
+import ui from '../settings/settings-ui.module.css';
 import {
   type AutoActionRule,
   type PatchAutoActionRule,
@@ -49,32 +54,41 @@ export default function AutoActionSettingsPage({
   const { data: settings } = useAutoActionSettingsQuery(workspaceId);
   const updateMut = useUpdateAutoActionSettings();
 
-  const [enabled, setEnabled] = useState(settings.enabled);
-  const [intervalMinutes, setIntervalMinutes] = useState(settings.intervalMinutes);
-  const [threshold, setThreshold] = useState(settings.threshold);
+  // The values the server holds; the form is dirty while any field differs.
+  const [baseline, setBaseline] = useState(() => ({
+    enabled: settings.enabled,
+    intervalMinutes: settings.intervalMinutes,
+    threshold: settings.threshold,
+  }));
+  const [enabled, setEnabled] = useState(baseline.enabled);
+  const [intervalMinutes, setIntervalMinutes] = useState(baseline.intervalMinutes);
+  const [threshold, setThreshold] = useState(baseline.threshold);
   const [submitting, setSubmitting] = useState(false);
+  const dirty =
+    enabled !== baseline.enabled ||
+    intervalMinutes !== baseline.intervalMinutes ||
+    threshold !== baseline.threshold;
+  const saveStatus = useSaveStatus(dirty);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setSubmitting(true);
 
     const patch: PatchAutoActionSettingsInput = {};
-    if (enabled !== settings.enabled) {
+    if (enabled !== baseline.enabled) {
       patch.enabled = enabled;
     }
-    if (intervalMinutes !== settings.intervalMinutes) {
+    if (intervalMinutes !== baseline.intervalMinutes) {
       patch.intervalMinutes = intervalMinutes;
     }
-    if (threshold !== settings.threshold) {
+    if (threshold !== baseline.threshold) {
       patch.threshold = threshold;
     }
 
     try {
       await updateMut.mutateAsync({ workspaceId, patch });
-      toaster.show({
-        tone: 'success',
-        message: t('workspace.auto_actions.saved'),
-      });
+      setBaseline({ enabled, intervalMinutes, threshold });
+      saveStatus.markSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -88,137 +102,126 @@ export default function AutoActionSettingsPage({
   const tier = thresholdTier(threshold);
 
   return (
-    <form
-      onSubmit={(e) => {
-        void handleSubmit(e);
-      }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>
-          {t('workspace.auto_actions.title')}
-        </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('workspace.auto_actions.description')}
-        </p>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('workspace.auto_actions.title')}</h1>
+          <p className={ui.lede}>{t('workspace.auto_actions.description')}</p>
+        </div>
       </header>
 
-      {/* Enabled toggle */}
-      <FormField
-        label={t('workspace.auto_actions.enabled.label')}
-        description={t('workspace.auto_actions.enabled.description')}
+      <form
+        onSubmit={(e) => {
+          void handleSubmit(e);
+        }}
+        className={ui.section}
       >
-        {(control) => (
-          <input
-            {...control}
-            type="checkbox"
-            role="switch"
-            aria-checked={enabled}
-            checked={enabled}
-            onChange={(e) => {
-              setEnabled(e.target.checked);
-            }}
-            // nf-token-override: component dimension, not a spacing step
-            style={{ inlineSize: '1.25rem', blockSize: '1.25rem' }}
-          />
-        )}
-      </FormField>
+        {/* Enabled toggle */}
+        <FormField
+          label={t('workspace.auto_actions.enabled.label')}
+          description={t('workspace.auto_actions.enabled.description')}
+        >
+          {(control) => <Switch {...control} checked={enabled} onCheckedChange={setEnabled} />}
+        </FormField>
 
-      {/* Interval (minutes) */}
-      <FormField
-        label={t('workspace.auto_actions.interval.label')}
-        description={t('workspace.auto_actions.interval.description')}
-      >
-        {(control) => (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
-            <Input
-              {...control}
-              type="number"
-              min={0}
-              max={1440}
-              step={1}
-              value={String(intervalMinutes)}
-              disabled={!enabled}
-              onChange={(e) => {
-                const v = Number.parseInt(e.target.value, 10);
-                if (!Number.isNaN(v)) {
-                  setIntervalMinutes(Math.max(0, Math.min(1440, v)));
-                }
-              }}
-              // nf-token-override: component dimension, not a spacing step
-              style={{ inlineSize: '6rem' }}
-            />
-            <span
-              style={{
-                fontSize: 'var(--nf-text-sm)',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {intervalMinutes === 0
-                ? t('workspace.auto_actions.interval.disabled')
-                : t('workspace.auto_actions.interval.minutes')}
-            </span>
-          </div>
-        )}
-      </FormField>
-
-      {/* Threshold slider */}
-      <FormField
-        label={t('workspace.auto_actions.threshold.label')}
-        description={t('workspace.auto_actions.threshold.description')}
-      >
-        {(control) => (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
-              <input
+        {/* Interval (minutes) */}
+        <FormField
+          label={t('workspace.auto_actions.interval.label')}
+          description={t('workspace.auto_actions.interval.description')}
+        >
+          {(control) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+              <Input
                 {...control}
-                type="range"
+                type="number"
                 min={0}
-                max={1}
-                step={0.05}
-                value={threshold}
+                max={1440}
+                step={1}
+                value={String(intervalMinutes)}
                 disabled={!enabled}
                 onChange={(e) => {
-                  setThreshold(Number.parseFloat(e.target.value));
+                  const v = Number.parseInt(e.target.value, 10);
+                  if (!Number.isNaN(v)) {
+                    setIntervalMinutes(Math.max(0, Math.min(1440, v)));
+                  }
                 }}
-                style={{ flex: 1 }}
+                // nf-token-override: component dimension, not a spacing step
+                style={{ inlineSize: '6rem' }}
               />
               <span
                 style={{
                   fontSize: 'var(--nf-text-sm)',
-                  fontVariantNumeric: 'tabular-nums',
-                  // nf-token-override: component dimension, not a spacing step
-                  minInlineSize: '3rem',
-                  textAlign: 'end',
+                  color: 'var(--nf-color-fg-muted)',
                 }}
               >
-                {threshold.toFixed(2)}
+                {intervalMinutes === 0
+                  ? t('workspace.auto_actions.interval.disabled')
+                  : t('workspace.auto_actions.interval.minutes')}
               </span>
             </div>
-            <span
-              style={{
-                fontSize: 'var(--nf-text-supporting)',
-                color: 'var(--nf-color-fg-muted)',
-                fontWeight: 500,
-              }}
-            >
-              {t(`workspace.auto_actions.threshold.${tier}`)}
-            </span>
-          </div>
-        )}
-      </FormField>
+          )}
+        </FormField>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? t('workspace.auto_actions.saving') : t('workspace.auto_actions.save')}
-        </Button>
-      </div>
+        {/* Threshold slider */}
+        <FormField
+          label={t('workspace.auto_actions.threshold.label')}
+          description={t('workspace.auto_actions.threshold.description')}
+        >
+          {(control) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
+                <input
+                  {...control}
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={threshold}
+                  disabled={!enabled}
+                  onChange={(e) => {
+                    setThreshold(Number.parseFloat(e.target.value));
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <span
+                  style={{
+                    fontSize: 'var(--nf-text-sm)',
+                    fontVariantNumeric: 'tabular-nums',
+                    // nf-token-override: component dimension, not a spacing step
+                    minInlineSize: '3rem',
+                    textAlign: 'end',
+                  }}
+                >
+                  {threshold.toFixed(2)}
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 'var(--nf-text-supporting)',
+                  color: 'var(--nf-color-fg-muted)',
+                  fontWeight: 500,
+                }}
+              >
+                {t(`workspace.auto_actions.threshold.${tier}`)}
+              </span>
+            </div>
+          )}
+        </FormField>
 
-      <hr style={{ border: 'none', borderBlockStart: '1px solid var(--nf-color-border)' }} />
+        <div className={ui.actions}>
+          <SaveStatus saved={saveStatus.saved} dirty={dirty} />
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {t('workspace.auto_actions.save')}
+          </Button>
+        </div>
+      </form>
 
       <AutoActionRulesSection workspaceId={workspaceId} masterEnabled={enabled} />
-
-      <hr style={{ border: 'none', borderBlockStart: '1px solid var(--nf-color-border)' }} />
 
       {/*
        * Per-signal-kind autonomy matrix. Sits beneath the
@@ -226,7 +229,7 @@ export default function AutoActionSettingsPage({
        * override per signal kind that fans out into all four rule rows.
        */}
       <AutonomyMatrix workspaceId={workspaceId} />
-    </form>
+    </div>
   );
 }
 
@@ -323,25 +326,25 @@ function AutoActionRulesSection({
   const { data: rules } = useAutoActionRulesQuery(workspaceId);
   const updateRulesMut = useUpdateAutoActionRules();
 
+  // The rules the server holds; drafts are compared against them for the save status.
+  const [baseline, setBaseline] = useState<AutoActionRule[]>(rules);
   const [drafts, setDrafts] = useState<Record<RuleKind, RuleDraft>>(() => toRuleDraftMap(rules));
   const [savingRules, setSavingRules] = useState(false);
+  const pendingPatches = buildRulesPatch(baseline, drafts);
+  const dirty = pendingPatches.length > 0;
+  const saveStatus = useSaveStatus(dirty);
 
   const handleRulesSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    // Prevent the parent form from submitting — the rules section lives
-    // inside the same <form> but has its own submit flow.
     e.preventDefault();
-    e.stopPropagation();
-
-    const patches = buildRulesPatch(rules, drafts);
-    if (patches.length === 0) return;
+    if (!dirty) return;
 
     setSavingRules(true);
     try {
-      await updateRulesMut.mutateAsync({ workspaceId, rules: patches });
-      toaster.show({
-        tone: 'success',
-        message: t('workspace.auto_actions.rules.saved'),
-      });
+      await updateRulesMut.mutateAsync({ workspaceId, rules: pendingPatches });
+      setBaseline((prev) =>
+        prev.map((rule) => ({ ...rule, ...(drafts[rule.kind as RuleKind] ?? {}) })),
+      );
+      saveStatus.markSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -359,54 +362,29 @@ function AutoActionRulesSection({
     }));
   };
 
-  const thStyle: React.CSSProperties = {
-    textAlign: 'start',
-    padding: 'var(--nf-space-2) var(--nf-space-3)',
-    fontSize: 'var(--nf-text-supporting)',
-    fontWeight: 600,
-    color: 'var(--nf-color-fg-muted)',
-    whiteSpace: 'nowrap',
-  };
-
-  const tdStyle: React.CSSProperties = {
-    padding: 'var(--nf-space-2) var(--nf-space-3)',
-    verticalAlign: 'middle',
-  };
-
   return (
-    // Use a nested fieldset so the rules "Save" button does not interfere
-    // with the global settings submit handler above.  We attach the
-    // submit handler to the wrapping div via a button with form attribute
-    // pointing at a hidden inner form — but since the section is already
-    // inside the outer <form>, we rely on the button's onClick instead.
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-lg)' }}>
+    <form
+      className={ui.section}
+      aria-labelledby="auto-action-rules-title"
+      onSubmit={(e) => {
+        void handleRulesSubmit(e);
+      }}
+    >
+      <div className={ui.sectionHeader}>
+        <h2 id="auto-action-rules-title" className={ui.sectionTitle}>
           {t('workspace.auto_actions.rules.title')}
         </h2>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('workspace.auto_actions.rules.description')}
-        </p>
-      </header>
+        <p className={ui.sectionDescription}>{t('workspace.auto_actions.rules.description')}</p>
+      </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          style={{
-            inlineSize: '100%',
-            borderCollapse: 'collapse',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+      <div className={ui.tableWrap}>
+        <table className={ui.table}>
           <thead>
-            <tr
-              style={{
-                borderBlockEnd: '1px solid var(--nf-color-border)',
-              }}
-            >
-              <th style={thStyle}>{t('workspace.auto_actions.rules.column.rule')}</th>
-              <th style={thStyle}>{t('workspace.auto_actions.rules.column.enabled')}</th>
-              <th style={thStyle}>{t('workspace.auto_actions.rules.column.confidence')}</th>
-              <th style={thStyle}>{t('workspace.auto_actions.rules.column.idle_hours')}</th>
+            <tr>
+              <th scope="col">{t('workspace.auto_actions.rules.column.rule')}</th>
+              <th scope="col">{t('workspace.auto_actions.rules.column.enabled')}</th>
+              <th scope="col">{t('workspace.auto_actions.rules.column.confidence')}</th>
+              <th scope="col">{t('workspace.auto_actions.rules.column.idle_hours')}</th>
             </tr>
           </thead>
           <tbody>
@@ -417,14 +395,9 @@ function AutoActionRulesSection({
               const idleDisabled = kind === 'escalate_overdue';
 
               return (
-                <tr
-                  key={kind}
-                  style={{
-                    borderBlockEnd: '1px solid var(--nf-color-border)',
-                  }}
-                >
+                <tr key={kind}>
                   {/* Rule name + description */}
-                  <td style={tdStyle}>
+                  <td>
                     <div
                       style={{
                         display: 'flex',
@@ -435,36 +408,26 @@ function AutoActionRulesSection({
                       <span style={{ fontWeight: 500 }}>
                         {t(`workspace.auto_actions.rules.${kind}.label`)}
                       </span>
-                      <span
-                        style={{
-                          fontSize: 'var(--nf-text-xs)',
-                          color: 'var(--nf-color-fg-muted)',
-                        }}
-                      >
+                      <span className={ui.muted} style={{ fontSize: 'var(--nf-text-xs)' }}>
                         {t(`workspace.auto_actions.rules.${kind}.description`)}
                       </span>
                     </div>
                   </td>
 
                   {/* Enabled toggle */}
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      aria-checked={draft.enabled}
+                  <td>
+                    <Switch
                       checked={draft.enabled}
                       disabled={rowDisabled}
-                      onChange={(e) => {
-                        updateDraft(kind, { enabled: e.target.checked });
+                      onCheckedChange={(next) => {
+                        updateDraft(kind, { enabled: next });
                       }}
                       aria-label={t(`workspace.auto_actions.rules.${kind}.label`)}
-                      // nf-token-override: component dimension, not a spacing step
-                      style={{ inlineSize: '1.125rem', blockSize: '1.125rem' }}
                     />
                   </td>
 
                   {/* Confidence */}
-                  <td style={tdStyle}>
+                  <td>
                     <Input
                       type="number"
                       min={0}
@@ -488,17 +451,9 @@ function AutoActionRulesSection({
                   </td>
 
                   {/* Idle hours */}
-                  <td style={tdStyle}>
+                  <td>
                     {idleDisabled ? (
-                      <span
-                        style={{
-                          fontSize: 'var(--nf-text-supporting)',
-                          color: 'var(--nf-color-fg-muted)',
-                          fontStyle: 'italic',
-                        }}
-                      >
-                        {t('workspace.auto_actions.rules.idle_na')}
-                      </span>
+                      <span className={ui.muted}>{t('workspace.auto_actions.rules.idle_na')}</span>
                     ) : (
                       <Input
                         type="number"
@@ -528,21 +483,17 @@ function AutoActionRulesSection({
         </table>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className={ui.actions}>
+        <SaveStatus saved={saveStatus.saved} dirty={dirty} />
         <Button
-          type="button"
+          type="submit"
           variant="primary"
           disabled={savingRules || !masterEnabled}
-          onClick={(e) => {
-            // Synthesise a FormEvent-like call so we can reuse handleRulesSubmit.
-            void handleRulesSubmit(e as unknown as FormEvent<HTMLFormElement>);
-          }}
+          aria-busy={savingRules || undefined}
         >
-          {savingRules
-            ? t('workspace.auto_actions.rules.saving')
-            : t('workspace.auto_actions.rules.save')}
+          {t('workspace.auto_actions.rules.save')}
         </Button>
       </div>
-    </section>
+    </form>
   );
 }

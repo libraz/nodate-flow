@@ -7,6 +7,7 @@
  * workspace is selected.
  */
 
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type ChangeEvent, type ReactElement, Suspense, useState } from 'react';
@@ -34,8 +35,7 @@ function SearchResults({
   const { data: results, isLoading } = useSearchPages(workspaceId, query);
 
   if (query.length < 2) return null;
-  // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-  if (isLoading) return <Skeleton style={{ blockSize: '2rem', inlineSize: '100%' }} />;
+  if (isLoading) return <Skeleton className={styles.searchSkeleton} />;
   if (!results || results.length === 0) return null;
 
   return (
@@ -46,6 +46,7 @@ function SearchResults({
             to="/pages/$pageId"
             params={{ pageId: page.id }}
             className={styles.searchResultItem}
+            title={page.title}
           >
             {page.title}
           </Link>
@@ -98,10 +99,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
   if (!workspaceId) {
     return (
       <section className={styles.container}>
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>{t('empty')}</p>
-          <p className={styles.emptyDescription}>{t('empty_description')}</p>
-        </div>
+        <EmptyState titleAs="p" title={t('empty')} description={t('empty_description')} />
       </section>
     );
   }
@@ -110,7 +108,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
     <section className={styles.container}>
       <div className={styles.layout}>
         {/* Left sidebar: search + tree */}
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className={styles.sidebarColumn}>
           <div className={styles.searchBar}>
             <input
               type="search"
@@ -122,15 +120,16 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
             />
           </div>
           {searchQuery.length >= 2 ? (
-            <div style={{ paddingInline: 'var(--nf-space-3)' }}>
+            <div className={styles.searchResultsWrap}>
               <SearchResults workspaceId={workspaceId} query={searchQuery} />
             </div>
           ) : (
             <Suspense
               fallback={
-                <div style={{ padding: 'var(--nf-space-4)' }}>
-                  {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-                  <Skeleton style={{ blockSize: '1.5rem', inlineSize: '80%' }} />
+                <div className={styles.treeFallback}>
+                  <Skeleton className={styles.treeSkeletonRow} />
+                  <Skeleton className={styles.treeSkeletonRow} />
+                  <Skeleton className={styles.treeSkeletonRow} />
                 </div>
               }
             >
@@ -143,10 +142,10 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
           )}
         </div>
 
-        {/* Right content area */}
-        <div className={styles.contentArea}>
-          {mode === 'create' && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-            <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
+        {/* Right content area; re-keyed per page and mode so each swap fades in. */}
+        <div key={`${mode}:${activePageId ?? ''}`} className={styles.contentArea}>
+          {mode === 'create' && (
+            <Suspense fallback={<Skeleton className={styles.contentSkeleton} />}>
               <PageEditor
                 workspaceId={workspaceId}
                 existingPage={undefined}
@@ -154,27 +153,26 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
               />
             </Suspense>
           )}
-          {mode === 'edit' &&
-            activePageId && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-              <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
-                <PageEditorWithData
-                  workspaceId={workspaceId}
-                  pageId={activePageId}
-                  onDone={handleEditorDone}
-                />
-              </Suspense>
-            )}
-          {mode === 'view' &&
-            activePageId && ( // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-              <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
-                <PageDetail workspaceId={workspaceId} pageId={activePageId} onEdit={handleEdit} />
-              </Suspense>
-            )}
+          {mode === 'edit' && activePageId && (
+            <Suspense fallback={<Skeleton className={styles.contentSkeleton} />}>
+              <PageEditorWithData
+                workspaceId={workspaceId}
+                pageId={activePageId}
+                onDone={handleEditorDone}
+              />
+            </Suspense>
+          )}
+          {mode === 'view' && activePageId && (
+            <Suspense fallback={<Skeleton className={styles.contentSkeleton} />}>
+              <PageDetail workspaceId={workspaceId} pageId={activePageId} onEdit={handleEdit} />
+            </Suspense>
+          )}
           {mode === 'view' && !activePageId && (
-            <div className={styles.empty}>
-              <p className={styles.emptyTitle}>{t('no_selection')}</p>
-              <p className={styles.emptyDescription}>{t('no_selection_description')}</p>
-            </div>
+            <EmptyState
+              titleAs="p"
+              title={t('no_selection')}
+              description={t('no_selection_description')}
+            />
           )}
         </div>
       </div>

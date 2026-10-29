@@ -13,6 +13,7 @@
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -188,30 +189,19 @@ function CommandModeBody({
       <div className={css.groupLabel}>{t('dock.command_palette.group_command')}</div>
 
       {resolveCommand.isPending && (
-        <p
-          className={css.emptyText}
-          style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}
-          aria-live="polite"
-        >
+        <p className={cx(css.emptyText, css.commandStatus)} aria-live="polite">
           {t('dock.command_palette.resolving')}
         </p>
       )}
 
       {resolveCommand.isError && (
-        <p
-          className={css.emptyText}
-          style={{
-            padding: 'var(--nf-space-2) var(--nf-space-3)',
-            color: 'var(--nf-color-danger-fg)',
-          }}
-          aria-live="assertive"
-        >
+        <p className={cx(css.emptyText, css.commandStatus, css.statusDanger)} aria-live="assertive">
           {formatApiError(resolveCommand.error, t, 'dock.command_palette.error')}
         </p>
       )}
 
       {!resolveCommand.isPending && !result && !resolveCommand.isError && (
-        <p className={css.emptyText} style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}>
+        <p className={cx(css.emptyText, css.commandStatus)}>
           {prompt.length > 0
             ? t('dock.command_palette.hint_select')
             : t('dock.command_palette.placeholder_command')}
@@ -240,26 +230,22 @@ function CommandModeBody({
               the palette never offers to run something it cannot run. */}
           {!isDispatchableTool(result.tool) ? (
             <p
-              className={css.emptyText}
-              style={{ color: 'var(--nf-color-danger-fg)' }}
+              key="unsupported"
+              className={cx(css.emptyText, css.statusDanger)}
               aria-live="assertive"
             >
               {t('dock.command_palette.unsupported', { tool: result.tool })}
             </p>
           ) : executing ? (
-            <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
+            <p key="executing" className={cx(css.emptyText, css.statusStrong)} aria-live="polite">
               {t('dock.command_palette.executing')}
             </p>
           ) : outcome ? (
-            <p
-              className={css.emptyText}
-              style={{ color: 'var(--nf-color-danger-fg)' }}
-              aria-live="assertive"
-            >
+            <p key="outcome" className={cx(css.emptyText, css.statusDanger)} aria-live="assertive">
               {outcomeMessage(outcome, t)}
             </p>
           ) : (
-            <p className={css.emptyText} style={{ color: 'var(--nf-color-fg)' }} aria-live="polite">
+            <p key="confirm" className={cx(css.emptyText, css.statusStrong)} aria-live="polite">
               {result.confidence >= 0.8
                 ? t('dock.command_palette.confirm_execute')
                 : t('dock.command_palette.confirm_low', { tool: result.tool })}
@@ -535,59 +521,71 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
             : t('dock.command_palette.placeholder')
         }
         aria-label={t('dock.command_palette.title')}
-        className={css.input}
+        className={cx(css.input, 'nf-focus-ring')}
       />
-      {mode === 'command' ? (
-        <CommandModeBody
-          prompt={commandPrompt}
-          wsId={wsId}
-          onSelect={onSelect}
-          onSearch={(q) => {
-            setQuery(q);
-            setActive(0);
-          }}
-          submitHandlerRef={commandSubmitRef}
-        />
-      ) : isSearching && filtered.length === 0 ? (
-        <p className={css.emptyText} aria-live="polite">
-          {t('dock.command_palette.searching')}
-        </p>
-      ) : filtered.length === 0 ? (
-        <p className={css.emptyText}>{t('dock.command_palette.empty')}</p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-          {grouped.map(([group, its]) => (
-            <div key={group}>
-              <div className={css.groupLabel}>{group}</div>
-              <ul className={css.resultList}>
-                {its.map((it) => {
-                  flatIdx += 1;
-                  const isActive = flatIdx === active;
-                  return (
-                    <li key={it.id}>
-                      <button
-                        type="button"
-                        aria-current={isActive ? 'true' : undefined}
-                        onClick={() => onSelect(it)}
-                        onMouseEnter={() => {
-                          const idx = filtered.findIndex((f) => f.id === it.id);
-                          if (idx >= 0) setActive(idx);
-                        }}
-                        className={cx(css.resultItem, isActive && css.resultItemActive)}
-                      >
-                        {it.icon ? (
-                          <Icon icon={it.icon} decorative style={{ flexShrink: 0, opacity: 0.6 }} />
-                        ) : null}
-                        {it.label}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className={css.results}>
+        {mode === 'command' ? (
+          <CommandModeBody
+            prompt={commandPrompt}
+            wsId={wsId}
+            onSelect={onSelect}
+            onSearch={(q) => {
+              setQuery(q);
+              setActive(0);
+            }}
+            submitHandlerRef={commandSubmitRef}
+          />
+        ) : isSearching && filtered.length === 0 ? (
+          <p key="searching" className={css.emptyText} aria-live="polite">
+            {t('dock.command_palette.searching')}
+          </p>
+        ) : filtered.length === 0 ? (
+          <p key="empty" className={css.emptyText}>
+            {t('dock.command_palette.empty')}
+          </p>
+        ) : (
+          <div key="results" className={css.groups}>
+            {grouped.map(([group, its]) => (
+              <div key={group}>
+                <div className={css.groupLabel}>{group}</div>
+                <ul className={css.resultList}>
+                  {its.map((it) => {
+                    flatIdx += 1;
+                    const isActive = flatIdx === active;
+                    return (
+                      <li key={it.id}>
+                        <button
+                          type="button"
+                          // Keep the keyboard selection visible inside the scrolling results.
+                          ref={
+                            isActive
+                              ? (el) => {
+                                  el?.scrollIntoView?.({ block: 'nearest' });
+                                }
+                              : undefined
+                          }
+                          aria-current={isActive ? 'true' : undefined}
+                          onClick={() => onSelect(it)}
+                          onMouseEnter={() => {
+                            const idx = filtered.findIndex((f) => f.id === it.id);
+                            if (idx >= 0) setActive(idx);
+                          }}
+                          className={cx(css.resultItem, isActive && css.resultItemActive)}
+                        >
+                          {it.icon ? (
+                            <Icon icon={it.icon} decorative className={css.resultIcon} />
+                          ) : null}
+                          <span className={css.resultLabel}>{it.label}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className={css.hintBar}>
         <span className={css.hintGroup}>
           <kbd className={css.kbd}>↑</kbd>
@@ -608,6 +606,20 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
             {t('dock.command_palette.command_hint')}
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Placeholder sized like the loaded palette so the dialog does not resize. */
+function PaletteSkeleton(): ReactElement {
+  return (
+    <div className={css.body} aria-busy="true">
+      <Skeleton className={css.skeletonInput} />
+      <div className={css.results}>
+        <Skeleton className={css.skeletonRow} />
+        <Skeleton className={css.skeletonRow} />
+        <Skeleton className={css.skeletonRow} />
       </div>
     </div>
   );
@@ -641,7 +653,7 @@ export default function CommandPalette({
 
   return (
     <Dialog open={open} onClose={onClose} title={t('dock.command_palette.title')}>
-      <Suspense fallback={<p style={{ margin: 0 }}>…</p>}>
+      <Suspense fallback={<PaletteSkeleton />}>
         <PaletteBody onSelect={handleSelect} initialCommandMode={initialCommandMode} />
       </Suspense>
     </Dialog>

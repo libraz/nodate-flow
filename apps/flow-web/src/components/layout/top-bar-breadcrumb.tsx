@@ -28,15 +28,17 @@ export default function TopBarBreadcrumb(): ReactElement | null {
   const state = useTopBarBreadcrumb();
   if (!state) return null;
   if (state.projectId != null) {
+    // Keyed on the trail so a change remounts it and replays the fade-in.
     return (
       <ProjectBreadcrumb
+        key={`${state.workspaceId}:${state.projectId}:${state.view ?? ''}`}
         workspaceId={state.workspaceId}
         projectId={state.projectId}
         view={state.view}
       />
     );
   }
-  return <WorkspaceBreadcrumb workspaceId={state.workspaceId} />;
+  return <WorkspaceBreadcrumb key={state.workspaceId} workspaceId={state.workspaceId} />;
 }
 
 /**

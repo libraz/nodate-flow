@@ -25,5 +25,6 @@
   "config": {
     "timebox_label": "时间盒",
     "project_label": "项目"
-  }
+  },
+  "remove_widget_confirm": "要从仪表板中移除此小组件吗？"
 }

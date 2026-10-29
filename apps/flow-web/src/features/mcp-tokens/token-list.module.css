@@ -1,0 +1,22 @@
+/* MCP token list specifics; table rhythm comes from settings-ui. */
+
+.nameCell {
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 14rem;
+}
+
+.scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1);
+}
+
+.scope {
+  padding: var(--nf-space-px) var(--nf-space-1-5);
+  border-radius: var(--nf-radius-xs);
+  background: var(--nf-color-bg-sunken);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: nowrap;
+}

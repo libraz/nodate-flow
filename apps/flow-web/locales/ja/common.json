@@ -1,12 +1,18 @@
 {
   "common": {
+    "loading": "読み込み中…",
     "breadcrumb": "パンくずリスト",
     "unknown_role": "不明な権限",
     "deactivated_user": "無効化されたユーザー",
     "network_error": "ネットワークエラーです。接続を確認してもう一度お試しください。",
     "date": {
-      "placeholder": "日付を選択"
-    }
+      "placeholder": "日付を選択",
+      "clear": "クリア",
+      "monthYear": "{year, number, ::group-off}年{month}月",
+      "weekdays": ["月", "火", "水", "木", "金", "土", "日"]
+    },
+    "undo": "元に戻す",
+    "cancel": "キャンセル"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -356,6 +362,10 @@
     "errors": {
       "visibility_failed": "カレンダーの表示を切り替えられませんでした",
       "leave_failed": "カレンダーから退出できませんでした"
+    },
+    "leave_confirm": {
+      "title": "カレンダーから退出しますか？",
+      "message": "「{name}」から退出しますか？再度追加されるまでアクセスできなくなります。"
     }
   },
   "not_found": {
@@ -392,7 +402,6 @@
       "slug": "スラッグ",
       "description": "説明",
       "submit": "保存",
-      "submitting": "保存中…",
       "cancel": "キャンセル",
       "close": "閉じる"
     },
@@ -489,7 +498,8 @@
       "go_to_login": "サインインへ",
       "error_title": "招待を利用できません",
       "error_network": "招待を確認できませんでした。接続を確認してもう一度お試しください。",
-      "error_back": "ホームへ"
+      "error_back": "ホームへ",
+      "revoke_confirm": "この招待リンクを取り消しますか？まだ使用していない人は、このリンクで参加できなくなります。"
     },
     "roles": {
       "owner": "オーナー",
@@ -522,8 +532,7 @@
       "name_placeholder": "Acme、Personal、Team Nova など",
       "slug_placeholder": "acme",
       "slug_hint": "小文字・数字・ハイフンのみ使用できます。",
-      "submit": "ワークスペースを作成",
-      "submitting": "作成中…"
+      "submit": "ワークスペースを作成"
     }
   },
   "projects": {
@@ -561,7 +570,6 @@
       "description": "説明",
       "visibility": "公開範囲",
       "submit": "保存",
-      "submitting": "保存中…",
       "cancel": "キャンセル"
     },
     "visibility": {
@@ -591,7 +599,8 @@
       "empty": "メンバーはまだいません。",
       "remove": "削除",
       "removed": "メンバーを削除しました",
-      "remove_failed": "メンバーの削除に失敗しました"
+      "remove_failed": "メンバーの削除に失敗しました",
+      "remove_confirm": "{name} をこのプロジェクトから削除しますか？"
     },
     "roles": {
       "lead": "リード",
@@ -738,7 +747,9 @@
       "update_partial": "{total}件中{failed}件のタスクの更新に失敗しました。",
       "deleted": "タスクを削除しました。",
       "delete_failed": "タスクの削除に失敗しました。",
-      "delete_partial": "{total}件中{failed}件のタスクの削除に失敗しました。"
+      "delete_partial": "{total}件中{failed}件のタスクの削除に失敗しました。",
+      "delete_confirm_title": "{count}件のタスクを削除しますか？",
+      "delete_confirm": "選択した{count}件のタスクを完全に削除します。この操作は取り消せません。"
     },
     "inline": {
       "edit_title": "タイトルを編集",
@@ -833,7 +844,8 @@
         "searchEmpty": "一致するタスクはありません。",
         "searchHint": "このワークスペース内のタスク名で検索します。",
         "addError": "依存の追加に失敗しました。",
-        "removeError": "依存の削除に失敗しました。"
+        "removeError": "依存の削除に失敗しました。",
+        "removed": "「{title}」との依存関係を削除しました。"
       },
       "infer_state": {
         "title": "次の推奨アクション",
@@ -1001,7 +1013,9 @@
           "body": "ドラフトはアーカイブされます。元のタスクとシグナルはそのまま残ります。",
           "confirm": "破棄",
           "cancel": "キャンセル"
-        }
+        },
+        "prev_page": "前のページ",
+        "next_page": "次のページ"
       }
     }
   },

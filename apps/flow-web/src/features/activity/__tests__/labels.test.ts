@@ -63,7 +63,7 @@ describe('actionLabel', () => {
   });
 
   it('falls back to a humanized form for an unknown action', () => {
-    expect(actionLabel('calendar.event.update', t)).toBe('Calendar event update');
+    expect(actionLabel('widget.frobnicate', t)).toBe('Widget frobnicate');
   });
 });
 

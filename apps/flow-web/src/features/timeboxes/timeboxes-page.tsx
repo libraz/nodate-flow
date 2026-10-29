@@ -24,17 +24,23 @@
  * temporary state.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { getRouteApi } from '@tanstack/react-router';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
+import type { TaskDerivedState } from '../tasks/api';
+import { STATE_KEY, STATE_TONE } from '../tasks/constants';
 import {
   asTimeboxStatus,
   type Timebox,
@@ -66,6 +72,23 @@ function toneForStatus(status: TimeboxStatus): BadgeTone {
   }
 }
 
+/** i18n key for each timebox status. */
+const STATUS_KEY: Record<TimeboxStatus, string> = {
+  planned: 'timeboxes.status.planned',
+  active: 'timeboxes.status.active',
+  completed: 'timeboxes.status.completed',
+  cancelled: 'timeboxes.status.cancelled',
+};
+
+/**
+ * The task's state as a known one, or null for a value this build does
+ * not name — drawn as a neutral badge with the raw value rather than
+ * guessed at.
+ */
+function knownTaskState(state: string): TaskDerivedState | null {
+  return state in STATE_KEY ? (state as TaskDerivedState) : null;
+}
+
 /** Format a YYYY-MM-DD date with the active locale's medium style. */
 function formatYmd(ymd: string, locale: string): string {
   if (!ymd) return '';
@@ -90,6 +113,7 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
   const removeTask = useRemoveTimeboxTaskMutation();
   const addTask = useAddTimeboxTaskMutation();
   const [taskIdInput, setTaskIdInput] = useState('');
+  const taskPresence = usePresenceList(tasks, (task) => task.id);
 
   const handleRemove = async (taskId: string): Promise<void> => {
     try {
@@ -119,25 +143,43 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
   return (
     <div className={styles.tasks}>
       <h4 className={styles.tasksTitle}>{t('timeboxes.add_task.label')}</h4>
-      {tasks.length === 0 ? (
+      {taskPresence.entries.length === 0 ? (
         <p className={styles.tasksEmpty}>{t('timeboxes.no_tasks')}</p>
       ) : (
-        tasks.map((task) => (
-          <div key={task.id} className={styles.taskRow}>
-            <span className={styles.taskTitle}>{task.title}</span>
-            <Badge tone="neutral">{task.derivedState}</Badge>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                void handleRemove(task.id);
-              }}
+        taskPresence.entries.map((entry) => {
+          const task = entry.item;
+          const state = knownTaskState(task.derivedState);
+          return (
+            <PresenceItem
+              key={entry.key}
+              present={entry.present}
+              onExited={() => taskPresence.onExited(entry.key)}
             >
-              {t('timeboxes.remove_task.label')}
-            </Button>
-          </div>
-        ))
+              <div className={styles.taskRow}>
+                <span className={styles.taskTitle} title={task.title}>
+                  {task.title}
+                </span>
+                <Badge tone={state ? STATE_TONE[state] : 'neutral'}>
+                  {state ? t(STATE_KEY[state]) : task.derivedState}
+                </Badge>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={removeTask.isPending}
+                  aria-busy={
+                    (removeTask.isPending && removeTask.variables?.taskId === task.id) || undefined
+                  }
+                  onClick={() => {
+                    void handleRemove(task.id);
+                  }}
+                >
+                  {t('timeboxes.remove_task.label')}
+                </Button>
+              </div>
+            </PresenceItem>
+          );
+        })
       )}
       <form
         onSubmit={(e) => {
@@ -154,7 +196,13 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
             setTaskIdInput(e.target.value);
           }}
         />
-        <Button type="submit" variant="default" size="sm">
+        <Button
+          type="submit"
+          variant="default"
+          size="sm"
+          disabled={taskIdInput.trim().length === 0 || addTask.isPending}
+          aria-busy={addTask.isPending || undefined}
+        >
           {t('timeboxes.add_task.label')}
         </Button>
       </form>
@@ -178,7 +226,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
   const tasksQuery = useTimeboxTasksQuery(workspaceId, timebox.id, status === 'active');
   const tasks = tasksQuery.data ?? [];
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter((tk) => tk.derivedState === 'completed').length;
+  const completedTasks = tasks.filter((tk) => tk.derivedState === 'done').length;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const [tasksOpen, setTasksOpen] = useState(status === 'active');
 
@@ -217,12 +265,26 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
     .join(' ');
 
   const showTasks = status === 'active';
+  const busy = updateStatus.isPending || deleteMutation.isPending;
+  /** Props for the button that moves the card to `next`: locked while any write runs, busy for its own. */
+  const transitionProps = (
+    next: TimeboxStatus,
+  ): { disabled: boolean; 'aria-busy': true | undefined } => ({
+    disabled: busy,
+    'aria-busy': (updateStatus.isPending && updateStatus.variables?.status === next) || undefined,
+  });
+  const deleteProps = {
+    disabled: busy,
+    'aria-busy': deleteMutation.isPending || undefined,
+  };
 
   return (
     <article className={cardClass}>
       <div className={styles.cardTop}>
-        <h3 className={styles.cardName}>{timebox.name}</h3>
-        <Badge tone={toneForStatus(status)}>{t(`timeboxes.status.${status}`)}</Badge>
+        <h3 className={styles.cardName} title={timebox.name}>
+          {timebox.name}
+        </h3>
+        <Badge tone={toneForStatus(status)}>{t(STATUS_KEY[status])}</Badge>
       </div>
       <div className={styles.cardMeta}>
         <span className={styles.dateRange}>
@@ -242,7 +304,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            <div className={styles.progressFill} style={{ inlineSize: `${progressPct}%` }} />
+            <div className={styles.progressFill} style={{ scale: `${progressPct / 100} 1` }} />
           </div>
           <span className={styles.progressLabel}>
             {t('timeboxes.progress', { done: completedTasks, total: totalTasks })}
@@ -256,6 +318,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               type="button"
               size="sm"
               variant="primary"
+              {...transitionProps('active')}
               onClick={() => {
                 void transition('active', 'timeboxes.transition.error');
               }}
@@ -276,6 +339,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               type="button"
               size="sm"
               variant="ghost"
+              {...transitionProps('cancelled')}
               onClick={() => {
                 void transition('cancelled', 'timeboxes.transition.error');
               }}
@@ -286,6 +350,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               type="button"
               size="sm"
               variant="danger"
+              {...deleteProps}
               onClick={() => {
                 void handleDelete();
               }}
@@ -300,6 +365,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               type="button"
               size="sm"
               variant="primary"
+              {...transitionProps('completed')}
               onClick={() => {
                 void transition('completed', 'timeboxes.transition.error');
               }}
@@ -310,6 +376,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               type="button"
               size="sm"
               variant="ghost"
+              {...transitionProps('cancelled')}
               onClick={() => {
                 void transition('cancelled', 'timeboxes.transition.error');
               }}
@@ -325,7 +392,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
               }}
               aria-expanded={tasksOpen}
             >
-              {tasksOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <ChevronRight size={14} aria-hidden className={styles.disclosureIcon} />
               <span>{t('timeboxes.add_task.label')}</span>
             </Button>
           </>
@@ -335,6 +402,7 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
             type="button"
             size="sm"
             variant="danger"
+            {...deleteProps}
             onClick={() => {
               void handleDelete();
             }}
@@ -343,10 +411,45 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
           </Button>
         ) : null}
       </div>
-      {showTasks && tasksOpen ? (
+      <Collapse open={showTasks && tasksOpen} className={styles.tasksCollapse}>
         <TaskList workspaceId={workspaceId} timeboxId={timebox.id} />
-      ) : null}
+      </Collapse>
     </article>
+  );
+}
+
+interface TimeboxCardListProps {
+  timeboxes: readonly Timebox[];
+  workspaceId: string;
+  locale: string;
+  onEdit: (timebox: Timebox) => void;
+}
+
+/** Cards of one section; a card that leaves (status change, delete) plays its exit. */
+function TimeboxCardList({
+  timeboxes,
+  workspaceId,
+  locale,
+  onEdit,
+}: TimeboxCardListProps): ReactElement {
+  const presence = usePresenceList(timeboxes, (tb) => tb.id);
+  return (
+    <>
+      {presence.entries.map((entry) => (
+        <PresenceItem
+          key={entry.key}
+          present={entry.present}
+          onExited={() => presence.onExited(entry.key)}
+        >
+          <TimeboxCard
+            timebox={entry.item}
+            workspaceId={workspaceId}
+            locale={locale}
+            onEdit={onEdit}
+          />
+        </PresenceItem>
+      ))}
+    </>
   );
 }
 
@@ -406,43 +509,37 @@ export default function TimeboxesPage(): ReactElement {
 
       {hasAny ? (
         <div className={styles.sections}>
-          {active.length > 0 ? (
+          <Collapse open={active.length > 0}>
             <section className={styles.section} aria-label={t('timeboxes.section.active')}>
               <header className={styles.sectionHeader}>
                 <h2 className={styles.sectionTitle}>{t('timeboxes.section.active')}</h2>
                 <span className={styles.sectionCount}>{active.length}</span>
               </header>
-              {active.map((tb) => (
-                <TimeboxCard
-                  key={tb.id}
-                  timebox={tb}
-                  workspaceId={workspaceId}
-                  locale={locale}
-                  onEdit={openEdit}
-                />
-              ))}
+              <TimeboxCardList
+                timeboxes={active}
+                workspaceId={workspaceId}
+                locale={locale}
+                onEdit={openEdit}
+              />
             </section>
-          ) : null}
+          </Collapse>
 
-          {planned.length > 0 ? (
+          <Collapse open={planned.length > 0}>
             <section className={styles.section} aria-label={t('timeboxes.section.planned')}>
               <header className={styles.sectionHeader}>
                 <h2 className={styles.sectionTitle}>{t('timeboxes.section.planned')}</h2>
                 <span className={styles.sectionCount}>{planned.length}</span>
               </header>
-              {planned.map((tb) => (
-                <TimeboxCard
-                  key={tb.id}
-                  timebox={tb}
-                  workspaceId={workspaceId}
-                  locale={locale}
-                  onEdit={openEdit}
-                />
-              ))}
+              <TimeboxCardList
+                timeboxes={planned}
+                workspaceId={workspaceId}
+                locale={locale}
+                onEdit={openEdit}
+              />
             </section>
-          ) : null}
+          </Collapse>
 
-          {archive.length > 0 ? (
+          <Collapse open={archive.length > 0}>
             <section className={styles.section} aria-label={t('timeboxes.section.archive')}>
               <button
                 type="button"
@@ -452,29 +549,34 @@ export default function TimeboxesPage(): ReactElement {
                 }}
                 aria-expanded={archiveOpen}
               >
-                {archiveOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <ChevronRight size={14} aria-hidden className={styles.disclosureIcon} />
                 <span>{t('timeboxes.section.archive')}</span>
                 <span className={styles.sectionCount}>{archive.length}</span>
               </button>
-              {archiveOpen
-                ? archive.map((tb) => (
-                    <TimeboxCard
-                      key={tb.id}
-                      timebox={tb}
-                      workspaceId={workspaceId}
-                      locale={locale}
-                      onEdit={openEdit}
-                    />
-                  ))
-                : null}
+              <Collapse open={archiveOpen} className={styles.archiveCollapse}>
+                <div className={styles.archiveList}>
+                  <TimeboxCardList
+                    timeboxes={archive}
+                    workspaceId={workspaceId}
+                    locale={locale}
+                    onEdit={openEdit}
+                  />
+                </div>
+              </Collapse>
             </section>
-          ) : null}
+          </Collapse>
         </div>
       ) : (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>{t('timeboxes.empty')}</p>
-          <p className={styles.emptyDescription}>{t('timeboxes.description')}</p>
-        </div>
+        <EmptyState
+          className={styles.empty}
+          title={t('timeboxes.empty')}
+          description={t('timeboxes.description')}
+          action={
+            <Button type="button" variant="primary" onClick={openCreate}>
+              {t('timeboxes.new')}
+            </Button>
+          }
+        />
       )}
 
       <TimeboxDialog

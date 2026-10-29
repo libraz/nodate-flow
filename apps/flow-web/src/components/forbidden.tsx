@@ -5,76 +5,23 @@
  * a polished state instead of the generic ErrorBoundary.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import { Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import styles from './status-page.module.css';
+
 export default function Forbidden(): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <section
-      style={{
-        minBlockSize: '60vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--nf-space-5)',
-        padding: 'var(--nf-space-12) var(--nf-space-8)',
-        textAlign: 'center',
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          fontFamily: 'var(--nf-font-display)',
-          fontSize: 'var(--nf-text-status-glyph)',
-          lineHeight: 1,
-          fontWeight: 700,
-          backgroundImage: 'var(--nf-gradient-wordmark)',
-          backgroundClip: 'text',
-          // biome-ignore lint/style/useNamingConvention: vendor prefix
-          WebkitBackgroundClip: 'text',
-          color: 'transparent',
-          // biome-ignore lint/style/useNamingConvention: vendor prefix
-          WebkitTextFillColor: 'transparent',
-        }}
-      >
+    <section className={styles.root}>
+      <div aria-hidden className={styles.code}>
         {t('forbidden.code', { defaultValue: '403' })}
       </div>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display)',
-          margin: 0,
-          fontSize: 'var(--nf-text-2xl)',
-          color: 'var(--nf-color-fg)',
-        }}
-      >
-        {t('forbidden.title')}
-      </h1>
-      <p
-        style={{
-          margin: 0,
-          // nf-token-override: component dimension, not a spacing step
-          maxInlineSize: '28rem',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
-        {t('forbidden.description')}
-      </p>
-      <Link
-        to="/"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: 'var(--nf-space-2) var(--nf-space-5)',
-          borderRadius: 'var(--nf-radius-md)',
-          background: 'var(--nf-color-accent)',
-          color: 'var(--nf-color-fg-on-accent)',
-          textDecoration: 'none',
-          fontWeight: 500,
-        }}
-      >
+      <h1 className={styles.title}>{t('forbidden.title')}</h1>
+      <p className={styles.description}>{t('forbidden.description')}</p>
+      <Link to="/" className={cx(styles.home, 'nf-focus-ring')}>
         {t('forbidden.back_home')}
       </Link>
     </section>

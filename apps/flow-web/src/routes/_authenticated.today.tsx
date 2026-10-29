@@ -9,23 +9,38 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { cx } from '@nodate-flow/ui/lib/cx';
+import Badge from '@nodate-flow/ui/primitives/badge';
+import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Day } from '@nodate-flow/ui/time';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle } from 'lucide-react';
-import { type ReactElement, useMemo } from 'react';
+import { type CSSProperties, type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
-import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR } from '../features/tasks/constants';
+import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
 import { apiRequest } from '../lib/api';
 import { formatDueDate } from '../lib/format-date';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
+import styles from './_authenticated.today.module.css';
 
 type AssignedTask = components['schemas']['MyTaskListItem'];
 
 type SectionKey = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later' | 'noDue';
+
+const SECTION_LABEL_KEY: Record<SectionKey, string> = {
+  overdue: 'today.sections.overdue',
+  today: 'today.sections.today',
+  tomorrow: 'today.sections.tomorrow',
+  thisWeek: 'today.sections.thisWeek',
+  later: 'today.sections.later',
+  noDue: 'today.sections.noDue',
+};
 
 const SECTION_ORDER: readonly SectionKey[] = [
   'overdue',
@@ -104,196 +119,81 @@ function TodayRoute(): ReactElement {
     return empty;
   }, [tasks, zone]);
 
+  const stagger = useFirstLoadStagger();
+
   const totalCount = SECTION_ORDER.reduce((sum, k) => sum + sections[k].length, 0);
 
   return (
-    <section
-      style={{
-        padding: 'var(--nf-space-page)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        // nf-token-override: component dimension, not a spacing step
-        maxInlineSize: '60rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-page-title)',
-          }}
-        >
-          {t('today.title')}
-        </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('today.subtitle')}</p>
+    <section className={styles.page}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>{t('today.title')}</h1>
+        <p className={styles.subtitle}>{t('today.subtitle')}</p>
       </header>
 
       {totalCount === 0 ? (
-        <div
-          style={{
-            padding: 'var(--nf-space-12) var(--nf-space-4)',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'var(--nf-space-4)',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-lg)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          <CheckCircle
-            size={48}
-            strokeWidth={1}
-            style={{ color: 'var(--nf-color-fg-muted)', opacity: 0.5 }}
-          />
-          <p style={{ margin: 0 }}>{t('today.empty')}</p>
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
-            }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: 'var(--nf-space-2) var(--nf-space-4)',
-              borderRadius: 'var(--nf-radius-md)',
-              background: 'var(--nf-color-accent)',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 'var(--nf-text-sm)',
-              fontWeight: 500,
-            }}
-          >
-            {t('dock.command_palette.create_task')}
-          </button>
-        </div>
+        <EmptyState
+          className={styles.empty}
+          icon={<CheckCircle size={40} strokeWidth={1.25} aria-hidden="true" />}
+          title={t('today.empty')}
+          titleAs="p"
+          action={
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
+              }}
+            >
+              {t('dock.command_palette.create_task')}
+            </Button>
+          }
+        />
       ) : null}
 
       {SECTION_ORDER.map((key) => {
         const items = sections[key];
         if (items.length === 0) return null;
         const isOverdue = key === 'overdue';
+        const label = t(SECTION_LABEL_KEY[key]);
         return (
-          <section
-            key={key}
-            aria-label={t(`today.sections.${key}`)}
-            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 'var(--nf-text-supporting)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: isOverdue ? 'var(--nf-color-danger-fg)' : 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {t(`today.sections.${key}`)} ({items.length})
+          <section key={key} aria-label={label} className={styles.section}>
+            <h2 className={cx(styles.sectionTitle, isOverdue && styles.sectionTitleOverdue)}>
+              {label}
+              <span className={styles.sectionCount}>({items.length})</span>
             </h2>
-            <ul
-              style={{
-                listStyle: 'none',
-                margin: 0,
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--nf-space-1)',
-              }}
-            >
-              {items.map((task) => {
+            <ul className={styles.list}>
+              {items.map((task, index) => {
                 const pri = (task.priority ?? 0) as TaskPriority;
                 return (
                   <li
                     key={task.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--nf-space-3)',
-                      padding: 'var(--nf-space-2-5) var(--nf-space-3)',
-                      borderRadius: 'var(--nf-radius-md)',
-                      background: isOverdue
-                        ? 'var(--nf-color-danger-subtle)'
-                        : 'var(--nf-color-surface)',
-                      borderInlineStart: isOverdue
-                        ? '3px solid var(--nf-color-danger)'
-                        : '3px solid transparent',
-                    }}
+                    className={motion.enter}
+                    style={
+                      {
+                        ...stagger(index),
+                        '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
+                      } as CSSProperties
+                    }
                   >
-                    <span
-                      aria-hidden
-                      style={{
-                        // nf-token-override: component dimension, not a spacing step
-                        inlineSize: '0.5rem',
-                        // nf-token-override: component dimension, not a spacing step
-                        blockSize: '0.5rem',
-                        borderRadius: 'var(--nf-radius-pill)',
-                        background:
-                          STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                          'var(--nf-color-fg-muted)',
-                        flexShrink: 0,
-                      }}
-                    />
                     <Link
                       to="/tasks/$taskId"
                       params={{ taskId: task.id }}
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        color: 'inherit',
-                        textDecoration: 'none',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
+                      className={cx(styles.row, isOverdue && styles.rowOverdue, 'nf-focus-ring')}
                     >
-                      {task.title}
-                    </Link>
-                    {pri > 0 ? (
-                      <span
-                        style={{
-                          fontSize: 'var(--nf-text-micro)',
-                          fontWeight: 600,
-                          padding: 'var(--nf-space-0-5) var(--nf-space-1-5)',
-                          borderRadius: 'var(--nf-radius-xs)',
-                          background: PRIORITY_COLOR[pri],
-                          color: 'white',
-                          whiteSpace: 'nowrap',
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        {t(PRIORITY_KEY[pri])}
+                      <span aria-hidden className={styles.stateDot} />
+                      <span className={styles.taskTitle}>{task.title}</span>
+                      {pri > 0 ? (
+                        <Badge tone={PRIORITY_TONE[pri]}>{t(PRIORITY_KEY[pri])}</Badge>
+                      ) : null}
+                      <span className={styles.context}>
+                        {task.projectName
+                          ? `${task.workspaceName} · ${task.projectName}`
+                          : task.workspaceName}
                       </span>
-                    ) : null}
-                    <span
-                      style={{
-                        fontSize: 'var(--nf-text-xs)',
-                        color: 'var(--nf-color-fg-muted)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {task.projectName
-                        ? `${task.workspaceName} · ${task.projectName}`
-                        : task.workspaceName}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 'var(--nf-text-xs)',
-                        color: 'var(--nf-color-fg-muted)',
-                        whiteSpace: 'nowrap',
-                        // nf-token-override: component dimension, not a spacing step
-                        minWidth: '5.5rem',
-                        textAlign: 'right',
-                      }}
-                    >
-                      {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
-                    </span>
+                      <span className={styles.due}>
+                        {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
+                      </span>
+                    </Link>
                   </li>
                 );
               })}

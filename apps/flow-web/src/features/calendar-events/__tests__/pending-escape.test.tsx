@@ -245,7 +245,7 @@ describe('the scope choice while its write is in flight', () => {
 
     // The confirm is locked on purpose: the question has been answered,
     // and answering it twice writes twice.
-    expect(button('recurrence.scope.save.pending').hasAttribute('disabled')).toBe(true);
+    expect(button('recurrence.scope.save.confirm').hasAttribute('disabled')).toBe(true);
     // Cancel is the exit. Taking it away exactly when the server stops
     // answering is what makes the dialog a trap.
     expect(button('recurrence.scope.cancel').hasAttribute('disabled')).toBe(false);
@@ -254,11 +254,10 @@ describe('the scope choice while its write is in flight', () => {
   it('reads as busy rather than merely greyed out', async () => {
     await startScopedSave();
 
-    const confirm = button('recurrence.scope.save.pending');
+    // The button draws a spinner over its label while busy, so a
+    // disabled button reads as working rather than as unavailable.
+    const confirm = button('recurrence.scope.save.confirm');
     expect(confirm.getAttribute('aria-busy')).toBe('true');
-    // A disabled button with unchanged copy says the same thing at 200ms
-    // and at 20 seconds.
-    expect(screen.queryByRole('button', { name: 'recurrence.scope.save.confirm' })).toBeNull();
   });
 
   it('dismisses the whole stack and re-reads the grid, without waiting for the server', async () => {
@@ -348,7 +347,7 @@ describe('the edit dialog while its own write is in flight', () => {
     await user.click(button('action.submit.edit'));
 
     // The commit is locked and says so; the way out is not.
-    expect(button('action.submit.saving').hasAttribute('disabled')).toBe(true);
+    expect(button('action.submit.edit').hasAttribute('disabled')).toBe(true);
     const cancel = button('action.cancel');
     expect(cancel.hasAttribute('disabled')).toBe(false);
 

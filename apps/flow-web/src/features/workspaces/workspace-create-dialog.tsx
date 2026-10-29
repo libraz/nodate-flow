@@ -174,8 +174,13 @@ export default function WorkspaceCreateDialog({
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('workspaces.form.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? t('workspaces.form.submitting') : t('workspaces.form.submit')}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {t('workspaces.form.submit')}
           </Button>
         </div>
       </form>

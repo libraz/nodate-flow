@@ -47,6 +47,7 @@ const copy = {
   removeConfirmAction: enCommon.calendar.settings.members.remove_confirm_action,
   removeSuccess: enCommon.calendar.settings.members.remove_success,
   roleEditor: enCommon.calendar.settings.members.role.editor,
+  roleOwner: enCommon.calendar.settings.members.role.owner,
 } as const;
 
 interface OwnedCalendar {
@@ -182,15 +183,7 @@ test.describe('calendar settings drawer — members tab', () => {
     await expect(actorRow).toBeVisible({ timeout: 10_000 });
     // Role badge renders as <span> — narrow the locator to <span> so the
     // role <option> elements inside the role <select> are not also hit.
-    //
-    // SURFACE GAP: the running flow-api `ListMembers` handler hard-codes
-    // every member's role to "editor" because the subscription.role
-    // column was dropped pre-itemkit-rebuild. The calendar owner should
-    // surface as "Owner", but the API stub forces "Editor" until the
-    // backend rebuild lands. Assert the actual surface state, not the
-    // intended one, so the test passes today and naturally tightens once
-    // the backend exposes the real role again.
-    await expect(actorRow.locator(`span:text-is("${copy.roleEditor}")`).first()).toBeVisible();
+    await expect(actorRow.locator(`span:text-is("${copy.roleOwner}")`).first()).toBeVisible();
   });
 
   test('B: invites a new member by email and the row appears', async ({ page }) => {

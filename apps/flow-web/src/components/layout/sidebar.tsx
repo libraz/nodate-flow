@@ -1,5 +1,7 @@
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
@@ -83,7 +85,9 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
   if (visible.length === 0) return null;
   return (
     <div className={styles.section}>
-      <div className={styles.sectionLabel}>{t('nav.workspaceProjects')}</div>
+      <div className={styles.sectionLabel} title={t('nav.workspaceProjects')}>
+        {t('nav.workspaceProjects')}
+      </div>
       {visible.map((p) => (
         <Link
           key={p.id}
@@ -294,7 +298,9 @@ function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElemen
   if (favorites.length === 0) return null;
   return (
     <div className={styles.section}>
-      <div className={styles.sectionLabel}>{t('favorites.sidebar_title')}</div>
+      <div className={styles.sectionLabel} title={t('favorites.sidebar_title')}>
+        {t('favorites.sidebar_title')}
+      </div>
       {favorites.map((f) => (
         <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} />
       ))}
@@ -322,6 +328,14 @@ export default function Sidebar(): ReactElement {
   const isMobile = useIsMobile();
   const currentWorkspaceId = useCurrentWorkspaceId();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const drawerOpen = isMobile && mobileOpen;
+  const backdropPresence = usePresence<HTMLDivElement>(drawerOpen);
+  const menuBtnPresence = usePresence<HTMLButtonElement>(isMobile && !mobileOpen);
+  // The workspace sub-tree keeps its last id so it can collapse after the route leaves it.
+  const [shownWorkspaceId, setShownWorkspaceId] = useState(currentWorkspaceId);
+  if (currentWorkspaceId && currentWorkspaceId !== shownWorkspaceId) {
+    setShownWorkspaceId(currentWorkspaceId);
+  }
 
   useEffect(() => {
     try {
@@ -373,9 +387,11 @@ export default function Sidebar(): ReactElement {
   return (
     <>
       {/* Mobile backdrop */}
-      {isMobile && mobileOpen ? (
+      {backdropPresence.mounted ? (
         // biome-ignore lint/a11y/noStaticElementInteractions: decorative click-outside backdrop for the mobile drawer; carries no accessible semantics (role="presentation"). Keyboard users dismiss via the drawer's own close control.
         <div
+          ref={backdropPresence.ref}
+          data-state={backdropPresence.state}
           className={styles.backdrop}
           onClick={() => setMobileOpen(false)}
           onKeyDown={(e) => {
@@ -385,10 +401,13 @@ export default function Sidebar(): ReactElement {
         />
       ) : null}
       {/* Mobile hamburger button */}
-      {isMobile && !mobileOpen ? (
+      {menuBtnPresence.mounted ? (
         <button
+          ref={menuBtnPresence.ref}
+          data-state={menuBtnPresence.state}
+          inert={!(isMobile && !mobileOpen)}
           type="button"
-          className={styles.mobileMenuBtn}
+          className={cx(styles.mobileMenuBtn, 'nf-focus-ring')}
           onClick={() => setMobileOpen(true)}
           aria-label={t('nav.expand')}
         >
@@ -402,17 +421,22 @@ export default function Sidebar(): ReactElement {
           isMobile && mobileOpen && styles.mobileOpen,
         )}
         data-collapsed={collapsed || undefined}
+        // Off-canvas on mobile: keep its links out of the tab order until opened.
+        inert={isMobile && !mobileOpen}
+        onKeyDown={(e) => {
+          if (isMobile && mobileOpen && e.key === 'Escape') setMobileOpen(false);
+        }}
       >
         <div className={styles.brand}>
           <span className={styles.brandLabel}>nodate-flow</span>
         </div>
-        {!collapsed ? (
+        <Collapse open={!collapsed}>
           <div className={styles.workspaceSwitcherSlot}>
             <Suspense fallback={null}>
               <WorkspaceSwitcher />
             </Suspense>
           </div>
-        ) : null}
+        </Collapse>
         <nav className={styles.nav} aria-label={t('nav.primary')}>
           {NAV_ITEMS.map((item) => {
             const label = t(labelKeyFor(item.key));
@@ -445,21 +469,33 @@ export default function Sidebar(): ReactElement {
             // even when the workspace has zero projects and the
             // suspense-driven `WorkspaceProjectsSection` returns
             // nothing.
-            if (item.key === 'workspaces' && currentWorkspaceId && !collapsed) {
+            if (item.key === 'workspaces') {
               return (
                 <div key={item.key}>
-                  {linkEl}
-                  <WorkspaceActivityLink workspaceId={currentWorkspaceId} />
-                  <WorkspaceTimeboxesLink workspaceId={currentWorkspaceId} />
-                  <WorkspaceInsightsPriorityLink workspaceId={currentWorkspaceId} />
-                  <WorkspaceRetroDraftsLink workspaceId={currentWorkspaceId} />
-                  <WorkspaceArchiveLink workspaceId={currentWorkspaceId} />
-                  <Suspense fallback={null}>
-                    <WorkspaceProjectsSection workspaceId={currentWorkspaceId} />
-                  </Suspense>
-                  <Suspense fallback={null}>
-                    <FavoritesSection workspaceId={currentWorkspaceId} />
-                  </Suspense>
+                  {collapsed ? (
+                    <Tooltip content={label} placement="right">
+                      {linkEl}
+                    </Tooltip>
+                  ) : (
+                    linkEl
+                  )}
+                  <Collapse open={!collapsed && Boolean(currentWorkspaceId)}>
+                    {shownWorkspaceId ? (
+                      <>
+                        <WorkspaceActivityLink workspaceId={shownWorkspaceId} />
+                        <WorkspaceTimeboxesLink workspaceId={shownWorkspaceId} />
+                        <WorkspaceInsightsPriorityLink workspaceId={shownWorkspaceId} />
+                        <WorkspaceRetroDraftsLink workspaceId={shownWorkspaceId} />
+                        <WorkspaceArchiveLink workspaceId={shownWorkspaceId} />
+                        <Suspense fallback={null}>
+                          <WorkspaceProjectsSection workspaceId={shownWorkspaceId} />
+                        </Suspense>
+                        <Suspense fallback={null}>
+                          <FavoritesSection workspaceId={shownWorkspaceId} />
+                        </Suspense>
+                      </>
+                    ) : null}
+                  </Collapse>
                 </div>
               );
             }

@@ -216,8 +216,13 @@ export default function ProjectCreateDialog({
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('projects.form.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? t('projects.form.submitting') : t('projects.form.submit')}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
+            {t('projects.form.submit')}
           </Button>
         </div>
       </form>

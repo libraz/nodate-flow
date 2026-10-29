@@ -40,7 +40,8 @@
   "task": {
     "add": "Add label",
     "remove": "Remove label",
-    "none": "No labels"
+    "none": "No labels",
+    "count": "{count, plural, one {# label} other {# labels}}"
   },
   "filters": {
     "label": "Label",

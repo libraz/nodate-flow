@@ -1,52 +1,8 @@
 /**
- * DataSettingsPage layout — single-column page hosting two stacked cards
- * (Imports above, Exports below). Every value comes from a design token;
- * no literal hex / rgb / px is hard-coded.
+ * DataSettingsPage specifics. Page, section and table rhythm come from
+ * the shared settings-ui module; this file holds only what is particular
+ * to exports and import jobs.
  */
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-5);
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display, inherit);
-  font-size: var(--nf-text-subsection-title);
-  color: var(--nf-color-fg);
-}
-
-.description {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-}
-
-.sectionTitle {
-  margin: 0;
-  font-size: var(--nf-text-base);
-  font-weight: 600;
-  color: var(--nf-color-fg);
-}
-
-.sectionDescription {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-}
 
 .exportRow {
   display: flex;
@@ -64,21 +20,7 @@
 .formatLegend {
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
-  font-weight: 500;
-}
-
-.formatChoices {
-  display: flex;
-  gap: var(--nf-space-3);
-}
-
-.formatLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-1);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg);
-  cursor: pointer;
+  font-weight: var(--nf-weight-medium);
 }
 
 .toolbar {
@@ -87,50 +29,6 @@
   justify-content: space-between;
   gap: var(--nf-space-3);
   flex-wrap: wrap;
-}
-
-.empty {
-  margin: 0;
-  padding: var(--nf-space-4);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-  border: var(--nf-space-px) dashed var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  text-align: center;
-}
-
-.tableWrap {
-  inline-size: 100%;
-  overflow-x: auto;
-}
-
-.table {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: var(--nf-text-sm);
-}
-
-.table thead th {
-  text-align: start;
-  font-size: var(--nf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--nf-color-fg-muted);
-  padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.table tbody td {
-  padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
-  color: var(--nf-color-fg);
-  vertical-align: top;
-}
-
-.table tbody tr:last-child td {
-  border-block-end: none;
 }
 
 .progress {
@@ -153,7 +51,13 @@
 .progressFill {
   block-size: 100%;
   background: var(--nf-color-accent);
-  transition: inline-size var(--nf-duration-base) ease;
+  /* Scaled from the logical start; the page sets `scale` to the fraction done. */
+  transform-origin: 0 50%;
+  transition: scale var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+[dir="rtl"] .progressFill {
+  transform-origin: 100% 50%;
 }
 
 .progressLabel {
@@ -208,6 +112,7 @@
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-bg);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .createGrid {
@@ -246,8 +151,14 @@
   min-block-size: 6rem;
 }
 
-.spinnerRow {
-  display: flex;
-  justify-content: center;
-  padding: var(--nf-space-4);
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3rem;
+  inline-size: 100%;
+}
+
+.skeletonForm {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 16rem;
+  inline-size: 100%;
 }

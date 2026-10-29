@@ -182,6 +182,7 @@ export default function PublicShareCreateDialog({
               variant="primary"
               data-testid="public-share-create-submit"
               disabled={submitting || title.trim() === ''}
+              aria-busy={submitting || undefined}
             >
               {t('workspace.public_shares.dialog.submit')}
             </Button>

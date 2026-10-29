@@ -17,6 +17,7 @@
  * one).
  */
 
+import { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AlertCircle } from 'lucide-react';
 import type { ReactElement } from 'react';
@@ -25,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth/auth-card';
 import { inviteInfoQueryOptions } from '../features/workspaces/invite-api';
 import { resolveInviteErrorKey } from '../features/workspaces/invite-errors';
+import styles from './invite.module.css';
 
 function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
   const { t } = useTranslation('common');
@@ -32,40 +34,14 @@ function InviteErrorComponent({ error }: { error: unknown }): ReactElement {
     <AuthCard>
       <main
         aria-label={t('workspaces.invites.error_title')}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 'var(--nf-space-4)',
-          textAlign: 'center',
-        }}
+        className={`${styles.main} ${styles['main--center']}`}
       >
-        <AlertCircle size={44} aria-hidden="true" style={{ color: 'var(--nf-color-danger-fg)' }} />
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-2xl)',
-            fontWeight: 'var(--nf-weight-semibold)',
-          }}
-        >
+        <AlertCircle size={44} aria-hidden="true" className={styles.errorIcon} />
+        <h1 className={`${styles.title} ${styles['title--semibold']}`}>
           {t('workspaces.invites.error_title')}
         </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-          {t(resolveInviteErrorKey(error))}
-        </p>
-        <Link
-          to="/"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            padding: 'var(--nf-space-2-5) var(--nf-space-5)',
-            borderRadius: 'var(--nf-radius-md)',
-            border: '1px solid var(--nf-color-border)',
-            color: 'var(--nf-color-fg)',
-            textDecoration: 'none',
-            fontWeight: 500,
-          }}
-        >
+        <p className={styles.text}>{t(resolveInviteErrorKey(error))}</p>
+        <Link to="/" className={buttonClassName()}>
           {t('workspaces.invites.error_back')}
         </Link>
       </main>

@@ -13,9 +13,7 @@
     "parseError": "解析错误",
     "nlPrompt": "用自然语言描述约束…",
     "generate": "生成",
-    "generating": "生成中…",
     "explain": "解释",
-    "explaining": "解释中…",
     "explanation": "解释",
     "advanced": "高级设置（类型与 JSON 表达式）",
     "errors": {
@@ -31,7 +29,9 @@
       "approval": "审批",
       "signal": "信号",
       "custom": "自定义"
-    }
+    },
+    "removeConfirmTitle": "移除约束？",
+    "removeConfirm": "引擎将不再因该约束而阻塞，且无法在此处恢复。"
   },
   "replay": {
     "title": "重放",

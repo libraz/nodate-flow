@@ -17,10 +17,6 @@
   color: var(--nf-color-fg-muted);
 }
 
-.empty {
-  margin: 0;
-}
-
 .list {
   list-style: none;
   margin: 0;
@@ -28,6 +24,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+  --presence-gap: var(--nf-space-2);
 }
 
 .row {
@@ -39,10 +36,15 @@
   border: 1px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: transparent;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .rowCurrent {
-  background: var(--nf-color-surface-hover);
+  border-color: color-mix(in oklch, var(--nf-color-accent) 35%, var(--nf-color-border));
 }
 
 .identity {
@@ -59,23 +61,22 @@
 .currentBadge {
   margin-inline-start: var(--nf-space-2);
   font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
   padding: var(--nf-space-px) var(--nf-space-2);
-  border-radius: var(--nf-radius-xs);
-  background: var(--nf-color-accent-hover);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent-subtle);
   color: var(--nf-color-accent-fg);
+  vertical-align: middle;
 }
 
 .metaPrimary {
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .metaSecondary {
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
 }

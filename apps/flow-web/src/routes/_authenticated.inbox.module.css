@@ -1,0 +1,50 @@
+/* /inbox — page shell around the Inbox / Intake tabs. */
+
+.page {
+  padding: var(--nf-space-page);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 60rem;
+  margin-inline: auto;
+  inline-size: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+/* Toolbar row, then rows sized like an inbox card. */
+.fallbackToolbar {
+  block-size: var(--nf-control-height);
+  /* nf-token-override: placeholder sized to the toolbar it stands in for */
+  inline-size: 20rem;
+  max-inline-size: 100%;
+  border-radius: var(--nf-radius-md);
+}
+
+.fallbackRow {
+  /* nf-token-override: placeholder sized to the inbox card it stands in for */
+  block-size: 4.75rem;
+  border-radius: var(--nf-radius-lg);
+}

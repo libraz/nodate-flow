@@ -28,7 +28,7 @@ describe('dashboard-view error handling', () => {
     expect(deleteCall).toBeGreaterThan(-1);
 
     const afterCall = source.slice(deleteCall, deleteCall + 300);
-    expect(afterCall).toContain('.catch(');
+    expect(afterCall).toMatch(/catch/);
   });
 
   it('imports toaster for error feedback', () => {

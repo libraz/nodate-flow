@@ -89,14 +89,12 @@
         "title": "保存重复事件",
         "legend": "此更改要应用到哪些事件？",
         "confirm": "保存",
-        "pending": "保存中…",
         "slow": "仍在等待服务器响应。可以取消，但更改仍有可能生效，请稍后查看日历。"
       },
       "delete": {
         "title": "删除重复事件",
         "legend": "要删除哪些事件？",
         "confirm": "删除",
-        "pending": "删除中…",
         "slow": "仍在等待服务器响应。可以取消，但删除仍有可能生效，请稍后查看日历。"
       },
       "cancel": "取消",
@@ -141,8 +139,6 @@
     "submit": {
       "create": "创建",
       "edit": "保存更改",
-      "creating": "创建中…",
-      "saving": "保存中…",
       "slow": "仍在等待服务器响应。可以取消，但更改仍有可能生效，请稍后查看日历。"
     },
     "cancel": "取消",
@@ -205,7 +201,9 @@
         "rsvp_failed": "无法保存你的回应",
         "can_edit_failed": "无法更改编辑权限",
         "remove_failed": "无法移除参与者"
-      }
+      },
+      "removed_toast": "已移除 {name}",
+      "leave_confirm": "要将自己从此活动中移除吗？"
     },
     "creator": {
       "label": "创建者",
@@ -262,7 +260,6 @@
       "delete_success": "已删除附件",
       "delete_error": "删除附件失败",
       "upload": "上传",
-      "uploading": "上传中…",
       "upload_success": "已上传附件",
       "upload_dedup_success": "相同文件已存在，已直接关联",
       "upload_error": "上传失败",
@@ -316,7 +313,6 @@
         "conflict_hint": "顺延后，这些任务会与其他项目冲突。",
         "row_time": "{old} → {new}",
         "apply": "应用顺延",
-        "applying": "应用中…",
         "success": "已顺延 {delta}（{count} 个任务）",
         "error": "应用顺延失败",
         "delta_seconds": "{seconds} 秒",

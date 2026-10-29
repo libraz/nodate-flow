@@ -4,6 +4,7 @@
  */
 
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
@@ -21,6 +22,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InboxItem } from './api';
+import styles from './inbox.module.css';
 import SnoozePopover from './snooze-popover';
 
 export interface InboxItemRowProps {
@@ -73,104 +75,43 @@ export default function InboxItemRow({
   const icon = SOURCE_ICON[item.source] ?? InboxIcon;
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
 
+  const handleArchive = (): void => {
+    onArchive(item.id);
+  };
+
+  const handleSnooze = (snoozeUntil: number): void => {
+    onSnooze(item.id, snoozeUntil);
+  };
+
   return (
-    <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-3-5)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // nf-token-override: component dimension, not a spacing step
-            inlineSize: '2rem',
-            // nf-token-override: component dimension, not a spacing step
-            blockSize: '2rem',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-surface)',
-            color: 'var(--nf-color-fg)',
-            flexShrink: 0,
-          }}
-        >
+    <Card className={styles.row}>
+      <div className={styles.rowInner}>
+        <div className={styles.sourceIcon}>
           <Icon icon={icon} decorative />
         </div>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-1)',
-            minInlineSize: 0,
-            flex: 1,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-2)',
-              flexWrap: 'wrap',
-            }}
-          >
+        <div className={styles.content}>
+          <div className={styles.meta}>
             <Badge tone="neutral">{sourceLabel}</Badge>
-            <span
-              style={{
-                fontFamily: 'var(--nf-font-mono)',
-                fontSize: 'var(--nf-text-supporting)',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {item.kind}
-            </span>
+            <span className={styles.kind}>{item.kind}</span>
           </div>
           {item.taskId ? (
             <Link
               to="/tasks/$taskId"
               params={{ taskId: item.taskId }}
-              style={{
-                color: 'var(--nf-color-fg)',
-                textDecoration: 'none',
-                fontWeight: 500,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+              className={cx(styles.taskLink, 'nf-focus-ring')}
             >
               {item.taskTitle ?? item.taskId}
             </Link>
           ) : null}
-          <span
-            style={{
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-supporting)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {formatRelative(item.receivedAt, locale)}
-          </span>
+          <span className={styles.time}>{formatRelative(item.receivedAt, locale)}</span>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--nf-space-2)', flexShrink: 0 }}>
-          <SnoozePopover
-            onSnooze={(snoozeUntil) => {
-              onSnooze(item.id, snoozeUntil);
-            }}
-          >
+        <div className={styles.actions}>
+          <SnoozePopover onSnooze={handleSnooze}>
             <Button type="button" variant="ghost" size="sm">
               {t('action.snooze')}
             </Button>
           </SnoozePopover>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onArchive(item.id);
-            }}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={handleArchive}>
             {t('action.archive')}
           </Button>
         </div>

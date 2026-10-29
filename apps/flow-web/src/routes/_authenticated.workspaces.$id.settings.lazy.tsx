@@ -1,14 +1,23 @@
 /**
  * /workspaces/$id/settings — pathless layout for workspace settings (lazy).
  *
- * Renders a left sub-nav (general / mcp tokens / ai providers) and an
- * <Outlet /> for the active sub-route.
+ * Renders a left sub-nav, grouped by concern, and an <Outlet /> for the
+ * active sub-route. Shares the account settings layout styles, so it
+ * collapses into the same scrollable tab strip below 768px, and keys the
+ * outlet on the path so each sub-page fades in on arrival.
  */
 
-import { cx } from '@nodate-flow/ui/lib/cx';
-import { createLazyFileRoute, getRouteApi, Link, Outlet } from '@tanstack/react-router';
+import {
+  createLazyFileRoute,
+  getRouteApi,
+  Link,
+  Outlet,
+  useRouterState,
+} from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './_authenticated.settings.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 
@@ -52,23 +61,64 @@ interface SubNavItem {
  */
 const AUDIT_LOG_ENABLED = (import.meta.env.VITE_NF_FEATURE_AUDIT_LOG as string | undefined) === '1';
 
-const BASE_SUB_NAV: readonly SubNavItem[] = [
-  { key: 'general', to: '/workspaces/$id/settings/general' },
-  { key: 'data', to: '/workspaces/$id/settings/data' },
-  { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
-  { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
-  { key: 'webhooks', to: '/workspaces/$id/settings/webhooks' },
-  { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
-  { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
-  { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
-  { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
-  { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
-  { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
+type NavGroupKey = 'workspace' | 'integrations' | 'ai' | 'reports';
+
+interface NavGroup {
+  key: NavGroupKey;
+  items: readonly SubNavItem[];
+}
+
+const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    key: 'workspace',
+    items: [
+      { key: 'general', to: '/workspaces/$id/settings/general' },
+      { key: 'data', to: '/workspaces/$id/settings/data' },
+      { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
+    ],
+  },
+  {
+    key: 'integrations',
+    items: [
+      { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
+      { key: 'webhooks', to: '/workspaces/$id/settings/webhooks' },
+    ],
+  },
+  {
+    key: 'ai',
+    items: [
+      { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
+      { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
+      { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
+      { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
+      { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
+    ],
+  },
+  {
+    key: 'reports',
+    items: AUDIT_LOG_ENABLED
+      ? [
+          { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
+          { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' },
+        ]
+      : [{ key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' }],
+  },
 ];
 
-const SUB_NAV: readonly SubNavItem[] = AUDIT_LOG_ENABLED
-  ? [...BASE_SUB_NAV, { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' }]
-  : BASE_SUB_NAV;
+function groupLabelKeyFor(
+  key: NavGroupKey,
+): 'nav_group.workspace' | 'nav_group.integrations' | 'nav_group.ai' | 'nav_group.reports' {
+  switch (key) {
+    case 'workspace':
+      return 'nav_group.workspace';
+    case 'integrations':
+      return 'nav_group.integrations';
+    case 'ai':
+      return 'nav_group.ai';
+    case 'reports':
+      return 'nav_group.reports';
+  }
+}
 
 function labelKeyFor(
   key: SubNavKey,
@@ -116,51 +166,29 @@ function labelKeyFor(
 function WorkspaceSettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
   const { id } = routeApi.useParams();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   return (
-    <section
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '16rem 1fr',
-        gap: 'var(--nf-space-8)',
-        padding: 'var(--nf-space-page)',
-        // nf-token-override: component dimension, not a spacing step
-        maxInlineSize: '72rem',
-        marginInline: 'auto',
-        inlineSize: '100%',
-      }}
-    >
-      <nav
-        aria-label={t('sections_label')}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}
-      >
-        {SUB_NAV.map((item) => (
-          <Link
-            key={item.key}
-            to={item.to}
-            params={{ id }}
-            className={cx('settings-subnav-link')}
-            activeProps={{
-              'aria-current': 'page',
-              style: {
-                background: 'var(--nf-color-accent-subtle)',
-                color: 'var(--nf-color-accent-fg)',
-                fontWeight: 500,
-              },
-            }}
-            style={{
-              display: 'block',
-              padding: 'var(--nf-space-2) var(--nf-space-3)',
-              borderRadius: 'var(--nf-radius-md)',
-              color: 'var(--nf-color-fg)',
-              textDecoration: 'none',
-            }}
-          >
-            {t(labelKeyFor(item.key))}
-          </Link>
+    <section className={styles.layout}>
+      <nav aria-label={t('sections_label')} className={styles.nav}>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.key} className={styles.group}>
+            <span className={styles.groupLabel}>{t(groupLabelKeyFor(group.key))}</span>
+            {group.items.map((item) => (
+              <Link
+                key={item.key}
+                to={item.to}
+                params={{ id }}
+                className={styles.link}
+                activeProps={{ 'aria-current': 'page' }}
+              >
+                {t(labelKeyFor(item.key))}
+              </Link>
+            ))}
+          </div>
         ))}
       </nav>
-      <div>
+      <div key={pathname} className={styles.outlet}>
         <Outlet />
       </div>
     </section>

@@ -33,6 +33,9 @@ export default function IntegrationsPanel(): ReactElement {
   const connect = useConnectIntegration();
   const disconnect = useDisconnectIntegration();
 
+  const connectingProvider = connect.isPending ? connect.variables?.provider : undefined;
+  const disconnectingId = disconnect.isPending ? disconnect.variables : undefined;
+
   const byName = new Map<string, ProviderStatus>();
   for (const p of providers) byName.set(p.provider, p);
 
@@ -67,6 +70,7 @@ export default function IntegrationsPanel(): ReactElement {
     if (
       !(await confirmAction({
         message: t('integrations.disconnect_confirm', { provider: providerName }),
+        confirmLabel: t('integrations.disconnect'),
       }))
     )
       return;
@@ -82,7 +86,7 @@ export default function IntegrationsPanel(): ReactElement {
   };
 
   return (
-    <section className={styles.section}>
+    <div className={styles.section}>
       <p className={styles.description}>{t('integrations.description')}</p>
       <ul className={styles.list}>
         {PROVIDER_ORDER.map((name) => {
@@ -99,7 +103,7 @@ export default function IntegrationsPanel(): ReactElement {
                   {t(`integrations.provider.${name}.description`)}
                 </span>
                 {connection != null ? (
-                  <span className={styles.metaSecondary}>
+                  <span className={styles.metaConnected}>
                     {t('integrations.connected_as', {
                       account: connection.externalAccountLabel,
                       time: new Date(connection.connectedAt * 1000).toLocaleString(i18n.language),
@@ -113,8 +117,8 @@ export default function IntegrationsPanel(): ReactElement {
                 {connection != null ? (
                   <Button
                     type="button"
-                    variant="danger"
                     disabled={disconnect.isPending}
+                    aria-busy={disconnectingId === connection.id}
                     onClick={() => {
                       void handleDisconnect(connection.id, t(`integrations.provider.${name}.name`));
                     }}
@@ -124,8 +128,9 @@ export default function IntegrationsPanel(): ReactElement {
                 ) : (
                   <Button
                     type="button"
-                    variant="primary"
+                    variant={configured ? 'primary' : 'default'}
                     disabled={!configured || connect.isPending}
+                    aria-busy={connectingProvider === name}
                     onClick={() => {
                       void handleConnect(name);
                     }}
@@ -138,6 +143,6 @@ export default function IntegrationsPanel(): ReactElement {
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

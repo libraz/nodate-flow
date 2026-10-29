@@ -1,19 +1,18 @@
 /**
- * Notification preference toggles for /settings/notifications.
+ * Notification preference toggles for /settings/notifications: one
+ * bordered list with hairline dividers, label and description on the
+ * inline-start side and the switch aligned to the first line.
  */
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-4);
+  gap: var(--nf-space-5);
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 40rem;
 }
 
 .workspacePicker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1-5);
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 20rem;
 }
@@ -28,8 +27,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-4);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 40rem;
 }
 
 .list {
@@ -38,28 +35,41 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  overflow: hidden;
 }
 
 .row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: var(--nf-space-3);
+  gap: var(--nf-space-4);
   align-items: start;
-  padding: var(--nf-space-3) var(--nf-space-4);
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
+  padding: var(--nf-space-3-5) var(--nf-space-4);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row + .row {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .identity {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--nf-space-0-5);
+  min-inline-size: 0;
 }
 
 .label {
+  font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg);
+  cursor: pointer;
 }
 
 .helpText {
@@ -67,7 +77,25 @@
   color: var(--nf-color-fg-muted);
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
+.skeletonLabel {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 9rem;
+}
+
+.skeletonHelp {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 0.875rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 18rem;
+  max-inline-size: 100%;
+}
+
+.skeletonSwitch {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 2.25rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1.25rem;
+  border-radius: var(--nf-radius-pill);
 }

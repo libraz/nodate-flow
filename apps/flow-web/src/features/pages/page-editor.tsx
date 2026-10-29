@@ -164,14 +164,7 @@ export default function PageEditor({
               id="page-parent"
               value={parentPageId}
               onChange={handleParentChange}
-              style={{
-                padding: 'var(--nf-space-2) var(--nf-space-3)',
-                borderRadius: 'var(--nf-radius-md)',
-                border: 'var(--nf-space-px) solid var(--nf-color-border)',
-                background: 'var(--nf-color-surface)',
-                color: 'var(--nf-color-fg)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
+              className={styles.select}
             >
               <option value="">{t('parent_none')}</option>
               {parentCandidates.map((p) => (
@@ -190,14 +183,7 @@ export default function PageEditor({
               value={projectId}
               onChange={handleProjectChange}
               disabled={isEditing}
-              style={{
-                padding: 'var(--nf-space-2) var(--nf-space-3)',
-                borderRadius: 'var(--nf-radius-md)',
-                border: 'var(--nf-space-px) solid var(--nf-color-border)',
-                background: 'var(--nf-color-surface)',
-                color: 'var(--nf-color-fg)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
+              className={styles.select}
             >
               <option value="">{t('project_none')}</option>
             </select>
@@ -233,7 +219,7 @@ export default function PageEditor({
             <Sparkles size={14} aria-hidden />
             {t('ai_generate')}
           </Button>
-          <span style={{ flex: 1 }} />
+          <span className={styles.formActionsSpacer} />
           <Button
             type="button"
             variant="ghost"
@@ -248,6 +234,7 @@ export default function PageEditor({
             variant="primary"
             size="sm"
             disabled={isSaving || title.trim().length === 0}
+            aria-busy={isSaving || undefined}
           >
             {isEditing ? t('edit') : t('create')}
           </Button>

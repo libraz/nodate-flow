@@ -3,19 +3,30 @@
  * delete actions. Plaintext API keys never appear here.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import { type AiProvidersQueryError, useAiProvidersQuery, useDeleteAiProvider } from './api';
+import ui from '../settings/settings-ui.module.css';
+import TruncatedText from '../settings/truncated-text';
+import {
+  type AiProvider,
+  type AiProvidersQueryError,
+  useAiProvidersQuery,
+  useDeleteAiProvider,
+} from './api';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
+import styles from './provider-list.module.css';
 import ProviderRotateDialog from './provider-rotate-dialog';
+
+const NO_PROVIDERS: readonly AiProvider[] = [];
 
 function useKindLabel(): (kind: string) => string {
   const { t } = useTranslation('ai');
@@ -61,9 +72,24 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
   const [addOpen, setAddOpen] = useState(false);
   const [rotateId, setRotateId] = useState<string | null>(null);
   const kindLabel = useKindLabel();
+  const { entries, onExited } = usePresenceList(providers ?? NO_PROVIDERS, (p) => p.id);
+  // Providers present at first paint; one added afterwards rises in.
+  const [initialIds, setInitialIds] = useState<ReadonlySet<string> | null>(null);
+  if (initialIds === null && providers !== undefined) {
+    setInitialIds(new Set(providers.map((p) => p.id)));
+  }
+  const deletingId = del.isPending ? del.variables : undefined;
+
+  const openAdd = (): void => {
+    setAddOpen(true);
+  };
 
   const handleDelete = async (providerId: string): Promise<void> => {
-    if (!(await confirmAction({ message: t('providers.action.confirm_delete') }))) return;
+    const confirmed = await confirmAction({
+      message: t('providers.action.confirm_delete'),
+      confirmLabel: t('providers.action.delete'),
+    });
+    if (!confirmed) return;
     del.mutate(providerId, {
       onSuccess: () => {
         toaster.show({ tone: 'success', message: t('providers.toast.deleted') });
@@ -75,169 +101,107 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
   };
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--nf-space-4)',
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-2xl)',
-          }}
-        >
-          {t('providers.title')}
-        </h1>
-        <Button
-          variant="primary"
-          disabled={isError}
-          onClick={() => {
-            setAddOpen(true);
-          }}
-        >
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('providers.title')}</h1>
+          <p className={ui.lede}>{t('providers.write_only_notice')}</p>
+        </div>
+        <Button variant="primary" disabled={isError} onClick={openAdd}>
           {t('providers.add')}
         </Button>
       </header>
 
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-        {t('providers.write_only_notice')}
-      </p>
-
       {isError ? (
-        <Card
+        <EmptyState
           role="alert"
-          style={{
-            padding: 'var(--nf-space-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 'var(--nf-space-3)',
-            textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: 0, color: 'var(--nf-color-fg)' }}>{t(errorMessageKey(error))}</p>
-          {error.status !== 403 ? (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                void refetch();
-              }}
-            >
-              {t('providers.error.retry')}
-            </Button>
-          ) : null}
-        </Card>
+          titleAs="p"
+          title={t(errorMessageKey(error))}
+          className={ui.empty}
+          action={
+            error.status !== 403 ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  void refetch();
+                }}
+              >
+                {t('providers.error.retry')}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : isLoading || !providers ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-3)' }}>
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-          {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+        <div className={ui.skeletonStack} aria-hidden="true">
+          <Skeleton className={styles.skeletonRow} />
+          <Skeleton className={styles.skeletonRow} />
         </div>
       ) : providers.length === 0 ? (
-        <Card
-          style={{
-            padding: 'var(--nf-space-8)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-          }}
-        >
-          {t('providers.empty')}
-        </Card>
+        <EmptyState
+          title={t('providers.empty')}
+          className={ui.empty}
+          action={<Button onClick={openAdd}>{t('providers.add')}</Button>}
+        />
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-3)',
-          }}
-        >
-          {providers.map((p) => (
-            <li key={p.id}>
-              <Card style={{ padding: 'var(--nf-space-4)' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 'var(--nf-space-4)',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div
-                    style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}
-                  >
-                    <strong>{p.name}</strong>
-                    <span
-                      style={{ color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}
-                    >
-                      {kindLabel(p.kind)}
-                      {p.defaultModel ? ` · ${p.defaultModel}` : ''}
+        <ul className={styles.list}>
+          {entries.map(({ key, item: p, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => {
+                onExited(key);
+              }}
+              className={initialIds !== null && !initialIds.has(p.id) ? styles.arrived : undefined}
+            >
+              <div className={styles.row}>
+                <div className={styles.identity}>
+                  <strong className={styles.name}>{p.name}</strong>
+                  <span className={styles.meta}>
+                    {kindLabel(p.kind)}
+                    {p.defaultModel ? ` · ${p.defaultModel}` : ''}
+                  </span>
+                  {/*
+                    The endpoint a provider talks to is part of what the
+                    provider is, and it was the one configured field the
+                    list never showed. An admin looking at this page
+                    could not tell an openai_compat row pointed at their
+                    gateway from one pointed anywhere else — nor spot a
+                    kind=openai row carrying a base URL, which the server
+                    now refuses to build and which used to take the whole
+                    workspace's AI down with it.
+                  */}
+                  {p.baseUrl ? <TruncatedText text={p.baseUrl} className={styles.baseUrl} /> : null}
+                  {p.kind === 'openai' && p.baseUrl ? (
+                    <span role="status" className={styles.invalid}>
+                      {t('providers.invalid_base_url')}
                     </span>
-                    {/*
-                      The endpoint a provider talks to is part of what the
-                      provider is, and it was the one configured field the
-                      list never showed. An admin looking at this page
-                      could not tell an openai_compat row pointed at their
-                      gateway from one pointed anywhere else — nor spot a
-                      kind=openai row carrying a base URL, which the server
-                      now refuses to build and which used to take the whole
-                      workspace's AI down with it.
-                    */}
-                    {p.baseUrl ? (
-                      <span
-                        style={{
-                          color: 'var(--nf-color-fg-muted)',
-                          fontSize: 'var(--nf-text-micro)',
-                          fontFamily: 'var(--nf-font-mono)',
-                          wordBreak: 'break-all',
-                        }}
-                      >
-                        {p.baseUrl}
-                      </span>
-                    ) : null}
-                    {p.kind === 'openai' && p.baseUrl ? (
-                      <span
-                        role="status"
-                        style={{
-                          color: 'var(--nf-color-danger-fg)',
-                          fontSize: 'var(--nf-text-supporting)',
-                        }}
-                      >
-                        {t('providers.invalid_base_url')}
-                      </span>
-                    ) : null}
-                    <MaskedKey value={p.apiKeyMasked} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setRotateId(p.id);
-                      }}
-                    >
-                      {t('providers.action.rotate')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onClick={() => {
-                        void handleDelete(p.id);
-                      }}
-                    >
-                      {t('providers.action.delete')}
-                    </Button>
-                  </div>
+                  ) : null}
+                  <MaskedKey value={p.apiKeyMasked} />
                 </div>
-              </Card>
-            </li>
+                <div className={styles.actions}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setRotateId(p.id);
+                    }}
+                  >
+                    {t('providers.action.rotate')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={del.isPending}
+                    aria-busy={deletingId === p.id}
+                    onClick={() => {
+                      void handleDelete(p.id);
+                    }}
+                  >
+                    {t('providers.action.delete')}
+                  </Button>
+                </div>
+              </div>
+            </PresenceItem>
           ))}
         </ul>
       )}
@@ -257,6 +221,6 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
           setRotateId(null);
         }}
       />
-    </section>
+    </div>
   );
 }

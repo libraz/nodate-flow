@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Reaction } from './api';
 import { useAddReaction, useRemoveReaction } from './api';
+import styles from './reaction-bar.module.css';
 
 /** Common emoji quick-picks. */
 const QUICK_EMOJIS = [
@@ -68,6 +69,7 @@ export default function ReactionBar({
   const addReaction = useAddReaction();
   const removeReaction = useRemoveReaction();
 
+  const busy = addReaction.isPending || removeReaction.isPending;
   const grouped = groupReactions(reactions, currentUserId);
 
   const handleToggle = (emoji: string, myReactionId?: string): void => {
@@ -79,33 +81,38 @@ export default function ReactionBar({
   };
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className={styles.bar}>
       {grouped.map((g) => (
         <button
           key={g.emoji}
           type="button"
           onClick={() => handleToggle(g.emoji, g.myReactionId)}
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors ${
-            g.myReactionId
-              ? 'border-[var(--nf-color-accent)] bg-[var(--nf-color-accent-subtle)]'
-              : 'border-[var(--nf-color-border)] hover:bg-[var(--nf-color-surface-hover)]'
-          }`}
+          disabled={busy}
+          aria-busy={
+            (addReaction.isPending && addReaction.variables?.emoji === g.emoji) ||
+            (removeReaction.isPending &&
+              g.myReactionId !== undefined &&
+              removeReaction.variables?.reactionId === g.myReactionId) ||
+            undefined
+          }
+          className={`${styles.pill ?? ''} ${g.myReactionId ? (styles.pillMine ?? '') : ''}`}
           title={g.userNames.join(', ')}
           aria-label={`${g.emoji} ${g.count}`}
         >
           <span>{g.emoji}</span>
-          <span className="text-[var(--nf-color-fg-muted)]">{g.count}</span>
+          <span className={styles.count}>{g.count}</span>
         </button>
       ))}
       <Popover
         content={
-          <div className="grid grid-cols-4 gap-1 p-2">
+          <div className={styles.picker}>
             {QUICK_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
                 onClick={() => handleToggle(emoji)}
-                className="rounded p-1.5 text-lg hover:bg-[var(--nf-color-surface-hover)]"
+                disabled={busy}
+                className={styles.pickerItem}
               >
                 {emoji}
               </button>
@@ -113,12 +120,12 @@ export default function ReactionBar({
           </div>
         }
       >
-        <Button variant="ghost" size="sm" aria-label={t('add')}>
+        <Button variant="ghost" size="sm" aria-label={t('add')} disabled={busy}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
-            className="h-4 w-4"
+            className={styles.addIcon}
             aria-hidden="true"
           >
             <path

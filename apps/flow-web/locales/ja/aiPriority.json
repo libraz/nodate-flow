@@ -41,8 +41,7 @@
     "applied": "{priority} に更新しました。",
     "applyFailed": "優先度を更新できませんでした。",
     "dismissed": "一旦却下しました。",
-    "undone": "元に戻しました。",
-    "undo": "元に戻す"
+    "undone": "元に戻しました。"
   },
   "error": {
     "fetchFailed": "優先度の提案を取得できませんでした。",

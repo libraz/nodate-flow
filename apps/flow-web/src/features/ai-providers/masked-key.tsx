@@ -3,6 +3,8 @@
  * lock icon. The plaintext key never reaches this component.
  */
 
+import Icon from '@nodate-flow/ui/icon';
+import { Lock } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,7 +27,7 @@ export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
         color: 'var(--nf-color-fg-muted)',
       }}
     >
-      <span aria-hidden="true">🔒</span>
+      <Icon icon={Lock} decorative size={14} />
       <code>{value}</code>
     </span>
   );

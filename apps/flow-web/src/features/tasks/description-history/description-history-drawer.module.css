@@ -76,6 +76,7 @@
   text-align: start;
   font: inherit;
   color: var(--nf-color-fg);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .versionItem:hover {

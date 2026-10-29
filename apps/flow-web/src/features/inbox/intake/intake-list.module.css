@@ -48,6 +48,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+  --presence-gap: var(--nf-space-2);
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.fallbackRow {
+  /* nf-token-override: placeholder sized to an intake row */
+  block-size: 4rem;
 }
 
 .row {
@@ -58,6 +70,14 @@
   border: 1px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-surface);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
 }
 
 .rowMain {

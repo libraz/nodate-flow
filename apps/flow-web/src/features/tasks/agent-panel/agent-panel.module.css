@@ -21,6 +21,7 @@
   border: 1px solid color-mix(in oklab, var(--nf-color-accent) 18%, transparent);
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 10rem;
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .header {
@@ -56,7 +57,7 @@
 
 .agentName {
   font-size: var(--nf-text-base);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -71,11 +72,15 @@
   padding: 0 var(--nf-space-2);
   border-radius: var(--nf-radius-pill);
   font-size: var(--nf-text-xs);
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   line-height: 1.5rem;
   white-space: nowrap;
   border: 1px solid transparent;
-  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-base) var(--nf-ease-standard),
+    border-color var(--nf-duration-base) var(--nf-ease-standard),
+    color var(--nf-duration-base) var(--nf-ease-standard);
 }
 
 .statusPill[data-tone="success"] {
@@ -107,26 +112,7 @@
 }
 
 .statusGlyph[data-pulse="true"] {
-  animation: pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .statusGlyph[data-pulse="true"] {
-    animation: none;
-  }
-  .statusPill {
-    transition: none;
-  }
+  animation: global(nf-pulse) calc(var(--nf-duration-slow) * 7) var(--nf-ease-standard) infinite;
 }
 
 .meta {

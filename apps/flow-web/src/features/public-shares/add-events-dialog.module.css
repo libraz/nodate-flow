@@ -67,6 +67,11 @@
   align-items: center;
   gap: var(--nf-space-2);
   padding: var(--nf-space-2) var(--nf-space-3);
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover:not(.rowDisabled) {
+  background: var(--nf-color-surface-hover);
 }
 
 .rowDisabled {

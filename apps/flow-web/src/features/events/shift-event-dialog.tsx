@@ -486,13 +486,12 @@ export default function ShiftEventDialog({
               type="button"
               variant="primary"
               disabled={applyMutation.isPending}
+              aria-busy={applyMutation.isPending || undefined}
               onClick={() => {
                 void handleApply();
               }}
             >
-              {applyMutation.isPending
-                ? t('event.shift.confirm.applying')
-                : t('event.shift.confirm.apply')}
+              {t('event.shift.confirm.apply')}
             </Button>
           </div>
         </div>

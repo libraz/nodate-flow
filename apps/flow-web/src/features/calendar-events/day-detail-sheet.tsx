@@ -9,10 +9,10 @@
  * finger can hit and where the event dialog, the task, and the create
  * gesture the cell used to carry all live.
  *
- * The sheet is a {@link Drawer} on the block-end edge rather than a
- * bottom sheet of its own: the primitive already owns the overlay lock,
- * Escape routing and the focus trap, and the route mounts it for the
- * calendars rail already.
+ * The sheet is a {@link Drawer} rather than a bottom sheet of its own:
+ * the primitive already owns the overlay lock, Escape routing, the focus
+ * trap and the enter/exit motion. The desktop grid opens the same sheet
+ * from the inline-end edge for a day's "+N more".
  *
  * Rows are ordered all-day, then timed by clock, then tasks — the order
  * a day is read in, not the order the caller happened to pass. All
@@ -35,6 +35,13 @@ type CalendarTask = components['schemas']['MyTaskListItem'];
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 
 export interface DayDetailSheetProps {
+  /** Whether the sheet is shown; flipping to false plays the drawer's exit. Defaults to true. */
+  open?: boolean;
+  /**
+   * Edge the sheet opens from: the block-end sheet on a phone, a side
+   * panel beside the desktop grid. Defaults to `block-end`.
+   */
+  side?: 'block-end' | 'inline-end';
   /** Local `YYYY-MM-DD` for the day being shown. */
   dateKey: string;
   /** Resolved BCP-47 locale for the header and the row times. */
@@ -81,6 +88,8 @@ interface DayRow {
 }
 
 export default function DayDetailSheet({
+  open = true,
+  side = 'block-end',
   dateKey,
   locale,
   zone,
@@ -153,9 +162,9 @@ export default function DayDetailSheet({
 
   return (
     <Drawer
-      open
+      open={open}
       onClose={onClose}
-      side="block-end"
+      side={side}
       data-testid="day-detail-sheet"
       title={
         <span className={styles.heading}>
@@ -170,7 +179,12 @@ export default function DayDetailSheet({
         <ul className={styles.list}>
           {rows.map((row) => (
             <li key={row.key}>
-              <button type="button" className={styles.row} onClick={row.onOpen}>
+              <button
+                type="button"
+                className={styles.row}
+                title={`${row.title} · ${row.workspaceName}`}
+                onClick={row.onOpen}
+              >
                 <span
                   aria-hidden
                   className={styles.marker}

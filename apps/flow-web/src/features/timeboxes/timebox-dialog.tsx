@@ -286,7 +286,12 @@ export default function TimeboxDialog({
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('timeboxes.dialog.cancel')}
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+          >
             {t(submitKey)}
           </Button>
         </div>

@@ -1,12 +1,18 @@
 {
   "common": {
+    "loading": "Loading…",
     "breadcrumb": "Breadcrumb",
     "unknown_role": "Unknown role",
     "deactivated_user": "Deactivated user",
     "network_error": "Network error. Check your connection and try again.",
     "date": {
-      "placeholder": "Select a date"
-    }
+      "placeholder": "Select a date",
+      "clear": "Clear",
+      "monthYear": "{month, select, 1 {January} 2 {February} 3 {March} 4 {April} 5 {May} 6 {June} 7 {July} 8 {August} 9 {September} 10 {October} 11 {November} other {December}} {year, number, ::group-off}",
+      "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    },
+    "undo": "Undo",
+    "cancel": "Cancel"
   },
   "landing": {
     "wordmark": "nodate-flow",
@@ -356,6 +362,10 @@
     "errors": {
       "visibility_failed": "Could not change the calendar visibility",
       "leave_failed": "Could not leave the calendar"
+    },
+    "leave_confirm": {
+      "title": "Leave calendar?",
+      "message": "Leave \"{name}\"? You will lose access until someone adds you back."
     }
   },
   "not_found": {
@@ -392,7 +402,6 @@
       "slug": "Slug",
       "description": "Description",
       "submit": "Save",
-      "submitting": "Saving…",
       "cancel": "Cancel",
       "close": "Close"
     },
@@ -489,7 +498,8 @@
       "go_to_login": "Go to sign in",
       "error_title": "Invite unavailable",
       "error_network": "We could not check this invite. Check your connection and try again.",
-      "error_back": "Go home"
+      "error_back": "Go home",
+      "revoke_confirm": "Revoke this invite link? Anyone who has not used it yet will no longer be able to join with it."
     },
     "roles": {
       "owner": "Owner",
@@ -522,8 +532,7 @@
       "name_placeholder": "Acme, Personal, Team Nova...",
       "slug_placeholder": "acme",
       "slug_hint": "Lowercase letters, numbers, and hyphens only.",
-      "submit": "Create workspace",
-      "submitting": "Creating…"
+      "submit": "Create workspace"
     }
   },
   "projects": {
@@ -561,7 +570,6 @@
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
-      "submitting": "Saving…",
       "cancel": "Cancel"
     },
     "visibility": {
@@ -591,7 +599,8 @@
       "empty": "No members yet.",
       "remove": "Remove",
       "removed": "Member removed",
-      "remove_failed": "Failed to remove the member"
+      "remove_failed": "Failed to remove the member",
+      "remove_confirm": "Remove {name} from this project?"
     },
     "roles": {
       "lead": "Lead",
@@ -738,7 +747,9 @@
       "update_partial": "{failed} of {total} tasks failed to update.",
       "deleted": "Tasks deleted.",
       "delete_failed": "Could not delete tasks.",
-      "delete_partial": "{failed} of {total} tasks failed to delete."
+      "delete_partial": "{failed} of {total} tasks failed to delete.",
+      "delete_confirm_title": "Delete {count, plural, one {# task} other {# tasks}}?",
+      "delete_confirm": "{count, plural, one {This task} other {These # tasks}} will be permanently deleted. This cannot be undone."
     },
     "inline": {
       "edit_title": "Edit title",
@@ -833,7 +844,8 @@
         "searchEmpty": "No matches.",
         "searchHint": "Type to search tasks in this workspace.",
         "addError": "Failed to add dependency.",
-        "removeError": "Failed to remove dependency."
+        "removeError": "Failed to remove dependency.",
+        "removed": "Removed dependency on \"{title}\"."
       },
       "infer_state": {
         "title": "Suggested next step",
@@ -1001,7 +1013,9 @@
           "body": "The draft will be archived. The original task and signal stay intact.",
           "confirm": "Discard",
           "cancel": "Cancel"
-        }
+        },
+        "prev_page": "Previous page",
+        "next_page": "Next page"
       }
     }
   },

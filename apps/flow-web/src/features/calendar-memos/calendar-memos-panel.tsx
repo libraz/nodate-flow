@@ -47,11 +47,16 @@
  * needed.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import {
   type FormEvent,
   type ReactElement,
@@ -111,6 +116,8 @@ export default function CalendarMemosPanel({
   const deleteMemo = useDeleteMemoMutation();
 
   const [draftTitle, setDraftTitle] = useState('');
+  const memos = sortMemos(memosQuery.data ?? []);
+  const { entries, onExited } = usePresenceList(memos, (memo) => memo.id);
 
   const handleAdd = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -148,62 +155,87 @@ export default function CalendarMemosPanel({
     );
   }
 
-  const memos = sortMemos(memosQuery.data ?? []);
+  // A refused read is not an empty list: saying "no memos yet" would
+  // invite someone to re-add what is already there.
+  if (memosQuery.isError) {
+    return (
+      <div className={styles.body}>
+        <ErrorFallback
+          tone="inline"
+          title={formatApiError(memosQuery.error, t, 'common.network_error')}
+          error={memosQuery.error}
+          action={{
+            label: t('calendar.load_error.retry'),
+            onClick: () => {
+              void memosQuery.refetch();
+            },
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.body}>
-      {memos.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('calendar.memos.empty')}</p>
       ) : (
         <ul className={styles.list}>
-          {memos.map((memo) => (
-            <MemoRow
-              key={memo.id}
-              memo={memo}
-              workspaceId={workspaceId}
-              calendarId={calendarId}
-              onUpdate={(body) =>
-                updateMemo.mutate(
-                  { wsId: workspaceId, calId: calendarId, memoId: memo.id, body },
-                  {
-                    onError: (err) => {
-                      toaster.show({
-                        tone: 'danger',
-                        message: formatApiError(err, t, 'calendar.memos.update_error'),
-                      });
-                    },
-                  },
-                )
-              }
-              onDelete={() => {
-                void (async () => {
-                  const ok = await confirmAction({
-                    title: t('calendar.memos.title'),
-                    message: t('calendar.memos.delete_confirm'),
-                    tone: 'danger',
-                    confirmLabel: t('calendar.memos.delete'),
-                  });
-                  if (!ok) return;
-                  deleteMemo.mutate(
-                    { wsId: workspaceId, calId: calendarId, memoId: memo.id },
+          {entries.map(({ key, item: memo, present }) => (
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+            >
+              <MemoRow
+                memo={memo}
+                workspaceId={workspaceId}
+                calendarId={calendarId}
+                onUpdate={(body) =>
+                  updateMemo.mutate(
+                    { wsId: workspaceId, calId: calendarId, memoId: memo.id, body },
                     {
-                      onSuccess: () => {
-                        toaster.show({
-                          tone: 'success',
-                          message: t('calendar.memos.delete_success'),
-                        });
-                      },
                       onError: (err) => {
                         toaster.show({
                           tone: 'danger',
-                          message: formatApiError(err, t, 'calendar.memos.delete_error'),
+                          message: formatApiError(err, t, 'calendar.memos.update_error'),
                         });
                       },
                     },
-                  );
-                })();
-              }}
-            />
+                  )
+                }
+                onDelete={() => {
+                  void (async () => {
+                    const ok = await confirmAction({
+                      title: t('calendar.memos.title'),
+                      message: t('calendar.memos.delete_confirm'),
+                      tone: 'danger',
+                      confirmLabel: t('calendar.memos.delete'),
+                    });
+                    if (!ok) return;
+                    deleteMemo.mutate(
+                      { wsId: workspaceId, calId: calendarId, memoId: memo.id },
+                      {
+                        onSuccess: () => {
+                          toaster.show({
+                            tone: 'success',
+                            message: t('calendar.memos.delete_success'),
+                          });
+                        },
+                        onError: (err) => {
+                          toaster.show({
+                            tone: 'danger',
+                            message: formatApiError(err, t, 'calendar.memos.delete_error'),
+                          });
+                        },
+                      },
+                    );
+                  })();
+                }}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}
@@ -222,6 +254,7 @@ export default function CalendarMemosPanel({
           variant="primary"
           size="sm"
           disabled={draftTitle.trim().length === 0 || createMemo.isPending}
+          aria-busy={createMemo.isPending || undefined}
         >
           {t('calendar.memos.add')}
         </Button>
@@ -388,7 +421,7 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
   const attribution = isOptimistic ? '' : authorName || t('common.deactivated_user');
 
   return (
-    <li className={styles.row}>
+    <div className={styles.row}>
       <input
         type="checkbox"
         className={styles.checkbox}
@@ -437,9 +470,8 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
             {hasBody && !showBody ? <span aria-hidden="true" className={styles.bodyDot} /> : null}
           </button>
         </div>
-        {showBody ? (
+        <Collapse open={showBody} id={bodyId} className={styles.bodyCollapse}>
           <Textarea
-            id={bodyId}
             className={styles.bodyTextarea}
             aria-label={t('calendar.memos.body_label')}
             placeholder={t('calendar.memos.body_placeholder')}
@@ -450,7 +482,7 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
             maxLength={BODY_MAX_LENGTH}
             rows={3}
           />
-        ) : null}
+        </Collapse>
         {attribution.length > 0 ? (
           <span className={styles.attribution}>
             {t('calendar.memos.author_attribution', { name: attribution })}
@@ -462,6 +494,6 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
           {t('calendar.memos.delete')}
         </Button>
       </div>
-    </li>
+    </div>
   );
 }

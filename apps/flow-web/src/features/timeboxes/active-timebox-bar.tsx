@@ -6,19 +6,20 @@
  * Behaviour:
  *   - Self-fetches the actor's workspaces and fans out a list query
  *     per workspace via `useActiveTimeboxesQuery`.
- *   - Renders only when at least one workspace has a timebox in the
- *     `active` state. Returns `null` otherwise so the slot collapses
- *     and consumes no vertical space.
+ *   - Shows only when at least one workspace has a timebox in the
+ *     `active` state. The bar sits in a `Collapse`, so it opens and
+ *     closes by animating the shell row instead of shifting `<main>`.
  *   - When several workspaces have an active timebox, picks the most
  *     recently updated (`updatedAt` desc, tiebreak on `createdAt`).
  *   - Stop action transitions the timebox to `completed` after a
  *     confirmation prompt, then invalidates so the bar collapses.
  */
 
-import Button from '@nodate-flow/ui/primitives/button';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link } from '@tanstack/react-router';
-import type { ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
@@ -67,10 +68,13 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
   const workspaceIds = workspaces.map((w) => w.id);
   const { active } = useActiveTimeboxesQuery(workspaceIds);
   const primary = pickPrimary(active);
-  if (!primary) return null;
+  // Keep the last timebox rendered while the bar collapses.
+  const [shown, setShown] = useState(primary);
+  if (primary && primary !== shown) setShown(primary);
+  if (!shown) return null;
 
   const workspaceName =
-    workspaces.find((w) => w.id === primary.workspaceId)?.name ?? primary.workspaceId;
+    workspaces.find((w) => w.id === shown.workspaceId)?.name ?? shown.workspaceId;
   // Total / completed task counters are not part of the timebox list
   // payload — the API surfaces them only via the per-timebox tasks
   // endpoint. The bar shows the timebox name + workspace caption and
@@ -85,8 +89,8 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
     if (!ok) return;
     try {
       await updateStatus.mutateAsync({
-        wsId: primary.workspaceId,
-        timeboxId: primary.timebox.id,
+        wsId: shown.workspaceId,
+        timeboxId: shown.timebox.id,
         status: 'completed',
       });
       toaster.show({ tone: 'success', message: t('active_timebox_bar.stop_success') });
@@ -99,33 +103,40 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
   };
 
   return (
-    <div className={styles.bar} role="status" aria-live="polite">
-      <span className={styles.label}>{t('active_timebox_bar.label')}</span>
-      <div className={styles.body}>
-        <span className={styles.name}>{primary.timebox.name}</span>
-        <span className={styles.workspace}>
-          {t('active_timebox_bar.workspace', { workspace: workspaceName })}
-        </span>
-      </div>
-      <div className={styles.actions}>
-        <Link to="/workspaces/$id/timeboxes" params={{ id: primary.workspaceId }}>
-          <Button type="button" size="sm" variant="default">
+    <Collapse open={Boolean(primary)}>
+      <div className={styles.bar} role="status" aria-live="polite">
+        <span className={styles.label}>{t('active_timebox_bar.label')}</span>
+        <div className={styles.body}>
+          <span className={styles.name} title={shown.timebox.name}>
+            {shown.timebox.name}
+          </span>
+          <span className={styles.workspace}>
+            {t('active_timebox_bar.workspace', { workspace: workspaceName })}
+          </span>
+        </div>
+        <div className={styles.actions}>
+          <Link
+            to="/workspaces/$id/timeboxes"
+            params={{ id: shown.workspaceId }}
+            className={buttonClassName({ size: 'sm' })}
+          >
             {t('active_timebox_bar.open')}
+          </Link>
+          <Button
+            type="button"
+            size="sm"
+            variant="primary"
+            onClick={() => {
+              void handleStop();
+            }}
+            disabled={updateStatus.isPending}
+            aria-busy={updateStatus.isPending || undefined}
+          >
+            {t('active_timebox_bar.stop')}
           </Button>
-        </Link>
-        <Button
-          type="button"
-          size="sm"
-          variant="primary"
-          onClick={() => {
-            void handleStop();
-          }}
-          disabled={updateStatus.isPending}
-        >
-          {t('active_timebox_bar.stop')}
-        </Button>
+        </div>
       </div>
-    </div>
+    </Collapse>
   );
 }
 

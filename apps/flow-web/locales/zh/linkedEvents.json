@@ -44,7 +44,6 @@
   "toast": {
     "linked": "已关联「{title}」。",
     "unlinked": "已取消关联「{title}」。",
-    "undo": "撤销",
     "linkFailed": "未能关联日程，请重试。",
     "unlinkFailed": "未能取消关联，请重试。",
     "alreadyLinkedError": "该日程已经关联过了。"

@@ -1,13 +1,14 @@
 /**
  * Pathless layout route guarding all authenticated pages. Renders the
- * AppShell around its children. While bootstrap is in progress we render
- * nothing (Suspense fallback would also work). On unauthenticated state
+ * AppShell around its children. While bootstrap is in progress we render a
+ * quiet skeleton that only fades in if the probe is slow. On unauthenticated state
  * the user is redirected to /login.
  */
 
 import { isSafeRedirect } from '@nodate-flow/sdk';
-import Button from '@nodate-flow/ui/primitives/button';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
+import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +24,7 @@ import QuickCaptureDialog from '../features/tasks/quick-capture-dialog';
 import TaskCreateDialog from '../features/tasks/task-create-dialog';
 import { useDefaultProjectId } from '../lib/use-default-project';
 import { useKeyboardShortcuts } from '../lib/use-keyboard-shortcuts';
+import styles from './_authenticated.module.css';
 
 function AuthenticatedLayout(): ReactElement | null {
   const { t } = useTranslation('common');
@@ -103,7 +105,7 @@ function AuthenticatedLayout(): ReactElement | null {
     }
   }, [status, isAuthenticated]);
 
-  if (status === 'loading') return null;
+  if (status === 'loading') return <PageSkeleton className={styles.boot} />;
   // We could not reach the auth service, which says nothing about whether
   // the session is still valid. Offer the retry instead of bouncing the
   // user to a login screen they may not even need.
@@ -135,19 +137,9 @@ function AuthenticatedLayout(): ReactElement | null {
         onClose={() => setNoProjectHintOpen(false)}
         title={t('tasks.new')}
       >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-4)',
-            // nf-token-override: component dimension, not a spacing step
-            minInlineSize: '20rem',
-          }}
-        >
-          <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-            {t('tasks.quick_create.no_projects.title')}
-          </p>
-          <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
+        <div className={styles.hint}>
+          <p className={styles.hintText}>{t('tasks.quick_create.no_projects.title')}</p>
+          <div className={styles.hintActions}>
             <Button type="button" variant="ghost" onClick={() => setNoProjectHintOpen(false)}>
               {t('tasks.form.cancel')}
             </Button>
@@ -156,17 +148,7 @@ function AuthenticatedLayout(): ReactElement | null {
                 to="/workspaces/$id/projects"
                 params={{ id: defaultWorkspaceId }}
                 onClick={() => setNoProjectHintOpen(false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  paddingInline: 'var(--nf-space-3)',
-                  paddingBlock: 'var(--nf-space-1-5)',
-                  borderRadius: 'var(--nf-radius-md)',
-                  background: 'var(--nf-color-accent)',
-                  color: 'var(--nf-color-fg-on-accent)',
-                  textDecoration: 'none',
-                  fontSize: 'var(--nf-text-sm)',
-                }}
+                className={buttonClassName({ variant: 'primary' })}
               >
                 {t('tasks.quick_create.no_projects.cta')}
               </Link>
@@ -186,31 +168,9 @@ function AuthenticatedLayout(): ReactElement | null {
 function SessionUnreachable({ onRetry }: { onRetry: () => void }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <main
-      aria-label={t('auth.offline.title')}
-      style={{
-        minBlockSize: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--nf-space-4)',
-        padding: 'var(--nf-space-6)',
-        textAlign: 'center',
-        background: 'var(--nf-color-bg)',
-        color: 'var(--nf-color-fg)',
-      }}
-    >
-      <h1 style={{ margin: 0, fontFamily: 'var(--nf-font-display)' }}>{t('auth.offline.title')}</h1>
-      <p
-        style={{
-          margin: 0,
-          color: 'var(--nf-color-fg-muted)',
-          maxInlineSize: 'var(--nf-measure-narrow)',
-        }}
-      >
-        {t('auth.offline.description')}
-      </p>
+    <main aria-label={t('auth.offline.title')} className={styles.offline}>
+      <h1 className={styles.offlineTitle}>{t('auth.offline.title')}</h1>
+      <p className={styles.offlineText}>{t('auth.offline.description')}</p>
       <Button type="button" variant="primary" onClick={onRetry}>
         {t('auth.offline.retry')}
       </Button>

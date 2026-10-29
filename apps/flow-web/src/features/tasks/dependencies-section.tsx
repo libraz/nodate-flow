@@ -8,27 +8,32 @@
  * debounced client-side.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
-import Spinner from '@nodate-flow/ui/primitives/spinner';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { X } from 'lucide-react';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import {
   type TaskDependencyEdge,
   type TaskDependencyKind,
   type TaskDerivedState,
+  tasksKeys,
   useAddTaskDependency,
   useRemoveTaskDependency,
   useTaskDependenciesQuery,
   useTaskSearch,
 } from './api';
-import { STATE_TONE } from './constants';
+import { STATE_KEY, STATE_TONE } from './constants';
 import styles from './dependencies-section.module.css';
 
 interface DependenciesSectionProps {
@@ -49,7 +54,10 @@ export default function DependenciesSection({
   const { t } = useTranslation('common');
   const { data } = useTaskDependenciesQuery(taskId);
   const remove = useRemoveTaskDependency();
+  const add = useAddTaskDependency();
+  const qc = useQueryClient();
   const [picking, setPicking] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const blocks = useMemo(() => data.outgoing.filter((e) => e.kind === 'blocks'), [data.outgoing]);
   const blockedBy = useMemo(
@@ -89,14 +97,41 @@ export default function DependenciesSection({
     duplicateOf.length === 0 &&
     duplicatedBy.length === 0;
 
-  const handleRemove = async (depId: string): Promise<void> => {
+  const handleRemove = async (edge: TaskDependencyEdge): Promise<void> => {
+    const outgoing = data.outgoing.some((e) => e.id === edge.id);
+    const kind = edge.kind as TaskDependencyKind;
+    setRemovingId(edge.id);
     try {
-      await remove.mutateAsync({ taskId, depId });
+      await remove.mutateAsync({ taskId, depId: edge.id });
+      toaster.show({
+        tone: 'info',
+        message: t('tasks.detail.dependencies.removed', { title: edge.otherTaskTitle }),
+        action: {
+          label: t('common.undo'),
+          onAction: () => {
+            // The edge keeps its direction: an incoming edge is owned by the other task.
+            const args = outgoing
+              ? { taskId, toTaskId: edge.otherTaskId, kind }
+              : { taskId: edge.otherTaskId, toTaskId: taskId, kind };
+            add.mutateAsync(args).then(
+              () => qc.invalidateQueries({ queryKey: tasksKeys.dependencies(taskId) }),
+              (err: unknown) => {
+                toaster.show({
+                  tone: 'danger',
+                  message: formatApiError(err, t, 'tasks.detail.dependencies.addError'),
+                });
+              },
+            );
+          },
+        },
+      });
     } catch (err) {
       toaster.show({
         tone: 'danger',
         message: formatApiError(err, t, 'tasks.detail.dependencies.removeError'),
       });
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -144,42 +179,49 @@ export default function DependenciesSection({
         items={parent}
         tone="info"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.subtasks')}
         items={subtasks}
         tone="info"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.blockedBy')}
         items={blockedBy}
         tone="danger"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.blocks')}
         items={blocks}
         tone="warning"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.relates')}
         items={relates}
         tone="neutral"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.duplicateOf')}
         items={duplicateOf}
         tone="neutral"
         onRemove={handleRemove}
+        removingId={removingId}
       />
       <DependencyGroup
         label={t('tasks.detail.dependencies.duplicatedBy')}
         items={duplicatedBy}
         tone="neutral"
         onRemove={handleRemove}
+        removingId={removingId}
       />
     </section>
   );
@@ -190,47 +232,63 @@ function DependencyGroup({
   items,
   tone,
   onRemove,
+  removingId,
 }: {
   label: string;
   items: TaskDependencyEdge[];
   tone: BadgeTone;
-  onRemove: (depId: string) => void | Promise<void>;
+  onRemove: (edge: TaskDependencyEdge) => void | Promise<void>;
+  removingId: string | null;
 }): ReactElement | null {
   const { t } = useTranslation('common');
-  if (items.length === 0) return null;
+  const { entries, onExited } = usePresenceList(items, (edge) => edge.id);
+  if (entries.length === 0) return null;
   return (
     <div className={styles.group}>
       <div className={styles.groupHeader}>
         <Badge tone={tone}>{label}</Badge>
-        <span>({items.length})</span>
+        <span className={styles.groupCount}>({items.length})</span>
       </div>
       <ul className={styles.groupList}>
-        {items.map((edge) => {
-          const stateTone = STATE_TONE[edge.otherTaskDerivedState as TaskDerivedState] ?? 'neutral';
+        {entries.map(({ key, item: edge, present }) => {
+          const state = edge.otherTaskDerivedState as TaskDerivedState;
           return (
-            <li key={edge.id} className={styles.groupItem}>
-              <Badge tone={stateTone}>{edge.otherTaskDerivedState}</Badge>
-              <Link
-                to="/tasks/$taskId"
-                params={{ taskId: edge.otherTaskId }}
-                className={styles.groupLink}
-              >
-                {edge.otherTaskTitle}
-              </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={t('tasks.detail.dependencies.removeNamed', {
-                  title: edge.otherTaskTitle,
-                })}
-                onClick={() => {
-                  void onRemove(edge.id);
-                }}
-              >
-                ×
-              </Button>
-            </li>
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+            >
+              <div className={styles.groupItem}>
+                <Badge tone={STATE_TONE[state] ?? 'neutral'}>
+                  {t(STATE_KEY[state] ?? 'tasks.status.open')}
+                </Badge>
+                <Link
+                  to="/tasks/$taskId"
+                  params={{ taskId: edge.otherTaskId }}
+                  className={styles.groupLink}
+                  title={edge.otherTaskTitle}
+                >
+                  {edge.otherTaskTitle}
+                </Link>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('tasks.detail.dependencies.removeNamed', {
+                    title: edge.otherTaskTitle,
+                  })}
+                  disabled={removingId === edge.id}
+                  aria-busy={removingId === edge.id}
+                  onClick={() => {
+                    void onRemove(edge);
+                  }}
+                >
+                  <X size={14} aria-hidden />
+                </Button>
+              </div>
+            </PresenceItem>
           );
         })}
       </ul>
@@ -266,6 +324,14 @@ function DependencyPicker({
 
   const search = useTaskSearch(workspaceId, debounced, debounced.length > 0);
   const results = (search.data ?? []).filter((task) => !excludeIds.has(task.id));
+  const stage =
+    debounced.length === 0
+      ? 'hint'
+      : search.isFetching
+        ? 'loading'
+        : results.length === 0
+          ? 'empty'
+          : 'results';
 
   const handlePick = async (toTaskId: string): Promise<void> => {
     try {
@@ -309,34 +375,40 @@ function DependencyPicker({
           {t('tasks.detail.dependencies.addCancel')}
         </Button>
       </div>
-      {debounced.length === 0 ? (
-        <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchHint')}</p>
-      ) : search.isFetching ? (
-        <div className={styles.pickerLoadingRow}>
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : results.length === 0 ? (
-        <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchEmpty')}</p>
-      ) : (
-        <ul className={styles.pickerResults}>
-          {results.map((task) => (
-            <li key={task.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  void handlePick(task.id);
-                }}
-                className={styles.pickerResultButton}
-              >
-                <Badge tone={STATE_TONE[task.derivedState as TaskDerivedState] ?? 'neutral'}>
-                  {task.derivedState}
-                </Badge>
-                <span className={styles.pickerResultTitle}>{task.title}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div key={stage} className={styles.pickerBody}>
+        {debounced.length === 0 ? (
+          <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchHint')}</p>
+        ) : search.isFetching ? (
+          <div className={styles.pickerLoadingRow} role="status" aria-label={t('common.loading')}>
+            <Skeleton className={styles.pickerSkeletonRow} />
+            <Skeleton className={styles.pickerSkeletonRow} />
+            <Skeleton className={styles.pickerSkeletonRow} />
+          </div>
+        ) : results.length === 0 ? (
+          <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchEmpty')}</p>
+        ) : (
+          <ul className={styles.pickerResults}>
+            {results.map((task) => (
+              <li key={task.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handlePick(task.id);
+                  }}
+                  className={styles.pickerResultButton}
+                >
+                  <Badge tone={STATE_TONE[task.derivedState as TaskDerivedState] ?? 'neutral'}>
+                    {t(STATE_KEY[task.derivedState as TaskDerivedState] ?? 'tasks.status.open')}
+                  </Badge>
+                  <span className={styles.pickerResultTitle} title={task.title}>
+                    {task.title}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

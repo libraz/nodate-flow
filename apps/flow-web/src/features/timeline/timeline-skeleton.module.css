@@ -1,0 +1,40 @@
+/* Placeholder shapes for the timeline's Suspense fallback. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.filterBar {
+  block-size: var(--nf-control-height);
+  inline-size: 100%;
+}
+
+.dayHeading {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 1.5rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 10rem;
+}
+
+.row {
+  display: flex;
+  gap: var(--nf-space-3);
+  align-items: center;
+}
+
+.avatar {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 2rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 2rem;
+  border-radius: var(--nf-radius-pill);
+  flex-shrink: 0;
+}
+
+.card {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3rem;
+  flex: 1;
+}

@@ -14,11 +14,20 @@
  * the editor rather than a bare textarea of its own.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
-import { type KeyboardEvent, type ReactElement, type RefObject, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactElement,
+  type RefObject,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import MentionTextarea from '../mentions/mention-textarea';
+import css from './markdown-editor.module.css';
 
 interface MarkdownEditorProps {
   /** Current Markdown source text. */
@@ -140,24 +149,10 @@ export default function MarkdownEditor({
     prefixLine(textareaRef, value, '> ', onChange);
   };
 
-  // Square icon-button toolbar items — `aspect-ratio: 1` paired with the
-  // `sm` button vertical padding lets each glyph share an equal hit-target
-  // without freezing a literal pixel/rem width.
-  const toolbarButtonStyle = { aspectRatio: '1', padding: 'var(--nf-space-1)' } as const;
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
+    <div className={css.root}>
       {/* Toolbar */}
-      <div
-        role="toolbar"
-        aria-label={t('tasks.markdown_editor.toolbar')}
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 'var(--nf-space-1)',
-          alignItems: 'center',
-        }}
-      >
+      <div role="toolbar" aria-label={t('tasks.markdown_editor.toolbar')} className={css.toolbar}>
         <Button
           type="button"
           variant="ghost"
@@ -165,7 +160,7 @@ export default function MarkdownEditor({
           onClick={handleBold}
           aria-label={t('tasks.markdown_editor.bold')}
           disabled={previewing}
-          style={{ ...toolbarButtonStyle, fontWeight: 700 }}
+          className={cx(css.toolButton, css.toolBold)}
         >
           B
         </Button>
@@ -176,7 +171,7 @@ export default function MarkdownEditor({
           onClick={handleItalic}
           aria-label={t('tasks.markdown_editor.italic')}
           disabled={previewing}
-          style={{ ...toolbarButtonStyle, fontStyle: 'italic' }}
+          className={cx(css.toolButton, css.toolItalic)}
         >
           I
         </Button>
@@ -187,7 +182,7 @@ export default function MarkdownEditor({
           onClick={handleHeading}
           aria-label={t('tasks.markdown_editor.heading')}
           disabled={previewing}
-          style={toolbarButtonStyle}
+          className={css.toolButton}
         >
           H
         </Button>
@@ -198,7 +193,7 @@ export default function MarkdownEditor({
           onClick={handleList}
           aria-label={t('tasks.markdown_editor.list')}
           disabled={previewing}
-          style={toolbarButtonStyle}
+          className={css.toolButton}
         >
           •
         </Button>
@@ -209,7 +204,7 @@ export default function MarkdownEditor({
           onClick={handleCode}
           aria-label={t('tasks.markdown_editor.code')}
           disabled={previewing}
-          style={{ ...toolbarButtonStyle, fontFamily: 'var(--nf-font-mono)' }}
+          className={cx(css.toolButton, css.toolMono)}
         >
           {'</>'}
         </Button>
@@ -220,7 +215,7 @@ export default function MarkdownEditor({
           onClick={handleLink}
           aria-label={t('tasks.markdown_editor.link')}
           disabled={previewing}
-          style={toolbarButtonStyle}
+          className={css.toolButton}
         >
           🔗
         </Button>
@@ -231,13 +226,13 @@ export default function MarkdownEditor({
           onClick={handleQuote}
           aria-label={t('tasks.markdown_editor.quote')}
           disabled={previewing}
-          style={toolbarButtonStyle}
+          className={css.toolButton}
         >
           &gt;
         </Button>
 
         {/* Spacer */}
-        <span style={{ flex: 1 }} />
+        <span className={css.spacer} />
 
         {/* Preview toggle */}
         <Button
@@ -256,38 +251,31 @@ export default function MarkdownEditor({
       {/* Editor / Preview area */}
       {previewing ? (
         <div
-          style={{
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-sm)',
-            padding: 'var(--nf-space-3)',
-            // `--nf-space-6` is 1.5rem so this preserves the original
-            // `${rows} * 1.5rem` minimum height while routing the base
-            // unit through the spacing scale.
-            minBlockSize: `calc(var(--nf-space-6) * ${String(rows)})`,
-            background: 'var(--nf-color-surface)',
-          }}
+          key="preview"
+          className={css.preview}
+          style={{ '--editor-rows': rows } as CSSProperties}
         >
           {value.trim().length > 0 ? (
             <Markdown>{value}</Markdown>
           ) : (
-            <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
-              {t('tasks.markdown_editor.preview_empty')}
-            </p>
+            <p className={css.previewEmpty}>{t('tasks.markdown_editor.preview_empty')}</p>
           )}
         </div>
       ) : (
-        <MentionTextarea
-          textareaRef={textareaRef}
-          value={value}
-          onChange={onChange}
-          workspaceId={workspaceId}
-          id={id}
-          rows={rows}
-          autoFocus={autoFocus}
-          placeholder={placeholder}
-          aria-label={ariaLabel}
-          onKeyDown={onKeyDown}
-        />
+        <div key="write" className={css.write}>
+          <MentionTextarea
+            textareaRef={textareaRef}
+            value={value}
+            onChange={onChange}
+            workspaceId={workspaceId}
+            id={id}
+            rows={rows}
+            autoFocus={autoFocus}
+            placeholder={placeholder}
+            aria-label={ariaLabel}
+            onKeyDown={onKeyDown}
+          />
+        </div>
       )}
     </div>
   );

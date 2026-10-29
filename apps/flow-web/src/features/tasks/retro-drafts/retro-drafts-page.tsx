@@ -22,18 +22,22 @@
  * initial query; the route-level Suspense boundary owns the skeleton.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirm } from '@nodate-flow/ui/primitives/confirm';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../../lib/api-error';
 import RetroDraftRow from './retro-draft-row';
 import styles from './retro-drafts.module.css';
 import {
   RETRO_DRAFTS_PAGE_SIZE,
+  type RetroDraft,
   useAcceptRetroDraft,
   useDiscardRetroDraft,
   useRetroDraftsQuery,
@@ -41,6 +45,44 @@ import {
 
 interface RetroDraftsPageProps {
   workspaceId: string;
+}
+
+interface DraftListProps {
+  drafts: readonly RetroDraft[];
+  locale: string;
+  busyIds: ReadonlySet<string>;
+  onAccept: (taskPublicId: string) => void;
+  onDiscard: (taskPublicId: string) => void;
+}
+
+/** An accepted or discarded draft collapses out of the queue instead of vanishing. */
+function DraftList({ drafts, locale, busyIds, onAccept, onDiscard }: DraftListProps): ReactElement {
+  const { entries, onExited } = usePresenceList(drafts, (draft) => draft.taskPublicId);
+  const staggerFor = useFirstLoadStagger();
+  return (
+    <div className={styles.rows}>
+      {entries.map(({ key, item: draft, present }, index) => {
+        const stagger = staggerFor(index);
+        return (
+          <PresenceItem
+            key={key}
+            present={present}
+            onExited={() => onExited(key)}
+            className={motion.enter}
+            {...(stagger ? { style: stagger } : {})}
+          >
+            <RetroDraftRow
+              draft={draft}
+              locale={locale}
+              busy={busyIds.has(draft.taskPublicId)}
+              onAccept={onAccept}
+              onDiscard={onDiscard}
+            />
+          </PresenceItem>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): ReactElement {
@@ -156,20 +198,19 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
   } else {
     body = (
       <div className={styles.list}>
-        {drafts.map((draft) => (
-          <RetroDraftRow
-            key={draft.taskPublicId}
-            draft={draft}
-            locale={locale}
-            busy={busyIds.has(draft.taskPublicId)}
-            onAccept={(id) => {
-              void handleAccept(id);
-            }}
-            onDiscard={(id) => {
-              void handleDiscard(id);
-            }}
-          />
-        ))}
+        {/* Keyed by page: paging swaps the rows, it does not remove them. */}
+        <DraftList
+          key={offset}
+          drafts={drafts}
+          locale={locale}
+          busyIds={busyIds}
+          onAccept={(id) => {
+            void handleAccept(id);
+          }}
+          onDiscard={(id) => {
+            void handleDiscard(id);
+          }}
+        />
 
         {totalPages > 1 ? (
           <nav className={styles.pagination} aria-label={t('tasks.retro.queue.title')}>
@@ -183,6 +224,7 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
                 size="sm"
                 disabled={!hasPrev}
                 onClick={handlePrev}
+                aria-label={t('tasks.retro.queue.prev_page')}
               >
                 {'‹'}
               </Button>
@@ -192,6 +234,7 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
                 size="sm"
                 disabled={!hasNext}
                 onClick={handleNext}
+                aria-label={t('tasks.retro.queue.next_page')}
               >
                 {'›'}
               </Button>

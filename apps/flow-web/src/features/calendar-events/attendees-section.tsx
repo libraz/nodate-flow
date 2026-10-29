@@ -15,19 +15,23 @@
  * re-renders off the invalidated `useAttendeesQuery` cache.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { useWorkspaceMembersQuery } from '../workspaces/api';
 import {
@@ -110,6 +114,7 @@ export default function AttendeesSection({
   const [pickerValue, setPickerValue] = useState('');
 
   const attendees: Attendee[] = attendeesQuery.data ?? [];
+  const { entries, onExited } = usePresenceList(attendees, (a) => a.id);
   const isOwner = ownerUserId !== null && ownerUserId === selfUserId;
   const selfAttendee = attendees.find((a) => a.userId === selfUserId);
 
@@ -171,10 +176,42 @@ export default function AttendeesSection({
     );
   };
 
-  const handleRemove = (userId: string): void => {
+  const handleRemove = async (attendee: Attendee): Promise<void> => {
+    // An owner can add the person straight back, so removal is undoable;
+    // a guest leaving their own seat cannot, so it asks first.
+    if (!isOwner) {
+      const ok = await confirmAction({
+        message: t('event.attendees.leave_confirm'),
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
     removeAttendee.mutate(
-      { ...scope, userId },
+      { ...scope, userId: attendee.userId },
       {
+        onSuccess: () => {
+          if (!isOwner) return;
+          toaster.show({
+            tone: 'info',
+            message: t('event.attendees.removed_toast', { name: attendee.displayName }),
+            action: {
+              label: t('common:common.undo'),
+              onAction: () => {
+                addAttendees.mutate(
+                  { ...scope, userIds: [attendee.userId] },
+                  {
+                    onError: (err) => {
+                      toaster.show({
+                        tone: 'danger',
+                        message: formatApiError(err, t, 'event.attendees.errors.add_failed'),
+                      });
+                    },
+                  },
+                );
+              },
+            },
+          });
+        },
         onError: (err) => {
           toaster.show({
             tone: 'danger',
@@ -236,70 +273,80 @@ export default function AttendeesSection({
         />
       </div>
 
-      {attendees.length === 0 ? (
+      {entries.length === 0 ? (
         <p className={styles.empty}>{t('event.attendees.empty')}</p>
       ) : (
         <ul className={styles.list}>
-          {attendees.map((a) => {
+          {entries.map(({ key, item: a, present }) => {
             const isSelf = a.userId === selfUserId;
             const canRemove = isOwner || isSelf;
             return (
-              <li key={a.id} className={styles.row}>
-                <Avatar
-                  size="sm"
-                  alt={a.displayName}
-                  initials={initialsOf(a.displayName)}
-                  {...(a.avatarUrl ? { src: a.avatarUrl } : {})}
-                />
-                <div className={styles.identity}>
-                  <span className={styles.name}>
-                    <span>{a.displayName}</span>
-                    {isSelf ? (
-                      <span className={styles.youPill}>{t('event.attendees.you')}</span>
-                    ) : null}
-                  </span>
-                </div>
-                <Badge tone={rsvpTone(a.rsvp)}>{t(rsvpLabelKey(a.rsvp))}</Badge>
-                <div className={styles.controls}>
-                  {isOwner && !isSelf ? (
-                    <span className={styles.canEdit}>
-                      <Switch
-                        checked={a.canEdit}
-                        onCheckedChange={(next) => handleToggleCanEdit(a.userId, next)}
-                        disabled={toggleCanEdit.isPending}
-                        aria-label={t('event.attendees.can_edit')}
-                      />
-                      <span aria-hidden>{t('event.attendees.can_edit')}</span>
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => onExited(key)}
+                className={motion.enter}
+              >
+                <div className={styles.row}>
+                  <Avatar
+                    size="sm"
+                    alt={a.displayName}
+                    initials={initialsOf(a.displayName)}
+                    {...(a.avatarUrl ? { src: a.avatarUrl } : {})}
+                  />
+                  <div className={styles.identity}>
+                    <span className={styles.name}>
+                      <span>{a.displayName}</span>
+                      {isSelf ? (
+                        <span className={styles.youPill}>{t('event.attendees.you')}</span>
+                      ) : null}
                     </span>
-                  ) : null}
-                  {isOwner ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        void handleInvite(a.id);
-                      }}
-                      disabled={createInvite.isPending}
-                    >
-                      {t('event.attendees.send_invite')}
-                    </Button>
-                  ) : null}
-                  {canRemove ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className={styles.removeButton}
-                      onClick={() => handleRemove(a.userId)}
-                      disabled={removeAttendee.isPending}
-                      aria-label={t('event.attendees.remove')}
-                    >
-                      {'×'}
-                    </Button>
-                  ) : null}
+                  </div>
+                  <Badge tone={rsvpTone(a.rsvp)}>{t(rsvpLabelKey(a.rsvp))}</Badge>
+                  <div className={styles.controls}>
+                    {isOwner && !isSelf ? (
+                      <span className={styles.canEdit}>
+                        <Switch
+                          checked={a.canEdit}
+                          onCheckedChange={(next) => handleToggleCanEdit(a.userId, next)}
+                          disabled={toggleCanEdit.isPending}
+                          aria-label={t('event.attendees.can_edit')}
+                        />
+                        <span aria-hidden>{t('event.attendees.can_edit')}</span>
+                      </span>
+                    ) : null}
+                    {isOwner ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          void handleInvite(a.id);
+                        }}
+                        disabled={createInvite.isPending}
+                      >
+                        {t('event.attendees.send_invite')}
+                      </Button>
+                    ) : null}
+                    {canRemove ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={styles.removeButton}
+                        onClick={() => {
+                          void handleRemove(a);
+                        }}
+                        disabled={removeAttendee.isPending}
+                        aria-label={t('event.attendees.remove')}
+                      >
+                        {'×'}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </li>
+              </PresenceItem>
             );
           })}
         </ul>

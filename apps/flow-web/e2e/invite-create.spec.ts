@@ -98,15 +98,15 @@ test.describe('invite create', () => {
     await dialog.getByTestId('invite-create-close').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
-    // The active-invites DataGrid (aria-label = "Invite links" / "招待
+    // The active-invites table (aria-label = "Invite links" / "招待
     // リンク") only renders once the workspace has at least one invite.
-    const invitesGrid = page.getByRole('grid', { name: /^(invite links|招待リンク)$/i });
-    await expect(invitesGrid).toBeVisible({ timeout: 10_000 });
+    const invitesTable = page.getByRole('table', { name: /^(invite links|招待リンク)$/i });
+    await expect(invitesTable).toBeVisible({ timeout: 10_000 });
 
-    // The label we submitted should appear in the grid body.
-    await expect(invitesGrid.getByText(inviteLabel, { exact: true })).toBeVisible();
+    // The label we submitted should appear in the table body.
+    await expect(invitesTable.getByText(inviteLabel, { exact: true })).toBeVisible();
     // And the role cell must reflect the non-default we picked.
-    await expect(invitesGrid.getByRole('gridcell', { name: 'admin' })).toBeVisible();
+    await expect(invitesTable.getByRole('cell', { name: 'admin', exact: true })).toBeVisible();
   });
 
   test('revoking a created invite removes its row from the active list', async ({ page }) => {
@@ -134,18 +134,22 @@ test.describe('invite create', () => {
     await dialog.getByTestId('invite-create-close').click();
     await expect(dialog).toBeHidden({ timeout: 5_000 });
 
-    const invitesGrid = page.getByRole('grid', { name: /^(invite links|招待リンク)$/i });
-    const labelCell = invitesGrid.getByText(inviteLabel, { exact: true });
+    const invitesTable = page.getByRole('table', { name: /^(invite links|招待リンク)$/i });
+    const labelCell = invitesTable.getByText(inviteLabel, { exact: true });
     await expect(labelCell).toBeVisible({ timeout: 10_000 });
 
     // Each row has its own Revoke button; scope to the row containing
     // the label we just created so parallel rows cannot confuse the
     // selector.
-    const row = invitesGrid.getByRole('row').filter({ hasText: inviteLabel });
+    const row = invitesTable.getByRole('row').filter({ hasText: inviteLabel });
     await row.getByTestId('invite-revoke').click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^(revoke|無効化|撤销)$/i })
+      .click();
 
     // The list hides itself entirely when empty (component returns an
-    // empty fragment), so after revoke the grid should disappear.
-    await expect(invitesGrid).toBeHidden({ timeout: 10_000 });
+    // empty fragment), so after revoke the table should disappear.
+    await expect(invitesTable).toBeHidden({ timeout: 10_000 });
   });
 });

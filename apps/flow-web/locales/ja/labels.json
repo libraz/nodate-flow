@@ -40,7 +40,8 @@
   "task": {
     "add": "ラベルを追加",
     "remove": "ラベルを削除",
-    "none": "ラベルなし"
+    "none": "ラベルなし",
+    "count": "{count, plural, other {ラベル {count} 件}}"
   },
   "filters": {
     "label": "ラベル",

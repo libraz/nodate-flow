@@ -1,0 +1,154 @@
+/* Task detail page — states and motion the inline styles cannot express. */
+
+.panel {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* The loading shell mirrors the two-column page so arrival does not reflow it. */
+.fallback {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: var(--nf-space-6);
+  padding: var(--nf-space-page);
+}
+
+.fallbackColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  min-inline-size: 0;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .fallback {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.editorEnter {
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.descriptionEmpty {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 3rem;
+  inline-size: 100%;
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg-muted);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--nf-duration-instant) var(--nf-ease-standard),
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.descriptionEmpty:hover {
+  border-color: var(--nf-color-border-strong);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg);
+}
+
+.descriptionEmpty:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.stateBadge {
+  display: inline-flex;
+}
+
+/* ── Lists in the sidebar and main column ─────────────────────── */
+
+.plainList {
+  --presence-gap: var(--nf-space-1-5);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--presence-gap);
+}
+
+.commentList {
+  --presence-gap: var(--nf-space-3);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--presence-gap);
+}
+
+.assigneeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.assigneeName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relatedLink {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1) var(--nf-space-2);
+  margin-inline: calc(var(--nf-space-2) * -1);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.relatedLink:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.relatedLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.relatedTitle {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.starSkeleton {
+  /* nf-token-override: matches the favourite star button footprint */
+  inline-size: 2rem;
+  /* nf-token-override: same footprint as the inline size above */
+  block-size: 2rem;
+}
+
+.breadcrumbSkeleton {
+  /* nf-token-override: matches one breadcrumb line */
+  inline-size: 16rem;
+  /* nf-token-override: same footprint as the inline size above */
+  block-size: 1.25rem;
+}

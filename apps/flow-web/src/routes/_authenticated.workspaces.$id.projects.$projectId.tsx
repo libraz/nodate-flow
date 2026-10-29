@@ -21,6 +21,7 @@ import Forbidden from '../components/forbidden';
 import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
+import styles from '../features/workspaces/workspaces.module.css';
 import { apiRequest } from '../lib/api';
 import { ApiError } from '../lib/api-error';
 
@@ -141,37 +142,15 @@ function ProjectLayout(): ReactElement {
       {project.description ? (
         <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
       ) : null}
-      <nav
-        aria-label={t('projects.nav.label')}
-        style={{
-          display: 'flex',
-          gap: 'var(--nf-space-1)',
-          borderBlockEnd: '1px solid var(--nf-color-border)',
-          paddingBlockEnd: 'var(--nf-space-2)',
-        }}
-      >
+      <nav aria-label={t('projects.nav.label')} className={styles.subNav}>
         {PROJECT_SUB_NAV.map((item) => (
           <Link
             key={item.key}
             to={item.to}
             params={{ id, projectId }}
             activeOptions={{ exact: item.key === 'overview' }}
-            activeProps={{
-              'aria-current': 'page',
-              'data-active': 'true',
-              style: {
-                background: 'var(--nf-color-accent-subtle)',
-                color: 'var(--nf-color-accent-fg)',
-                fontWeight: 500,
-              },
-            }}
-            style={{
-              display: 'inline-block',
-              padding: 'var(--nf-space-2) var(--nf-space-3-5)',
-              borderRadius: 'var(--nf-radius-md)',
-              color: 'var(--nf-color-fg)',
-              textDecoration: 'none',
-            }}
+            activeProps={{ 'aria-current': 'page', 'data-active': 'true' }}
+            className={styles.subNavLink}
           >
             {t(labelKeyFor(item.key))}
           </Link>
@@ -240,20 +219,7 @@ function ProjectNotFound({ workspaceId }: { workspaceId: string }): ReactElement
       >
         {t('projects.not_found.body')}
       </p>
-      <Link
-        to="/workspaces/$id"
-        params={{ id: workspaceId }}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: 'var(--nf-space-2) var(--nf-space-5)',
-          borderRadius: 'var(--nf-radius-md)',
-          background: 'var(--nf-color-accent)',
-          color: 'var(--nf-color-fg-on-accent)',
-          textDecoration: 'none',
-          fontWeight: 500,
-        }}
-      >
+      <Link to="/workspaces/$id" params={{ id: workspaceId }} className={styles.ctaLink}>
         {t('projects.not_found.cta')}
       </Link>
     </section>

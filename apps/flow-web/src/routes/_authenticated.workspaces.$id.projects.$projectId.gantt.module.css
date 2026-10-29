@@ -1,0 +1,286 @@
+/*
+ * Gantt view. One scroll container holds the chart so the timescale stays
+ * pinned above long task lists and the label column stays pinned while the
+ * chart pans sideways.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  padding-block-end: var(--nf-space-page);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-2xl);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.controls {
+  display: flex;
+  gap: var(--nf-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.group {
+  display: flex;
+  gap: var(--nf-space-0-5);
+  align-items: center;
+}
+
+.group + .group {
+  border-inline-start: var(--nf-space-px) solid var(--nf-color-border);
+  padding-inline-start: var(--nf-space-2);
+}
+
+/* --- Chart frame --- */
+
+.scroller {
+  overflow: auto;
+  max-block-size: 70vh;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+  overscroll-behavior: contain;
+}
+
+.scroller:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.canvas {
+  display: grid;
+  inline-size: max-content;
+  min-inline-size: 100%;
+}
+
+.corner,
+.timescale {
+  position: sticky;
+  inset-block-start: 0;
+  background: var(--nf-color-surface);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.corner {
+  inset-inline-start: 0;
+  z-index: 3;
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.timescale {
+  z-index: 2;
+}
+
+.labels {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--nf-color-surface);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+/* Re-mounted on zoom so the new scale fades in rather than snapping. */
+.layer {
+  display: block;
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* --- Timescale --- */
+
+.axisText {
+  font-variant-numeric: tabular-nums;
+  fill: var(--nf-color-fg-muted);
+}
+
+.axisMonth {
+  font-variant-numeric: tabular-nums;
+  fill: var(--nf-color-fg);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.todayPill {
+  fill: var(--nf-color-accent);
+}
+
+.todayText {
+  font-variant-numeric: tabular-nums;
+  fill: var(--nf-color-fg-on-accent);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.todayLine {
+  stroke: var(--nf-color-accent);
+}
+
+/* --- Label column --- */
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  inline-size: 100%;
+  padding-inline: var(--nf-space-2-5);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.labelRow:hover,
+.labelRow[data-hovered] {
+  background: var(--nf-color-surface-hover);
+}
+
+.labelRow:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 var(--nf-focus-ring-width) var(--nf-color-focus-ring);
+}
+
+.stateDot {
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  flex-shrink: 0;
+}
+
+.labelText {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-supporting);
+}
+
+/* --- Bars --- */
+
+.bar {
+  cursor: pointer;
+  outline: none;
+}
+
+.barFill {
+  fill-opacity: 0.85;
+  transition:
+    fill-opacity var(--nf-duration-fast) var(--nf-ease-out),
+    stroke-width var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.barFill[data-done] {
+  fill-opacity: 0.5;
+}
+
+.bar:hover .barFill,
+.bar[data-hovered] .barFill {
+  fill-opacity: 1;
+  stroke-width: 2;
+}
+
+.barFocus {
+  fill: none;
+  stroke: var(--nf-color-focus-ring);
+  stroke-width: 2;
+  opacity: 0;
+}
+
+.bar:focus-visible .barFocus {
+  opacity: 1;
+}
+
+/* --- Unscheduled --- */
+
+.unscheduled {
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
+  padding: var(--nf-space-2) var(--nf-space-3);
+}
+
+.unscheduledSummary {
+  cursor: pointer;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+  border-radius: var(--nf-radius-sm);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.unscheduledSummary:hover {
+  color: var(--nf-color-fg);
+}
+
+.unscheduledSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.unscheduledList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  padding-block-start: var(--nf-space-2-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+/* Contents of a closed <details> are not rendered, so this replays on every open. */
+.unscheduled[open] .unscheduledList {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+}
+
+.unscheduledLink {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1-5) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-supporting);
+  text-decoration: none;
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.unscheduledLink:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.unscheduledLink:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+/* --- Loading --- */
+
+.skeletonTitle {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 2rem;
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 8rem;
+}
+
+.skeletonControls {
+  block-size: var(--nf-control-height);
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  inline-size: 24rem;
+  max-inline-size: 100%;
+}
+
+.skeletonChart {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 20rem;
+  inline-size: 100%;
+}

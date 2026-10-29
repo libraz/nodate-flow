@@ -67,7 +67,8 @@
         "paused_option": "{name}（已暂停）",
         "remove": "取消分配 {name}",
         "failed": "分配代理失败",
-        "remove_failed": "取消分配代理失败"
+        "remove_failed": "取消分配代理失败",
+        "removed": "已将 {name} 从此任务移除。"
       }
     }
   },

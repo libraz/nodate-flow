@@ -8,16 +8,19 @@
 
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
-import { type ChangeEvent, type ReactElement, useState } from 'react';
+import { type ChangeEvent, type ReactElement, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatDate, formatEpochDateTime } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
+import ui from '../settings/settings-ui.module.css';
+import TruncatedText from '../settings/truncated-text';
 import { type AuditLogEntry, type AuditLogFilters, useAuditLogsQuery } from './api';
+import styles from './audit-log-view.module.css';
 
 const PAGE_SIZE = 50;
 
@@ -203,60 +206,27 @@ function handleExportCsv(
 
 function AuditRow({ entry, locale }: { entry: AuditLogEntry; locale: string }): ReactElement {
   const { t } = useTranslation('settings');
+  const metadata = formatMetadata(entry.metadataJson);
   return (
     <tr>
-      <td
-        style={{
-          padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: 'var(--nf-text-supporting)',
-          whiteSpace: 'nowrap',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
+      <td className={`${ui.numeric} ${ui.muted}`}>
         {formatEpochDateTime(entry.occurredAt, locale)}
       </td>
-      <td style={{ padding: 'var(--nf-space-2) var(--nf-space-3)' }}>
+      <td>
         <Badge tone={toneForAction(entry.action)}>{entry.action}</Badge>
       </td>
-      <td
-        style={{
-          padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: 'var(--nf-text-supporting)',
-        }}
-      >
-        {entry.actorDisplayName ?? t('audit_log.unknown_actor')}
-      </td>
-      <td
-        style={{
-          padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: 'var(--nf-text-supporting)',
-        }}
-      >
-        {entry.resourceType}
-      </td>
-      <td
-        style={{
-          padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: 'var(--nf-text-xs)',
-          fontFamily: 'var(--nf-font-mono)',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
-        {entry.resourcePublicId ?? '\u2014'}
-      </td>
-      <td
-        style={{
-          padding: 'var(--nf-space-2) var(--nf-space-3)',
-          fontSize: 'var(--nf-text-xs)',
-          color: 'var(--nf-color-fg-muted)',
-          // nf-token-override: component dimension, not a spacing step
-          maxInlineSize: '16rem',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {formatMetadata(entry.metadataJson) || '\u2014'}
+      <td>{entry.actorDisplayName ?? t('audit_log.unknown_actor')}</td>
+      <td>{entry.resourceType}</td>
+      <td className={`${ui.mono} ${ui.muted}`}>{entry.resourcePublicId ?? '\u2014'}</td>
+      <td>
+        {metadata ? (
+          <TruncatedText
+            text={metadata}
+            className={`${styles.metadataCell} ${ui.mono} ${ui.muted}`}
+          />
+        ) : (
+          <span className={ui.muted}>{'\u2014'}</span>
+        )}
       </td>
     </tr>
   );
@@ -271,10 +241,20 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
   const formatMonthYear = (year: number, month: number): string =>
     tCommon('common.date.monthYear', { year, month });
 
-  const [filters, setFilters] = useState<AuditLogFilters>({
+  const [filters, setFiltersNow] = useState<AuditLogFilters>({
     limit: PAGE_SIZE,
     offset: 0,
   });
+  // The search box answers each keystroke at once; the query follows in a transition.
+  const [actorInput, setActorInput] = useState('');
+  // A filter or page change keeps the current rows on screen while the next
+  // page suspends, instead of replacing the whole view with the fallback.
+  const [isRefreshing, startTransition] = useTransition();
+  const setFilters = (update: (prev: AuditLogFilters) => AuditLogFilters): void => {
+    startTransition(() => {
+      setFiltersNow(update);
+    });
+  };
 
   const { data } = useAuditLogsQuery(workspaceId, filters);
 
@@ -298,6 +278,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
       dateTo?: string;
     },
   ): AuditLogFilters => {
+    // An empty override clears that filter; omitting it keeps the previous value.
     const next: AuditLogFilters = { limit: prev.limit ?? PAGE_SIZE, offset: 0 };
     const m = { ...prev, ...overrides };
     if (m.action) next.action = m.action;
@@ -310,29 +291,31 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
 
   const handleActionChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     const v = e.target.value;
-    setFilters((prev) => buildNext(prev, v ? { action: v } : {}));
+    setFilters((prev) => buildNext(prev, { action: v }));
   };
 
   const handleResourceTypeChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     const v = e.target.value;
-    setFilters((prev) => buildNext(prev, v ? { resourceType: v } : {}));
+    setFilters((prev) => buildNext(prev, { resourceType: v }));
   };
 
   const handleActorSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const v = e.target.value;
-    setFilters((prev) => buildNext(prev, v ? { actorSearch: v } : {}));
+    setActorInput(v);
+    setFilters((prev) => buildNext(prev, { actorSearch: v }));
   };
 
   const handleDateFromChange = (v: string): void => {
-    setFilters((prev) => buildNext(prev, v ? { dateFrom: v } : {}));
+    setFilters((prev) => buildNext(prev, { dateFrom: v }));
   };
 
   const handleDateToChange = (v: string): void => {
-    setFilters((prev) => buildNext(prev, v ? { dateTo: v } : {}));
+    setFilters((prev) => buildNext(prev, { dateTo: v }));
   };
 
   const handleClearFilters = (): void => {
-    setFilters({ limit: PAGE_SIZE, offset: 0 });
+    setActorInput('');
+    setFilters(() => ({ limit: PAGE_SIZE, offset: 0 }));
   };
 
   const handlePrevPage = (): void => {
@@ -364,276 +347,160 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('audit_log.title')}</h1>
-          <Button variant="default" size="sm" onClick={handleExport}>
-            {t('audit_log.export_csv')}
-          </Button>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('audit_log.title')}</h1>
+          <p className={ui.lede}>{t('audit_log.description')}</p>
         </div>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('audit_log.description')}
-        </p>
+        <Button variant="default" onClick={handleExport} disabled={data.entries.length === 0}>
+          {t('audit_log.export_csv')}
+        </Button>
       </header>
 
-      {/* Filters */}
-      <Card style={{ padding: 'var(--nf-space-3)' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 'var(--nf-space-3)',
-            alignItems: 'flex-end',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <label
-              htmlFor="audit-action-filter"
-              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
-            >
-              {t('audit_log.filter.action')}
-            </label>
-            <Select
-              id="audit-action-filter"
-              value={filters.action ?? ''}
-              onChange={handleActionChange}
-              // nf-token-override: component dimension, not a spacing step
-              style={{ minInlineSize: '12rem' }}
-            >
-              <option value="">{t('audit_log.filter.all_actions')}</option>
-              {ACTION_OPTIONS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <label
-              htmlFor="audit-resource-type-filter"
-              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
-            >
-              {t('audit_log.filter.resource_type')}
-            </label>
-            <Select
-              id="audit-resource-type-filter"
-              value={filters.resourceType ?? ''}
-              onChange={handleResourceTypeChange}
-              // nf-token-override: component dimension, not a spacing step
-              style={{ minInlineSize: '10rem' }}
-            >
-              <option value="">{t('audit_log.filter.all_types')}</option>
-              {RESOURCE_TYPE_OPTIONS.map((rt) => (
-                <option key={rt} value={rt}>
-                  {rt}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <label
-              htmlFor="audit-actor-search"
-              style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}
-            >
-              {t('audit_log.filter.actor_search')}
-            </label>
-            <Input
-              id="audit-actor-search"
-              type="search"
-              placeholder={t('audit_log.filter.actor_search_placeholder')}
-              value={filters.actorSearch ?? ''}
-              onChange={handleActorSearchChange}
-              // nf-token-override: component dimension, not a spacing step
-              style={{ minInlineSize: '12rem' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
-              {t('audit_log.filter.date_from')}
-            </span>
-            <DatePicker
-              value={filters.dateFrom ?? ''}
-              onChange={handleDateFromChange}
-              weekdayLabels={weekdayLabels}
-              weekStart={weekStart}
-              formatMonthYear={formatMonthYear}
-              prevLabel={tCommon('calendar.prev')}
-              nextLabel={tCommon('calendar.next')}
-              triggerLabel={
-                filters.dateFrom
-                  ? formatDate(filters.dateFrom, locale)
-                  : tCommon('common.date.placeholder')
-              }
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <span style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
-              {t('audit_log.filter.date_to')}
-            </span>
-            <DatePicker
-              value={filters.dateTo ?? ''}
-              onChange={handleDateToChange}
-              weekdayLabels={weekdayLabels}
-              weekStart={weekStart}
-              formatMonthYear={formatMonthYear}
-              prevLabel={tCommon('calendar.prev')}
-              nextLabel={tCommon('calendar.next')}
-              triggerLabel={
-                filters.dateTo
-                  ? formatDate(filters.dateTo, locale)
-                  : tCommon('common.date.placeholder')
-              }
-              {...(filters.dateFrom ? { minDate: filters.dateFrom } : {})}
-            />
-          </div>
-
-          <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-            {t('audit_log.filter.clear')}
-          </Button>
-        </div>
-      </Card>
-
-      {/* Table */}
-      {data.entries.length === 0 ? (
-        <div
-          style={{
-            padding: 'var(--nf-space-12) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-lg)',
-            background: 'var(--nf-color-bg-sunken)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
-          {t(hasActiveFilter ? 'audit_log.empty_filtered' : 'audit_log.empty')}
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              inlineSize: '100%',
-              borderCollapse: 'collapse',
-              fontSize: 'var(--nf-text-sm)',
-            }}
+      <div className={styles.filters}>
+        <div className={styles.filter}>
+          <label htmlFor="audit-action-filter" className={styles.filterLabel}>
+            {t('audit_log.filter.action')}
+          </label>
+          <Select
+            id="audit-action-filter"
+            value={filters.action ?? ''}
+            onChange={handleActionChange}
+            className={styles.filterWide}
           >
-            <thead>
-              <tr
-                style={{
-                  borderBlockEnd: '1px solid var(--nf-color-border)',
-                }}
-              >
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.timestamp')}
-                </th>
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.action')}
-                </th>
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.actor')}
-                </th>
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.resource_type')}
-                </th>
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.resource_id')}
-                </th>
-                <th
-                  style={{
-                    padding: 'var(--nf-space-2) var(--nf-space-3)',
-                    textAlign: 'start',
-                    fontSize: 'var(--nf-text-xs)',
-                    fontWeight: 500,
-                    color: 'var(--nf-color-fg-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {t('audit_log.column.metadata')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.entries.map((entry) => (
-                <AuditRow key={entry.publicId} entry={entry} locale={locale} />
-              ))}
-            </tbody>
-          </table>
+            <option value="">{t('audit_log.filter.all_actions')}</option>
+            {ACTION_OPTIONS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </Select>
         </div>
-      )}
 
-      {/* Pagination */}
-      {data.total > PAGE_SIZE ? (
-        <nav
-          aria-label={t('audit_log.pagination.label')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--nf-space-4)',
-          }}
+        <div className={styles.filter}>
+          <label htmlFor="audit-resource-type-filter" className={styles.filterLabel}>
+            {t('audit_log.filter.resource_type')}
+          </label>
+          <Select
+            id="audit-resource-type-filter"
+            value={filters.resourceType ?? ''}
+            onChange={handleResourceTypeChange}
+            className={styles.filterNarrow}
+          >
+            <option value="">{t('audit_log.filter.all_types')}</option>
+            {RESOURCE_TYPE_OPTIONS.map((rt) => (
+              <option key={rt} value={rt}>
+                {rt}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className={styles.filter}>
+          <label htmlFor="audit-actor-search" className={styles.filterLabel}>
+            {t('audit_log.filter.actor_search')}
+          </label>
+          <Input
+            id="audit-actor-search"
+            type="search"
+            autoComplete="off"
+            placeholder={t('audit_log.filter.actor_search_placeholder')}
+            value={actorInput}
+            onChange={handleActorSearchChange}
+            className={styles.filterWide}
+          />
+        </div>
+
+        <div className={styles.filter}>
+          <span className={styles.filterLabel}>{t('audit_log.filter.date_from')}</span>
+          <DatePicker
+            value={filters.dateFrom ?? ''}
+            onChange={handleDateFromChange}
+            weekdayLabels={weekdayLabels}
+            weekStart={weekStart}
+            formatMonthYear={formatMonthYear}
+            prevLabel={tCommon('calendar.prev')}
+            nextLabel={tCommon('calendar.next')}
+            triggerLabel={
+              filters.dateFrom
+                ? formatDate(filters.dateFrom, locale)
+                : tCommon('common.date.placeholder')
+            }
+          />
+        </div>
+
+        <div className={styles.filter}>
+          <span className={styles.filterLabel}>{t('audit_log.filter.date_to')}</span>
+          <DatePicker
+            value={filters.dateTo ?? ''}
+            onChange={handleDateToChange}
+            weekdayLabels={weekdayLabels}
+            weekStart={weekStart}
+            formatMonthYear={formatMonthYear}
+            prevLabel={tCommon('calendar.prev')}
+            nextLabel={tCommon('calendar.next')}
+            triggerLabel={
+              filters.dateTo
+                ? formatDate(filters.dateTo, locale)
+                : tCommon('common.date.placeholder')
+            }
+            {...(filters.dateFrom ? { minDate: filters.dateFrom } : {})}
+          />
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClearFilters}
+          disabled={!hasActiveFilter}
+          className={styles.clear}
         >
-          <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={handlePrevPage}>
+          {t('audit_log.filter.clear')}
+        </Button>
+      </div>
+
+      <div className={styles.results} aria-busy={isRefreshing}>
+        {data.entries.length === 0 ? (
+          <EmptyState
+            titleAs="p"
+            title={t(hasActiveFilter ? 'audit_log.empty_filtered' : 'audit_log.empty')}
+            className={ui.empty}
+          />
+        ) : (
+          <div className={ui.tableWrap}>
+            <table className={ui.table}>
+              <thead>
+                <tr>
+                  <th>{t('audit_log.column.timestamp')}</th>
+                  <th>{t('audit_log.column.action')}</th>
+                  <th>{t('audit_log.column.actor')}</th>
+                  <th>{t('audit_log.column.resource_type')}</th>
+                  <th>{t('audit_log.column.resource_id')}</th>
+                  <th>{t('audit_log.column.metadata')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.entries.map((entry) => (
+                  <AuditRow key={entry.publicId} entry={entry} locale={locale} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {data.total > PAGE_SIZE ? (
+        <nav aria-label={t('audit_log.pagination.label')} className={styles.pagination}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage === 0 || isRefreshing}
+            onClick={handlePrevPage}
+          >
             {t('audit_log.pagination.prev')}
           </Button>
-          <span
-            style={{ fontSize: 'var(--nf-text-supporting)', color: 'var(--nf-color-fg-muted)' }}
-          >
+          <span className={styles.pageOf}>
             {t('audit_log.pagination.page_of', {
               current: currentPage + 1,
               total: totalPages,
@@ -642,7 +509,7 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
           <Button
             variant="ghost"
             size="sm"
-            disabled={currentPage >= totalPages - 1}
+            disabled={currentPage >= totalPages - 1 || isRefreshing}
             onClick={handleNextPage}
           >
             {t('audit_log.pagination.next')}

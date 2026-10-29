@@ -11,10 +11,14 @@
  * - Zoom: day / week / month presets + step zoom in/out
  * - Critical path: longest dependency chain highlighted in red
  * - Dependency arrows: blocks edges with arrowheads
+ *
+ * The timescale and the bar body are separate SVGs inside one scroll
+ * container, so the timescale stays pinned while long lists scroll.
  */
 
 import type { components } from '@nodate-flow/sdk';
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { ToggleChip } from '@nodate-flow/ui/primitives/toggle-chip';
@@ -28,6 +32,7 @@ import { useProjectDependenciesQuery } from '../features/projects/api';
 import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { apiRequest } from '../lib/api';
+import styles from './_authenticated.workspaces.$id.projects.$projectId.gantt.module.css';
 
 type TaskListItem = components['schemas']['TaskListItem'];
 
@@ -192,20 +197,33 @@ function zoomPresetFromIndex(idx: number): ZoomPreset | undefined {
   return undefined;
 }
 
+function GanttSkeleton(): ReactElement {
+  return (
+    <div className={styles.root} aria-busy="true">
+      <div className={styles.toolbar}>
+        <Skeleton className={styles.skeletonTitle} />
+        <Skeleton className={styles.skeletonControls} />
+      </div>
+      <Skeleton className={styles.skeletonChart} />
+    </div>
+  );
+}
+
 function GanttRoute(): ReactElement {
   return (
-    // nf-token-override: placeholder sized to the content it stands in for, not a spacing step
-    <Suspense fallback={<Skeleton style={{ blockSize: '20rem', inlineSize: '100%' }} />}>
+    <Suspense fallback={<GanttSkeleton />}>
       <GanttView />
     </Suspense>
   );
 }
 
 function GanttView(): ReactElement {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const { projectId } = routeApi.useParams();
   const navigate = useNavigate();
   const [offsetDays, setOffsetDays] = useState(0);
+  // Task whose label row or bar is under the pointer; both halves highlight together.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
   const [showCriticalPath, setShowCriticalPath] = useState(true);
 
@@ -290,7 +308,7 @@ function GanttView(): ReactElement {
   const viewportDays = Math.max(14, Math.round(960 / dayWidth));
   const visibleDays = Math.min(totalDays - offsetDays, viewportDays);
   const chartWidth = visibleDays * dayWidth;
-  const chartHeight = HEADER_HEIGHT + scheduled.length * (ROW_HEIGHT + ROW_GAP);
+  const bodyHeight = scheduled.length * (ROW_HEIGHT + ROW_GAP);
 
   const todayOffset = diffDays(viewStart, today);
   const showTodayLine = todayOffset >= 0 && todayOffset < visibleDays;
@@ -306,7 +324,7 @@ function GanttView(): ReactElement {
     scheduled.forEach(({ task, start, end }, idx) => {
       const startX = diffDays(viewStart, start) * dayWidth;
       const endX = (diffDays(viewStart, end) + 1) * dayWidth;
-      const y = HEADER_HEIGHT + idx * (ROW_HEIGHT + ROW_GAP) + (ROW_HEIGHT + ROW_GAP) / 2;
+      const y = idx * (ROW_HEIGHT + ROW_GAP) + (ROW_HEIGHT + ROW_GAP) / 2;
       map.set(task.id, { x1: startX, x2: endX, y });
     });
     return map;
@@ -381,6 +399,11 @@ function GanttView(): ReactElement {
   // boundary is in view, so users always have date context.
   const hasMonthBoundary = dayCells.some((c) => c.isMonthStart);
   const firstDayDate = dayCells[0]?.date ?? viewStart;
+  const monthFormat = new Intl.DateTimeFormat(i18n.resolvedLanguage ?? 'en', {
+    year: 'numeric',
+    month: 'short',
+  });
+  const todayX = todayOffset * dayWidth + dayWidth / 2;
 
   const goPrev = (): void => {
     setOffsetDays((o) => Math.max(0, o - 7));
@@ -393,40 +416,23 @@ function GanttView(): ReactElement {
     setOffsetDays(Math.max(0, Math.min(Math.max(0, totalDays - visibleDays), t0)));
   };
 
+  const openTask = (taskId: string): void => {
+    void navigate({ to: '/tasks/$taskId', params: { taskId } });
+  };
+
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <style>{`
-        .gantt-label-row:hover { background: var(--nf-color-bg-sunken); }
-        .gantt-label-row:focus-visible { outline: 2px solid var(--nf-color-accent); outline-offset: -2px; }
-      `}</style>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--nf-space-3)',
-          flexWrap: 'wrap',
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)', fontWeight: 600 }}>
-          {t('gantt.title')}
-        </h2>
-        <div
-          style={{
-            display: 'flex',
-            gap: 'var(--nf-space-2)',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          {/* Navigation */}
-          <div style={{ display: 'flex', gap: 'var(--nf-space-1)', alignItems: 'center' }}>
+    <section className={styles.root}>
+      <header className={styles.toolbar}>
+        <h2 className={styles.title}>{t('gantt.title')}</h2>
+        <div className={styles.controls}>
+          <div className={styles.group}>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               aria-label={t('gantt.prev')}
               onClick={goPrev}
+              disabled={offsetDays === 0}
             >
               <ChevronLeft size={16} aria-hidden />
             </Button>
@@ -439,21 +445,13 @@ function GanttView(): ReactElement {
               size="sm"
               aria-label={t('gantt.next')}
               onClick={goNext}
+              disabled={offsetDays >= Math.max(0, totalDays - visibleDays)}
             >
               <ChevronRight size={16} aria-hidden />
             </Button>
           </div>
 
-          {/* Zoom controls */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 'var(--nf-space-0-5)',
-              alignItems: 'center',
-              borderInlineStart: '1px solid var(--nf-color-border)',
-              paddingInlineStart: 'var(--nf-space-2)',
-            }}
-          >
+          <div className={styles.group}>
             <Button
               type="button"
               variant="ghost"
@@ -465,19 +463,14 @@ function GanttView(): ReactElement {
               <Minus size={14} aria-hidden />
             </Button>
             {/*
-             * View selector: Month / Week / Day as a segmented control.
-             * Delegates to the shared `SegmentedControl` primitive which
-             * implements the WAI-ARIA APG radiogroup pattern (roving
-             * tabindex, arrow / Home / End nav, space / enter activation).
-             * When the current zoom index doesn't match any preset (the
-             * user has stepped in/out) the control renders with no segment
-             * selected, which the primitive handles by parking roving
-             * focus on the first enabled option.
+             * View selector: Month / Week / Day as a segmented control
+             * (WAI-ARIA radiogroup). After a step zoom no segment is
+             * selected, so every preset stays clickable.
              */}
             <SegmentedControl<ZoomPreset>
               ariaLabel={t('gantt.zoom_preset_aria')}
               size="sm"
-              value={zoomPresetFromIndex(zoomIdx) ?? 'week'}
+              value={zoomPresetFromIndex(zoomIdx) ?? null}
               onChange={(next) => setZoomIdx(ZOOM_PRESET_INDEX[next])}
               options={[
                 { value: 'month', label: t('gantt.zoom_month') },
@@ -498,14 +491,7 @@ function GanttView(): ReactElement {
           </div>
 
           {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              borderInlineStart: '1px solid var(--nf-color-border)',
-              paddingInlineStart: 'var(--nf-space-2)',
-            }}
-          >
+          <div className={styles.group}>
             <ToggleChip
               pressed={showCriticalPath}
               onPressedChange={setShowCriticalPath}
@@ -518,363 +504,303 @@ function GanttView(): ReactElement {
       </header>
 
       {scheduled.length === 0 ? (
-        <div
-          style={{
-            padding: 'var(--nf-space-12) var(--nf-space-4)',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-muted)',
-            border: '1px dashed var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-lg)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          {t('gantt.empty')}
-        </div>
+        <EmptyState titleAs="p" title={t('gantt.empty')} />
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `${LABEL_WIDTH}px minmax(0, 1fr)`,
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-md)',
-            overflow: 'hidden',
-            background: 'var(--nf-color-surface)',
-          }}
-        >
-          {/* Label column */}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll region must be keyboard-scrollable
+        <section className={styles.scroller} aria-label={t('gantt.title')} tabIndex={0}>
           <div
-            style={{
-              borderInlineEnd: '1px solid var(--nf-color-border)',
-            }}
+            className={styles.canvas}
+            style={{ gridTemplateColumns: `${LABEL_WIDTH}px ${chartWidth}px` }}
           >
-            <div
-              style={{
-                blockSize: HEADER_HEIGHT,
-                borderBlockEnd: '1px solid var(--nf-color-border)',
-              }}
-            />
-            {scheduled.map(({ task }) => (
-              <Link
-                key={task.id}
-                to="/tasks/$taskId"
-                params={{ taskId: task.id }}
-                title={task.title}
-                className="gantt-label-row"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--nf-space-2)',
-                  inlineSize: '100%',
-                  blockSize: ROW_HEIGHT + ROW_GAP,
-                  paddingInline: 'var(--nf-space-2-5)',
-                  textAlign: 'start',
-                  color: 'inherit',
-                  textDecoration: 'none',
-                  overflow: 'hidden',
-                }}
+            <div className={styles.corner} style={{ blockSize: HEADER_HEIGHT }} />
+
+            <div className={styles.timescale}>
+              <svg
+                key={zoomIdx}
+                aria-hidden
+                className={styles.layer}
+                width={chartWidth}
+                height={HEADER_HEIGHT}
               >
-                <span
-                  aria-hidden
-                  style={{
-                    // nf-token-override: component dimension, not a spacing step
-                    inlineSize: '0.5rem',
-                    // nf-token-override: component dimension, not a spacing step
-                    blockSize: '0.5rem',
-                    borderRadius: 'var(--nf-radius-pill)',
-                    background:
-                      STATE_COLOR[task.derivedState as TaskDerivedState] ??
-                      'var(--nf-color-fg-muted)',
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontSize: 'var(--nf-text-supporting)',
-                  }}
-                >
-                  {task.title}
-                </span>
-              </Link>
-            ))}
-          </div>
-
-          {/* Chart column */}
-          <div style={{ overflowX: 'auto' }}>
-            <svg
-              role="img"
-              aria-label={t('gantt.title')}
-              width={chartWidth}
-              height={chartHeight}
-              style={{ display: 'block' }}
-            >
-              <title>{t('gantt.title')}</title>
-              <defs>
-                <marker
-                  id="gantt-arrow-open"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="4"
-                  markerHeight="4"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill={CRITICAL_PATH_COLOR} />
-                </marker>
-                <marker
-                  id="gantt-arrow-done"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="4"
-                  markerHeight="4"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-fg-muted)" />
-                </marker>
-              </defs>
-              {/* Day grid + weekend shading */}
-              {dayCells.map((c) => (
-                <g key={c.date.toISOString()}>
-                  {c.isWeekend ? (
-                    <rect
-                      x={c.x}
-                      y={HEADER_HEIGHT}
-                      width={dayWidth}
-                      height={chartHeight - HEADER_HEIGHT}
-                      fill="var(--nf-color-bg-sunken)"
-                    />
-                  ) : null}
-                  <line
-                    x1={c.x}
-                    y1={HEADER_HEIGHT}
-                    x2={c.x}
-                    y2={chartHeight}
-                    stroke="var(--nf-color-hairline)"
-                    strokeWidth={c.isMonthStart ? 1.5 : 0.5}
-                  />
-                  {showDayLabel ? (
-                    <text
-                      x={c.x + dayWidth / 2}
-                      y={HEADER_HEIGHT - 6}
-                      textAnchor="middle"
-                      fontSize="10"
-                      fill="var(--nf-color-fg-muted)"
-                    >
-                      {c.date.getDate()}
-                    </text>
-                  ) : null}
-                  {c.isMonthStart ? (
-                    <text
-                      x={c.x + 4}
-                      y={14}
-                      fontSize="10"
-                      fontWeight="600"
-                      fill="var(--nf-color-fg)"
-                    >
-                      {`${c.date.getFullYear()}/${c.date.getMonth() + 1}`}
-                    </text>
-                  ) : null}
-                </g>
-              ))}
-
-              {/* Fallback month label when no boundary is in view */}
-              {!hasMonthBoundary ? (
-                <text x={4} y={14} fontSize="10" fontWeight="600" fill="var(--nf-color-fg)">
-                  {`${firstDayDate.getFullYear()}/${firstDayDate.getMonth() + 1}`}
-                </text>
-              ) : null}
-
-              {/* Today vertical line */}
-              {showTodayLine ? (
-                <line
-                  x1={todayOffset * dayWidth + dayWidth / 2}
-                  y1={HEADER_HEIGHT}
-                  x2={todayOffset * dayWidth + dayWidth / 2}
-                  y2={chartHeight}
-                  stroke="var(--nf-color-accent)"
-                  strokeWidth={1.5}
-                  strokeDasharray="3 3"
-                />
-              ) : null}
-
-              {/* Dependency arrows (drawn before bars so they sit behind them) */}
-              {dependencyArrows.map((arrow) => (
-                <path
-                  key={arrow.id}
-                  d={arrow.path}
-                  fill="none"
-                  stroke={
-                    arrow.critical
-                      ? CRITICAL_PATH_COLOR
-                      : arrow.danger
-                        ? CRITICAL_PATH_COLOR
-                        : 'var(--nf-color-fg-muted)'
-                  }
-                  strokeWidth={arrow.critical ? 1.5 : 0.75}
-                  strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
-                  markerEnd={
-                    arrow.danger || arrow.critical
-                      ? 'url(#gantt-arrow-open)'
-                      : 'url(#gantt-arrow-done)'
-                  }
-                  opacity={arrow.critical ? 1 : arrow.danger ? 0.9 : 0.55}
-                />
-              ))}
-
-              {/* Bars (drawn after arrows so they sit on top) */}
-              {scheduled.map(({ task, start, end }, idx) => {
-                const startX = diffDays(viewStart, start) * dayWidth;
-                const endX = (diffDays(viewStart, end) + 1) * dayWidth;
-                const visStart = Math.max(0, startX);
-                const visEnd = Math.min(chartWidth, endX);
-                if (visEnd <= 0 || visStart >= chartWidth) return null;
-                const w = Math.max(2, visEnd - visStart);
-                const y =
-                  HEADER_HEIGHT +
-                  idx * (ROW_HEIGHT + ROW_GAP) +
-                  (ROW_HEIGHT + ROW_GAP - BAR_HEIGHT) / 2;
-                const fill =
-                  STATE_COLOR[task.derivedState as TaskDerivedState] ?? 'var(--nf-color-fg-muted)';
-                const isCritical = criticalPathIds.has(task.id);
-                return (
-                  // biome-ignore lint/a11y/useSemanticElements: SVG task bars cannot be native <button> elements; role="button" + tabIndex + keyboard handler is the correct interactive pattern inside the chart.
-                  <g
-                    key={task.id}
-                    role="button"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => {
-                      void navigate({
-                        to: '/tasks/$taskId',
-                        params: { taskId: task.id },
-                      });
-                    }}
-                    aria-label={task.title}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        void navigate({
-                          to: '/tasks/$taskId',
-                          params: { taskId: task.id },
-                        });
-                      }
-                    }}
-                  >
-                    {isCritical ? (
+                {dayCells.map((c) => (
+                  <g key={c.date.toISOString()}>
+                    {showDayLabel ? (
+                      <text
+                        x={c.x + dayWidth / 2}
+                        y={HEADER_HEIGHT - 6}
+                        textAnchor="middle"
+                        fontSize="10"
+                        className={styles.axisText}
+                      >
+                        {c.date.getDate()}
+                      </text>
+                    ) : null}
+                    {c.isMonthStart ? (
+                      <text x={c.x + 4} y={14} fontSize="10" className={styles.axisMonth}>
+                        {monthFormat.format(c.date)}
+                      </text>
+                    ) : null}
+                  </g>
+                ))}
+                {!hasMonthBoundary ? (
+                  <text x={4} y={14} fontSize="10" className={styles.axisMonth}>
+                    {monthFormat.format(firstDayDate)}
+                  </text>
+                ) : null}
+                {/* Today marker: a filled pill behind the day number, or a tick when days are too narrow to label. */}
+                {showTodayLine ? (
+                  showDayLabel ? (
+                    <g>
                       <rect
-                        x={visStart - 2}
-                        y={y - 2}
-                        width={w + 4}
-                        height={BAR_HEIGHT + 4}
-                        rx={6}
-                        ry={6}
-                        fill="none"
-                        stroke={CRITICAL_PATH_COLOR}
-                        strokeWidth={2}
-                        strokeDasharray="4 2"
-                        opacity={0.7}
+                        x={todayX - 9}
+                        y={HEADER_HEIGHT - 18}
+                        width={18}
+                        height={16}
+                        rx={8}
+                        className={styles.todayPill}
+                      />
+                      <text
+                        x={todayX}
+                        y={HEADER_HEIGHT - 6}
+                        textAnchor="middle"
+                        fontSize="10"
+                        className={styles.todayText}
+                      >
+                        {today.getDate()}
+                      </text>
+                    </g>
+                  ) : (
+                    <path
+                      d={`M ${todayX - 4} ${HEADER_HEIGHT - 6} L ${todayX + 4} ${HEADER_HEIGHT - 6} L ${todayX} ${HEADER_HEIGHT} z`}
+                      className={styles.todayPill}
+                    />
+                  )
+                ) : null}
+              </svg>
+            </div>
+
+            <div className={styles.labels}>
+              {scheduled.map(({ task }) => (
+                <Link
+                  key={task.id}
+                  to="/tasks/$taskId"
+                  params={{ taskId: task.id }}
+                  title={task.title}
+                  className={styles.labelRow}
+                  data-hovered={hoveredId === task.id || undefined}
+                  style={{ blockSize: ROW_HEIGHT + ROW_GAP }}
+                  onPointerEnter={() => setHoveredId(task.id)}
+                  onPointerLeave={() => setHoveredId(null)}
+                >
+                  <span
+                    aria-hidden
+                    className={styles.stateDot}
+                    style={{
+                      background:
+                        STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                        'var(--nf-color-fg-muted)',
+                    }}
+                  />
+                  <span className={styles.labelText}>{task.title}</span>
+                </Link>
+              ))}
+            </div>
+
+            <div>
+              {/* biome-ignore lint/a11y/useSemanticElements: an SVG cannot be a <fieldset>; the group labels the bar buttons it contains */}
+              <svg
+                key={zoomIdx}
+                role="group"
+                aria-label={t('gantt.title')}
+                className={styles.layer}
+                width={chartWidth}
+                height={bodyHeight}
+              >
+                <defs>
+                  <marker
+                    id="gantt-arrow-open"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="4"
+                    markerHeight="4"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill={CRITICAL_PATH_COLOR} />
+                  </marker>
+                  <marker
+                    id="gantt-arrow-done"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="4"
+                    markerHeight="4"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-fg-muted)" />
+                  </marker>
+                </defs>
+                {/* Day grid + weekend shading */}
+                {dayCells.map((c) => (
+                  <g key={c.date.toISOString()}>
+                    {c.isWeekend ? (
+                      <rect
+                        x={c.x}
+                        y={0}
+                        width={dayWidth}
+                        height={bodyHeight}
+                        fill="var(--nf-color-bg-sunken)"
                       />
                     ) : null}
-                    <rect
-                      x={visStart}
-                      y={y}
-                      width={w}
-                      height={BAR_HEIGHT}
-                      rx={3}
-                      ry={3}
-                      fill={fill}
-                      fillOpacity={task.derivedState === 'done' ? 0.5 : 0.85}
-                      stroke={fill}
-                      strokeWidth={1}
-                    >
-                      <title>{task.title}</title>
-                    </rect>
+                    <line
+                      x1={c.x}
+                      y1={0}
+                      x2={c.x}
+                      y2={bodyHeight}
+                      stroke="var(--nf-color-hairline)"
+                      strokeWidth={c.isMonthStart ? 1.5 : 0.5}
+                    />
                   </g>
-                );
-              })}
-            </svg>
+                ))}
+
+                {showTodayLine ? (
+                  <line
+                    x1={todayX}
+                    y1={0}
+                    x2={todayX}
+                    y2={bodyHeight}
+                    className={styles.todayLine}
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                  />
+                ) : null}
+
+                {/* Dependency arrows (drawn before bars so they sit behind them) */}
+                {dependencyArrows.map((arrow) => (
+                  <path
+                    key={arrow.id}
+                    d={arrow.path}
+                    fill="none"
+                    stroke={
+                      arrow.critical || arrow.danger
+                        ? CRITICAL_PATH_COLOR
+                        : 'var(--nf-color-fg-muted)'
+                    }
+                    strokeWidth={arrow.critical ? 1.5 : 0.75}
+                    strokeDasharray={arrow.danger || arrow.critical ? undefined : '3 3'}
+                    markerEnd={
+                      arrow.danger || arrow.critical
+                        ? 'url(#gantt-arrow-open)'
+                        : 'url(#gantt-arrow-done)'
+                    }
+                    opacity={arrow.critical ? 1 : arrow.danger ? 0.9 : 0.55}
+                  />
+                ))}
+
+                {/* Bars (drawn after arrows so they sit on top) */}
+                {scheduled.map(({ task, start, end }, idx) => {
+                  const startX = diffDays(viewStart, start) * dayWidth;
+                  const endX = (diffDays(viewStart, end) + 1) * dayWidth;
+                  const visStart = Math.max(0, startX);
+                  const visEnd = Math.min(chartWidth, endX);
+                  if (visEnd <= 0 || visStart >= chartWidth) return null;
+                  const w = Math.max(2, visEnd - visStart);
+                  const y = idx * (ROW_HEIGHT + ROW_GAP) + (ROW_HEIGHT + ROW_GAP - BAR_HEIGHT) / 2;
+                  const fill =
+                    STATE_COLOR[task.derivedState as TaskDerivedState] ??
+                    'var(--nf-color-fg-muted)';
+                  const isCritical = criticalPathIds.has(task.id);
+                  return (
+                    // biome-ignore lint/a11y/useSemanticElements: SVG task bars cannot be native <button> elements; role="button" + tabIndex + keyboard handler is the correct interactive pattern inside the chart.
+                    <g
+                      key={task.id}
+                      role="button"
+                      className={styles.bar}
+                      data-hovered={hoveredId === task.id || undefined}
+                      onClick={() => openTask(task.id)}
+                      onPointerEnter={() => setHoveredId(task.id)}
+                      onPointerLeave={() => setHoveredId(null)}
+                      aria-label={task.title}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openTask(task.id);
+                        }
+                      }}
+                    >
+                      {isCritical ? (
+                        <rect
+                          x={visStart - 2}
+                          y={y - 2}
+                          width={w + 4}
+                          height={BAR_HEIGHT + 4}
+                          rx={6}
+                          ry={6}
+                          fill="none"
+                          stroke={CRITICAL_PATH_COLOR}
+                          strokeWidth={2}
+                          strokeDasharray="4 2"
+                          opacity={0.7}
+                        />
+                      ) : null}
+                      <rect
+                        x={visStart}
+                        y={y}
+                        width={w}
+                        height={BAR_HEIGHT}
+                        rx={3}
+                        ry={3}
+                        fill={fill}
+                        className={styles.barFill}
+                        data-done={task.derivedState === 'done' || undefined}
+                        stroke={fill}
+                        strokeWidth={1}
+                      >
+                        <title>{task.title}</title>
+                      </rect>
+                      <rect
+                        x={visStart - 4}
+                        y={y - 4}
+                        width={w + 8}
+                        height={BAR_HEIGHT + 8}
+                        rx={7}
+                        ry={7}
+                        className={styles.barFocus}
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {unscheduled > 0 ? (
-        <details
-          style={{
-            alignSelf: 'stretch',
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-bg-sunken)',
-            padding: 'var(--nf-space-2) var(--nf-space-3)',
-          }}
-        >
-          <summary
-            style={{
-              cursor: 'pointer',
-              fontSize: 'var(--nf-text-supporting)',
-              color: 'var(--nf-color-fg-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-2)',
-            }}
-          >
+        <details className={styles.unscheduled}>
+          <summary className={styles.unscheduledSummary}>
             {t('gantt.unscheduled', { count: unscheduled })}
           </summary>
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              paddingBlockStart: 'var(--nf-space-2-5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-1)',
-            }}
-          >
+          <ul className={styles.unscheduledList}>
             {unscheduledTasks.map((task) => (
               <li key={task.id}>
                 <Link
                   to="/tasks/$taskId"
                   params={{ taskId: task.id }}
-                  style={{
-                    inlineSize: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--nf-space-2)',
-                    padding: 'var(--nf-space-1-5) var(--nf-space-2)',
-                    borderRadius: 'var(--nf-radius-sm)',
-                    color: 'var(--nf-color-fg)',
-                    fontSize: 'var(--nf-text-supporting)',
-                    textDecoration: 'none',
-                  }}
+                  className={styles.unscheduledLink}
+                  title={task.title}
                 >
                   <span
                     aria-hidden
+                    className={styles.stateDot}
                     style={{
-                      // nf-token-override: component dimension, not a spacing step
-                      inlineSize: '0.5rem',
-                      // nf-token-override: component dimension, not a spacing step
-                      blockSize: '0.5rem',
-                      borderRadius: 'var(--nf-radius-pill)',
                       background:
                         STATE_COLOR[task.derivedState as TaskDerivedState] ??
                         'var(--nf-color-fg-muted)',
-                      flexShrink: 0,
                     }}
                   />
-                  <span
-                    style={{
-                      flex: 1,
-                      minInlineSize: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {task.title}
-                  </span>
+                  <span className={styles.labelText}>{task.title}</span>
                 </Link>
               </li>
             ))}

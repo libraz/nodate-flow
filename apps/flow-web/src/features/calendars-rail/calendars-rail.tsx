@@ -27,10 +27,14 @@
  * and removes one layer of mounted chrome from the route.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Drawer from '@nodate-flow/ui/primitives/drawer';
 import Popover from '@nodate-flow/ui/primitives/popover';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
@@ -38,6 +42,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../lib/api';
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import CalendarMemosPanel from '../calendar-memos/calendar-memos-panel';
 import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
@@ -97,12 +102,14 @@ export default function CalendarsRail({
     <aside aria-label={t('calendars_rail.title')} className={styles.rail}>
       <h2 className={styles.title}>{t('calendars_rail.title')}</h2>
       {workspaces.map((ws, idx) => {
-        const calendars = calendarQueries[idx]?.data ?? [];
+        const query = calendarQueries[idx];
+        const calendars = query?.data ?? [];
         return (
           <CalendarsSection
             key={ws.id}
             workspace={ws}
             calendars={calendars}
+            loading={query?.isPending ?? false}
             selfUserId={selfUserId}
             showHeader={showHeaders}
           />
@@ -115,6 +122,8 @@ export default function CalendarsRail({
 interface CalendarsSectionProps {
   workspace: { id: string; name: string; country?: string };
   calendars: RailCalendar[];
+  /** True until the section's first answer arrives; drawn as placeholder rows, not as empty. */
+  loading: boolean;
   selfUserId: string;
   showHeader: boolean;
 }
@@ -135,25 +144,32 @@ type SectionMode = 'list' | 'discover';
 function CalendarsSection({
   workspace,
   calendars,
+  loading,
   selfUserId,
   showHeader,
 }: CalendarsSectionProps): ReactElement {
   const { t } = useTranslation('common');
   const [mode, setMode] = useState<SectionMode>('list');
+  // The first paint is not a swap; only a return from discover fades in.
+  const [swapped, setSwapped] = useState(false);
 
   const sortedCalendars = [...calendars].sort(
     (a, b) => a.subscriptionSortWeight - b.subscriptionSortWeight,
   );
+  const { entries, onExited } = usePresenceList(sortedCalendars, (cal) => cal.id);
 
   if (mode === 'discover') {
     const titleId = `calendars-rail-discover-title-${workspace.id}`;
     return (
-      <section className={styles.section} aria-labelledby={titleId}>
+      <section key="discover" className={styles.section} aria-labelledby={titleId}>
         <header className={styles.sectionHeaderDiscover}>
           <button
             type="button"
             className={styles.backButton}
-            onClick={() => setMode('list')}
+            onClick={() => {
+              setMode('list');
+              setSwapped(true);
+            }}
             aria-label={t('calendars_rail.title')}
           >
             <ChevronLeft size={16} aria-hidden />
@@ -162,25 +178,46 @@ function CalendarsSection({
             {t('calendars_rail.discover.title')}
           </h3>
         </header>
-        <DiscoverList workspaceId={workspace.id} onClose={() => setMode('list')} />
+        <DiscoverList
+          workspaceId={workspace.id}
+          onClose={() => {
+            setMode('list');
+            setSwapped(true);
+          }}
+        />
       </section>
     );
   }
 
   return (
-    <section className={styles.section}>
+    <section
+      key="list"
+      className={`${styles.section}${swapped ? ` ${styles['section--swapped']}` : ''}`}
+    >
       {showHeader ? <h3 className={styles.sectionHeader}>{workspace.name}</h3> : null}
-      {sortedCalendars.length === 0 ? (
+      {loading ? (
+        <div className={styles.rowSkeletons} aria-busy="true">
+          <Skeleton className={styles.rowSkeleton} />
+          <Skeleton className={styles.rowSkeleton} />
+        </div>
+      ) : entries.length === 0 ? (
         <p className={styles.empty}>{t('calendars_rail.discover.empty')}</p>
       ) : (
         <ul className={styles.list}>
-          {sortedCalendars.map((cal) => (
-            <CalendarRow
-              key={cal.id}
-              workspaceId={workspace.id}
-              calendar={cal}
-              selfUserId={selfUserId}
-            />
+          {entries.map((entry) => (
+            <PresenceItem
+              key={entry.key}
+              as="li"
+              present={entry.present}
+              onExited={() => onExited(entry.key)}
+              className={motion.enter}
+            >
+              <CalendarRow
+                workspaceId={workspace.id}
+                calendar={entry.item}
+                selfUserId={selfUserId}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}
@@ -242,8 +279,16 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
     );
   };
 
-  const handleLeave = (): void => {
+  const handleLeave = async (): Promise<void> => {
     setMenuOpen(false);
+    // Leaving drops the actor's membership; only a manager can add them back.
+    const ok = await confirmAction({
+      title: t('calendars_rail.leave_confirm.title'),
+      message: t('calendars_rail.leave_confirm.message', { name: calendar.name }),
+      tone: 'danger',
+      confirmLabel: t('calendars_rail.actions.leave'),
+    });
+    if (!ok) return;
     leaveCal.mutate(
       { wsId: workspaceId, calId: calendar.id, userId: selfUserId },
       {
@@ -307,7 +352,9 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
             type="button"
             role="menuitem"
             className={`${styles.menuItem} ${styles['menuItem--danger']}`}
-            onClick={handleLeave}
+            onClick={() => {
+              void handleLeave();
+            }}
             disabled={pending}
           >
             {t('calendars_rail.actions.leave')}
@@ -318,8 +365,16 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
   );
 
   return (
-    <li className={`${styles.row}${calendar.visible ? '' : ` ${styles['row--hidden']}`}`}>
-      <span aria-hidden className={styles.dot} style={{ background: calendar.displayColor }} />
+    <div className={`${styles.row}${calendar.visible ? '' : ` ${styles['row--hidden']}`}`}>
+      <span
+        aria-hidden
+        className={styles.dot}
+        style={
+          calendar.visible
+            ? { background: calendar.displayColor, borderColor: calendar.displayColor }
+            : { background: 'transparent', borderColor: calendar.displayColor }
+        }
+      />
       <span className={styles.name} title={calendar.name}>
         {calendar.name}
       </span>
@@ -351,7 +406,9 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           </button>
         </Popover>
       </span>
-      {settingsOpen ? (
+      {/* Mounted whether open or not, so closing plays the drawer's exit
+          instead of cutting it; a closed drawer renders nothing. */}
+      {isManager ? (
         <CalendarSettingsDrawer
           workspaceId={workspaceId}
           calendarId={calendar.id}
@@ -359,16 +416,14 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
           onClose={() => setSettingsOpen(false)}
         />
       ) : null}
-      {memosOpen ? (
-        <Drawer
-          open={memosOpen}
-          onClose={() => setMemosOpen(false)}
-          title={`${t('calendar.memos.title')} — ${calendar.name}`}
-          side="inline-end"
-        >
-          <CalendarMemosPanel workspaceId={workspaceId} calendarId={calendar.id} />
-        </Drawer>
-      ) : null}
-    </li>
+      <Drawer
+        open={memosOpen}
+        onClose={() => setMemosOpen(false)}
+        title={`${t('calendar.memos.title')} — ${calendar.name}`}
+        side="inline-end"
+      >
+        <CalendarMemosPanel workspaceId={workspaceId} calendarId={calendar.id} />
+      </Drawer>
+    </div>
   );
 }

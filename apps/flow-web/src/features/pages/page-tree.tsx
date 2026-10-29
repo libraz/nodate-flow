@@ -6,9 +6,14 @@
  * page is highlighted. A "New page" button sits at the bottom.
  */
 
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Link } from '@tanstack/react-router';
-import { ChevronDown, ChevronRight, FileText, Plus } from 'lucide-react';
+import { ChevronRight, FileText, Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,15 +40,30 @@ function ChildTreeContent({
   activePageId: string | undefined;
 }): ReactElement | null {
   const { data: children } = useChildPagesQuery(workspaceId, parentId);
-  if (children.length === 0) return null;
+  const presence = usePresenceList(children, (child) => child.id);
+  if (presence.entries.length === 0) return null;
   return (
     <ul className={styles.treeChildren}>
-      {children.map((child) => (
-        <li key={child.id}>
-          <TreeNode page={child} workspaceId={workspaceId} activePageId={activePageId} />
-        </li>
+      {presence.entries.map((entry) => (
+        <PresenceItem
+          key={entry.key}
+          as="li"
+          present={entry.present}
+          onExited={() => presence.onExited(entry.key)}
+        >
+          <TreeNode page={entry.item} workspaceId={workspaceId} activePageId={activePageId} />
+        </PresenceItem>
       ))}
     </ul>
+  );
+}
+
+function ChildTreeFallback(): ReactElement {
+  return (
+    <div className={styles.treeChildren} aria-hidden="true">
+      <Skeleton className={styles.treeSkeletonRow} />
+      <Skeleton className={styles.treeSkeletonRow} />
+    </div>
   );
 }
 
@@ -66,31 +86,28 @@ function TreeNode({ page, workspaceId, activePageId }: ChildTreeNodeProps): Reac
           aria-label={expanded ? t('tree.collapse') : t('tree.expand')}
           aria-expanded={expanded}
         >
-          {expanded ? (
-            <ChevronDown size={14} aria-hidden />
-          ) : (
-            <ChevronRight size={14} aria-hidden />
-          )}
+          <ChevronRight size={14} aria-hidden className={styles.treeChevron} />
         </button>
-        <FileText size={14} aria-hidden style={{ flexShrink: 0 }} />
+        <FileText size={14} aria-hidden className={styles.treeIcon} />
         <Link
           to="/pages/$pageId"
           params={{ pageId: page.id }}
           className={styles.treeItemLabel}
-          style={{ color: 'inherit', textDecoration: 'none' }}
+          aria-current={isActive ? 'page' : undefined}
+          title={page.title}
         >
           {page.title}
         </Link>
       </div>
-      {expanded && (
-        <Suspense fallback={null}>
+      <Collapse open={expanded}>
+        <Suspense fallback={<ChildTreeFallback />}>
           <ChildTreeContent
             parentId={page.id}
             workspaceId={workspaceId}
             activePageId={activePageId}
           />
         </Suspense>
-      )}
+      </Collapse>
     </>
   );
 }
@@ -112,6 +129,7 @@ export default function PageTree({
 }: PageTreeProps): ReactElement {
   const { t } = useTranslation('pages');
   const { data: pages } = usePagesQuery(workspaceId);
+  const presence = usePresenceList(pages, (page) => page.id);
 
   return (
     <div className={styles.treeSidebar}>
@@ -128,17 +146,19 @@ export default function PageTree({
         </Button>
       </div>
 
-      {pages.length === 0 ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>{t('empty')}</p>
-          <p className={styles.emptyDescription}>{t('empty_description')}</p>
-        </div>
+      {presence.entries.length === 0 ? (
+        <EmptyState titleAs="p" title={t('empty')} description={t('empty_description')} />
       ) : (
         <ul className={styles.treeList}>
-          {pages.map((page) => (
-            <li key={page.id}>
-              <TreeNode page={page} workspaceId={workspaceId} activePageId={activePageId} />
-            </li>
+          {presence.entries.map((entry) => (
+            <PresenceItem
+              key={entry.key}
+              as="li"
+              present={entry.present}
+              onExited={() => presence.onExited(entry.key)}
+            >
+              <TreeNode page={entry.item} workspaceId={workspaceId} activePageId={activePageId} />
+            </PresenceItem>
           ))}
         </ul>
       )}

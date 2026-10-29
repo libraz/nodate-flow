@@ -9,9 +9,12 @@
  */
 
 import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Card from '@nodate-flow/ui/primitives/card';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Day, type Zone } from '@nodate-flow/ui/time';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
@@ -38,6 +41,7 @@ import { useWorkspaceStream } from '../realtime/use-workspace-stream';
 import { type TaskReminder, useRemindersQuery } from '../reminders/api';
 import type { TaskDerivedState, TaskPriority } from '../tasks/api';
 import { setTaskFilters } from '../tasks/use-task-filters';
+import styles from './glass-dock.module.css';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
 
@@ -308,10 +312,12 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
 
 function GlassDockSuggestionRow({
   suggestion,
+  disabled,
   onApply,
   onDismiss,
 }: {
   suggestion: AiSuggestion;
+  disabled: boolean;
   onApply: (inboxItemId: string) => void;
   onDismiss: (inboxItemId: string) => void;
 }): ReactElement {
@@ -323,9 +329,9 @@ function GlassDockSuggestionRow({
     onDismiss(suggestion.inboxItemId);
   };
   return (
-    <Card style={{ padding: 'var(--nf-space-2-5) var(--nf-space-3)' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+    <Card className={styles.suggestionCard}>
+      <div className={styles.suggestionBody}>
+        <div className={styles.suggestionMeta}>
           <Badge
             tone={
               suggestion.score >= 0.8 ? 'danger' : suggestion.score >= 0.5 ? 'warning' : 'neutral'
@@ -333,31 +339,11 @@ function GlassDockSuggestionRow({
           >
             {confidenceLabel(suggestion.score, t)}
           </Badge>
-          <span
-            style={{
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {suggestion.recommendedAction}
-          </span>
+          <span className={styles.suggestionAction}>{suggestion.recommendedAction}</span>
         </div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-supporting)',
-            color: 'var(--nf-color-fg)',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            // biome-ignore lint/style/useNamingConvention: vendor-prefixed CSS props
-            WebkitLineClamp: 2,
-            // biome-ignore lint/style/useNamingConvention: vendor-prefixed CSS props
-            WebkitBoxOrient: 'vertical',
-          }}
-        >
-          {suggestion.reasoning}
-        </p>
+        <p className={styles.suggestionReasoning}>{suggestion.reasoning}</p>
         <SuggestionActions
+          disabled={disabled}
           onApply={handleApply}
           onDismiss={handleDismiss}
           onEdit={() => {
@@ -598,12 +584,23 @@ function GlassDockImpl(): ReactElement {
   useWorkspaceStream(workspaceId);
   const { data, isError: suggestionsFailed } = useAiSuggestionsQuery(workspaceId);
   const suggestions: AiSuggestion[] = data ?? [];
+  // A resolved row stays mounted for its exit; the empty state waits for it.
+  const suggestionPresence = usePresenceList(suggestions, (s) => s.inboxItemId);
   const applyMutation = useApplyAiSuggestion(workspaceId ?? '');
   const dismissMutation = useDismissAiSuggestion(workspaceId ?? '');
+  const pendingInboxItemId = applyMutation.isPending
+    ? applyMutation.variables
+    : dismissMutation.isPending
+      ? dismissMutation.variables
+      : undefined;
 
   useFocusTrap(panelRef, open);
 
+  // Set when the panel closes so the pill that replaces it takes focus back.
+  const restoreFocusRef = useRef(false);
+
   const handleToggle = (): void => {
+    restoreFocusRef.current = open;
     setOpen((prev) => !prev);
   };
 
@@ -631,35 +628,31 @@ function GlassDockImpl(): ReactElement {
     });
   };
 
+  const countBadge =
+    suggestions.length > 0 ? (
+      <span key={suggestions.length} className={styles.count}>
+        <Badge tone="accent">{suggestions.length}</Badge>
+      </span>
+    ) : null;
+
   if (!open) {
     return (
       <button
+        ref={(el) => {
+          if (el && restoreFocusRef.current) {
+            restoreFocusRef.current = false;
+            el.focus();
+          }
+        }}
         type="button"
         onClick={handleToggle}
         aria-expanded={false}
         aria-label={t('glass_dock.expand')}
-        style={{
-          position: 'fixed',
-          insetBlockEnd: 'var(--nf-space-4)',
-          insetInlineEnd: 'var(--nf-space-4)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-2)',
-          padding: 'var(--nf-space-2-5) var(--nf-space-3-5)',
-          borderRadius: 'var(--nf-radius-pill)',
-          background: 'var(--nf-color-surface)',
-          border: '1px solid var(--nf-color-border)',
-          color: 'var(--nf-color-fg)',
-          boxShadow: 'var(--nf-shadow-lg)',
-          cursor: 'pointer',
-          zIndex: 50,
-        }}
+        className={cx(styles.pill, 'nf-focus-ring')}
       >
         <Icon icon={Sparkles} decorative />
-        <span style={{ fontSize: 'var(--nf-text-supporting)', fontWeight: 600 }}>
-          {t('glass_dock.title')}
-        </span>
-        {suggestions.length > 0 ? <Badge tone="accent">{suggestions.length}</Badge> : null}
+        <span className={styles.pillLabel}>{t('glass_dock.title')}</span>
+        {countBadge}
       </button>
     );
   }
@@ -669,107 +662,62 @@ function GlassDockImpl(): ReactElement {
       ref={panelRef}
       role="region"
       aria-label={t('glass_dock.title')}
-      style={{
-        position: 'fixed',
-        insetBlockEnd: 'var(--nf-space-4)',
-        insetInlineEnd: 'var(--nf-space-4)',
-        // nf-token-override: component dimension, not a spacing step
-        inlineSize: '360px',
-        maxBlockSize: '70vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--nf-color-bg-elevated)',
-        border: '1px solid var(--nf-color-border)',
-        borderRadius: 'var(--nf-radius-lg)',
-        boxShadow: 'var(--nf-shadow-lg)',
-        zIndex: 50,
+      className={styles.panel}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          restoreFocusRef.current = true;
+          setOpen(false);
+        }
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 'var(--nf-space-3) var(--nf-space-3-5)',
-          borderBlockEnd: '1px solid var(--nf-color-border)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+      <div className={styles.header}>
+        <div className={styles.headerTitle}>
           <Icon icon={Sparkles} decorative />
-          <strong style={{ fontSize: 'var(--nf-text-sm)' }}>{t('glass_dock.title')}</strong>
-          {suggestions.length > 0 ? <Badge tone="accent">{suggestions.length}</Badge> : null}
+          <strong>{t('glass_dock.title')}</strong>
+          {countBadge}
         </div>
         <button
           type="button"
           onClick={handleToggle}
           aria-expanded={true}
           aria-label={t('glass_dock.collapse')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // nf-token-override: component dimension, not a spacing step
-            inlineSize: '1.75rem',
-            // nf-token-override: component dimension, not a spacing step
-            blockSize: '1.75rem',
-            borderRadius: 'var(--nf-radius-sm)',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--nf-color-fg)',
-            cursor: 'pointer',
-          }}
+          className={cx(styles.close, 'nf-focus-ring')}
         >
           <Icon icon={X} decorative />
         </button>
       </div>
-      <NlQueryPanel workspaceId={workspaceId} />
-      <AutoActionsPanel workspaceId={workspaceId} />
-      <RemindersPanel workspaceId={workspaceId} />
-      <StateSuggestionsPanel workspaceId={workspaceId} />
-      <div
-        style={{
-          overflow: 'auto',
-          padding: 'var(--nf-space-3)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
-        {suggestionsFailed ? (
-          <p
-            role="status"
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-supporting)',
-              textAlign: 'center',
-              padding: 'var(--nf-space-4)',
-            }}
-          >
-            {tCommon('glass_dock.unavailable')}
-          </p>
-        ) : suggestions.length === 0 ? (
-          <p
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-supporting)',
-              textAlign: 'center',
-              padding: 'var(--nf-space-4)',
-            }}
-          >
-            {t('glass_dock.empty')}
-          </p>
-        ) : (
-          suggestions.map((suggestion) => (
-            <GlassDockSuggestionRow
-              key={suggestion.inboxItemId}
-              suggestion={suggestion}
-              onApply={handleApply}
-              onDismiss={handleDismiss}
-            />
-          ))
-        )}
+      <div className={styles.body}>
+        <NlQueryPanel workspaceId={workspaceId} />
+        <AutoActionsPanel workspaceId={workspaceId} />
+        <RemindersPanel workspaceId={workspaceId} />
+        <StateSuggestionsPanel workspaceId={workspaceId} />
+        <div className={styles.list}>
+          {suggestionsFailed ? (
+            <p key="unavailable" role="status" className={styles.message}>
+              {tCommon('glass_dock.unavailable')}
+            </p>
+          ) : suggestionPresence.entries.length === 0 ? (
+            <p key="empty" className={styles.message}>
+              {t('glass_dock.empty')}
+            </p>
+          ) : (
+            suggestionPresence.entries.map(({ key, item, present }) => (
+              <PresenceItem
+                key={key}
+                present={present}
+                onExited={() => suggestionPresence.onExited(key)}
+              >
+                <GlassDockSuggestionRow
+                  suggestion={item}
+                  disabled={pendingInboxItemId === item.inboxItemId}
+                  onApply={handleApply}
+                  onDismiss={handleDismiss}
+                />
+              </PresenceItem>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

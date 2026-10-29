@@ -8,6 +8,12 @@
  */
 
 .section {
+  /* Fills <main> below the top bar, so on desktop the month grid can take
+     whatever height the chrome above it leaves (see `.layoutFill`). A
+     minimum rather than a size: once the cells hit their floor the page
+     grows and <main> scrolls. */
+  box-sizing: border-box;
+  min-block-size: 100%;
   padding: var(--nf-space-page);
   display: flex;
   flex-direction: column;
@@ -52,14 +58,56 @@
 .monthLabel {
   margin: 0;
   font-size: var(--nf-text-lg);
+  font-variant-numeric: tabular-nums;
   /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 10rem;
+  overflow: hidden;
+}
+
+.monthLabel__text {
+  display: inline-block;
+}
+
+/* ───── period navigation ─────
+   A navigation mounts a fresh grid (and label) that enters from the side
+   it came from: the previous month from inline-start, the next from
+   inline-end. Short and ease-out, so it explains the move without
+   holding up the next click. */
+.slide--fromPrev {
+  animation: global(nf-slide-in-from-inline-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.slide--fromNext {
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .gridColumn {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-inline-size: 0;
+}
+
+/* Mounted only once a refetch has outlasted the route's delay. */
+.fetchBar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 1;
+  block-size: var(--nf-space-0-5);
+  overflow: hidden;
+  pointer-events: none;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.fetchBar[data-state="closed"] {
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.fetchBar__runner {
+  block-size: 100%;
+  background: linear-gradient(to right, transparent, var(--nf-color-accent), transparent);
+  animation: global(nf-shimmer) calc(var(--nf-duration-slow) * 6) var(--nf-ease-standard) infinite;
 }
 
 /**
@@ -78,6 +126,11 @@
   border: var(--nf-space-px) solid var(--nf-color-warning);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-warning-subtle);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.loadError[data-state="closed"] {
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .loadError__message {
@@ -112,28 +165,81 @@
 }
 
 .grid {
+  --cal-cell-min-block-size: 4.5rem;
+  /* Row height where the grid does not fill the page (narrow layouts):
+     fixed, so a cell never grows with what it holds. */
+  --cal-cell-fallback-block-size: 7rem;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: var(--cal-cell-fallback-block-size);
   gap: var(--nf-space-1);
 }
 
+/* ───── fill the viewport ─────
+   On desktop the layout takes the height the header and toolbar leave,
+   and the weeks share it: each row is at least the floor and otherwise an
+   equal share, whatever the cells hold. Below `lg` the rail stacks above
+   the grid and the fixed fallback rows apply. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (min-width: 1024px) {
+  .layoutFill {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .gridColumn {
+    align-self: stretch;
+    min-block-size: 0;
+  }
+
+  .grid {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    grid-template-rows: repeat(var(--cal-weeks, 6), minmax(var(--cal-cell-min-block-size), 1fr));
+  }
+}
+
+/* Two-column range: the invites panel wraps under the rail, so the grid
+   spans both rows rather than sharing its height with the panel's row.
+   The column is explicit: a definite row alone is placed first by grid
+   auto-placement and would take column 1 from the rail. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions. */
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .layoutFill {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .gridColumn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
 .cell {
-  /* nf-token-override: component dimension, not a spacing step */
-  min-block-size: clamp(7rem, 14vh, 11rem);
-  padding: var(--nf-space-2);
+  /* The cell is sized by its grid row, never by what it holds, so a
+     day's pills arriving cannot change the row height. The route measures
+     one cell's pill list and draws as many pill lines as fit, folding the
+     rest into the header's "+N more". */
+  --cal-pill-block-size: 1.0625rem;
+  --cal-cell-head-block-size: 1.25rem;
+  box-sizing: border-box;
+  min-block-size: 0;
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
   border-radius: var(--nf-radius-md);
   background: transparent;
   border: 1px solid transparent;
   opacity: 0.4;
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-1);
+  gap: var(--nf-space-0-5);
   overflow: hidden;
   cursor: default;
   transition:
-    background var(--nf-duration-fast),
-    border-color var(--nf-duration-fast),
-    outline-color var(--nf-duration-fast);
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .cell--inMonth {
@@ -144,8 +250,13 @@
 }
 
 .cell--inMonth:hover {
-  outline: 1px solid var(--nf-color-border);
-  outline-offset: -1px;
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
+}
+
+.cell--inMonth:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .cell--today {
@@ -171,8 +282,8 @@
   font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg-muted);
-  /* nf-token-override: component dimension, not a spacing step */
-  min-block-size: 1.25rem;
+  block-size: var(--cal-cell-head-block-size);
+  flex-shrink: 0;
 }
 
 .dateNumber {
@@ -220,13 +331,20 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  /* Takes what the header leaves; this is the box the pill budget is read from. */
+  flex: 1 1 auto;
+  min-block-size: 0;
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-px);
+  /* A removed pill collapses its share of the gap with it. */
+  --presence-gap: var(--nf-space-px);
   overflow: hidden;
 }
 
 .taskPill {
+  box-sizing: border-box;
+  block-size: var(--cal-pill-block-size);
   display: flex;
   align-items: center;
   gap: var(--nf-space-1);
@@ -240,6 +358,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: grab;
+  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.taskPill:hover {
+  background: var(--nf-color-surface-hover);
 }
 
 .taskPill__dot {
@@ -260,6 +383,7 @@
 .eventPill {
   all: unset;
   box-sizing: border-box;
+  block-size: var(--cal-pill-block-size);
   inline-size: 100%;
   display: flex;
   align-items: center;
@@ -271,6 +395,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  transition: filter var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+/* `all: unset` above drops the native focus ring, so both pill kinds
+   draw the shared one. */
+.taskPill:focus-visible,
+.eventPill:focus-visible,
+.morePill:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .eventPill__marker {
@@ -319,9 +453,27 @@
 }
 
 .morePill {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  align-items: center;
+  block-size: var(--cal-pill-block-size);
   font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg-muted);
   padding-inline: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.morePill:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
 }
 
 /* Every event pill is movable, repeating ones included — a repeating
@@ -332,7 +484,7 @@
 }
 
 .eventPill--draggable:hover {
-  box-shadow: inset 0 0 0 1px var(--nf-color-border);
+  filter: brightness(0.97) saturate(1.1);
 }
 
 /* ───── pointer drag ───── */
@@ -342,17 +494,18 @@
    the lifted state at the end of it, so the wait reads as the gesture
    working rather than as nothing happening. */
 .pill--holding {
-  transform: scale(0.97);
-  transition: transform var(--nf-duration-slow) var(--nf-ease-standard);
+  scale: var(--nf-motion-scale);
+  transition: scale var(--nf-duration-slow) var(--nf-ease-standard);
   cursor: grabbing;
 }
 
 /* The source keeps its place in the day while the moving copy is out —
-   dimmed to an outline, so the row does not reflow mid-gesture and the
-   day it came from stays readable. */
+   dimmed, so the row does not reflow mid-gesture and the day it came
+   from stays readable. */
 .pill--lifted {
   opacity: 0.35;
   cursor: grabbing;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 /* The moving copy. Physical viewport coordinates drive its transform, so
@@ -376,6 +529,14 @@
   white-space: nowrap;
   overflow: hidden;
   user-select: none;
+  /* Lifts off the grid rather than appearing: `scale` is its own
+     property, so it composes with the transform the gesture writes. */
+  animation: global(nf-scale-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* Released: the copy settles out where it was let go instead of vanishing. */
+.dragProxy[data-state="closed"] {
+  animation: global(nf-scale-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .dragProxy__marker {
@@ -436,13 +597,6 @@
 .mobileRailBar {
   display: flex;
   justify-content: flex-end;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pill--holding {
-    transition: none;
-    transform: none;
-  }
 }
 
 /* Tighter section padding on phones so the month-scroll gets more width. */

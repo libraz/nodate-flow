@@ -49,6 +49,7 @@ import {
 } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import {
+  type CSSProperties,
   type ReactElement,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -397,13 +398,14 @@ function WeekRow({
                   drag?.holdingKey === sourceKey && styles['pill--holding'],
                   drag?.drag?.sourceKey === sourceKey && styles['pill--lifted'],
                 )}
-                style={{
-                  insetInlineStart: insetStart,
-                  inlineSize: width,
-                  insetBlockStart: `${p.track * TRACK_REM}rem`,
-                  background: `color-mix(in oklch, ${markerColorForKind(p.event.kind)} 22%, transparent)`,
-                  borderInlineStartColor: markerColorForKind(p.event.kind),
-                }}
+                style={
+                  {
+                    insetInlineStart: insetStart,
+                    inlineSize: width,
+                    insetBlockStart: `${p.track * TRACK_REM}rem`,
+                    '--chip-hue': markerColorForKind(p.event.kind),
+                  } as CSSProperties
+                }
                 title={`${p.event.title} · ${p.event.workspaceName}`}
                 onPointerDown={(e) => {
                   drag?.pressSource(e, sourceKey, {
@@ -553,10 +555,7 @@ function WeekRow({
                         drag?.holdingKey === sourceKey && styles['pill--holding'],
                         drag?.drag?.sourceKey === sourceKey && styles['pill--lifted'],
                       )}
-                      style={{
-                        background: `color-mix(in oklch, ${markerColorForKind(evt.kind)} 18%, transparent)`,
-                        borderInlineStartColor: markerColorForKind(evt.kind),
-                      }}
+                      style={{ '--chip-hue': markerColorForKind(evt.kind) } as CSSProperties}
                       title={`${evt.title} · ${evt.workspaceName}`}
                       onPointerDown={(e) => {
                         drag?.pressSource(e, sourceKey, {

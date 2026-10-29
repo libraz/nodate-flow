@@ -1,0 +1,100 @@
+/* Reaction pills and the quick-pick grid. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1-5);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  padding-block: var(--nf-space-0-5);
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  background: transparent;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-xs);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.pill:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+}
+
+.pill:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
+}
+
+.pill:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.pill:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.pillMine {
+  border-color: var(--nf-color-accent);
+  background: var(--nf-color-accent-subtle);
+}
+
+.pillMine:hover:not(:disabled) {
+  background: var(--nf-color-accent-subtle);
+}
+
+.count {
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--nf-space-1);
+  padding: var(--nf-space-2);
+}
+
+.pickerItem {
+  padding: var(--nf-space-1-5);
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  font-size: var(--nf-text-lg);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.pickerItem:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+}
+
+.pickerItem:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
+}
+
+.pickerItem:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.pickerItem:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.addIcon {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+}

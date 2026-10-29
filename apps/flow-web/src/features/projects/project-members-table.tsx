@@ -10,12 +10,14 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { formatEpoch } from '../../lib/format';
 import { selectUser, useAuth } from '../auth/auth-store';
 import { type ProjectMember, useProjectMembersQuery, useRemoveProjectMember } from './api';
@@ -40,6 +42,11 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
   const leadCount = members.filter((m) => m.role === 'lead').length;
 
   const handleRemove = async (member: ProjectMember): Promise<void> => {
+    const confirmed = await confirmAction({
+      message: t('projects.members.remove_confirm', { name: member.email }),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await removeMember.mutateAsync({ id: projectId, userId: member.userId });
       toaster.show({ tone: 'success', message: t('projects.members.removed') });
@@ -71,7 +78,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
       id: 'email',
       accessorKey: 'email',
       header: () => t('projects.members.email'),
-      cell: ({ row }) => <span>{row.original.email}</span>,
+      cell: ({ row }) => <span title={row.original.email}>{row.original.email}</span>,
     },
     {
       id: 'role',
@@ -83,7 +90,9 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
       id: 'added_at',
       header: () => t('projects.members.added_at'),
       cell: ({ row }) => (
-        <span>{formatEpoch(row.original.addedAt ?? row.original.createdAt, locale) ?? '—'}</span>
+        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {formatEpoch(row.original.addedAt ?? row.original.createdAt, locale) ?? '—'}
+        </span>
       ),
     },
     ...(isLead
@@ -99,11 +108,15 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
               // refuses anyway — so do not offer it as a button.
               const isLastLead = member.role === 'lead' && leadCount <= 1;
               if (isSelf || isLastLead) return null;
+              // Only the row being removed waits; the others stay actionable.
+              const removing =
+                removeMember.isPending && removeMember.variables?.userId === member.userId;
               return (
                 <Button
                   variant="danger"
                   size="sm"
-                  disabled={removeMember.isPending}
+                  disabled={removing}
+                  aria-busy={removing || undefined}
                   onClick={() => {
                     void handleRemove(member);
                   }}
@@ -144,21 +157,8 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
         aria-label={t('projects.members.title')}
         columns={columns}
         data={members}
-        emptyContent={
-          <span
-            style={{
-              display: 'block',
-              padding: 'var(--nf-space-8) var(--nf-space-4)',
-              textAlign: 'center',
-              color: 'var(--nf-color-fg-muted)',
-              border: '1px dashed var(--nf-color-border)',
-              borderRadius: 'var(--nf-radius-md)',
-              background: 'var(--nf-color-bg-sunken)',
-            }}
-          >
-            {t('projects.members.empty')}
-          </span>
-        }
+        getRowId={(row) => row.userId}
+        emptyContent={<EmptyState titleAs="p" title={t('projects.members.empty')} />}
         // nf-token-override: component dimension, not a spacing step
         style={{ minBlockSize: '16rem' }}
       />

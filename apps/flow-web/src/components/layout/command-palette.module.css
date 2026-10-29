@@ -9,6 +9,7 @@
 }
 
 .input {
+  min-block-size: var(--nf-control-height);
   padding: var(--nf-space-2) var(--nf-space-3);
   border-radius: var(--nf-radius-md);
   border: 1px solid var(--nf-color-border);
@@ -17,7 +18,45 @@
   font-size: var(--nf-text-sm);
 }
 
+/*
+ * Fixed band for every body state (list, searching, empty, command), so
+ * typing never resizes the dialog; long result lists scroll inside it.
+ */
+.results {
+  display: flex;
+  flex-direction: column;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 16rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: min(60vh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.skeletonInput {
+  block-size: var(--nf-control-height);
+  border-radius: var(--nf-radius-md);
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the result row it stands in for */
+  block-size: 2.25rem;
+  margin-block-end: var(--nf-space-1);
+  border-radius: var(--nf-radius-md);
+}
+
 .groupLabel {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--nf-color-bg-elevated);
   font-size: var(--nf-text-micro);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -44,18 +83,60 @@
   color: var(--nf-color-fg);
   cursor: pointer;
   font-size: var(--nf-text-sm);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  /* Highlight follows the selection quickly; leaving rows fade out a touch slower. */
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .resultItem:hover,
 .resultItemActive {
   background: var(--nf-color-surface-hover);
+  transition-duration: var(--nf-duration-instant);
+}
+
+.resultItemActive {
+  color: var(--nf-color-fg);
+}
+
+.resultIcon {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.resultItemActive .resultIcon {
+  opacity: 1;
+  color: var(--nf-color-accent-fg);
+}
+
+.resultLabel {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .emptyText {
   margin: 0;
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
+  /* Status lines are keyed per state in JSX, so each swap replays the fade. */
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.commandStatus {
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+}
+
+.statusDanger {
+  color: var(--nf-color-danger-fg);
+}
+
+.statusStrong {
+  color: var(--nf-color-fg);
 }
 
 .hintBar {

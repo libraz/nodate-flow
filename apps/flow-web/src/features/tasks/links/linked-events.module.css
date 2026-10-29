@@ -7,8 +7,7 @@
  * `color-mix()` so the four themes (aurora / dotline / glass-light /
  * glass-dark) inherit the right accent without per-theme overrides.
  *
- * Motion respects `prefers-reduced-motion`: shake-out becomes a plain
- * fade, popover scale becomes a flat opacity step.
+ * Motion durations come from the tokens, which reduced motion zeroes.
  */
 
 /* ── Section ─────────────────────────────────────────────────── */
@@ -70,16 +69,10 @@
   transform: rotate(90deg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .caret {
-    transition: none;
-  }
-}
-
 .title {
   margin: 0;
   font-size: var(--nf-text-base);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
 }
 
@@ -88,15 +81,6 @@
   color: var(--nf-color-fg-subtle);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
-}
-
-.body {
-  display: flex;
-  flex-direction: column;
-}
-
-.body[hidden] {
-  display: none;
 }
 
 /* ── List ────────────────────────────────────────────────────── */
@@ -117,52 +101,15 @@
   padding: var(--nf-space-3) var(--nf-space-4);
   border-block-end: 1px solid var(--nf-color-hairline);
   font-size: var(--nf-text-sm);
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    opacity var(--nf-duration-base) var(--nf-ease-standard),
-    transform var(--nf-duration-base) var(--nf-ease-standard);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.row:last-child {
+.list > :last-child .row {
   border-block-end-color: transparent;
 }
 
 .row:hover {
   background: color-mix(in oklab, var(--nf-color-bg-elevated) 60%, transparent);
-}
-
-.row[data-removing="true"] {
-  animation: nf-link-shake-out var(--nf-duration-base) var(--nf-ease-standard) forwards;
-  pointer-events: none;
-}
-
-@keyframes nf-link-shake-out {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  35% {
-    transform: translateX(0.375rem);
-    opacity: 0.85;
-  }
-  70% {
-    transform: translateX(0);
-    opacity: 0.4;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .row {
-    transition: none;
-  }
-  .row[data-removing="true"] {
-    animation: none;
-    opacity: 0;
-  }
 }
 
 .glyphCell {
@@ -203,7 +150,7 @@
   display: block;
   color: var(--nf-color-fg);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -233,7 +180,7 @@
 
 .time[data-tone="today"] {
   color: var(--nf-color-accent-fg);
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
 }
 
 .time[data-tone="upcoming"] {
@@ -250,9 +197,9 @@
   border: 0;
   color: var(--nf-color-fg-subtle);
   /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 1.5rem;
+  inline-size: 1.75rem;
   /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.5rem;
+  block-size: 1.75rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -270,6 +217,13 @@
   opacity: 1;
 }
 
+/* Without hover there is no reveal, so the control stays visible. */
+@media (hover: none) {
+  .unlinkBtn {
+    opacity: 1;
+  }
+}
+
 .unlinkBtn:hover {
   background: color-mix(in oklab, var(--nf-color-danger) 12%, transparent);
   color: var(--nf-color-danger-fg);
@@ -279,12 +233,6 @@
   outline: none;
   opacity: 1;
   box-shadow: var(--nf-shadow-focus);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .unlinkBtn {
-    transition: none;
-  }
 }
 
 /* ── Header trigger button (link event) ─────────────────────── */
@@ -318,45 +266,16 @@
 
 /* ── Popover (Picker) ───────────────────────────────────────── */
 
-.popoverHost {
-  position: relative;
-  display: inline-flex;
-}
-
+/* Body of the Popover primitive's panel: cancels its padding so the input
+   and footer bands run edge to edge, and clips them to its corners. */
 .popover {
-  position: absolute;
-  inset-block-start: calc(100% + var(--nf-space-2));
-  inset-inline-end: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: clamp(20rem, var(--nf-measure-narrow), 90vw);
+  margin: calc(var(--nf-space-4) * -1);
   /* nf-token-override: component dimension, not a spacing step */
   max-block-size: clamp(20rem, 80vh, var(--nf-measure-narrow));
   display: flex;
   flex-direction: column;
-  background: var(--nf-color-bg-elevated);
-  border: 1px solid var(--nf-color-hairline);
-  border-radius: var(--nf-radius-lg);
-  box-shadow: var(--nf-shadow-lg);
-  z-index: 50;
-  transform-origin: top right;
-  animation: nf-link-popover-in var(--nf-duration-base) var(--nf-ease-standard);
-}
-
-@keyframes nf-link-popover-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .popover {
-    animation: none;
-  }
+  border-radius: inherit;
+  overflow: hidden;
 }
 
 .popoverInputRow {
@@ -366,8 +285,6 @@
   padding: var(--nf-space-2) var(--nf-space-3);
   border-block-end: 1px solid var(--nf-color-hairline);
   background: var(--nf-color-bg);
-  border-start-start-radius: var(--nf-radius-lg);
-  border-start-end-radius: var(--nf-radius-lg);
 }
 
 .popoverInputIcon {
@@ -419,6 +336,7 @@
 }
 
 .resultsHint {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   margin: 0;
   padding: var(--nf-space-3) var(--nf-space-4);
   font-size: var(--nf-text-sm);
@@ -434,6 +352,10 @@
   cursor: pointer;
   border-inline-start: 2px solid transparent;
   font-size: var(--nf-text-sm);
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    border-color var(--nf-duration-instant) var(--nf-ease-standard),
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .resultRow[aria-disabled="true"] {
@@ -500,8 +422,6 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
   background: var(--nf-color-bg);
-  border-end-start-radius: var(--nf-radius-lg);
-  border-end-end-radius: var(--nf-radius-lg);
 }
 
 .popoverFooterLabel {
@@ -540,7 +460,7 @@
   color: var(--nf-color-fg-muted);
   font: inherit;
   font-size: var(--nf-text-xs);
-  font-weight: 500;
+  font-weight: var(--nf-weight-medium);
   padding: var(--nf-space-1) var(--nf-space-3);
   border-radius: var(--nf-radius-pill);
   cursor: pointer;
@@ -568,4 +488,16 @@
   inline-size: 0.875rem;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.875rem;
+}
+
+.resultsSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.resultsSkeletonRow {
+  block-size: var(--nf-space-5);
 }

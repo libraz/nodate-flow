@@ -1,0 +1,36 @@
+/*
+ * Both faces share one grid cell; the inactive one is hidden but still
+ * sizes the button, so the swap never changes its width.
+ */
+
+.root {
+  white-space: nowrap;
+}
+
+.stack {
+  display: inline-grid;
+}
+
+.face {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-1-5);
+  transition:
+    opacity var(--nf-duration-fast) var(--nf-ease-standard),
+    translate var(--nf-duration-fast) var(--nf-ease-standard),
+    visibility var(--nf-duration-fast);
+}
+
+.face[aria-hidden="true"] {
+  opacity: 0;
+  translate: 0 var(--nf-motion-shift-sm);
+  visibility: hidden;
+}
+
+.icon {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  flex-shrink: 0;
+}

@@ -21,9 +21,13 @@
  * itself does not fall back.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -101,6 +105,8 @@ export default function InvitesTab({
 
   const { data: invites } = useEventInvitesQuery(workspaceId, calendarId, eventId);
   const revoke = useRevokeEventInviteMutation();
+  const { entries, onExited } = usePresenceList(invites, (invite) => invite.id);
+  const staggerFor = useFirstLoadStagger();
 
   const nowSec = Math.floor(Date.now() / 1000);
 
@@ -127,7 +133,7 @@ export default function InvitesTab({
     );
   };
 
-  if (invites.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className={styles.tabPanel}>
         <p className={styles.invitesEmpty}>{t('event.invites.empty')}</p>
@@ -139,35 +145,44 @@ export default function InvitesTab({
   return (
     <div className={styles.tabPanel}>
       <ul className={styles.invitesList}>
-        {invites.map((invite) => {
+        {entries.map(({ key, item: invite, present }, index) => {
           const tone = inviteTone(invite, nowSec);
           const statusKey = inviteStatusKey(invite, nowSec);
           const expiryDisplay = formatExpiry(invite.expiresAt, locale);
           return (
-            <li key={invite.id} className={styles.inviteRow}>
-              <div className={styles.inviteIdentity}>
-                <span className={styles.inviteEmail}>{invite.email}</span>
-                {expiryDisplay ? (
-                  <span className={styles.inviteExpiry}>
-                    {t('event.invites.expires_at', { date: expiryDisplay })}
-                  </span>
-                ) : null}
+            <PresenceItem
+              key={key}
+              as="li"
+              present={present}
+              onExited={() => onExited(key)}
+              className={motion.enter}
+              style={staggerFor(index)}
+            >
+              <div className={styles.inviteRow}>
+                <div className={styles.inviteIdentity}>
+                  <span className={styles.inviteEmail}>{invite.email}</span>
+                  {expiryDisplay ? (
+                    <span className={styles.inviteExpiry}>
+                      {t('event.invites.expires_at', { date: expiryDisplay })}
+                    </span>
+                  ) : null}
+                </div>
+                <Badge tone={tone}>{t(statusKey)}</Badge>
+                <div className={styles.inviteControls}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      void handleRevoke(invite.id);
+                    }}
+                    disabled={revoke.isPending}
+                  >
+                    {t('event.invites.revoke')}
+                  </Button>
+                </div>
               </div>
-              <Badge tone={tone}>{t(statusKey)}</Badge>
-              <div className={styles.inviteControls}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    void handleRevoke(invite.id);
-                  }}
-                  disabled={revoke.isPending}
-                >
-                  {t('event.invites.revoke')}
-                </Button>
-              </div>
-            </li>
+            </PresenceItem>
           );
         })}
       </ul>

@@ -1,98 +1,17 @@
 /**
- * WebhooksSettingsPage layout — single column hosting one card with a
- * header, the webhook list (table), and an inline empty state. All values
- * resolve to design tokens; no hex / rgb / px is hard-coded.
+ * WebhooksSettingsPage specifics. Page, section, table and secret-panel
+ * rhythm come from the shared settings-ui module; this file holds the
+ * column widths, the row action menu and the deliveries drawer.
  */
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-5);
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--nf-space-3);
-  flex-wrap: wrap;
-}
-
-.headerText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display, inherit);
-  font-size: var(--nf-text-subsection-title);
-  color: var(--nf-color-fg);
-}
-
-.description {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-}
-
-.tableWrap {
-  inline-size: 100%;
-  overflow-x: auto;
-}
-
-.table {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: var(--nf-text-sm);
-}
-
-.table thead th {
-  text-align: start;
-  font-size: var(--nf-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--nf-color-fg-muted);
-  padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.table tbody td {
-  padding: var(--nf-space-2) var(--nf-space-3);
-  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
-  color: var(--nf-color-fg);
-  vertical-align: top;
-}
-
-.table tbody tr:last-child td {
-  border-block-end: none;
-}
 
 .urlCell {
-  font-family: var(--nf-font-mono, monospace);
-  font-size: var(--nf-text-xs);
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 18rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .descriptionCell {
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .eventTypesCell {
@@ -128,7 +47,7 @@
   cursor: pointer;
   font-size: var(--nf-text-sm);
   line-height: 1.4;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .menuItem:hover,
@@ -153,7 +72,7 @@
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .menuTrigger:hover,
@@ -171,33 +90,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--nf-space-2);
-}
-
-.secretPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-  padding: var(--nf-space-3);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  background: var(--nf-color-bg);
-}
-
-.secretWarning {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-warning-fg);
-}
-
-.secretValue {
-  font-family: var(--nf-font-mono, monospace);
-  font-size: var(--nf-text-sm);
-}
-
-.secretRow {
-  display: flex;
-  gap: var(--nf-space-2);
-  align-items: center;
 }
 
 .deliveriesList {
@@ -249,22 +141,6 @@
   justify-content: flex-end;
 }
 
-.deliveriesEmpty {
-  margin: 0;
-  padding: var(--nf-space-4);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-  border: var(--nf-space-px) dashed var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  text-align: center;
-}
-
-.spinnerRow {
-  display: flex;
-  justify-content: center;
-  padding: var(--nf-space-4);
-}
-
 .activeCell {
   white-space: nowrap;
 }
@@ -273,4 +149,22 @@
   font-family: var(--nf-font-mono, monospace);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
+}
+
+.skeletonRow {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3.25rem;
+  inline-size: 100%;
+}
+
+.skeletonDelivery {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3.5rem;
+  inline-size: 100%;
+}
+
+.skeletonSecret {
+  /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
+  block-size: 3.75rem;
+  inline-size: 100%;
 }

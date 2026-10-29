@@ -29,15 +29,11 @@ function ProjectDetailRoute(): ReactElement {
     <Suspense
       fallback={
         <div
-          style={{
-            padding: 'var(--nf-space-8)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-4)',
-          }}
+          aria-busy="true"
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}
         >
           {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-          <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
+          <Skeleton style={{ blockSize: 'var(--nf-control-height)', inlineSize: '16rem' }} />
           {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
           <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
         </div>

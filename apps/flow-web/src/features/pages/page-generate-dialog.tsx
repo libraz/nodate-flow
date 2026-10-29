@@ -132,9 +132,15 @@ export default function PageGenerateDialog({
           >
             {t('generate.cancel')}
           </Button>
-          <Button type="submit" variant="primary" size="sm" disabled={submitDisabled}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={submitDisabled}
+            aria-busy={isGenerating || undefined}
+          >
             <Sparkles size={14} aria-hidden />
-            {isGenerating ? t('generate.submitting') : t('generate.submit')}
+            {t('generate.submit')}
           </Button>
         </div>
       </form>

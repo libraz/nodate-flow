@@ -1,9 +1,10 @@
 /**
  * ArchivedRow — a single row in the Archive list.
  *
- * Renders the row as a `<li>` (not a `<button>`) so we can put the
+ * Renders the row as a `<div>` (not a `<button>`) so we can put the
  * checkbox + the title link inside without nested interactive elements
- * (button-in-button is forbidden by the spec). The whole `<li>` is
+ * (button-in-button is forbidden by the spec); the list item around it
+ * belongs to the virtualized list. The whole row is
  * keyboard-focusable so j/k navigation can land on it; Enter triggers
  * "view detail", Space toggles selection, `u` unarchives.
  *
@@ -49,8 +50,8 @@ export interface ArchivedRowProps {
   onUnarchive: (id: string) => void;
   onActivate: (id: string) => void;
   onFocus: (id: string) => void;
-  /** Forwarded to the `<li>` root for keyboard-driven focus management. */
-  rowRef?: Ref<HTMLLIElement>;
+  /** Forwarded to the row root for keyboard-driven focus management. */
+  rowRef?: Ref<HTMLDivElement>;
 }
 
 function ArchivedRowImpl({
@@ -95,12 +96,12 @@ function ArchivedRowImpl({
     };
   }, [task.title]);
 
-  const handleRowClick = (event: MouseEvent<HTMLLIElement>): void => {
+  const handleRowClick = (event: MouseEvent<HTMLDivElement>): void => {
     if ((event.target as HTMLElement).closest('a, button, input')) return;
     onActivate(task.id);
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLLIElement>): void => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === ' ') {
       event.preventDefault();
       onToggleSelect(task.id, { shift: event.shiftKey });
@@ -137,8 +138,10 @@ function ArchivedRowImpl({
   const archiverInitial = archiverName ? archiverName.slice(0, 2).toUpperCase() : '';
 
   return (
-    <li
+    <div
       ref={rowRef}
+      role="group"
+      aria-label={task.title}
       className={styles.row}
       data-selected={selected ? 'true' : 'false'}
       data-removing={removing ? 'true' : undefined}
@@ -200,17 +203,15 @@ function ArchivedRowImpl({
         <Link
           to="/tasks/$taskId"
           params={{ taskId: task.id }}
-          aria-label={t('row.viewDetail')}
+          className={styles.rowActionLink}
           onClick={(event) => {
             event.stopPropagation();
           }}
         >
-          <Button type="button" variant="ghost" size="sm">
-            {t('row.viewDetail')}
-          </Button>
+          {t('row.viewDetail')}
         </Link>
       </span>
-    </li>
+    </div>
   );
 }
 

@@ -9,10 +9,12 @@
  * - the per-provider outbound rate-limit table
  *
  * The query suspends, so this component is meant to live inside a
- * `<Suspense>` boundary that renders {@link MetricsSkeleton}.
+ * `<Suspense>` boundary that renders {@link MetricsSkeleton}. A window
+ * change is deferred: the previous figures stay on screen, dimmed, until
+ * the new window resolves, instead of collapsing back to the skeleton.
  */
 
-import type { ReactElement } from 'react';
+import { type ReactElement, useDeferredValue } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AcceptanceCard from './acceptance-card';
@@ -31,11 +33,17 @@ export default function MetricsDashboard({
   windowDays,
 }: MetricsDashboardProps): ReactElement {
   const { t } = useTranslation('aiMetrics');
-  const { data } = useAiMetricsQuery(workspaceId, windowDays);
+  const deferredWindow = useDeferredValue(windowDays);
+  const { data } = useAiMetricsQuery(workspaceId, deferredWindow);
   const outboundRows = data.outboundLimits ?? [];
+  const stale = deferredWindow !== windowDays;
 
   return (
-    <>
+    <div
+      className={styles.dashboard}
+      data-stale={stale || undefined}
+      aria-busy={stale || undefined}
+    >
       <div className={styles.kpiGrid}>
         <KpiCard label={t('kpi.proposed')} value={data.proposed} />
         <KpiCard label={t('kpi.applied')} value={data.applied} />
@@ -47,6 +55,6 @@ export default function MetricsDashboard({
         dismissed={data.dismissed}
       />
       <OutboundTable rows={outboundRows} />
-    </>
+    </div>
   );
 }

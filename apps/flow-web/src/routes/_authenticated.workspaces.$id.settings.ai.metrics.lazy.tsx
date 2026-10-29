@@ -23,6 +23,7 @@ import MetricsDashboard from '../features/ai-metrics/metrics-dashboard';
 import MetricsError from '../features/ai-metrics/metrics-error';
 import MetricsSkeleton from '../features/ai-metrics/metrics-skeleton';
 import WindowSelector from '../features/ai-metrics/window-selector';
+import ui from '../features/settings/settings-ui.module.css';
 import AccessRestricted from '../features/workspaces/access-restricted';
 import { ApiError } from '../lib/api-error';
 
@@ -60,9 +61,11 @@ function AiMetricsRoute(): ReactElement {
 
   return (
     <section className={styles.root}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('page.title')}</h1>
-        <p className={styles.description}>{t('page.description')}</p>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('page.title')}</h1>
+          <p className={ui.lede}>{t('page.description')}</p>
+        </div>
       </header>
       <WindowSelector value={windowDays} onChange={handleWindowChange} />
       <ErrorBoundary FallbackComponent={MetricsErrorFallback} resetKeys={[windowDays]}>

@@ -13,10 +13,13 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import FormField from '@nodate-flow/ui/primitives/form-field';
 import Select from '@nodate-flow/ui/primitives/select';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useMemo, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
@@ -28,6 +31,8 @@ import {
   useUpdateNotificationPreferences,
 } from './notifications-api';
 import styles from './notifications-form.module.css';
+import SaveStatus, { useSaveStatus } from './save-status';
+import ui from './settings-ui.module.css';
 
 /** The channel the form edits; see the module comment. */
 const CHANNEL = 'in_app';
@@ -102,6 +107,12 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
 
   const serverState = useMemo(() => mutedByCategory(preferences), [preferences]);
   const [muted, setMuted] = useState<Record<string, boolean>>(serverState);
+  // What was last loaded or saved; the refetch after a save lands later.
+  const [baseline, setBaseline] = useState<Record<string, boolean>>(serverState);
+  const dirty = CATEGORIES.some(
+    (row) => (muted[row.category] ?? false) !== (baseline[row.category] ?? false),
+  );
+  const saveStatus = useSaveStatus(dirty);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -113,7 +124,8 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
     }));
     try {
       await update.mutateAsync(body);
-      toaster.show({ tone: 'success', message: t('notifications.saved') });
+      setBaseline(muted);
+      saveStatus.markSaved();
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -131,8 +143,7 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
       }}
       className={styles.form}
     >
-      <p className={styles.channelNote}>{t('notifications.channel_note')}</p>
-      <ul className={styles.list}>
+      <ul className={styles.list} aria-describedby="notif-channel-note">
         {CATEGORIES.map((row) => {
           const id = `notif-${row.category}`;
           return (
@@ -141,10 +152,13 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
                 <label htmlFor={id} className={styles.label}>
                   {t(row.labelKey)}
                 </label>
-                <span className={styles.helpText}>{t(row.descriptionKey)}</span>
+                <span id={`${id}-help`} className={styles.helpText}>
+                  {t(row.descriptionKey)}
+                </span>
               </div>
               <Switch
                 id={id}
+                aria-describedby={`${id}-help`}
                 checked={!(muted[row.category] ?? false)}
                 onCheckedChange={(next) => {
                   setMuted((prev) => ({ ...prev, [row.category]: !next }));
@@ -156,12 +170,46 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
         })}
       </ul>
 
-      <div className={styles.actions}>
-        <Button type="submit" variant="primary" disabled={submitGuard.submitting}>
-          {submitGuard.submitting ? t('notifications.saving') : t('notifications.save')}
+      <p id="notif-channel-note" className={styles.channelNote}>
+        {t('notifications.channel_note')}
+      </p>
+      <div className={ui.actions}>
+        <SaveStatus saved={saveStatus.saved} dirty={dirty} />
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={submitGuard.submitting}
+          aria-busy={submitGuard.submitting}
+        >
+          {t('notifications.save')}
         </Button>
       </div>
     </form>
+  );
+}
+
+function PreferencesSkeleton(): ReactElement {
+  return (
+    <div className={styles.list} aria-hidden="true">
+      {CATEGORIES.map((row) => (
+        <div key={row.category} className={styles.row}>
+          <div className={styles.identity}>
+            <Skeleton className={styles.skeletonLabel} />
+            <Skeleton className={styles.skeletonHelp} />
+          </div>
+          <Skeleton className={styles.skeletonSwitch} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Placeholder with the panel's own shape, shown while the queries suspend. */
+export function NotificationsFormSkeleton(): ReactElement {
+  return (
+    <div className={styles.panel}>
+      <PreferencesSkeleton />
+    </div>
   );
 }
 
@@ -171,7 +219,7 @@ export default function NotificationsForm(): ReactElement {
   const [workspaceId, setWorkspaceId] = useState<string>(workspaces[0]?.id ?? '');
 
   if (workspaces.length === 0) {
-    return <p className={styles.helpText}>{t('notifications.no_workspaces')}</p>;
+    return <EmptyState titleAs="p" title={t('notifications.no_workspaces')} className={ui.empty} />;
   }
 
   const selected = workspaces.some((w) => w.id === workspaceId)
@@ -181,26 +229,29 @@ export default function NotificationsForm(): ReactElement {
   return (
     <div className={styles.panel}>
       {workspaces.length > 1 && (
-        <label className={styles.workspacePicker} htmlFor="notif-workspace">
-          <span className={styles.helpText}>{t('notifications.workspace_label')}</span>
-          <Select
-            id="notif-workspace"
-            value={selected}
-            onChange={(e) => {
-              setWorkspaceId(e.target.value);
-            }}
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </Select>
-        </label>
+        <FormField label={t('notifications.workspace_label')} className={styles.workspacePicker}>
+          {(control) => (
+            <Select
+              {...control}
+              value={selected}
+              onChange={(e) => {
+                setWorkspaceId(e.target.value);
+              }}
+            >
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
       )}
       {/* Keyed on the workspace so switching resets local edits to that
           workspace's saved state instead of carrying them across. */}
-      <WorkspacePreferences key={selected} workspaceId={selected} />
+      <Suspense fallback={<PreferencesSkeleton />}>
+        <WorkspacePreferences key={selected} workspaceId={selected} />
+      </Suspense>
     </div>
   );
 }

@@ -18,9 +18,10 @@ export default function LabelBadge({ name, color, onRemove }: LabelBadgeProps): 
     <span
       className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-tight"
       style={{
-        backgroundColor: `${color}20`,
+        // color-mix accepts any colour syntax; a hex alpha suffix only works on hex.
+        backgroundColor: `color-mix(in oklab, ${color} 12%, transparent)`,
         color,
-        border: `1px solid ${color}40`,
+        border: `1px solid color-mix(in oklab, ${color} 25%, transparent)`,
       }}
     >
       <span

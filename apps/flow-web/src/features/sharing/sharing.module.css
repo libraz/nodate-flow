@@ -20,6 +20,9 @@
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-semibold);
   inline-size: fit-content;
+  transition:
+    background-color var(--nf-duration-base) var(--nf-ease-standard),
+    color var(--nf-duration-base) var(--nf-ease-standard);
 }
 
 .statusPublic {
@@ -36,6 +39,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+}
+
+/* The link arrives with publishing; it rises in rather than popping. */
+.linkReveal {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .linkLabel {

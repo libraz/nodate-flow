@@ -1,0 +1,99 @@
+/*
+ * Project detail: the overview's status summary.
+ */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding-block-end: var(--nf-space-page);
+}
+
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  padding: var(--nf-space-6);
+}
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.activeCount {
+  /* nf-token-override: a counter read as a figure, not as prose — it pairs with the supporting caption below it and is sized against that pairing */
+  font-size: 2rem;
+  font-weight: var(--nf-weight-semibold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+.progress {
+  margin-inline-start: auto;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  display: flex;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  overflow: hidden;
+  background: var(--nf-color-bg-sunken);
+}
+
+/* Each state's share; a changed count re-flows the bar instead of snapping. */
+.segment {
+  min-inline-size: 0;
+  transition: flex-grow var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+.states {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--nf-space-2);
+}
+
+.state {
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-hairline);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+}
+
+.stateLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.stateDot {
+  inline-size: var(--nf-space-2);
+  block-size: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  flex-shrink: 0;
+}
+
+.stateCount {
+  font-size: var(--nf-text-xl);
+  font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}

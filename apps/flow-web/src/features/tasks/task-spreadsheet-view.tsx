@@ -8,14 +8,17 @@
  * for row virtualization to handle 500+ tasks smoothly.
  */
 
+import Button from '@nodate-flow/ui/primitives/button';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
+import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ReactElement } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
+import { confirmAction } from '../../lib/confirm-action';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
@@ -97,6 +100,12 @@ function BulkActionBar({
   };
 
   const handleBulkDelete = async () => {
+    const confirmed = await confirmAction({
+      title: t('tasks.bulk.delete_confirm_title', { count: selectedIds.length }),
+      message: t('tasks.bulk.delete_confirm', { count: selectedIds.length }),
+      confirmLabel: t('tasks.bulk.delete'),
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
       const results = await Promise.allSettled(selectedIds.map((id) => deleteTask.mutateAsync(id)));
@@ -128,10 +137,10 @@ function BulkActionBar({
       </span>
       <span className={css.bulkBarSpacer} />
 
-      <select
+      <Select
+        className={css.bulkBarSelect}
         aria-label={t('tasks.spreadsheet.set_priority')}
         disabled={busy}
-        className={css.bulkBtn}
         defaultValue=""
         onChange={(e) => {
           if (e.target.value) {
@@ -148,20 +157,22 @@ function BulkActionBar({
         <option value="2">{t('tasks.priority.medium')}</option>
         <option value="3">{t('tasks.priority.high')}</option>
         <option value="4">{t('tasks.priority.urgent')}</option>
-      </select>
+      </Select>
 
-      <button
+      <Button
         type="button"
+        variant="danger"
+        size="sm"
         disabled={busy}
-        className={css.bulkBtnDanger}
+        aria-busy={busy}
         onClick={() => void handleBulkDelete()}
       >
         {t('tasks.bulk.delete')}
-      </button>
+      </Button>
 
-      <button type="button" disabled={busy} className={css.bulkBtnClear} onClick={onClear}>
+      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClear}>
         {t('tasks.bulk.clear')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -409,7 +420,15 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
         />
       );
     }
-    return <span>{task.title}</span>;
+    return (
+      <span
+        className={css.titleText}
+        title={task.title}
+        data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
+      >
+        {task.title}
+      </span>
+    );
   };
 
   const renderStatusCell = (task: TaskListItem, rowIdx: number): ReactElement => {
@@ -569,9 +588,9 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
         {/* Header */}
         <div className={css.headerRow} role="row" aria-rowindex={1}>
           <div className={css.headerCellCheckbox} role="columnheader">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={selectedRows.size === tasks.length && tasks.length > 0}
+              indeterminate={selectedRows.size > 0 && selectedRows.size < tasks.length}
               onChange={toggleAll}
               aria-label={t('tasks.bulk.selected', { count: tasks.length })}
             />
@@ -625,8 +644,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
                 >
                   {/* Checkbox */}
                   <div className={css.cellCheckbox} role="gridcell">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isSelected}
                       onChange={() => toggleRow(task.id)}
                       aria-label={task.title}

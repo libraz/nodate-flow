@@ -1,0 +1,196 @@
+/* Workspace activity feed — filter chips over a bordered, scrolling list. */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: 40rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+}
+
+.sentinel {
+  block-size: var(--nf-space-px);
+}
+
+.skeletonList {
+  composes: list;
+  overflow: hidden;
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--nf-space-3-5);
+  align-items: center;
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.skeletonRow:last-child {
+  border-block-end: none;
+}
+
+.skeletonAvatar {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.skeletonLine {
+  /* nf-token-override: placeholder sized to the two text lines it stands in for */
+  block-size: 2.25rem;
+  border-radius: var(--nf-radius-sm);
+}
+
+.empty {
+  border: var(--nf-space-px) dashed var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-bg-sunken);
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-8);
+  padding-inline: var(--nf-space-4);
+  text-align: center;
+  color: var(--nf-color-danger-fg);
+  border: var(--nf-space-px) solid var(--nf-color-danger);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-danger-subtle);
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Row ───────────────────────────────────────── */
+
+/* Enter motion is the shared list `.enter`; `--stagger-index` comes from the first-load factory. */
+.row {
+  composes: enter from "@nodate-flow/ui/styles/list-motion.module.css";
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--nf-space-3-5);
+  align-items: start;
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.75rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+}
+
+.glyphAgent {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.actor {
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.action {
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+}
+
+.sourceChip {
+  padding-inline: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-xs);
+  border: var(--nf-space-px) solid var(--source-tone);
+  color: var(--source-tone);
+  font-size: var(--nf-text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.time {
+  margin-inline-start: auto;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.resource {
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--nf-font-mono);
+}
+
+.severity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+/* Severity reads as a small dot beside its label, not as an edge stripe. */
+.severityDot {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  background: var(--severity-tone);
+}

@@ -18,10 +18,13 @@
  */
 
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import {
   type ChangeEvent,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactElement,
   type RefObject,
@@ -270,60 +273,116 @@ export default function MentionTextarea({
         aria-autocomplete={open ? 'list' : undefined}
         aria-activedescendant={showRows ? optionId(activeIndex) : undefined}
       />
-      {open && anchor !== null ? (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={t('tasks.mentions.listbox_label')}
-          className={styles.list}
-          style={popupPosition(anchor)}
-        >
-          {/*
-           * A listbox may only own options, so the two rows that are not
-           * people are presentational. Their text still reaches assistive
-           * technology through the live region above.
-           */}
-          {failed ? (
-            <li role="presentation" className={styles.statusRow}>
-              {t('tasks.mentions.load_failed')}
-            </li>
-          ) : null}
-          {!failed && loading ? (
-            <li role="presentation" className={styles.statusRow}>
-              {t('tasks.mentions.loading')}
-            </li>
-          ) : null}
-          {showRows
-            ? items.map((candidate, index) => (
-                <li
-                  key={candidate.userId}
-                  id={optionId(index)}
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  className={`${styles.option} ${index === activeIndex ? styles.optionActive : ''}`}
-                  onMouseDown={(event) => {
-                    // Keep focus — and therefore the caret — in the
-                    // textarea we are about to write into.
-                    event.preventDefault();
-                    choose(candidate);
-                  }}
-                >
-                  <MemberAvatar candidate={candidate} />
-                  <span className={styles.names}>
-                    <span className={styles.displayName}>{candidate.displayName}</span>
-                    <span className={styles.email}>{candidate.email}</span>
-                  </span>
-                </li>
-              ))
-            : null}
-        </ul>
-      ) : null}
+      <MentionPopup
+        model={open && anchor !== null ? { anchor, failed, loading, items, activeIndex } : null}
+        listId={listId}
+        optionId={optionId}
+        onChoose={choose}
+      />
       {enabled ? (
         <VisuallyHidden>
           <span role="status">{status}</span>
         </VisuallyHidden>
       ) : null}
     </>
+  );
+}
+
+interface PopupModel {
+  anchor: CaretRect;
+  failed: boolean;
+  loading: boolean;
+  items: MentionCandidate[];
+  activeIndex: number;
+}
+
+function popupSignature(model: PopupModel): string {
+  const { anchor, failed, loading, items, activeIndex } = model;
+  const ids = items.map((item) => item.userId).join(',');
+  return `${String(anchor.left)}|${String(anchor.top)}|${String(anchor.bottom)}|${String(failed)}|${String(loading)}|${String(activeIndex)}|${ids}`;
+}
+
+/**
+ * The listbox. `model` is null while closed; the last model is held for
+ * the exit so the list fades out with its rows instead of emptying first.
+ */
+function MentionPopup({
+  model,
+  listId,
+  optionId,
+  onChoose,
+}: {
+  model: PopupModel | null;
+  listId: string;
+  optionId: (index: number) => string;
+  onChoose: (candidate: MentionCandidate) => void;
+}): ReactElement | null {
+  const { t } = useTranslation('common');
+  const [held, setHeld] = useState<PopupModel | null>(model);
+  const [heldSignature, setHeldSignature] = useState<string | null>(
+    model === null ? null : popupSignature(model),
+  );
+  const signature = model === null ? null : popupSignature(model);
+  if (model !== null && signature !== heldSignature) {
+    setHeld(model);
+    setHeldSignature(signature);
+  }
+  const presence = usePresence<HTMLUListElement>(model !== null);
+  const view = model ?? held;
+  if (!presence.mounted || view === null) return null;
+  const { anchor, failed, loading, items, activeIndex } = view;
+
+  return (
+    <ul
+      ref={presence.ref}
+      id={listId}
+      role="listbox"
+      aria-label={t('tasks.mentions.listbox_label')}
+      data-state={presence.state}
+      inert={model === null}
+      className={styles.list}
+      style={popupPosition(anchor)}
+    >
+      {/*
+       * A listbox may only own options, so the two rows that are not
+       * people are presentational. Their text still reaches assistive
+       * technology through the live region above.
+       */}
+      {failed ? (
+        <li role="presentation" className={styles.statusRow}>
+          {t('tasks.mentions.load_failed')}
+        </li>
+      ) : null}
+      {!failed && loading ? (
+        <li role="presentation" className={styles.statusSkeleton}>
+          <Skeleton className={styles.statusSkeletonRow} />
+          <Skeleton className={styles.statusSkeletonRow} />
+        </li>
+      ) : null}
+      {!failed
+        ? items.map((candidate, index) => (
+            <li
+              key={candidate.userId}
+              id={optionId(index)}
+              role="option"
+              aria-selected={index === activeIndex}
+              className={`${styles.option} ${index === activeIndex ? styles.optionActive : ''}`}
+              onMouseDown={(event) => {
+                // Keep focus — and therefore the caret — in the
+                // textarea we are about to write into.
+                event.preventDefault();
+                onChoose(candidate);
+              }}
+            >
+              <MemberAvatar candidate={candidate} />
+              <span className={styles.names}>
+                <span className={styles.displayName}>{candidate.displayName}</span>
+                <span className={styles.email}>{candidate.email}</span>
+              </span>
+            </li>
+          ))
+        : null}
+    </ul>
   );
 }
 
@@ -346,16 +405,14 @@ function MemberAvatar({ candidate }: { candidate: MentionCandidate }): ReactElem
  * right-to-left body, where the measured pixel offset counts from the
  * other edge.
  */
-function popupPosition(anchor: CaretRect): {
-  insetInlineStart: string;
-  insetBlockStart?: string;
-  insetBlockEnd?: string;
-} {
+function popupPosition(anchor: CaretRect): CSSProperties {
   const rtl = document.documentElement.dir === 'rtl';
   const inlineStart = rtl ? window.innerWidth - anchor.left : anchor.left;
   const below = window.innerHeight - anchor.bottom;
   const flip = below < POPUP_RESERVE && anchor.top > below;
   return {
+    // The enter scales out from the corner nearest the caret.
+    ['--mention-origin' as string]: `${flip ? 'bottom' : 'top'} ${rtl ? 'right' : 'left'}`,
     insetInlineStart: `${String(Math.max(0, inlineStart))}px`,
     ...(flip
       ? { insetBlockEnd: `${String(Math.max(0, window.innerHeight - anchor.top + CARET_GAP))}px` }

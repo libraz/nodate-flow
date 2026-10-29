@@ -11,6 +11,7 @@
  * apply from the document root.
  */
 
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,15 +59,7 @@ export default function PublicShareEmbedPage({ token }: PublicShareEmbedPageProp
   return (
     <main style={embedRootStyle} aria-label={page.title}>
       {events.length === 0 ? (
-        <p
-          style={{
-            padding: 'var(--nf-space-12) 0',
-            textAlign: 'center',
-            color: 'var(--nf-color-fg-subtle)',
-          }}
-        >
-          {t('share.no_upcoming_events')}
-        </p>
+        <EmptyState titleAs="p" title={t('share.no_upcoming_events')} />
       ) : (
         <ShareMonthGrid
           events={events}

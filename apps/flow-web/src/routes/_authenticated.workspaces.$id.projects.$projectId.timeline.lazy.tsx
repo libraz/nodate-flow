@@ -3,12 +3,11 @@
  * timeline (lazy).
  */
 
-import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { useProjectQuery } from '../features/projects/api';
+import TimelineSkeleton from '../features/timeline/timeline-skeleton';
 import TimelineView from '../features/timeline/timeline-view';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/timeline');
@@ -22,15 +21,8 @@ function ProjectTimelineInner({ projectId }: { projectId: string }): ReactElemen
 
 function ProjectTimelineRoute(): ReactElement {
   const { projectId } = routeApi.useParams();
-  const { t } = useTranslation('common');
   return (
-    <Suspense
-      fallback={
-        <div style={{ padding: 'var(--nf-space-8)', display: 'flex', justifyContent: 'center' }}>
-          <Spinner label={t('common.loading')} />
-        </div>
-      }
-    >
+    <Suspense fallback={<TimelineSkeleton />}>
       <ProjectTimelineInner projectId={projectId} />
     </Suspense>
   );

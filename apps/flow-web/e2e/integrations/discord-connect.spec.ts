@@ -337,12 +337,7 @@ test.describe('integrations panel — Discord', () => {
     // interpolation actually happened so a future broken i18n key
     // does not silently strip the placeholder.
     await expect(confirmDialog).toContainText(copy.discordName);
-    // The themed confirm registers locale-aware fallbacks via
-    // setConfirmActionLabels in providers/i18n-provider; the EN
-    // affirmative defaults to "Confirm" (or "実行" for ja). Match
-    // both case-insensitively so a future locale flip on the shared
-    // tenant does not break this spec.
-    await confirmDialog.getByRole('button', { name: /^(confirm|delete|実行|削除)$/i }).click();
+    await confirmDialog.getByRole('button', { name: copy.disconnect, exact: true }).click();
 
     expect(disconnectCalled, 'DELETE /me/integrations/{id} must have been called').toBe(true);
 

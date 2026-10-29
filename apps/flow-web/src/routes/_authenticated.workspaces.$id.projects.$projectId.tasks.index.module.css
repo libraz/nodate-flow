@@ -1,0 +1,4 @@
+/* Keyed per view: a view swap replays a short fade. */
+.view {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}

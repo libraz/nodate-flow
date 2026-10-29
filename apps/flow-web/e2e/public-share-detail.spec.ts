@@ -149,14 +149,11 @@ test.describe('public share detail', () => {
     await expect(rowA).toBeVisible({ timeout: 10_000 });
     await expect(rowB).toBeVisible();
 
-    // Detach event A. Each row exposes a single Remove button; the
-    // themed confirm dialog asks for confirmation before the request
-    // fires.
+    // Detach event A. Each row exposes a single Remove button; detaching
+    // acts immediately and offers Undo via a toast.
     await rowA.getByRole('button', { name: /^remove$/i, exact: true }).click();
-    const confirmDialog = page.getByRole('dialog');
-    await expect(confirmDialog).toBeVisible({ timeout: 5_000 });
-    await confirmDialog.getByRole('button', { name: /^(confirm|実行|remove)$/i }).click();
-    await expect(confirmDialog).toBeHidden({ timeout: 5_000 });
+    await expect(page.getByText(/event removed/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /^undo$/i })).toBeVisible();
 
     // Row A disappears; row B remains.
     await expect(rowA).toBeHidden({ timeout: 10_000 });

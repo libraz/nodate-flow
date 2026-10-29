@@ -180,3 +180,62 @@
   resize: vertical;
   min-block-size: calc(var(--nf-space-6) * 1.5);
 }
+
+/* ── Interaction states ─────────────────────────────────────── */
+
+.trigger,
+.optionApply,
+.optionDelete,
+.optionAction,
+.saveButton {
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    border-color var(--nf-duration-instant) var(--nf-ease-standard),
+    color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  border-color: var(--nf-color-border-strong);
+  color: var(--nf-color-fg);
+}
+
+.option {
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.option:not(.optionSelected):hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.optionDelete,
+.optionAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 1.5rem;
+  border-radius: var(--nf-radius-xs);
+}
+
+.optionDelete:hover {
+  color: var(--nf-color-danger-fg);
+  background: color-mix(in oklab, var(--nf-color-danger) 10%, transparent);
+}
+
+.saveButton:not(:disabled):hover {
+  background: color-mix(in oklab, var(--nf-color-accent) 88%, var(--nf-color-fg));
+}
+
+.trigger:focus-visible,
+.optionApply:focus-visible,
+.optionDelete:focus-visible,
+.optionAction:focus-visible,
+.saveButton:focus-visible,
+.saveInput:focus-visible,
+.descriptionInput:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}

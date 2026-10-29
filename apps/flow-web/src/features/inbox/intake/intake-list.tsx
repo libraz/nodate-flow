@@ -15,11 +15,15 @@
  * pending list immediately.
  */
 
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -68,11 +72,9 @@ export default function IntakeList(): ReactElement {
       </div>
       <Suspense
         fallback={
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />
+          <div className={styles.fallback} aria-busy="true">
+            <Skeleton className={styles.fallbackRow} />
+            <Skeleton className={styles.fallbackRow} />
           </div>
         }
       >
@@ -92,6 +94,8 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
   const create = useCreateIntakeItemMutation();
   const triage = useTriageIntakeItemMutation();
 
+  const presence = usePresenceList(items, (item) => item.id);
+  const stagger = useFirstLoadStagger();
   const [title, setTitle] = useState('');
   const [convertItem, setConvertItem] = useState<IntakeItem | null>(null);
 
@@ -146,41 +150,32 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
           variant="primary"
           size="sm"
           disabled={create.isPending || title.trim().length === 0}
+          aria-busy={create.isPending || undefined}
         >
           {t('intake.quick_add.submit')}
         </Button>
       </form>
 
-      {items.length === 0 ? (
+      {presence.entries.length === 0 ? (
         <p className={styles.empty}>{t('intake.empty')}</p>
       ) : (
         <ul className={styles.list}>
-          {items.map((item) => (
-            <li key={item.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <p className={styles.rowTitle}>{item.title}</p>
-                {item.body ? <p className={styles.rowBody}>{item.body}</p> : null}
-              </div>
-              <div className={styles.rowActions}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDismiss(item)}
-                  disabled={triage.isPending}
-                >
-                  {t('intake.dismiss.action')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setConvertItem(item)}
-                >
-                  {t('intake.convert.action')}
-                </Button>
-              </div>
-            </li>
+          {presence.entries.map((entry, index) => (
+            <PresenceItem
+              key={entry.key}
+              as="li"
+              present={entry.present}
+              onExited={() => presence.onExited(entry.key)}
+              className={motion.enter}
+              style={stagger(index)}
+            >
+              <IntakeRow
+                item={entry.item}
+                pending={triage.isPending}
+                onDismiss={handleDismiss}
+                onConvert={setConvertItem}
+              />
+            </PresenceItem>
           ))}
         </ul>
       )}
@@ -192,5 +187,38 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
         onClose={() => setConvertItem(null)}
       />
     </>
+  );
+}
+
+interface IntakeRowProps {
+  item: IntakeItem;
+  pending: boolean;
+  onDismiss: (item: IntakeItem) => void;
+  onConvert: (item: IntakeItem) => void;
+}
+
+function IntakeRow({ item, pending, onDismiss, onConvert }: IntakeRowProps): ReactElement {
+  const { t } = useTranslation('inbox');
+  return (
+    <div className={styles.row}>
+      <div className={styles.rowMain}>
+        <p className={styles.rowTitle}>{item.title}</p>
+        {item.body ? <p className={styles.rowBody}>{item.body}</p> : null}
+      </div>
+      <div className={styles.rowActions}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onDismiss(item)}
+          disabled={pending}
+        >
+          {t('intake.dismiss.action')}
+        </Button>
+        <Button type="button" variant="primary" size="sm" onClick={() => onConvert(item)}>
+          {t('intake.convert.action')}
+        </Button>
+      </div>
+    </div>
   );
 }

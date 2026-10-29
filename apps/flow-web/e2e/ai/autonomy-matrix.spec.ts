@@ -5,7 +5,7 @@
  * rendered as a section inside `auto-action-settings.tsx`, mounted at
  * `/workspaces/{wsId}/settings/auto-actions`.
  *
- * The matrix renders one row per signal_kind (8 today, sourced from the
+ * The matrix renders one row per signal_kind (4 today, sourced from the
  * SDK's SIGNAL_KINDS registry). Each row exposes a SegmentedControl with
  * three modes — suggest / draft / auto — that map to the operator-picked
  * `autonomyLevel` override on the underlying auto-action rules. Saving a
@@ -13,7 +13,7 @@
  * `(kind, signalKind)` pairs all carry the same override.
  *
  * Cases:
- *   1. matrix renders all 8 signal kinds with the three labelled modes.
+ *   1. matrix renders all signal kinds with the three labelled modes.
  *   2. picking Auto in a row → Save (1) → success toast → reload keeps
  *      Auto active for that row.
  *   3. picking modes in two rows → Save reflects count=2 → Reset clears
@@ -129,8 +129,8 @@ test.describe('autonomy matrix', () => {
   });
 
   /**
-   * 1. Matrix mounts, shows the table header, has at least 8 rows (one
-   *    per signal kind from the SDK registry), and every row exposes
+   * 1. Matrix mounts, shows the table header, has one row per
+   *    signal kind from the SDK registry, and every row exposes
    *    Suggest / Draft / Auto segments. Console stays clean during the
    *    initial render.
    */
@@ -145,10 +145,10 @@ test.describe('autonomy matrix', () => {
     await expect(matrix.getByRole('columnheader', { name: copy.headerKind })).toBeVisible();
     await expect(matrix.getByRole('columnheader', { name: copy.headerMode })).toBeVisible();
 
-    // One row per signal kind. The SDK registry currently ships 8 kinds;
-    // assert at least 8 so the test stays valid if more get added.
+    // One row per signal kind. The SDK registry currently ships 4 kinds
+    // (e2e cannot import the SDK); update this when kinds are added.
     const rowGroups = matrix.getByRole('radiogroup');
-    await expect(rowGroups).toHaveCount(8, { timeout: 5_000 });
+    await expect(rowGroups).toHaveCount(4, { timeout: 5_000 });
 
     // Every row carries the three labelled segments. Check on the
     // discord.presence row as a representative sample — exhaustive

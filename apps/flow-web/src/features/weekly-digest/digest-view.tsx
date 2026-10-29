@@ -1,5 +1,5 @@
 /**
- * DigestView — workspace weekly digest panel (2.AI-9 frontend).
+ * DigestView — workspace weekly digest panel.
  *
  * Renders state counts, completed-this-week and overdue-open task
  * lists, and the server-rendered markdown body as a preformatted
@@ -7,11 +7,15 @@
  * source of truth for what is reported.
  */
 
-import Card from '@nodate-flow/ui/primitives/card';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CopyButton from '../settings/copy-button';
+import ui from '../settings/settings-ui.module.css';
+import TruncatedText from '../settings/truncated-text';
 import { useWeeklyDigestQuery, type WeeklyDigestCounts, type WeeklyDigestTask } from './api';
+import styles from './digest-view.module.css';
 
 function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
   const { t } = useTranslation('settings');
@@ -23,27 +27,14 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
     { key: 'cancelled', label: t('weekly_digest.counts.cancelled') },
   ];
   return (
-    <ul
-      style={{
-        listStyle: 'none',
-        margin: 0,
-        padding: 0,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(7rem, 1fr))',
-        gap: 'var(--nf-space-2)',
-      }}
-    >
+    <dl className={styles.counts}>
       {items.map((item) => (
-        <li key={item.key}>
-          <Card style={{ padding: 'var(--nf-space-2-5) var(--nf-space-3)' }}>
-            <div style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
-              {item.label}
-            </div>
-            <div style={{ fontSize: 'var(--nf-text-xl)', fontWeight: 600 }}>{counts[item.key]}</div>
-          </Card>
-        </li>
+        <div key={item.key} className={styles.count}>
+          <dt className={styles.countLabel}>{item.label}</dt>
+          <dd className={styles.countValue}>{counts[item.key]}</dd>
+        </div>
       ))}
-    </ul>
+    </dl>
   );
 }
 
@@ -55,44 +46,14 @@ function TaskList({
   emptyLabel: string;
 }): ReactElement {
   if (tasks.length === 0) {
-    return (
-      <p
-        style={{
-          margin: 0,
-          color: 'var(--nf-color-fg-muted)',
-          fontSize: 'var(--nf-text-supporting)',
-        }}
-      >
-        {emptyLabel}
-      </p>
-    );
+    return <p className={styles.empty}>{emptyLabel}</p>;
   }
   return (
-    <ul
-      style={{
-        listStyle: 'none',
-        margin: 0,
-        padding: 0,
-        display: 'grid',
-        gap: 'var(--nf-space-1)',
-      }}
-    >
+    <ul className={styles.tasks}>
       {tasks.map((task) => (
-        <li
-          key={task.taskId}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 'var(--nf-space-4)',
-            fontSize: 'var(--nf-text-supporting)',
-          }}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {task.title}
-          </span>
-          <span style={{ color: 'var(--nf-color-fg-muted)', fontFamily: 'var(--nf-font-mono)' }}>
-            {task.date}
-          </span>
+        <li key={task.taskId} className={styles.task}>
+          <TruncatedText text={task.title} />
+          <span className={styles.taskDate}>{task.date}</span>
         </li>
       ))}
     </ul>
@@ -105,53 +66,50 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   const completed = data.completedThisWeek ?? [];
   const overdue = data.overdueOpen ?? [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-2xl)' }}>{t('weekly_digest.title')}</h1>
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-supporting)',
-          }}
-        >
-          {t('weekly_digest.description')}
-        </p>
+    <div className={ui.page}>
+      <header className={ui.header}>
+        <div className={ui.headerText}>
+          <h1 className={ui.title}>{t('weekly_digest.title')}</h1>
+          <p className={ui.lede}>{t('weekly_digest.description')}</p>
+        </div>
       </header>
 
       <CountsRow counts={data.counts} />
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('weekly_digest.completed_this_week')}
-        </h2>
-        <TaskList tasks={completed} emptyLabel={t('weekly_digest.empty_completed')} />
-      </section>
+      <div className={styles.lists}>
+        <section className={ui.section} aria-labelledby="digest-completed-title">
+          <h2 id="digest-completed-title" className={ui.sectionTitle}>
+            {t('weekly_digest.completed_this_week')}
+          </h2>
+          <TaskList tasks={completed} emptyLabel={t('weekly_digest.empty_completed')} />
+        </section>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('weekly_digest.overdue_open')}
-        </h2>
-        <TaskList tasks={overdue} emptyLabel={t('weekly_digest.empty_overdue')} />
-      </section>
+        <section className={ui.section} aria-labelledby="digest-overdue-title">
+          <h2 id="digest-overdue-title" className={ui.sectionTitle}>
+            {t('weekly_digest.overdue_open')}
+          </h2>
+          <TaskList tasks={overdue} emptyLabel={t('weekly_digest.empty_overdue')} />
+        </section>
+      </div>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('weekly_digest.markdown')}
-        </h2>
-        <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: 'var(--nf-font-mono)',
-              fontSize: 'var(--nf-text-xs)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
+      <section className={ui.section} aria-labelledby="digest-markdown-title">
+        <div className={styles.markdownHeader}>
+          <h2 id="digest-markdown-title" className={ui.sectionTitle}>
+            {t('weekly_digest.markdown')}
+          </h2>
+          <CopyButton
+            value={data.markdown}
+            size="sm"
+            label={t('weekly_digest.copy')}
+            copiedLabel={t('weekly_digest.copied')}
+            onError={() => {
+              // error-toast-exempt: the clipboard write never reaches the API; its
+              // DOMException message is untranslated UA text.
+              toaster.show({ tone: 'danger', message: t('weekly_digest.copy_failed') });
             }}
-          >
-            {data.markdown}
-          </pre>
-        </Card>
+          />
+        </div>
+        <pre className={styles.markdown}>{data.markdown}</pre>
       </section>
     </div>
   );
