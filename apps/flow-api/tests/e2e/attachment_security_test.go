@@ -2,8 +2,8 @@
 // attachment_dedup_test.go and probe the failure / abuse modes of the
 // task-attachment presign endpoint:
 //
-//   - SigV4 signed-header binding (x-amz-content-sha256) keeps the
-//     dedup row tied to the bytes the client claimed.
+//   - The signed relay URL binds size, content type and sha256, so the
+//     dedup row stays tied to the bytes the client claimed.
 //   - Cross-workspace lookups never leak attachment metadata or
 //     download URLs.
 //   - Validation rejects malformed sha256, oversized files, blocked
@@ -37,13 +37,13 @@ func presignAttachmentRaw(t *testing.T, token, taskID string, body map[string]an
 		token, body)
 }
 
-// TestPresignHashTamperRejected verifies the SigV4 binding closes the
+// TestPresignHashTamperRejected verifies the relay closes the
 // content-poisoning window: a client that uploads bytes whose hash does
-// not match the value declared at presign time is rejected by MinIO at
-// the storage layer. The DB attachment row is left orphaned (no MinIO
-// blob), and a follow-up download surfaces 0-byte / not-found behaviour
-// — the test pins the storage-layer rejection because that is the
-// security-critical assertion (everything else is recoverable).
+// not match the value declared at presign time is rejected with 400 and
+// no object is stored. The same-length body gets past the size and type
+// checks, so the rejection has to come from the storage layer's digest
+// check. A fresh presign of the declared content must then still be a
+// miss, and uploading the real bytes must succeed.
 func TestPresignHashTamperRejected(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
@@ -52,9 +52,9 @@ func TestPresignHashTamperRejected(t *testing.T) {
 	tt := newTenant(t)
 	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "tamper")
 
-	// Declare sha256(A) but upload bytes B.
+	// Declare sha256(A) but upload bytes B of the same length.
 	declared := makePNG(t, 8, 8, color.RGBA{R: 1, G: 2, B: 3, A: 255})
-	tampered := makePNG(t, 8, 8, color.RGBA{R: 9, G: 9, B: 9, A: 255})
+	tampered := flipLastByte(declared)
 	require.NotEqual(t,
 		hex.EncodeToString(sha256Sum(declared)),
 		hex.EncodeToString(sha256Sum(tampered)),
@@ -63,65 +63,92 @@ func TestPresignHashTamperRejected(t *testing.T) {
 	res := presignAttachment(t, tt.AccessToken, taskID, "innocent.png", "image/png", declared)
 	require.False(t, res.Deduplicated)
 	require.NotEmpty(t, res.UploadURL)
-	require.NotEmpty(t, res.RequiredHeaders["x-amz-content-sha256"])
 
-	// PUT tampered bytes against the URL minted for declared.sha256.
-	// MinIO must reject (XAmzContentSHA256Mismatch / BadDigest are 400;
-	// SignatureDoesNotMatch is 403). All three are 4xx.
-	status, raw := putToPresignedURLStatus(t, res.UploadURL, "image/png", tampered, res.RequiredHeaders)
-	require.GreaterOrEqualf(t, status, 400, "MinIO must reject hash-mismatched body; body=%s", string(raw))
-	require.Lessf(t, status, 500, "rejection must be a client error, not a 5xx; body=%s", string(raw))
+	status, raw := putToPresignedURLStatus(t, res.UploadURL, "image/png", tampered)
+	require.Equalf(t, http.StatusBadRequest, status, "relay must reject a hash-mismatched body; body=%s", string(raw))
 
-	// MinIO refused the write so no blob lives at the content-addressed
-	// key. The storage_objects row exists (handler committed before the
-	// PUT, by design) but the blob does not.
+	// The storage_objects row exists (the handler committed before the PUT,
+	// by design) but the blob does not.
 	testStorage.MustNotExist(t, res.StorageKey)
+
+	// The rejected write left nothing that a later upload would mistake for
+	// the content: the next presign is still a miss and the real bytes land.
+	retry := presignAttachment(t, tt.AccessToken, taskID, "honest.png", "image/png", declared)
+	require.False(t, retry.Deduplicated, "a rejected upload must not make the content look stored")
+	require.NotEmpty(t, retry.UploadURL)
+	uploadViaPresignedURL(t, retry.UploadURL, "image/png", declared)
+	testStorage.MustExist(t, retry.StorageKey)
 }
 
-// TestPresignHeaderMissingRejected verifies that omitting the required
-// x-amz-content-sha256 header on the PUT triggers SigV4 rejection: the
-// header is folded into the signed-headers list, so the bucket cannot
-// reproduce the signature without it. This is the same defence as
-// TestPresignHashTamperRejected from a different angle (header gone vs
-// body altered).
-func TestPresignHeaderMissingRejected(t *testing.T) {
+// TestPresignContentTypeMismatchRejected: the signed content type is part of
+// the reservation, so an upload that declares another type (or none) is
+// refused with 415 before a byte is stored.
+func TestPresignContentTypeMismatchRejected(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
 	t.Parallel()
 
 	tt := newTenant(t)
-	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "header-missing")
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "type-mismatch")
 
 	payload := makePNG(t, 8, 8, color.RGBA{R: 30, G: 40, B: 50, A: 255})
 	res := presignAttachment(t, tt.AccessToken, taskID, "ok.png", "image/png", payload)
 	require.NotEmpty(t, res.UploadURL)
-	require.NotEmpty(t, res.RequiredHeaders["x-amz-content-sha256"],
-		"server must return the header it expects on the PUT")
 
-	// PUT the correct bytes but DROP the required header. The bucket
-	// cannot reproduce the SigV4 signature without the signed-header
-	// value, so it rejects the upload. The exact code depends on
-	// which check fires first:
-	//   - 403 SignatureDoesNotMatch when the recomputed signature
-	//     differs from the signed value, or
-	//   - 400 AccessDenied with the explicit "headers present in the
-	//     request which were not signed" message when the request
-	//     header set diverges from the signed-headers list.
-	// Both prove the binding holds. We pin "this is a 4xx and the
-	// error mentions Signed/Signature/AccessDenied" so the test does
-	// not flake on a MinIO upgrade that swaps which check wins the
-	// race.
-	status, raw := putToPresignedURLStatus(t, res.UploadURL, "image/png", payload, nil)
-	require.GreaterOrEqualf(t, status, 400,
-		"missing x-amz-content-sha256 must be rejected; body=%s", string(raw))
-	require.Lessf(t, status, 500,
-		"rejection must be 4xx not 5xx; body=%s", string(raw))
-	body := string(raw)
-	require.Truef(t,
-		strings.Contains(body, "SignatureDoesNotMatch") ||
-			strings.Contains(body, "AccessDenied") ||
-			strings.Contains(body, "not signed"),
-		"MinIO error body must identify a SigV4 binding violation; body=%s", body)
+	status, raw := putToPresignedURLStatus(t, res.UploadURL, "text/html", payload)
+	require.Equalf(t, http.StatusUnsupportedMediaType, status, "body=%s", string(raw))
+	status, raw = putToPresignedURLStatus(t, res.UploadURL, "", payload)
+	require.Equalf(t, http.StatusUnsupportedMediaType, status, "missing Content-Type; body=%s", string(raw))
+	testStorage.MustNotExist(t, res.StorageKey)
+
+	// Parameters on the media type are ignored, as the relay compares media types.
+	uploadViaPresignedURL(t, res.UploadURL, "IMAGE/PNG; charset=binary", payload)
+	testStorage.MustExist(t, res.StorageKey)
+}
+
+// TestPresignResponsesCarryNoStorageHeaders: the upload URL is
+// self-authorizing, so neither presign surface tells the client to send
+// any header besides Content-Type.
+func TestPresignResponsesCarryNoStorageHeaders(t *testing.T) {
+	bootstrap(t)
+	requireStorage(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	taskID := createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, "no-headers")
+	payload := makePNG(t, 8, 8, color.RGBA{R: 71, G: 72, B: 73, A: 255})
+	sum := sha256Sum(payload)
+
+	status, raw := doJSONStatus(t, http.MethodPost,
+		fmt.Sprintf("%s/tasks/%s/attachments/presign", testServerURL, taskID),
+		tt.AccessToken, map[string]any{
+			"filename":    "a.png",
+			"contentType": "image/png",
+			"byteSize":    len(payload),
+			"sha256":      hex.EncodeToString(sum),
+		})
+	require.Equalf(t, http.StatusOK, status, "body=%s", string(raw))
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(raw, &body))
+	require.NotEmpty(t, body["uploadUrl"])
+	require.NotContains(t, body, "requiredHeaders")
+	require.NotContains(t, string(raw), "x-amz")
+
+	pt := asPersona(t)
+	calID := createCalendarForAttachments(t, pt)
+	evtID := createCalendarEventForAttachments(t, pt, calID, "No headers")
+	cstatus, craw := presignCalendarAttachmentRaw(t, pt, calID, evtID, map[string]any{
+		"filename":    "a.png",
+		"contentType": "image/png",
+		"byteSize":    len(payload),
+		"sha256":      hex.EncodeToString(sum),
+	})
+	require.Equalf(t, http.StatusOK, cstatus, "body=%s", string(craw))
+	var cbody map[string]any
+	require.NoError(t, json.Unmarshal(craw, &cbody))
+	require.NotEmpty(t, cbody["uploadUrl"])
+	require.NotContains(t, cbody, "requiredHeaders")
+	require.NotContains(t, string(craw), "x-amz")
 }
 
 // TestCrossWorkspaceAttachmentDownload verifies that an attachment's
@@ -149,7 +176,7 @@ func TestCrossWorkspaceAttachmentDownload(t *testing.T) {
 	payload := makePNG(t, 12, 12, color.RGBA{R: 100, G: 100, B: 100, A: 255})
 	res := presignAttachment(t, a.AccessToken, taskA, "secret.png", "image/png", payload)
 	require.False(t, res.Deduplicated)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	t.Run("outsider list of A's task returns 4xx", func(t *testing.T) {
 		status, body := doJSONStatus(t, http.MethodGet,
@@ -365,7 +392,7 @@ func TestPresignFilenameEdgeCases(t *testing.T) {
 		require.True(t, strings.HasPrefix(res.StorageKey, "workspace/"),
 			"storage key must follow workspace/{hex}/{sha} layout: got %q", res.StorageKey)
 
-		uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+		uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 		// The attachment row preserves the dangerous-looking name as
 		// data, but the storage layer is unaffected by it.
@@ -395,7 +422,7 @@ func TestPresignFilenameEdgeCases(t *testing.T) {
 		original := "ファイル\u200b名.png"
 		res := presignAttachment(t, tt.AccessToken, taskID, original, "image/png", payload)
 		require.False(t, res.Deduplicated)
-		uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+		uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 		var list struct {
 			Attachments []struct {
@@ -555,6 +582,14 @@ func jsonUnmarshalNoCop(raw []byte, out any) error {
 // sha256Sum returns the 32-byte SHA-256 of b. Local helper so the
 // tests do not depend on the package-private sha256Of in
 // avatar_dedup_test.go.
+// flipLastByte returns a copy of b with its last byte changed: same length,
+// different digest, so only the digest check can reject it.
+func flipLastByte(b []byte) []byte {
+	out := append([]byte(nil), b...)
+	out[len(out)-1] ^= 0xff
+	return out
+}
+
 func sha256Sum(b []byte) []byte {
 	sum := sha256.Sum256(b)
 	return sum[:]

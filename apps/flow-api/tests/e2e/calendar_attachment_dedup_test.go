@@ -7,7 +7,7 @@
 //   - dedup hit on identical bytes within a workspace
 //   - ref-count GC dropping the MinIO blob on last delete
 //   - non-ASCII filenames round-trip via RFC 5987
-//   - SigV4 hash-mismatch rejection
+//   - relay hash-mismatch rejection
 //
 // Calendar attachments live behind /workspaces/{wsId}/calendars/{calId}
 // /events/{evtId}/attachments/* and are mediated by
@@ -37,11 +37,10 @@ import (
 // implement PresignUploadOutputBody / PresignAttachmentOutput.Body
 // from the same set of conventions.
 type calendarPresignResponse struct {
-	UploadURL       string            `json:"uploadUrl"`
-	StorageKey      string            `json:"storageKey"`
-	AttachmentID    string            `json:"attachmentId"`
-	Deduplicated    bool              `json:"deduplicated"`
-	RequiredHeaders map[string]string `json:"requiredHeaders"`
+	UploadURL    string `json:"uploadUrl"`
+	StorageKey   string `json:"storageKey"`
+	AttachmentID string `json:"attachmentId"`
+	Deduplicated bool   `json:"deduplicated"`
 }
 
 // createCalendarForAttachments creates a personal calendar in the
@@ -165,9 +164,7 @@ func TestCalendarPresignDedupHit(t *testing.T) {
 	first := presignCalendarAttachment(t, tt, calID, evtID, "doc.png", "image/png", payload)
 	require.False(t, first.Deduplicated, "first calendar upload must not be deduplicated")
 	require.NotEmpty(t, first.UploadURL)
-	require.NotEmpty(t, first.RequiredHeaders["x-amz-content-sha256"],
-		"miss branch must return signed-header binding")
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	confirmCalendarAttachment(t, tt, calID, evtID, first.AttachmentID)
 	testStorage.MustExist(t, first.StorageKey)
 
@@ -177,8 +174,7 @@ func TestCalendarPresignDedupHit(t *testing.T) {
 
 	second := presignCalendarAttachment(t, tt, calID, evtID, "doc-copy.png", "image/png", payload)
 	require.True(t, second.Deduplicated, "second calendar upload must dedup")
-	require.Empty(t, second.UploadURL, "deduped response must NOT return a presigned PUT URL")
-	require.Empty(t, second.RequiredHeaders, "deduped response must NOT return signed-header bindings")
+	require.Empty(t, second.UploadURL, "deduped response must NOT return an upload URL")
 	require.Equal(t, first.StorageKey, second.StorageKey,
 		"calendar dedup must reuse the same storage_objects.storage_key")
 	require.NotEqual(t, first.AttachmentID, second.AttachmentID,
@@ -207,7 +203,7 @@ func TestCalendarDeleteRefCountGc(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 9, G: 80, B: 70, A: 255})
 	first := presignCalendarAttachment(t, tt, calID, evtID, "first.png", "image/png", payload)
 	require.False(t, first.Deduplicated)
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	confirmCalendarAttachment(t, tt, calID, evtID, first.AttachmentID)
 
 	second := presignCalendarAttachment(t, tt, calID, evtID, "second.png", "image/png", payload)
@@ -262,7 +258,7 @@ func TestCalendarJapaneseFilename(t *testing.T) {
 
 	res := presignCalendarAttachment(t, tt, calID, evtID, original, "image/png", payload)
 	require.False(t, res.Deduplicated)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	t.Run("calendar list returns UTF-8 filename verbatim", func(t *testing.T) {
 		var list struct {
@@ -280,7 +276,7 @@ func TestCalendarJapaneseFilename(t *testing.T) {
 			"calendar filename column must preserve UTF-8 across persistence + JSON")
 	})
 
-	t.Run("calendar download URL embeds RFC 5987 percent-encoded filename", func(t *testing.T) {
+	t.Run("calendar download URL signs the original filename", func(t *testing.T) {
 		var dl struct {
 			DownloadURL string `json:"downloadUrl"`
 		}
@@ -292,14 +288,12 @@ func TestCalendarJapaneseFilename(t *testing.T) {
 
 		parsed, err := url.Parse(dl.DownloadURL)
 		require.NoError(t, err)
-		disp := parsed.Query().Get("response-content-disposition")
-		require.NotEmpty(t, disp,
-			"calendar presigned URL must carry response-content-disposition")
-		require.Truef(t, strings.Contains(disp, "filename*=UTF-8''"+expectedRFC5987),
-			"calendar Content-Disposition param must be RFC 5987: got %q", disp)
+		require.Equal(t, original, parsed.Query().Get("fn"),
+			"calendar download URL must carry the signed filename")
+		require.Equal(t, "/blobs/"+res.StorageKey, parsed.Path)
 	})
 
-	t.Run("calendar GET against presigned URL surfaces RFC 5987 header", func(t *testing.T) {
+	t.Run("calendar GET against download URL surfaces RFC 5987 header", func(t *testing.T) {
 		var dl struct {
 			DownloadURL string `json:"downloadUrl"`
 		}
@@ -308,7 +302,7 @@ func TestCalendarJapaneseFilename(t *testing.T) {
 				testServerURL, tt.workspaceID(), calID, evtID, res.AttachmentID),
 			tt.token(), nil, &dl)
 
-		resp, err := http.Get(dl.DownloadURL) //nolint:gosec,noctx // testing presigned URL flow
+		resp, err := http.Get(dl.DownloadURL) //nolint:gosec,noctx // testing signed relay URL flow
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
@@ -321,9 +315,8 @@ func TestCalendarJapaneseFilename(t *testing.T) {
 }
 
 // TestCalendarHashTamperRejected mirrors TestPresignHashTamperRejected
-// for the calendar event surface. The shared SigV4 binding via
-// PresignPutWithSha256 rejects the upload when bytes do not match the
-// declared hash.
+// for the calendar event surface. The signed relay URL rejects the
+// upload when bytes do not match the declared hash.
 func TestCalendarHashTamperRejected(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
@@ -334,16 +327,20 @@ func TestCalendarHashTamperRejected(t *testing.T) {
 	evtID := createCalendarEventForAttachments(t, tt, calID, "Cal Tamper")
 
 	declared := makePNG(t, 8, 8, color.RGBA{R: 11, G: 22, B: 33, A: 255})
-	tampered := makePNG(t, 8, 8, color.RGBA{R: 99, G: 99, B: 99, A: 255})
+	tampered := flipLastByte(declared)
 
 	res := presignCalendarAttachment(t, tt, calID, evtID, "innocent.png", "image/png", declared)
 	require.False(t, res.Deduplicated)
 	require.NotEmpty(t, res.UploadURL)
 
-	status, raw := putToPresignedURLStatus(t, res.UploadURL, "image/png", tampered, res.RequiredHeaders)
-	require.GreaterOrEqualf(t, status, 400, "MinIO must reject; body=%s", string(raw))
-	require.Lessf(t, status, 500, "rejection must be 4xx; body=%s", string(raw))
+	status, raw := putToPresignedURLStatus(t, res.UploadURL, "image/png", tampered)
+	require.Equalf(t, http.StatusBadRequest, status, "relay must reject a hash-mismatched body; body=%s", string(raw))
 	testStorage.MustNotExist(t, res.StorageKey)
+
+	retry := presignCalendarAttachment(t, tt, calID, evtID, "honest.png", "image/png", declared)
+	require.False(t, retry.Deduplicated, "a rejected upload must not make the content look stored")
+	uploadViaPresignedURL(t, retry.UploadURL, "image/png", declared)
+	testStorage.MustExist(t, retry.StorageKey)
 }
 
 // countCalendarEventAttachmentsForStorageKey counts how many

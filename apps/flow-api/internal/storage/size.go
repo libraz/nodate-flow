@@ -8,10 +8,10 @@ import (
 )
 
 // StatObject returns the actual stored size, in bytes, of the object at key.
-// It is used after a presigned PUT completes to verify the real upload size
+// It is used after a signed upload completes to verify the real upload size
 // against the per-file ceiling: the byteSize a client declares at presign
 // time is never trusted, because a client can declare a tiny size and then
-// stream a much larger body to the presigned URL.
+// stream a much larger body to the upload URL.
 func (c *Client) StatObject(ctx context.Context, key string) (int64, error) {
 	info, err := c.mc.StatObject(ctx, c.bucket, key, minio.StatObjectOptions{})
 	if err != nil {

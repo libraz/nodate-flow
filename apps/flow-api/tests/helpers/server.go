@@ -221,8 +221,10 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 	hookHandle := eventbus.AddNotifyHook(tap.Publish)
 
 	var flowStorage *flowstorage.Client
+	var blobSigner *flowstorage.Signer
 	if bundle != nil {
 		flowStorage = bundle.Flow
+		blobSigner = bundle.Signer
 	}
 
 	flowHandler := router.Build(router.Deps{
@@ -239,6 +241,7 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 		StreamNotifier:     notifier,
 		StreamRemember:     tap.RememberWorkspace,
 		Storage:            flowStorage,
+		BlobSigner:         blobSigner,
 	})
 
 	var authHandler http.Handler
@@ -253,6 +256,9 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 
 	composite := newCompositeHandler(authHandler, flowHandler)
 	srv := httptest.NewServer(composite)
+	if blobSigner != nil {
+		blobSigner.SetBase(srv.URL)
+	}
 	cleanup := func() {
 		eventbus.RemoveNotifyHook(hookHandle)
 		srv.Close()

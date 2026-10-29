@@ -289,6 +289,10 @@ type Config struct {
 	// S3UseSSL enables TLS for the S3 connection. Defaults to true;
 	// local MinIO development should set NF_S3_USE_SSL=false.
 	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"true"`
+
+	// PublicURL is the externally-visible origin of the flow-api (path prefix
+	// preserved), used as the base of the signed blob URLs handed to browsers.
+	PublicURL string `env:"NF_FLOW_PUBLIC_URL" envDefault:"http://localhost:8080"`
 }
 
 // Load parses NF_* environment variables into a Config and validates

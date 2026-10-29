@@ -86,21 +86,12 @@ type PresignAttachmentInput struct {
 }
 
 // PresignAttachmentOutput is the response for the presign endpoint.
-//
-// RequiredHeaders mirrors tasks.PresignUploadOutputBody.RequiredHeaders:
-// when non-empty the client MUST send each header verbatim alongside
-// the PUT, since they are folded into the SigV4 signed-headers list
-// and any mismatch causes the bucket to reject the upload. The server
-// emits a single x-amz-content-sha256 entry to bind the upload body
-// to the digest the client claimed, defeating content-vs-hash
-// poisoning of the dedup row. Omitted on the deduplicated branch.
 type PresignAttachmentOutput struct {
 	Body struct {
-		UploadURL       string            `json:"uploadUrl,omitempty" doc:"Presigned PUT URL. Empty when deduplicated=true."`
-		StorageKey      string            `json:"storageKey" doc:"Object key (informational; the presigned URL already encodes it)."`
-		AttachmentID    string            `json:"attachmentId" doc:"Public ID of the created attachment row"`
-		Deduplicated    bool              `json:"deduplicated" doc:"True when the server reused an existing blob and no upload is needed."`
-		RequiredHeaders map[string]string `json:"requiredHeaders,omitempty" doc:"Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true."`
+		UploadURL    string `json:"uploadUrl,omitempty" doc:"Signed PUT URL on the API. Empty when deduplicated=true."`
+		StorageKey   string `json:"storageKey" doc:"Object key (informational; the signed URL already encodes it)."`
+		AttachmentID string `json:"attachmentId" doc:"Public ID of the created attachment row"`
+		Deduplicated bool   `json:"deduplicated" doc:"True when the server reused an existing blob and no upload is needed."`
 	}
 }
 
@@ -117,7 +108,7 @@ type DownloadAttachmentInput struct {
 // operation-specific name to avoid a generated OpenAPI schema collision
 // with the tasks package's DownloadAttachmentOutputBody.
 type DownloadCalendarAttachmentOutputBody struct {
-	DownloadURL string `json:"downloadUrl" doc:"Presigned GET URL with Content-Disposition: attachment"`
+	DownloadURL string `json:"downloadUrl" doc:"Signed GET URL on the API; the file is served as an attachment"`
 }
 
 // DownloadAttachmentOutput is the response for the download endpoint.
@@ -194,7 +185,7 @@ func ListAttachments(deps Deps) func(context.Context, *ListAttachmentsInput) (*L
 // the server runs content-addressed dedup against
 // storage_objects(workspace_id, sha256) and either bumps the existing
 // row's ref_count (deduplicated=true, no upload) or allocates a fresh
-// row and returns a presigned PUT URL.
+// row and returns a signed PUT URL.
 func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput) (*PresignAttachmentOutput, error) {
 	return func(ctx context.Context, input *PresignAttachmentInput) (*PresignAttachmentOutput, error) {
 		if deps.Storage == nil {
@@ -390,25 +381,18 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			}
 		}
 
-		// Generate the presigned PUT URL only on the miss branch.
-		// PresignPutWithSha256 binds x-amz-content-sha256 into the
-		// SigV4 signed-headers list so the bucket rejects an upload
-		// whose body hash does not match the value the client claimed
-		// — which is precisely the value we keyed the dedup row on.
-		// Without this binding a malicious client could upload bytes
-		// B under a presign minted for sha=A, poisoning the row that
-		// the next legitimate uploader of A would dedup onto.
-		var (
-			uploadURL       string
-			requiredHeaders map[string]string
-		)
+		// Mint the signed upload URL only on the miss branch. The URL binds
+		// the exact size, media type and SHA-256, and the blob relay has the
+		// store reject bytes that hash differently, so a client cannot upload
+		// bytes B against a claim of sha=A and poison the row that the next
+		// legitimate uploader of A would dedup onto.
+		var uploadURL string
 		if !deduplicated {
-			u, err := deps.Storage.PresignPutWithSha256(ctx, storageKey, shaHex, calendarPresignExpiry)
+			u, err := deps.Storage.SignedPutURL(storageKey, input.Body.ContentType, int64(input.Body.ByteSize), shaHex, calendarPresignExpiry)
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			uploadURL = u
-			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
 
 		// Presigning is a write: the attachment row is committed above,
@@ -433,13 +417,12 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		out.Body.StorageKey = storageKey
 		out.Body.AttachmentID = attPub.String()
 		out.Body.Deduplicated = deduplicated
-		out.Body.RequiredHeaders = requiredHeaders
 		return out, nil
 	}
 }
 
-// DownloadAttachment returns a presigned GET URL for an event
-// attachment. The Content-Disposition header is RFC 5987 encoded so
+// DownloadAttachment returns a signed GET URL for an event
+// attachment. The relay emits Content-Disposition in RFC 5987 form so
 // non-ASCII filenames (e.g. Japanese) survive the round trip without
 // mojibake.
 func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInput) (*DownloadAttachmentOutput, error) {
@@ -474,7 +457,7 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.CalendarAttachmentNotFound, apierrors.CalendarAttachmentStoreReadInterrupted))
 		}
 
-		downloadURL, err := deps.Storage.PresignGet(ctx, att.StorageKey, att.Filename, calendarPresignExpiry)
+		downloadURL, err := deps.Storage.SignedDownloadURL(att.StorageKey, att.Filename, calendarPresignExpiry)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

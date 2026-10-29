@@ -5,7 +5,7 @@
 // storage_objects and the attachment delete paths rely on a sweeper
 // hard-deleting a row once nothing references it, and a failed
 // RemoveObject keeps the row so the blob is retried on the next pass.
-// Separately, every presigned upload URL is handed out against a row
+// Separately, every signed upload URL is handed out against a row
 // committed before the bytes arrive, so a client that asks for a URL and never uploads leaves a reservation
 // whose declared size nobody checked.
 //
@@ -41,7 +41,7 @@ const (
 	// before it is treated as abandoned.
 	//
 	// The number is not a guess about client behaviour: it is the
-	// lifetime of the presigned URL the row is currently serving, plus
+	// lifetime of the signed URL the row is currently serving, plus
 	// room for a transfer already in flight when the URL expired. Once
 	// that URL is dead no upload can arrive against the row, so waiting
 	// longer only delays the reclaim. Setting it shorter is the

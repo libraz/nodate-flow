@@ -16,6 +16,9 @@ import (
 	flowstorage "github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
+// testSignerKey signs blob relay URLs in the test harness only.
+var testSignerKey = []byte("test-blob-signer-key-0123456789ab")
+
 // StorageBundle bundles the per-package storage clients and the raw
 // minio-go handle needed for direct object inspection (HEAD / PUT / GET)
 // during integration tests. Both Flow and Auth point at the same MinIO
@@ -28,6 +31,10 @@ type StorageBundle struct {
 	// owns PutObject / GetObject so the avatar handler can stream
 	// uploads directly to MinIO.
 	Auth *testutil.StorageClient
+	// Signer mints the relay URLs the Flow client hands out and verifies them
+	// in the relay. NewTestServerWithStorage points it at the test server once
+	// that server is listening.
+	Signer *flowstorage.Signer
 	// Raw is the underlying minio-go client. Tests use it to assert
 	// that an object physically exists / does not exist after dedup
 	// or GC operations.
@@ -55,12 +62,16 @@ func NewStorageBundle(inst *MinIOInstance) (*StorageBundle, error) {
 	}
 	bucket := fmt.Sprintf("test-%d", time.Now().UnixNano())
 
+	// The base is unknown until the test server listens; the server helper
+	// sets it then.
+	signer := flowstorage.NewSigner("", testSignerKey)
 	flowClient, err := flowstorage.NewClient(flowstorage.Config{
 		Endpoint:  inst.Endpoint,
 		AccessKey: inst.AccessKey,
 		SecretKey: inst.SecretKey,
 		Bucket:    bucket,
 		UseSSL:    false,
+		Signer:    signer,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("flow storage client: %w", err)
@@ -90,6 +101,7 @@ func NewStorageBundle(inst *MinIOInstance) (*StorageBundle, error) {
 
 	return &StorageBundle{
 		Flow:   flowClient,
+		Signer: signer,
 		Auth:   authClient,
 		Raw:    raw,
 		Bucket: bucket,
@@ -136,9 +148,8 @@ func (b *StorageBundle) MustNotExist(t *testing.T, key string) {
 }
 
 // PutBytes uploads raw bytes to the bundle's bucket under the given
-// key. Used by the attachment dedup tests to satisfy the presigned PUT
-// step; tests can also drive a real HTTP PUT against the presigned URL,
-// but the SDK call is far cheaper.
+// key. Used by the attachment dedup tests to write an object directly,
+// bypassing the relay.
 func (b *StorageBundle) PutBytes(ctx context.Context, key string, data []byte, contentType string) error {
 	_, err := b.Raw.PutObject(ctx, b.Bucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,

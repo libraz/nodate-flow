@@ -183,8 +183,8 @@ func RegisterTaskScopedReads(api huma.API, deps Deps) {
 		OperationID: "tasks-attachments-download",
 		Method:      http.MethodGet,
 		Path:        "/tasks/{id}/attachments/{aid}/download",
-		Summary:     "Get a presigned GET URL for downloading an attachment",
-		Description: "Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.",
+		Summary:     "Get a signed download URL for an attachment",
+		Description: "Returns a short-lived signed URL on this API's blob relay. The file is always served as an attachment of opaque bytes, never inline. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.",
 		Tags:        []string{"Tasks"},
 	}, DownloadAttachment(deps))
 
@@ -413,8 +413,8 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		OperationID: "tasks-attachments-presign",
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments/presign",
-		Summary:     "Reserve an attachment row and (if needed) get a presigned PUT URL",
-		Description: "Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.",
+		Summary:     "Reserve an attachment row and (if needed) get a signed PUT URL",
+		Description: "Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a signed PUT URL on this API's blob relay; the URL binds the exact size, content type and SHA-256, and the relay rejects any upload that differs, so the bytes are never sent to object storage directly. The attachment row is always created in the same transaction.",
 		Tags:        []string{"Tasks"},
 	}, PresignUpload(deps))
 
@@ -423,7 +423,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/attachments/{aid}/confirm",
 		Summary:     "Confirm an uploaded attachment and enforce its real size",
-		Description: "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+		Description: "Called after the client finishes the upload. The signed PUT URL already binds the exact size, content type and SHA-256, so this is a second check: the server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling. Returns the object's true size on success.",
 		Tags:        []string{"Tasks"},
 	}, ConfirmUpload(deps))
 

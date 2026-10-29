@@ -34,12 +34,11 @@ func storageObjectExists(ctx context.Context, t *testing.T, key string) bool {
 // TestSweeperReclaimsAnAbandonedReservation is the bound on what one
 // account can store.
 //
-// The presigned PUT binds the body's hash but not its length, and the
-// only size anyone checks at presign time is the one the client
-// declared. Declare a byte, send whatever fits, skip the confirm call
-// that would measure it, repeat — with nothing reclaiming the result
-// the ceiling is not a ceiling. Reclamation is what makes the attack
-// cost the attacker something: the bytes come back.
+// The only size anyone checks at presign time is the one the client
+// declared. Reserve, skip the confirm call that would measure it,
+// repeat — with nothing reclaiming the result the ceiling is not a
+// ceiling. Reclamation is what makes the attack cost the attacker
+// something: the bytes come back.
 func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
@@ -51,13 +50,13 @@ func TestSweeperReclaimsAnAbandonedReservation(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 41, G: 42, B: 43, A: 255})
 
 	res := presignAttachment(t, tt.AccessToken, taskID, "hoard.png", "image/png", payload)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 	testStorage.MustExist(t, res.StorageKey)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// Age the reservation past the presigned URL's lifetime: no upload
+	// Age the reservation past the upload URL's lifetime: no upload
 	// can arrive against it any more, so nothing is being interrupted.
 	//
 	// updated_at is the column the sweep ages rows by, because a row
@@ -100,7 +99,7 @@ func TestSweeperLeavesAConfirmedUploadAlone(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 51, G: 52, B: 53, A: 255})
 
 	res := presignAttachment(t, tt.AccessToken, taskID, "keep.png", "image/png", payload)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, res.AttachmentID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -172,7 +171,7 @@ func TestSweeperSparesAReservationJustHandedOutAgain(t *testing.T) {
 	require.NotEmpty(t, repaired.UploadURL)
 	require.Equal(t, abandoned.StorageKey, repaired.StorageKey,
 		"the repair must reuse the key the existing row already points at")
-	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload, repaired.RequiredHeaders)
+	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload)
 
 	sweeper := newSweeper(t)
 	sweeper.ReservationTTL = time.Hour
@@ -225,7 +224,7 @@ func TestSweeperReclaimsAnUnreferencedRow(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 61, G: 62, B: 63, A: 255})
 
 	res := presignAttachment(t, tt.AccessToken, taskID, "orphan.png", "image/png", payload)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, res.AttachmentID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -268,7 +267,7 @@ func TestSweeperKeepsAReferencedRow(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 71, G: 72, B: 73, A: 255})
 
 	res := presignAttachment(t, tt.AccessToken, taskID, "live.png", "image/png", payload)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, res.AttachmentID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -330,7 +329,7 @@ func TestSweeperRetriesABlobWhoseRemovalFailed(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 81, G: 82, B: 83, A: 255})
 
 	res := presignAttachment(t, tt.AccessToken, taskID, "retry.png", "image/png", payload)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

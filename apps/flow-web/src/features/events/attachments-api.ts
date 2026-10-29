@@ -14,7 +14,7 @@
  * runs dedup against {@code storage_objects}. When the digest already
  * exists the response carries {@code deduplicated: true} and no
  * {@code uploadUrl} — we skip the PUT entirely. Otherwise we stream
- * the file straight to the presigned PUT URL the API returned.
+ * the file to the signed PUT URL the API returned.
  *
  * All list hooks share the
  * {@code ['events', 'attachments', wsId, calId, evtId]} cache row so a
@@ -83,9 +83,10 @@ export interface PresignEventAttachmentArgs {
  *      digest + metadata. The server creates the attachment row in the
  *      same transaction and either reuses an existing
  *      {@code storage_objects} entry (deduplicated=true) or returns a
- *      presigned PUT URL.
+ *      signed PUT URL served by the API.
  *   3. If {@code deduplicated} is true, skip the upload. Otherwise PUT
- *      the file straight at the returned {@code uploadUrl}.
+ *      the file to the returned {@code uploadUrl} with the declared
+ *      Content-Type.
  *
  * Invalidates the event's attachment list on success regardless of
  * which branch ran.
@@ -122,23 +123,19 @@ export function usePresignEventAttachmentMutation(): UseMutationResult<
         throw new ApiError('UPLOAD_FAILED', 'Presign response missing uploadUrl');
       }
 
-      const headers: Record<string, string> = {
-        'Content-Type': contentType,
-        ...(data.requiredHeaders ?? {}),
-      };
+      // The signed URL binds sha256 and size; the relay requires the
+      // Content-Type to equal the one declared at presign.
       const res = await fetch(data.uploadUrl, {
         method: 'PUT',
         body: file,
-        headers,
+        headers: { 'Content-Type': contentType },
       });
       if (!res.ok) throw new ApiError('UPLOAD_FAILED', 'File upload failed');
 
-      // Post-upload size enforcement. The presigned PUT binds only the
-      // SHA-256, not the length, so the server StatObjects the stored
-      // blob and rejects it (deleting the attachment row and, if now
-      // unreferenced, the blob) when the actual size exceeds the
-      // per-file ceiling. Only reachable on the non-deduplicated branch
-      // where a fresh blob was actually stored.
+      // Post-upload size enforcement: the server stats the stored blob
+      // and rejects it (deleting the attachment row and, if now
+      // unreferenced, the blob) when it exceeds the per-file ceiling.
+      // Only reachable on the non-deduplicated branch.
       try {
         await apiRequest(
           (client) =>
@@ -172,7 +169,7 @@ export interface FetchEventAttachmentDownloadUrlArgs {
 }
 
 /**
- * One-shot fetch of a presigned GET URL for an event attachment. Use
+ * One-shot fetch of a signed GET URL (served by the API) for an event attachment. Use
  * this from a click handler ({@code window.open(url, '_blank')}) when
  * you only need the URL once and do not want to keep it cached.
  */

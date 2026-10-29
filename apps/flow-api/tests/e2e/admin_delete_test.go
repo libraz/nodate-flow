@@ -170,7 +170,7 @@ func uploadAttachmentForTask(t *testing.T, tt *helpers.TestTenant, label string,
 	taskID = createTaskForAttachment(t, tt.AccessToken, tt.ProjectPublicID, label)
 	res := presignAttachment(t, tt.AccessToken, taskID, label+".png", "image/png", payload)
 	require.False(t, res.Deduplicated, "fresh upload must not be deduplicated")
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, res.AttachmentID)
 	return taskID, res.StorageKey
 }
@@ -625,7 +625,7 @@ func TestAdminDeleteUserSharedAttachment(t *testing.T) {
 	taskID := createTaskForAttachment(t, owner.AccessToken, owner.ProjectPublicID, "shared")
 	first := presignAttachment(t, owner.AccessToken, taskID, "shared-a.png", "image/png", payload)
 	require.False(t, first.Deduplicated, "first upload must miss")
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	confirmAttachment(t, owner.AccessToken, taskID, first.AttachmentID)
 
 	second := presignAttachment(t, owner.AccessToken, taskID, "shared-b.png", "image/png", payload)

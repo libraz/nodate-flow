@@ -1,7 +1,8 @@
 /**
  * Verify the post-upload size-enforcement handshake for task attachments.
  *
- * The presigned PUT binds only the SHA-256, not the length, so after a
+ * The upload URL is signed with the declared size and digest, but the
+ * declared size is still a number the client supplied, so after a
  * fresh blob is stored the client must call
  * POST /tasks/{id}/attachments/{aid}/confirm. The server re-stats the
  * object and, on an oversize blob, deletes the attachment row and
@@ -94,7 +95,7 @@ describe('usePresignUpload confirm handshake', () => {
 
     await result.current.mutateAsync({ taskId: 'task-1', file });
 
-    // The presigned PUT ran before confirm.
+    // The upload PUT ran before confirm.
     expect(fetch).toHaveBeenCalledTimes(1);
     // Confirm was posted with the attachment id from the presign body.
     expect(postMock).toHaveBeenCalledWith('/tasks/{id}/attachments/{aid}/confirm', {

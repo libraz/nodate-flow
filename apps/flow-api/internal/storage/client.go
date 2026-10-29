@@ -1,18 +1,27 @@
-// Package storage wraps an S3-compatible object store (MinIO / AWS S3)
-// and exposes presigned-URL operations for file uploads and downloads.
+// Package storage wraps an S3-compatible object store (MinIO / AWS S3).
+//
+// The store is reachable only from the private network. Browsers never talk to
+// it: the Client mints HMAC-signed URLs that address the API's own blob relay,
+// and the relay moves the bytes through Open and Put. See Signer.
 package storage
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+// ErrChecksumMismatch means the store rejected a write because the bytes did
+// not hash to the digest the caller declared. The object was not stored.
+var ErrChecksumMismatch = errors.New("storage: body does not match the declared sha256")
 
 // Config holds the connection parameters for the S3-compatible store.
 type Config struct {
@@ -21,13 +30,17 @@ type Config struct {
 	SecretKey string
 	Bucket    string
 	UseSSL    bool
+	// Signer mints the browser-facing blob URLs. Nil leaves the client able to
+	// store and read blobs server-side but unable to hand any to a browser.
+	Signer *Signer
 }
 
-// Client is a thin wrapper around the minio-go SDK that provides
-// presigned URL generation and bucket bootstrapping.
+// Client is a thin wrapper around the minio-go SDK that mints signed blob URLs,
+// streams objects in and out for the relay, and bootstraps the bucket.
 type Client struct {
 	mc     *minio.Client
 	bucket string
+	signer *Signer
 }
 
 // NewClient creates a new S3 storage client. It does not connect or
@@ -37,11 +50,15 @@ func NewClient(cfg Config) (*Client, error) {
 	mc, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
+		// minio-go refuses a caller-supplied x-amz-checksum-* header unless
+		// the client opts into trailing-header support. Put relies on that
+		// header to have the store verify the body digest.
+		TrailingHeaders: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: new client: %w", err)
 	}
-	return &Client{mc: mc, bucket: cfg.Bucket}, nil
+	return &Client{mc: mc, bucket: cfg.Bucket, signer: cfg.Signer}, nil
 }
 
 // EnsureBucket creates the configured bucket if it does not already
@@ -60,69 +77,91 @@ func (c *Client) EnsureBucket(ctx context.Context) error {
 	return nil
 }
 
-// PresignPut returns a presigned PUT URL that the caller can use to
-// upload an object directly to the store. The URL expires after the
-// given duration.
-//
-// This variant does NOT pin the body hash: minio-go's PresignedPutObject
-// signs with UNSIGNED-PAYLOAD, so the bucket cannot detect a
-// content-vs-claim mismatch. Prefer [Client.PresignPutWithSha256] for
-// any flow that performs content-addressed dedup against the claimed
-// digest, otherwise a malicious client can poison a dedup row by
-// declaring sha=A and uploading bytes B.
-func (c *Client) PresignPut(ctx context.Context, key string, expires time.Duration) (string, error) {
-	u, err := c.mc.PresignedPutObject(ctx, c.bucket, key, expires)
-	if err != nil {
-		return "", fmt.Errorf("storage: presign put: %w", err)
+// SignedPutURL returns a URL the browser uploads an object through: exactly
+// byteSize bytes of contentType whose SHA-256 is sha256Hex. See Signer.PutURL.
+func (c *Client) SignedPutURL(key, contentType string, byteSize int64, sha256Hex string, expires time.Duration) (string, error) {
+	if c.signer == nil {
+		return "", ErrSignerUnconfigured
 	}
-	return u.String(), nil
+	return c.signer.PutURL(key, contentType, byteSize, sha256Hex, expires)
 }
 
-// PresignPutWithSha256 returns a presigned PUT URL that requires the
-// client to send the x-amz-content-sha256 header set to the supplied
-// lowercase 64-char hex digest. The header is woven into the SigV4
-// signed-headers list, so the bucket rejects the upload with
-// XAmzContentSHA256Mismatch / BadDigest if the actual body hash does
-// not match the expected value or the header is omitted/altered.
-//
-// This is the variant to use whenever the server uses the claimed
-// sha256 for content-addressed dedup: without it a client could declare
-// sha=A and upload bytes B, poisoning the storage_objects row that the
-// next legitimate uploader of A would dedup onto.
-//
-// The client MUST send the header verbatim alongside the PUT:
-//
-//	PUT <url>
-//	x-amz-content-sha256: <expectedSha256Hex>
-//	body: <file bytes>
-//
-// minio-go's PresignedPutObject signs with UNSIGNED-PAYLOAD and offers
-// no way to inject signed headers, so we drop down to PresignHeader
-// (the documented escape hatch in the upstream API for exactly this
-// use case) and pass the header through extraHeaders.
-func (c *Client) PresignPutWithSha256(ctx context.Context, key string, expectedSha256Hex string, expires time.Duration) (string, error) {
-	extraHeaders := http.Header{}
-	extraHeaders.Set("x-amz-content-sha256", expectedSha256Hex)
-	u, err := c.mc.PresignHeader(ctx, http.MethodPut, c.bucket, key, expires, url.Values{}, extraHeaders)
-	if err != nil {
-		return "", fmt.Errorf("storage: presign put with sha256: %w", err)
+// SignedDownloadURL returns a URL the browser saves the object through as an
+// attachment named filename. The name is emitted in RFC 5987 form by the relay
+// so non-ASCII names survive the round trip through HTTP headers.
+func (c *Client) SignedDownloadURL(key, filename string, expires time.Duration) (string, error) {
+	if c.signer == nil {
+		return "", ErrSignerUnconfigured
 	}
-	return u.String(), nil
+	return c.signer.DownloadURL(key, filename, expires)
 }
 
-// PresignGet returns a presigned GET URL for downloading an object.
-// The response-content-disposition header is forced to "attachment" so
-// browsers always download rather than render inline. The filename is
-// emitted in RFC 5987 form so non-ASCII names (e.g. Japanese) survive
-// the round trip through HTTP headers without UTF-8 mojibake.
-func (c *Client) PresignGet(ctx context.Context, key string, filename string, expires time.Duration) (string, error) {
-	params := make(url.Values)
-	params.Set("response-content-disposition", contentDispositionAttachment(filename))
-	u, err := c.mc.PresignedGetObject(ctx, c.bucket, key, expires, params)
+// Object is an open object body. It is seekable so the relay can answer Range
+// requests without reading from the start.
+type Object struct {
+	obj *minio.Object
+	// Size is the stored length in bytes.
+	Size int64
+	// ModTime is the object's last-modified time.
+	ModTime time.Time
+}
+
+// Read implements io.Reader.
+func (o *Object) Read(p []byte) (int, error) { return o.obj.Read(p) }
+
+// Seek implements io.Seeker.
+func (o *Object) Seek(offset int64, whence int) (int64, error) { return o.obj.Seek(offset, whence) }
+
+// Close releases the underlying connection.
+func (o *Object) Close() error { return o.obj.Close() }
+
+// Open returns the object's bytes for reading, and whether it exists.
+//
+// The metadata is read up front because minio-go opens lazily: a missing
+// object would otherwise surface partway through a response that had already
+// claimed success.
+func (c *Client) Open(ctx context.Context, key string) (*Object, bool, error) {
+	obj, err := c.mc.GetObject(ctx, c.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
-		return "", fmt.Errorf("storage: presign get: %w", err)
+		return nil, false, fmt.Errorf("storage: open object: %w", err)
 	}
-	return u.String(), nil
+	stat, err := obj.Stat()
+	if err != nil {
+		_ = obj.Close()
+		resp := minio.ToErrorResponse(err)
+		if resp.StatusCode == 404 || resp.Code == "NoSuchKey" {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("storage: stat opened object: %w", err)
+	}
+	return &Object{obj: obj, Size: stat.Size, ModTime: stat.LastModified}, true, nil
+}
+
+// Put stores exactly byteSize bytes read from r under key, and has the store
+// itself reject the write if the bytes do not hash to sha256Hex.
+//
+// The digest goes out as x-amz-checksum-sha256 on a single PUT, so the store
+// verifies the whole body before the object becomes visible. Multipart is
+// disabled because a part-wise upload would carry no whole-object SHA-256 to
+// check. A rejected digest returns ErrChecksumMismatch.
+func (c *Client) Put(ctx context.Context, key string, r io.Reader, byteSize int64, contentType, sha256Hex string) error {
+	raw, err := hex.DecodeString(sha256Hex)
+	if err != nil || len(raw) != 32 {
+		return errors.New("storage: put: sha256 must be 64 hex characters")
+	}
+	_, err = c.mc.PutObject(ctx, c.bucket, key, r, byteSize, minio.PutObjectOptions{
+		ContentType:      contentType,
+		DisableMultipart: true,
+		UserMetadata:     map[string]string{"x-amz-checksum-sha256": base64.StdEncoding.EncodeToString(raw)},
+	})
+	if err != nil {
+		switch minio.ToErrorResponse(err).Code {
+		case "BadDigest", "XAmzContentChecksumMismatch", "XAmzContentSHA256Mismatch", "InvalidDigest":
+			return ErrChecksumMismatch
+		}
+		return fmt.Errorf("storage: put object: %w", err)
+	}
+	return nil
 }
 
 // RemoveObject deletes the object at key. It is a no-op on the remote
@@ -190,13 +229,13 @@ func KeyForUser(userPublicIDHex, sha256Hex string) string {
 	return fmt.Sprintf("user/%s/%s", userPublicIDHex, sha256Hex)
 }
 
-// contentDispositionAttachment formats an HTTP Content-Disposition header
+// ContentDispositionAttachment formats an HTTP Content-Disposition header
 // per RFC 5987 / RFC 6266 with both an ASCII fallback `filename=` and a
 // UTF-8 `filename*=` parameter. Browsers that only understand the legacy
 // form get a sanitized name (non-ASCII bytes replaced with '_'); modern
 // browsers honour the percent-encoded UTF-8 parameter and render the
 // original Japanese / emoji / accented filename verbatim.
-func contentDispositionAttachment(filename string) string {
+func ContentDispositionAttachment(filename string) string {
 	ascii := asciiFallbackName(filename)
 	encoded := percentEncodeRFC5987(filename)
 	return fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, ascii, encoded)

@@ -3,7 +3,7 @@
  * attachments.
  *
  * Mirrors the task-side check: after a fresh blob is stored via the
- * presigned PUT, the client must call the calendar confirm endpoint so
+ * upload PUT, the client must call the calendar confirm endpoint so
  * the server can re-stat the object and reject an oversize upload
  * (deleting the attachment row). Invariants:
  *

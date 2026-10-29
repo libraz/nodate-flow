@@ -166,7 +166,7 @@ func recordCalendarChange(
 // authenticated path, so appending it here would put an anonymous actor
 // on the feed for a change the attendee list already shows. And an
 // operation that changes nothing at all yet must still leave a trace —
-// handing out a presigned URL that carries a stored object, confirming
+// handing out a signed URL that carries a stored object, confirming
 // the measured size of an upload that is already on the timeline — where
 // a timeline row per request would bury the changes that matter while an
 // administrator still needs to find that it happened.

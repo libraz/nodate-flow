@@ -122,7 +122,7 @@ func TestSuspendedAuthorKeepsContributionsVisible(t *testing.T) {
 	taskPayload := makePNG(t, 6, 6, color.RGBA{R: 40, G: 80, B: 120, A: 255})
 	taskUpload := presignAttachment(t, member.AccessToken, task.ID, "handover.png", "image/png", taskPayload)
 	require.NotEmpty(t, taskUpload.AttachmentID, "task presign must reserve an attachment")
-	uploadViaPresignedURL(t, taskUpload.UploadURL, "image/png", taskPayload, taskUpload.RequiredHeaders)
+	uploadViaPresignedURL(t, taskUpload.UploadURL, "image/png", taskPayload)
 	confirmAttachment(t, member.AccessToken, task.ID, taskUpload.AttachmentID)
 
 	// The member's contribution on the workspace surfaces.
@@ -180,7 +180,7 @@ func TestSuspendedAuthorKeepsContributionsVisible(t *testing.T) {
 	memberPersona := tenantPersona{tok: member.AccessToken, ws: owner.WorkspacePublicID}
 	calUpload := presignCalendarAttachment(t, memberPersona, calID, evtID, "agenda.png", "image/png", calPayload)
 	require.NotEmpty(t, calUpload.AttachmentID, "calendar presign must reserve an attachment")
-	uploadViaPresignedURL(t, calUpload.UploadURL, "image/png", calPayload, calUpload.RequiredHeaders)
+	uploadViaPresignedURL(t, calUpload.UploadURL, "image/png", calPayload)
 	confirmCalendarAttachment(t, memberPersona, calID, evtID, calUpload.AttachmentID)
 
 	// Every row must be visible to the owner before the suspension, or a

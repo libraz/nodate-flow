@@ -6,8 +6,8 @@
  * server logs, database dumps, extension-less exports. Declaring the
  * generic binary type for all of them throws away the filename, which is
  * the only remaining hint, so the upload falls back to the extension
- * first. The value asserted here is also the one the presigned PUT is
- * signed with, so the metadata and the PUT header have to agree.
+ * first. The value asserted here is also the one the signed upload URL
+ * binds, so the metadata and the PUT header have to agree.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

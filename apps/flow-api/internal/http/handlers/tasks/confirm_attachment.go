@@ -41,10 +41,9 @@ type ConfirmTaskAttachmentOutput struct {
 
 // ConfirmUpload handles POST /tasks/{id}/attachments/{aid}/confirm.
 //
-// The presigned PUT only binds the body's SHA-256, not its length, so a
-// client can declare a tiny byteSize at presign time and then stream an
-// arbitrarily large body to the URL. This endpoint closes that gap: after
-// the client finishes the upload it calls confirm, the handler StatObjects
+// The signed PUT URL binds the size, content type and SHA-256 and the blob
+// relay enforces them; this endpoint is a second check on the stored
+// object: after the client finishes the upload it calls confirm, the handler StatObjects
 // the real blob, and if the actual stored size exceeds the shared per-file
 // ceiling the attachment row and (if now unreferenced) the underlying blob
 // are deleted and the request is rejected. On success the caller receives

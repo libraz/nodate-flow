@@ -903,10 +903,10 @@ type DeleteTaskAttachmentOutput struct {
 // Sha256 is the lowercase hex (64 chars) digest of the file the client
 // is about to upload. The server uses it to look up an existing
 // content-addressed storage_objects row in the same workspace; on a hit
-// the attachment is created against the existing blob (no MinIO upload
+// the attachment is created against the existing blob (no upload
 // needed) and the response carries Deduplicated=true with empty
 // UploadURL. On a miss the server allocates a new storage_objects row
-// and returns a presigned PUT URL the client streams the bytes to.
+// and returns a signed upload URL the client streams the bytes to.
 //
 // ContentType stops at the width of the storage_objects column that
 // records it, so a type this body accepts is a type the row can hold.
@@ -928,22 +928,14 @@ type PresignUploadInput struct {
 // Deduplicated is true when the server already had a storage_objects
 // row in this workspace with the same sha256; in that case UploadURL
 // is empty and the client MUST NOT issue a PUT. Otherwise UploadURL
-// is a short-lived presigned PUT the client streams the file body to.
-//
-// RequiredHeaders carries headers the client MUST include in the PUT
-// request verbatim; they are part of the SigV4 signed-headers list so
-// any tampering invalidates the signature and the upload is rejected
-// by the bucket. The server today emits a single x-amz-content-sha256
-// entry that pins the body to the digest the client originally
-// claimed, blocking content-vs-hash mismatch attacks against the
-// dedup row. The map is omitted from the wire payload entirely on
-// the deduplicated branch.
+// is a short-lived signed URL served by this API; the sha256, size and
+// content type are bound in the URL, so the client sends the file body
+// with no extra request headers.
 type PresignUploadOutputBody struct {
-	UploadURL       string            `json:"uploadUrl,omitempty" doc:"Presigned PUT URL. Empty when deduplicated=true."`
-	StorageKey      string            `json:"storageKey" doc:"Object key (informational; the presigned URL already encodes it)."`
-	AttachmentID    string            `json:"attachmentId" doc:"Public ID of the created attachment row"`
-	Deduplicated    bool              `json:"deduplicated" doc:"True when the server reused an existing blob and no upload is needed."`
-	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty" doc:"Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true."`
+	UploadURL    string `json:"uploadUrl,omitempty" doc:"Signed upload URL served by this API. The sha256, size and content type are bound in the URL; PUT the file body with no extra headers. Empty when deduplicated=true."`
+	StorageKey   string `json:"storageKey" doc:"Object key (informational; the signed URL already encodes it)."`
+	AttachmentID string `json:"attachmentId" doc:"Public ID of the created attachment row"`
+	Deduplicated bool   `json:"deduplicated" doc:"True when the server reused an existing blob and no upload is needed."`
 }
 
 // PresignUploadOutput is the response for POST /tasks/{id}/attachments/presign.
@@ -959,7 +951,7 @@ type DownloadAttachmentInput struct {
 
 // DownloadAttachmentOutputBody is the response body for download.
 type DownloadAttachmentOutputBody struct {
-	DownloadURL string `json:"downloadUrl" doc:"Presigned GET URL with Content-Disposition: attachment"`
+	DownloadURL string `json:"downloadUrl" doc:"Signed download URL served by this API, delivered with Content-Disposition: attachment"`
 }
 
 // DownloadAttachmentOutput is the response for GET /tasks/{id}/attachments/{aid}/download.

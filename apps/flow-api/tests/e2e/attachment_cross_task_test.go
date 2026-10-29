@@ -43,7 +43,7 @@ func TestCrossTaskAttachmentAccess(t *testing.T) {
 	res := presignAttachment(t, tt.AccessToken, taskB, "b-secret.png", "image/png", payload)
 	require.False(t, res.Deduplicated)
 	require.NotEmpty(t, res.AttachmentID)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	// Positive control: the attachment is genuinely reachable through
 	// its own task path, so the cross-task 404s below prove scoping

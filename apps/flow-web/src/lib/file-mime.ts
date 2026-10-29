@@ -11,7 +11,7 @@
  *
  * The server runs the same fallback before deciding whether an upload is
  * allowed, and it takes a declared type at its word, so the value chosen
- * here is also the one the presigned PUT is signed with.
+ * here is also the one the signed upload URL requires as the PUT Content-Type.
  */
 
 /** What a browser reports for a file it cannot identify. */

@@ -39,9 +39,9 @@ type ConfirmAttachmentOutput struct {
 
 // ConfirmAttachment is the calendar analogue of tasks.ConfirmUpload.
 //
-// The presigned PUT binds only the file's SHA-256, not its length, so a
-// client can declare a tiny byteSize at presign time and stream a much
-// larger body. After the upload finishes the client calls confirm; the
+// The signed PUT URL binds the size, content type and SHA-256 and the blob
+// relay enforces them; confirm is a second check on the stored object. After
+// the upload finishes the client calls confirm; the
 // handler StatObjects the real blob and, if the actual size exceeds the
 // shared per-file ceiling, deletes the attachment row (and GCs the blob if
 // it is now unreferenced) and rejects the request. Success returns the

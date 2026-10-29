@@ -62,6 +62,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/blobs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	activityhandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/activity"
 	aihandlers "github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/ai"
@@ -195,9 +196,13 @@ type Deps struct {
 	FlowAPISignalToken string
 
 	// Storage is the S3-compatible object store client for file
-	// uploads / downloads. Nil in tests; presign endpoints return
-	// INTERNAL.UNEXPECTED.
+	// uploads / downloads. Nil in tests; the upload / download endpoints
+	// return INTERNAL.UNEXPECTED.
 	Storage *storage.Client
+	// BlobSigner checks the signed URLs the blob relay is addressed by. It
+	// must be the signer Storage mints with, or no URL would verify. Nil
+	// leaves the relay unmounted.
+	BlobSigner *storage.Signer
 
 	// HookRunner is the runner the event hooks registered here submit
 	// their work to, shared with the hooks cmd/api registers so one bound
@@ -469,6 +474,15 @@ func BuildResult(deps Deps) Result {
 			Window:      time.Minute,
 		})
 		r.Use(globalRL.Middleware())
+	}
+
+	// Blob relay: raw bytes in and out of the object store, addressed only by
+	// URLs this API signed, so no auth middleware runs and the signature is the
+	// authorization. It sits on the bare mux, outside huma, because a huma
+	// operation would parse and cap the body, and no body-size or timeout
+	// middleware is applied here so a large upload is not cut off.
+	if deps.BlobSigner != nil {
+		r.Mount(storage.BlobPath, blobs.Handler(blobs.Deps{Storage: deps.Storage, Signer: deps.BlobSigner}))
 	}
 
 	shared := buildSharedDeps(deps)
@@ -1868,16 +1882,16 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			OperationID: "attachments-presign",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/presign",
-			Summary:     "Reserve an attachment row and (if needed) get a presigned PUT URL",
-			Description: "Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to.",
+			Summary:     "Reserve an attachment row and (if needed) get a signed PUT URL",
+			Description: "Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a signed PUT URL on this API's blob relay; the URL binds the exact size, content type and SHA-256, and the relay rejects any upload that differs, so the bytes are never sent to object storage directly.",
 			Tags:        []string{"Calendar"},
 		}, calendars.PresignAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "attachments-download",
 			Method:      http.MethodGet,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/download",
-			Summary:     "Get a presigned GET URL for downloading an attachment",
-			Description: "Returns a short-lived presigned GET URL with Content-Disposition: attachment. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.",
+			Summary:     "Get a signed download URL for an attachment",
+			Description: "Returns a short-lived signed URL on this API's blob relay. The file is always served as an attachment of opaque bytes, never inline. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.",
 			Tags:        []string{"Calendar"},
 		}, calendars.DownloadAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
@@ -1885,7 +1899,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events/{evtId}/attachments/{attId}/confirm",
 			Summary:     "Confirm an uploaded attachment and enforce its real size",
-			Description: "Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.",
+			Description: "Called after the client finishes the upload. The signed PUT URL already binds the exact size, content type and SHA-256, so this is a second check: the server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling. Returns the object's true size on success.",
 			Tags:        []string{"Calendar"},
 		}, calendars.ConfirmAttachment(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{

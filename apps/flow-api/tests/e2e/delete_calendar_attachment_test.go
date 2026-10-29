@@ -153,7 +153,7 @@ func TestWorkspaceDeleteSweepsCalendarAttachments(t *testing.T) {
 	persona := tenantPersona{tok: tt.AccessToken, ws: tt.WorkspacePublicID}
 	pres := presignCalendarAttachment(t, persona, calID, evtID, "cal-att.png", "image/png", payload)
 	require.Falsef(t, pres.Deduplicated, "fresh upload must not dedup")
-	uploadViaPresignedURL(t, pres.UploadURL, "image/png", payload, pres.RequiredHeaders)
+	uploadViaPresignedURL(t, pres.UploadURL, "image/png", payload)
 	testStorage.MustExist(t, pres.StorageKey)
 	require.Equalf(t, 1,
 		countCalendarEventAttachmentsByPublicID(t, testDB, pres.AttachmentID),

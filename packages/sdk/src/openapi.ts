@@ -1680,8 +1680,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reserve an attachment row and (if needed) get a presigned PUT URL
-         * @description Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to. The attachment row is always created in the same transaction.
+         * Reserve an attachment row and (if needed) get a signed PUT URL
+         * @description Single entry point for adding an attachment to a task. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a signed PUT URL on this API's blob relay; the URL binds the exact size, content type and SHA-256, and the relay rejects any upload that differs, so the bytes are never sent to object storage directly. The attachment row is always created in the same transaction.
          */
         post: operations["tasks-attachments-presign"];
         delete?: never;
@@ -1721,7 +1721,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm an uploaded attachment and enforce its real size
-         * @description Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.
+         * @description Called after the client finishes the upload. The signed PUT URL already binds the exact size, content type and SHA-256, so this is a second check: the server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling. Returns the object's true size on success.
          */
         post: operations["tasks-attachments-confirm"];
         delete?: never;
@@ -1738,8 +1738,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a presigned GET URL for downloading an attachment
-         * @description Returns a short-lived presigned GET URL so the client can stream the file straight from object storage. The API never proxies the bytes.
+         * Get a signed download URL for an attachment
+         * @description Returns a short-lived signed URL on this API's blob relay. The file is always served as an attachment of opaque bytes, never inline. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.
          */
         get: operations["tasks-attachments-download"];
         put?: never;
@@ -3176,8 +3176,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reserve an attachment row and (if needed) get a presigned PUT URL
-         * @description Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a presigned PUT URL the client streams the bytes to.
+         * Reserve an attachment row and (if needed) get a signed PUT URL
+         * @description Single entry point for adding an attachment to an event. The client supplies the file's SHA-256; the server runs content-addressed dedup and either bumps the ref count on an existing storage_objects row (deduplicated=true, no upload) or returns a signed PUT URL on this API's blob relay; the URL binds the exact size, content type and SHA-256, and the relay rejects any upload that differs, so the bytes are never sent to object storage directly.
          */
         post: operations["attachments-presign"];
         delete?: never;
@@ -3217,7 +3217,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm an uploaded attachment and enforce its real size
-         * @description Called after the client finishes the presigned PUT. The server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling — the presigned PUT binds only the SHA-256, not the length, so the client-declared byteSize cannot be trusted. Returns the object's true size on success.
+         * @description Called after the client finishes the upload. The signed PUT URL already binds the exact size, content type and SHA-256, so this is a second check: the server StatObjects the stored blob and rejects it (deleting the attachment row and, if now unreferenced, the blob) when the actual size exceeds the per-file ceiling. Returns the object's true size on success.
          */
         post: operations["attachments-confirm"];
         delete?: never;
@@ -3234,8 +3234,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a presigned GET URL for downloading an attachment
-         * @description Returns a short-lived presigned GET URL with Content-Disposition: attachment. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.
+         * Get a signed download URL for an attachment
+         * @description Returns a short-lived signed URL on this API's blob relay. The file is always served as an attachment of opaque bytes, never inline. Non-ASCII filenames are emitted in RFC 5987 form so they survive HTTP header transport.
          */
         get: operations["attachments-download"];
         put?: never;
@@ -6644,7 +6644,7 @@ export interface components {
              * @example https://example.com/schemas/DownloadAttachmentOutputBody.json
              */
             readonly $schema?: string;
-            /** @description Presigned GET URL with Content-Disposition: attachment */
+            /** @description Signed download URL served by this API, delivered with Content-Disposition: attachment */
             downloadUrl: string;
         };
         DownloadCalendarAttachmentOutputBody: {
@@ -6654,7 +6654,7 @@ export interface components {
              * @example https://example.com/schemas/DownloadCalendarAttachmentOutputBody.json
              */
             readonly $schema?: string;
-            /** @description Presigned GET URL with Content-Disposition: attachment */
+            /** @description Signed GET URL on the API; the file is served as an attachment */
             downloadUrl: string;
         };
         DuplicateCandidate: {
@@ -8854,13 +8854,9 @@ export interface components {
             attachmentId: string;
             /** @description True when the server reused an existing blob and no upload is needed. */
             deduplicated: boolean;
-            /** @description Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true. */
-            requiredHeaders?: {
-                [key: string]: string;
-            };
-            /** @description Object key (informational; the presigned URL already encodes it). */
+            /** @description Object key (informational; the signed URL already encodes it). */
             storageKey: string;
-            /** @description Presigned PUT URL. Empty when deduplicated=true. */
+            /** @description Signed PUT URL on the API. Empty when deduplicated=true. */
             uploadUrl?: string;
         };
         PresignUploadBody: {
@@ -8893,13 +8889,9 @@ export interface components {
             attachmentId: string;
             /** @description True when the server reused an existing blob and no upload is needed. */
             deduplicated: boolean;
-            /** @description Headers the client MUST send verbatim with the PUT. Currently emits x-amz-content-sha256 to bind the upload body to the claimed digest. Empty/omitted when deduplicated=true. */
-            requiredHeaders?: {
-                [key: string]: string;
-            };
-            /** @description Object key (informational; the presigned URL already encodes it). */
+            /** @description Object key (informational; the signed URL already encodes it). */
             storageKey: string;
-            /** @description Presigned PUT URL. Empty when deduplicated=true. */
+            /** @description Signed upload URL served by this API. The sha256, size and content type are bound in the URL; PUT the file body with no extra headers. Empty when deduplicated=true. */
             uploadUrl?: string;
         };
         Project: {

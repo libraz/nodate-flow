@@ -3,6 +3,9 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -154,8 +157,15 @@ func main() {
 	}
 
 	// S3-compatible object storage for file uploads. When NF_S3_ENDPOINT
-	// is empty the presign endpoints return INTERNAL.UNEXPECTED but the
-	// rest of the API still boots normally.
+	// is empty the upload/download endpoints return INTERNAL.UNEXPECTED but
+	// the rest of the API still boots normally. The store is never exposed
+	// to browsers: the URLs they receive point at the blob relay on this
+	// API, signed by blobSigner.
+	blobSigner, err := newBlobSigner(cfg.PublicURL, cfg.SecretKey, logger)
+	if err != nil {
+		logger.Error("blob url signer init failed", "err", err)
+		os.Exit(1)
+	}
 	var storageClient *storage.Client
 	if cfg.S3Endpoint != "" {
 		sc, serr := storage.NewClient(storage.Config{
@@ -164,6 +174,7 @@ func main() {
 			SecretKey: cfg.S3SecretKey,
 			Bucket:    cfg.S3Bucket,
 			UseSSL:    cfg.S3UseSSL,
+			Signer:    blobSigner,
 		})
 		if serr != nil {
 			logger.Error("storage client init failed", "err", serr)
@@ -539,6 +550,7 @@ func main() {
 		JudgeEnqueuer:         judgeEnqueuer,
 		FlowAPISignalToken:    cfg.FlowAPISignalToken,
 		Storage:               storageClient,
+		BlobSigner:            blobSigner,
 		EmailSender:           emailSender,
 		EmailFrom:             cfg.SMTPFrom,
 		FlowWebURL:            cfg.FlowWebURL,
@@ -777,6 +789,30 @@ func main() {
 		logger.Warn("event hook shutdown timed out", "err", err)
 	}
 	logger.Info("shutdown complete")
+}
+
+// blobURLLabel domain-separates the blob-URL signing key from the master
+// secret's other uses, so a blob URL can never be presented as, or help forge,
+// a session token.
+const blobURLLabel = "nodate-flow:blob-url:v1"
+
+// newBlobSigner builds the signer for browser-facing blob URLs. The key is
+// derived from the master secret; with no secret (development only, config
+// refuses it in production) a random key is used and URLs die on restart.
+func newBlobSigner(publicURL, secret string, logger *slog.Logger) (*storage.Signer, error) {
+	var key []byte
+	if secret == "" {
+		key = make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			return nil, err
+		}
+		logger.Warn("NF_SECRET_KEY is empty: blob URLs are signed with an ephemeral key and stop working on restart")
+	} else {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(blobURLLabel))
+		key = mac.Sum(nil)
+	}
+	return storage.NewSigner(publicURL, key), nil
 }
 
 // resolveVersion returns NF_FLOW_VERSION, the Go build main module version, or

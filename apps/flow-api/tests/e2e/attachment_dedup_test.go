@@ -57,55 +57,36 @@ func presignAttachment(t *testing.T, token, taskID, filename, contentType string
 }
 
 type presignResponse struct {
-	UploadURL       string            `json:"uploadUrl"`
-	StorageKey      string            `json:"storageKey"`
-	AttachmentID    string            `json:"attachmentId"`
-	Deduplicated    bool              `json:"deduplicated"`
-	RequiredHeaders map[string]string `json:"requiredHeaders"`
+	UploadURL    string `json:"uploadUrl"`
+	StorageKey   string `json:"storageKey"`
+	AttachmentID string `json:"attachmentId"`
+	Deduplicated bool   `json:"deduplicated"`
 }
 
-// uploadViaPresignedURL streams the bytes to the supplied presigned PUT
-// URL and asserts a 2xx response. The upload step belongs to the client
-// in production; the test simulates that step so the MinIO blob is
-// physically present when the test inspects ref counts.
-//
-// requiredHeaders are the entries the server returned alongside the
-// presigned URL (currently x-amz-content-sha256). They MUST be sent
-// verbatim because they are folded into the SigV4 signed-headers list;
-// omitting or altering them causes MinIO to reject the upload with
-// SignatureDoesNotMatch / XAmzContentSHA256Mismatch.
-func uploadViaPresignedURL(t *testing.T, presignedURL, contentType string, payload []byte, requiredHeaders map[string]string) {
+// uploadViaPresignedURL streams the bytes to the signed relay URL the
+// presign returned and asserts a 2xx response. The upload step belongs to
+// the client in production; the test simulates that step so the MinIO blob
+// is physically present when the test inspects ref counts. The only header
+// the client sends is Content-Type, equal to the one declared at presign.
+func uploadViaPresignedURL(t *testing.T, uploadURL, contentType string, payload []byte) {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPut, presignedURL, bytes.NewReader(payload))
-	require.NoError(t, err, "build PUT request")
-	req.Header.Set("Content-Type", contentType)
-	for k, v := range requiredHeaders {
-		req.Header.Set(k, v)
-	}
-	req.ContentLength = int64(len(payload))
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err, "PUT to presigned URL")
-	defer func() { _ = resp.Body.Close() }()
-	raw, _ := io.ReadAll(resp.Body)
-	require.GreaterOrEqualf(t, resp.StatusCode, 200, "PUT %s -> %d body=%s", presignedURL, resp.StatusCode, string(raw))
-	require.Lessf(t, resp.StatusCode, 300, "PUT %s -> %d body=%s", presignedURL, resp.StatusCode, string(raw))
+	status, raw := putToPresignedURLStatus(t, uploadURL, contentType, payload)
+	require.GreaterOrEqualf(t, status, 200, "PUT %s -> %d body=%s", uploadURL, status, string(raw))
+	require.Lessf(t, status, 300, "PUT %s -> %d body=%s", uploadURL, status, string(raw))
 }
 
 // putToPresignedURLStatus is the negative-path counterpart to
 // uploadViaPresignedURL: it issues the PUT and returns the status code
-// + raw body without asserting success, so the caller can verify that
-// MinIO rejects mismatched / missing signed headers.
-func putToPresignedURLStatus(t *testing.T, presignedURL, contentType string, payload []byte, requiredHeaders map[string]string) (int, []byte) {
+// and raw body without asserting success, so the caller can verify that
+// the relay rejects a mismatched body.
+func putToPresignedURLStatus(t *testing.T, uploadURL, contentType string, payload []byte) (int, []byte) {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPut, presignedURL, bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(payload))
 	require.NoError(t, err, "build PUT request")
 	req.Header.Set("Content-Type", contentType)
-	for k, v := range requiredHeaders {
-		req.Header.Set(k, v)
-	}
 	req.ContentLength = int64(len(payload))
 	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err, "PUT to presigned URL")
+	require.NoError(t, err, "PUT to signed upload URL")
 	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, raw
@@ -186,16 +167,11 @@ func TestPresignDedupHit(t *testing.T) {
 	t.Run("first presign uploads to MinIO", func(t *testing.T) {
 		first := presignAttachment(t, tt.AccessToken, taskID, "doc.png", "image/png", payload)
 		require.False(t, first.Deduplicated, "first upload must not be deduplicated")
-		require.NotEmpty(t, first.UploadURL, "first upload must return a presigned PUT URL")
+		require.NotEmpty(t, first.UploadURL, "first upload must return a signed upload URL")
 		require.NotEmpty(t, first.StorageKey)
 		require.NotEmpty(t, first.AttachmentID)
 
-		require.NotNil(t, first.RequiredHeaders, "miss branch must return requiredHeaders")
-		expectedSHA := sha256.Sum256(payload)
-		require.Equal(t, hex.EncodeToString(expectedSHA[:]),
-			first.RequiredHeaders["x-amz-content-sha256"],
-			"requiredHeaders must pin the body hash for SigV4 verification")
-		uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+		uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 		confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
 		testStorage.MustExist(t, first.StorageKey)
 
@@ -207,8 +183,7 @@ func TestPresignDedupHit(t *testing.T) {
 		t.Run("second presign hits dedup", func(t *testing.T) {
 			second := presignAttachment(t, tt.AccessToken, taskID, "doc-copy.png", "image/png", payload)
 			require.True(t, second.Deduplicated, "second upload must be deduplicated")
-			require.Empty(t, second.UploadURL, "deduplicated response must NOT carry a presigned PUT URL")
-			require.Empty(t, second.RequiredHeaders, "deduplicated response must NOT carry requiredHeaders (no PUT happens)")
+			require.Empty(t, second.UploadURL, "deduplicated response must NOT carry an upload URL")
 			require.Equal(t, first.StorageKey, second.StorageKey, "dedup must reuse the same storage key")
 			require.NotEqual(t, first.AttachmentID, second.AttachmentID, "each presign creates a distinct attachment row")
 
@@ -242,14 +217,14 @@ func TestPresignDifferentWorkspaces(t *testing.T) {
 
 	resA := presignAttachment(t, a.AccessToken, taskA, "shared.png", "image/png", payload)
 	require.False(t, resA.Deduplicated, "tenant A first upload must not be deduplicated")
-	uploadViaPresignedURL(t, resA.UploadURL, "image/png", payload, resA.RequiredHeaders)
+	uploadViaPresignedURL(t, resA.UploadURL, "image/png", payload)
 
 	resB := presignAttachment(t, b.AccessToken, taskB, "shared.png", "image/png", payload)
 	require.False(t, resB.Deduplicated, "tenant B first upload must not be deduplicated even with identical sha256")
 	require.NotEmpty(t, resB.UploadURL)
 	require.NotEqual(t, resA.StorageKey, resB.StorageKey,
 		"workspace-scoped dedup must produce distinct storage keys across tenants")
-	uploadViaPresignedURL(t, resB.UploadURL, "image/png", payload, resB.RequiredHeaders)
+	uploadViaPresignedURL(t, resB.UploadURL, "image/png", payload)
 
 	rcA, okA := storageObjectRefCount(t, testDB, resA.StorageKey)
 	rcB, okB := storageObjectRefCount(t, testDB, resB.StorageKey)
@@ -273,7 +248,7 @@ func TestDeleteRefCountGc(t *testing.T) {
 
 	first := presignAttachment(t, tt.AccessToken, taskID, "first.png", "image/png", payload)
 	require.False(t, first.Deduplicated)
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
 
 	second := presignAttachment(t, tt.AccessToken, taskID, "second.png", "image/png", payload)
@@ -312,7 +287,7 @@ func TestDeleteRefCountGc(t *testing.T) {
 // trip end-to-end:
 //   - Stored in attachments.filename as UTF-8 (no transcoding)
 //   - Surfaced unchanged on the list endpoint
-//   - Embedded in the presigned download URL using the RFC 5987
+//   - Signed into the download URL and emitted by the relay in the RFC 5987
 //     percent-encoded UTF-8 form so browsers render the original glyphs
 func TestJapaneseFilename(t *testing.T) {
 	bootstrap(t)
@@ -328,7 +303,7 @@ func TestJapaneseFilename(t *testing.T) {
 
 	res := presignAttachment(t, tt.AccessToken, taskID, original, "image/png", payload)
 	require.False(t, res.Deduplicated)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	t.Run("list returns UTF-8 filename verbatim", func(t *testing.T) {
 		var list struct {
@@ -345,7 +320,7 @@ func TestJapaneseFilename(t *testing.T) {
 			"filename column must preserve UTF-8 across persistence + JSON marshalling")
 	})
 
-	t.Run("download URL embeds RFC 5987 encoded filename", func(t *testing.T) {
+	t.Run("download URL signs the original filename", func(t *testing.T) {
 		var dl struct {
 			DownloadURL string `json:"downloadUrl"`
 		}
@@ -356,14 +331,12 @@ func TestJapaneseFilename(t *testing.T) {
 
 		parsed, err := url.Parse(dl.DownloadURL)
 		require.NoError(t, err)
-		disp := parsed.Query().Get("response-content-disposition")
-		require.NotEmpty(t, disp,
-			"presigned URL must carry response-content-disposition for browser download")
-		require.True(t, strings.Contains(disp, "filename*=UTF-8''"+expectedRFC5987),
-			"Content-Disposition param must use RFC 5987 percent-encoded UTF-8: got %q", disp)
+		require.Equal(t, original, parsed.Query().Get("fn"),
+			"the relay URL must carry the signed filename the attachment is saved under")
+		require.Equal(t, "/blobs/"+res.StorageKey, parsed.Path)
 	})
 
-	t.Run("GET against presigned URL returns RFC 5987 Content-Disposition header", func(t *testing.T) {
+	t.Run("GET against download URL returns RFC 5987 Content-Disposition header", func(t *testing.T) {
 		var dl struct {
 			DownloadURL string `json:"downloadUrl"`
 		}
@@ -371,13 +344,13 @@ func TestJapaneseFilename(t *testing.T) {
 			fmt.Sprintf("%s/tasks/%s/attachments/%s/download", testServerURL, taskID, res.AttachmentID),
 			tt.AccessToken, nil, &dl)
 
-		resp, err := http.Get(dl.DownloadURL) //nolint:gosec,noctx // testing presigned URL flow
+		resp, err := http.Get(dl.DownloadURL) //nolint:gosec,noctx // testing signed relay URL flow
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
 
 		require.Equal(t, http.StatusOK, resp.StatusCode,
-			"GET against presigned URL must return 200")
+			"GET against the download URL must return 200")
 		disp := resp.Header.Get("Content-Disposition")
 		require.True(t, strings.Contains(disp, "filename*=UTF-8''"+expectedRFC5987),
 			"Content-Disposition response header must round-trip the RFC 5987 form: got %q", disp)
@@ -422,7 +395,7 @@ func TestPresignAbandonedUploadDoesNotPoisonDedup(t *testing.T) {
 	require.Equal(t, abandoned.StorageKey, second.StorageKey,
 		"the repair must fill the key the existing row already points at, not allocate a second one")
 
-	uploadViaPresignedURL(t, second.UploadURL, "image/png", payload, second.RequiredHeaders)
+	uploadViaPresignedURL(t, second.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, second.AttachmentID)
 	testStorage.MustExist(t, second.StorageKey)
 
@@ -452,7 +425,7 @@ func TestPresignRepairsAnAlreadyPoisonedRow(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 4, G: 5, B: 6, A: 255})
 
 	first := presignAttachment(t, tt.AccessToken, taskID, "orig.png", "image/png", payload)
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	testStorage.MustExist(t, first.StorageKey)
 
 	// The object goes away while the row stays: a blob lost to a bucket
@@ -469,7 +442,7 @@ func TestPresignRepairsAnAlreadyPoisonedRow(t *testing.T) {
 	require.NotEmpty(t, repaired.UploadURL)
 	require.Equal(t, first.StorageKey, repaired.StorageKey)
 
-	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload, repaired.RequiredHeaders)
+	uploadViaPresignedURL(t, repaired.UploadURL, "image/png", payload)
 	testStorage.MustExist(t, repaired.StorageKey)
 }
 
@@ -477,12 +450,10 @@ func TestPresignRepairsAnAlreadyPoisonedRow(t *testing.T) {
 // size-limit fix.
 //
 // The ceiling is enforced on a number the client supplies at presign
-// time, and the presigned PUT binds only the body's hash, not its
-// length. A member can therefore declare one byte, send whatever they
-// like, and never call confirm — nothing measures the result. The row
-// that upload created must not then be handed to the next person as
-// proof the content is stored, because the size on it is still the
-// number the first client made up.
+// time. Until confirm measures the stored object, the size on the row
+// is still the number the client typed. A member who uploads and never
+// calls confirm leaves a row that must not be handed to the next person
+// as proof the content is stored.
 func TestUnconfirmedUploadIsNotADedupCandidate(t *testing.T) {
 	bootstrap(t)
 	requireStorage(t)
@@ -495,7 +466,7 @@ func TestUnconfirmedUploadIsNotADedupCandidate(t *testing.T) {
 	// Upload, but never confirm: the bytes are in the bucket and the
 	// row still carries only the declared size.
 	first := presignAttachment(t, tt.AccessToken, taskID, "unconfirmed.png", "image/png", payload)
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	testStorage.MustExist(t, first.StorageKey)
 
 	second := presignAttachment(t, tt.AccessToken, taskID, "next.png", "image/png", payload)
@@ -518,7 +489,7 @@ func TestConfirmedUploadBecomesADedupCandidate(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 31, G: 32, B: 33, A: 255})
 
 	first := presignAttachment(t, tt.AccessToken, taskID, "confirmed.png", "image/png", payload)
-	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload, first.RequiredHeaders)
+	uploadViaPresignedURL(t, first.UploadURL, "image/png", payload)
 	confirmAttachment(t, tt.AccessToken, taskID, first.AttachmentID)
 
 	second := presignAttachment(t, tt.AccessToken, taskID, "copy.png", "image/png", payload)

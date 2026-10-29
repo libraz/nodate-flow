@@ -1132,10 +1132,10 @@ export interface PresignUploadArgs {
  *      server inserts the {@code attachments} row in the same
  *      transaction it consults the {@code storage_objects} table.
  *   2. If the response carries {@code deduplicated: true} the bytes
- *      already exist in object storage; we skip the PUT entirely.
- *   3. Otherwise we stream the file to the presigned {@code uploadUrl}
- *      with a {@code PUT} (Content-Type matches the metadata sent in
- *      step 1, so the signature is honored).
+ *      already exist in storage; we skip the PUT entirely.
+ *   3. Otherwise we PUT the file to the API-signed {@code uploadUrl}
+ *      (the sha256 and size are bound in the URL; Content-Type must
+ *      equal the value sent in step 1).
  *
  * Either branch invalidates the task's attachments cache so the list
  * row appears (or its ref count is reflected) immediately.
@@ -1181,23 +1181,19 @@ export function usePresignUpload(): UseMutationResult<
         throw new ApiError('UPLOAD_FAILED', 'Presign response missing uploadUrl');
       }
 
-      const headers: Record<string, string> = {
-        'Content-Type': contentType,
-        ...(data.requiredHeaders ?? {}),
-      };
+      // The signed URL binds sha256 and size; the relay requires the
+      // Content-Type to equal the one declared at presign.
       const res = await fetch(data.uploadUrl, {
         method: 'PUT',
         body: file,
-        headers,
+        headers: { 'Content-Type': contentType },
       });
       if (!res.ok) throw new ApiError('UPLOAD_FAILED', 'File upload failed');
 
-      // Post-upload size enforcement. The presigned PUT binds only the
-      // SHA-256, not the length, so the server StatObjects the stored
-      // blob and rejects it (deleting the attachment row and, if now
-      // unreferenced, the blob) when the actual size exceeds the
-      // per-file ceiling. Only reachable on the non-deduplicated branch
-      // where a fresh blob was actually stored.
+      // Post-upload size enforcement: the server stats the stored blob
+      // and rejects it (deleting the attachment row and, if now
+      // unreferenced, the blob) when it exceeds the per-file ceiling.
+      // Only reachable on the non-deduplicated branch.
       try {
         await apiRequest(
           (client) =>
@@ -1227,7 +1223,7 @@ export interface DownloadAttachmentArgs {
   attachmentId: string;
 }
 
-/** Gets a presigned download URL for an attachment. */
+/** Gets a signed download URL (served by the API) for an attachment. */
 export async function fetchDownloadUrl(taskId: string, attachmentId: string): Promise<string> {
   const data = await apiRequest(
     (client) =>

@@ -105,7 +105,7 @@ func TestWorkspaceDeleteRemovesStorageRowsAndBlobs(t *testing.T) {
 	payload := makePNG(t, 8, 8, color.RGBA{R: 50, G: 100, B: 150, A: 255})
 	res := presignAttachment(t, tt.AccessToken, taskID, "blob.png", "image/png", payload)
 	require.False(t, res.Deduplicated)
-	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload, res.RequiredHeaders)
+	uploadViaPresignedURL(t, res.UploadURL, "image/png", payload)
 
 	wsID := internalWorkspaceID(t, testDB, tt.WorkspacePublicID)
 	require.Equalf(t, 1, countStorageObjectsForWorkspace(t, testDB, wsID),

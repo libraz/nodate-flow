@@ -47,19 +47,19 @@ const presignMaxAttempts = 3
 //  1. Dedup hit. The (workspace_id, sha256) UNIQUE key on
 //     storage_objects already has a row, so the handler bumps that
 //     row's ref_count, inserts the attachment with the existing FK,
-//     and returns deduplicated=true with no presigned URL — the
+//     and returns deduplicated=true with no upload URL — the
 //     client should NOT issue a PUT.
 //  2. Miss. The handler allocates a new storage_objects row at
 //     ref_count=1 with a content-addressed storage key
 //     (workspace/{wsHex}/{sha256Hex}), inserts the attachment, and
-//     returns a short-lived presigned PUT URL the client streams the
+//     returns a short-lived signed PUT URL the client streams the
 //     file bytes to. The blob lands at the predetermined key so the
 //     server never has to mutate the storage_objects row after the
 //     upload completes.
 //
 // Both branches happen inside a single transaction so the attachment
 // row and the storage_objects row stay consistent if either INSERT
-// fails. The presigned URL is generated AFTER commit so a failed
+// fails. The signed URL is generated AFTER commit so a failed
 // MinIO call cannot leave an orphan attachment.
 //
 // Concurrent-race retry: on InsertStorageObject MySQL 1062 we MUST
@@ -255,21 +255,14 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			}
 		}
 
-		// Generate the presigned PUT URL only on the miss branch.
-		// PresignPutWithSha256 binds x-amz-content-sha256 into the
-		// SigV4 signed-headers list so the bucket rejects the upload
-		// (XAmzContentSHA256Mismatch / BadDigest) if the body bytes
-		// do not actually hash to the value the client claimed. That
-		// closes the content-poisoning attack against the dedup row:
-		// otherwise a client could upload bytes B under a presign
-		// minted for sha=A and the next legitimate uploader of A
-		// would dedup onto the wrong content.
-		var (
-			uploadURL       string
-			requiredHeaders map[string]string
-		)
+		// Mint the signed upload URL only on the miss branch. The URL binds
+		// the exact size, media type and SHA-256, and the blob relay has the
+		// store reject bytes that hash differently, so a client cannot upload
+		// bytes B against a claim of sha=A and poison the dedup row that the
+		// next legitimate uploader of A would land on.
+		var uploadURL string
 		if !deduplicated {
-			u, err := deps.Storage.PresignPutWithSha256(ctx, storageKey, shaHex, presignExpiry)
+			u, err := deps.Storage.SignedPutURL(storageKey, in.Body.ContentType, int64(in.Body.ByteSize), shaHex, presignExpiry)
 			if err != nil {
 				// The DB is committed; we cannot rollback. The client
 				// can retry the presign endpoint and will hit the
@@ -279,23 +272,21 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			uploadURL = u
-			requiredHeaders = map[string]string{"x-amz-content-sha256": shaHex}
 		}
 
 		return &PresignUploadOutput{Body: PresignUploadOutputBody{
-			UploadURL:       uploadURL,
-			StorageKey:      storageKey,
-			AttachmentID:    attachPub.String(),
-			Deduplicated:    deduplicated,
-			RequiredHeaders: requiredHeaders,
+			UploadURL:    uploadURL,
+			StorageKey:   storageKey,
+			AttachmentID: attachPub.String(),
+			Deduplicated: deduplicated,
 		}}, nil
 	}
 }
 
 // DownloadAttachment handles GET /tasks/{id}/attachments/{aid}/download.
-// It returns a presigned GET URL with Content-Disposition: attachment.
-// The filename embedded in the disposition header uses RFC 5987 form so
-// non-ASCII (e.g. Japanese) names round-trip without mojibake.
+// It returns a signed URL on the blob relay that serves the file as an
+// attachment. The relay emits the filename in RFC 5987 form so non-ASCII
+// (e.g. Japanese) names round-trip without mojibake.
 func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInput) (*DownloadAttachmentOutput, error) {
 	return func(ctx context.Context, in *DownloadAttachmentInput) (*DownloadAttachmentOutput, error) {
 		if deps.Storage == nil {
@@ -324,7 +315,7 @@ func DownloadAttachment(deps Deps) func(context.Context, *DownloadAttachmentInpu
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
 
-		downloadURL, err := deps.Storage.PresignGet(ctx, row.StorageKey, row.Filename, presignExpiry)
+		downloadURL, err := deps.Storage.SignedDownloadURL(row.StorageKey, row.Filename, presignExpiry)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
