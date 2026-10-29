@@ -132,80 +132,42 @@ test.describe('task detail edit affordances', () => {
     await injectAuth(page.context(), tenant);
     await openTaskDetail(page, taskId, title);
 
-    // Pick a specific, unambiguous day that will render identically
-    // in any locale after formatDueDate(): a day in the middle of the
-    // month far from month boundaries so locale month-name variation
-    // is the only difference. We assert via the exact digit "15" on
-    // the trigger which both en ("Apr 15, 2026") and ja ("2026/04/15")
-    // share.
-    const targetYear = 2026;
-    const targetMonth = 6; // June — also avoids any DST surprises
+    // Target the 15th of next month, computed from the current date: a
+    // mid-month day avoids boundary effects, and the picker opens at the
+    // current month so exactly one Next click reaches it. The trigger
+    // text is asserted via the digits "15" and the year, which every
+    // locale's formatDueDate() output shares.
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + 1, 15);
+    const targetYear = target.getFullYear();
+    const targetMonth = target.getMonth() + 1;
     const targetDay = 15;
     const targetIso = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(
       targetDay,
     ).padStart(2, '0')}`;
 
-    // The sidebar has two DatePickers (start, due). Scope to the
-    // sidebar aside and locate by its surrounding "Due date" / "期日"
-    // label's sibling trigger. The picker trigger renders the
-    // placeholder "No date" / "日付を選択" when unset — use the
-    // FormField label + nearest picker approach by filtering buttons
-    // inside the <aside> to the one showing the placeholder copy.
+    // The sidebar has two DatePickers (start, due). Both triggers show
+    // the same placeholder, so locate the due trigger as the first
+    // button in the FormField under the "Due date" / "期日" label.
     const sidebar = page.locator('aside');
-
-    // Find the due-date picker's trigger. The placeholder used when
-    // no date is set comes from common.date.placeholder which is
-    // shared between start and due triggers — so we disambiguate by
-    // clicking the trigger that follows the "Due date" / "期日" label.
     const dueLabel = sidebar.getByText(/^(Due date|期日)$/);
     await expect(dueLabel).toBeVisible({ timeout: 5_000 });
-    // The DatePicker trigger is the button rendered inside the
-    // FormField under that label; it's the first button after the
-    // label within the same FormField container.
     const dueTrigger = dueLabel.locator('..').getByRole('button').first();
     await dueTrigger.click();
 
-    // The popover opens at the current month. Step the month header
-    // forward with the Next button until we land on the target
-    // month. The Next button has aria-label = calendar.next
-    // ("Next month" / "次の月"). Match the full label so we don't
-    // collide with any other "Next" button elsewhere on the page
-    // (e.g. the ai.next "次へ" etc.).
+    // The popover opens at the current month; step forward once. The
+    // Next button has aria-label = calendar.next ("Next month" /
+    // "次の月"); match it in full so ai.next ("次へ") cannot collide.
     const nextBtn = page.getByRole('button', { name: /^(Next month|次の月)$/ });
     await expect(nextBtn).toBeVisible({ timeout: 5_000 });
+    await nextBtn.click();
 
-    // Target month header copy, per common.date.monthYear:
-    //   en: ICU plural -> "June 2026"
-    //   ja: literal    -> "2026年6月"
-    const monthNamesEn = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    const targetMonthHeaderEn = `${monthNamesEn[targetMonth - 1]} ${targetYear}`;
-    const targetMonthHeaderJa = `${targetYear}年${targetMonth}月`;
-    const targetHeaderRe = new RegExp(`^(${targetMonthHeaderEn}|${targetMonthHeaderJa})$`);
-
-    // Safety cap: walk at most 24 months forward. If the popover's
-    // current month is already at/past the target on mount the loop
-    // exits immediately.
-    for (let i = 0; i < 24; i++) {
-      const header = page.getByText(targetHeaderRe).first();
-      if (await header.isVisible().catch(() => false)) break;
-      await nextBtn.click();
-    }
-    // Explicitly assert the target month header landed so a
-    // loop-exit on iteration 24 fails loudly instead of silently
-    // clicking the wrong day.
+    // Month header per common.date.monthYear:
+    //   en: "November 2026"   ja: "2026年11月"
+    const monthNameEn = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(target);
+    const targetHeaderRe = new RegExp(
+      `^(${monthNameEn} ${targetYear}|${targetYear}年${targetMonth}月)$`,
+    );
     await expect(page.getByText(targetHeaderRe).first()).toBeVisible({ timeout: 5_000 });
 
     // Click the day button (the calendar grid renders each day as a
