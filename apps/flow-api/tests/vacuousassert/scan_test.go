@@ -290,13 +290,13 @@ func TestRootsFollowGoWork(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	real, err := TestRoots(root)
+	repoRoots, err := TestRoots(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"apps/flow-api", "apps/flow-worker", "packages/go-shared"} {
-		if !slices.Contains(real, filepath.FromSlash(want)) {
-			t.Errorf("repository roots %v lack %s", real, want)
+		if !slices.Contains(repoRoots, filepath.FromSlash(want)) {
+			t.Errorf("repository roots %v lack %s", repoRoots, want)
 		}
 	}
 }

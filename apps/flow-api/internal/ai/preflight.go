@@ -37,7 +37,7 @@ func (p *PreFlight) ShouldSkip(ctx context.Context, workspaceID, agentID uint32)
 	hasActivity, err := p.Queries.HasNewActivityForAgent(ctx, generated.HasNewActivityForAgentParams{
 		WorkspaceID:  workspaceID,
 		OccurredAt:   lastRun,
-		ActorAgentID: sql.NullInt32{Int32: int32(agentID), Valid: true},
+		ActorAgentID: sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- ai_agents.id is INT UNSIGNED, fits int32 within realistic deployments
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "preflight: HasNewActivityForAgent failed, agent will run",

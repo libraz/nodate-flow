@@ -126,10 +126,10 @@ func TestSignerRejectsTamperedPutFields(t *testing.T) {
 		key    string
 		edit   func(q url.Values)
 	}{
-		{"key", "PUT", testKey + "x", func(q url.Values) {}},
-		{"key sibling workspace", "PUT", "workspace/ffffffff/" + testSha, func(q url.Values) {}},
-		{"method GET", "GET", testKey, func(q url.Values) {}},
-		{"method POST", "POST", testKey, func(q url.Values) {}},
+		{"key", "PUT", testKey + "x", func(_ url.Values) {}},
+		{"key sibling workspace", "PUT", "workspace/ffffffff/" + testSha, func(_ url.Values) {}},
+		{"method GET", "GET", testKey, func(_ url.Values) {}},
+		{"method POST", "POST", testKey, func(_ url.Values) {}},
 		{"exp extended", "PUT", testKey, func(q url.Values) { q.Set("exp", "99999999999") }},
 		{"exp unparsable", "PUT", testKey, func(q url.Values) { q.Set("exp", "soon") }},
 		{"exp removed", "PUT", testKey, func(q url.Values) { q.Del("exp") }},

@@ -11,7 +11,7 @@ import (
 
 func TestRequestLogger_ResponseControllerFlush(t *testing.T) {
 	var flushErr error
-	h := RequestLogger(slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := RequestLogger(slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		flushErr = http.NewResponseController(w).Flush()
 	}))
 

@@ -94,7 +94,7 @@ func (c *instrumentedConn) PrepareContext(ctx context.Context, query string) (dr
 	if p, ok := c.Conn.(driver.ConnPrepareContext); ok {
 		stmt, err = p.PrepareContext(ctx, query)
 	} else {
-		stmt, err = c.Conn.Prepare(query)
+		stmt, err = c.Prepare(query)
 	}
 	if err != nil {
 		return nil, err

@@ -54,7 +54,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
 				TaskID:      task.ID,
-				UserID:      sql.NullInt32{Int32: int32(uid), Valid: true},
+				UserID:      sql.NullInt32{Int32: int32(uid), Valid: true}, //#nosec G115 -- uid is bounded by the math.MaxInt32 check above
 				Role:        role,
 			}); err != nil {
 				return err

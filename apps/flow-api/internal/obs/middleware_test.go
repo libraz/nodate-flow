@@ -8,7 +8,7 @@ import (
 
 func TestTraceMiddleware_ResponseControllerFlush(t *testing.T) {
 	var flushErr error
-	h := TraceMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := TraceMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		flushErr = http.NewResponseController(w).Flush()
 	}))
 

@@ -177,6 +177,7 @@ func ownerCount(ctx context.Context, t *testing.T, db *sql.DB, wsID uint32) int 
 func runCrossOwnerRace(t *testing.T, db *sql.DB, first, second func(ctx context.Context, tx *dbretry.Tx) error) (firstErr, secondErr error) {
 	t.Helper()
 	ctx := context.Background()
+	racerCtx := ctx
 	secondStarted := make(chan struct{})
 	secondDone := make(chan error, 1)
 
@@ -185,7 +186,7 @@ func runCrossOwnerRace(t *testing.T, db *sql.DB, first, second func(ctx context.
 			return err
 		}
 		go func() {
-			secondDone <- dbretry.InTx(context.Background(), db, "memberkit.test.second", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			secondDone <- dbretry.InTx(racerCtx, db, "memberkit.test.second", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 				close(secondStarted)
 				return second(ctx, tx)
 			})

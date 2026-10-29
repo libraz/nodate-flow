@@ -90,8 +90,8 @@ func TestHookRunnerDrainsAndRefusesAfterShutdown(t *testing.T) {
 		t.Error("a job submitted after Shutdown must be refused")
 	}
 	select {
-	case <-done:
-		t.Fatal("Shutdown returned while accepted jobs were still queued")
+	case err := <-done:
+		t.Fatalf("Shutdown returned (%v) while accepted jobs were still queued", err)
 	default:
 	}
 	close(release)

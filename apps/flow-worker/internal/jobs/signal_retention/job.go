@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-worker/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 const (
@@ -69,7 +70,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 		n, err := j.Signals.DeleteExpiredUnappliedSignals(ctx, cutoff)
 		if err != nil {
 			j.Logger.ErrorContext(ctx, "signal_retention: sweep failed",
-				slog.Any("err", err), slog.Int64("deleted", total))
+				slog.Any("err", err), logutil.LogNumber("deleted", total))
 			return fmt.Errorf("signal_retention: delete expired signals: %w", err)
 		}
 		total += n
@@ -78,7 +79,7 @@ func (j *Job) Tick(ctx context.Context, now time.Time) error {
 		}
 	}
 	if total > 0 {
-		j.Logger.InfoContext(ctx, "signal_retention: deleted expired signals", slog.Int64("deleted", total))
+		j.Logger.InfoContext(ctx, "signal_retention: deleted expired signals", logutil.LogNumber("deleted", total))
 	}
 	return nil
 }

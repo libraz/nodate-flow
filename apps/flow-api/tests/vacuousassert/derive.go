@@ -99,7 +99,7 @@ func TestRoots(root string) ([]string, error) {
 			continue
 		}
 		dir = filepath.Clean(dir)
-		if _, statErr := os.Stat(filepath.Join(root, dir)); statErr != nil {
+		if _, statErr := os.Stat(filepath.Join(root, dir)); statErr != nil { //#nosec G703 -- dir comes from the repository go.work, not user input
 			return nil, fmt.Errorf("vacuousassert: go.work module %s: %w", dir, statErr)
 		}
 		roots = append(roots, dir)
