@@ -121,6 +121,9 @@ INSERT INTO nf_nullable_unique_allow (table_name, index_name, column_name, reaso
   ('calendar_events', 'uniq_calendar_events_task_singleton_role', 'task_singleton_role',
    'The generated column deliberately resolves to NULL for everything that may repeat — every scheduled block, and every soft-deleted row of either role — so only live due projections occupy the key.'),
 
+  ('calendar_events', 'uniq_calendar_events_source_uid', 'source_uid_key',
+   'One live import per iCalendar UID per calendar. An event created here, a recurrence override, and every soft-deleted row carry no key, and none of them is an import that a second copy of the file could duplicate.'),
+
   ('calendars', 'uniq_calendars_system_slug', 'system_slug',
    'One calendar per provider feed per workspace. A personal calendar carries no slug and no claim on one, and a workspace holds many of them.'),
 
@@ -174,10 +177,10 @@ SET @nf_nuk_unjustified := (
 
 CALL nf_conformance_assert(
   @nf_nuk_unjustified IS NULL,
-  CONCAT('a unique index containing a nullable column binds nothing for the rows where that column is NULL; ',
+  CONCAT('50 unjustified nullable unique key: ', IFNULL(@nf_nuk_unjustified, ''),
+         '. A unique index containing a nullable column binds nothing for the rows where that column is NULL; ',
          'either name the value with a generated column or add the index to the allowlist in ',
-         'sql/core/conformance/schema/50-nullable-unique-keys.sql with the reason it is meant to be inert. Found: ',
-         IFNULL(@nf_nuk_unjustified, '')));
+         'sql/core/conformance/schema/50-nullable-unique-keys.sql with the reason it is meant to be inert'));
 
 -- An allowlist that can outlive what it describes is worse than none: it
 -- reads as a review of the current schema and is a record of an old one.
@@ -200,9 +203,9 @@ SET @nf_nuk_stale := (
 
 CALL nf_conformance_assert(
   @nf_nuk_stale IS NULL,
-  CONCAT('an allowlist entry must name a nullable column of a unique index that still exists; ',
-         'these describe nothing in the schema and must be removed: ',
-         IFNULL(@nf_nuk_stale, '')));
+  CONCAT('50 stale allowlist entry: ', IFNULL(@nf_nuk_stale, ''),
+         '. An allowlist entry must name a nullable column of a unique index that still exists; ',
+         'these describe nothing in the schema and must be removed'));
 
 -- A reason is the whole entry, so a blank or one-word one is an
 -- allowlist with the justification left out. The floor is deliberately
@@ -216,9 +219,9 @@ SET @nf_nuk_unreasoned := (
 
 CALL nf_conformance_assert(
   @nf_nuk_unreasoned IS NULL,
-  CONCAT('every allowlist entry must carry a written reason saying which rows the key is inert for ',
-         'and why that is correct; these do not: ',
-         IFNULL(@nf_nuk_unreasoned, '')));
+  CONCAT('50 allowlist entry without a reason: ', IFNULL(@nf_nuk_unreasoned, ''),
+         '. Every allowlist entry must carry a written reason saying which rows the key is inert for ',
+         'and why that is correct'));
 
 DROP TEMPORARY TABLE IF EXISTS nf_nullable_unique_cols;
 DROP TEMPORARY TABLE IF EXISTS nf_nullable_unique_tables;

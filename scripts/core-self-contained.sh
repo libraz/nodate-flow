@@ -29,7 +29,8 @@ for entry in "${PATTERNS[@]}"; do
   pattern="${entry%%	*}"
   advice="${entry#*	}"
   # PROTOCOL.md is the contract's own prose and may name core's files.
-  if hits="$(grep -rInE "$pattern" "$CORE_DIR" --exclude=PROTOCOL.md 2>/dev/null)"; then
+  # tools/ is shell that globs and names files of whichever layers it is given.
+  if hits="$(grep -rInE "$pattern" "$CORE_DIR" --exclude=PROTOCOL.md --exclude-dir=tools 2>/dev/null)"; then
     echo "---- sql/core references something a vendored copy will not have ----"
     echo "$hits"
     echo "  -> $advice"

@@ -209,12 +209,13 @@ func waitForPing(ctx context.Context, db *sql.DB, timeout time.Duration) error {
 
 // ApplyRepoSchema loads the layered schema — tables, then cross-layer
 // constraints, then views, then triggers — alphabetically within each
-// directory and with FK checks disabled. Equivalent to sql/build-schema.sh
-// but in-process.
+// directory and with FK checks disabled. Equivalent to
+// sql/core/tools/build-schema.sh core [time] flow but in-process. The time
+// layer takes part only when sql/time exists.
 //
-// Cross-layer foreign keys live in sql/flow/constraints and must be applied
-// after every CREATE TABLE of both layers, because they reference tables from
-// each.
+// Cross-layer foreign keys live in each layer's constraints directory and must
+// be applied after every CREATE TABLE of all layers, because they reference
+// tables from each.
 //
 // Triggers are part of the schema, not an optional extra: the
 // calendar_events projection guard rejects writes that would desync a task
@@ -225,29 +226,22 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	coreTablesDir := filepath.Join(root, "sql", "core", "tables")
-	flowTablesDir := filepath.Join(root, "sql", "flow", "tables")
-	constraintsDir := filepath.Join(root, "sql", "flow", "constraints")
-	viewsDir := filepath.Join(root, "sql", "flow", "views")
-	coreTriggersDir := filepath.Join(root, "sql", "core", "triggers")
-	flowTriggersDir := filepath.Join(root, "sql", "flow", "triggers")
-
 	if _, err := db.ExecContext(ctx, "SET FOREIGN_KEY_CHECKS = 0"); err != nil {
 		return err
 	}
 	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 0"); err != nil {
 		return err
 	}
-	if err := ExecSQLDirs(ctx, db, coreTablesDir, flowTablesDir); err != nil {
+	if err := ExecSQLDirs(ctx, db, schemaLayerDirs(root, "tables")...); err != nil {
 		return fmt.Errorf("tables: %w", err)
 	}
-	if err := ExecSQLDir(ctx, db, constraintsDir); err != nil {
+	if err := ExecSQLDirs(ctx, db, schemaLayerDirs(root, "constraints")...); err != nil {
 		return fmt.Errorf("constraints: %w", err)
 	}
-	if err := ExecSQLDir(ctx, db, viewsDir); err != nil {
+	if err := ExecSQLDirs(ctx, db, schemaLayerDirs(root, "views")...); err != nil {
 		return fmt.Errorf("views: %w", err)
 	}
-	if err := ExecSQLDirs(ctx, db, coreTriggersDir, flowTriggersDir); err != nil {
+	if err := ExecSQLDirs(ctx, db, schemaLayerDirs(root, "triggers")...); err != nil {
 		return fmt.Errorf("triggers: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, "SET UNIQUE_CHECKS = 1"); err != nil {
@@ -259,13 +253,36 @@ func ApplyRepoSchema(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// schemaLayers lists the layer directories under root/sql in the order
+// build-schema.sh takes them: core, time when sql/time exists, flow.
+func schemaLayers(root string) []string {
+	layers := []string{"core"}
+	if info, err := os.Stat(filepath.Join(root, "sql", "time")); err == nil && info.IsDir() {
+		layers = append(layers, "time")
+	}
+	return append(layers, "flow")
+}
+
+// schemaLayerDirs returns the existing sql/<layer>/<sub> directories in layer
+// order. A layer may omit any of tables, constraints, views and triggers.
+func schemaLayerDirs(root, sub string) []string {
+	var dirs []string
+	for _, layer := range schemaLayers(root) {
+		dir := filepath.Join(root, "sql", layer, sub)
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			dirs = append(dirs, dir)
+		}
+	}
+	return dirs
+}
+
 // ExecSQLDirs executes every *.sql file across the given directories,
 // directory by directory and alphabetically within each, matching the
-// emission order of sql/build-schema.sh.
+// emission order of sql/core/tools/build-schema.sh.
 //
 // Creation order carries no semantics here: the caller runs this with FK
 // checks disabled, and no delete path may depend on the order InnoDB walks
-// a cascade chain. See sql/build-schema.sh for the two ON DELETE RESTRICT
+// a cascade chain. See sql/core/tools/build-schema.sh for the two ON DELETE RESTRICT
 // edges that make that rule worth stating.
 func ExecSQLDirs(ctx context.Context, db *sql.DB, dirs ...string) error {
 	for _, dir := range dirs {

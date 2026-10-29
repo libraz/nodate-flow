@@ -138,7 +138,7 @@ build-go: ## go build every package in every Go module
 
 # The Go integration and e2e suites — cross-tenant isolation, IDOR, secret
 # leakage — only run when NF_TEST_INTEGRATION is non-empty, and they boot
-# their own MySQL/MinIO containers via testcontainers, so a working Docker
+# their own MySQL and object-storage containers via testcontainers, so a working Docker
 # daemon is required. They are on by default: a regression suite that has to
 # be opted into is a regression suite nobody runs. On a machine without
 # Docker, run `make test NF_TEST_INTEGRATION=` to fall back to unit tests.
@@ -152,7 +152,7 @@ override NF_TEST_INTEGRATION := 1
 endif
 NF_TEST_INTEGRATION ?= 1
 
-.PHONY: test test-unit test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-holidays test-e2e test-contract test-openapi-diff test-schema-diff verify-codegen test-core-contract lighthouse
+.PHONY: test test-unit test-api test-api-mock test-api-real test-auth-api test-worker test-presence test-go-shared test-cli test-web test-accounts-web test-ui test-sdk test-holidays test-e2e test-contract test-openapi-diff test-schema-diff verify-codegen test-core-contract test-core-equivalence lighthouse
 
 # Every module that ships code has a target here and every target is
 # reachable from `test`. A suite nothing invokes is indistinguishable
@@ -171,7 +171,7 @@ test: test-api test-auth-api test-worker test-presence test-go-shared \
       test-cli test-web test-accounts-web test-ui test-sdk test-holidays ## Run unit/integration tests (Go + TS; Go integration suites need Docker)
 
 # The rung between `make check` and `make test`. `check` reads the sources
-# and runs no behaviour; `test` boots MySQL and MinIO through
+# and runs no behaviour; `test` boots MySQL and object storage through
 # testcontainers and takes minutes. Neither is something to run on every
 # commit, which is how a commit whose unit tests fail reaches the branch
 # with every local gate reporting green.
@@ -233,7 +233,7 @@ test-contract: ## Schemathesis contract tests (requires running API)
 test-openapi-diff: ## Fail if the committed API document or the SDK types drift from the Go sources
 	bash scripts/check-openapi-drift.sh
 
-test-schema-diff: ## Fail if sql/schema.sql is out of sync with sql/core/** and sql/flow/**
+test-schema-diff: ## Fail if sql/schema.sql is out of sync with the sql/ layers
 	./scripts/schema-diff.sh
 
 verify-codegen: ## Fail if generated code is out of sync with the schema, the error YAML, the signal-kind YAML, the sqlc overrides, or the holiday dataset
@@ -247,6 +247,12 @@ test-core-contract: ## Check a database against the core contract (NF_CONFORMANC
 	bash sql/core/conformance/run.sh \
 	  --dsn "$${NF_CONFORMANCE_DSN:-$(NF_DB_USER):$(NF_DB_PASSWORD)@$(NF_DB_HOST):$(NF_DB_PORT)/$(NF_DB_NAME)}" \
 	  --mode $${NF_CONFORMANCE_MODE:-schema}
+
+test-core-equivalence: ## Compare the schema of two databases (NF_EQUIV_DSN_A, NF_EQUIV_DSN_B, optional NF_EQUIV_TABLES)
+	bash sql/core/tools/check-layer-equivalence.sh \
+	  --dsn-a "$${NF_EQUIV_DSN_A:?set NF_EQUIV_DSN_A}" \
+	  --dsn-b "$${NF_EQUIV_DSN_B:?set NF_EQUIV_DSN_B}" \
+	  $${NF_EQUIV_TABLES:+--tables "$$NF_EQUIV_TABLES"}
 
 lighthouse: build-web ## Run Lighthouse CI (a11y 95+, perf 70+)
 	$(PKG_X) @lhci/cli autorun
@@ -291,8 +297,8 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals
-check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + tool response internal-id guard + goroutine FailNow guard + AI invocation outcome guard + calendar write-ACL guard + event kind/payload guard + metrics wiring guard + duplicate-refusal reachability guard
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals check-no-core-alters check-vendored
+check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals check-no-core-alters check-vendored ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + tool response internal-id guard + goroutine FailNow guard + AI invocation outcome guard + calendar write-ACL guard + event kind/payload guard + metrics wiring guard + duplicate-refusal reachability guard + core-table alter guard + vendored time layer integrity
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
 	cd apps/flow-api && NF_TEST_INTEGRATION= go test -count=1 ./tests/softdelete/
@@ -360,6 +366,12 @@ check-region-parity: ## Fail when the Go and TS country allowlists disagree
 
 check-sdk-browser-safe: ## Fail when anything pulls Node types into the browser SDK
 	node scripts/check-sdk-browser-safe.mjs
+
+check-no-core-alters: ## Fail when a product layer reshapes a core table
+	bash sql/core/tools/check-no-core-alters.sh
+
+check-vendored: ## Fail when the vendored sql/time layer was edited locally (a no-op until sql/time is vendored)
+	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --local-only; else echo "sql/time is not vendored; nothing to check"; fi
 
 check-schema-collisions: ## Fail when one component schema is the response of two operations that were never declared to share it
 	./scripts/check-schema-collisions.sh
@@ -485,8 +497,11 @@ NF_DB_PASSWORD ?= nodatepw
 NF_DB_NAME     ?= nodate_flow
 
 .PHONY: db-schema db-apply db-reset db-shell seed-flow seed-calendar
-db-schema: ## Regenerate sql/schema.sql from sql/core + sql/flow
-	bash sql/build-schema.sh > sql/schema.sql
+# Layers in build order; sql/time joins once it is vendored.
+SCHEMA_LAYERS := core $(if $(wildcard sql/time),time) flow
+
+db-schema: ## Regenerate sql/schema.sql from the sql/ layers (core, time when present, flow)
+	bash sql/core/tools/build-schema.sh $(SCHEMA_LAYERS) > sql/schema.sql
 
 db-apply: db-schema ## Apply schema.sql to a self-hosted MySQL (uses NF_DB_* vars)
 	@echo "applying sql/schema.sql to $(NF_DB_USER)@$(NF_DB_HOST):$(NF_DB_PORT)/$(NF_DB_NAME)"

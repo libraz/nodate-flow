@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # schema-diff.sh — verify the committed sql/schema.sql matches what
-# `bash sql/build-schema.sh` produces from the layered sql/core/ and
-# sql/flow/ trees.
+# `bash sql/core/tools/build-schema.sh` produces from the layered sql/core/,
+# sql/time/ (when present) and sql/flow/ trees.
 # Fails with a non-zero exit when the regenerated schema differs from
 # the committed copy.
 #
@@ -23,7 +23,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SCHEMA_FILE="$ROOT_DIR/sql/schema.sql"
-BUILD_SCRIPT="$ROOT_DIR/sql/build-schema.sh"
+BUILD_SCRIPT="$ROOT_DIR/sql/core/tools/build-schema.sh"
+
+# Same layer order as `make db-schema`; sql/time joins once it exists.
+LAYERS=(core)
+[[ -d "$ROOT_DIR/sql/time" ]] && LAYERS+=(time)
+LAYERS+=(flow)
 
 if [[ ! -f "$SCHEMA_FILE" ]]; then
   echo "ERROR: $SCHEMA_FILE not found. Run 'make db-schema' first." >&2
@@ -39,8 +44,8 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 # Regenerate into a temp file so we never touch the committed copy.
-if ! bash "$BUILD_SCRIPT" >"$TMP_DIR/schema.regen.sql"; then
-  echo "ERROR: sql/build-schema.sh failed." >&2
+if ! bash "$BUILD_SCRIPT" "${LAYERS[@]}" >"$TMP_DIR/schema.regen.sql"; then
+  echo "ERROR: sql/core/tools/build-schema.sh failed." >&2
   exit 2
 fi
 
@@ -57,7 +62,7 @@ if ! diff -u "$SCHEMA_FILE" "$TMP_DIR/schema.regen.sql" >"$TMP_DIR/schema.diff";
 fi
 
 if [[ $exit_code -eq 0 ]]; then
-  echo "sql/schema.sql is in sync with sql/core/ and sql/flow/."
+  echo "sql/schema.sql is in sync with the sql/ layers (${LAYERS[*]})."
 else
   echo ""
   echo "Schema drift detected. Run 'make db-schema' and commit the updated sql/schema.sql."

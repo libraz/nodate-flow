@@ -162,7 +162,7 @@ sql:
             go_struct_tag: 'json:"-"'
           # Generated columns that exist only to shape an index: the de-NULLed
           # projections a partial UNIQUE key is built on (calendar_event_attendees.event_id_key,
-          # calendar_events.task_singleton_role, auto_action_rules.signal_kind_match,
+          # calendar_events.source_uid_key, calendar_events.task_singleton_role, auto_action_rules.signal_kind_match,
           # labels.scope_project_id, lenses.scope_project_id, pages.scope_parent_page_id,
           # user_view_preferences.scope_key)
           # and the `active` liveness marker that scopes a soft-delete UNIQUE key to
@@ -183,6 +183,8 @@ sql:
           - column: "*.active"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_uid_key"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'
@@ -502,6 +504,8 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
+          - column: "*.source_uid_key"
+            go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_parent_page_id"
@@ -754,6 +758,8 @@ sql:
           - column: "*.active"
             go_struct_tag: 'json:"-"'
           - column: "*.event_id_key"
+            go_struct_tag: 'json:"-"'
+          - column: "*.source_uid_key"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'

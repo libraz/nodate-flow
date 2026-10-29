@@ -760,6 +760,7 @@ const (
 	IdentitiesProviderGithub      IdentitiesProvider = "github"
 	IdentitiesProviderMicrosoft   IdentitiesProvider = "microsoft"
 	IdentitiesProviderGenericOidc IdentitiesProvider = "generic_oidc"
+	IdentitiesProviderLine        IdentitiesProvider = "line"
 )
 
 func (e *IdentitiesProvider) Scan(src interface{}) error {
@@ -2712,15 +2713,19 @@ type CalendarEvent struct {
 	Location sql.NullString `json:"location"`
 	// Free-form notes (markdown)
 	Memo sql.NullString `json:"memo"`
-	// Meeting link or related URL
+	// Meeting link or related URL. utf8mb4 rather than latin1: an internationalised address (RFC 3987) carries non-ASCII directly, and latin1 refuses the whole value.
 	Url sql.NullString `json:"url"`
+	// UID of the VEVENT this event was imported from, as the file gave it. NULL when the event was created here, when it is a recurrence override, or when the file UID exceeded the column.
+	SourceUid sql.NullString `json:"sourceUid"`
+	// source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_calendar_events_source_uid to rows the calendar still shows. Generated: never written directly.
+	SourceUidKey sql.NullString `json:"-"`
 	// Event owner (whose color/layer). Only owner, managers, or can_edit attendees may edit
 	OwnerUserID uint32 `json:"-"`
 	// Actual creator (may differ from owner for manager delegation)
 	CreatedByUserID uint32 `json:"-"`
 	// Label for block-kind events (e.g., Working, Focus Time, Out of Office)
 	BlockLabel sql.NullString `json:"blockLabel"`
-	// Recurrence rule: {freq, interval, byDay, byMonthDay, bySetPos, until, count}
+	// Recurrence rule: {freq, interval, byDay[], byMonthDay[], bySetPos[], wkst, until, count}. The shape is enforced by chk_calendar_events_recurrence_shape; the semantics are PROTOCOL.md §Recurrence.
 	RecurrenceRule json.RawMessage `json:"recurrenceRule"`
 	// Computed end date for recurrence expansion queries
 	RecurrenceEnd sql.NullTime `json:"recurrenceEnd"`
@@ -2771,7 +2776,9 @@ type CalendarEventAttachment struct {
 	// Admin notes
 	Notes sql.NullString `json:"notes"`
 	// Enabled flag (soft delete)
-	Enabled   bool         `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// When a confirmed attachment was deleted. NULL on a live row and on a reservation that was never confirmed.
+	RetiredAt sql.NullTime `json:"retiredAt"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
 }
@@ -3128,6 +3135,8 @@ type Event struct {
 	ActorSystemSource sql.NullString `json:"actorSystemSource"`
 	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). A projection reading the log cancels both events out. The log is immutable: a reversal is a new row, never an UPDATE or DELETE of the original.
 	ReversesEventID sql.NullInt64 `json:"-"`
+	// public_id of the entity this event is about, so one entity history is an index range. Set for every kind whose event-kinds registry entry names a subject table, NULL for the rest. Written by the appender alongside the payload; never derived from it.
+	SubjectPublicID sql.NullString `json:"subjectPublicId"`
 	// Event type (e.g., task.created, signal.attached, signal.judged)
 	Type string `json:"type"`
 	// Event payload
@@ -3865,6 +3874,8 @@ type Session struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
+	// Name of the application that issued the session (flow, time), written as a SQL literal. An application refreshes, looks up and purges only its own rows; revoking every session of a user ignores it. Empty only on a row no conforming writer produced.
+	Audience string `json:"audience"`
 	// SHA-256 hex of refresh token
 	RefreshHash string `json:"refreshHash"`
 	// Client user agent at issue time
@@ -3877,6 +3888,8 @@ type Session struct {
 	RevokedAt sql.NullTime `json:"revokedAt"`
 	// SHA-256 hex of the refresh token this session last replaced. Rotation overwrites refresh_hash, so without this the superseded token leaves no trace and a replay of it is indistinguishable from a token that was never issued. Presenting a token that matches this column is the signal that a rotated token was replayed.
 	RotatedFromHash sql.NullString `json:"rotatedFromHash"`
+	// When the refresh token was last exchanged. Lets an application tell a replay of rotated_from_hash from one client asking twice within a grace window.
+	RotatedAt sql.NullTime `json:"rotatedAt"`
 	// Last refresh time
 	LastUsedAt sql.NullTime `json:"lastUsedAt"`
 	// Display order

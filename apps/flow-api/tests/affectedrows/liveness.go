@@ -88,7 +88,7 @@ var livenessVocabulary = []livenessGroup{
 		Reason: "computed from a removal marker and so not assignable by any statement; it " +
 			"carries that marker's liveness into a unique key, going NULL once the row is " +
 			"removed so the key constrains only the live rows",
-		Columns: []string{"active", "task_singleton_role"},
+		Columns: []string{"active", "source_uid_key", "task_singleton_role"},
 	},
 	{
 		Role: RemovalMarker,
@@ -135,7 +135,8 @@ var livenessVocabulary = []livenessGroup{
 			"added_at", "completed_at", "delivered_at", "done", "edited_at",
 			"email_verified_at", "failed_at", "finished_at", "invited_at", "joined_at",
 			"last_login_at", "last_refreshed_at", "last_used_at", "mfa_confirmed_at",
-			"resolved_at", "safety_checked_at", "satisfied_at", "scored_at", "sent_at",
+			"resolved_at", "retired_at", "rotated_at", "safety_checked_at", "satisfied_at",
+			"scored_at", "sent_at",
 			"shared_at", "started_at", "updated_at", "uploaded_at",
 		},
 	},
