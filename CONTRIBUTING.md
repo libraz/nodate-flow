@@ -8,7 +8,7 @@ submit changes.
 
 - **Go 1.23+**
 - **Node.js 20+** with **Bun** (preferred) or npm
-- **Docker** and **Docker Compose** (for MySQL, Redis, MinIO)
+- **Docker** and **Docker Compose** (for MySQL, Redis, and S3-compatible storage)
 - **Make**
 
 ## Development setup
@@ -17,7 +17,7 @@ submit changes.
 git clone <repo>
 cd nodate-flow
 cp .env.example .env          # created automatically by `make dev` if missing
-docker compose up -d           # starts MySQL, Redis, MinIO
+docker compose up -d           # starts MySQL, Redis, object storage
 make dev                       # runs Go API + React frontend in parallel
 ```
 
@@ -110,7 +110,7 @@ Both run automatically via git hooks (pre-commit) and CI. Do not bypass them.
 nodate-flow uses real infrastructure for tests -- no database mocks.
 
 **Backend (Go):** `go test` with `testify` and `testcontainers-go` for MySQL,
-Redis, and MinIO. API E2E tests live in `apps/flow-api/tests/`.
+Redis, and S3-compatible storage. API E2E tests live in `apps/flow-api/tests/`.
 
 **Frontend (TypeScript):** Vitest with `@testing-library/react` and `happy-dom`
 for component tests. Playwright for browser E2E.
@@ -127,11 +127,11 @@ make test-web          # frontend tests only
 
 The suites come in tiers, and the tier decides where each one can run:
 
-| Tier             | What it is                                                                                               | Where it runs                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `make check`     | Static guards. Reads the sources, runs no behaviour.                                                     | Locally, and step by step in CI                                     |
-| `make test-unit` | Every suite that needs no container. No `-race`, and `-short` skips the whole-module source scanners.    | Locally, and in the pre-commit hook, narrowed to the staged changes |
-| `make test`      | The above plus the suites that boot MySQL and MinIO. Minutes, and they contend for the container reaper. | Locally on demand, and in full in CI                                |
+| Tier             | What it is                                                                                                    | Where it runs                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `make check`     | Static guards. Reads the sources, runs no behaviour.                                                          | Locally, and step by step in CI                                     |
+| `make test-unit` | Every suite that needs no container. No `-race`, and `-short` skips the whole-module source scanners.         | Locally, and in the pre-commit hook, narrowed to the staged changes |
+| `make test`      | The above plus the suites that boot MySQL and S3 storage. Minutes, and they contend for the container reaper. | Locally on demand, and in full in CI                                |
 
 Nothing a faster tier skips is skipped everywhere: CI runs every suite
 with `-race` and without `-short`. The tiers exist to move the fast half

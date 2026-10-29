@@ -209,8 +209,8 @@ cp .env.example .env    # edit with your secrets
 docker compose up
 ```
 
-The compose stack includes the Go API, React frontend, MySQL, Redis, MinIO
-(S3-compatible object storage), Prometheus, and Grafana.
+The compose stack includes the Go API, React frontend, MySQL, Redis, an
+S3-compatible object store, Prometheus, and Grafana.
 
 ---
 
