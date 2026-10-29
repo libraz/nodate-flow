@@ -73,13 +73,11 @@ func WeeklyDigest(deps Deps) func(context.Context, *WeeklyDigestInput) (*WeeklyD
 
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID:   ws.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         digestLimit,
-			Offset:        0,
+			WorkspaceID: ws.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       digestLimit,
+			Offset:      0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

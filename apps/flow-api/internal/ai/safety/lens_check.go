@@ -67,13 +67,11 @@ func (c *LensChecker) Check(ctx context.Context, workspaceID uint32, projectID *
 
 	if projectID != nil {
 		rows, err := c.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
-			WorkspaceID:   workspaceID,
-			ProjectID:     *projectID,
-			IsElevated:    0,
-			ActorUserID:   0,
-			ActorUserID_2: 0,
-			ActorUserID_3: 0,
-			Limit:         limit,
+			WorkspaceID: workspaceID,
+			ProjectID:   *projectID,
+			IsElevated:  0,
+			ActorUserID: 0,
+			Limit:       limit,
 		})
 		if err != nil {
 			return nil, err
@@ -83,12 +81,10 @@ func (c *LensChecker) Check(ctx context.Context, workspaceID uint32, projectID *
 		}
 	} else {
 		rows, err := c.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
-			WorkspaceID:   workspaceID,
-			IsElevated:    0,
-			ActorUserID:   0,
-			ActorUserID_2: 0,
-			ActorUserID_3: 0,
-			Limit:         limit,
+			WorkspaceID: workspaceID,
+			IsElevated:  0,
+			ActorUserID: 0,
+			Limit:       limit,
 		})
 		if err != nil {
 			return nil, err

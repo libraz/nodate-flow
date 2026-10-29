@@ -46,14 +46,12 @@ func runListFavorites(ctx context.Context, deps Deps, s *session, raw json.RawMe
 	}
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	rows, err := deps.Queries.ListFavoritesForUser(ctx, generated.ListFavoritesForUserParams{
-		WorkspaceID:   s.workspaceID,
-		UserID:        s.userID,
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		Limit:         in.Limit,
-		Offset:        in.Offset,
+		WorkspaceID: s.workspaceID,
+		UserID:      s.userID,
+		IsElevated:  vis.IsElevated,
+		ActorUserID: vis.ActorUserID,
+		Limit:       in.Limit,
+		Offset:      in.Offset,
 	})
 	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)

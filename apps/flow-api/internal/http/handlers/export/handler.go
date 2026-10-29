@@ -454,12 +454,10 @@ func fetchForWorkspace(
 ) (exportDataset, error) {
 	visibility := acl.ListVisibilityArgs(actorID, ws.Role)
 	dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
-		WorkspaceID:   ws.ID,
-		IsElevated:    visibility.IsElevated,
-		ActorUserID:   visibility.ActorUserID,
-		ActorUserID_2: visibility.ActorUserID,
-		ActorUserID_3: visibility.ActorUserID,
-		Limit:         limit,
+		WorkspaceID: ws.ID,
+		IsElevated:  visibility.IsElevated,
+		ActorUserID: visibility.ActorUserID,
+		Limit:       limit,
 	})
 	if err != nil {
 		return exportDataset{}, datasetQueryFailed(ctx, "workspace", err)

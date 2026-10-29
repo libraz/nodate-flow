@@ -365,14 +365,12 @@ func (o *Orchestrator) ProposeSteps(
 			queryVec, embedErr := embedClient.EmbedQuery(ctx, workspaceID, taskText)
 			if embedErr == nil {
 				candidates, listErr := reader.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-					WorkspaceID:   workspaceID,
-					Model:         embedClient.Model(),
-					TaskID:        0,
-					IsElevated:    vis.IsElevated,
-					ActorUserID:   vis.ActorUserID,
-					ActorUserID_2: vis.ActorUserID,
-					ActorUserID_3: vis.ActorUserID,
-					Limit:         stepsMaxCandidates,
+					WorkspaceID: workspaceID,
+					Model:       embedClient.Model(),
+					TaskID:      0,
+					IsElevated:  vis.IsElevated,
+					ActorUserID: vis.ActorUserID,
+					Limit:       stepsMaxCandidates,
 				})
 				if listErr == nil {
 					ranked = make([]scoredTask, 0, len(candidates))

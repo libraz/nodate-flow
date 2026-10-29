@@ -67,13 +67,11 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID:   ws.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         priorityOptLimit,
-			Offset:        0,
+			WorkspaceID: ws.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       priorityOptLimit,
+			Offset:      0,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

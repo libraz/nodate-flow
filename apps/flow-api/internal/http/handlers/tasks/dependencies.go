@@ -47,8 +47,6 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 			FromTaskPublicID: types.FromUUID(task.PublicID),
 			IsElevated:       vis.IsElevated,
 			ActorUserID:      vis.ActorUserID,
-			ActorUserID_2:    vis.ActorUserID,
-			ActorUserID_3:    vis.ActorUserID,
 			Limit:            200,
 			Offset:           0,
 		})
@@ -71,8 +69,6 @@ func ListDependencies(deps Deps) func(context.Context, *ListTaskDependenciesInpu
 			ToTaskPublicID: types.FromUUID(task.PublicID),
 			IsElevated:     vis.IsElevated,
 			ActorUserID:    vis.ActorUserID,
-			ActorUserID_2:  vis.ActorUserID,
-			ActorUserID_3:  vis.ActorUserID,
 			Limit:          200,
 			Offset:         0,
 		})

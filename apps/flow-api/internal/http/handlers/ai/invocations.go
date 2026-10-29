@@ -58,14 +58,11 @@ func ListInvocations(deps Deps) func(context.Context, *ListInvocationsInput) (*L
 		}
 		vis := acl.ListVisibilityArgs(actorID, ws.Role)
 		rows, err := deps.Queries.ListAiInvocationsForWorkspace(ctx, generated.ListAiInvocationsForWorkspaceParams{
-			WorkspaceID:   ws.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			ActorUserID_4: vis.ActorUserID,
-			Limit:         in.Limit,
-			Offset:        in.Offset,
+			WorkspaceID: ws.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       in.Limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

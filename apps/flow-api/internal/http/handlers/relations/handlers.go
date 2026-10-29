@@ -45,16 +45,11 @@ func ListForWorkspace(deps Deps) func(context.Context, *ListForWorkspaceInput) (
 		// which is its own disclosure.
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListPendingSuggestionsForWorkspace(ctx, generated.ListPendingSuggestionsForWorkspaceParams{
-			WorkspaceID:   ws.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			ActorUserID_4: vis.ActorUserID,
-			ActorUserID_5: vis.ActorUserID,
-			ActorUserID_6: vis.ActorUserID,
-			Limit:         limit,
-			Offset:        in.Offset,
+			WorkspaceID: ws.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -101,17 +96,12 @@ func ListForTask(deps Deps) func(context.Context, *ListForTaskInput) (*ListForTa
 		// and is not covered by that. Same filter as the workspace list.
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListPendingSuggestionsForTask(ctx, generated.ListPendingSuggestionsForTaskParams{
-			WorkspaceID:   ws.ID,
-			SourceTaskID:  tc.ID,
-			TargetTaskID:  tc.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			ActorUserID_4: vis.ActorUserID,
-			ActorUserID_5: vis.ActorUserID,
-			ActorUserID_6: vis.ActorUserID,
-			Limit:         limit,
+			WorkspaceID:  ws.ID,
+			SourceTaskID: tc.ID,
+			TargetTaskID: tc.ID,
+			IsElevated:   vis.IsElevated,
+			ActorUserID:  vis.ActorUserID,
+			Limit:        limit,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -154,15 +144,10 @@ func Resolve(deps Deps) func(context.Context, *ResolveInput) (*ResolveOutput, er
 		// absent rather than as a refusal.
 		vis := acl.ListVisibilityArgs(actorID, wsRole)
 		suggestion, err := deps.Queries.GetSuggestionByPublicId(ctx, generated.GetSuggestionByPublicIdParams{
-			WorkspaceID:   wsID,
-			PublicID:      pub,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			ActorUserID_4: vis.ActorUserID,
-			ActorUserID_5: vis.ActorUserID,
-			ActorUserID_6: vis.ActorUserID,
+			WorkspaceID: wsID,
+			PublicID:    pub,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
 		})
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.RelationSuggestionNotFound, apierrors.InternalUnexpected))

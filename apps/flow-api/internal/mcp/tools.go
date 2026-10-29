@@ -1935,12 +1935,10 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	vis := acl.ListVisibilityArgs(s.userID, wsRole)
 	var children []ai.ChildTaskSummary
 	childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
-		WorkspaceID:   s.workspaceID,
-		ParentTaskID:  sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
+		WorkspaceID:  s.workspaceID,
+		ParentTaskID: sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+		IsElevated:   vis.IsElevated,
+		ActorUserID:  vis.ActorUserID,
 	})
 	if err == nil {
 		for _, c := range childRows {
@@ -2338,13 +2336,11 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 			return nil, err
 		}
 		dbRows, err := deps.Queries.ExportTasksForLens(ctx, generated.ExportTasksForLensParams{
-			WorkspaceID:   s.workspaceID,
-			ProjectID:     prjID,
-			IsElevated:    visibility.IsElevated,
-			ActorUserID:   visibility.ActorUserID,
-			ActorUserID_2: visibility.ActorUserID,
-			ActorUserID_3: visibility.ActorUserID,
-			Limit:         in.Limit,
+			WorkspaceID: s.workspaceID,
+			ProjectID:   prjID,
+			IsElevated:  visibility.IsElevated,
+			ActorUserID: visibility.ActorUserID,
+			Limit:       in.Limit,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
@@ -2364,12 +2360,10 @@ func runExportTasks(ctx context.Context, deps Deps, s *session, raw json.RawMess
 		}
 	} else {
 		dbRows, err := deps.Queries.ExportTasksForWorkspace(ctx, generated.ExportTasksForWorkspaceParams{
-			WorkspaceID:   s.workspaceID,
-			IsElevated:    visibility.IsElevated,
-			ActorUserID:   visibility.ActorUserID,
-			ActorUserID_2: visibility.ActorUserID,
-			ActorUserID_3: visibility.ActorUserID,
-			Limit:         in.Limit,
+			WorkspaceID: s.workspaceID,
+			IsElevated:  visibility.IsElevated,
+			ActorUserID: visibility.ActorUserID,
+			Limit:       in.Limit,
 		})
 		if err != nil {
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)

@@ -309,11 +309,10 @@ func ListDeliveries(deps Deps) func(context.Context, *ListDeliveriesInput) (*Lis
 		}
 
 		rows, err := deps.Queries.ListWebhookDeliveries(ctx, generated.ListWebhookDeliveriesParams{
-			WorkspaceID:   wsCtx.ID,
-			WorkspaceID_2: wsCtx.ID,
-			PublicID:      pub,
-			Limit:         limit,
-			Offset:        in.Offset,
+			WorkspaceID: wsCtx.ID,
+			PublicID:    pub,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

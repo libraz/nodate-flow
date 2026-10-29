@@ -117,11 +117,9 @@ func ListAiSuggestions(deps TriageDeps) func(context.Context, *AiSuggestionListI
 			return nil, err
 		}
 		rows, err := deps.Queries.ListPendingAiSuggestionsForReader(ctx, generated.ListPendingAiSuggestionsForReaderParams{
-			WorkspaceID:   wsID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
+			WorkspaceID: wsID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -203,12 +201,10 @@ func appendSuggestionReaction(deps TriageDeps, reaction suggestionReaction) func
 			return nil, err
 		}
 		visible, err := deps.Queries.GetInboxItemTaskVisible(ctx, generated.GetInboxItemTaskVisibleParams{
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			WorkspaceID:   wsID,
-			PublicID:      itemPub,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			WorkspaceID: wsID,
+			PublicID:    itemPub,
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {

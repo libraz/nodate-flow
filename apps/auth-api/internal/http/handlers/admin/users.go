@@ -29,13 +29,12 @@ func ListUsers(deps Deps) func(context.Context, *ListUsersInput) (*ListUsersOutp
 		}
 
 		rows, err := deps.Queries.AdminListUsers(ctx, generated.AdminListUsersParams{
-			Column1:  in.Search,
-			CONCAT:   in.Search,
-			CONCAT_2: in.Search,
-			Column4:  filterEnabled,
-			Enabled:  enabledBool,
-			Limit:    limit,
-			Offset:   in.Offset,
+			Column1: in.Search,
+			CONCAT:  in.Search,
+			Column4: filterEnabled,
+			Enabled: enabledBool,
+			Limit:   limit,
+			Offset:  in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

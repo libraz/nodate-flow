@@ -197,14 +197,12 @@ func (o *Orchestrator) ProposeSmartCreate(
 
 	// ---- retrieve candidate embeddings ----
 	candidates, err := scReader.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID:   workspaceID,
-		Model:         embedClient.Model(),
-		TaskID:        0, // no self to exclude
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		Limit:         smartCreateMaxCandidates,
+		WorkspaceID: workspaceID,
+		Model:       embedClient.Model(),
+		TaskID:      0, // no self to exclude
+		IsElevated:  vis.IsElevated,
+		ActorUserID: vis.ActorUserID,
+		Limit:       smartCreateMaxCandidates,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ai: smart create list candidates: %w", err)
@@ -234,12 +232,10 @@ func (o *Orchestrator) ProposeSmartCreate(
 	var taskRows []generated.ListTasksWithAssigneesForSmartCreateRow
 	if len(taskIDs) > 0 {
 		taskRows, err = scReader.ListTasksWithAssigneesForSmartCreate(ctx, generated.ListTasksWithAssigneesForSmartCreateParams{
-			WorkspaceID:   workspaceID,
-			TaskIds:       taskIDs,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
+			WorkspaceID: workspaceID,
+			TaskIds:     taskIDs,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("ai: smart create list assignees: %w", err)

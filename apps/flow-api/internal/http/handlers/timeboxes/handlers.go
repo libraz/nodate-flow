@@ -724,13 +724,11 @@ func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTi
 		// by arithmetic.
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		rows, err := deps.Queries.ListTasksForTimebox(ctx, generated.ListTasksForTimeboxParams{
-			TimeboxID:     tb.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         limit,
-			Offset:        in.Offset,
+			TimeboxID:   tb.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -738,11 +736,9 @@ func ListTasks(deps Deps) func(context.Context, *ListTimeboxTasksInput) (*ListTi
 
 		// Fetch progress counts.
 		progress, err := deps.Queries.CountTasksForTimebox(ctx, generated.CountTasksForTimeboxParams{
-			TimeboxID:     tb.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
+			TimeboxID:   tb.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

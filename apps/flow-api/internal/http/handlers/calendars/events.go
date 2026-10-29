@@ -858,8 +858,6 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			// argument; clear_recurrence_rule appears in three SET
 			// expressions because clearing the rule clears the two
 			// columns that only describe a series.
-			ClearRecurrenceRule_2: cleared.recurrenceRule,
-			ClearRecurrenceRule_3: cleared.recurrenceRule,
 		}
 		if input.Body.Kind != nil {
 			params.Kind = calendar.NullCalendarEventsKind{

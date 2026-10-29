@@ -70,13 +70,11 @@ func (o *Orchestrator) ProposeInboxTriage(ctx context.Context, workspaceID uint3
 	var prompt string
 	if o.Queries != nil {
 		rows, qerr := o.Queries.ListInbox(ctx, generated.ListInboxParams{
-			WorkspaceID:   workspaceID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         int32(limit),
-			Offset:        0,
+			WorkspaceID: workspaceID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       int32(limit),
+			Offset:      0,
 		})
 		if qerr != nil {
 			return nil, fmt.Errorf("ai: list inbox: %w", qerr)

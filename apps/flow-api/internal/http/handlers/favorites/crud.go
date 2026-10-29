@@ -174,14 +174,12 @@ func List(deps Deps) func(context.Context, *ListFavoritesInput) (*ListFavoritesO
 		}
 		vis := acl.ListVisibilityArgs(actorID, wsRole)
 		rows, err := deps.Queries.ListFavoritesForUser(ctx, generated.ListFavoritesForUserParams{
-			WorkspaceID:   wsID,
-			UserID:        actorID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         limit,
-			Offset:        in.Offset,
+			WorkspaceID: wsID,
+			UserID:      actorID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

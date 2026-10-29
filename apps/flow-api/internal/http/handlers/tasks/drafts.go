@@ -70,16 +70,11 @@ func listRetroDrafts(
 	ctx context.Context, q *generated.Queries, workspaceID uint32, vis acl.VisibilityArgs, limit, offset int32,
 ) (*ListRetroDraftsOutput, error) {
 	rows, err := q.ListRetroDraftsForWorkspace(ctx, generated.ListRetroDraftsForWorkspaceParams{
-		WorkspaceID:   workspaceID,
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		ActorUserID_4: vis.ActorUserID,
-		ActorUserID_5: vis.ActorUserID,
-		ActorUserID_6: vis.ActorUserID,
-		Limit:         limit,
-		Offset:        offset,
+		WorkspaceID: workspaceID,
+		IsElevated:  vis.IsElevated,
+		ActorUserID: vis.ActorUserID,
+		Limit:       limit,
+		Offset:      offset,
 	})
 	if err != nil {
 		return nil, httpErr(apierrors.InternalUnexpected)

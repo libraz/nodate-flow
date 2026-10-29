@@ -80,7 +80,7 @@ func TestRankSimilarTasksAppliesDefaultsOrderAndCap(t *testing.T) {
 			t.Errorf("candidate %d = id %d duplicate %v, want id %d duplicate %v", i, got[i].ID, got[i].Duplicate, wantIDs[i], wantDup[i])
 		}
 	}
-	if store.listArgs.Limit != DefaultCandidateLimit || store.listArgs.ActorUserID_3 != 11 || store.listArgs.TaskID != 9 {
+	if store.listArgs.Limit != DefaultCandidateLimit || store.listArgs.ActorUserID != 11 || store.listArgs.TaskID != 9 {
 		t.Errorf("candidate query args = %+v, want limit %d, actor 11 on every slot, task 9", store.listArgs, DefaultCandidateLimit)
 	}
 }

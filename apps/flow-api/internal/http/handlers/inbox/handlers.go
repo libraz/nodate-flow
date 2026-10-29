@@ -46,13 +46,11 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 			}
 			vis := acl.ListVisibilityArgs(actorID, wsRole)
 			rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
-				WorkspaceID:   wsID,
-				IsElevated:    vis.IsElevated,
-				ActorUserID:   vis.ActorUserID,
-				ActorUserID_2: vis.ActorUserID,
-				ActorUserID_3: vis.ActorUserID,
-				Limit:         limit,
-				Offset:        in.Offset,
+				WorkspaceID: wsID,
+				IsElevated:  vis.IsElevated,
+				ActorUserID: vis.ActorUserID,
+				Limit:       limit,
+				Offset:      in.Offset,
 			})
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -91,13 +89,11 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 		// inbox, which does compute the flag.
 		userVis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRoleMember)
 		rows, err := deps.Queries.ListInboxForUser(ctx, generated.ListInboxForUserParams{
-			UserID:        actorID,
-			IsElevated:    userVis.IsElevated,
-			ActorUserID:   userVis.ActorUserID,
-			ActorUserID_2: userVis.ActorUserID,
-			ActorUserID_3: userVis.ActorUserID,
-			Limit:         limit,
-			Offset:        in.Offset,
+			UserID:      actorID,
+			IsElevated:  userVis.IsElevated,
+			ActorUserID: userVis.ActorUserID,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)

@@ -589,8 +589,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					ProjectPublicID: pubBytes[:],
 					IsElevated:      prjVis.IsElevated,
 					ActorUserID:     prjVis.ActorUserID,
-					ActorUserID_2:   prjVis.ActorUserID,
-					ActorUserID_3:   prjVis.ActorUserID,
 					CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 					CursorPublicID:  cursorPID,
 					Limit:           limit + 1,
@@ -617,8 +615,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				ProjectPublicID: pubBytes[:],
 				IsElevated:      prjVis.IsElevated,
 				ActorUserID:     prjVis.ActorUserID,
-				ActorUserID_2:   prjVis.ActorUserID,
-				ActorUserID_3:   prjVis.ActorUserID,
 				Limit:           limit,
 				Offset:          in.Offset,
 			})
@@ -635,8 +631,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 						ProjectPublicID: pubBytes[:],
 						IsElevated:      prjVis.IsElevated,
 						ActorUserID:     prjVis.ActorUserID,
-						ActorUserID_2:   prjVis.ActorUserID,
-						ActorUserID_3:   prjVis.ActorUserID,
 					})
 				})
 				if terr != nil {
@@ -702,8 +696,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				StateFilter:     "", // empty string skips the filter (see SQL comment)
 				IsElevated:      vis.IsElevated,
 				ActorUserID:     vis.ActorUserID,
-				ActorUserID_2:   vis.ActorUserID,
-				ActorUserID_3:   vis.ActorUserID,
 				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 				CursorPublicID:  cursorPID,
 				Limit:           limit + 1,
@@ -727,13 +719,11 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		}
 
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
-			WorkspaceID:   wsInternal,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         limit,
-			Offset:        in.Offset,
+			WorkspaceID: wsInternal,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -744,11 +734,9 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		if len(rows) > 0 {
 			total, terr := listTotal(in.Offset, limit, len(rows), func() (int64, error) {
 				return deps.Queries.CountTasksForWorkspace(ctx, generated.CountTasksForWorkspaceParams{
-					WorkspaceID:   wsInternal,
-					IsElevated:    vis.IsElevated,
-					ActorUserID:   vis.ActorUserID,
-					ActorUserID_2: vis.ActorUserID,
-					ActorUserID_3: vis.ActorUserID,
+					WorkspaceID: wsInternal,
+					IsElevated:  vis.IsElevated,
+					ActorUserID: vis.ActorUserID,
 				})
 			})
 			if terr != nil {

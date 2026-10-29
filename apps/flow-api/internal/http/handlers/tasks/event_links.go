@@ -341,8 +341,6 @@ func ListLinkedTasks(deps Deps) func(context.Context, *ListLinkedTasksInput) (*L
 			Relation:      generated.TaskEventLinksRelation(in.Relation),
 			IsElevated:    vis.IsElevated,
 			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
 			Limit:         limit,
 			Offset:        in.Offset,
 		})

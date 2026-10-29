@@ -106,7 +106,6 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 		rows, err := deps.CalendarQueries.ListDiscoverableCalendarsInWorkspace(ctx, calendar.ListDiscoverableCalendarsInWorkspaceParams{
 			WorkspaceID: wsID,
 			ActorID:     int64(actorID),
-			ActorID_2:   int64(actorID),
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarCalendarListQueryInterrupted)

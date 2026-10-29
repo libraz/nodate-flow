@@ -141,8 +141,6 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 				WorkspaceID:      ws.ID,
 				IsElevated:       vis.IsElevated,
 				ActorUserID:      vis.ActorUserID,
-				ActorUserID_2:    vis.ActorUserID,
-				ActorUserID_3:    vis.ActorUserID,
 				CursorArchivedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
 				CursorPublicID:   cursorPID,
 				Limit:            in.Limit + 1,
@@ -169,13 +167,11 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 		}
 
 		rows, err := deps.Queries.ListArchivedTasksForWorkspace(ctx, generated.ListArchivedTasksForWorkspaceParams{
-			WorkspaceID:   ws.ID,
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
-			Limit:         in.Limit,
-			Offset:        in.Offset,
+			WorkspaceID: ws.ID,
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
+			Limit:       in.Limit,
+			Offset:      in.Offset,
 		})
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -188,11 +184,9 @@ func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*Li
 		if len(rows) > 0 {
 			total, terr := listTotal(in.Offset, in.Limit, len(rows), func() (int64, error) {
 				return deps.Queries.CountArchivedTasksForWorkspace(ctx, generated.CountArchivedTasksForWorkspaceParams{
-					WorkspaceID:   ws.ID,
-					IsElevated:    vis.IsElevated,
-					ActorUserID:   vis.ActorUserID,
-					ActorUserID_2: vis.ActorUserID,
-					ActorUserID_3: vis.ActorUserID,
+					WorkspaceID: ws.ID,
+					IsElevated:  vis.IsElevated,
+					ActorUserID: vis.ActorUserID,
 				})
 			})
 			if terr != nil {

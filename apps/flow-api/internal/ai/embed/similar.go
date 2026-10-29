@@ -103,14 +103,12 @@ func (c *Client) RankSimilarTasks(ctx context.Context, q SimilarStore, in Simila
 	}
 
 	rows, err := q.ListCandidateTaskEmbeddings(ctx, generated.ListCandidateTaskEmbeddingsParams{
-		WorkspaceID:   in.WorkspaceID,
-		Model:         model,
-		TaskID:        in.TaskID,
-		IsElevated:    in.IsElevated,
-		ActorUserID:   in.ActorUserID,
-		ActorUserID_2: in.ActorUserID,
-		ActorUserID_3: in.ActorUserID,
-		Limit:         DefaultCandidateLimit,
+		WorkspaceID: in.WorkspaceID,
+		Model:       model,
+		TaskID:      in.TaskID,
+		IsElevated:  in.IsElevated,
+		ActorUserID: in.ActorUserID,
+		Limit:       DefaultCandidateLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("embed: list candidate embeddings: %w", err)

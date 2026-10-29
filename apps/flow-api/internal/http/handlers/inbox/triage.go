@@ -69,13 +69,11 @@ type TriageOutput struct {
 // never empty.
 func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vis acl.VisibilityArgs, limit int) ([]ai.InboxTriageSuggestion, error) {
 	rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
-		WorkspaceID:   wsID,
-		IsElevated:    vis.IsElevated,
-		ActorUserID:   vis.ActorUserID,
-		ActorUserID_2: vis.ActorUserID,
-		ActorUserID_3: vis.ActorUserID,
-		Limit:         int32(limit), //#nosec G115 -- limit is validated to maximum:50 by the handler
-		Offset:        0,
+		WorkspaceID: wsID,
+		IsElevated:  vis.IsElevated,
+		ActorUserID: vis.ActorUserID,
+		Limit:       int32(limit), //#nosec G115 -- limit is validated to maximum:50 by the handler
+		Offset:      0,
 	})
 	if err != nil {
 		return nil, err

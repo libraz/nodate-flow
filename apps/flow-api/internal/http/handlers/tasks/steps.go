@@ -154,12 +154,10 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(ws.Role))
 		var children []ai.ChildTaskSummary
 		childRows, err := deps.Queries.ListChildTasksByParentID(ctx, generated.ListChildTasksByParentIDParams{
-			WorkspaceID:   ws.ID,
-			ParentTaskID:  sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			IsElevated:    vis.IsElevated,
-			ActorUserID:   vis.ActorUserID,
-			ActorUserID_2: vis.ActorUserID,
-			ActorUserID_3: vis.ActorUserID,
+			WorkspaceID:  ws.ID,
+			ParentTaskID: sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- parent task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			IsElevated:   vis.IsElevated,
+			ActorUserID:  vis.ActorUserID,
 		})
 		if err == nil {
 			for _, c := range childRows {
