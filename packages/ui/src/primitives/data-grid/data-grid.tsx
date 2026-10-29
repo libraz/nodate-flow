@@ -117,6 +117,8 @@ interface FocusedCell {
 }
 
 const PAGE_JUMP = 10;
+/** Fixed width (px) of the generated row-selection column. */
+const SELECT_COLUMN_SIZE = 40;
 
 function DataGridInner<TData>(
   props: DataGridProps<TData>,
@@ -198,6 +200,9 @@ function DataGridInner<TData>(
         />
       ),
       enableSorting: false,
+      size: SELECT_COLUMN_SIZE,
+      minSize: SELECT_COLUMN_SIZE,
+      maxSize: SELECT_COLUMN_SIZE,
     };
     return [selectCol, ...columns];
   }, [columns, enableRowSelection, selectAllRowsLabel, selectRowLabel]);
@@ -205,6 +210,10 @@ function DataGridInner<TData>(
   const table = useReactTable<TData>({
     data,
     columns: finalColumns,
+    // Keeps TanStack's default minSize/maxSize out of columnDef so only explicit values apply.
+    defaultColumn: { minSize: undefined, maxSize: undefined } as unknown as Partial<
+      ColumnDef<TData, unknown>
+    >,
     state: { sorting, rowSelection: selection, columnPinning: pinning },
     onSortingChange: setSorting,
     onRowSelectionChange: handleSelectionChange,
@@ -322,6 +331,12 @@ function DataGridInner<TData>(
     return offset;
   };
 
+  // Sum of per-column floors so the header and rows span the full scroll width when the root overflows.
+  const tableMinSize = table.getVisibleLeafColumns().reduce((sum, col) => {
+    if (enableColumnResizing || col.getIsPinned()) return sum + col.getSize();
+    return sum + (col.columnDef.minSize ?? 0);
+  }, 0);
+
   const renderRows: { row: (typeof rows)[number] | undefined; idx: number; start: number }[] =
     useFallback
       ? rows.map((row, idx) => ({ row, idx, start: idx * estimateSize }))
@@ -338,7 +353,10 @@ function DataGridInner<TData>(
       style={{ ...columnSizeVars, ...style } as CSSProperties}
       tabIndex={-1}
     >
-      <div className={styles.table}>
+      <div
+        className={styles.table}
+        style={tableMinSize > 0 ? { minInlineSize: `${tableMinSize}px` } : undefined}
+      >
         {headerGroups.map((group, gIdx) => (
           <div key={group.id} role="row" aria-rowindex={gIdx + 1} className={styles.headerRow}>
             {group.headers.map((header, hIdx) => {
@@ -356,6 +374,14 @@ function DataGridInner<TData>(
               const headerStyle: CSSProperties = enableColumnResizing
                 ? { inlineSize: `var(--col-${header.id}-size)`, flex: 'none' }
                 : { flex: `${header.getSize()} 1 0` };
+              const headerMinSize = header.column.columnDef.minSize;
+              if (!enableColumnResizing && headerMinSize !== undefined && !isPinned) {
+                headerStyle.minInlineSize = `${headerMinSize}px`;
+              }
+              const headerMaxSize = header.column.columnDef.maxSize;
+              if (!enableColumnResizing && headerMaxSize !== undefined && !isPinned) {
+                headerStyle.maxInlineSize = `${headerMaxSize}px`;
+              }
               if (isPinned === 'left') {
                 headerStyle.position = 'sticky';
                 headerStyle.insetInlineStart = `${getPinnedOffset(hIdx, group.headers)}px`;
@@ -390,9 +416,11 @@ function DataGridInner<TData>(
                     }
                   }}
                 >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.isPlaceholder ? null : (
+                    <span className={styles.headerLabel}>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </span>
+                  )}
                   {sortDir === 'asc' && <span className={styles.sortIndicator}>▲</span>}
                   {sortDir === 'desc' && <span className={styles.sortIndicator}>▼</span>}
                   {enableColumnResizing && header.column.getCanResize() && (
@@ -452,6 +480,14 @@ function DataGridInner<TData>(
                     const cellStyle: CSSProperties = enableColumnResizing
                       ? { inlineSize: `var(--col-${cell.column.id}-size)`, flex: 'none' }
                       : { flex: `${cell.column.getSize()} 1 0` };
+                    const cellMinSize = cell.column.columnDef.minSize;
+                    if (!enableColumnResizing && cellMinSize !== undefined && !isPinned) {
+                      cellStyle.minInlineSize = `${cellMinSize}px`;
+                    }
+                    const cellMaxSize = cell.column.columnDef.maxSize;
+                    if (!enableColumnResizing && cellMaxSize !== undefined && !isPinned) {
+                      cellStyle.maxInlineSize = `${cellMaxSize}px`;
+                    }
                     if (isPinned === 'left') {
                       cellStyle.position = 'sticky';
                       cellStyle.insetInlineStart = `${getPinnedOffset(

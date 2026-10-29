@@ -772,11 +772,15 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
    * remounts every cell. Per-render state (edit mode, mutations, the
    * current task order) reaches the cells through ListCellContext.
    */
+  // Each minSize fits the column's header label (ja and en) or its widest cell value,
+  // plus cell padding and the sort indicator where the column is sortable.
   const columns: ColumnDef<TaskListItem, unknown>[] = useMemo(
     () => [
       {
         id: 'drag',
         size: 32,
+        minSize: 32,
+        maxSize: 32,
         enableSorting: false,
         header: () => null,
         cell: ({ row }) => (
@@ -787,6 +791,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         id: 'title',
         accessorKey: 'title',
         size: 320,
+        minSize: 160,
         header: () => t('tasks.columns.title'),
         cell: ({ row }) => <TitleCell task={row.original} />,
       },
@@ -794,6 +799,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         id: 'status',
         accessorKey: 'derivedState',
         size: 100,
+        minSize: 120,
         header: () => t('tasks.columns.status'),
         cell: ({ row }) => {
           const state = row.original.derivedState as TaskDerivedState;
@@ -837,6 +843,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       {
         id: 'deps',
         size: 60,
+        minSize: 64,
         enableSorting: false,
         header: () => t('tasks.columns.deps'),
         cell: ({ row }) => {
@@ -858,6 +865,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       {
         id: 'assignee',
         size: 110,
+        minSize: 96,
         enableSorting: false,
         header: () => t('tasks.columns.assignee'),
         cell: ({ row }) => {
@@ -892,6 +900,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         id: 'due',
         accessorKey: 'dueOn',
         size: 100,
+        minSize: 72,
         header: () => t('tasks.columns.due'),
         cell: ({ row }) => <DueCell task={row.original} locale={locale} />,
       },
@@ -899,6 +908,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         id: 'priority',
         accessorKey: 'priority',
         size: 90,
+        minSize: 104,
         header: () => t('tasks.columns.priority'),
         cell: ({ row }) => <PriorityCell task={row.original} />,
       },
@@ -906,6 +916,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         id: 'updated',
         accessorKey: 'updatedAt',
         size: 110,
+        minSize: 120,
         header: () => t('tasks.columns.updated'),
         cell: ({ row }) => (
           <span className={css.updated}>{formatEpoch(row.original.updatedAt, locale) ?? '—'}</span>

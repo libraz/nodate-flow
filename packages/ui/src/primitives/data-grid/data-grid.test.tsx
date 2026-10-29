@@ -292,4 +292,63 @@ describe('DataGrid getRowProps', () => {
     expect(row?.style.position).toBe('absolute');
     expect(row?.style.opacity).toBe('0.5');
   });
+
+  it('floors flex columns at an explicit minSize on header and body cells only', () => {
+    const cols: ColumnDef<Row, unknown>[] = [
+      { accessorKey: 'id', header: 'ID' },
+      { accessorKey: 'name', header: 'Name', minSize: 120 },
+    ];
+    const container = renderGrid({ columns: cols });
+    const q = (col: number, role: string) =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(`[role="${role}"][data-col-index="${col}"]`),
+      );
+    const named = [...q(1, 'columnheader'), ...q(1, 'gridcell')];
+    expect(named.length).toBe(1 + ROWS.length);
+    for (const el of named) expect(el.style.minInlineSize).toBe('120px');
+    const plain = [...q(0, 'columnheader'), ...q(0, 'gridcell')];
+    expect(plain.length).toBe(1 + ROWS.length);
+    for (const el of plain) expect(el.style.minInlineSize).toBe('');
+  });
+
+  it('sets the table min-inline-size to the sum of column minSizes', () => {
+    const cols: ColumnDef<Row, unknown>[] = [
+      { accessorKey: 'id', header: 'ID' },
+      { accessorKey: 'name', header: 'Name', minSize: 120 },
+      { accessorKey: 'age', header: 'Age', minSize: 80 },
+    ];
+    const container = renderGrid({ columns: cols });
+    const tableEl = container.querySelector<HTMLElement>('[role="grid"] > div');
+    expect(tableEl?.style.minInlineSize).toBe('200px');
+  });
+
+  it('caps flex columns at an explicit maxSize on header and body cells only', () => {
+    const cols: ColumnDef<Row, unknown>[] = [
+      { accessorKey: 'id', header: 'ID', maxSize: 60 },
+      { accessorKey: 'name', header: 'Name' },
+    ];
+    const container = renderGrid({ columns: cols });
+    const q = (col: number, role: string) =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(`[role="${role}"][data-col-index="${col}"]`),
+      );
+    const capped = [...q(0, 'columnheader'), ...q(0, 'gridcell')];
+    expect(capped.length).toBe(1 + ROWS.length);
+    for (const el of capped) expect(el.style.maxInlineSize).toBe('60px');
+    const plain = [...q(1, 'columnheader'), ...q(1, 'gridcell')];
+    for (const el of plain) expect(el.style.maxInlineSize).toBe('');
+  });
+
+  it('keeps the row-selection column at a fixed width', () => {
+    const container = renderGrid({ enableRowSelection: true });
+    const cells = [
+      ...container.querySelectorAll<HTMLElement>('[role="columnheader"][data-col-index="0"]'),
+      ...container.querySelectorAll<HTMLElement>('[role="gridcell"][data-col-index="0"]'),
+    ];
+    expect(cells.length).toBe(1 + ROWS.length);
+    for (const el of cells) {
+      expect(el.style.minInlineSize).not.toBe('');
+      expect(el.style.minInlineSize).toBe(el.style.maxInlineSize);
+    }
+  });
 });
