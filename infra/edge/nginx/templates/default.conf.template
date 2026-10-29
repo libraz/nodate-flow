@@ -1,0 +1,35 @@
+# Plain HTTP, for a host where something else terminates TLS (a reverse proxy
+# or a tunnel). Baked into the image as the default; compose.prod.yml mounts
+# tls.conf.template over it. NF_* names are substituted at container start.
+
+server {
+    listen 80;
+    server_name ${NF_ACCOUNTS_HOST};
+    access_log /var/log/nginx/access.log edge;
+    root /usr/share/nginx/accounts;
+    include /etc/nginx/conf.d/snippets/csp-accounts.conf;
+    include /etc/nginx/conf.d/snippets/spa-accounts.conf;
+}
+
+server {
+    listen 80;
+    server_name ${NF_APP_HOST};
+    access_log /var/log/nginx/access.log edge;
+    root /usr/share/nginx/flow;
+    include /etc/nginx/conf.d/snippets/csp-flow.conf;
+    include /etc/nginx/conf.d/snippets/spa-flow.conf;
+}
+
+server {
+    listen 80;
+    server_name ${NF_AUTH_HOST};
+    access_log /var/log/nginx/access.log edge;
+    include /etc/nginx/conf.d/snippets/auth.conf;
+}
+
+server {
+    listen 80;
+    server_name ${NF_API_HOST};
+    access_log /var/log/nginx/access.log edge;
+    include /etc/nginx/conf.d/snippets/api.conf;
+}

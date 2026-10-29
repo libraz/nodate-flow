@@ -1,0 +1,64 @@
+# TLS terminated here. compose.prod.yml mounts this over
+# /etc/nginx/templates/default.conf.template, replacing the plain-HTTP default.
+# One certificate covers all four hostnames; NF_TLS_CERT_NAME is its directory
+# under /etc/letsencrypt/live/. It has to exist before nginx starts, or the
+# container fails to load its configuration.
+
+# http-level: this file is included there, and all four servers share them.
+ssl_certificate     /etc/letsencrypt/live/${NF_TLS_CERT_NAME}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/${NF_TLS_CERT_NAME}/privkey.pem;
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_session_cache   shared:SSL:10m;
+ssl_session_timeout 1d;
+ssl_session_tickets off;
+
+server {
+    listen 80 default_server;
+    server_name ${NF_ACCOUNTS_HOST} ${NF_APP_HOST} ${NF_AUTH_HOST} ${NF_API_HOST};
+    access_log /var/log/nginx/access.log edge;
+
+    # Renewal is answered over plain HTTP; certbot --webroot writes here.
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NF_ACCOUNTS_HOST};
+    access_log /var/log/nginx/access.log edge;
+    root /usr/share/nginx/accounts;
+    include /etc/nginx/conf.d/snippets/csp-accounts.conf;
+    include /etc/nginx/conf.d/snippets/spa-accounts.conf;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NF_APP_HOST};
+    access_log /var/log/nginx/access.log edge;
+    root /usr/share/nginx/flow;
+    include /etc/nginx/conf.d/snippets/csp-flow.conf;
+    include /etc/nginx/conf.d/snippets/spa-flow.conf;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NF_AUTH_HOST};
+    access_log /var/log/nginx/access.log edge;
+    include /etc/nginx/conf.d/snippets/auth.conf;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NF_API_HOST};
+    access_log /var/log/nginx/access.log edge;
+    include /etc/nginx/conf.d/snippets/api.conf;
+}
