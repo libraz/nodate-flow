@@ -1,6 +1,7 @@
 package kindscan_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -124,6 +125,38 @@ func TestScanSQLRefusesARootWithNoQueries(t *testing.T) {
 
 	if _, err := kindscan.ScanSQL(t.TempDir()); err == nil {
 		t.Fatal("a root holding no query must be an error, not an empty result")
+	}
+}
+
+// TestScanSQLSkipsAVendoredLayer holds the exclusion to the marker: the
+// same text is reported outside a directory holding UPSTREAM.json and not
+// inside one.
+func TestScanSQLSkipsAVendoredLayer(t *testing.T) {
+	t.Parallel()
+
+	const stmt = "INSERT INTO events (type) VALUES ('task.invented');\n"
+	root := t.TempDir()
+	for name, body := range map[string]string{
+		"own/q.sql":              stmt,
+		"vendored/q.sql":         stmt,
+		"vendored/deep/q.sql":    stmt,
+		"vendored/UPSTREAM.json": "{}",
+	} {
+		p := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	msgs, err := kindscan.ScanSQL(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 || !strings.Contains(msgs[0], "own") {
+		t.Fatalf("only the file outside the vendored layer must be reported, got %v", msgs)
 	}
 }
 

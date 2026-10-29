@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -108,7 +109,14 @@ func ScanSQL(dir string) ([]string, error) {
 		if werr != nil {
 			return werr
 		}
-		if entry.IsDir() || !strings.HasSuffix(name, ".sql") {
+		if entry.IsDir() {
+			// A vendored layer is another product's text, checked by that product.
+			if _, serr := root.Stat(path.Join(name, "UPSTREAM.json")); serr == nil {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, ".sql") {
 			return nil
 		}
 		src, rerr := root.ReadFile(name)
