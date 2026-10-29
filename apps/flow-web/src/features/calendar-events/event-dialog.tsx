@@ -1403,6 +1403,7 @@ export default function EventDialog({
                         {allDay ? null : (
                           <TimePicker
                             value={startTime}
+                            listLabel={t('field.startTime')}
                             onChange={editing('startTime', setStartTime)}
                             step={15}
                           />
@@ -1436,6 +1437,7 @@ export default function EventDialog({
                         {allDay ? null : (
                           <TimePicker
                             value={endTime}
+                            listLabel={t('field.endTime')}
                             onChange={editing('endTime', setEndTime)}
                             step={15}
                           />

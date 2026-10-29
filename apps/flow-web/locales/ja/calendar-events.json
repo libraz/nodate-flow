@@ -31,6 +31,8 @@
     "calendar": "カレンダー",
     "start": "開始",
     "end": "終了",
+    "startTime": "開始時刻",
+    "endTime": "終了時刻",
     "allDay": "終日",
     "location": "場所",
     "memo": "メモ",

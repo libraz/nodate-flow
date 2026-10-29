@@ -14,6 +14,8 @@ export interface TimePickerProps {
   value: string;
   /** Called when the user selects a time slot. */
   onChange: (time: string) => void;
+  /** Accessible name of the time-slot listbox. */
+  listLabel: string;
   /** Interval between slots in minutes. Defaults to 15. */
   step?: number;
   /** Custom trigger label. Defaults to the value. */
@@ -46,6 +48,7 @@ function nearestSlot(value: string, step: number): string {
 export default function TimePicker({
   value,
   onChange,
+  listLabel,
   step = 15,
   triggerLabel,
   className,
@@ -78,7 +81,7 @@ export default function TimePicker({
       onOpenChange={setOpen}
       placement="bottom-start"
       content={
-        <div className={styles.list} role="listbox" aria-label="Time">
+        <div className={styles.list} role="listbox" aria-label={listLabel}>
           {slots.map((slot) => {
             const isSelected = slot === nearest;
             return (

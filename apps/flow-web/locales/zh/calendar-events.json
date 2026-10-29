@@ -31,6 +31,8 @@
     "calendar": "日历",
     "start": "开始",
     "end": "结束",
+    "startTime": "开始时间",
+    "endTime": "结束时间",
     "allDay": "全天",
     "location": "地点",
     "memo": "备注",
