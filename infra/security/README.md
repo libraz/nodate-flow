@@ -100,7 +100,7 @@ bunx npm-audit --production
 ### A02: Cryptographic Failures
 
 - [ ] All secrets encrypted at rest (AES-256-GCM via `internal/crypto`)
-- [ ] TLS enforced in production (Caddy auto-HTTPS)
+- [ ] TLS enforced in production (the edge nginx terminates TLS and sends HSTS)
 - [ ] JWT uses EdDSA (Ed25519), not HMAC
 - [ ] Password hashing uses Argon2id with recommended parameters
 - [ ] Semgrep crypto error-check rules pass
