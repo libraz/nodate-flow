@@ -11,13 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.8"
-  BUN_VERSION: "1.4.2"
+  GO_VERSION: "1.27.3"
+  BUN_VERSION: "1.4.4"
   # Pinned for the same reason the Go and bun versions are: a linter
   # release that adds a check would otherwise turn main red on its own
   # schedule, and it would disagree with the version a contributor has
   # installed locally.
-  GOLANGCI_LINT_VERSION: "v2.13.2"
+  GOLANGCI_LINT_VERSION: "v2.15.0"
 
 jobs:
   web:
