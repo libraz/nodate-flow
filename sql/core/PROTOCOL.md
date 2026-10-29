@@ -371,7 +371,9 @@ sit inside workspace membership.
   objects with `uploaded_at IS NULL` and `updated_at` older than the cutoff,
   deletes the referencing rows in tables the sweeper's layer owns, and
   deletes the object in the same transaction. The unreferenced sweep takes
-  objects with `ref_count = 0`, with no age condition.
+  confirmed objects (`uploaded_at IS NOT NULL`) with `ref_count = 0`, with no
+  age condition. A reservation is never taken by it, however old: only the
+  unconfirmed sweep reclaims one.
 - **Time limits.** An upload URL for a reservation expires within 15 minutes
   of the row's `updated_at`. A sweeper's cutoff is at least 45 minutes, so
   one implementation's sweep never removes another's upload in progress.
