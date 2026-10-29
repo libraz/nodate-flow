@@ -1,0 +1,47 @@
+{
+  "repository": "git@github.com:libraz/nodate-time.git",
+  "sourcePath": "sql/time",
+  "ref": "5278c4fc68a617eb61266d43adcfdcbaa82331ed",
+  "files": [
+    {
+      "path": "event-kinds.yaml",
+      "sha256": "1e36afcb53f8b6cbceba559cae3d9857d089b8b87cf90f5fdd1817433480216f"
+    },
+    {
+      "path": "tables/album_photos.sql",
+      "sha256": "c2021b624ef8e7b5200fd82a7a0a2845202c156b9a34619d422871aac4f4b4fd"
+    },
+    {
+      "path": "tables/avatar_uploads.sql",
+      "sha256": "4f011f2f14509f8b549d10e6fb7fc2a7750ffa51b82c8182480f3209cbe48a86"
+    },
+    {
+      "path": "tables/calendar_invites.sql",
+      "sha256": "80bd370b0996635cf09ec09d64eb531343e48bee68786db6f9115f1614ccab86"
+    },
+    {
+      "path": "tables/email_verifications.sql",
+      "sha256": "1324d2ca4de30bf9fb8e2d2b883cb3d47a3adfe5217d880b7e00d9eb20f9ff16"
+    },
+    {
+      "path": "tables/oauth_provider_configs.sql",
+      "sha256": "3f2b448fd4f81e80d24fdd2344be1a2199670c3cf292c7d104396e1a05f8e4a4"
+    },
+    {
+      "path": "tables/password_resets.sql",
+      "sha256": "ed152fc02d4b08332591c1139915894043ee4391aa850dda05f0047d79bf6221"
+    },
+    {
+      "path": "tables/signin_states.sql",
+      "sha256": "a1acf4efbe75650c57b8d7f24fd6ff2109a98f0bae1881da19012ee2782100fd"
+    },
+    {
+      "path": "upgrades/from-v0.1.0.sql",
+      "sha256": "f02ed5f3b9cb6b702165a8308c11be6c91508d90c54567c3ea9d38982f692e75"
+    },
+    {
+      "path": "views/storage_objects_unreferenced.sql",
+      "sha256": "d93f756ff16a0c41c96e930d948e89efdefd45f098edf246b47b21f79bd92857"
+    }
+  ]
+}

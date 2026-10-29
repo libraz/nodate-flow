@@ -2,6 +2,7 @@ package eventkinds
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -28,10 +29,11 @@ func schemaDirs(t *testing.T) []string {
 	t.Helper()
 
 	root := repoRoot(t)
-	return []string{
-		filepath.Join(root, "sql", "core"),
-		filepath.Join(root, "sql", "flow"),
+	dirs := []string{filepath.Join(root, "sql", "core")}
+	if _, err := os.Stat(filepath.Join(root, "sql", "time")); err == nil {
+		dirs = append(dirs, filepath.Join(root, "sql", "time"))
 	}
+	return append(dirs, filepath.Join(root, "sql", "flow"))
 }
 
 // TestEveryKindColumnIsClassified holds the scanner's column rule to the

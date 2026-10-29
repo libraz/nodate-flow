@@ -119,10 +119,13 @@ func (t Table) allGenerated(k Key) bool {
 }
 
 // layerDirs are the directories the schema is built from, in the order
-// sql/build-schema.sh emits them.
+// sql/core/tools/build-schema.sh emits them. The time layer is absent
+// until it is vendored.
 var layerDirs = [][]string{
 	{"sql", "core", "tables"},
 	{"sql", "core", "constraints"},
+	{"sql", "time", "tables"},
+	{"sql", "time", "constraints"},
 	{"sql", "flow", "tables"},
 	{"sql", "flow", "constraints"},
 }

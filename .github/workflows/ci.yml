@@ -323,6 +323,42 @@ jobs:
           bash sql/core/conformance/run.sh \
             --dsn 'root:conformance@127.0.0.1:3306/full_stack' --mode all
 
+      - name: Core contract (core + time layers)
+        run: |
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE time_set'
+          bash sql/core/tools/build-schema.sh core time \
+            | mysql -h 127.0.0.1 -uroot -pconformance time_set
+          bash sql/core/conformance/run.sh \
+            --dsn 'root:conformance@127.0.0.1:3306/time_set' --mode all
+
+      - name: Core contract (core + time + flow layers, as committed)
+        run: |
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE full_set'
+          mysql -h 127.0.0.1 -uroot -pconformance full_set < sql/schema.sql
+          bash sql/core/conformance/run.sh \
+            --dsn 'root:conformance@127.0.0.1:3306/full_set' --mode all
+
+      # A time-only database that gains the flow layer later must end up
+      # with the same schema as one built with every layer at once, and
+      # applying the flow layer a second time must change nothing.
+      - name: Time set plus flow equals a fresh full set
+        run: |
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE time_plus_flow'
+          bash sql/core/tools/build-schema.sh core time \
+            | mysql -h 127.0.0.1 -uroot -pconformance time_plus_flow
+          for _ in 1 2; do
+            bash sql/core/tools/build-schema.sh flow \
+              | mysql -h 127.0.0.1 -uroot -pconformance time_plus_flow
+          done
+          mysql -h 127.0.0.1 -uroot -pconformance -e 'CREATE DATABASE fresh_full'
+          bash sql/core/tools/build-schema.sh core time flow \
+            | mysql -h 127.0.0.1 -uroot -pconformance fresh_full
+          bash sql/core/conformance/run.sh \
+            --dsn 'root:conformance@127.0.0.1:3306/time_plus_flow' --mode all
+          bash sql/core/tools/check-layer-equivalence.sh \
+            --dsn-a 'root:conformance@127.0.0.1:3306/time_plus_flow' \
+            --dsn-b 'root:conformance@127.0.0.1:3306/fresh_full'
+
   api:
     name: API (format, lint, test)
     # GitHub-hosted Linux runners ship a running Docker daemon, which is what

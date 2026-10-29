@@ -370,6 +370,10 @@ check-sdk-browser-safe: ## Fail when anything pulls Node types into the browser 
 check-no-core-alters: ## Fail when a product layer reshapes a core table
 	bash sql/core/tools/check-no-core-alters.sh
 
+vendor-time: ## Re-vendor sql/time from the nodate-time checkout (NF_TIME_REPO, optional NF_TIME_REF)
+	bash sql/core/tools/vendor.sh --from "$${NF_TIME_REPO:-../nodate-time}" --src sql/time --dest sql/time \
+	  --repository git@github.com:libraz/nodate-time.git $${NF_TIME_REF:+--ref "$$NF_TIME_REF"}
+
 check-vendored: ## Fail when the vendored sql/time layer was edited locally (a no-op until sql/time is vendored)
 	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --local-only; else echo "sql/time is not vendored; nothing to check"; fi
 
@@ -496,7 +500,7 @@ NF_DB_USER     ?= nodate
 NF_DB_PASSWORD ?= nodatepw
 NF_DB_NAME     ?= nodate_flow
 
-.PHONY: db-schema db-apply db-reset db-shell seed-flow seed-calendar
+.PHONY: vendor-time db-schema db-apply db-reset db-shell seed-flow seed-calendar
 # Layers in build order; sql/time joins once it is vendored.
 SCHEMA_LAYERS := core $(if $(wildcard sql/time),time) flow
 

@@ -11,6 +11,7 @@
       "!**/node_modules",
       "!**/dist",
       "!**/build",
+      "!**/sql/time",
       "!**/.next",
       "!**/apps/flow-api/internal/db/generated",
       "!**/apps/flow-api/internal/errors",
