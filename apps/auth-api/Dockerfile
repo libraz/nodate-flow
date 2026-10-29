@@ -2,15 +2,17 @@
 # Multi-stage build for the nodate-flow auth API.
 # Build context is the repo root so go.work is visible.
 
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 
 # Copy workspace + module manifests first for layer caching.
-# All modules listed in go.work must be resolvable, even when only
-# one is built here.
-COPY go.work go.work.sum* ./
+# go mod download in workspace mode loads every module listed in go.work,
+# so all five go.mod/go.sum pairs are needed even though one is built.
+COPY go.work go.work.sum ./
 COPY apps/auth-api/go.mod apps/auth-api/go.sum ./apps/auth-api/
 COPY apps/flow-api/go.mod apps/flow-api/go.sum ./apps/flow-api/
+COPY apps/flow-worker/go.mod apps/flow-worker/go.sum ./apps/flow-worker/
+COPY apps/presence-discord/go.mod apps/presence-discord/go.sum ./apps/presence-discord/
 COPY packages/go-shared/go.mod packages/go-shared/go.sum ./packages/go-shared/
 
 RUN --mount=type=cache,target=/go/pkg/mod \

@@ -1,0 +1,14 @@
+.git
+**/node_modules
+.env
+.env.*
+!.env.example
+backup/
+**/dist
+.claude/
+.serena/
+coverage/
+**/test-results
+**/playwright-report
+.DS_Store
+**/.DS_Store
