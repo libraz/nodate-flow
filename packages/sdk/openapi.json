@@ -12409,6 +12409,7 @@
         "properties": {
           "attempts": {
             "format": "int32",
+            "maximum": 255,
             "minimum": 0,
             "type": "integer"
           },
@@ -12429,6 +12430,8 @@
           },
           "httpStatus": {
             "format": "int32",
+            "maximum": 32767,
+            "minimum": -32768,
             "type": ["integer", "null"]
           },
           "id": {
@@ -12437,6 +12440,7 @@
           },
           "maxAttempts": {
             "format": "int32",
+            "maximum": 255,
             "minimum": 0,
             "type": "integer"
           },

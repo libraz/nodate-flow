@@ -325,13 +325,14 @@ if [[ "$merged_paths" -lt "$flow_paths" || "$merged_paths" -lt "$auth_paths" ]];
 fi
 
 # The committed document is formatted, so the scratch one has to be too.
-# The formatter is pointed at the repository config explicitly: a file
-# outside the tree finds no config by discovery and would be formatted to
-# the tool's own defaults instead of this repository's.
-if ! (cd "$ROOT_DIR" && bunx biome format --config-path="$ROOT_DIR" --write "$SCRATCH/openapi.json") >/dev/null; then
+# It goes through stdin under the committed document's path: biome refuses a
+# path outside the tree, and the path is what selects this repository's config.
+if ! (cd "$ROOT_DIR" && bunx biome format --stdin-file-path=packages/sdk/openapi.json \
+  <"$SCRATCH/openapi.json" >"$SCRATCH/openapi.formatted.json"); then
   echo "ERROR: formatting the regenerated API document failed." >&2
   exit 2
 fi
+mv "$SCRATCH/openapi.formatted.json" "$SCRATCH/openapi.json"
 
 # The types are generated from the committed document, not from the
 # regenerated one: this comparison answers whether the types were
