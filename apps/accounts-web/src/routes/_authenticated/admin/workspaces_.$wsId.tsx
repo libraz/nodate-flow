@@ -8,17 +8,18 @@
  * the operator to type the workspace slug verbatim.
  */
 
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { adminBadgeBase, adminLabelStyle, adminValueStyle } from '../../../features/admin/styles';
 import { apiRequest } from '../../../lib/api';
 import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
@@ -156,8 +157,13 @@ function DeleteWorkspaceDialog({
           <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
             {t('workspaces.danger.confirm.cancel')}
           </Button>
-          <Button type="submit" variant="danger" disabled={!matches || pending}>
-            {pending ? t('workspaces.danger.deleting') : t('workspaces.danger.confirm.submit')}
+          <Button
+            type="submit"
+            variant="danger"
+            aria-busy={pending || undefined}
+            disabled={!matches || pending}
+          >
+            {t('workspaces.danger.confirm.submit')}
           </Button>
         </div>
       </form>
@@ -275,95 +281,72 @@ function WorkspaceDetailPage(): ReactElement {
   };
 
   if (loading) {
-    return <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>;
+    return (
+      <div className="aw-stack aw-stack-6" aria-busy="true">
+        <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+        <Skeleton style={{ blockSize: 'var(--nf-space-8)', inlineSize: '40%' }} />
+        <div className="aw-panel aw-stack aw-stack-3">
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+        </div>
+      </div>
+    );
   }
 
   if (error || !workspace) {
     return (
-      <div>
-        <Link to="/admin/workspaces" style={{ color: 'var(--nf-color-accent-fg)' }}>
-          {t('common.back_to_workspaces')}
-        </Link>
-        <p
-          role="alert"
-          style={{
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+      <div className="aw-stack aw-stack-4">
+        <p role="alert" className="aw-error">
           {error ?? t('errors.generic')}
         </p>
+        <Link to="/admin/workspaces" className="aw-link aw-text-sm">
+          {t('common.back_to_workspaces')}
+        </Link>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
+    <div className="aw-stack aw-stack-6">
       <div>
-        <Link
-          to="/admin/workspaces"
-          style={{
-            color: 'var(--nf-color-accent-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <Link to="/admin/workspaces" className="aw-link aw-text-sm">
           {t('common.back_to_workspaces')}
         </Link>
       </div>
 
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-2xl)',
-          margin: 0,
-        }}
-      >
-        {t('workspaces.detail')}
-      </h1>
+      <h1 className="aw-page-title">{t('workspaces.detail')}</h1>
 
-      <div
-        style={{
-          padding: 'var(--nf-space-4)',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md)',
-        }}
-      >
-        <div style={adminLabelStyle}>{t('workspaces.name')}</div>
-        <div style={adminValueStyle}>{workspace.name}</div>
+      <dl className="aw-panel aw-dl">
+        <dt>{t('workspaces.name')}</dt>
+        <dd>{workspace.name}</dd>
 
-        <div style={adminLabelStyle}>{t('workspaces.slug')}</div>
-        <div style={adminValueStyle}>{workspace.slug}</div>
+        <dt>{t('workspaces.slug')}</dt>
+        <dd>{workspace.slug}</dd>
 
-        <div style={adminLabelStyle}>{t('workspaces.members')}</div>
-        <div style={adminValueStyle}>{workspace.memberCount}</div>
+        <dt>{t('workspaces.members')}</dt>
+        <dd>{workspace.memberCount}</dd>
 
-        <div style={adminLabelStyle}>{t('workspaces.projects')}</div>
-        <div style={adminValueStyle}>{workspace.projectCount}</div>
+        <dt>{t('workspaces.projects')}</dt>
+        <dd>{workspace.projectCount}</dd>
 
-        <div style={adminLabelStyle}>{t('workspaces.status')}</div>
-        <div style={adminValueStyle}>
+        <dt>{t('workspaces.status')}</dt>
+        <dd>
           <span
-            style={{
-              ...adminBadgeBase,
-              background: workspace.enabled
-                ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
-                : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
-              color: workspace.enabled ? 'var(--nf-color-success-fg)' : 'var(--nf-color-danger-fg)',
-            }}
+            className={workspace.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'}
           >
             {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
           </span>
-        </div>
+        </dd>
 
-        <div style={adminLabelStyle}>{t('workspaces.created_at')}</div>
-        <div style={adminValueStyle}>
-          {formatTimestamp(workspace.createdAt, { locale, fallback: t('common.never') })}
-        </div>
-      </div>
+        <dt>{t('workspaces.created_at')}</dt>
+        <dd>{formatTimestamp(workspace.createdAt, { locale, fallback: t('common.never') })}</dd>
+      </dl>
 
       <div>
         <Button
           variant="default"
+          aria-busy={actionLoading || undefined}
           disabled={actionLoading}
           onClick={() => void handleToggleEnabled()}
         >

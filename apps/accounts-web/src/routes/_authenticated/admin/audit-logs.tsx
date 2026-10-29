@@ -7,12 +7,14 @@ import Button from '@nodate-flow/ui/primitives/button';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Input from '@nodate-flow/ui/primitives/input';
 import { createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import TableRegion from '../../../components/table-region';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
+
+import styles from './audit-logs.module.css';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced silently drifted
@@ -43,6 +45,7 @@ function AuditLogsPage(): ReactElement {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [perPage] = useState(20);
+  const actionFilterId = useId();
   const [actionFilter, setActionFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -117,43 +120,24 @@ function AuditLogsPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-2xl)',
-          margin: 0,
-        }}
-      >
-        {t('audit_logs.title')}
-      </h1>
+    <div className="aw-stack aw-stack-6">
+      <h1 className="aw-page-title">{t('audit_logs.title')}</h1>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--nf-space-3)',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        {/* nf-token-override: component dimension, not a spacing step */}
-        <div style={{ flex: 1, minWidth: '200px' }}>
+      <div className={styles.filters}>
+        <div className={styles.filter}>
+          <label htmlFor={actionFilterId} className="aw-muted aw-text-xs">
+            {t('audit_logs.filter_action')}
+          </label>
           <Input
+            id={actionFilterId}
             type="text"
             placeholder={t('audit_logs.filter_action')}
             value={actionFilter}
             onChange={handleActionChange}
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-          <span
-            style={{
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('audit_logs.filter_from')}
-          </span>
+        <div className="aw-stack aw-stack-1">
+          <span className="aw-muted aw-text-xs">{t('audit_logs.filter_from')}</span>
           <DatePicker
             value={fromDate}
             onChange={handleFromChange}
@@ -166,15 +150,8 @@ function AuditLogsPage(): ReactElement {
             }
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-          <span
-            style={{
-              fontSize: 'var(--nf-text-xs)',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {t('audit_logs.filter_to')}
-          </span>
+        <div className="aw-stack aw-stack-1">
+          <span className="aw-muted aw-text-xs">{t('audit_logs.filter_to')}</span>
           <DatePicker
             value={toDate}
             onChange={handleToChange}
@@ -191,66 +168,49 @@ function AuditLogsPage(): ReactElement {
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {error}
         </p>
       ) : null}
 
-      {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
-      ) : entries.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('audit_logs.no_results')}</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={adminTableStyle}>
-            <thead>
-              <tr>
-                <th style={adminThStyle}>{t('audit_logs.occurred_at')}</th>
-                <th style={adminThStyle}>{t('audit_logs.action')}</th>
-                <th style={adminThStyle}>{t('audit_logs.actor')}</th>
-                <th style={adminThStyle}>{t('audit_logs.target')}</th>
-                <th style={adminThStyle}>{t('audit_logs.ip_address')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td style={adminTdStyle}>{formatTimestamp(entry.occurredAt, { locale })}</td>
-                  <td style={adminTdStyle}>{entry.action}</td>
-                  <td style={adminTdStyle}>{entry.actorDisplayName ?? ''}</td>
-                  <td style={adminTdStyle}>
-                    {entry.targetResourceType ?? ''}
-                    {entry.targetWorkspaceName ? ` (${entry.targetWorkspaceName})` : ''}
-                  </td>
-                  <td style={adminTdStyle}>{entry.ipAddress ?? ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 'var(--nf-text-sm)',
-        }}
+      <TableRegion
+        loading={loading}
+        rowCount={entries.length}
+        loadingLabel={t('common.loading')}
+        emptyTitle={t('audit_logs.no_results')}
       >
+        <table className="aw-table">
+          <thead>
+            <tr>
+              <th className="aw-th">{t('audit_logs.occurred_at')}</th>
+              <th className="aw-th">{t('audit_logs.action')}</th>
+              <th className="aw-th">{t('audit_logs.actor')}</th>
+              <th className="aw-th">{t('audit_logs.target')}</th>
+              <th className="aw-th">{t('audit_logs.ip_address')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <tr key={entry.id}>
+                <td className="aw-td">{formatTimestamp(entry.occurredAt, { locale })}</td>
+                <td className="aw-td">{entry.action}</td>
+                <td className="aw-td">{entry.actorDisplayName ?? ''}</td>
+                <td className="aw-td">
+                  {entry.targetResourceType ?? ''}
+                  {entry.targetWorkspaceName ? ` (${entry.targetWorkspaceName})` : ''}
+                </td>
+                <td className="aw-td">{entry.ipAddress ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
+
+      <div className="aw-pagination">
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           {t('common.previous')}
         </Button>
-        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-          {t('common.page', { page, total: totalPages })}
-        </span>
+        <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
         <Button
           variant="default"
           disabled={page >= totalPages}

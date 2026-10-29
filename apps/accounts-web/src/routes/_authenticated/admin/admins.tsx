@@ -3,17 +3,21 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
+import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { adminTableStyle, adminTdStyle, adminThStyle } from '../../../features/admin/styles';
+import TableRegion from '../../../components/table-region';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
+import { useArrivedRows } from '../../../hooks/use-arrived-rows';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
+import styles from './admins.module.css';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced rendered
@@ -33,6 +37,11 @@ export function AdminsPage(): ReactElement {
   const invalidateInstanceStats = useInvalidateInstanceStats();
   const [admins, setAdmins] = useState<InstanceAdmin[]>([]);
   const [loading, setLoading] = useState(true);
+  const adminPresence = usePresenceList(admins, (admin) => admin.userId);
+  const isArrived = useArrivedRows(
+    admins.map((admin) => admin.userId),
+    !loading,
+  );
   const [error, setError] = useState<string | null>(null);
   const { guard: guardSubmit, submitting: actionLoading, end: endSubmit } = useSubmitGuard();
   const [grantError, setGrantError] = useState<string | null>(null);
@@ -148,96 +157,69 @@ export function AdminsPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-2xl)',
-          margin: 0,
-        }}
-      >
-        {t('admins.title')}
-      </h1>
+    <div className="aw-stack aw-stack-6">
+      <h1 className="aw-page-title">{t('admins.title')}</h1>
 
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {error}
         </p>
       ) : null}
 
-      {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
-      ) : admins.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('admins.no_admins')}</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={adminTableStyle}>
-            <thead>
-              <tr>
-                <th style={adminThStyle}>{t('admins.name')}</th>
-                <th style={adminThStyle}>{t('admins.email')}</th>
-                <th style={adminThStyle}>{t('admins.granted_at')}</th>
-                <th style={adminThStyle}>{t('admins.granted_by')}</th>
-                <th style={adminThStyle} />
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((admin) => (
-                <tr key={admin.id}>
-                  <td style={adminTdStyle}>{admin.displayName}</td>
-                  <td style={adminTdStyle}>{admin.email}</td>
-                  <td style={adminTdStyle}>{formatTimestamp(admin.grantedAt, { locale })}</td>
-                  <td style={adminTdStyle}>{admin.grantedByDisplayName ?? ''}</td>
-                  <td style={adminTdStyle}>
-                    <Button
-                      variant="danger"
-                      disabled={actionLoading}
-                      onClick={() => void handleRevoke(admin.userId)}
-                    >
-                      {t('admins.revoke')}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div
-        style={{
-          padding: 'var(--nf-space-4)',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md)',
-        }}
+      <TableRegion
+        loading={loading}
+        rowCount={adminPresence.entries.length}
+        loadingLabel={t('common.loading')}
+        emptyTitle={t('admins.no_admins')}
       >
-        <h2
-          style={{
-            fontFamily: 'var(--nf-font-sans)',
-            fontSize: 'var(--nf-text-lg)',
-            margin: '0 0 var(--nf-space-4) 0',
-          }}
-        >
+        <table className="aw-table">
+          <thead>
+            <tr>
+              <th className="aw-th">{t('admins.name')}</th>
+              <th className="aw-th">{t('admins.email')}</th>
+              <th className="aw-th">{t('admins.granted_at')}</th>
+              <th className="aw-th">{t('admins.granted_by')}</th>
+              <th className="aw-th" />
+            </tr>
+          </thead>
+          <tbody>
+            {adminPresence.entries.map(({ key, item: admin, present }) => (
+              <PresenceRow
+                key={key}
+                present={present}
+                arrived={isArrived(key)}
+                onExited={() => {
+                  adminPresence.onExited(key);
+                }}
+              >
+                <td className="aw-td">{admin.displayName}</td>
+                <td className="aw-td">{admin.email}</td>
+                <td className="aw-td">{formatTimestamp(admin.grantedAt, { locale })}</td>
+                <td className="aw-td">{admin.grantedByDisplayName ?? ''}</td>
+                <td className="aw-td">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    aria-busy={actionLoading || undefined}
+                    disabled={actionLoading}
+                    onClick={() => void handleRevoke(admin.userId)}
+                  >
+                    {t('admins.revoke')}
+                  </Button>
+                </td>
+              </PresenceRow>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
+
+      <section className="aw-panel aw-stack aw-stack-2" aria-labelledby="grant-admin-heading">
+        <h2 id="grant-admin-heading" className="aw-section-title">
           {t('admins.grant')}
         </h2>
-        <div style={{ display: 'flex', gap: 'var(--nf-space-3)', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label
-              htmlFor="grant-user-search"
-              style={{
-                display: 'block',
-                fontSize: 'var(--nf-text-xs)',
-                color: 'var(--nf-color-fg-muted)',
-                marginBlockEnd: 'var(--nf-space-1)',
-              }}
-            >
+        <div className={styles.grantRow}>
+          <div className={styles.grantField}>
+            <label htmlFor="grant-user-search" className={styles.grantLabel}>
               {t('admins.grant_search_label')}
             </label>
             <Combobox
@@ -260,14 +242,7 @@ export function AdminsPage(): ReactElement {
                 return (
                   <div>
                     <div>{user.displayName}</div>
-                    <div
-                      style={{
-                        color: 'var(--nf-color-fg-muted)',
-                        fontSize: 'var(--nf-text-xs)',
-                      }}
-                    >
-                      {user.email}
-                    </div>
+                    <div className={styles.optionEmail}>{user.email}</div>
                   </div>
                 );
               }}
@@ -276,6 +251,7 @@ export function AdminsPage(): ReactElement {
           <Button
             type="button"
             variant="primary"
+            aria-busy={actionLoading || undefined}
             disabled={actionLoading || !selectedUserId}
             onClick={() => {
               const picked = userResults.find((u) => u.id === selectedUserId);
@@ -285,28 +261,13 @@ export function AdminsPage(): ReactElement {
             {t('admins.grant_submit')}
           </Button>
         </div>
-        <p
-          style={{
-            margin: 'var(--nf-space-2) 0 0 0',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-          }}
-        >
-          {t('admins.grant_hint')}
-        </p>
+        <p className="aw-flush aw-muted aw-text-xs">{t('admins.grant_hint')}</p>
         {grantError ? (
-          <p
-            role="alert"
-            style={{
-              margin: 'var(--nf-space-2) 0 0 0',
-              color: 'var(--nf-color-danger-fg)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
+          <p role="alert" className="aw-error">
             {grantError}
           </p>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }

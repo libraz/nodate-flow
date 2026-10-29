@@ -114,8 +114,14 @@ function StatsPage(): ReactElement {
         >
           {t('actions.lastUpdated', { time: formatLastUpdated(lastUpdated, locale) })}
         </output>
-        <Button type="button" variant="default" disabled={isBusy} onClick={handleRefresh}>
-          {isBusy ? t('actions.refreshing') : t('actions.refresh')}
+        <Button
+          type="button"
+          variant="default"
+          aria-busy={isBusy || undefined}
+          disabled={isBusy}
+          onClick={handleRefresh}
+        >
+          {t('actions.refresh')}
         </Button>
       </div>
 

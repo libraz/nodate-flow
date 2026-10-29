@@ -5,28 +5,26 @@
 
 import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  adminBadgeBase,
-  adminLabelStyle,
-  adminTdStyle,
-  adminThStyle,
-  adminValueStyle,
-} from '../../../features/admin/styles';
+import TableRegion from '../../../components/table-region';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { selectUser, useAuth } from '../../../features/auth/auth-store';
 import { apiRequest } from '../../../lib/api';
 import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
+import styles from './users-detail.module.css';
 
 /**
  * SDK-derived shapes; mirror the auth-api Go schema verbatim so a server-side
@@ -81,46 +79,12 @@ function DeleteUserDialog({
       title={t('users.danger.confirm.title', { email: user.email })}
       dismissOnOverlayClick={!pending}
     >
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
-      >
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm)',
-            lineHeight: 1.5,
-          }}
-        >
-          {t('users.danger.confirm.warning')}
-        </p>
+      <form onSubmit={handleSubmit} className={styles.confirmForm}>
+        <p className={styles.confirmWarning}>{t('users.danger.confirm.warning')}</p>
 
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-2)',
-            padding: 'var(--nf-space-3)',
-            border: '1px solid var(--nf-color-border)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'var(--nf-color-bg-sunken)',
-          }}
-        >
-          <strong style={{ fontSize: 'var(--nf-text-sm)' }}>
-            {t('users.danger.confirm.loses_heading')}
-          </strong>
-          <ul
-            style={{
-              margin: 0,
-              paddingInlineStart: 'var(--nf-space-5)',
-              fontSize: 'var(--nf-text-sm)',
-              color: 'var(--nf-color-fg-muted)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-1)',
-            }}
-          >
+        <div className={styles.losesBox}>
+          <strong className={styles.losesHeading}>{t('users.danger.confirm.loses_heading')}</strong>
+          <ul className={styles.losesList}>
             <li>{t('users.danger.confirm.loses_account')}</li>
             <li>{t('users.danger.confirm.loses_workspaces', { count: user.workspaceCount })}</li>
             <li>{t('users.danger.confirm.loses_attachments')}</li>
@@ -146,18 +110,17 @@ function DeleteUserDialog({
           )}
         </FormField>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 'var(--nf-space-3)',
-          }}
-        >
+        <div className={styles.confirmActions}>
           <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
             {t('users.danger.confirm.cancel')}
           </Button>
-          <Button type="submit" variant="danger" disabled={!matches || pending}>
-            {pending ? t('users.danger.deleting') : t('users.danger.confirm.submit')}
+          <Button
+            type="submit"
+            variant="danger"
+            aria-busy={pending || undefined}
+            disabled={!matches || pending}
+          >
+            {t('users.danger.confirm.submit')}
           </Button>
         </div>
       </form>
@@ -179,6 +142,7 @@ export function UserDetailPage(): ReactElement {
   const currentUser = useAuth(selectUser);
   const [user, setUser] = useState<UserDetail | null>(null);
   const [sessions, setSessions] = useState<UserSession[]>([]);
+  const sessionPresence = usePresenceList(sessions, (s) => s.id);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -380,91 +344,73 @@ export function UserDetailPage(): ReactElement {
   };
 
   if (loading) {
-    return <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>;
+    return (
+      <div className="aw-stack aw-stack-6" aria-busy="true">
+        <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+        <Skeleton className={styles.titleSkeleton} />
+        <div className="aw-panel aw-stack aw-stack-3">
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+        </div>
+      </div>
+    );
   }
 
   if (error || !user) {
     return (
-      <div>
-        <p
-          role="alert"
-          style={{
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+      <div className="aw-stack aw-stack-4">
+        <p role="alert" className="aw-error">
           {error ?? t('errors.generic')}
         </p>
+        <Link to="/admin/users" className="aw-link aw-text-sm">
+          {t('common.back_to_users')}
+        </Link>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
+    <div className="aw-stack aw-stack-6">
       <div>
         <Link to="/admin/users" className="aw-link aw-text-sm">
           {t('common.back_to_users')}
         </Link>
       </div>
 
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-2xl)',
-          margin: 0,
-        }}
-      >
-        {t('users.detail')}
-      </h1>
+      <h1 className="aw-page-title">{t('users.detail')}</h1>
 
-      <div
-        style={{
-          padding: 'var(--nf-space-4)',
-          border: '1px solid var(--nf-color-border)',
-          borderRadius: 'var(--nf-radius-md)',
-        }}
-      >
-        <div style={adminLabelStyle}>{t('users.name')}</div>
-        <div style={adminValueStyle}>{user.displayName}</div>
+      <dl className="aw-panel aw-dl">
+        <dt>{t('users.name')}</dt>
+        <dd>{user.displayName}</dd>
 
-        <div style={adminLabelStyle}>{t('users.email')}</div>
-        <div style={adminValueStyle}>{user.email}</div>
+        <dt>{t('users.email')}</dt>
+        <dd>{user.email}</dd>
 
-        <div style={adminLabelStyle}>{t('users.status')}</div>
-        <div style={adminValueStyle}>
-          <span
-            style={{
-              ...adminBadgeBase,
-              background: user.enabled
-                ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
-                : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
-              color: user.enabled ? 'var(--nf-color-success-fg)' : 'var(--nf-color-danger-fg)',
-            }}
-          >
+        <dt>{t('users.status')}</dt>
+        <dd>
+          <span className={user.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'}>
             {user.enabled ? t('users.enabled') : t('users.disabled')}
           </span>
-        </div>
+        </dd>
 
-        <div style={adminLabelStyle}>{t('users.admin')}</div>
-        <div style={adminValueStyle}>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</div>
+        <dt>{t('users.admin')}</dt>
+        <dd>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</dd>
 
-        <div style={adminLabelStyle}>{t('users.workspaces')}</div>
-        <div style={adminValueStyle}>{user.workspaceCount}</div>
+        <dt>{t('users.workspaces')}</dt>
+        <dd>{user.workspaceCount}</dd>
 
-        <div style={adminLabelStyle}>{t('users.last_login')}</div>
-        <div style={adminValueStyle}>
-          {formatTimestamp(user.lastLoginAt, { locale, fallback: t('common.never') })}
-        </div>
+        <dt>{t('users.last_login')}</dt>
+        <dd>{formatTimestamp(user.lastLoginAt, { locale, fallback: t('common.never') })}</dd>
 
-        <div style={adminLabelStyle}>{t('users.created_at')}</div>
-        <div style={adminValueStyle}>
-          {formatTimestamp(user.createdAt, { locale, fallback: t('common.never') })}
-        </div>
-      </div>
+        <dt>{t('users.created_at')}</dt>
+        <dd>{formatTimestamp(user.createdAt, { locale, fallback: t('common.never') })}</dd>
+      </dl>
 
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3)' }}>
+      <div className="aw-actions">
         <Button
           variant="default"
+          aria-busy={enabledGuard.submitting || undefined}
           disabled={enabledGuard.submitting}
           onClick={() => void handleToggleEnabled()}
         >
@@ -472,6 +418,7 @@ export function UserDetailPage(): ReactElement {
         </Button>
         <Button
           variant="default"
+          aria-busy={adminGuard.submitting || undefined}
           disabled={adminGuard.submitting}
           onClick={() => void handleToggleAdmin()}
         >
@@ -479,104 +426,71 @@ export function UserDetailPage(): ReactElement {
         </Button>
       </div>
 
-      <h2
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-lg)',
-          margin: 0,
-        }}
-      >
-        {t('users.sessions')}
-      </h2>
+      <h2 className="aw-section-title">{t('users.sessions')}</h2>
 
-      {sessions.length === 0 ? (
-        <p
-          style={{
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
-          {t('users.no_results')}
-        </p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={adminThStyle}>{t('users.user_agent')}</th>
-                <th style={adminThStyle}>{t('users.ip_address')}</th>
-                <th style={adminThStyle}>{t('users.created_at')}</th>
-                <th style={adminThStyle}>
-                  <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id}>
-                  <td style={adminTdStyle}>{s.userAgent}</td>
-                  <td style={adminTdStyle}>{s.ipAddress}</td>
-                  <td style={adminTdStyle}>
-                    {formatTimestamp(s.createdAt, { locale, fallback: t('common.never') })}
-                  </td>
-                  <td style={adminTdStyle}>
-                    {s.active ? (
-                      <Button
-                        variant="danger"
-                        disabled={sessionGuard.submitting}
-                        onClick={() => void handleRevokeSession(s.id)}
-                      >
-                        {t('admins.revoke')}
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TableRegion
+        loading={false}
+        rowCount={sessionPresence.entries.length}
+        loadingLabel={t('common.loading')}
+        emptyTitle={t('users.no_results')}
+      >
+        <table className="aw-table">
+          <thead>
+            <tr>
+              <th className="aw-th">{t('users.user_agent')}</th>
+              <th className="aw-th">{t('users.ip_address')}</th>
+              <th className="aw-th">{t('users.created_at')}</th>
+              <th className="aw-th">
+                <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessionPresence.entries.map(({ key, item: s, present }) => (
+              <PresenceRow
+                key={key}
+                present={present}
+                onExited={() => {
+                  sessionPresence.onExited(key);
+                }}
+              >
+                <td className="aw-td">{s.userAgent}</td>
+                <td className="aw-td">{s.ipAddress}</td>
+                <td className="aw-td">
+                  {formatTimestamp(s.createdAt, { locale, fallback: t('common.never') })}
+                </td>
+                <td className="aw-td">
+                  {s.active ? (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      aria-busy={sessionGuard.submitting || undefined}
+                      disabled={sessionGuard.submitting}
+                      onClick={() => void handleRevokeSession(s.id)}
+                    >
+                      {t('admins.revoke')}
+                    </Button>
+                  ) : null}
+                </td>
+              </PresenceRow>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
 
       {currentUser?.id !== user.id ? (
-        <section
-          aria-labelledby="user-danger-zone-heading"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-3)',
-            marginBlockStart: 'var(--nf-space-4)',
-            padding: 'var(--nf-space-4)',
-            border: '1px solid var(--nf-color-danger)',
-            borderRadius: 'var(--nf-radius-md)',
-            background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
-          }}
-        >
-          <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-            <h2
-              id="user-danger-zone-heading"
-              style={{
-                margin: 0,
-                fontFamily: 'var(--nf-font-sans)',
-                fontSize: 'var(--nf-text-lg)',
-                color: 'var(--nf-color-danger-fg)',
-              }}
-            >
+        <section aria-labelledby="user-danger-zone-heading" className={styles.dangerZone}>
+          <header className={styles.dangerHeader}>
+            <h2 id="user-danger-zone-heading" className={styles.dangerTitle}>
               {t('users.danger.title')}
             </h2>
-            <p
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
-            >
-              {t('users.danger.description')}
-            </p>
+            <p className={styles.dangerDescription}>{t('users.danger.description')}</p>
           </header>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className={styles.dangerActions}>
             <Button
               type="button"
               variant="danger"
+              aria-busy={deleteGuard.submitting || undefined}
               disabled={deleteGuard.submitting}
               onClick={() => {
                 setDeleteOpen(true);

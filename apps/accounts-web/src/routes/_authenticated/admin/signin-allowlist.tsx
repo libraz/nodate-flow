@@ -21,17 +21,21 @@
 
 import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createFileRoute } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useArrivedRows } from '../../../hooks/use-arrived-rows';
 import { apiRequest } from '../../../lib/api';
 import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
@@ -221,6 +225,13 @@ export function SignInAllowlistPage(): ReactElement {
 
   const active = entries.filter((entry) => entry.enabled);
   const withdrawn = entries.filter((entry) => !entry.enabled);
+  // An entry moves between the two tables on withdraw / restore: it fades out of one and enters the other.
+  const activePresence = usePresenceList(active, (entry) => entry.id);
+  const withdrawnPresence = usePresenceList(withdrawn, (entry) => entry.id);
+  const isArrived = useArrivedRows(
+    entries.map((entry) => entry.id),
+    !loading,
+  );
 
   /*
    * Both kinds stay visible: picking one decides whether the field beside it
@@ -248,9 +259,17 @@ export function SignInAllowlistPage(): ReactElement {
       ? t('signin_allowlist.domain_value', { value: entry.value })
       : entry.value;
 
-  const renderRows = (rows: AllowlistEntry[], withdrawnRows: boolean): ReactElement[] =>
-    rows.map((entry) => (
-      <tr key={entry.id} className={withdrawnRows ? styles.withdrawnRow : undefined}>
+  const renderRows = (presence: typeof activePresence, withdrawnRows: boolean): ReactElement[] =>
+    presence.entries.map(({ key, item: entry, present }) => (
+      <PresenceRow
+        key={key}
+        present={present}
+        arrived={isArrived(key)}
+        onExited={() => {
+          presence.onExited(key);
+        }}
+        className={withdrawnRows ? styles.withdrawnRow : undefined}
+      >
         <td className="aw-td">{renderKind(entry.kind)}</td>
         <td className="aw-td">
           <span className={styles.value}>{renderValue(entry)}</span>
@@ -272,6 +291,8 @@ export function SignInAllowlistPage(): ReactElement {
           {withdrawnRows ? (
             <Button
               variant="default"
+              size="sm"
+              aria-busy={rowGuard.submitting || undefined}
               disabled={rowGuard.submitting}
               onClick={() => void handleRestore(entry)}
             >
@@ -280,6 +301,8 @@ export function SignInAllowlistPage(): ReactElement {
           ) : (
             <Button
               variant="danger"
+              size="sm"
+              aria-busy={rowGuard.submitting || undefined}
               disabled={rowGuard.submitting}
               onClick={() => void handleWithdraw(entry)}
             >
@@ -287,10 +310,10 @@ export function SignInAllowlistPage(): ReactElement {
             </Button>
           )}
         </td>
-      </tr>
+      </PresenceRow>
     ));
 
-  const renderTable = (rows: AllowlistEntry[], withdrawnRows: boolean): ReactElement => (
+  const renderTable = (presence: typeof activePresence, withdrawnRows: boolean): ReactElement => (
     <div className="aw-table-scroll">
       <table className="aw-table">
         <thead>
@@ -305,7 +328,7 @@ export function SignInAllowlistPage(): ReactElement {
             </th>
           </tr>
         </thead>
-        <tbody>{renderRows(rows, withdrawnRows)}</tbody>
+        <tbody>{renderRows(presence, withdrawnRows)}</tbody>
       </table>
     </div>
   );
@@ -329,7 +352,12 @@ export function SignInAllowlistPage(): ReactElement {
       ) : null}
 
       {loading ? (
-        <p className="aw-muted">{t('common.loading')}</p>
+        <div className="aw-table-skeleton" aria-busy="true">
+          <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+        </div>
       ) : (
         <>
           <section className={styles.section} aria-labelledby="allowlist-active-heading">
@@ -339,17 +367,17 @@ export function SignInAllowlistPage(): ReactElement {
               </h2>
               <p className="aw-flush aw-muted aw-text-xs">{t('signin_allowlist.kind_legend')}</p>
             </div>
-            {active.length === 0 ? (
+            {activePresence.entries.length === 0 ? (
               <aside className={`${styles.notice} ${styles.noticeOpen}`}>
                 <p className={styles.noticeTitle}>{t('signin_allowlist.open_title')}</p>
                 <p className={styles.noticeBody}>{t('signin_allowlist.open_body')}</p>
               </aside>
             ) : (
-              renderTable(active, false)
+              renderTable(activePresence, false)
             )}
           </section>
 
-          {withdrawn.length > 0 ? (
+          {withdrawnPresence.entries.length > 0 ? (
             <section className={styles.section} aria-labelledby="allowlist-withdrawn-heading">
               <div className={styles.sectionHead}>
                 <h2 id="allowlist-withdrawn-heading" className="aw-section-title">
@@ -359,7 +387,7 @@ export function SignInAllowlistPage(): ReactElement {
                   {t('signin_allowlist.withdrawn_description')}
                 </p>
               </div>
-              {renderTable(withdrawn, true)}
+              {renderTable(withdrawnPresence, true)}
             </section>
           ) : null}
 
@@ -435,6 +463,7 @@ export function SignInAllowlistPage(): ReactElement {
           <Button
             type="submit"
             variant="primary"
+            aria-busy={addGuard.submitting || undefined}
             disabled={addGuard.submitting || value.trim() === ''}
           >
             {t('signin_allowlist.add_submit')}

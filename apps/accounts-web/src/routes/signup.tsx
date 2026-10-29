@@ -177,7 +177,9 @@ function SignupPage(): ReactElement {
                   emailRef.current = el;
                 }}
                 type="email"
-                autoComplete="email"
+                autoComplete="username"
+                inputMode="email"
+                spellCheck={false}
               />
             );
           }}
@@ -239,8 +241,13 @@ function SignupPage(): ReactElement {
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting || submitGuard.submitting}>
-          {isSubmitting || submitGuard.submitting ? t('signup.submitting') : t('signup.submit')}
+        <Button
+          type="submit"
+          variant="primary"
+          aria-busy={isSubmitting || submitGuard.submitting || undefined}
+          disabled={isSubmitting || submitGuard.submitting}
+        >
+          {t('signup.submit')}
         </Button>
 
         <OAuthButtonRow mode="signup" onError={setServerError} />

@@ -10,10 +10,12 @@ import {
   groupTimezonesByRegion,
   SUPPORTED_COUNTRIES,
 } from '@nodate-flow/sdk';
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -146,7 +148,25 @@ function WorkspaceEditPage(): ReactElement {
         <p role="alert" className="aw-error">
           {loadError}
         </p>
-        <Link to="/workspaces">{t('workspaces.back')}</Link>
+        <Link to="/workspaces" className="aw-link aw-text-sm">
+          {t('workspaces.back')}
+        </Link>
+      </AuthCard>
+    );
+  }
+
+  // Until the workspace arrives the form would show editable blanks that
+  // the response then overwrites; hold its place instead.
+  if (workspace === null) {
+    return (
+      <AuthCard width="wide">
+        <div className="aw-stack aw-stack-5" aria-busy="true">
+          <h1 className="aw-page-title">{t('workspaces.edit_title')}</h1>
+          <VisuallyHidden>{t('workspaces.loading')}</VisuallyHidden>
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
+        </div>
       </AuthCard>
     );
   }
@@ -241,27 +261,21 @@ function WorkspaceEditPage(): ReactElement {
           </p>
         ) : null}
 
-        {success ? (
-          <output
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-success-fg)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('workspaces.saved')}
-          </output>
+        {success && !isDirty ? (
+          <output className="aw-success">{t('workspaces.saved')}</output>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={isSubmitting || !isDirty}>
-          {isSubmitting ? t('profile.saving') : t('profile.save')}
+        <Button
+          type="submit"
+          variant="primary"
+          aria-busy={isSubmitting || undefined}
+          disabled={isSubmitting || !isDirty}
+        >
+          {t('profile.save')}
         </Button>
 
-        <p style={{ margin: 0 }}>
-          <Link
-            to="/workspaces"
-            style={{ fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg-muted)' }}
-          >
+        <p className="aw-flush aw-text-sm">
+          <Link to="/workspaces" className="aw-muted">
             {t('workspaces.back')}
           </Link>
         </p>

@@ -1,0 +1,23 @@
+/* Grant-admin panel: search field beside the grant button. */
+
+.grantRow {
+  display: flex;
+  gap: var(--nf-space-3);
+  align-items: flex-end;
+}
+
+.grantField {
+  flex: 1;
+}
+
+.grantLabel {
+  display: block;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  margin-block-end: var(--nf-space-1);
+}
+
+.optionEmail {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+}

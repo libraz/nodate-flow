@@ -15,7 +15,6 @@
   },
   "actions": {
     "refresh": "更新",
-    "refreshing": "更新中…",
     "lastUpdated": "最終更新 {time}"
   },
   "placeholder": {

@@ -40,7 +40,6 @@
       "title": "危险操作",
       "description": "不可逆操作。永久删除该用户将移除其账户、所有会话以及他们上传的全部附件和头像。",
       "delete": "删除用户",
-      "deleting": "删除中…",
       "confirm": {
         "title": "删除 {email}？",
         "warning": "这将永久删除该用户账户，并对实例中所有引用其文件进行清理。此操作无法撤销。",
@@ -85,7 +84,6 @@
       "title": "危险操作",
       "description": "不可逆操作。永久删除该工作区将销毁其所有项目、任务、成员以及上传的文件。",
       "delete": "删除工作区",
-      "deleting": "删除中…",
       "confirm": {
         "title": "删除 {name}？",
         "warning": "这将永久删除工作区，并不可逆地从对象存储中清除每一份已上传的文件。此操作无法撤销。",
@@ -194,7 +192,6 @@
     "max_members_per_workspace": "每个工作区的最大成员数",
     "unlimited_placeholder": "0 表示不限",
     "save": "保存设置",
-    "saving": "保存中…",
     "saved": "设置已保存。"
   },
   "setup": {

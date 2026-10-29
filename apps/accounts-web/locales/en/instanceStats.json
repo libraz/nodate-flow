@@ -15,7 +15,6 @@
   },
   "actions": {
     "refresh": "Refresh",
-    "refreshing": "Refreshing…",
     "lastUpdated": "Last refreshed {time}"
   },
   "placeholder": {

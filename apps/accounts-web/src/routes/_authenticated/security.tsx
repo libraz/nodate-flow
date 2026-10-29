@@ -4,14 +4,19 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import QRCode from 'qrcode';
-import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
+import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../../components/auth-card';
@@ -198,6 +203,8 @@ export function SecurityPage(): ReactElement {
   // -- Active sessions --
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const sessionPresence = usePresenceList(sessions, (session) => session.id);
+  const stagger = useFirstLoadStagger();
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -306,9 +313,16 @@ export function SecurityPage(): ReactElement {
             <output className="aw-success">{t('security.password_changed')}</output>
           ) : null}
 
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? t('security.password_changing') : t('security.password_change')}
-          </Button>
+          <div>
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={isSubmitting || undefined}
+              disabled={isSubmitting}
+            >
+              {t('security.password_change')}
+            </Button>
+          </div>
         </form>
       </section>
 
@@ -326,49 +340,63 @@ export function SecurityPage(): ReactElement {
       <section className="aw-stack aw-stack-4">
         <h2 className="aw-section-title">{t('security.sessions_title')}</h2>
         {sessionsLoading ? (
-          <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_loading')}</p>
+          <div className="aw-stack aw-stack-3" aria-busy="true">
+            <Skeleton />
+            <Skeleton />
+          </div>
         ) : sessions.length === 0 ? (
           <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_empty')}</p>
         ) : (
           <ul className="aw-list">
-            {sessions.map((session) => (
-              <li
-                key={session.id}
-                className={`aw-row-between aw-surface ${session.current ? 'aw-surface-elevated' : ''}`}
+            {sessionPresence.entries.map(({ key, item: session, present }, index) => (
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => {
+                  sessionPresence.onExited(key);
+                }}
+                className={`aw-presence-item ${motion.enter}`}
+                style={stagger(index)}
               >
-                <div>
-                  <p
-                    className={`aw-flush aw-text-sm ${session.current ? 'aw-weight-semibold' : ''}`}
-                    title={session.userAgent || undefined}
-                  >
-                    {session.userAgent
-                      ? formatDevice(session.userAgent)
-                      : t('security.session_unknown_agent')}
-                    {session.current ? ` (${t('security.session_current')})` : ''}
-                  </p>
-                  <p className="aw-flush aw-muted aw-text-xs">{session.ipAddress}</p>
-                  <p className="aw-flush aw-muted aw-text-xs">
-                    {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
-                    {' · '}
-                    {t('security.session_last_active')}:{' '}
-                    {session.lastUsedAt !== undefined && session.lastUsedAt !== null
-                      ? formatRelative(session.lastUsedAt, locale)
-                      : t('security.session_last_active_unknown')}
-                  </p>
+                <div
+                  className={`aw-row-between aw-surface ${session.current ? 'aw-surface-elevated' : ''}`}
+                >
+                  <div>
+                    <p
+                      className={`aw-flush aw-text-sm ${session.current ? 'aw-weight-semibold' : ''}`}
+                      title={session.userAgent || undefined}
+                    >
+                      {session.userAgent
+                        ? formatDevice(session.userAgent)
+                        : t('security.session_unknown_agent')}
+                      {session.current ? ` (${t('security.session_current')})` : ''}
+                    </p>
+                    <p className="aw-flush aw-muted aw-text-xs">{session.ipAddress}</p>
+                    <p className="aw-flush aw-muted aw-text-xs">
+                      {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
+                      {' · '}
+                      {t('security.session_last_active')}:{' '}
+                      {session.lastUsedAt !== undefined && session.lastUsedAt !== null
+                        ? formatRelative(session.lastUsedAt, locale)
+                        : t('security.session_last_active_unknown')}
+                    </p>
+                  </div>
+                  {!session.current ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      aria-busy={revokingId === session.id || undefined}
+                      disabled={revokingId === session.id}
+                      onClick={() => {
+                        void handleRevokeSession(session.id);
+                      }}
+                    >
+                      {t('security.session_revoke')}
+                    </Button>
+                  ) : null}
                 </div>
-                {!session.current ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={revokingId === session.id}
-                    onClick={() => {
-                      void handleRevokeSession(session.id);
-                    }}
-                  >
-                    {t('security.session_revoke')}
-                  </Button>
-                ) : null}
-              </li>
+              </PresenceItem>
             ))}
           </ul>
         )}
@@ -397,6 +425,15 @@ function TotpSection(): ReactElement {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [startPassword, setStartPassword] = useState('');
+  const startPasswordRef = useRef<HTMLInputElement>(null);
+
+  // A refusal is almost always the password; hand focus back to it so the
+  // error read with the field is the first thing heard.
+  useEffect(() => {
+    if (!errorKey) return;
+    startPasswordRef.current?.focus();
+    startPasswordRef.current?.select();
+  }, [errorKey]);
 
   // Load initial status. The server only returns `status`, not the
   // otpauth URL / secret, so a page reload mid-enrollment drops us
@@ -502,7 +539,11 @@ function TotpSection(): ReactElement {
   };
 
   if (status === null) {
-    return <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.loading')}</p>;
+    return (
+      <div className="aw-stack aw-stack-3" aria-busy="true">
+        <Skeleton />
+      </div>
+    );
   }
 
   // After confirm, show recovery codes once.
@@ -519,17 +560,25 @@ function TotpSection(): ReactElement {
 
   if (status === 'disabled') {
     return (
-      <div className="aw-stack aw-stack-3">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (busy || startPassword === '') return;
+          void startEnroll(startPassword);
+        }}
+        noValidate
+        className="aw-stack aw-stack-3"
+      >
         <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.disabled_description')}</p>
-        {errorKey ? (
-          <p role="alert" className="aw-error">
-            {t(errorKey)}
-          </p>
-        ) : null}
-        <FormField label={t('security.totp.password_required')} required>
+        <FormField
+          label={t('security.totp.password_required')}
+          required
+          {...(errorKey ? { error: t(errorKey) } : {})}
+        >
           {(control) => (
             <PasswordInput
               {...control}
+              ref={startPasswordRef}
               value={startPassword}
               autoComplete="current-password"
               onChange={(e) => {
@@ -541,17 +590,15 @@ function TotpSection(): ReactElement {
         </FormField>
         <div>
           <Button
-            type="button"
+            type="submit"
             variant="primary"
+            aria-busy={busy || undefined}
             disabled={busy || startPassword === ''}
-            onClick={() => {
-              void startEnroll(startPassword);
-            }}
           >
             {t('security.totp.start_setup')}
           </Button>
         </div>
-      </div>
+      </form>
     );
   }
 
@@ -562,17 +609,25 @@ function TotpSection(): ReactElement {
       // the QR step. Offer to restart (POST /me/totp/enroll is
       // idempotent in the pending state and rotates the secret).
       return (
-        <div className="aw-stack aw-stack-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (busy || startPassword === '') return;
+            void startEnroll(startPassword);
+          }}
+          noValidate
+          className="aw-stack aw-stack-3"
+        >
           <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.pending_description')}</p>
-          {errorKey ? (
-            <p role="alert" className="aw-error">
-              {t(errorKey)}
-            </p>
-          ) : null}
-          <FormField label={t('security.totp.password_required')} required>
+          <FormField
+            label={t('security.totp.password_required')}
+            required
+            {...(errorKey ? { error: t(errorKey) } : {})}
+          >
             {(control) => (
               <PasswordInput
                 {...control}
+                ref={startPasswordRef}
                 value={startPassword}
                 autoComplete="current-password"
                 onChange={(e) => {
@@ -584,12 +639,10 @@ function TotpSection(): ReactElement {
           </FormField>
           <div className="aw-actions">
             <Button
-              type="button"
+              type="submit"
               variant="primary"
+              aria-busy={busy || undefined}
               disabled={busy || startPassword === ''}
-              onClick={() => {
-                void startEnroll(startPassword);
-              }}
             >
               {t('security.totp.resume_restart')}
             </Button>
@@ -604,7 +657,7 @@ function TotpSection(): ReactElement {
               {t('security.totp.cancel')}
             </Button>
           </div>
-        </div>
+        </form>
       );
     }
     return (
@@ -686,7 +739,7 @@ function EnrollmentStep({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="aw-stack aw-stack-3">
+    <form onSubmit={handleSubmit} className="aw-stack aw-stack-3 aw-step-forward">
       <p className="aw-flush aw-text-sm">{t('security.totp.enroll_instructions')}</p>
       {qrDataUrl ? (
         <img
@@ -713,10 +766,12 @@ function EnrollmentStep({
         {(control) => (
           <Input
             {...control}
+            className="aw-otp"
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="[0-9]{6}"
             maxLength={6}
+            autoFocus
             value={code}
             onChange={(e) => {
               setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
@@ -755,9 +810,10 @@ function EnrollmentStep({
         <Button
           type="submit"
           variant="primary"
+          aria-busy={busy || undefined}
           disabled={busy || code.length !== 6 || password === ''}
         >
-          {busy ? t('security.totp.confirming') : t('security.totp.confirm')}
+          {t('security.totp.confirm')}
         </Button>
         <Button
           type="button"
@@ -853,7 +909,7 @@ export function RecoveryCodesView({
   };
 
   return (
-    <div className="aw-stack aw-stack-3 aw-print-only-area">
+    <div className="aw-stack aw-stack-3 aw-print-only-area aw-step-forward">
       <h3 className="aw-flush aw-text-base">{t('security.totp.recovery_codes_title')}</h3>
       <p role="alert" className="aw-warning">
         {t('security.totp.recovery_codes_warning')}
@@ -916,6 +972,13 @@ function EnabledPanel({
   const [password, setPassword] = useState('');
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!errorKey) return;
+    passwordRef.current?.focus();
+    passwordRef.current?.select();
+  }, [errorKey]);
 
   const resetForm = (): void => {
     setPassword('');
@@ -1007,14 +1070,21 @@ function EnabledPanel({
         if (mode === 'disable') void handleDisable(e);
         else void handleRegenerate(e);
       }}
-      className="aw-stack aw-stack-3"
+      noValidate
+      className="aw-stack aw-stack-3 aw-step-forward"
     >
       <p className="aw-flush aw-text-sm">{title}</p>
-      <FormField label={t('security.totp.password_required')} required>
+      <FormField
+        label={t('security.totp.password_required')}
+        required
+        {...(errorKey ? { error: t(errorKey) } : {})}
+      >
         {(control) => (
           <PasswordInput
             {...control}
+            ref={passwordRef}
             autoComplete="current-password"
+            autoFocus
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
@@ -1023,15 +1093,11 @@ function EnabledPanel({
           />
         )}
       </FormField>
-      {errorKey ? (
-        <p role="alert" className="aw-error">
-          {t(errorKey)}
-        </p>
-      ) : null}
       <div className="aw-actions">
         <Button
           type="submit"
           variant={mode === 'disable' ? 'danger' : 'primary'}
+          aria-busy={busy || undefined}
           disabled={busy || password === ''}
         >
           {submitLabel}

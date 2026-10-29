@@ -13,25 +13,20 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
-import Button from '@nodate-flow/ui/primitives/button';
-import FormField from '@nodate-flow/ui/primitives/form-field';
-import Input from '@nodate-flow/ui/primitives/input';
+import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { createFileRoute, Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, useCallback, useEffect, useState } from 'react';
+import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
 import { authStore } from '../features/auth/auth-store';
-import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
+import TotpChallengeForm, { type TotpCredential } from '../features/auth/totp-challenge-form';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import { takeOidcRedirect } from '../features/oauth/oidc-redirect';
 import { apiRequest } from '../lib/api';
 import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
 import { refreshAccessToken } from '../lib/sdk';
 import { useSubmitGuard } from '../lib/use-submit-guard';
-
-const RECOVERY_MIN_LEN = 8;
-const RECOVERY_MAX_LEN = 20;
 
 type TotpResponse = components['schemas']['AuthTokens'];
 
@@ -65,11 +60,7 @@ export function OIDCCompletePage(): ReactElement {
   const [status, setStatus] = useState<'verifying' | 'totp' | 'error'>('verifying');
   const [error, setError] = useState<AuthErrorI18nKey | null>(null);
   const [challengeToken, setChallengeToken] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-  const [useRecovery, setUseRecovery] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState('');
   const totpGuard = useSubmitGuard();
-  const capsHint = useCapsLockHint();
 
   const completeSignIn = useCallback(
     async (accessToken: string): Promise<void> => {
@@ -149,19 +140,12 @@ export function OIDCCompletePage(): ReactElement {
     };
   }, [location.hash, completeSignIn]);
 
-  const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
-    if (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6) return;
+  const handleTotpSubmit = async (credential: TotpCredential): Promise<void> => {
     if (totpGuard.guard()) return;
     setError(null);
     try {
       const data = await apiRequest(
-        (client) =>
-          client.POST('/auth/login/totp', {
-            body: useRecovery
-              ? { challengeToken, recoveryCode: recoveryCode.trim() }
-              : { challengeToken, code: totpCode },
-          }),
+        (client) => client.POST('/auth/login/totp', { body: { challengeToken, ...credential } }),
         'Sign-in failed',
       );
       await completeSignIn((data as TotpResponse).accessToken);
@@ -173,102 +157,24 @@ export function OIDCCompletePage(): ReactElement {
   };
 
   if (status === 'totp') {
-    const recoveryRemaining = RECOVERY_MIN_LEN - recoveryCode.trim().length;
-    const totpStatus = useRecovery
-      ? recoveryRemaining > 0
-        ? t('login.recovery_helper')
-        : t('login.totp_status_awaiting')
-      : totpCode.length < 6
-        ? t('login.totp_status_need_digits')
-        : t('login.totp_status_awaiting');
-    const totpError = error ? t(error) : null;
     return (
       <AuthCard>
-        <form
-          onSubmit={(e) => {
-            void handleTotpSubmit(e);
+        <TotpChallengeForm
+          className="aw-step-forward"
+          error={error}
+          submitting={totpGuard.submitting}
+          onSubmit={(credential) => {
+            void handleTotpSubmit(credential);
           }}
-          noValidate
-          className="aw-stack aw-stack-5"
-        >
-          <h1 className="aw-page-title">{t('login.totp_title')}</h1>
-          <p className="aw-flush aw-muted aw-text-sm">{t('login.totp_instructions')}</p>
-          {useRecovery ? (
-            <FormField
-              label={t('login.recovery_code')}
-              required
-              description={totpStatus}
-              {...(totpError ? { error: totpError } : {})}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="one-time-code"
-                  maxLength={RECOVERY_MAX_LEN}
-                  value={recoveryCode}
-                  onChange={(e) => {
-                    setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
-                  }}
-                  onKeyDown={capsHint.handlers.onKeyDown}
-                  onFocus={capsHint.handlers.onFocus}
-                  onBlur={capsHint.handlers.onBlur}
-                  autoFocus
-                />
-              )}
-            </FormField>
-          ) : (
-            <FormField
-              label={t('login.totp_code')}
-              required
-              description={totpStatus}
-              {...(totpError ? { error: totpError } : {})}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => {
-                    setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                  }}
-                  onKeyDown={capsHint.handlers.onKeyDown}
-                  onFocus={capsHint.handlers.onFocus}
-                  onBlur={capsHint.handlers.onBlur}
-                  autoFocus
-                />
-              )}
-            </FormField>
-          )}
-          {capsHint.capsLockOn ? (
-            <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
-              {t('login.caps_lock_on')}
-            </output>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setUseRecovery((v) => !v);
-              setError(null);
-            }}
-            disabled={totpGuard.submitting}
-          >
-            {useRecovery ? t('login.totp_use_code') : t('login.totp_use_recovery')}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={
-              totpGuard.submitting ||
-              (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6)
-            }
-          >
-            {useRecovery ? t('login.recovery_submit') : t('login.totp_submit')}
-          </Button>
-        </form>
+          onModeChange={() => {
+            setError(null);
+          }}
+          cancel={
+            <Link to="/login" className="aw-link aw-text-sm aw-self-center">
+              {t('login.totp_cancel')}
+            </Link>
+          }
+        />
       </AuthCard>
     );
   }
@@ -278,11 +184,14 @@ export function OIDCCompletePage(): ReactElement {
       <div className="aw-stack aw-stack-5" role={status === 'error' ? 'alert' : undefined}>
         <h1 className="aw-page-title">{t('login.oidc_title')}</h1>
         {status === 'verifying' ? (
-          <p className="aw-flush aw-muted">{t('login.oidc_verifying')}</p>
+          <p className="aw-flush aw-row aw-row-2 aw-muted aw-text-sm">
+            <Spinner size="sm" label={t('login.oidc_verifying')} />
+            <span aria-hidden="true">{t('login.oidc_verifying')}</span>
+          </p>
         ) : (
           <>
             <p className="aw-flush aw-error">{error ? t(error) : t('errors.generic')}</p>
-            <Link to="/login" className="aw-link">
+            <Link to="/login" className="aw-link aw-text-sm">
               {t('login.magic_link_back')}
             </Link>
           </>

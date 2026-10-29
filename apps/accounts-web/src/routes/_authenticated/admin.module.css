@@ -36,6 +36,7 @@
   text-decoration: none;
   font-size: var(--nf-text-sm);
   border-radius: var(--nf-radius-md);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .navLink:hover {
@@ -54,6 +55,10 @@
 
 .spacer {
   flex: 1;
+}
+
+.page {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .backLink {

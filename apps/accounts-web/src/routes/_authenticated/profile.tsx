@@ -351,17 +351,9 @@ export function ProfilePage(): ReactElement {
           void handleSubmit(onSubmit)(e);
         }}
         noValidate
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
+        className="aw-stack aw-stack-5"
       >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-sans)',
-            fontSize: 'var(--nf-text-2xl)',
-            margin: 0,
-          }}
-        >
-          {t('profile.title')}
-        </h1>
+        <h1 className="aw-page-title">{t('profile.title')}</h1>
 
         {showEmptyWorkspacesCta ? (
           <Card
@@ -516,24 +508,15 @@ export function ProfilePage(): ReactElement {
           </p>
         ) : null}
 
-        {success ? (
-          <output
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-success-fg)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('profile.saved')}
-          </output>
-        ) : null}
+        {success && !isDirty ? <output className="aw-success">{t('profile.saved')}</output> : null}
 
         <Button
           type="submit"
           variant="primary"
+          aria-busy={isSubmitting || submitGuard.submitting || undefined}
           disabled={isSubmitting || submitGuard.submitting || !isDirty}
         >
-          {isSubmitting || submitGuard.submitting ? t('profile.saving') : t('profile.save')}
+          {t('profile.save')}
         </Button>
 
         <p

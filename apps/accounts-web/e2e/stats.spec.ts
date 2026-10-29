@@ -41,7 +41,6 @@ const copy = {
   workspacesTitle: enInstanceStats.kpi.workspaces.title,
   workspacesHelp: enInstanceStats.kpi.workspaces.help,
   refresh: enInstanceStats.actions.refresh,
-  refreshing: enInstanceStats.actions.refreshing,
   placeholderTitle: enInstanceStats.placeholder.title,
   placeholderBody: enInstanceStats.placeholder.body,
   errorFetchFailed: enInstanceStats.error.fetchFailed,
@@ -80,10 +79,8 @@ test.describe('admin instance stats dashboard', () => {
     await expect(page.getByText(copy.usersHelp)).toBeVisible();
     await expect(page.getByText(copy.workspacesHelp)).toBeVisible();
 
-    // Refresh button (or its busy variant if data is still loading)
-    const refreshButton = page.getByRole('button', {
-      name: new RegExp(`^(${copy.refresh}|${copy.refreshing.replace(/…/, '…')})$`),
-    });
+    // Refresh button keeps its label while busy (aria-busy only)
+    const refreshButton = page.getByRole('button', { name: copy.refresh, exact: true });
     await expect(refreshButton).toBeVisible();
 
     // Placeholder section

@@ -20,4 +20,13 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
   text-decoration: none;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.adminLink:hover {
+  color: var(--nf-color-fg);
+}
+
+.page {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }

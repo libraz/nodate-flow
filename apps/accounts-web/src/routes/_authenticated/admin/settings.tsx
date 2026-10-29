@@ -3,7 +3,11 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import Button from '@nodate-flow/ui/primitives/button';
+import FormField from '@nodate-flow/ui/primitives/form-field';
+import Input from '@nodate-flow/ui/primitives/input';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -112,85 +116,111 @@ export function SettingsPage(): ReactElement {
   };
 
   if (loading) {
-    return <p className={styles.loading}>{t('common.loading')}</p>;
+    return (
+      <div className="aw-stack aw-stack-6" aria-busy="true">
+        <h1 className="aw-page-title">{t('settings.title')}</h1>
+        <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+        <div className={`aw-stack aw-stack-5 ${styles.form}`}>
+          <Skeleton className={styles.fieldSkeleton} />
+          <Skeleton className={styles.fieldSkeleton} />
+          <Skeleton className={styles.fieldSkeleton} />
+          <Skeleton className={styles.fieldSkeleton} />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.title}>{t('settings.title')}</h1>
+    <div className="aw-stack aw-stack-6">
+      <h1 className="aw-page-title">{t('settings.title')}</h1>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          {t('settings.registration_open')}
-          <p className={styles.description}>{t('settings.registration_open_desc')}</p>
-          <select
-            value={registrationOpen}
-            onChange={(e) => setRegistrationOpen(e.target.value)}
-            className={styles.input}
-          >
-            <option value="true">{t('common.yes')}</option>
-            <option value="false">{t('common.no')}</option>
-          </select>
-        </label>
-      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!saving) void handleSave();
+        }}
+        noValidate
+        className={`aw-stack aw-stack-5 ${styles.form}`}
+      >
+        <FormField
+          label={t('settings.registration_open')}
+          description={t('settings.registration_open_desc')}
+        >
+          {(control) => (
+            <select
+              {...control}
+              value={registrationOpen}
+              onChange={(e) => setRegistrationOpen(e.target.value)}
+              className="aw-select"
+            >
+              <option value="true">{t('common.yes')}</option>
+              <option value="false">{t('common.no')}</option>
+            </select>
+          )}
+        </FormField>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          {t('settings.mfa_enforcement')}
-          <p className={styles.description}>{t('settings.mfa_enforcement_desc')}</p>
-          <select
-            value={mfaEnforcement}
-            onChange={(e) => setMfaEnforcement(e.target.value)}
-            className={styles.input}
-          >
-            <option value="none">{t('settings.mfa_none')}</option>
-            <option value="optional">{t('settings.mfa_optional')}</option>
-            <option value="required">{t('settings.mfa_required')}</option>
-          </select>
-        </label>
-      </div>
+        <FormField
+          label={t('settings.mfa_enforcement')}
+          description={t('settings.mfa_enforcement_desc')}
+        >
+          {(control) => (
+            <select
+              {...control}
+              value={mfaEnforcement}
+              onChange={(e) => setMfaEnforcement(e.target.value)}
+              className="aw-select"
+            >
+              <option value="none">{t('settings.mfa_none')}</option>
+              <option value="optional">{t('settings.mfa_optional')}</option>
+              <option value="required">{t('settings.mfa_required')}</option>
+            </select>
+          )}
+        </FormField>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          {t('settings.max_workspaces_per_user')}
-          <input
-            type="number"
-            min="0"
-            value={maxWorkspacesPerUser}
-            onChange={(e) => setMaxWorkspacesPerUser(e.target.value)}
-            className={styles.input}
-            placeholder={t('settings.unlimited_placeholder')}
-          />
-        </label>
-      </div>
+        <FormField label={t('settings.max_workspaces_per_user')}>
+          {(control) => (
+            <Input
+              {...control}
+              type="number"
+              min="0"
+              inputMode="numeric"
+              className={styles.number}
+              value={maxWorkspacesPerUser}
+              onChange={(e) => setMaxWorkspacesPerUser(e.target.value)}
+              placeholder={t('settings.unlimited_placeholder')}
+            />
+          )}
+        </FormField>
 
-      <div className={styles.field}>
-        <label className={styles.label}>
-          {t('settings.max_members_per_workspace')}
-          <input
-            type="number"
-            min="0"
-            value={maxMembersPerWorkspace}
-            onChange={(e) => setMaxMembersPerWorkspace(e.target.value)}
-            className={styles.input}
-            placeholder={t('settings.unlimited_placeholder')}
-          />
-        </label>
-      </div>
+        <FormField label={t('settings.max_members_per_workspace')}>
+          {(control) => (
+            <Input
+              {...control}
+              type="number"
+              min="0"
+              inputMode="numeric"
+              className={styles.number}
+              value={maxMembersPerWorkspace}
+              onChange={(e) => setMaxMembersPerWorkspace(e.target.value)}
+              placeholder={t('settings.unlimited_placeholder')}
+            />
+          )}
+        </FormField>
 
-      {error ? (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p role="alert" className="aw-error">
+            {error}
+          </p>
+        ) : null}
 
-      {success ? <output className={styles.success}>{t('settings.saved')}</output> : null}
+        {success ? <output className="aw-success">{t('settings.saved')}</output> : null}
 
-      <div>
-        <Button variant="primary" disabled={saving} onClick={() => void handleSave()}>
-          {saving ? t('settings.saving') : t('settings.save')}
-        </Button>
-      </div>
+        <div>
+          <Button type="submit" variant="primary" aria-busy={saving || undefined} disabled={saving}>
+            {t('settings.save')}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

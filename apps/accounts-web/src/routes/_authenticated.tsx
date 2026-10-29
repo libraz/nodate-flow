@@ -22,6 +22,7 @@ export function AuthenticatedLayout(): ReactElement | null {
   const user = useAuth(selectUser);
   const navigate = useNavigate();
   const location = useLocation();
+  const pageKey = location.pathname.startsWith('/admin') ? '/admin' : location.pathname;
   // pathname + search + hash, without the origin — /login resolves it
   // against this app's own origin, so it stays a same-origin target.
   const returnTo = location.href;
@@ -50,7 +51,10 @@ export function AuthenticatedLayout(): ReactElement | null {
           </Link>
         </nav>
       ) : null}
-      <Outlet />
+      {/* Keyed so each page fades in as it replaces the last; the admin shell keeps one key and fades its own pages. */}
+      <div key={pageKey} className={styles.page}>
+        <Outlet />
+      </div>
     </>
   );
 }

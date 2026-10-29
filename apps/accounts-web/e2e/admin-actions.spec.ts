@@ -99,7 +99,7 @@ test.describe('admin user-detail action mutations', () => {
 
     // The Admin row shows "No" before the grant.
     const adminLabel = page
-      .locator('div')
+      .locator('dt')
       .filter({ hasText: new RegExp(`^${copy.admin}$`) })
       .first();
     await expect(adminLabel).toBeVisible({ timeout: 10_000 });

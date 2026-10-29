@@ -17,10 +17,11 @@ import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useS
 import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth-card';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
+import AuthStep from '../features/auth/auth-step';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
+import TotpChallengeForm, { type TotpCredential } from '../features/auth/totp-challenge-form';
 import { useCapabilities } from '../features/auth/use-capabilities';
-import { useCapsLockHint } from '../features/auth/use-caps-lock-hint';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
@@ -29,19 +30,11 @@ import { type AuthErrorI18nKey, mapAuthThrown } from '../lib/auth-errors';
 import { safeRedirectTarget } from '../lib/redirect-target';
 import { useSubmitGuard } from '../lib/use-submit-guard';
 
-/**
- * Recovery code character bounds enforced by the auth-api: codes are
- * generated as 10-character base32 strings but we accept up to 20 chars
- * defensively so a future longer-format rotation does not silently
- * truncate user input. Mirrored in the i18n helper text key so the copy
- * and the validation cannot drift.
- */
-const RECOVERY_MIN_LEN = 8;
-const RECOVERY_MAX_LEN = 20;
-
 // Module-scope constant so Vite tree-shakes the dev-only panel out of
 // production bundles when used as a JSX guard. A render-scope check would
 // still ship the JSX and seed list to prod.
+type LoginStep = 'password' | 'magic-request' | 'magic-sent' | 'totp';
+
 const DEV_MODE = import.meta.env.DEV;
 
 const DEV_SEED_PASSWORD = 'password123';
@@ -303,11 +296,7 @@ function LoginPage(): ReactElement {
 
   const [serverError, setServerError] = useState<AuthErrorI18nKey | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
-  const [totpCode, setTotpCode] = useState('');
-  const [useRecovery, setUseRecovery] = useState(false);
-  const [recoveryCode, setRecoveryCode] = useState('');
   const totpGuard = useSubmitGuard();
-  const totpCapsHint = useCapsLockHint();
   const [showMagicLink, setShowMagicLink] = useState(false);
   const [magicLinkEmail, setMagicLinkEmail] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -421,22 +410,15 @@ function LoginPage(): ReactElement {
     }
   };
 
-  const handleTotpSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
+  const handleTotpSubmit = async (credential: TotpCredential): Promise<void> => {
     setServerError(null);
     if (challengeToken == null) return;
-    if (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6) return;
     // Synchronous re-entrancy guard: a fast double Enter / double click
     // bails on the second call before reaching the network layer.
     if (totpGuard.guard()) return;
     try {
       const data = await apiRequest(
-        (client) =>
-          client.POST('/auth/login/totp', {
-            body: useRecovery
-              ? { challengeToken, recoveryCode: recoveryCode.trim() }
-              : { challengeToken, code: totpCode },
-          }),
+        (client) => client.POST('/auth/login/totp', { body: { challengeToken, ...credential } }),
         'Sign-in failed',
       );
       const totp = data as TotpResponse;
@@ -450,9 +432,6 @@ function LoginPage(): ReactElement {
 
   const handleCancelTotp = (): void => {
     setChallengeToken(null);
-    setTotpCode('');
-    setRecoveryCode('');
-    setUseRecovery(false);
     setServerError(null);
   };
 
@@ -477,199 +456,30 @@ function LoginPage(): ReactElement {
     }
   };
 
-  if (showMagicLink) {
-    if (magicLinkSent) {
-      return (
-        <AuthCard>
-          <div className="aw-stack aw-stack-5">
-            <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
-            <p className="aw-flush aw-muted aw-text-sm">
-              {t('login.magic_link_sent', { email: magicLinkEmail })}
-            </p>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setShowMagicLink(false);
-                setMagicLinkSent(false);
-                setMagicLinkEmail('');
-              }}
-            >
-              {t('login.magic_link_back')}
-            </Button>
-          </div>
-        </AuthCard>
-      );
-    }
-    return (
-      <AuthCard>
-        <form
-          key="magic-link-request"
-          onSubmit={(e) => {
-            void handleMagicLinkSubmit(e);
-          }}
-          noValidate
-          className="aw-stack aw-stack-5"
-        >
-          <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
-          <p className="aw-flush aw-muted aw-text-sm">{t('login.magic_link_instructions')}</p>
-          <FormField label={t('login.email')} required>
-            {(control) => (
-              <Input
-                {...control}
-                ref={magicLinkEmailRef}
-                type="email"
-                autoComplete="email"
-                value={magicLinkEmail}
-                onChange={(e) => {
-                  setMagicLinkEmail(e.target.value);
-                }}
-                autoFocus
-              />
-            )}
-          </FormField>
-          {serverError ? (
-            <p role="alert" className="aw-error">
-              {t(serverError)}
-            </p>
-          ) : null}
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={magicLinkGuard.submitting || !magicLinkEmail.trim()}
-          >
-            {magicLinkGuard.submitting
-              ? t('login.magic_link_sending')
-              : t('login.magic_link_submit')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setShowMagicLink(false);
-              setServerError(null);
-            }}
-          >
-            {t('login.magic_link_back')}
-          </Button>
-        </form>
-      </AuthCard>
-    );
-  }
+  const handleOpenMagicLink = (): void => {
+    setShowMagicLink(true);
+    setServerError(null);
+  };
 
-  if (challengeToken != null) {
-    // Status copy reflects validation state so the `aria-live` region read
-    // by screen readers stays in sync with the visible input. We only ever
-    // surface a single description string per render to avoid contradictory
-    // hints (the disabled submit button is the second cue).
-    const recoveryRemaining = RECOVERY_MIN_LEN - recoveryCode.trim().length;
-    const totpStatus = useRecovery
-      ? recoveryRemaining > 0
-        ? t('login.recovery_helper')
-        : t('login.totp_status_awaiting')
-      : totpCode.length < 6
-        ? t('login.totp_status_need_digits')
-        : t('login.totp_status_awaiting');
-    const totpError = serverError ? t(serverError) : null;
-    return (
-      <AuthCard>
-        <form
-          key="totp-challenge"
-          onSubmit={(e) => {
-            void handleTotpSubmit(e);
-          }}
-          noValidate
-          className="aw-stack aw-stack-5"
-        >
-          <h1 className="aw-page-title">{t('login.totp_title')}</h1>
-          <p className="aw-flush aw-muted aw-text-sm">{t('login.totp_instructions')}</p>
-          {useRecovery ? (
-            <FormField
-              label={t('login.recovery_code')}
-              required
-              description={totpStatus}
-              {...(totpError ? { error: totpError } : {})}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  autoComplete="one-time-code"
-                  maxLength={RECOVERY_MAX_LEN}
-                  value={recoveryCode}
-                  onChange={(e) => {
-                    setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
-                  }}
-                  onKeyDown={totpCapsHint.handlers.onKeyDown}
-                  onFocus={totpCapsHint.handlers.onFocus}
-                  onBlur={totpCapsHint.handlers.onBlur}
-                  autoFocus
-                />
-              )}
-            </FormField>
-          ) : (
-            <FormField
-              label={t('login.totp_code')}
-              required
-              description={totpStatus}
-              {...(totpError ? { error: totpError } : {})}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => {
-                    setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                  }}
-                  onKeyDown={totpCapsHint.handlers.onKeyDown}
-                  onFocus={totpCapsHint.handlers.onFocus}
-                  onBlur={totpCapsHint.handlers.onBlur}
-                  autoFocus
-                />
-              )}
-            </FormField>
-          )}
-          {totpCapsHint.capsLockOn ? (
-            <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
-              {t('login.caps_lock_on')}
-            </output>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setUseRecovery((v) => !v);
-              setServerError(null);
-            }}
-            disabled={totpGuard.submitting}
-          >
-            {useRecovery ? t('login.totp_use_code') : t('login.totp_use_recovery')}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={
-              totpGuard.submitting ||
-              (useRecovery ? recoveryCode.trim().length < RECOVERY_MIN_LEN : totpCode.length !== 6)
-            }
-          >
-            {useRecovery ? t('login.recovery_submit') : t('login.totp_submit')}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleCancelTotp}
-            disabled={totpGuard.submitting}
-          >
-            {t('login.totp_cancel')}
-          </Button>
-        </form>
-      </AuthCard>
-    );
-  }
+  const handleCloseMagicLink = (): void => {
+    setShowMagicLink(false);
+    setMagicLinkSent(false);
+    setServerError(null);
+  };
+
+  // The step on screen follows `step` one exit behind: the leaving step collapses
+  // first, then `shown` catches up and the next one opens.
+  const step: LoginStep = showMagicLink
+    ? magicLinkSent
+      ? 'magic-sent'
+      : 'magic-request'
+    : challengeToken != null
+      ? 'totp'
+      : 'password';
+  const [shown, setShown] = useState<LoginStep>(step);
+  const handleStepExited = (): void => {
+    setShown(step);
+  };
 
   /**
    * Submit handler that wires F4 (focus management). RHF validates first;
@@ -700,205 +510,300 @@ function LoginPage(): ReactElement {
 
   return (
     <AuthCard>
-      <form
-        key="password-login"
-        onSubmit={(e) => {
-          void submitWithFocus(e);
-        }}
-        noValidate
-        className="aw-stack aw-stack-5"
-      >
-        <h1 className="aw-page-title">{t('login.title')}</h1>
-
-        {rateLimited ? (
-          <output aria-live="polite" data-testid="login-rate-limit-banner" className="aw-warning">
-            {t('rate_limit.banner', {
-              minutes: rateLimitMinutes,
-              seconds: rateLimitSeconds,
-            })}
-          </output>
-        ) : null}
-
-        <FormField
-          label={t('login.email')}
-          required
-          {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
+      <AuthStep open={step === 'password' && shown === 'password'} onExited={handleStepExited}>
+        <form
+          onSubmit={(e) => {
+            void submitWithFocus(e);
+          }}
+          noValidate
+          className="aw-stack aw-stack-5"
         >
-          {(control) => {
-            const { ref: rhfRef, ...field } = register('email');
-            return (
+          <h1 className="aw-page-title">{t('login.title')}</h1>
+
+          {rateLimited ? (
+            <output aria-live="polite" data-testid="login-rate-limit-banner" className="aw-warning">
+              {t('rate_limit.banner', {
+                minutes: rateLimitMinutes,
+                seconds: rateLimitSeconds,
+              })}
+            </output>
+          ) : null}
+
+          <FormField
+            label={t('login.email')}
+            required
+            {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
+          >
+            {(control) => {
+              const { ref: rhfRef, ...field } = register('email');
+              return (
+                <Input
+                  {...control}
+                  {...field}
+                  ref={(el) => {
+                    rhfRef(el);
+                    emailRef.current = el;
+                  }}
+                  type="email"
+                  autoComplete="username"
+                  inputMode="email"
+                  spellCheck={false}
+                  autoFocus
+                  disabled={rateLimited}
+                />
+              );
+            }}
+          </FormField>
+
+          <FormField
+            label={t('login.password')}
+            required
+            {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
+          >
+            {(control) => {
+              const { ref: rhfRef, ...field } = register('password');
+              return (
+                <PasswordInput
+                  {...control}
+                  {...field}
+                  ref={(el) => {
+                    rhfRef(el);
+                    passwordRef.current = el;
+                  }}
+                  autoComplete="current-password"
+                  disabled={rateLimited}
+                />
+              );
+            }}
+          </FormField>
+
+          {serverError ? (
+            <p
+              ref={alertRef}
+              role="alert"
+              tabIndex={-1}
+              className="aw-error"
+              data-testid="login-server-error"
+            >
+              {t(serverError)}
+            </p>
+          ) : null}
+
+          <Button
+            type="submit"
+            variant="primary"
+            aria-busy={isSubmitting || undefined}
+            disabled={isSubmitting || rateLimited}
+          >
+            {t('login.submit')}
+          </Button>
+
+          <OAuthButtonRow
+            mode="login"
+            {...(redirectTarget ? { redirect: redirectTarget } : {})}
+            onError={setServerError}
+          />
+
+          {caps?.magicLink && (
+            <>
+              <div className="aw-row aw-row-3 aw-muted aw-text-sm">
+                <hr className="aw-rule" />
+                <span>{t('login.magic_link_divider')}</span>
+                <hr className="aw-rule" />
+              </div>
+
+              <Button type="button" variant="ghost" onClick={handleOpenMagicLink}>
+                {t('login.magic_link_button')}
+              </Button>
+            </>
+          )}
+
+          {caps?.registrationOpen !== false && (
+            <p className="aw-flush aw-muted aw-text-sm aw-text-center">
+              {t('login.no_account')}{' '}
+              <Link to="/signup" className="aw-link">
+                {t('login.signup_link')}
+              </Link>
+            </p>
+          )}
+
+          {DEV_MODE && (
+            <section className="dql-panel" aria-label={t('login.devQuickLogin.title')}>
+              <style>{DEV_PANEL_STYLES}</style>
+
+              <header className="dql-head">
+                <span className="dql-tag" aria-hidden="true">
+                  {t('login.devQuickLogin.tag')}
+                </span>
+                <h2 className="dql-title">{t('login.devQuickLogin.title')}</h2>
+              </header>
+
+              <div className="dql-tier">
+                <div className="dql-tier-label" aria-hidden="true">
+                  {t('login.devQuickLogin.tiers.instance')}
+                </div>
+                <div className="dql-grid">
+                  {DEV_TIER_INSTANCE.map((role) => (
+                    <button
+                      key={role.email}
+                      type="button"
+                      className="dql-chip dql-chip--hero"
+                      onClick={() => {
+                        handleDevQuickLogin(role.email);
+                      }}
+                      disabled={isSubmitting || rateLimited}
+                    >
+                      <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                      <span className="dql-label">{t(role.labelKey)}</span>
+                      <span className="dql-email">{role.email}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="dql-tier">
+                <div className="dql-tier-label" aria-hidden="true">
+                  {t('login.devQuickLogin.tiers.workspace')}
+                </div>
+                <div className="dql-grid">
+                  {DEV_TIER_WORKSPACE.map((role) => (
+                    <button
+                      key={role.email}
+                      type="button"
+                      className="dql-chip"
+                      onClick={() => {
+                        handleDevQuickLogin(role.email);
+                      }}
+                      disabled={isSubmitting || rateLimited}
+                    >
+                      <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                      <span className="dql-label">{t(role.labelKey)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="dql-tier">
+                <div className="dql-tier-label" aria-hidden="true">
+                  {t('login.devQuickLogin.tiers.project')}
+                </div>
+                <div className="dql-grid">
+                  {DEV_TIER_PROJECT.map((role) => (
+                    <button
+                      key={role.email}
+                      type="button"
+                      className="dql-chip dql-chip--project"
+                      onClick={() => {
+                        handleDevQuickLogin(role.email);
+                      }}
+                      disabled={isSubmitting || rateLimited}
+                    >
+                      <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
+                      <span className="dql-label">{t(role.labelKey)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="dql-caption">{t('login.devQuickLogin.caption')}</p>
+            </section>
+          )}
+        </form>
+      </AuthStep>
+      <AuthStep
+        open={step === 'magic-request' && shown === 'magic-request'}
+        onExited={handleStepExited}
+      >
+        <form
+          onSubmit={(e) => {
+            void handleMagicLinkSubmit(e);
+          }}
+          noValidate
+          className="aw-stack aw-stack-5"
+        >
+          <div className="aw-stack aw-stack-2">
+            <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
+            <p className="aw-flush aw-muted aw-text-sm">{t('login.magic_link_instructions')}</p>
+          </div>
+          <FormField label={t('login.email')} required>
+            {(control) => (
               <Input
                 {...control}
-                {...field}
-                ref={(el) => {
-                  rhfRef(el);
-                  emailRef.current = el;
-                }}
+                ref={magicLinkEmailRef}
                 type="email"
                 autoComplete="email"
-                autoFocus
-                disabled={rateLimited}
-              />
-            );
-          }}
-        </FormField>
-
-        <FormField
-          label={t('login.password')}
-          required
-          {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
-        >
-          {(control) => {
-            const { ref: rhfRef, ...field } = register('password');
-            return (
-              <PasswordInput
-                {...control}
-                {...field}
-                ref={(el) => {
-                  rhfRef(el);
-                  passwordRef.current = el;
+                inputMode="email"
+                spellCheck={false}
+                value={magicLinkEmail}
+                onChange={(e) => {
+                  setMagicLinkEmail(e.target.value);
                 }}
-                autoComplete="current-password"
-                disabled={rateLimited}
+                autoFocus
               />
-            );
-          }}
-        </FormField>
-
-        {serverError ? (
-          <p
-            ref={alertRef}
-            role="alert"
-            tabIndex={-1}
-            className="aw-error"
-            data-testid="login-server-error"
+            )}
+          </FormField>
+          {serverError ? (
+            <p role="alert" className="aw-error">
+              {t(serverError)}
+            </p>
+          ) : null}
+          <div className="aw-stack aw-stack-2">
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={magicLinkGuard.submitting || undefined}
+              disabled={magicLinkGuard.submitting || !magicLinkEmail.trim()}
+            >
+              {t('login.magic_link_submit')}
+            </Button>
+            <Button type="button" variant="ghost" onClick={handleCloseMagicLink}>
+              {t('login.magic_link_back')}
+            </Button>
+          </div>
+        </form>
+      </AuthStep>
+      <AuthStep open={step === 'magic-sent' && shown === 'magic-sent'} onExited={handleStepExited}>
+        <div className="aw-stack aw-stack-5 aw-step-forward">
+          <div className="aw-stack aw-stack-2">
+            <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
+            <output className="aw-flush aw-muted aw-text-sm">
+              {t('login.magic_link_sent', { email: magicLinkEmail })}
+            </output>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              handleCloseMagicLink();
+              setMagicLinkEmail('');
+            }}
           >
-            {t(serverError)}
-          </p>
-        ) : null}
-
-        <Button type="submit" variant="primary" disabled={isSubmitting || rateLimited}>
-          {isSubmitting ? t('login.submitting') : t('login.submit')}
-        </Button>
-
-        <OAuthButtonRow
-          mode="login"
-          {...(redirectTarget ? { redirect: redirectTarget } : {})}
-          onError={setServerError}
-        />
-
-        {caps?.magicLink && (
-          <>
-            <div className="aw-row aw-row-3 aw-muted aw-text-sm">
-              <hr className="aw-rule" />
-              <span>{t('login.magic_link_divider')}</span>
-              <hr className="aw-rule" />
-            </div>
-
+            {t('login.magic_link_back')}
+          </Button>
+        </div>
+      </AuthStep>
+      <AuthStep open={step === 'totp' && shown === 'totp'} onExited={handleStepExited}>
+        <TotpChallengeForm
+          error={serverError}
+          submitting={totpGuard.submitting}
+          onSubmit={(credential) => {
+            void handleTotpSubmit(credential);
+          }}
+          onModeChange={() => {
+            setServerError(null);
+          }}
+          cancel={
             <Button
               type="button"
               variant="ghost"
-              onClick={() => {
-                setShowMagicLink(true);
-                setServerError(null);
-              }}
+              onClick={handleCancelTotp}
+              disabled={totpGuard.submitting}
             >
-              {t('login.magic_link_button')}
+              {t('login.totp_cancel')}
             </Button>
-          </>
-        )}
-
-        {caps?.registrationOpen !== false && (
-          <p className="aw-flush aw-muted aw-text-sm aw-text-center">
-            {t('login.no_account')}{' '}
-            <Link to="/signup" className="aw-link">
-              {t('login.signup_link')}
-            </Link>
-          </p>
-        )}
-
-        {DEV_MODE && (
-          <section className="dql-panel" aria-label={t('login.devQuickLogin.title')}>
-            <style>{DEV_PANEL_STYLES}</style>
-
-            <header className="dql-head">
-              <span className="dql-tag" aria-hidden="true">
-                {t('login.devQuickLogin.tag')}
-              </span>
-              <h2 className="dql-title">{t('login.devQuickLogin.title')}</h2>
-            </header>
-
-            <div className="dql-tier">
-              <div className="dql-tier-label" aria-hidden="true">
-                {t('login.devQuickLogin.tiers.instance')}
-              </div>
-              <div className="dql-grid">
-                {DEV_TIER_INSTANCE.map((role) => (
-                  <button
-                    key={role.email}
-                    type="button"
-                    className="dql-chip dql-chip--hero"
-                    onClick={() => {
-                      handleDevQuickLogin(role.email);
-                    }}
-                    disabled={isSubmitting || rateLimited}
-                  >
-                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
-                    <span className="dql-label">{t(role.labelKey)}</span>
-                    <span className="dql-email">{role.email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="dql-tier">
-              <div className="dql-tier-label" aria-hidden="true">
-                {t('login.devQuickLogin.tiers.workspace')}
-              </div>
-              <div className="dql-grid">
-                {DEV_TIER_WORKSPACE.map((role) => (
-                  <button
-                    key={role.email}
-                    type="button"
-                    className="dql-chip"
-                    onClick={() => {
-                      handleDevQuickLogin(role.email);
-                    }}
-                    disabled={isSubmitting || rateLimited}
-                  >
-                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
-                    <span className="dql-label">{t(role.labelKey)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="dql-tier">
-              <div className="dql-tier-label" aria-hidden="true">
-                {t('login.devQuickLogin.tiers.project')}
-              </div>
-              <div className="dql-grid">
-                {DEV_TIER_PROJECT.map((role) => (
-                  <button
-                    key={role.email}
-                    type="button"
-                    className="dql-chip dql-chip--project"
-                    onClick={() => {
-                      handleDevQuickLogin(role.email);
-                    }}
-                    disabled={isSubmitting || rateLimited}
-                  >
-                    <span className={`dql-dot dql-dot--${role.rank}`} aria-hidden="true" />
-                    <span className="dql-label">{t(role.labelKey)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p className="dql-caption">{t('login.devQuickLogin.caption')}</p>
-          </section>
-        )}
-      </form>
+          }
+        />
+      </AuthStep>
     </AuthCard>
   );
 }

@@ -40,7 +40,6 @@
       "title": "Danger zone",
       "description": "Irreversible actions. Permanently deleting this user removes their account, every session, and all attachments and avatars they have uploaded.",
       "delete": "Delete user",
-      "deleting": "Deleting…",
       "confirm": {
         "title": "Delete {email}?",
         "warning": "This permanently deletes the user account and reconciles every uploaded file referenced by them across the instance. This action cannot be undone.",
@@ -85,7 +84,6 @@
       "title": "Danger zone",
       "description": "Irreversible actions. Permanently deleting this workspace destroys all of its projects, tasks, members, and uploaded files.",
       "delete": "Delete workspace",
-      "deleting": "Deleting…",
       "confirm": {
         "title": "Delete {name}?",
         "warning": "This permanently deletes the workspace and irreversibly removes every uploaded file from object storage. This action cannot be undone.",
@@ -194,7 +192,6 @@
     "max_members_per_workspace": "Max Members per Workspace",
     "unlimited_placeholder": "0 = unlimited",
     "save": "Save Settings",
-    "saving": "Saving…",
     "saved": "Settings saved successfully."
   },
   "setup": {

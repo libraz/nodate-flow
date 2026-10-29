@@ -1,0 +1,55 @@
+/*
+ * KPI tile. The value re-mounts on every change of its formatted text, so a
+ * new figure settles in from just below; a refetch dims the figure it is
+ * about to replace instead of swapping it for a placeholder.
+ */
+
+/* Inside the Card's own padding, so the two add up to --nf-space-6. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 128px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+}
+
+.value {
+  margin: 0;
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-4xl);
+  font-weight: var(--nf-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--nf-color-fg);
+  transition: opacity var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+.value[aria-busy="true"] {
+  opacity: 0.5;
+}
+
+.figure {
+  display: inline-block;
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+.placeholder {
+  /* Matches one line of the value's type so the tile does not grow on arrival. */
+  inline-size: 40%;
+  block-size: 1.1em;
+}
+
+.help {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

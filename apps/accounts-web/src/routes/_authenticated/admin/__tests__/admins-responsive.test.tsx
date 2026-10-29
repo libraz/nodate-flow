@@ -2,12 +2,15 @@
  * Verify the admins table is wrapped in an overflow-x scroll container so
  * narrow viewports get a horizontal scrollbar instead of clipping wide cells.
  *
- * happy-dom does not implement getComputedStyle for inline styles, so we
- * read `wrapperEl.style.overflowX` directly — which works because the wrapper
- * uses `style={{ overflowX: 'auto' }}` (the same source the production CSS
- * cascade resolves to).
+ * happy-dom does not load the app stylesheet, so the test checks both
+ * halves: the wrapper carries `aw-table-scroll`, and layout.css gives that
+ * class `overflow-x: auto`.
  */
 
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import i18n from 'i18next';
@@ -140,6 +143,13 @@ describe('admins responsive table wrapper', () => {
 
     const wrapper = table.parentElement;
     expect(wrapper).not.toBeNull();
-    expect((wrapper as HTMLDivElement).style.overflowX).toBe('auto');
+    expect(wrapper?.classList.contains('aw-table-scroll')).toBe(true);
+
+    const layoutCss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../../styles/layout.css'),
+      'utf-8',
+    );
+    const rule = layoutCss.slice(layoutCss.indexOf('.aw-table-scroll {'));
+    expect(rule.slice(0, rule.indexOf('}'))).toContain('overflow-x: auto');
   });
 });

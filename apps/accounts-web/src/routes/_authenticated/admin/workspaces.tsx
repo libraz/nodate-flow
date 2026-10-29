@@ -9,12 +9,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  adminBadgeBase,
-  adminTableStyle,
-  adminTdStyle,
-  adminThStyle,
-} from '../../../features/admin/styles';
+import TableRegion from '../../../components/table-region';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 
@@ -99,21 +94,14 @@ function WorkspacesPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-2xl)',
-          margin: 0,
-        }}
-      >
-        {t('workspaces.title')}
-      </h1>
+    <div className="aw-stack aw-stack-6">
+      <h1 className="aw-page-title">{t('workspaces.title')}</h1>
 
-      <div style={{ display: 'flex', gap: 'var(--nf-space-3)', alignItems: 'center' }}>
-        <div style={{ flex: 1 }}>
+      <div className="aw-row aw-row-3">
+        <div className="aw-grow">
           <Input
             type="search"
+            aria-label={t('workspaces.search')}
             placeholder={t('workspaces.search')}
             value={search}
             onChange={handleSearchChange}
@@ -123,14 +111,7 @@ function WorkspacesPage(): ReactElement {
           value={statusFilter}
           onChange={handleFilterChange}
           aria-label={t('workspaces.status')}
-          style={{
-            padding: 'var(--nf-space-2) var(--nf-space-3)',
-            borderRadius: 'var(--nf-radius-md)',
-            border: 'var(--nf-space-px) solid var(--nf-color-border)',
-            background: 'var(--nf-color-bg)',
-            color: 'var(--nf-color-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
+          className="aw-select"
         >
           <option value="all">{t('workspaces.all_workspaces')}</option>
           <option value="active">{t('workspaces.active_only')}</option>
@@ -139,89 +120,62 @@ function WorkspacesPage(): ReactElement {
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
+        <p role="alert" className="aw-error">
           {error}
         </p>
       ) : null}
 
-      {loading ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('common.loading')}</p>
-      ) : workspaces.length === 0 ? (
-        <p style={{ color: 'var(--nf-color-fg-muted)' }}>{t('workspaces.no_results')}</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={adminTableStyle}>
-            <thead>
-              <tr>
-                <th style={adminThStyle}>{t('workspaces.name')}</th>
-                <th style={adminThStyle}>{t('workspaces.slug')}</th>
-                <th style={adminThStyle}>{t('workspaces.members')}</th>
-                <th style={adminThStyle}>{t('workspaces.projects')}</th>
-                <th style={adminThStyle}>{t('workspaces.status')}</th>
-                <th style={adminThStyle}>{t('workspaces.created_at')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workspaces.map((ws) => (
-                <tr key={ws.id}>
-                  <td style={adminTdStyle}>
-                    <Link
-                      to="/admin/workspaces/$wsId"
-                      params={{ wsId: ws.id }}
-                      style={{ color: 'var(--nf-color-accent-fg)' }}
-                    >
-                      {ws.name}
-                    </Link>
-                  </td>
-                  <td style={adminTdStyle}>{ws.slug}</td>
-                  <td style={adminTdStyle}>{ws.memberCount}</td>
-                  <td style={adminTdStyle}>{ws.projectCount ?? 0}</td>
-                  <td style={adminTdStyle}>
-                    <span
-                      style={{
-                        ...adminBadgeBase,
-                        background: ws.enabled
-                          ? 'color-mix(in srgb, var(--nf-color-success) 15%, transparent)'
-                          : 'color-mix(in srgb, var(--nf-color-danger) 15%, transparent)',
-                        color: ws.enabled
-                          ? 'var(--nf-color-success-fg)'
-                          : 'var(--nf-color-danger-fg)',
-                      }}
-                    >
-                      {ws.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
-                    </span>
-                  </td>
-                  <td style={adminTdStyle}>
-                    {formatTimestamp(ws.createdAt, { locale, fallback: t('common.never') })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: 'var(--nf-text-sm)',
-        }}
+      <TableRegion
+        loading={loading}
+        rowCount={workspaces.length}
+        loadingLabel={t('common.loading')}
+        emptyTitle={t('workspaces.no_results')}
       >
+        <table className="aw-table">
+          <thead>
+            <tr>
+              <th className="aw-th">{t('workspaces.name')}</th>
+              <th className="aw-th">{t('workspaces.slug')}</th>
+              <th className="aw-th">{t('workspaces.members')}</th>
+              <th className="aw-th">{t('workspaces.projects')}</th>
+              <th className="aw-th">{t('workspaces.status')}</th>
+              <th className="aw-th">{t('workspaces.created_at')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {workspaces.map((ws) => (
+              <tr key={ws.id}>
+                <td className="aw-td">
+                  <Link to="/admin/workspaces/$wsId" params={{ wsId: ws.id }} className="aw-link">
+                    {ws.name}
+                  </Link>
+                </td>
+                <td className="aw-td">{ws.slug}</td>
+                <td className="aw-td">{ws.memberCount}</td>
+                <td className="aw-td">{ws.projectCount ?? 0}</td>
+                <td className="aw-td">
+                  <span
+                    className={
+                      ws.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'
+                    }
+                  >
+                    {ws.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
+                  </span>
+                </td>
+                <td className="aw-td">
+                  {formatTimestamp(ws.createdAt, { locale, fallback: t('common.never') })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableRegion>
+
+      <div className="aw-pagination">
         <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           {t('common.previous')}
         </Button>
-        <span style={{ color: 'var(--nf-color-fg-muted)' }}>
-          {t('common.page', { page, total: totalPages })}
-        </span>
+        <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
         <Button
           variant="default"
           disabled={page >= totalPages}

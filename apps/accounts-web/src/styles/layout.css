@@ -86,6 +86,21 @@
   font-size: var(--nf-text-sm);
 }
 
+/*
+ * Inline status messages (`aw-error` / `aw-success` / `aw-warning`) mount
+ * when they have something to say, so they reveal on mount: a fade with a
+ * short drop from the field above them.
+ */
+.aw-error,
+.aw-success,
+.aw-warning {
+  /* No orphaned last character: ja breaks at phrase boundaries, all scripts avoid a lone last line word. */
+  text-wrap: pretty;
+  word-break: auto-phrase;
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: nf-slide-in-from-block-start var(--nf-duration-base) var(--nf-ease-out);
+}
+
 .aw-link {
   color: var(--nf-color-accent-fg);
   font-weight: var(--nf-weight-medium);
@@ -117,7 +132,7 @@
 .aw-rule {
   flex: 1;
   border: none;
-  border-block-start: 1px solid var(--nf-color-border);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 /* ── badges ───────────────────────────────────────────────────────────── */
@@ -151,7 +166,7 @@
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
   border-radius: var(--nf-radius-md);
-  border: 1px solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-bg);
   color: var(--nf-color-fg);
   font-size: var(--nf-text-sm);
@@ -165,11 +180,24 @@
   font-size: var(--nf-text-sm);
 }
 
+.aw-table {
+  font-variant-numeric: tabular-nums;
+}
+
+.aw-table tbody tr {
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.aw-table tbody tr:hover,
+.aw-table tbody tr:focus-within {
+  background: var(--nf-color-surface-hover);
+}
+
 .aw-th {
   text-align: start;
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
-  border-block-end: 2px solid var(--nf-color-border);
+  border-block-end: calc(var(--nf-space-px) * 2) solid var(--nf-color-border);
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg-muted);
   white-space: nowrap;
@@ -178,11 +206,100 @@
 .aw-td {
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
-  border-block-end: 1px solid var(--nf-color-border);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 .aw-table-scroll {
   overflow-x: auto;
+  animation: nf-fade-in var(--nf-duration-base) var(--nf-ease-out);
+  transition: opacity var(--nf-duration-base) var(--nf-ease-standard);
+}
+
+/* A refetch keeps the previous rows on screen, dimmed, instead of blanking them. */
+.aw-table-scroll[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.aw-table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2);
+}
+
+/* ── description list (admin detail pages) ────────────────────────────── */
+
+.aw-panel {
+  padding: var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+}
+
+.aw-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--nf-space-3) var(--nf-space-6);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.aw-dl dt {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  align-self: center;
+}
+
+.aw-dl dd {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+/* ── multi-step auth flows ────────────────────────────────────────────── */
+/*
+ * A step that replaces the previous one slides in along the reading
+ * direction: forward from the inline end, back from the inline start.
+ * The first step a page opens on carries neither class, so it does not
+ * move on top of the card's own entrance.
+ */
+.aw-step-forward {
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: nf-slide-in-from-inline-end var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+.aw-step-back {
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: nf-slide-in-from-inline-start var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+/* One-time codes: fixed-width digits with room between them. */
+.aw-otp {
+  font-variant-numeric: tabular-nums;
+  /* nf-token-override: digit tracking is typographic, not a spacing step */
+  letter-spacing: 0.2em;
+}
+
+/* ── link rows (workspace list) ───────────────────────────────────────── */
+
+.aw-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  text-decoration: none;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.aw-link-row:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
 }
 
 /* ── pagination row ───────────────────────────────────────────────────── */
@@ -192,6 +309,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── section heading & generic surface ────────────────────────────────── */
@@ -230,6 +348,11 @@
   gap: var(--nf-space-3);
 }
 
+/* A list entry rendered through PresenceItem: its exit collapses the list gap too. */
+.aw-presence-item {
+  --presence-gap: var(--nf-space-3);
+}
+
 .aw-row-between {
   display: flex;
   align-items: center;
@@ -239,7 +362,7 @@
 .aw-surface {
   padding: var(--nf-space-3);
   border-radius: var(--nf-radius-md);
-  border: 1px solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 .aw-surface-elevated {

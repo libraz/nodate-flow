@@ -16,6 +16,7 @@
  * otherwise ship with no keyboard focus indicator and no build error.
  */
 @import "@nodate-flow/ui/styles/focus-ring.css";
+@import "@nodate-flow/ui/styles/motion.css";
 
 @import "./layout.css";
 

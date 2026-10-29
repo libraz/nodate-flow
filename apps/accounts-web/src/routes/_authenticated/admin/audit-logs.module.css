@@ -1,0 +1,16 @@
+/* Filter row: fields share a baseline under their captions and wrap as a group. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nf-space-3);
+}
+
+.filter {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 200px;
+}

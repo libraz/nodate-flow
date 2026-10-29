@@ -1,6 +1,6 @@
 /**
  * Verify the admin layout guard renders three states correctly:
- *   - user === null         → loading skeleton (Spinner), NOT null
+ *   - user === null         → page skeleton, NOT null
  *   - user && !isInstanceAdmin → returns null (effect issues redirect)
  *   - user && isInstanceAdmin → renders the admin shell
  *
@@ -25,6 +25,7 @@ import enAdmin from '../../../../locales/en/admin.json';
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  useLocation: () => ({ pathname: '/admin/users' }),
   Link: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Outlet: () => null,
   createFileRoute: () => () => ({ options: {} }),

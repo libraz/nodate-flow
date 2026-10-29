@@ -1,3 +1,11 @@
 {
-  "common": {}
+  "common": {
+    "date": {
+      "monthYear": "{year, number, ::group-off}年{month}月",
+      "weekdays": ["一", "二", "三", "四", "五", "六", "日"],
+      "prev_month": "上一个月",
+      "next_month": "下一个月",
+      "placeholder": "选择日期"
+    }
+  }
 }

@@ -2,13 +2,16 @@
  * KpiCard — single counter tile for the instance-stats dashboard.
  *
  * Renders a label, a large tabular-numeric value, and a one-line
- * help description. Loading state shows a placeholder dash so the
- * layout doesn't jump when data resolves.
+ * help description. The first load holds the value's line with a
+ * skeleton so the tile does not grow when data resolves.
  */
 
 import Card from '@nodate-flow/ui/primitives/card';
+import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './kpi-card.module.css';
 
 export interface KpiCardProps {
   /** Short label rendered above the value. */
@@ -38,56 +41,23 @@ function KpiCard({ title, value, help, loading }: KpiCardProps): ReactElement {
   // page — the same split that made every admin timestamp US-shaped.
   const { i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? 'en';
-  const display = loading && value === undefined ? '—' : formatValue(value, locale);
+  const display = formatValue(value, locale);
 
   return (
-    <Card
-      elevated
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-        padding: 'var(--nf-space-6)',
-        // nf-token-override: component dimension, not a spacing step
-        minBlockSize: '160px',
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-sm)',
-          fontWeight: 600,
-          color: 'var(--nf-color-fg-muted)',
-          letterSpacing: '0.02em',
-          textTransform: 'uppercase',
-        }}
-      >
-        {title}
-      </p>
-      <p
-        aria-live="polite"
-        aria-busy={loading || undefined}
-        style={{
-          margin: 0,
-          fontFamily: 'var(--nf-font-sans)',
-          fontSize: 'var(--nf-text-4xl)',
-          fontWeight: 700,
-          fontVariantNumeric: 'tabular-nums',
-          color: 'var(--nf-color-fg)',
-          lineHeight: 1.1,
-        }}
-      >
-        {display}
-      </p>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 'var(--nf-text-xs)',
-          color: 'var(--nf-color-fg-muted)',
-        }}
-      >
-        {help}
-      </p>
+    <Card elevated>
+      <div className={styles.body}>
+        <p className={styles.title}>{title}</p>
+        <div aria-live="polite" aria-busy={loading || undefined} className={styles.value}>
+          {loading && value === undefined ? (
+            <Skeleton className={styles.placeholder} />
+          ) : (
+            <span key={display} className={styles.figure}>
+              {display}
+            </span>
+          )}
+        </div>
+        <p className={styles.help}>{help}</p>
+      </div>
     </Card>
   );
 }

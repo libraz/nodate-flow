@@ -21,6 +21,7 @@
 }
 
 .noticeOpen {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   border-color: var(--nf-color-warning);
   background: var(--nf-color-warning-subtle);
 }
@@ -35,6 +36,7 @@
 }
 
 .section {
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
