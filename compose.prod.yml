@@ -1,0 +1,314 @@
+# Production stack: one TLS-terminating edge container is the only published
+# surface; everything else lives on the compose network. The required .env
+# values are listed in README `## Deployment`; ci/compose-prod.env names them all.
+#
+# Origins are derived once from NF_PUBLIC_SCHEME and the four NF_*_HOST names.
+name: nodate-flow-prod
+
+x-db-dsn: &db-dsn ${NF_DB_USER:-nodate}:${NF_DB_PASSWORD:?database user password}@tcp(mysql:3306)/${NF_DB_NAME:-nodate_flow}?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27
+
+services:
+  edge:
+    build:
+      context: .
+      dockerfile: infra/edge/Dockerfile
+      # Baked into the bundles: changing a host or the scheme needs
+      # `up -d --build edge`, not a restart.
+      args:
+        VITE_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_API_HOST:?public hostname of flow-api}
+        VITE_AUTH_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST:?public hostname of auth-api}
+        VITE_ACCOUNTS_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST:?public hostname of accounts-web}
+        VITE_PUBLIC_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST:?public hostname of flow-web}
+        VITE_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+        VITE_NF_ALLOWED_REDIRECT_ORIGINS: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      auth-api:
+        condition: service_healthy
+    environment:
+      # Substituted into the templates; the filter leaves nginx's own $host alone.
+      NGINX_ENVSUBST_FILTER: "^NF_"
+      NF_PUBLIC_SCHEME: ${NF_PUBLIC_SCHEME:-https}
+      NF_ACCOUNTS_HOST: ${NF_ACCOUNTS_HOST}
+      NF_APP_HOST: ${NF_APP_HOST}
+      NF_AUTH_HOST: ${NF_AUTH_HOST}
+      NF_API_HOST: ${NF_API_HOST}
+      NF_TLS_CERT_NAME: ${NF_TLS_CERT_NAME:-${NF_ACCOUNTS_HOST}}
+      NF_EMBED_FRAME_ANCESTORS: ${NF_EMBED_FRAME_ANCESTORS:-*}
+    volumes:
+      # Replaces the plain-HTTP template baked into the image. Drop this mount
+      # (and the certificate ones) to run behind a host-side proxy or over HTTP.
+      - ./infra/edge/nginx/tls.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Mounted whole: under live/ the files are symlinks into archive/.
+      - ${NF_TLS_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+      # certbot --webroot challenge directory; renewal needs no downtime.
+      - ${NF_ACME_WEBROOT:-./acme}:/var/www/acme:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+  mysql:
+    image: mysql:9.6
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${NF_DB_ROOT_PASSWORD:?database root password}
+      MYSQL_DATABASE: ${NF_DB_NAME:-nodate_flow}
+      MYSQL_USER: ${NF_DB_USER:-nodate}
+      MYSQL_PASSWORD: ${NF_DB_PASSWORD:?database user password}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --max-connections=256
+      # Stored DATETIMEs are UTC wall clocks; the DSN pins the session zone too.
+      - --default-time-zone=+00:00
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Applied on first boot of an empty volume only; see README for re-apply.
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      # TCP, not the socket: the init-time server listens only on the socket.
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${NF_DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # S3-compatible gateway on the compose network only. The browser reaches
+  # blobs through flow-api's /blobs relay. NF_S3_* may point at an external
+  # S3 instead (drop this service and its depends_on entries).
+  storage:
+    image: versity/versitygw:v1.10.0
+    restart: unless-stopped
+    command: ["posix", "/data"]
+    environment:
+      ROOT_ACCESS_KEY: ${NF_S3_ACCESS_KEY:?object storage access key}
+      ROOT_SECRET_KEY: ${NF_S3_SECRET_KEY:?object storage secret key}
+      VGW_HEALTH: /health
+    volumes:
+      - storage_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:7070/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  auth-api:
+    build:
+      context: .
+      dockerfile: apps/auth-api/Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 25s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    expose:
+      - "8082"
+      - "9092"
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    environment:
+      NF_ENV: production
+      NF_COOKIE_SECURE: "true"
+      NF_AUTH_PORT: "8082"
+      NF_AUTH_METRICS_PORT: "9092"
+      NF_AUTH_LOG_LEVEL: ${NF_AUTH_LOG_LEVEL:-info}
+      NF_SECRET_KEY: ${NF_SECRET_KEY:?32-byte hex key, openssl rand -hex 32}
+      NF_DB_DSN: *db-dsn
+      NF_DB_MAX_OPEN_CONNS: ${NF_AUTH_DB_MAX_OPEN_CONNS:-16}
+      NF_DB_MAX_IDLE_CONNS: ${NF_AUTH_DB_MAX_IDLE_CONNS:-4}
+      NF_DB_CONN_MAX_LIFETIME: ${NF_AUTH_DB_CONN_MAX_LIFETIME:-30m}
+      NF_TRUSTED_PROXY_HOPS: ${NF_TRUSTED_PROXY_HOPS:-1}
+      NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
+      NF_OAUTH_ALLOWED_DOMAINS: ${NF_OAUTH_ALLOWED_DOMAINS:-}
+      NF_OAUTH_ALLOWED_EMAILS: ${NF_OAUTH_ALLOWED_EMAILS:-}
+      NF_AUTH_MIN_PASSWORD_LENGTH: ${NF_AUTH_MIN_PASSWORD_LENGTH:-8}
+      NF_AUTH_RATE_LIMIT_GLOBAL_MAX: ${NF_AUTH_RATE_LIMIT_GLOBAL_MAX:-200}
+      NF_AUTH_RATE_LIMIT_GLOBAL_WINDOW: ${NF_AUTH_RATE_LIMIT_GLOBAL_WINDOW:-60}
+      NF_AUTH_RATE_LIMIT_AUTH_MAX: ${NF_AUTH_RATE_LIMIT_AUTH_MAX:-20}
+      NF_AUTH_RATE_LIMIT_AUTH_WINDOW: ${NF_AUTH_RATE_LIMIT_AUTH_WINDOW:-900}
+      NF_AUTH_RATE_LIMIT_SESSION_MAX: ${NF_AUTH_RATE_LIMIT_SESSION_MAX:-60}
+      NF_AUTH_RATE_LIMIT_SESSION_WINDOW: ${NF_AUTH_RATE_LIMIT_SESSION_WINDOW:-900}
+      NF_AUTH_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST},${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+      NF_AUTH_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST}
+      NF_AUTH_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST}
+      NF_AUTH_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+      NF_AUTH_DISCORD_REDIRECT_URI: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST}/oauth/callback/discord
+      NF_AUTH_GOOGLE_CLIENT_ID: ${NF_AUTH_GOOGLE_CLIENT_ID:-}
+      NF_AUTH_GOOGLE_CLIENT_SECRET: ${NF_AUTH_GOOGLE_CLIENT_SECRET:-}
+      NF_AUTH_GITHUB_OIDC_CLIENT_ID: ${NF_AUTH_GITHUB_OIDC_CLIENT_ID:-}
+      NF_AUTH_GITHUB_OIDC_CLIENT_SECRET: ${NF_AUTH_GITHUB_OIDC_CLIENT_SECRET:-}
+      NF_AUTH_MICROSOFT_OIDC_CLIENT_ID: ${NF_AUTH_MICROSOFT_OIDC_CLIENT_ID:-}
+      NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET: ${NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET:-}
+      NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS: ${NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS:-}
+      NF_AUTH_GITHUB_CLIENT_ID: ${NF_AUTH_GITHUB_CLIENT_ID:-}
+      NF_AUTH_GITHUB_CLIENT_SECRET: ${NF_AUTH_GITHUB_CLIENT_SECRET:-}
+      NF_AUTH_SLACK_CLIENT_ID: ${NF_AUTH_SLACK_CLIENT_ID:-}
+      NF_AUTH_SLACK_CLIENT_SECRET: ${NF_AUTH_SLACK_CLIENT_SECRET:-}
+      NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID: ${NF_AUTH_GOOGLE_INTEGRATION_CLIENT_ID:-}
+      NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET: ${NF_AUTH_GOOGLE_INTEGRATION_CLIENT_SECRET:-}
+      NF_AUTH_DISCORD_CLIENT_ID: ${NF_AUTH_DISCORD_CLIENT_ID:-}
+      NF_AUTH_DISCORD_CLIENT_SECRET: ${NF_AUTH_DISCORD_CLIENT_SECRET:-}
+      NF_AUTH_SMTP_HOST: ${NF_SMTP_HOST:?SMTP host; without it magic-link requests send nothing}
+      NF_AUTH_SMTP_PORT: ${NF_SMTP_PORT:-587}
+      NF_AUTH_SMTP_USERNAME: ${NF_SMTP_USERNAME:-}
+      NF_AUTH_SMTP_PASSWORD: ${NF_SMTP_PASSWORD:-}
+      NF_AUTH_SMTP_FROM: ${NF_SMTP_FROM:?sender address for outgoing mail}
+      NF_S3_ENDPOINT: storage:7070
+      NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY}
+      NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY}
+      NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate}
+      NF_S3_USE_SSL: "false"
+      NF_VERSION: ${NF_VERSION:-}
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/flow-api/Dockerfile
+    restart: unless-stopped
+    # Shutdown budget inside the process is 20s.
+    stop_grace_period: 25s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    expose:
+      - "8080"
+      - "9090"
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    environment:
+      NF_ENV: production
+      NF_COOKIE_SECURE: "true"
+      NF_FLOW_PORT: "8080"
+      NF_FLOW_METRICS_PORT: "9090"
+      NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
+      NF_SECRET_KEY: ${NF_SECRET_KEY}
+      NF_DB_DSN: *db-dsn
+      NF_DB_MAX_OPEN_CONNS: ${NF_FLOW_DB_MAX_OPEN_CONNS:-32}
+      NF_DB_MAX_IDLE_CONNS: ${NF_FLOW_DB_MAX_IDLE_CONNS:-8}
+      NF_DB_CONN_MAX_LIFETIME: ${NF_FLOW_DB_CONN_MAX_LIFETIME:-30m}
+      NF_TRUSTED_PROXY_HOPS: ${NF_TRUSTED_PROXY_HOPS:-1}
+      NF_REGISTRATION_OPEN: ${NF_REGISTRATION_OPEN:-true}
+      # Single replica: in-process stream and outbound limiter, no Redis.
+      NF_FLOW_STREAM_BACKEND: memory
+      NF_FLOW_OUTBOUND_BACKEND: memory
+      NF_FLOW_STREAM: ${NF_FLOW_STREAM:-true}
+      NF_FLOW_STREAM_TAIL: ${NF_FLOW_STREAM_TAIL:-true}
+      NF_FLOW_STREAM_TAIL_INTERVAL: ${NF_FLOW_STREAM_TAIL_INTERVAL:-1s}
+      # All three secrets are required while insecure mode is off; generate
+      # random values for integrations you do not use.
+      NF_FLOW_WEBHOOKS_INSECURE: "false"
+      NF_FLOW_GH_WEBHOOK_SECRET: ${NF_FLOW_GH_WEBHOOK_SECRET:?GitHub webhook secret}
+      NF_FLOW_SLACK_SIGNING_SECRET: ${NF_FLOW_SLACK_SIGNING_SECRET:?Slack signing secret}
+      NF_FLOW_GOOGLE_CHANNEL_TOKEN: ${NF_FLOW_GOOGLE_CHANNEL_TOKEN:?Google channel token}
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN:?shared token for flow-worker and presence-discord}
+      NF_FLOW_DEFAULT_WORKSPACE_ID: ${NF_FLOW_DEFAULT_WORKSPACE_ID:-}
+      NF_FLOW_AI_MOCK: ${NF_FLOW_AI_MOCK:-false}
+      NF_FLOW_AI_DAILY_BUDGET_CENTS: ${NF_FLOW_AI_DAILY_BUDGET_CENTS:-0}
+      NF_FLOW_OUTBOUND_LLM_RPS: ${NF_FLOW_OUTBOUND_LLM_RPS:-0}
+      NF_FLOW_OUTBOUND_LLM_BURST: ${NF_FLOW_OUTBOUND_LLM_BURST:-0}
+      NF_FLOW_EMBED_OPENAI_KEY: ${NF_FLOW_EMBED_OPENAI_KEY:-}
+      NF_FLOW_EMBED_MODEL: ${NF_FLOW_EMBED_MODEL:-}
+      NF_FLOW_EMBED_BASE_URL: ${NF_FLOW_EMBED_BASE_URL:-}
+      NF_FLOW_AGENT_TICK_INTERVAL: ${NF_FLOW_AGENT_TICK_INTERVAL:-1m}
+      NF_FLOW_AGENT_WORKER_COUNT: ${NF_FLOW_AGENT_WORKER_COUNT:-1}
+      NF_FLOW_AGENT_RUNNER: ${NF_FLOW_AGENT_RUNNER:-orchestrator}
+      NF_FLOW_AGENT_RUNS_PURGE_INTERVAL: ${NF_FLOW_AGENT_RUNS_PURGE_INTERVAL:-1h}
+      NF_FLOW_AGENT_RUNS_RETENTION: ${NF_FLOW_AGENT_RUNS_RETENTION:-168h}
+      NF_AGENT_HANDOFF_LOOP_LIMIT: ${NF_AGENT_HANDOFF_LOOP_LIMIT:-5}
+      NF_FLOW_AUTO_ACTION_INTERVAL: ${NF_FLOW_AUTO_ACTION_INTERVAL:-5m}
+      NF_FLOW_AUTO_ACTION_THRESHOLD: ${NF_FLOW_AUTO_ACTION_THRESHOLD:-0.80}
+      NF_FLOW_AUTO_ACTION_DRY_RUN: ${NF_FLOW_AUTO_ACTION_DRY_RUN:-false}
+      NF_FLOW_ITEM_RECONCILER_INTERVAL: ${NF_FLOW_ITEM_RECONCILER_INTERVAL:-5m}
+      NF_NOTIFICATION_FANOUT_TIMEOUT: ${NF_NOTIFICATION_FANOUT_TIMEOUT:-30s}
+      NF_FLOW_OTEL_ENDPOINT: ${NF_OTEL_ENDPOINT:-}
+      NF_FLOW_OTEL_INSECURE: ${NF_FLOW_OTEL_INSECURE:-true}
+      NF_FLOW_SMTP_HOST: ${NF_SMTP_HOST}
+      NF_FLOW_SMTP_PORT: ${NF_SMTP_PORT:-587}
+      NF_FLOW_SMTP_USERNAME: ${NF_SMTP_USERNAME:-}
+      NF_FLOW_SMTP_PASSWORD: ${NF_SMTP_PASSWORD:-}
+      NF_FLOW_SMTP_FROM: ${NF_SMTP_FROM}
+      NF_FLOW_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+      NF_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+      NF_FLOW_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_API_HOST}
+      NF_S3_ENDPOINT: storage:7070
+      NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY}
+      NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY}
+      NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate}
+      NF_S3_USE_SSL: "false"
+      NF_EMBED_FRAME_ANCESTORS: ${NF_EMBED_FRAME_ANCESTORS:-*}
+      NF_VERSION: ${NF_VERSION:-}
+      NF_FLOW_VERSION: ${NF_FLOW_VERSION:-}
+
+  flow-worker:
+    build:
+      context: .
+      dockerfile: apps/flow-worker/Dockerfile
+    restart: unless-stopped
+    # Shutdown budget inside the process is 30s.
+    stop_grace_period: 35s
+    depends_on:
+      mysql:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    expose:
+      - "9091"
+    environment:
+      NF_DB_DSN: *db-dsn
+      NF_DB_MAX_OPEN_CONNS: ${NF_WORKER_DB_MAX_OPEN_CONNS:-8}
+      NF_DB_MAX_IDLE_CONNS: ${NF_WORKER_DB_MAX_IDLE_CONNS:-4}
+      NF_DB_CONN_MAX_LIFETIME: ${NF_WORKER_DB_CONN_MAX_LIFETIME:-30m}
+      NF_FLOW_API_BASE_URL: http://api:8080
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN}
+      NF_FLOW_WORKER_PORT: "9091"
+      NF_FLOW_WORKER_LOG_LEVEL: ${NF_FLOW_WORKER_LOG_LEVEL:-info}
+      NF_FLOW_WORKER_TICK_INTERVAL: ${NF_FLOW_WORKER_TICK_INTERVAL:-60s}
+      NF_FLOW_WORKER_BUSINESS_METRICS_INTERVAL: ${NF_FLOW_WORKER_BUSINESS_METRICS_INTERVAL:-60s}
+      NF_FLOW_WORKER_SHUTDOWN_TIMEOUT: ${NF_FLOW_WORKER_SHUTDOWN_TIMEOUT:-30s}
+      NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_ENDPOINT:-}
+      NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+
+  # Opt in with `--profile presence-discord`. The bot token is optional here
+  # so the file interpolates without it; the service refuses to start unset.
+  presence-discord:
+    build:
+      context: .
+      dockerfile: apps/presence-discord/Dockerfile
+    profiles: ["presence-discord"]
+    restart: unless-stopped
+    stop_grace_period: 15s
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "9094"
+    environment:
+      NF_DISCORD_BOT_TOKEN: ${NF_DISCORD_BOT_TOKEN:-}
+      NF_FLOW_API_BASE_URL: http://api:8080
+      NF_FLOW_API_SIGNAL_TOKEN: ${NF_FLOW_API_SIGNAL_TOKEN}
+      NF_PRESENCE_DEBOUNCE_SECONDS: ${NF_PRESENCE_DEBOUNCE_SECONDS:-5}
+      NF_PRESENCE_METRICS_ADDR: ${NF_PRESENCE_METRICS_ADDR:-:9094}
+      NF_PRESENCE_LOG_LEVEL: ${NF_PRESENCE_LOG_LEVEL:-info}
+      NF_PRESENCE_SHUTDOWN_TIMEOUT: ${NF_PRESENCE_SHUTDOWN_TIMEOUT:-10s}
+      NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_ENDPOINT:-}
+      NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+
+volumes:
+  mysql_data:
+  storage_data:
