@@ -304,8 +304,8 @@ jobs:
       - name: Product layers leave core tables alone
         run: make check-no-core-alters
 
-      - name: Vendored layers are unedited
-        run: make check-vendored
+      - name: Vendored layers are unedited and match their pin
+        run: make check-vendored-pin
 
       - name: Core contract (core layer only)
         run: |

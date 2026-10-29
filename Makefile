@@ -297,7 +297,7 @@ define go-modules-each
 	fi
 endef
 
-.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals check-no-core-alters check-vendored
+.PHONY: check lint lint-go format format-check format-check-go typecheck vet check-dtos check-css-var-parens check-public-router check-web-bounds check-tokens check-breakpoints check-themes check-colors check-spacing check-strings check-region-parity check-sdk-browser-safe check-schema-collisions check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals check-no-core-alters check-vendored check-vendored-pin check-vendored-current
 check: lint format-check typecheck vet i18n-check check-dtos check-css-var-parens check-public-router check-web-bounds check-region-parity check-sdk-browser-safe check-schema-collisions check-tokens check-themes check-colors check-spacing check-strings check-breakpoints check-reachability check-revival-writers check-affected-rows check-vacuous-assertions check-task-visibility check-commit-boundary check-error-toasts check-outbound-deadline check-enum-parity check-column-bounds check-response-ids check-goroutine-failnow check-ai-outcome check-calendar-write-acl check-event-kinds check-metrics-wiring check-duplicate-refusals check-no-core-alters check-vendored ## Lint + formatting + typecheck + go vet + i18n locale guard + DTO drift guard + CSS var() paren guard + public-surface guard + web input-bound guard + Go/TS region parity + browser-SDK Node-type guard + OpenAPI schema-collision guard + design-token guards (references, theme parity, colours, spacing) + hardcoded UI string guard + breakpoint guard + gate-reachability guard + soft-delete revival-writer guard + affected-row guard + vacuous-assertion guard + task-visibility guard + commit-boundary compile gate + error-toast guard + outbound-deadline guard + input enum-parity guard + input column-bounds guard + tool response internal-id guard + goroutine FailNow guard + AI invocation outcome guard + calendar write-ACL guard + event kind/payload guard + metrics wiring guard + duplicate-refusal reachability guard + core-table alter guard + vendored time layer integrity
 
 check-revival-writers: ## Fail when a grant keyed on a tuple alone has no writer that revives a revoked row
@@ -375,7 +375,13 @@ vendor-time: ## Re-vendor sql/time from the nodate-time checkout (NF_TIME_REPO, 
 	  --repository git@github.com:libraz/nodate-time.git $${NF_TIME_REF:+--ref "$$NF_TIME_REF"}
 
 check-vendored: ## Fail when the vendored sql/time layer was edited locally (a no-op until sql/time is vendored)
-	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --local-only; else echo "sql/time is not vendored; nothing to check"; fi
+	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --mode local; else echo "sql/time is not vendored; nothing to check"; fi
+
+check-vendored-pin: ## Fail when sql/time was edited locally or differs from its pinned ref (needs network; a no-op until sql/time is vendored)
+	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --mode pin; else echo "sql/time is not vendored; nothing to check"; fi
+
+check-vendored-current: ## Fail when sql/time is not the upstream default branch, on top of the pin checks (needs network; a no-op until sql/time is vendored)
+	@if [ -f sql/time/UPSTREAM.json ]; then bash sql/core/tools/check-vendored.sh sql/time --mode all; else echo "sql/time is not vendored; nothing to check"; fi
 
 check-schema-collisions: ## Fail when one component schema is the response of two operations that were never declared to share it
 	./scripts/check-schema-collisions.sh
