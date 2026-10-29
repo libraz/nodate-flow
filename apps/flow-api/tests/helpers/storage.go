@@ -47,8 +47,8 @@ type StorageBundle struct {
 // at the supplied MinIO instance, ensures the bucket exists, and returns
 // the bundle ready to plug into NewTestServerWithStorage. The bucket
 // name is randomized so two parallel processes (or two tests using
-// StartIsolatedMinIO) cannot stomp on each other's objects.
-func BuildStorageBundle(t *testing.T, inst *MinIOInstance) *StorageBundle {
+// StartIsolatedStorage) cannot stomp on each other's objects.
+func BuildStorageBundle(t *testing.T, inst *StorageInstance) *StorageBundle {
 	t.Helper()
 	bundle, err := NewStorageBundle(inst)
 	require.NoError(t, err, "build storage bundle")
@@ -56,9 +56,9 @@ func BuildStorageBundle(t *testing.T, inst *MinIOInstance) *StorageBundle {
 }
 
 // NewStorageBundle is the *testing.T-free variant for TestMain callers.
-func NewStorageBundle(inst *MinIOInstance) (*StorageBundle, error) {
+func NewStorageBundle(inst *StorageInstance) (*StorageBundle, error) {
 	if inst == nil {
-		return nil, errors.New("storage bundle: nil minio instance")
+		return nil, errors.New("storage bundle: nil storage instance")
 	}
 	bucket := fmt.Sprintf("test-%d", time.Now().UnixNano())
 

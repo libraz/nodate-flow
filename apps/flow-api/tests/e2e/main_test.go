@@ -72,14 +72,14 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	// MinIO backs the attachment / avatar dedup tests against the real
+	// Storage backs the attachment / avatar dedup tests against the real
 	// S3 path; without it those tests have nothing to assert on.
-	minioInst, err := helpers.EnsureSharedMinIO()
+	storageInst, err := helpers.EnsureSharedStorage()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "e2e: start shared minio:", err)
+		fmt.Fprintln(os.Stderr, "e2e: start shared storage:", err)
 		os.Exit(1)
 	}
-	testStorage, err = helpers.NewStorageBundle(minioInst)
+	testStorage, err = helpers.NewStorageBundle(storageInst)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e: build storage bundle:", err)
 		os.Exit(1)
