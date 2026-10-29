@@ -154,7 +154,7 @@ func TestComposeProdDefaultsMatchConfigDefaults(t *testing.T) {
 			t.Errorf("%s is listed as divergent (%s) but compose.prod.yml does not set it", name, reason)
 			continue
 		}
-		if got, comparable := composeDefault(ref, value); comparable && got == read[name] {
+		if got, hasDefault := composeDefault(ref, value); hasDefault && got == read[name] {
 			t.Errorf("%s is listed as divergent but compose.prod.yml already matches the config default %q", name, got)
 		}
 	}
@@ -166,8 +166,8 @@ func TestComposeProdDefaultsMatchConfigDefaults(t *testing.T) {
 		if _, ok := divergentDefaults[name]; ok {
 			continue
 		}
-		got, comparable := composeDefault(ref, value)
-		if !comparable {
+		got, hasDefault := composeDefault(ref, value)
+		if !hasDefault {
 			continue
 		}
 		if got != want {
