@@ -31,7 +31,47 @@ func TestValidateRule(t *testing.T) {
 		{"interval at the upper bound", []byte(`{"freq":"daily","interval":999}`), false},
 		{"count at the upper bound", []byte(`{"freq":"daily","count":1000}`), false},
 		{"byMonthDay at the bounds", []byte(`{"freq":"monthly","byMonthDay":[1,31]}`), false},
-		{"explicit nulls are absent members", []byte(`{"freq":"daily","interval":null,"count":null,"until":null,"byDay":null,"byMonthDay":null,"bySetPos":null}`), false},
+		{"valid monthly nth weekday", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[2]}`), false},
+		{"valid monthly last weekday", []byte(`{"freq":"monthly","byDay":["FR"],"bySetPos":[-1]}`), false},
+		{"valid monthly fifth weekday", []byte(`{"freq":"monthly","byDay":["TH"],"bySetPos":[5]}`), false},
+		{"valid wkst SU", []byte(`{"freq":"weekly","interval":2,"byDay":["TU","SU"],"wkst":"SU"}`), false},
+		{"valid wkst MO", []byte(`{"freq":"weekly","interval":2,"byDay":["TU","SU"],"wkst":"MO"}`), false},
+		{"byDay holding all seven weekdays", []byte(`{"freq":"weekly","byDay":["MO","TU","WE","TH","FR","SA","SU"]}`), false},
+
+		// The CHECK refuses a member holding null, so a rule carrying one
+		// cannot be stored however the decode reads it.
+		{"null member rejected", []byte(`{"freq":"daily","interval":null}`), true},
+		{"null until rejected", []byte(`{"freq":"daily","until":null}`), true},
+		{"unknown member rejected", []byte(`{"freq":"daily","foo":1}`), true},
+		{"integral float interval rejected", []byte(`{"freq":"daily","interval":1.0}`), true},
+		{"fractional interval rejected", []byte(`{"freq":"daily","interval":1.5}`), true},
+		{"exponent interval rejected", []byte(`{"freq":"daily","interval":1e1}`), true},
+		{"boolean interval rejected", []byte(`{"freq":"daily","interval":true}`), true},
+		{"count above the bound rejected", []byte(`{"freq":"daily","count":1001}`), true},
+		{"count 2^31 rejected", []byte(`{"freq":"daily","count":2147483648}`), true},
+		{"count 2^32 rejected", []byte(`{"freq":"daily","count":4294967296}`), true},
+		{"scalar byMonthDay rejected", []byte(`{"freq":"monthly","byMonthDay":5}`), true},
+		{"empty byMonthDay rejected", []byte(`{"freq":"monthly","byMonthDay":[]}`), true},
+		{"repeated byMonthDay rejected", []byte(`{"freq":"monthly","byMonthDay":[5,5]}`), true},
+		{"empty byDay rejected", []byte(`{"freq":"weekly","byDay":[]}`), true},
+		{"repeated byDay rejected", []byte(`{"freq":"weekly","byDay":["MO","MO"]}`), true},
+		{"scalar byDay rejected", []byte(`{"freq":"weekly","byDay":"MO"}`), true},
+		{"until with count rejected", []byte(`{"freq":"daily","until":"2026-03-01","count":3}`), true},
+		{"short until rejected", []byte(`{"freq":"daily","until":"2026-3-1"}`), true},
+		{"non-ASCII until rejected", []byte(`{"freq":"daily","until":"２０２６-03-01"}`), true},
+		{"lowercase wkst rejected", []byte(`{"freq":"weekly","wkst":"su"}`), true},
+		{"other wkst rejected", []byte(`{"freq":"weekly","wkst":"TU"}`), true},
+
+		// The combinations the CHECK leaves to the applications.
+		{"byMonthDay on weekly rejected", []byte(`{"freq":"weekly","byMonthDay":[5]}`), true},
+		{"byMonthDay on daily rejected", []byte(`{"freq":"daily","byMonthDay":[5]}`), true},
+		{"byMonthDay on yearly rejected", []byte(`{"freq":"yearly","byMonthDay":[5]}`), true},
+		{"byDay on daily rejected", []byte(`{"freq":"daily","byDay":["MO"]}`), true},
+		{"byDay on yearly rejected", []byte(`{"freq":"yearly","byDay":["MO"]}`), true},
+		{"bySetPos on weekly rejected", []byte(`{"freq":"weekly","byDay":["MO"],"bySetPos":[2]}`), true},
+		{"monthly byDay without bySetPos rejected", []byte(`{"freq":"monthly","byDay":["MO"]}`), true},
+		{"monthly bySetPos with two weekdays rejected", []byte(`{"freq":"monthly","byDay":["MO","TU"],"bySetPos":[2]}`), true},
+		{"monthly byDay with byMonthDay rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[2],"byMonthDay":[5]}`), true},
 
 		{"malformed json rejected", []byte(`{not json`), true},
 		{"array is not a rule object", []byte(`[{"freq":"daily"}]`), true},
@@ -66,34 +106,27 @@ func TestValidateRule(t *testing.T) {
 		// stored -1 matches no day at all, so the series silently holds
 		// no occurrences.
 		{"negative byMonthDay rejected", []byte(`{"freq":"monthly","byMonthDay":[-1]}`), true},
-		// No expander implements bySetPos, so accepting an in-range value
-		// stored a rule that then expanded as if the selector were absent:
-		// "second Monday" came back as every Monday, silently.
-		{"bySetPos rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":2}`), true},
-		{"bySetPos zero rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":0}`), true},
-		{"bySetPos negative rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":-1}`), true},
-		{"bySetPos too large rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":6}`), true},
-		// Refused whichever shape it is written in. The member is held as
-		// raw JSON so a list spelling cannot slip past a scalar check.
-		{"bySetPos list rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[2]}`), true},
+		// bySetPos is a one-item array of 1..5 or -1, and only beside byDay.
+		{"scalar bySetPos rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":2}`), true},
+		{"bySetPos zero rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[0]}`), true},
+		{"bySetPos minus two rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[-2]}`), true},
+		{"bySetPos too large rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[6]}`), true},
+		{"bySetPos with two positions rejected", []byte(`{"freq":"monthly","byDay":["MO"],"bySetPos":[1,2]}`), true},
+		{"bySetPos without byDay rejected", []byte(`{"freq":"monthly","bySetPos":[2]}`), true},
 		{"unparseable until rejected", []byte(`{"freq":"daily","until":"not-a-date"}`), true},
 		{"unpadded until rejected", []byte(`{"freq":"daily","until":"2026-3-5"}`), true},
 		{"impossible until rejected", []byte(`{"freq":"daily","until":"2026-02-30"}`), true},
 
-		// byDay tokens are matched the way both expanders match them:
-		// lowercased and trimmed. Refusing a spelling they both resolve
-		// would put a rule outside the write route that is inside the
-		// read route, which is the split this grammar exists to close.
-		{"lowercase byDay accepted", []byte(`{"freq":"weekly","byDay":["mo"]}`), false},
-		{"mixed case byDay accepted", []byte(`{"freq":"weekly","byDay":["Mo"]}`), false},
-		{"padded byDay accepted", []byte(`{"freq":"weekly","byDay":[" MO "]}`), false},
-		// A timestamp without an offset is read as an instant in the
-		// event's own timezone, by this expander and by the browser one.
-		// It is the same spelling the exception list already accepts on
-		// the same route.
-		{"until without an offset accepted", []byte(`{"freq":"daily","until":"2026-03-01T09:00:00"}`), false},
+		// The CHECK stores the uppercase codes only. The expanders still
+		// read other spellings, but a write has to be one the CHECK takes.
+		{"lowercase byDay rejected", []byte(`{"freq":"weekly","byDay":["mo"]}`), true},
+		{"mixed case byDay rejected", []byte(`{"freq":"weekly","byDay":["Mo"]}`), true},
+		{"padded byDay rejected", []byte(`{"freq":"weekly","byDay":[" MO "]}`), true},
+		// UNTIL is a date or an RFC 3339 instant; a wall clock with no
+		// offset is neither.
+		{"until without an offset rejected", []byte(`{"freq":"daily","until":"2026-03-01T09:00:00"}`), true},
 		{"until with an offset accepted", []byte(`{"freq":"daily","until":"2026-03-01T09:00:00+09:00"}`), false},
-		{"empty until is an absent bound", []byte(`{"freq":"daily","until":""}`), false},
+		{"empty until rejected", []byte(`{"freq":"daily","until":""}`), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,7 +152,7 @@ func TestValidateRuleNamesTheField(t *testing.T) {
 		{`{"freq":"daily","count":0}`, "count"},
 		{`{"freq":"weekly","byDay":["XX"]}`, "byDay"},
 		{`{"freq":"monthly","byMonthDay":[40]}`, "byMonthDay"},
-		{`{"freq":"monthly","bySetPos":2}`, "bySetPos"},
+		{`{"freq":"monthly","bySetPos":[2]}`, "bySetPos"},
 		{`{"freq":"daily","until":"not-a-date"}`, "until"},
 		{`{not json`, "recurrenceRule"},
 	}

@@ -53,27 +53,29 @@ func TestValidateRecurrenceRule(t *testing.T) {
 		{"count zero rejected", rawRule(`{"freq":"daily","count":0}`), true},
 		{"count too large rejected", rawRule(`{"freq":"daily","count":5000}`), true},
 		{"bad byDay rejected", rawRule(`{"freq":"weekly","byDay":["XX"]}`), true},
-		// A lowercase weekday token used to be refused here while both
-		// expanders resolved it, which put a rule inside the read grammar
-		// and outside the write one. The token set is now read by the one
-		// function the expanders use, and it lowercases before looking
-		// up, so the route accepts what they act on.
-		{"lowercase byDay accepted", rawRule(`{"freq":"weekly","byDay":["mo"]}`), false},
+		// The CHECK stores uppercase weekday codes only, so a write in any
+		// other spelling would fail at the database instead of here.
+		{"lowercase byDay rejected", rawRule(`{"freq":"weekly","byDay":["mo"]}`), true},
 		{"byMonthDay zero rejected", rawRule(`{"freq":"monthly","byMonthDay":[0]}`), true},
 		{"byMonthDay out of range rejected", rawRule(`{"freq":"monthly","byMonthDay":[40]}`), true},
-		// No expander implements bySetPos, so accepting an in-range value
-		// stored a rule that then expanded as if the selector were absent:
-		// "second Monday" came back as every Monday, silently.
-		{"bySetPos rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":2}`), true},
-		{"bySetPos zero rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":0}`), true},
-		{"bySetPos negative rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":-1}`), true},
-		{"bySetPos too large rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":6}`), true},
+		// bySetPos is a one-item array beside a single monthly byDay.
+		{"valid monthly nth weekday", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":[2]}`), false},
+		{"valid monthly last weekday", rawRule(`{"freq":"monthly","byDay":["FR"],"bySetPos":[-1]}`), false},
+		{"valid wkst", rawRule(`{"freq":"weekly","interval":2,"byDay":["TU","SU"],"wkst":"SU"}`), false},
+		{"scalar bySetPos rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":2}`), true},
+		{"bySetPos zero rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":[0]}`), true},
+		{"bySetPos minus two rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":[-2]}`), true},
+		{"bySetPos too large rejected", rawRule(`{"freq":"monthly","byDay":["MO"],"bySetPos":[6]}`), true},
+		{"bySetPos without byDay rejected", rawRule(`{"freq":"monthly","bySetPos":[2]}`), true},
+		{"scalar byMonthDay rejected", rawRule(`{"freq":"monthly","byMonthDay":5}`), true},
+		{"null member rejected", rawRule(`{"freq":"daily","count":null}`), true},
+		{"unknown member rejected", rawRule(`{"freq":"daily","foo":1}`), true},
+		{"until with count rejected", rawRule(`{"freq":"daily","until":"2026-03-01","count":3}`), true},
+		{"invalid wkst rejected", rawRule(`{"freq":"weekly","wkst":"TU"}`), true},
 		{"unparseable until rejected", rawRule(`{"freq":"daily","until":"not-a-date"}`), true},
-		// An UNTIL without an offset used to be refused here while both
-		// expanders read it as an instant in the event's own timezone,
-		// and while the exception list on this same route accepted the
-		// identical spelling.
-		{"until without an offset accepted", rawRule(`{"freq":"daily","until":"2026-03-01T09:00:00"}`), false},
+		// UNTIL is a date or an RFC 3339 instant; a wall clock with no
+		// offset is neither.
+		{"until without an offset rejected", rawRule(`{"freq":"daily","until":"2026-03-01T09:00:00"}`), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -188,8 +190,9 @@ func TestBothTransportsAgreeOnTheGrammar(t *testing.T) {
 		{
 			name:        "weekly on a lowercase weekday",
 			rule:        `{"freq":"weekly","byDay":["mo"],"count":2}`,
-			restAccepts: true,
+			restAccepts: false,
 			occurrences: []string{"2026-03-02", "2026-03-09"},
+			note:        "the expander reads the token, but the CHECK would refuse the write",
 		},
 		{
 			name:        "until as a bare date",
@@ -200,8 +203,15 @@ func TestBothTransportsAgreeOnTheGrammar(t *testing.T) {
 		{
 			name:        "until without an offset",
 			rule:        `{"freq":"daily","until":"2026-03-04T09:00:00"}`,
-			restAccepts: true,
+			restAccepts: false,
 			occurrences: []string{"2026-03-02", "2026-03-03", "2026-03-04"},
+			note:        "the expander reads a wall clock in the event's zone, which the shape does not name",
+		},
+		{
+			name:        "monthly on the first Monday",
+			rule:        `{"freq":"monthly","byDay":["MO"],"bySetPos":[1],"count":2}`,
+			restAccepts: true,
+			occurrences: []string{"2026-03-02"},
 		},
 		{
 			name:        "monthly on a listed day of the month",
@@ -248,15 +258,15 @@ func TestBothTransportsAgreeOnTheGrammar(t *testing.T) {
 			name:        "byMonthDay outside the month",
 			rule:        `{"freq":"monthly","byMonthDay":[40]}`,
 			restAccepts: false,
-			occurrences: nil,
-			note:        "no day matches, so the series holds nothing",
+			occurrences: []string{"2026-03-02"},
+			note:        "no rule day matches, so the series is only the event's start",
 		},
 		{
 			name:        "byMonthDay counting back from the end of the month",
 			rule:        `{"freq":"monthly","byMonthDay":[-1]}`,
 			restAccepts: false,
-			occurrences: nil,
-			note:        "the RFC 5545 meaning is not implemented and no day matches",
+			occurrences: []string{"2026-03-02"},
+			note:        "the RFC 5545 meaning is not implemented, so no rule day matches and the series is only the event's start",
 		},
 		{
 			name:        "unparseable until",
@@ -266,11 +276,11 @@ func TestBothTransportsAgreeOnTheGrammar(t *testing.T) {
 			note:        "the end date is discarded and the series runs past it",
 		},
 		{
-			name:        "bySetPos",
+			name:        "scalar bySetPos",
 			rule:        `{"freq":"monthly","byDay":["MO"],"bySetPos":2}`,
 			restAccepts: false,
-			occurrences: []string{"2026-03-02"},
-			note:        "the selector is not applied, so every matching Monday stands",
+			occurrences: nil,
+			note:        "a scalar does not decode, so the stored value reads as no rule",
 		},
 		{
 			name:        "freq the expander cannot step",

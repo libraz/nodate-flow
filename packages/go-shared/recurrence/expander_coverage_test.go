@@ -55,6 +55,11 @@ var expanderMarker = regexp.MustCompile(`not-a-series-expander:[ \t]*[A-Za-z][^\
 // count, however it goes about locating it.
 const goldenFixtureName = "recurrence_golden.json"
 
+// coreFixtureName is sql/core/recurrence/fixtures.json, the core schema
+// contract's cases. It is what pins bySetPos, wkst and the clamp across
+// every application sharing the database, so every expander loads it too.
+const coreFixtureName = "fixtures.json"
+
 // expander is one derived expansion site.
 type expander struct {
 	// Dir is the directory whose tests have to reach the fixture.
@@ -63,8 +68,6 @@ type expander struct {
 	Path string
 	// Name identifies the dispatch inside that file.
 	Name string
-	// ReadsBySetPos records that the site acts on the bySetPos selector.
-	ReadsBySetPos bool
 }
 
 // ---------------------------------------------------------------------
@@ -145,25 +148,6 @@ func mentionsTimeTime(expr ast.Expr) bool {
 	return found
 }
 
-// readsBySetPos reports whether a function acts on the bySetPos selector,
-// as opposed to a rule type merely declaring the field. Struct types are
-// skipped for exactly that reason: declaring the field is how an
-// implementation accepts a stored rule that carries it, and is not the
-// same as applying it.
-func readsBySetPos(fn *ast.FuncDecl) bool {
-	found := false
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		if _, ok := n.(*ast.StructType); ok {
-			return false
-		}
-		if ident, ok := n.(*ast.Ident); ok && strings.EqualFold(ident.Name, "bySetPos") {
-			found = true
-		}
-		return true
-	})
-	return found
-}
-
 // goExpanders returns the dispatch sites in one parsed Go file, skipping
 // the ones that carry a marker.
 func goExpanders(fset *token.FileSet, file *ast.File, root, path string) []expander {
@@ -184,10 +168,9 @@ func goExpanders(fset *token.FileSet, file *ast.File, root, path string) []expan
 			rel = path
 		}
 		out = append(out, expander{
-			Dir:           filepath.Dir(path),
-			Path:          rel,
-			Name:          fn.Name.Name + " (" + fset.Position(fn.Pos()).String() + ")",
-			ReadsBySetPos: readsBySetPos(fn),
+			Dir:  filepath.Dir(path),
+			Path: rel,
+			Name: fn.Name.Name + " (" + fset.Position(fn.Pos()).String() + ")",
 		})
 	}
 	return out
@@ -287,10 +270,6 @@ func tsExpander(src string) bool {
 	return stepsByEveryCalendarUnit(code)
 }
 
-func tsReadsBySetPos(src string) bool {
-	return strings.Contains(strings.ToLower(stripTSComments(src)), "bysetpos")
-}
-
 // ---------------------------------------------------------------------
 // Tree walk
 // ---------------------------------------------------------------------
@@ -375,10 +354,9 @@ func findExpanders(t *testing.T, root string) []expander {
 					rel = path
 				}
 				out = append(out, expander{
-					Dir:           filepath.Dir(path),
-					Path:          rel,
-					Name:          rel,
-					ReadsBySetPos: tsReadsBySetPos(src),
+					Dir:  filepath.Dir(path),
+					Path: rel,
+					Name: rel,
 				})
 			}
 			return nil
@@ -391,7 +369,7 @@ func findExpanders(t *testing.T, root string) []expander {
 	return out
 }
 
-// loadsGoldenFixture reports whether one test source names the fixture in
+// loadsFixture reports whether one test source names the fixture in
 // code rather than in prose.
 //
 // The distinction is the whole value of the check: a test that mentions
@@ -399,7 +377,7 @@ func findExpanders(t *testing.T, root string) []expander {
 // reads as coverage to a plain text search while asserting nothing. The
 // Go half asks the parser for string literals; the TypeScript half drops
 // whole-line comments and looks for the quoted name.
-func loadsGoldenFixture(path string, raw []byte) (bool, error) {
+func loadsFixture(path string, raw []byte, name string) (bool, error) {
 	if strings.HasSuffix(path, "_test.go") {
 		file, err := parser.ParseFile(token.NewFileSet(), path, raw, 0)
 		if err != nil {
@@ -412,7 +390,7 @@ func loadsGoldenFixture(path string, raw []byte) (bool, error) {
 				return true
 			}
 			if text, err := strconv.Unquote(lit.Value); err == nil &&
-				strings.Contains(text, goldenFixtureName) {
+				strings.Contains(text, name) {
 				found = true
 			}
 			return true
@@ -420,14 +398,14 @@ func loadsGoldenFixture(path string, raw []byte) (bool, error) {
 		return found, nil
 	}
 	code := stripTSComments(string(raw))
-	return strings.Contains(code, "'"+goldenFixtureName+"'") ||
-		strings.Contains(code, `"`+goldenFixtureName+`"`), nil
+	return strings.Contains(code, "'"+name+"'") ||
+		strings.Contains(code, `"`+name+`"`), nil
 }
 
-// reachesGoldenFixture reports whether a test beside the expander loads
-// the shared fixture. Both the directory itself and a __tests__ beside it
+// reachesFixture reports whether a test beside the expander loads the
+// named fixture. Both the directory itself and a __tests__ beside it
 // count, because that is where each language puts its tests.
-func reachesGoldenFixture(dir string) (bool, error) {
+func reachesFixture(dir, fixture string) (bool, error) {
 	for _, candidate := range []string{dir, filepath.Join(dir, "__tests__")} {
 		entries, err := os.ReadDir(candidate)
 		if err != nil {
@@ -446,7 +424,7 @@ func reachesGoldenFixture(dir string) (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			loads, err := loadsGoldenFixture(path, raw)
+			loads, err := loadsFixture(path, raw, fixture)
 			if err != nil {
 				return false, err
 			}
@@ -490,7 +468,7 @@ func TestEveryExpanderReadsTheGoldenFixture(t *testing.T) {
 	}
 
 	for _, site := range found {
-		reaches, err := reachesGoldenFixture(site.Dir)
+		reaches, err := reachesFixture(site.Dir, goldenFixtureName)
 		if err != nil {
 			t.Fatalf("read tests beside %s: %v", site.Path, err)
 		}
@@ -506,33 +484,27 @@ func TestEveryExpanderReadsTheGoldenFixture(t *testing.T) {
 	}
 }
 
-// TestNoExpanderAppliesBySetPosAlone keeps the selector's unimplemented
-// state shared.
+// TestEveryExpanderReadsTheCoreFixtures fails on an expansion site whose
+// tests never load sql/core/recurrence/fixtures.json.
 //
-// bySetPos is the "nth matching day of the period" selector — what
-// expresses "second Monday of the month". The stored grammar lists it and
-// no expander applies it, which is a limit rather than a defect as long
-// as every expander has the same limit. Implemented in one of them, the
-// same stored rule would mean two different series depending on which
-// surface answered, and the surface nobody watches would be the one that
-// disagreed.
-func TestNoExpanderAppliesBySetPosAlone(t *testing.T) {
+// Those cases are where the selectors live — bySetPos, wkst, the
+// month-end clamp — and they are shared with the other application on
+// the same database. An expander that skips them can disagree with it on
+// "second Monday of the month" while agreeing with every case in
+// testdata/recurrence_golden.json.
+func TestEveryExpanderReadsTheCoreFixtures(t *testing.T) {
 	t.Parallel()
 
-	root := repoRoot(t)
-	var applying []string
-	for _, site := range findExpanders(t, root) {
-		if site.ReadsBySetPos {
-			applying = append(applying, site.Name)
+	for _, site := range findExpanders(t, repoRoot(t)) {
+		reaches, err := reachesFixture(site.Dir, coreFixtureName)
+		if err != nil {
+			t.Fatalf("read tests beside %s: %v", site.Path, err)
+		}
+		if !reaches {
+			t.Errorf("%s: no test beside this expansion site loads sql/core/recurrence/%s, "+
+				"the cases that pin bySetPos, wkst and the clamp", site.Name, coreFixtureName)
 		}
 	}
-	if len(applying) == 0 {
-		return
-	}
-	t.Errorf("these expansion sites act on bySetPos: %s. The selector is either applied by every "+
-		"expander or by none — one stored rule cannot mean two series depending on which surface "+
-		"was asked. Teach the others first, then extend testdata/%s so the shared meaning is "+
-		"written down", strings.Join(applying, ", "), goldenFixtureName)
 }
 
 // TestExpanderDetectionSeesAFourthExpander is the positive control: it
@@ -632,55 +604,6 @@ func reasonless(anchor time.Time, freq string, n int) time.Time {
 	}
 }
 
-// TestBySetPosDetectionSeesAnApplication is the positive control for the
-// selector check: declaring the field is not applying it, and acting on
-// it is.
-func TestBySetPosDetectionSeesAnApplication(t *testing.T) {
-	t.Parallel()
-
-	const src = `package p
-
-func declares(freq string) time.Time {
-	type rule struct {
-		BySetPos []int
-	}
-	switch freq {
-	case "daily", "weekly", "monthly", "yearly":
-		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	return time.Time{}
-}
-
-func applies(r *Rule, freq string) time.Time {
-	if len(r.BySetPos) > 0 {
-		return time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
-	}
-	switch freq {
-	case "daily", "weekly", "monthly", "yearly":
-		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-	return time.Time{}
-}
-`
-
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "sample.go", src, parser.ParseComments)
-	if err != nil {
-		t.Fatalf("parse sample: %v", err)
-	}
-
-	sites := goExpanders(fset, file, "", "sample.go")
-	if len(sites) != 2 {
-		t.Fatalf("derivation reported %d sites, want 2", len(sites))
-	}
-	if sites[0].ReadsBySetPos {
-		t.Error("a struct field declaring bySetPos was read as applying it")
-	}
-	if !sites[1].ReadsBySetPos {
-		t.Error("a function acting on bySetPos was not reported as applying it")
-	}
-}
-
 // TestTypeScriptDetectionSeparatesExpandersFromDeclarations is the
 // positive control for the TypeScript half, which reads text rather than
 // a syntax tree and so has to be shown to tell the two apart.
@@ -729,17 +652,6 @@ function dayKey(sec: number): string {
   }
 }
 `
-	const mentionsInProse = `// bySetPos is decoded and never applied.
-function occurrenceFromAnchor(anchor: DateTime, freq: Freq, offset: number): DateTime {
-  switch (freq) {
-    case 'daily':
-    case 'weekly':
-    case 'monthly':
-    case 'yearly':
-      return anchor.plus({ days: offset });
-  }
-}
-`
 
 	if tsExpander(declaration) {
 		t.Error("a module that only declares the frequencies was read as an expander")
@@ -749,12 +661,6 @@ function occurrenceFromAnchor(anchor: DateTime, freq: Freq, offset: number): Dat
 	}
 	if !tsExpander(expansion) {
 		t.Error("a module that steps a series was not read as an expander")
-	}
-	if tsReadsBySetPos(mentionsInProse) {
-		t.Error("a comment about bySetPos was read as an application of it")
-	}
-	if !tsReadsBySetPos("const nth = rule.bySetPos[0];") {
-		t.Error("code reading bySetPos was not reported")
 	}
 }
 
@@ -771,7 +677,7 @@ func TestFixtureCoverageNeedsALoadNotAMention(t *testing.T) {
 // package does not read.
 func TestSomethingElse(t *testing.T) {}
 `)
-	loads, err := loadsGoldenFixture("mention_test.go", mention)
+	loads, err := loadsFixture("mention_test.go", mention, goldenFixtureName)
 	if err != nil {
 		t.Fatalf("parse mention: %v", err)
 	}
@@ -786,7 +692,7 @@ func TestGolden(t *testing.T) {
 	_ = raw
 }
 `)
-	loads, err = loadsGoldenFixture("load_test.go", load)
+	loads, err = loadsFixture("load_test.go", load, goldenFixtureName)
 	if err != nil {
 		t.Fatalf("parse load: %v", err)
 	}
@@ -794,12 +700,12 @@ func TestGolden(t *testing.T) {
 		t.Error("a test reading the fixture was not counted as loading it")
 	}
 
-	if ok, _ := loadsGoldenFixture("mention.test.ts", []byte(
-		"// see testdata/recurrence_golden.json\nconst x = 1;\n")); ok {
+	if ok, _ := loadsFixture("mention.test.ts", []byte(
+		"// see testdata/recurrence_golden.json\nconst x = 1;\n"), goldenFixtureName); ok {
 		t.Error("a TypeScript comment naming the fixture was counted as loading it")
 	}
-	if ok, _ := loadsGoldenFixture("load.test.ts", []byte(
-		"const p = path.join(dir, 'testdata', 'recurrence_golden.json');\n")); !ok {
+	if ok, _ := loadsFixture("load.test.ts", []byte(
+		"const p = path.join(dir, 'testdata', 'recurrence_golden.json');\n"), goldenFixtureName); !ok {
 		t.Error("a TypeScript test reading the fixture was not counted as loading it")
 	}
 }

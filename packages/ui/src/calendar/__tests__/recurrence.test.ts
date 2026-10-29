@@ -5,6 +5,7 @@ import { DateTime, Settings } from 'luxon';
 import { describe, expect, it } from 'vitest';
 
 import { expandAllRecurrences, expandRecurrence } from '../recurrence';
+import type { RecurrenceRule } from '../types';
 
 interface RecurrenceGoldenFixture {
   name: string;
@@ -12,15 +13,7 @@ interface RecurrenceGoldenFixture {
     startAt: string;
     endAt: string;
     timezone?: string;
-    recurrenceRule: {
-      freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
-      interval?: number;
-      byDay?: string[];
-      byMonthDay?: number[];
-      bySetPos?: number;
-      until?: string;
-      count?: number;
-    };
+    recurrenceRule: RecurrenceRule;
     recurrenceExceptions?: string[];
     recurrenceEnd?: string;
   };
@@ -100,6 +93,63 @@ describe('expandRecurrence — timezone awareness', () => {
     const delta = (instances[1]?.startAt.toMillis() ?? 0) - (instances[0]?.startAt.toMillis() ?? 0);
     expect(delta).toBe(7 * 24 * 60 * 60 * 1000);
   });
+});
+
+/** One case of `sql/core/recurrence/fixtures.json`, the core schema contract's cases. */
+interface CoreRecurrenceFixture {
+  name: string;
+  rule: RecurrenceRule;
+  dtstart: string;
+  tz: string;
+  expect: string[];
+}
+
+function loadCoreFixtures(): CoreRecurrenceFixture[] {
+  let dir = process.cwd();
+  for (;;) {
+    const candidate = path.join(dir, 'sql', 'core', 'recurrence', 'fixtures.json');
+    if (existsSync(candidate)) {
+      return JSON.parse(readFileSync(candidate, 'utf8')) as CoreRecurrenceFixture[];
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      throw new Error('could not find sql/core/recurrence/fixtures.json');
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * The cases every application sharing the database expands identically
+ * (PROTOCOL.md §Recurrence), asserted with the offsets they are written
+ * in. A bounded rule has to stop where `expect` stops; an unbounded one
+ * has to open with it.
+ */
+describe('expandRecurrence — core contract fixtures', () => {
+  const fixtures = loadCoreFixtures();
+
+  it('loads cases', () => {
+    expect(fixtures.length).toBeGreaterThan(0);
+  });
+
+  for (const fixture of fixtures) {
+    it(fixture.name, () => {
+      const start = DateTime.fromISO(fixture.dtstart, { setZone: true });
+      const instances = expandRecurrence(
+        {
+          startAt: fixture.dtstart,
+          endAt: start.plus({ hours: 1 }).toISO() ?? '',
+          timezone: fixture.tz,
+          recurrenceRule: fixture.rule,
+        },
+        start,
+        start.plus({ years: 10 }),
+      );
+      const bounded = fixture.rule.count !== undefined || fixture.rule.until !== undefined;
+      const got = instances.map((i) => i.startAt.toISO({ suppressMilliseconds: true }));
+      expect(bounded ? got : got.slice(0, fixture.expect.length)).toEqual(fixture.expect);
+    });
+  }
 });
 
 describe('expandRecurrence — shared golden fixtures', () => {
@@ -194,7 +244,7 @@ describe('expandRecurrence — weekly byDay expansion', () => {
         freq: 'weekly' as const,
         interval: 1,
         byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
-      },
+      } satisfies RecurrenceRule,
     };
     const instances = expandRecurrence(
       event,
@@ -220,7 +270,7 @@ describe('expandRecurrence — weekly byDay expansion', () => {
     const event = {
       startAt: '2026-07-06T09:00:00Z',
       endAt: '2026-07-06T10:00:00Z',
-      recurrenceRule: { freq: 'weekly' as const, interval: 2, byDay: ['MO', 'WE'] },
+      recurrenceRule: { freq: 'weekly', interval: 2, byDay: ['MO', 'WE'] } satisfies RecurrenceRule,
     };
     const instances = expandRecurrence(
       event,
@@ -242,7 +292,11 @@ describe('expandRecurrence — weekly byDay expansion', () => {
     const event = {
       startAt: '2026-07-08T09:00:00Z',
       endAt: '2026-07-08T10:00:00Z',
-      recurrenceRule: { freq: 'weekly' as const, byDay: ['MO', 'WE', 'FR'], count: 5 },
+      recurrenceRule: {
+        freq: 'weekly',
+        byDay: ['MO', 'WE', 'FR'],
+        count: 5,
+      } satisfies RecurrenceRule,
     };
     const instances = expandRecurrence(
       event,

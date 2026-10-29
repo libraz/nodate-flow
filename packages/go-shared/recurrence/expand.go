@@ -2,8 +2,9 @@
 // occurrences that fall inside a time range.
 //
 // The rule grammar is the closed set the schema stores — freq, interval,
-// byDay, byMonthDay, until, count — not RFC 5545 in general. Nothing
-// here parses an RRULE string; callers hand over the JSON the
+// byDay, byMonthDay, bySetPos, wkst, until, count — not RFC 5545 in
+// general; sql/core/PROTOCOL.md §Recurrence states it. Nothing here
+// parses an RRULE string; callers hand over the JSON the
 // calendar_events.recurrence_rule column holds.
 //
 // This is a port of the browser expander (packages/ui/src/calendar/
@@ -30,6 +31,7 @@ package recurrence
 import (
 	"encoding/json"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -61,22 +63,18 @@ func (f Freq) Valid() bool {
 	return false
 }
 
-// Rule is the stored recurrence rule.
-//
-// BySetPos is kept as raw JSON rather than as a typed selector because
-// nothing applies it: no expander in the product reads it, so a decoded
-// value would only invite one of them to start. Holding the raw member
-// lets Validate refuse a rule that carries it whatever shape it was
-// written in, while a row already storing one still decodes and expands
-// on the fields that do have a meaning.
+// Rule is the stored recurrence rule, in the canonical shape the
+// chk_calendar_events_recurrence_shape CHECK enforces. Every member is
+// omitted when empty, because the CHECK refuses a key holding null.
 type Rule struct {
-	Freq       Freq            `json:"freq"`
-	Interval   *int            `json:"interval"`
-	ByDay      []string        `json:"byDay"`
-	ByMonthDay []int           `json:"byMonthDay"`
-	BySetPos   json.RawMessage `json:"bySetPos"`
-	Until      string          `json:"until"`
-	Count      *int            `json:"count"`
+	Freq       Freq     `json:"freq"`
+	Interval   *int     `json:"interval,omitempty"`
+	ByDay      []string `json:"byDay,omitempty"`
+	ByMonthDay []int    `json:"byMonthDay,omitempty"`
+	BySetPos   []int    `json:"bySetPos,omitempty"`
+	Wkst       string   `json:"wkst,omitempty"`
+	Until      string   `json:"until,omitempty"`
+	Count      *int     `json:"count,omitempty"`
 }
 
 // Event is the minimal projection of a recurring calendar_events row.
@@ -345,6 +343,11 @@ func ProducesEntry(evt Event, entry string) bool {
 // anchor, before any exception or overridden start is subtracted. It
 // stops when visit returns false, when the series' own bounds end it, or
 // at the first candidate at or after limit.
+//
+// The rule is stepped one period at a time — interval days, weeks, months
+// or years from the anchor's own — and each period yields its candidates
+// in order. The anchor is always the first occurrence; a rule candidate
+// at or before it is not counted again.
 func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
 	loc := zoneFor(evt.zone()).Location()
 	anchor := evt.StartAt.In(loc)
@@ -356,6 +359,9 @@ func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
 	maxCount := math.MaxInt32
 	if evt.Rule.Count != nil && *evt.Rule.Count >= 0 {
 		maxCount = *evt.Rule.Count
+	}
+	if maxCount == 0 {
+		return
 	}
 	// Two independent upper bounds, and the earlier one ends the series.
 	var until *time.Time
@@ -369,63 +375,193 @@ func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
 		}
 	}
 
-	byDay := normalizeByDay(evt.Rule.ByDay)
-	byMonthDay := evt.Rule.ByMonthDay
-
-	// RFC 5545 BYDAY expands a WEEKLY rule: WEEKLY;BYDAY=MO,WE yields an
-	// occurrence on each listed weekday of every included week, not just
-	// on the anchor's weekday. That path walks day by day and keeps a day
-	// whose weekday is listed and whose week is an interval multiple away
-	// from the anchor's. For every other combination byDay and byMonthDay
-	// narrow the freq cursor instead of expanding it.
-	expandsWeekdays := evt.Rule.Freq == FreqWeekly && len(byDay) > 0
-	anchorWeekStart := startOfISOWeek(anchor)
-	budget := scanBudget(anchor, limit, evt.Rule.Freq, interval, expandsWeekdays)
+	x := newExpansion(evt.Rule, anchor)
+	budget := scanBudget(anchor, limit, evt.Rule.Freq, interval)
 
 	emitted := 0
-	for n := 0; emitted < maxCount && n < budget; n++ {
-		var candidate time.Time
-		if expandsWeekdays {
-			candidate = addDaysWallClock(anchor, n)
-		} else {
-			candidate = occurrenceFromAnchor(anchor, evt.Rule.Freq, n*interval)
-		}
-
-		if !candidate.Before(limit) {
+	for n := 0; n < budget; n++ {
+		start, candidates := x.period(n * interval)
+		if !start.Before(limit) || (until != nil && start.After(*until)) {
 			return
 		}
-		if until != nil && candidate.After(*until) {
-			return
+		if n == 0 {
+			// The start is the first occurrence whether or not the rule
+			// would produce it (RFC 5545 DTSTART), and it counts.
+			candidates = append([]time.Time{anchor}, candidates...)
 		}
-
-		var passes bool
-		if expandsWeekdays {
-			passes = matchesByDay(candidate, byDay) &&
-				isoWeekOffset(candidate, anchorWeekStart)%interval == 0 &&
-				(len(byMonthDay) == 0 || matchesByMonthDay(candidate, byMonthDay))
-		} else {
-			passes = (len(byDay) == 0 || matchesByDay(candidate, byDay)) &&
-				(len(byMonthDay) == 0 || matchesByMonthDay(candidate, byMonthDay))
-		}
-		if !passes {
-			continue
-		}
-
-		// A cancelled occurrence still counts against COUNT: the series
-		// is "ten meetings", and cancelling one does not conjure an
-		// eleventh at the end. A replaced one counts for the stronger
-		// reason that it still happens — it was moved, not cancelled —
-		// so it consumes a count exactly as an ordinary occurrence
-		// does, and the ten meetings are still ten.
-		emitted++
-		if !visit(candidate) {
-			return
+		for i, candidate := range candidates {
+			if (n > 0 || i > 0) && !candidate.After(anchor) {
+				continue
+			}
+			if !candidate.Before(limit) {
+				return
+			}
+			if until != nil && candidate.After(*until) {
+				return
+			}
+			// A cancelled occurrence still counts against COUNT: the
+			// series is "ten meetings", and cancelling one does not
+			// conjure an eleventh at the end. A replaced one counts for
+			// the stronger reason that it still happens — it was moved,
+			// not cancelled — so the ten meetings are still ten.
+			emitted++
+			if !visit(candidate) || emitted >= maxCount {
+				return
+			}
 		}
 	}
 }
 
-// scanBudget returns how many candidates the scan may examine before
-// giving up.
+// expansion is a rule resolved against its anchor: the weekday tokens
+// decoded and the anchor's week located under wkst.
+type expansion struct {
+	freq       Freq
+	anchor     time.Time
+	byDay      []time.Weekday
+	byMonthDay []int
+	bySetPos   []int
+	// weekStart is local midnight on the first day of the anchor's week,
+	// the week counted from wkst.
+	weekStart time.Time
+}
+
+func newExpansion(r *Rule, anchor time.Time) expansion {
+	wkst := time.Monday
+	if d, ok := parseWeekday(r.Wkst); ok {
+		wkst = d
+	}
+	back := (int(anchor.Weekday()) - int(wkst) + 7) % 7
+	y, m, d := anchor.Date()
+	return expansion{
+		freq:       r.Freq,
+		anchor:     anchor,
+		byDay:      normalizeByDay(r.ByDay),
+		byMonthDay: r.ByMonthDay,
+		bySetPos:   r.BySetPos,
+		weekStart:  time.Date(y, m, d-back, 0, 0, 0, 0, anchor.Location()),
+	}
+}
+
+// period returns the start of the period `offset` freq-units after the
+// anchor's, and the candidates it holds in order. The start is never
+// later than any of its candidates, so a caller can stop on it even when
+// a period holds none.
+//
+// RFC 5545 BYDAY expands a WEEKLY rule — WEEKLY;BYDAY=MO,WE yields each
+// listed weekday of every included week — and BYMONTHDAY or BYDAY expand
+// a MONTHLY one, with BYSETPOS then picking from the month's set. Every
+// other combination narrows the single freq-stepped candidate instead.
+func (x expansion) period(offset int) (time.Time, []time.Time) {
+	switch {
+	case x.freq == FreqWeekly && len(x.byDay) > 0:
+		return x.weekPeriod(offset)
+	case x.freq == FreqMonthly && (len(x.byMonthDay) > 0 || len(x.byDay) > 0):
+		return x.monthPeriod(offset)
+	}
+	candidate := occurrenceFromAnchor(x.anchor, x.freq, offset)
+	if (len(x.byDay) > 0 && !matchesByDay(candidate, x.byDay)) ||
+		(len(x.byMonthDay) > 0 && !matchesByMonthDay(candidate, x.byMonthDay)) {
+		return candidate, nil
+	}
+	return candidate, []time.Time{candidate}
+}
+
+// weekPeriod holds the listed weekdays of the week `offset` weeks after
+// the anchor's, in the order wkst puts them.
+func (x expansion) weekPeriod(offset int) (time.Time, []time.Time) {
+	y, m, d := x.weekStart.Date()
+	start := time.Date(y, m, d+offset*7, 0, 0, 0, 0, x.weekStart.Location())
+	var out []time.Time
+	for i := range 7 {
+		day := atAnchorClock(x.anchor, y, m, d+offset*7+i)
+		if !matchesByDay(day, x.byDay) {
+			continue
+		}
+		if len(x.byMonthDay) > 0 && !matchesByMonthDay(day, x.byMonthDay) {
+			continue
+		}
+		out = append(out, day)
+	}
+	return start, out
+}
+
+// monthPeriod holds the days of the month `offset` months after the
+// anchor's that the rule selects. A byMonthDay the month does not have is
+// clamped to its last day; a bySetPos position it does not have selects
+// nothing.
+func (x expansion) monthPeriod(offset int) (time.Time, []time.Time) {
+	total := int(x.anchor.Month()) - 1 + offset
+	year := x.anchor.Year() + floorDiv(total, 12)
+	month := time.Month(floorMod(total, 12) + 1)
+	last := daysInMonth(year, month)
+	start := time.Date(year, month, 1, 0, 0, 0, 0, x.anchor.Location())
+
+	var days []int
+	if len(x.byMonthDay) > 0 {
+		seen := map[int]bool{}
+		for _, md := range x.byMonthDay {
+			if md < minMonthDay || md > maxMonthDay {
+				continue
+			}
+			day := min(md, last)
+			if !seen[day] {
+				seen[day] = true
+				days = append(days, day)
+			}
+		}
+		sort.Ints(days)
+	} else {
+		for day := 1; day <= last; day++ {
+			days = append(days, day)
+		}
+	}
+	if len(x.byDay) > 0 {
+		kept := days[:0:0]
+		for _, day := range days {
+			if matchesByDay(time.Date(year, month, day, 0, 0, 0, 0, time.UTC), x.byDay) {
+				kept = append(kept, day)
+			}
+		}
+		days = kept
+	}
+	if len(x.bySetPos) > 0 {
+		days = selectPositions(days, x.bySetPos)
+	}
+
+	out := make([]time.Time, 0, len(days))
+	for _, day := range days {
+		out = append(out, atAnchorClock(x.anchor, year, month, day))
+	}
+	return start, out
+}
+
+// selectPositions picks the 1-based positions from the start of set, or
+// from its end when negative, and returns them in ascending order.
+func selectPositions(set, positions []int) []int {
+	seen := map[int]bool{}
+	var out []int
+	for _, pos := range positions {
+		i := pos - 1
+		if pos < 0 {
+			i = len(set) + pos
+		}
+		if pos == 0 || i < 0 || i >= len(set) || seen[set[i]] {
+			continue
+		}
+		seen[set[i]] = true
+		out = append(out, set[i])
+	}
+	sort.Ints(out)
+	return out
+}
+
+// atAnchorClock is the given local day at the anchor's wall-clock time.
+func atAnchorClock(anchor time.Time, year int, month time.Month, day int) time.Time {
+	return time.Date(year, month, day, anchor.Hour(), anchor.Minute(), anchor.Second(), anchor.Nanosecond(), anchor.Location())
+}
+
+// scanBudget returns how many periods the scan may examine before giving
+// up.
 //
 // The budget is derived from the distance between the anchor and the far
 // edge of the window, because that is how many steps it takes to get
@@ -433,10 +569,7 @@ func walk(evt Event, limit time.Time, visit func(candidate time.Time) bool) {
 // anchored two decades before the window runs out of steps on the way and
 // the window comes back empty, which reads as "nothing is scheduled" to
 // an agent and as "no reminder is due" to the scheduler.
-//
-// perDay marks the weekly-BYDAY path, which walks one day at a time
-// regardless of the rule's interval.
-func scanBudget(anchor, rangeEnd time.Time, freq Freq, interval int, perDay bool) int {
+func scanBudget(anchor, rangeEnd time.Time, freq Freq, interval int) int {
 	if interval <= 0 {
 		interval = 1
 	}
@@ -445,16 +578,14 @@ func scanBudget(anchor, rangeEnd time.Time, freq Freq, interval int, perDay bool
 	days := int(rangeEnd.Sub(anchor).Hours() / 24)
 
 	needed := 0
-	switch {
-	case perDay:
-		needed = days
-	case freq == FreqDaily:
+	switch freq {
+	case FreqDaily:
 		needed = days / interval
-	case freq == FreqWeekly:
+	case FreqWeekly:
 		needed = days / 7 / interval
-	case freq == FreqMonthly:
+	case FreqMonthly:
 		needed = monthsBetween(anchor, rangeEnd) / interval
-	case freq == FreqYearly:
+	case FreqYearly:
 		needed = monthsBetween(anchor, rangeEnd) / 12 / interval
 	}
 	// Two spare steps absorb the rounding in the estimate itself: a
@@ -530,21 +661,6 @@ func floorMod(a, b int) int { return a - floorDiv(a, b)*b }
 
 func daysInMonth(year int, month time.Month) int {
 	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
-}
-
-// startOfISOWeek returns local midnight on the Monday of t's week.
-func startOfISOWeek(t time.Time) time.Time {
-	offset := (int(t.Weekday()) + 6) % 7 // Monday = 0
-	y, m, d := t.Date()
-	return time.Date(y, m, d-offset, 0, 0, 0, 0, t.Location())
-}
-
-// isoWeekOffset counts whole weeks between the anchor's week and the
-// candidate's. Rounded because a DST transition makes the span between
-// two week starts a non-integral number of 24-hour blocks.
-func isoWeekOffset(candidate, anchorWeekStart time.Time) int {
-	delta := startOfISOWeek(candidate).Sub(anchorWeekStart)
-	return int(math.Round(delta.Hours() / (24 * 7)))
 }
 
 func matchesByDay(t time.Time, byDay []time.Weekday) bool {

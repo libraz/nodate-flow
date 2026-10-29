@@ -73,11 +73,22 @@ export interface Calendar {
   systemSlug?: string;
 }
 
+/**
+ * A stored recurrence rule in the canonical shape the
+ * `chk_calendar_events_recurrence_shape` CHECK enforces; the semantics are
+ * `sql/core/PROTOCOL.md` §Recurrence. Every list member is an array even
+ * with one item, and an absent member is omitted, never `null`.
+ */
 export interface RecurrenceRule {
   freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
   interval?: number;
-  byDay?: string[];
+  byDay?: Array<'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU'>;
   byMonthDay?: number[];
+  /** One position, 1..5 or -1, picking from the month's `byDay` matches. */
+  bySetPos?: number[];
+  /** First day of the week; absent means `MO`. */
+  wkst?: 'MO' | 'SU';
+  /** A `YYYY-MM-DD` date (through the end of that local day) or an RFC 3339 instant. */
   until?: string;
   count?: number;
 }

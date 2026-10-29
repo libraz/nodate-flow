@@ -222,13 +222,13 @@ function presetToMinutes(preset: NotificationPreset): number | null {
  * Translate a recurrence preset to a recurrence-rule payload. `'none'`
  * returns null so the caller omits the field.
  *
- * The emitted shape matches the canonical {@link RecurrenceRule} contract
- * shared with the recurrence expander (`@nodate-flow/ui/calendar`): `freq`
- * tokens are lowercase (`daily` / `weekly` / `monthly` / `yearly`) and
- * `byDay` weekday tokens are the lowercase two-letter forms the expander's
- * day map keys on (`mo` / `tu` / …). These are API enum values — not UI
- * copy — so they stay literal lowercase. The `@api` validator accepts the
- * same lowercase canonical set.
+ * The emitted shape is the canonical {@link RecurrenceRule} the
+ * `chk_calendar_events_recurrence_shape` CHECK stores: `freq` tokens are
+ * lowercase (`daily` / `weekly` / `monthly` / `yearly`) and `byDay` holds
+ * the uppercase two-letter codes (`MO` / `TU` / …). These are API enum
+ * values — not UI copy — so they stay literal. No preset carries an
+ * interval, so none needs `wkst`, and the default week start (`MO`) is
+ * the one written by omission.
  */
 export function presetToRRule(preset: RecurrencePreset, _startDate: string): RecurrenceRule | null {
   switch (preset) {
@@ -242,7 +242,7 @@ export function presetToRRule(preset: RecurrencePreset, _startDate: string): Rec
     case 'daily':
       return { freq: 'daily' };
     case 'weekdays':
-      return { freq: 'weekly', byDay: ['mo', 'tu', 'we', 'th', 'fr'] };
+      return { freq: 'weekly', byDay: ['MO', 'TU', 'WE', 'TH', 'FR'] };
     case 'weekly':
       return { freq: 'weekly' };
     case 'monthly':
@@ -276,8 +276,8 @@ export function rruleToPreset(rule: RecurrenceRule | null | undefined): Recurren
       return byDay.length === 0 ? 'daily' : 'custom';
     case 'weekly': {
       if (byDay.length === 0) return 'weekly';
-      const weekdays = ['mo', 'tu', 'we', 'th', 'fr'];
-      const normalized = [...byDay].map((d) => d.toLowerCase()).sort();
+      const weekdays = ['MO', 'TU', 'WE', 'TH', 'FR'];
+      const normalized = [...byDay].map((d) => d.toUpperCase()).sort();
       return normalized.join(',') === [...weekdays].sort().join(',') ? 'weekdays' : 'custom';
     }
     case 'monthly':

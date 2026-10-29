@@ -85,24 +85,103 @@ function occurrenceFromAnchor(
   }
 }
 
-function matchesByDay(dt: DateTime, byDay: string[]): boolean {
-  const isoWeekday = dt.weekday;
-  return byDay.some((d) => DAY_MAP[d.trim().toLowerCase()] === isoWeekday);
+/** ISO weekday numbers (Mon=1..Sun=7) for byDay tokens; unknown ones drop out. */
+function weekdayNumbers(tokens: readonly string[] | undefined): Set<number> {
+  const out = new Set<number>();
+  for (const token of tokens ?? []) {
+    const n = DAY_MAP[token.trim().toLowerCase()];
+    if (n !== undefined) out.add(n);
+  }
+  return out;
 }
 
-function matchesByMonthDay(dt: DateTime, byMonthDay: number[]): boolean {
-  return byMonthDay.includes(dt.day);
+/** A local day at the anchor's wall-clock time, in the anchor's zone. */
+function atAnchorClock(anchor: DateTime, day: DateTime): DateTime {
+  return DateTime.fromObject(
+    {
+      year: day.year,
+      month: day.month,
+      day: day.day,
+      hour: anchor.hour,
+      minute: anchor.minute,
+      second: anchor.second,
+      millisecond: anchor.millisecond,
+    },
+    { zone: anchor.zone },
+  );
 }
 
 /**
- * Number of whole ISO weeks (Monday start) between the anchor's week and the
- * candidate's week, in the event timezone. Used to decide whether a day
- * belongs to an "included" week of a WEEKLY;INTERVAL=n rule. Rounded because
- * a DST transition can make the wall-clock span between two week starts a
- * non-integral number of 7-day blocks.
+ * Pick 1-based positions from the start of `set`, or from its end when
+ * negative, returned in ascending order. A position the set does not have
+ * picks nothing.
  */
-function isoWeekOffset(candidate: DateTime, anchorWeekStart: DateTime): number {
-  return Math.round(candidate.startOf('week').diff(anchorWeekStart, 'weeks').weeks);
+function selectPositions(set: number[], positions: readonly number[]): number[] {
+  const picked = new Set<number>();
+  for (const pos of positions) {
+    const i = pos < 0 ? set.length + pos : pos - 1;
+    const day = pos === 0 ? undefined : set[i];
+    if (day !== undefined) picked.add(day);
+  }
+  return [...picked].sort((x, y) => x - y);
+}
+
+interface Period {
+  /** Never later than any candidate, so a period holding none still ends the scan. */
+  start: DateTime;
+  candidates: DateTime[];
+}
+
+/**
+ * The rule resolved against its anchor, stepped one period at a time —
+ * `offset` days, weeks, months or years from the anchor's own.
+ *
+ * RFC 5545 BYDAY expands a WEEKLY rule (each listed weekday of every
+ * included week, the week counted from `wkst`), and BYMONTHDAY or BYDAY
+ * expand a MONTHLY one, with BYSETPOS then picking from the month's set.
+ * A byMonthDay the month does not have is clamped to its last day. Every
+ * other combination narrows the single freq-stepped candidate instead.
+ */
+function periodStepper(rule: RecurrenceRule, anchor: DateTime): (offset: number) => Period {
+  const byDay = weekdayNumbers(rule.byDay);
+  const byMonthDay = (rule.byMonthDay ?? []).filter((d) => d >= 1 && d <= 31);
+  const bySetPos = rule.bySetPos ?? [];
+  const wkst = DAY_MAP[(rule.wkst ?? 'MO').toLowerCase()] ?? 1;
+  const weekStart = anchor.startOf('day').minus({ days: (anchor.weekday - wkst + 7) % 7 });
+  const matchesDay = (dt: DateTime) => byDay.size === 0 || byDay.has(dt.weekday);
+  const matchesMonthDay = (dt: DateTime) => byMonthDay.length === 0 || byMonthDay.includes(dt.day);
+
+  if (rule.freq === 'weekly' && byDay.size > 0) {
+    return (offset) => {
+      const start = weekStart.plus({ weeks: offset });
+      const candidates: DateTime[] = [];
+      for (let i = 0; i < 7; i++) {
+        const day = start.plus({ days: i });
+        if (matchesDay(day) && matchesMonthDay(day)) candidates.push(atAnchorClock(anchor, day));
+      }
+      return { start, candidates };
+    };
+  }
+
+  if (rule.freq === 'monthly' && (byMonthDay.length > 0 || byDay.size > 0)) {
+    return (offset) => {
+      const start = anchor.startOf('month').plus({ months: offset });
+      const last = start.daysInMonth ?? 31;
+      let days =
+        byMonthDay.length > 0
+          ? [...new Set(byMonthDay.map((d) => Math.min(d, last)))].sort((x, y) => x - y)
+          : Array.from({ length: last }, (_, i) => i + 1);
+      days = days.filter((d) => matchesDay(start.set({ day: d })));
+      if (bySetPos.length > 0) days = selectPositions(days, bySetPos);
+      return { start, candidates: days.map((d) => atAnchorClock(anchor, start.set({ day: d }))) };
+    };
+  }
+
+  return (offset) => {
+    const candidate = occurrenceFromAnchor(anchor, rule.freq, offset);
+    const passes = matchesDay(candidate) && matchesMonthDay(candidate);
+    return { start: candidate, candidates: passes ? [candidate] : [] };
+  };
 }
 
 interface RecurrenceExceptionSets {
@@ -227,38 +306,26 @@ export function expandRecurrence(
   const exceptions = buildRecurrenceExceptionSets(event.recurrenceExceptions, zone);
   const overridden = buildRecurrenceExceptionSets(event.overriddenStarts, zone);
 
-  const byDay = rule.byDay && rule.byDay.length > 0 ? rule.byDay : null;
-  const byMonthDay = rule.byMonthDay && rule.byMonthDay.length > 0 ? rule.byMonthDay : null;
-
-  // RFC 5545 BYDAY *expands* a WEEKLY rule: WEEKLY;BYDAY=MO,TU,WE,TH,FR
-  // yields one occurrence per listed weekday in every included week, not just
-  // the DTSTART weekday. That path scans day by day and keeps a day when its
-  // weekday is listed and its ISO-week offset from DTSTART is a multiple of
-  // the interval. For every other supported combination byDay/byMonthDay act
-  // as limits on the freq cursor.
-  const expandsWeekdays = rule.freq === 'weekly' && byDay !== null;
-  const anchorWeekStart = eventStart.startOf('week');
-
+  const step = periodStepper(rule, eventStart);
   const results: ExpandedInstance[] = [];
   let emitted = 0;
 
-  for (let n = 0; emitted < maxCount; n++) {
-    const candidate = expandsWeekdays
-      ? eventStart.plus({ days: n })
-      : occurrenceFromAnchor(eventStart, rule.freq, n * interval);
+  // The start is the first occurrence whether or not the rule would
+  // produce it (RFC 5545 DTSTART), and it counts; a rule candidate at or
+  // before it is not counted again. Negated comparisons so an invalid
+  // candidate or range still terminates.
+  scan: for (let n = 0; emitted < maxCount; n++) {
+    const period = step(n * interval);
+    const { start } = period;
+    if (!(start < rangeEnd)) break;
+    if (until && start > until) break;
+    const candidates = n === 0 ? [eventStart, ...period.candidates] : period.candidates;
 
-    // Negated comparison so an invalid candidate or range still terminates.
-    if (!(candidate < rangeEnd)) break;
-    if (until && candidate > until) break;
+    for (const [i, candidate] of candidates.entries()) {
+      if ((n > 0 || i > 0) && !(candidate > eventStart)) continue;
+      if (!(candidate < rangeEnd)) break scan;
+      if (until && candidate > until) break scan;
 
-    const passes = expandsWeekdays
-      ? matchesByDay(candidate, byDay) &&
-        isoWeekOffset(candidate, anchorWeekStart) % interval === 0 &&
-        (!byMonthDay || matchesByMonthDay(candidate, byMonthDay))
-      : (!byDay || matchesByDay(candidate, byDay)) &&
-        (!byMonthDay || matchesByMonthDay(candidate, byMonthDay));
-
-    if (passes) {
       // A cancelled occurrence still counts against COUNT: the series is
       // "ten meetings", and cancelling one does not conjure an eleventh at
       // the end. A replaced one counts for the stronger reason that it
@@ -281,6 +348,7 @@ export function expandRecurrence(
           results.push({ startAt: candidate, endAt: instanceEnd });
         }
       }
+      if (emitted >= maxCount) break scan;
     }
   }
 

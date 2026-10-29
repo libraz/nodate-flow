@@ -994,10 +994,10 @@ describe('presetToRRule', () => {
     expect(presetToRRule('yearly', '2030-06-15')).toEqual({ freq: 'yearly' });
   });
 
-  it('emits lowercase weekday byDay tokens for the weekdays preset', () => {
+  it('emits the uppercase weekday codes the shape CHECK stores for the weekdays preset', () => {
     expect(presetToRRule('weekdays', '2030-06-15')).toEqual({
       freq: 'weekly',
-      byDay: ['mo', 'tu', 'we', 'th', 'fr'],
+      byDay: ['MO', 'TU', 'WE', 'TH', 'FR'],
     });
   });
 
@@ -1037,8 +1037,9 @@ describe('rruleToPreset', () => {
     expect(rruleToPreset({ freq: 'daily', count: 10 })).toBe('custom');
     expect(rruleToPreset({ freq: 'daily', until: '2030-12-31' })).toBe('custom');
     expect(rruleToPreset({ freq: 'monthly', byMonthDay: [1, 15] })).toBe('custom');
-    expect(rruleToPreset({ freq: 'weekly', byDay: ['mo', 'we'] })).toBe('custom');
-    expect(rruleToPreset({ freq: 'daily', byDay: ['mo'] })).toBe('custom');
+    expect(rruleToPreset({ freq: 'weekly', byDay: ['MO', 'WE'] })).toBe('custom');
+    expect(rruleToPreset({ freq: 'daily', byDay: ['MO'] })).toBe('custom');
+    expect(rruleToPreset({ freq: 'monthly', byDay: ['MO'], bySetPos: [2] })).toBe('custom');
   });
 
   it('never authors a rule for the value it uses to describe one', () => {
