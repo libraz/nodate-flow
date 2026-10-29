@@ -241,7 +241,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 		// The attendee list is part of the event, and one call adds
 		// several names, so the event is the row every operation in this
 		// file is recorded against; who was affected is in the payload.
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventAttendeeAdded,
 			AuditAction:  "calendar.attendee.add",
 			ResourceType: "calendar.event",
@@ -345,7 +345,7 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
 		}
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventAttendeeRemoved,
 			AuditAction:  "calendar.attendee.remove",
 			ResourceType: "calendar.event",
@@ -409,7 +409,7 @@ func UpdateRsvp(deps Deps) func(context.Context, *UpdateRsvpInput) (*UpdateRsvpO
 		out := &UpdateRsvpOutput{}
 		out.Body.Updated = true
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventRsvpUpdated,
 			AuditAction:  "calendar.attendee.rsvp_update",
 			ResourceType: "calendar.event",
@@ -493,7 +493,7 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 		// event's own updated kind. The audit action names it precisely,
 		// which is what an administrator asking who handed out edit
 		// rights filters on.
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventUpdated,
 			AuditAction:  "calendar.attendee.can_edit_update",
 			ResourceType: "calendar.event",

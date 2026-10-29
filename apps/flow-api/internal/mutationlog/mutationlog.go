@@ -41,6 +41,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
 
@@ -94,6 +95,10 @@ type Mutation struct {
 	// per-calendar activity feed reads. Nil for changes with no
 	// calendar subject.
 	CalendarID *int64
+	// SubjectPublicID is the public_id of the entity the event is about,
+	// stored in events.subject_public_id. Required for a kind whose
+	// registry entry names a subject table; the zero value stores NULL.
+	SubjectPublicID types.PublicID
 	// Payload describes what changed. It is stored as both the event
 	// payload and the audit metadata, deliberately: two descriptions of
 	// one change drift, and a reader comparing the tables then cannot
@@ -301,13 +306,14 @@ func (r *Recorder) event(a Actor, m Mutation) eventbus.Event {
 		actor = &v
 	}
 	return eventbus.Event{
-		Type:         m.EventType,
-		WorkspaceID:  a.WorkspaceID,
-		ActorUserID:  actor,
-		ActorAgentID: m.ActorAgentID,
-		TaskID:       m.TaskID,
-		CalendarID:   m.CalendarID,
-		Payload:      m.Payload,
+		Type:            m.EventType,
+		WorkspaceID:     a.WorkspaceID,
+		ActorUserID:     actor,
+		ActorAgentID:    m.ActorAgentID,
+		TaskID:          m.TaskID,
+		CalendarID:      m.CalendarID,
+		Payload:         m.Payload,
+		SubjectPublicID: m.SubjectPublicID,
 	}
 }
 

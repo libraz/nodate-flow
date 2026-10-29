@@ -153,17 +153,23 @@ func updateCalendarEventOccurrences(
 	// performs applies, and the write below is the whole change.
 	originalStart := handlerutil.UnixToTime(in.OccurrenceStart)
 	calID64 := int64(calendarID)
+	eventTitle := evt.Title
+	if in.Title != nil {
+		eventTitle = *in.Title
+	}
 	// record commits the trail with the write, inside its transaction.
 	record := func(ctx context.Context, tx *dbretry.Tx, written types.PublicID) error {
 		rec := recorder(deps)
 		if err := rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.CalEventUpdated,
-			AuditAction:  "calendar.event.update",
-			ResourceType: "calendar.event",
-			ResourceID:   eventPub.String(),
-			CalendarID:   &calID64,
+			EventType:       eventbus.CalEventUpdated,
+			SubjectPublicID: eventPub,
+			AuditAction:     "calendar.event.update",
+			ResourceType:    "calendar.event",
+			ResourceID:      eventPub.String(),
+			CalendarID:      &calID64,
 			Payload: map[string]any{
 				"eventId":         eventPub.String(),
+				"title":           eventTitle,
 				"scope":           string(scope),
 				"occurrenceStart": in.OccurrenceStart,
 				"writtenEventId":  written.String(),
@@ -180,13 +186,15 @@ func updateCalendarEventOccurrences(
 		// that learns only of the truncation never hears of the continuing
 		// master.
 		return rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.CalEventCreated,
-			AuditAction:  "calendar.event.create",
-			ResourceType: "calendar.event",
-			ResourceID:   written.String(),
-			CalendarID:   &calID64,
+			EventType:       eventbus.CalEventCreated,
+			SubjectPublicID: written,
+			AuditAction:     "calendar.event.create",
+			ResourceType:    "calendar.event",
+			ResourceID:      written.String(),
+			CalendarID:      &calID64,
 			Payload: map[string]any{
 				"eventId":      written.String(),
+				"title":        eventTitle,
 				"splitFromId":  eventPub.String(),
 				"splitStartAt": in.OccurrenceStart,
 				"via":          "mcp",
@@ -237,13 +245,15 @@ func deleteCalendarEventOccurrences(
 	// for and what an administrator searches the log by.
 	record := func(ctx context.Context, tx *dbretry.Tx) error {
 		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.CalEventUpdated,
-			AuditAction:  "calendar.event.delete",
-			ResourceType: "calendar.event",
-			ResourceID:   eventPub.String(),
-			CalendarID:   &calID64,
+			EventType:       eventbus.CalEventUpdated,
+			SubjectPublicID: eventPub,
+			AuditAction:     "calendar.event.delete",
+			ResourceType:    "calendar.event",
+			ResourceID:      eventPub.String(),
+			CalendarID:      &calID64,
 			Payload: map[string]any{
 				"eventId":         eventPub.String(),
+				"title":           evt.Title,
 				"scope":           string(scope),
 				"occurrenceStart": occurrenceStart,
 				"via":             "mcp",

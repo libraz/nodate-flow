@@ -7,6 +7,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	generated "github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
@@ -149,6 +150,38 @@ func recordCalendarChange(
 ) {
 	m.CalendarID = calendarMutationCalendar(calendarID)
 	deps.Mutations.Record(ctx, calendarMutationActor(workspaceID, actorUserID), m)
+}
+
+// recordCalendarEventChange is [recordCalendarChange] for a change whose
+// event kind names calendar_events as its subject: the event itself and
+// everything hanging off it. The event's public_id and title are required
+// parameters because the registry (sql/core/event-kinds.yaml) makes both
+// part of the contract, and a call site that could omit either would
+// write a row readers cannot attribute. The title is stamped into the
+// payload here so no site spells it out.
+func recordCalendarEventChange(
+	ctx context.Context,
+	deps Deps,
+	workspaceID, calendarID, actorUserID uint32,
+	eventPublicID types.PublicID,
+	eventTitle string,
+	m mutationlog.Mutation,
+) {
+	m.SubjectPublicID = eventPublicID
+	if m.Payload == nil {
+		m.Payload = map[string]any{}
+	}
+	m.Payload["title"] = eventTitle
+	recordCalendarChange(ctx, deps, workspaceID, calendarID, actorUserID, m)
+}
+
+// addressedEventID is the public id of the event a request addressed. An
+// unparseable value yields the zero id, which the appender refuses for a
+// kind that names a subject, so a malformed id cannot reach the log as a
+// NULL.
+func addressedEventID(s string) types.PublicID {
+	id, _ := parsePublicID(s)
+	return id
 }
 
 // recordCalendarAudit is [recordCalendarChange] for something that has

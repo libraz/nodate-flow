@@ -122,7 +122,7 @@ func recordOccurrenceDelete(
 	master calendar.FindCalendarEventByPublicIdRow,
 	calID uint32,
 ) {
-	recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+	recordCalendarEventChange(ctx, deps, wsID, calID, actorID, addressedEventID(input.EvtID), master.Title, mutationlog.Mutation{
 		EventType:    eventbus.CalEventUpdated,
 		AuditAction:  "calendar.event.delete",
 		ResourceType: "calendar.event",

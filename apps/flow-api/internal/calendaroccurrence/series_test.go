@@ -184,3 +184,35 @@ func TestValidateOccurrenceReadsAllDaySeriesInUTC(t *testing.T) {
 		t.Error("the occurrence a bare-date exception cancels was accepted")
 	}
 }
+
+// Two rules that differ in the position within the period or in the week
+// start lay occurrences out differently, so an occurrence's position in
+// one names nothing in the other.
+func TestSamePatternSeesBySetPosAndWkst(t *testing.T) {
+	t.Parallel()
+
+	rule := func(raw string) *recurrence.Rule {
+		t.Helper()
+		r, err := recurrence.ParseRule([]byte(raw))
+		if err != nil || r == nil {
+			t.Fatalf("parse %s: %v", raw, err)
+		}
+		return r
+	}
+	cases := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"same", `{"freq":"monthly","byDay":["FR"],"bySetPos":[-1]}`, `{"freq":"monthly","byDay":["FR"],"bySetPos":[-1]}`, true},
+		{"set position differs", `{"freq":"monthly","byDay":["FR"],"bySetPos":[-1]}`, `{"freq":"monthly","byDay":["FR"],"bySetPos":[1]}`, false},
+		{"set position dropped", `{"freq":"monthly","byDay":["FR"],"bySetPos":[1]}`, `{"freq":"monthly","byDay":["FR"]}`, false},
+		{"week start differs", `{"freq":"weekly","interval":2,"byDay":["TU","SU"],"wkst":"MO"}`, `{"freq":"weekly","interval":2,"byDay":["TU","SU"],"wkst":"SU"}`, false},
+		{"unset week start is Monday", `{"freq":"weekly","byDay":["TU"]}`, `{"freq":"weekly","byDay":["TU"],"wkst":"MO"}`, true},
+	}
+	for _, tc := range cases {
+		if got := samePattern(rule(tc.a), rule(tc.b)); got != tc.want {
+			t.Errorf("%s: samePattern = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

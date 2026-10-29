@@ -180,7 +180,7 @@ func CreateChecklistItem(deps Deps) func(context.Context, *CreateChecklistItemIn
 			CreatedAt:  handlerutil.NowUnix(),
 		}
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventChecklistCreated,
 			AuditAction:  "calendar.checklist.create",
 			ResourceType: "calendar.checklist",
@@ -242,7 +242,7 @@ func UpdateChecklistItem(deps Deps) func(context.Context, *UpdateChecklistItemIn
 			return nil, httpErr(apierrors.CalendarChecklistStoreWriteInterrupted)
 		}
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventChecklistUpdated,
 			AuditAction:  "calendar.checklist.update",
 			ResourceType: "calendar.checklist",
@@ -302,7 +302,7 @@ func DeleteChecklistItem(deps Deps) func(context.Context, *DeleteChecklistItemIn
 		out := &DeleteChecklistItemOutput{}
 		out.Body.Deleted = true
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventChecklistDeleted,
 			AuditAction:  "calendar.checklist.delete",
 			ResourceType: "calendar.checklist",

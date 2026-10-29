@@ -1,6 +1,7 @@
 package eventbus
 
 import (
+	"errors"
 	"slices"
 	"strings"
 )
@@ -218,22 +219,14 @@ func FamilyOf(k Kind) (Family, bool) {
 
 // FamilyForEventType is [FamilyOf] for a value that has already left Go
 // — the `type` column, an SSE tap argument, a webhook payload — where
-// the kind is carried as a plain string.
+// the kind is carried as a plain string. A kind in the core registry
+// resolves to the family the registry gives it; any other kind falls
+// back to its longest family prefix.
 func FamilyForEventType(eventType string) (Family, bool) {
-	var (
-		best    Family
-		bestLen int
-		found   bool
-	)
-	for family, prefix := range familyPrefix {
-		if !strings.HasPrefix(eventType, prefix) {
-			continue
-		}
-		if len(prefix) > bestLen {
-			best, bestLen, found = family, len(prefix), true
-		}
+	if info, ok := coreKinds[eventType]; ok {
+		return info.Family, true
 	}
-	return best, found
+	return familyByPrefix(eventType)
 }
 
 // judgeOnlyKinds are the kinds only the signaljudge Applier may append
@@ -265,4 +258,107 @@ func JudgeOnlyKinds() []Kind {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// ErrSubjectRequired is returned by the appenders when a kind whose
+// registry entry names a subject table is appended without the subject's
+// public_id. The row would carry a NULL where every reader of the entity's
+// history expects an id.
+var ErrSubjectRequired = errors.New("eventbus: kind requires a subject public_id")
+
+// Tables a registry entry may name as the subject of its kind.
+const (
+	SubjectCalendarEvents = "calendar_events"
+	SubjectCalendarMemos  = "calendar_memos"
+)
+
+// KindInfo is one row of the core registry: the family a reader routes
+// the kind by and the table whose public_id the writer stores in
+// events.subject_public_id (empty means the column stays NULL).
+type KindInfo struct {
+	Family  Family
+	Subject string
+}
+
+// coreKinds mirrors sql/core/event-kinds.yaml. TestCoreRegistry reads the
+// yaml and fails when the two differ.
+//
+// The keys are plain strings because calendar.member.updated and
+// calendar.event.attendee.updated are registered for readers but not
+// emitted here, so they have no constant.
+var coreKinds = map[string]KindInfo{
+	"calendar.created":                  {FamilyCalendar, ""},
+	"calendar.updated":                  {FamilyCalendar, ""},
+	"calendar.deleted":                  {FamilyCalendar, ""},
+	"calendar.subscribed":               {FamilyCalendar, ""},
+	"calendar.subscription.updated":     {FamilyCalendar, ""},
+	"calendar.member.added":             {FamilyCalendar, ""},
+	"calendar.member.removed":           {FamilyCalendar, ""},
+	"calendar.member.role_changed":      {FamilyCalendar, ""},
+	"calendar.member.updated":           {FamilyCalendar, ""},
+	"calendar.event.created":            {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.updated":            {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.deleted":            {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.comment.created":    {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.comment.updated":    {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.comment.deleted":    {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.checklist.created":  {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.checklist.updated":  {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.checklist.deleted":  {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.attachment.created": {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.attachment.deleted": {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.attendee.added":     {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.attendee.removed":   {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.attendee.updated":   {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.rsvp.updated":       {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.invite.created":     {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.invite.rotated":     {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.invite.revoked":     {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.memo.created":             {FamilyCalendar, SubjectCalendarMemos},
+	"calendar.memo.updated":             {FamilyCalendar, SubjectCalendarMemos},
+	"calendar.memo.completed":           {FamilyCalendar, SubjectCalendarMemos},
+	"calendar.memo.deleted":             {FamilyCalendar, SubjectCalendarMemos},
+	"calendar.reminder":                 {FamilyCalendar, ""},
+	"workspace.member.added":            {FamilyWorkspaceMember, ""},
+	"workspace.member.removed":          {FamilyWorkspaceMember, ""},
+	"workspace.member.role_changed":     {FamilyWorkspaceMember, ""},
+}
+
+// CoreKindInfo returns the registry row for k; the second result is false
+// for a kind outside the core registry (a product-layer kind).
+func CoreKindInfo(k Kind) (KindInfo, bool) {
+	info, ok := coreKinds[string(k)]
+	return info, ok
+}
+
+// SubjectOf returns the table whose public_id the writer of k must put in
+// events.subject_public_id, or "" when the column stays NULL.
+func SubjectOf(k Kind) string { return coreKinds[string(k)].Subject }
+
+// CoreKindNames returns every registered kind string, unsorted.
+func CoreKindNames() []string {
+	out := make([]string, 0, len(coreKinds))
+	for k := range coreKinds {
+		out = append(out, k)
+	}
+	return out
+}
+
+// familyByPrefix is the fallback for kinds outside the registry, such as
+// the runtime-built task.transition.<name> and kinds a product layer adds.
+func familyByPrefix(eventType string) (Family, bool) {
+	var (
+		best    Family
+		bestLen int
+		found   bool
+	)
+	for family, prefix := range familyPrefix {
+		if !strings.HasPrefix(eventType, prefix) {
+			continue
+		}
+		if len(prefix) > bestLen {
+			best, bestLen, found = family, len(prefix), true
+		}
+	}
+	return best, found
 }

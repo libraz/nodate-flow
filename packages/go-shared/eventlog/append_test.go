@@ -61,8 +61,8 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if !strings.Contains(got.query, "INSERT INTO events") {
 		t.Fatalf("query = %q, want an INSERT INTO events", got.query)
 	}
-	if len(got.args) != 7 {
-		t.Fatalf("arg count = %d, want 7", len(got.args))
+	if len(got.args) != 8 {
+		t.Fatalf("arg count = %d, want 8", len(got.args))
 	}
 	if got.args[0] != driver.Value(pubID) {
 		t.Errorf("public_id arg = %v, want the returned %v", got.args[0], pubID)
@@ -76,18 +76,21 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if got.args[3] != driver.Value(actor) {
 		t.Errorf("actor_user_id arg = %v, want %d", got.args[3], actor)
 	}
-	if got.args[4] != driver.Value(string(eventbus.ItemScheduled)) {
-		t.Errorf("type arg = %v, want item.scheduled", got.args[4])
+	if got.args[4] != nil {
+		t.Errorf("subject_public_id arg = %v, want NULL for a kind with no subject", got.args[4])
 	}
-	raw, ok := got.args[5].(json.RawMessage)
+	if got.args[5] != driver.Value(string(eventbus.ItemScheduled)) {
+		t.Errorf("type arg = %v, want item.scheduled", got.args[5])
+	}
+	raw, ok := got.args[6].(json.RawMessage)
 	if !ok {
-		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[5])
+		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[6])
 	}
 	if string(raw) != `{"note":"hello"}` {
 		t.Errorf("payload arg = %s, want the marshalled payload", raw)
 	}
-	if got.args[6] != driver.Value(occurred) {
-		t.Errorf("occurred_at arg = %v, want %v", got.args[6], occurred)
+	if got.args[7] != driver.Value(occurred) {
+		t.Errorf("occurred_at arg = %v, want %v", got.args[7], occurred)
 	}
 }
 
@@ -104,9 +107,9 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	after := time.Now().UTC()
 
 	args := rec.statements()[0].args
-	raw, ok := args[5].(json.RawMessage)
+	raw, ok := args[6].(json.RawMessage)
 	if !ok || string(raw) != "{}" {
-		t.Errorf("payload arg = %v, want {}", args[5])
+		t.Errorf("payload arg = %v, want {}", args[6])
 	}
 	if args[2] != nil {
 		t.Errorf("task_id arg = %v, want NULL for an event with no task", args[2])
@@ -114,7 +117,7 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	if args[3] != nil {
 		t.Errorf("actor_user_id arg = %v, want NULL for a system event", args[3])
 	}
-	occurred, ok := args[6].(time.Time)
+	occurred, ok := args[7].(time.Time)
 	if !ok {
 		t.Fatalf("occurred_at arg is %T, want time.Time", args[6])
 	}
@@ -609,4 +612,31 @@ func stubDB(t *testing.T) (*sql.DB, *recorder) {
 		openMu.Unlock()
 	})
 	return db, rec
+}
+
+// TestAppendWritesTheSubject pins that an explicit subject reaches
+// events.subject_public_id, and that a kind whose registry entry names a
+// subject table is refused without one.
+func TestAppendWritesTheSubject(t *testing.T) {
+	db, rec := stubDB(t)
+
+	subject := dbtype.New()
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:            eventbus.CalEventCreated,
+		WorkspaceID:     1,
+		SubjectPublicID: subject,
+	}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if got := rec.statements()[0].args[4]; got != driver.Value(subject) {
+		t.Errorf("subject_public_id arg = %v, want %v", got, subject)
+	}
+
+	_, err := Append(context.Background(), dbretry.AutoCommit(db), Event{Type: eventbus.CalMemoCreated, WorkspaceID: 1})
+	if !errors.Is(err, eventbus.ErrSubjectRequired) {
+		t.Fatalf("append without a subject: err = %v, want ErrSubjectRequired", err)
+	}
+	if n := len(rec.statements()); n != 1 {
+		t.Errorf("statement count = %d, want the refused append to write nothing", n)
+	}
 }

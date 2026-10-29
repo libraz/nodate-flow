@@ -38,6 +38,10 @@ import (
 // onto their "already reversed" answer rather than an internal error.
 var ErrAlreadyReversed = errors.New("eventbus: event already reversed")
 
+// ErrSubjectRequired is returned when a kind whose registry entry names a
+// subject table is appended without the subject's public_id.
+var ErrSubjectRequired = sharedbus.ErrSubjectRequired
+
 // validateActors enforces the three-way actor exclusion rule documented on
 // [Event] and `sql/core/tables/events.sql`. At most one of ActorUserID,
 // ActorAgentID, ActorSystemSource may be set per call; zero is allowed and
@@ -160,6 +164,11 @@ type Event struct {
 	// for normal (non-reversal) callers — every other writer leaves
 	// this unset.
 	ReversesEventID *int64
+	// SubjectPublicID is the public_id of the entity the event is about,
+	// written to events.subject_public_id. The zero value stores NULL.
+	// A kind whose registry entry names a subject table must carry one
+	// ([ErrSubjectRequired] otherwise); it is never derived from Payload.
+	SubjectPublicID types.PublicID
 	// Payload is an arbitrary JSON-encodable value stored in payload_json.
 	Payload any
 }
@@ -515,6 +524,13 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 		)
 		return fail(err)
 	}
+	if sharedbus.SubjectOf(evt.Type) != "" && evt.SubjectPublicID == (types.PublicID{}) {
+		slog.ErrorContext(ctx, "eventbus: kind requires a subject public_id",
+			"type", evt.Type,
+			"workspace_id", evt.WorkspaceID,
+		)
+		return fail(fmt.Errorf("eventbus: append %s: %w", evt.Type, ErrSubjectRequired))
+	}
 	// Internal ids must not reach the payload. The rail lives on the
 	// append path, shared with eventlog.Append, because a payload map is
 	// assembled at runtime and only the finished value says what will be
@@ -554,19 +570,15 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 	if evt.ReversesEventID != nil {
 		reversesID = sql.NullInt64{Int64: *evt.ReversesEventID, Valid: true}
 	}
+	var subjectID *types.PublicID
+	if evt.SubjectPublicID != (types.PublicID{}) {
+		subjectID = &evt.SubjectPublicID
+	}
 	now := time.Now().UTC()
 	pubID := types.New()
-	// Branch on actor kind. The three INSERTs map 1:1 onto the three
-	// actor sources documented on [Event] and `sql/core/tables/events.sql`:
-	//   ActorAgentID set -> AppendAgentEvent (binds actor_agent_id,
-	//                       carries triggered_by_signal_id for Applier
-	//                       writes — ADR 0008 D4)
-	//   otherwise        -> AppendEvent (binds actor_user_id +
-	//                       actor_system_source, the latter being the
-	//                       worker-tick path per ADR 0008 D8)
-	// validateActors above has already rejected any row that set more
-	// than one source, so the branch is decidable without further
-	// guards.
+	// ActorAgentID set -> AppendAgentEvent; otherwise AppendEvent, which
+	// binds actor_user_id and actor_system_source. validateActors above has
+	// already rejected any row that set more than one source.
 	var insert func(ctx context.Context) error
 	var lastID int64
 	if evt.ActorAgentID != nil {
@@ -579,6 +591,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 			ActorAgentID:        agentID,
 			TriggeredBySignalID: signalID,
 			ReversesEventID:     reversesID,
+			SubjectPublicID:     subjectID,
 			Type:                string(evt.Type),
 			PayloadJson:         raw,
 			OccurredAt:          now,
@@ -609,6 +622,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 			ActorSystemSource:   sysSource,
 			TriggeredBySignalID: signalID,
 			ReversesEventID:     reversesID,
+			SubjectPublicID:     subjectID,
 			Type:                string(evt.Type),
 			PayloadJson:         raw,
 			OccurredAt:          now,

@@ -3136,7 +3136,7 @@ type Event struct {
 	// Internal FK to events.id. Non-NULL means this event is a compensating reverse of another event (e.g., user undoing an auto-completion). A projection reading the log cancels both events out. The log is immutable: a reversal is a new row, never an UPDATE or DELETE of the original.
 	ReversesEventID sql.NullInt64 `json:"-"`
 	// public_id of the entity this event is about, so one entity history is an index range. Set for every kind whose event-kinds registry entry names a subject table, NULL for the rest. Written by the appender alongside the payload; never derived from it.
-	SubjectPublicID sql.NullString `json:"subjectPublicId"`
+	SubjectPublicID *types.PublicID `json:"subjectPublicId"`
 	// Event type (e.g., task.created, signal.attached, signal.judged)
 	Type string `json:"type"`
 	// Event payload

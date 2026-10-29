@@ -11,8 +11,9 @@ import (
 // calendarRecordGates are the two package adapters a handler records
 // through, keyed by the name a call site writes.
 var calendarRecordGates = map[string]bool{
-	"recordCalendarChange": true,
-	"recordCalendarAudit":  true,
+	"recordCalendarChange":      true,
+	"recordCalendarEventChange": true,
+	"recordCalendarAudit":       true,
 }
 
 // recordSite is one mutation literal handed to one of those adapters.
@@ -229,7 +230,7 @@ func TestAttachmentConfirmRecordsTheMeasuredSizeWithoutASecondTimelineRow(t *tes
 	// attachment is gone — so it stays on the timeline and must not be
 	// folded into the record above.
 	rejected := siteFor(t, sites, "calendar.attachment.delete")
-	if rejected.gate != "recordCalendarChange" {
+	if rejected.gate != "recordCalendarEventChange" {
 		t.Errorf("line %d: the oversize rejection deletes the attachment, so it belongs on the timeline", rejected.line)
 	}
 	if !rejected.fields["EventType"] {
@@ -246,7 +247,7 @@ func TestTheAttachmentEventIsAppendedWhenTheRowIsCreated(t *testing.T) {
 
 	sites := recordSitesIn(t, "attachments.go", "PresignAttachment")
 	created := siteFor(t, sites, "calendar.attachment.create")
-	if created.gate != "recordCalendarChange" {
+	if created.gate != "recordCalendarEventChange" {
 		t.Fatalf("line %d: the attachment reaches the timeline through %s", created.line, created.gate)
 	}
 	if got := created.strings["EventType"]; got != "" {

@@ -305,7 +305,7 @@ func CreateEventInvite(deps Deps) func(context.Context, *CreateEventInviteInput)
 			eventType = eventbus.CalEventInviteRotated
 			auditAction = "calendar.invite.rotate"
 		}
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventType,
 			AuditAction:  auditAction,
 			ResourceType: "calendar.invite",
@@ -603,7 +603,7 @@ func RevokeEventInvite(deps Deps) func(context.Context, *RevokeEventInviteInput)
 		if err := deps.CalendarQueries.DisableCalendarEventInvite(ctx, invite.ID); err != nil {
 			return nil, httpErr(apierrors.CalendarInviteStoreRevokeInterrupted)
 		}
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventInviteRevoked,
 			AuditAction:  "calendar.invite.revoke",
 			ResourceType: "calendar.invite",

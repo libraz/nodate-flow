@@ -177,10 +177,11 @@ func CreateMemo(deps Deps) func(context.Context, *CreateMemoInput) (*CreateMemoO
 		}
 
 		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
-			EventType:    eventbus.CalMemoCreated,
-			AuditAction:  "calendar.memo.create",
-			ResourceType: "calendar.memo",
-			ResourceID:   memoPublicID.String(),
+			EventType:       eventbus.CalMemoCreated,
+			SubjectPublicID: memoPublicID,
+			AuditAction:     "calendar.memo.create",
+			ResourceType:    "calendar.memo",
+			ResourceID:      memoPublicID.String(),
 			Payload: map[string]any{
 				"memoId":     memoPublicID.String(),
 				"calendarId": input.CalID,
@@ -249,10 +250,11 @@ func UpdateMemo(deps Deps) func(context.Context, *UpdateMemoInput) (*UpdateMemoO
 		out.Body.Updated = true
 
 		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
-			EventType:    eventbus.CalMemoUpdated,
-			AuditAction:  "calendar.memo.update",
-			ResourceType: "calendar.memo",
-			ResourceID:   input.MemoID,
+			EventType:       eventbus.CalMemoUpdated,
+			SubjectPublicID: types.FromUUID(memoUID),
+			AuditAction:     "calendar.memo.update",
+			ResourceType:    "calendar.memo",
+			ResourceID:      input.MemoID,
 			Payload: map[string]any{
 				"memoId":     input.MemoID,
 				"calendarId": input.CalID,
@@ -308,10 +310,11 @@ func DeleteMemo(deps Deps) func(context.Context, *DeleteMemoInput) (*DeleteMemoO
 		out.Body.Deleted = true
 
 		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
-			EventType:    eventbus.CalMemoDeleted,
-			AuditAction:  "calendar.memo.delete",
-			ResourceType: "calendar.memo",
-			ResourceID:   input.MemoID,
+			EventType:       eventbus.CalMemoDeleted,
+			SubjectPublicID: types.FromUUID(memoUID),
+			AuditAction:     "calendar.memo.delete",
+			ResourceType:    "calendar.memo",
+			ResourceID:      input.MemoID,
 			Payload: map[string]any{
 				"memoId":     input.MemoID,
 				"calendarId": input.CalID,

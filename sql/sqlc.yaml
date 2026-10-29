@@ -64,6 +64,16 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # events.subject_public_id: BINARY(16) and nullable, so a NullString would
+          # truncate the 36-char text form into the column; the pointer keeps NULL
+          # for a kind with no subject.
+          - column: "*.subject_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
           - column: "*.user_public_id"
             go_type:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -430,6 +440,16 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # events.subject_public_id: BINARY(16) and nullable, so a NullString would
+          # truncate the 36-char text form into the column; the pointer keeps NULL
+          # for a kind with no subject.
+          - column: "*.subject_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
           - column: "*.user_public_id"
             go_type:
               import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -665,6 +685,16 @@ sql:
               import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
               package: "types"
               type: "PublicID"
+          # events.subject_public_id: BINARY(16) and nullable, so a NullString would
+          # truncate the 36-char text form into the column; the pointer keeps NULL
+          # for a kind with no subject.
+          - column: "*.subject_public_id"
+            nullable: true
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+              pointer: true
           - column: "*.user_public_id"
             go_type:
               import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"

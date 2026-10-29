@@ -188,7 +188,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 		}
 		out.Body.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCommentCreated,
 			AuditAction:  "calendar.comment.create",
 			ResourceType: "calendar.comment",
@@ -241,7 +241,7 @@ func EditComment(deps Deps) func(context.Context, *EditCommentInput) (*EditComme
 			return nil, httpErr(apierrors.CalendarCommentStoreWriteInterrupted)
 		}
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCommentUpdated,
 			AuditAction:  "calendar.comment.update",
 			ResourceType: "calendar.comment",
@@ -316,7 +316,7 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteCommentInput) (*Delet
 		out := &DeleteCommentOutput{}
 		out.Body.Deleted = true
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCommentDeleted,
 			AuditAction:  "calendar.comment.delete",
 			ResourceType: "calendar.comment",

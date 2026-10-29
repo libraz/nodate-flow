@@ -15,12 +15,13 @@ import (
 // omit, and hand the rest through as a literal, which is what
 // [TestCalendarMutationLiteralsNameTheWholeChange] reads.
 var mutationLogGates = map[string]bool{
-	"Record":               true,
-	"RecordStrict":         true,
-	"RecordInTx":           true,
-	"RecordTxAudit":        true,
-	"recordCalendarChange": true,
-	"recordCalendarAudit":  true,
+	"Record":                    true,
+	"RecordStrict":              true,
+	"RecordInTx":                true,
+	"RecordTxAudit":             true,
+	"recordCalendarChange":      true,
+	"recordCalendarEventChange": true,
+	"recordCalendarAudit":       true,
 }
 
 // eventOwnedElsewhereGates are the gates that write only the audit row

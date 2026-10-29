@@ -139,7 +139,8 @@ type Querier interface {
 	//
 	// `calendar_id` mirrors AppendEvent: an agent acting on a calendar
 	// through the MCP calendar tools produces a row that has to land in the
-	// same per-calendar feed a human action would.
+	// same per-calendar feed a human action would. `subject_public_id` mirrors
+	// AppendEvent.
 	AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error)
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
@@ -172,6 +173,10 @@ type Querier interface {
 	// would drift from it. NULL for events with no calendar subject. Every
 	// event emitted from the calendar handlers binds it; see
 	// internal/http/handlers/calendars/deps.go.
+	//
+	// `subject_public_id` is the public_id of the entity the event is about,
+	// written by the caller for every kind whose registry entry
+	// (sql/core/event-kinds.yaml) names a subject table; NULL otherwise.
 	AppendEvent(ctx context.Context, arg AppendEventParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.
 	AppendInstanceAuditLog(ctx context.Context, arg AppendInstanceAuditLogParams) (int64, error)

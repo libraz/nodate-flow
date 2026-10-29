@@ -366,7 +366,7 @@ func recordOccurrencePatch(
 		"occurrenceStart": *input.Body.OccurrenceStart,
 		"writtenEventId":  written.PublicID.String(),
 	}
-	recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+	recordCalendarEventChange(ctx, deps, wsID, calID, actorID, addressedEventID(input.EvtID), written.Title, mutationlog.Mutation{
 		EventType:    eventbus.CalEventUpdated,
 		AuditAction:  "calendar.event.update",
 		ResourceType: "calendar.event",
@@ -377,7 +377,7 @@ func recordOccurrencePatch(
 	// A split also brings a series into existence, and a subscriber that
 	// learns only of the truncation never hears of the continuing master.
 	if scope == scopeThisAndFollowing {
-		recordCalendarChange(ctx, deps, wsID, calID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, calID, actorID, written.PublicID, written.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCreated,
 			AuditAction:  "calendar.event.create",
 			ResourceType: "calendar.event",

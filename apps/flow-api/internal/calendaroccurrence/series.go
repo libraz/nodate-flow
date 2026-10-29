@@ -1134,7 +1134,16 @@ func samePattern(a, b *recurrence.Rule) bool {
 	if a == nil || b == nil || a.Freq != b.Freq || intervalOf(a) != intervalOf(b) {
 		return false
 	}
-	return sameStrings(a.ByDay, b.ByDay) && sameInts(a.ByMonthDay, b.ByMonthDay)
+	return sameStrings(a.ByDay, b.ByDay) && sameInts(a.ByMonthDay, b.ByMonthDay) &&
+		sameInts(a.BySetPos, b.BySetPos) && wkstOf(a) == wkstOf(b)
+}
+
+// wkstOf is the week start a rule expands with; an unset one is Monday.
+func wkstOf(r *recurrence.Rule) string {
+	if r.Wkst == "" {
+		return "MO"
+	}
+	return r.Wkst
 }
 
 func intervalOf(r *recurrence.Rule) int {

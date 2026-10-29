@@ -130,7 +130,7 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 		// The oversize path deletes the attachment, so it is recorded
 		// under the same action as an explicit delete; the reason is what
 		// tells the two apart.
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventAttachmentDeleted,
 			AuditAction:  "calendar.attachment.delete",
 			ResourceType: "calendar.attachment",

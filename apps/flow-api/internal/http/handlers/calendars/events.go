@@ -565,7 +565,7 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			payload["startAt"] = startAtNT.Time
 			payload["endAt"] = endAtNT.Time
 		}
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, created.PublicID, created.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCreated,
 			AuditAction:  "calendar.event.create",
 			ResourceType: "calendar.event",
@@ -1101,7 +1101,7 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			// An unlinked event has no itemkit write behind it, so the
 			// existing kind is emitted here to keep webhook subscribers
 			// working.
-			recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+			recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, updated.PublicID, updated.Title, mutationlog.Mutation{
 				EventType:    eventbus.CalEventUpdated,
 				AuditAction:  "calendar.event.update",
 				ResourceType: "calendar.event",

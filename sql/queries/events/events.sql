@@ -28,6 +28,10 @@
 -- would drift from it. NULL for events with no calendar subject. Every
 -- event emitted from the calendar handlers binds it; see
 -- internal/http/handlers/calendars/deps.go.
+--
+-- `subject_public_id` is the public_id of the entity the event is about,
+-- written by the caller for every kind whose registry entry
+-- (sql/core/event-kinds.yaml) names a subject table; NULL otherwise.
 INSERT INTO events (
   public_id,
   workspace_id,
@@ -37,10 +41,11 @@ INSERT INTO events (
   actor_system_source,
   triggered_by_signal_id,
   reverses_event_id,
+  subject_public_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: AppendAgentEvent :execlastid
 -- Append a single agent-actor event to the append-only event log. Mirrors
@@ -63,7 +68,8 @@ INSERT INTO events (
 --
 -- `calendar_id` mirrors AppendEvent: an agent acting on a calendar
 -- through the MCP calendar tools produces a row that has to land in the
--- same per-calendar feed a human action would.
+-- same per-calendar feed a human action would. `subject_public_id` mirrors
+-- AppendEvent.
 INSERT INTO events (
   public_id,
   workspace_id,
@@ -72,10 +78,11 @@ INSERT INTO events (
   actor_agent_id,
   triggered_by_signal_id,
   reverses_event_id,
+  subject_public_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListTransitionEventsForReplay :many
 -- Ordered list of task.transition.* events for a single task,

@@ -290,16 +290,108 @@ func appendItemEvents(
 	if legacy == "" {
 		return nil
 	}
-	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-		Type:        legacy,
-		WorkspaceID: workspaceID,
-		ActorUserID: actorUserID,
-		TaskID:      taskID,
-		Payload:     payload,
-	}); err != nil {
-		return fmt.Errorf("itemkit: append legacy event: %w", err)
+	if eventbus.SubjectOf(legacy) == "" {
+		// A legacy kind about no calendar event (task.disabled).
+		if _, err := eventlog.Append(ctx, tx, eventlog.Event{
+			Type:        legacy,
+			WorkspaceID: workspaceID,
+			ActorUserID: actorUserID,
+			TaskID:      taskID,
+			Payload:     payload,
+		}); err != nil {
+			return fmt.Errorf("itemkit: append legacy event: %w", err)
+		}
+		return nil
+	}
+	subjects, err := legacyEventSubjects(ctx, tx, kind, workspaceID, taskID, payload)
+	if err != nil {
+		return fmt.Errorf("itemkit: resolve legacy event subjects: %w", err)
+	}
+	for _, subject := range subjects {
+		legacyPayload := make(map[string]any, len(payload)+2)
+		for k, v := range payload {
+			legacyPayload[k] = v
+		}
+		legacyPayload["eventId"] = subject.publicID.String()
+		legacyPayload["title"] = subject.title
+		if _, err := eventlog.Append(ctx, tx, eventlog.Event{
+			Type:            legacy,
+			WorkspaceID:     workspaceID,
+			ActorUserID:     actorUserID,
+			TaskID:          taskID,
+			Payload:         legacyPayload,
+			SubjectPublicID: subject.publicID,
+		}); err != nil {
+			return fmt.Errorf("itemkit: append legacy event: %w", err)
+		}
 	}
 	return nil
+}
+
+// legacySubject is a calendar event a legacy calendar.event.* row is about.
+type legacySubject struct {
+	publicID dbtype.PublicID
+	title    string
+}
+
+// legacyEventSubjects names the calendar events the legacy row dual-emitted
+// with an item.* kind is about, one subject per event. The caller's own
+// eventPublicId wins; a task-wide change resolves the task's linked events
+// instead: the live ones for a rename, the live due-role one for a
+// reschedule (the only event a task's due date moves), the ones just
+// disabled for an unschedule.
+func legacyEventSubjects(
+	ctx context.Context,
+	tx TX,
+	kind eventbus.Kind,
+	workspaceID uint32,
+	taskID *uint32,
+	payload map[string]any,
+) ([]legacySubject, error) {
+	var (
+		query string
+		args  []any
+	)
+	if pub, ok := payload["eventPublicId"].(string); ok {
+		id, err := dbtype.Parse(pub)
+		if err != nil {
+			return nil, fmt.Errorf("eventPublicId %q: %w", pub, err)
+		}
+		query = `SELECT public_id, title FROM calendar_events WHERE workspace_id = ? AND public_id = ?`
+		args = []any{workspaceID, id}
+	} else if taskID == nil {
+		return nil, nil
+	} else if kind == eventbus.ItemUnscheduled {
+		role, _ := payload["role"].(string)
+		query = `SELECT public_id, title FROM calendar_events
+		         WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = FALSE
+		           AND updated_at = (SELECT MAX(updated_at) FROM calendar_events
+		                             WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = FALSE)
+		         ORDER BY id`
+		args = []any{workspaceID, *taskID, role, workspaceID, *taskID, role}
+	} else if kind == eventbus.ItemRescheduled {
+		query = `SELECT public_id, title FROM calendar_events
+		         WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = TRUE ORDER BY id`
+		args = []any{workspaceID, *taskID, string(RoleDue)}
+	} else {
+		query = `SELECT public_id, title FROM calendar_events
+		         WHERE workspace_id = ? AND task_id = ? AND enabled = TRUE ORDER BY id`
+		args = []any{workspaceID, *taskID}
+	}
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []legacySubject
+	for rows.Next() {
+		var subject legacySubject
+		if err := rows.Scan(&subject.publicID, &subject.title); err != nil {
+			return nil, err
+		}
+		out = append(out, subject)
+	}
+	return out, rows.Err()
 }
 
 // legacyKindFor returns the legacy kind to dual-emit alongside a new

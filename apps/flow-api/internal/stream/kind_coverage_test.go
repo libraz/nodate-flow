@@ -96,3 +96,29 @@ func TestPublishedStreamKindsAreDeclared(t *testing.T) {
 		}
 	}
 }
+
+// TestStreamKindFollowsTheCoreRegistry proves a kind in the core registry
+// reaches the stream kind its registry family maps to, including the
+// registered kinds that flow-api never emits, and that a product-layer
+// kind outside the registry still routes by its namespace.
+func TestStreamKindFollowsTheCoreRegistry(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range eventbus.CoreKindNames() {
+		info, _ := eventbus.CoreKindInfo(eventbus.Kind(name))
+		want := streamKindForFamily[info.Family]
+		got, ok := KindForEventType(name)
+		if want == "" {
+			if ok {
+				t.Errorf("%s: published as %q, but its family %q is not published", name, got, info.Family)
+			}
+			continue
+		}
+		if !ok || got != want {
+			t.Errorf("%s: KindForEventType = %q, %v; want %q", name, got, ok, want)
+		}
+	}
+	if got, ok := KindForEventType("calendar.photo.created"); !ok || got != KindCalendarChanged {
+		t.Errorf("calendar.photo.created: KindForEventType = %q, %v; want the calendar kind by namespace", got, ok)
+	}
+}

@@ -3679,11 +3679,12 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			return err
 		}
 		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.CalEventCreated,
-			AuditAction:  "calendar.event.create",
-			ResourceType: "calendar.event",
-			ResourceID:   pub.String(),
-			CalendarID:   &calID64,
+			EventType:       eventbus.CalEventCreated,
+			SubjectPublicID: pub,
+			AuditAction:     "calendar.event.create",
+			ResourceType:    "calendar.event",
+			ResourceID:      pub.String(),
+			CalendarID:      &calID64,
 			Payload: map[string]any{
 				"eventId":    pub.String(),
 				"calendarId": in.CalendarID,
@@ -3955,6 +3956,10 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 
 	if !isLinked || (!titleChanged && !timeChanged) {
 		calID64 := int64(owner.CalendarID)
+		eventTitle := evt.Title
+		if in.Title != nil {
+			eventTitle = *in.Title
+		}
 		if err := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries); err != nil {
 				return err
@@ -3962,13 +3967,15 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			// This branch never reaches itemkit, so nothing else appends
 			// the event.
 			return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-				EventType:    eventbus.CalEventUpdated,
-				AuditAction:  "calendar.event.update",
-				ResourceType: "calendar.event",
-				ResourceID:   eventPub.String(),
-				CalendarID:   &calID64,
+				EventType:       eventbus.CalEventUpdated,
+				SubjectPublicID: eventPub,
+				AuditAction:     "calendar.event.update",
+				ResourceType:    "calendar.event",
+				ResourceID:      eventPub.String(),
+				CalendarID:      &calID64,
 				Payload: map[string]any{
 					"eventId": eventPub.String(),
+					"title":   eventTitle,
 					"via":     "mcp",
 				},
 				CallSite: "mcp.update_calendar_event",
@@ -4577,11 +4584,12 @@ func runToggleCalendarMemo(ctx context.Context, deps Deps, s *session, raw json.
 		// ticked off by an agent reads the same on the timeline as one
 		// ticked off in the web app.
 		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.CalMemoUpdated,
-			AuditAction:  "calendar.memo.update",
-			ResourceType: "calendar.memo",
-			ResourceID:   in.MemoID,
-			CalendarID:   &calID64,
+			EventType:       eventbus.CalMemoUpdated,
+			SubjectPublicID: memoPub,
+			AuditAction:     "calendar.memo.update",
+			ResourceType:    "calendar.memo",
+			ResourceID:      in.MemoID,
+			CalendarID:      &calID64,
 			Payload: map[string]any{
 				"memoId":     in.MemoID,
 				"calendarId": in.CalendarID,

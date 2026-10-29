@@ -23,10 +23,11 @@ INSERT INTO events (
   actor_agent_id,
   triggered_by_signal_id,
   reverses_event_id,
+  subject_public_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AppendAgentEventParams struct {
@@ -37,6 +38,7 @@ type AppendAgentEventParams struct {
 	ActorAgentID        sql.NullInt32   `json:"-"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
 	ReversesEventID     sql.NullInt64   `json:"-"`
+	SubjectPublicID     *types.PublicID `json:"subjectPublicId"`
 	Type                string          `json:"type"`
 	PayloadJson         json.RawMessage `json:"payloadJson"`
 	OccurredAt          time.Time       `json:"occurredAt"`
@@ -62,7 +64,8 @@ type AppendAgentEventParams struct {
 //
 // `calendar_id` mirrors AppendEvent: an agent acting on a calendar
 // through the MCP calendar tools produces a row that has to land in the
-// same per-calendar feed a human action would.
+// same per-calendar feed a human action would. `subject_public_id` mirrors
+// AppendEvent.
 func (q *Queries) AppendAgentEvent(ctx context.Context, arg AppendAgentEventParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, appendAgentEvent,
 		arg.PublicID,
@@ -72,6 +75,7 @@ func (q *Queries) AppendAgentEvent(ctx context.Context, arg AppendAgentEventPara
 		arg.ActorAgentID,
 		arg.TriggeredBySignalID,
 		arg.ReversesEventID,
+		arg.SubjectPublicID,
 		arg.Type,
 		arg.PayloadJson,
 		arg.OccurredAt,
@@ -92,10 +96,11 @@ INSERT INTO events (
   actor_system_source,
   triggered_by_signal_id,
   reverses_event_id,
+  subject_public_id,
   type,
   payload_json,
   occurred_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type AppendEventParams struct {
@@ -107,6 +112,7 @@ type AppendEventParams struct {
 	ActorSystemSource   sql.NullString  `json:"actorSystemSource"`
 	TriggeredBySignalID sql.NullInt32   `json:"-"`
 	ReversesEventID     sql.NullInt64   `json:"-"`
+	SubjectPublicID     *types.PublicID `json:"subjectPublicId"`
 	Type                string          `json:"type"`
 	PayloadJson         json.RawMessage `json:"payloadJson"`
 	OccurredAt          time.Time       `json:"occurredAt"`
@@ -141,6 +147,10 @@ type AppendEventParams struct {
 // would drift from it. NULL for events with no calendar subject. Every
 // event emitted from the calendar handlers binds it; see
 // internal/http/handlers/calendars/deps.go.
+//
+// `subject_public_id` is the public_id of the entity the event is about,
+// written by the caller for every kind whose registry entry
+// (sql/core/event-kinds.yaml) names a subject table; NULL otherwise.
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, appendEvent,
 		arg.PublicID,
@@ -151,6 +161,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (int64
 		arg.ActorSystemSource,
 		arg.TriggeredBySignalID,
 		arg.ReversesEventID,
+		arg.SubjectPublicID,
 		arg.Type,
 		arg.PayloadJson,
 		arg.OccurredAt,

@@ -397,7 +397,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 
 		// Presigning is a write: the attachment row is committed above,
 		// and the URL is only what lets the bytes follow it.
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventAttachmentCreated,
 			AuditAction:  "calendar.attachment.create",
 			ResourceType: "calendar.attachment",
@@ -605,7 +605,7 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteAttachmentInput) (
 		out := &DeleteAttachmentOutput{}
 		out.Body.Deleted = true
 
-		recordCalendarChange(ctx, deps, wsID, cal.ID, actorID, mutationlog.Mutation{
+		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventAttachmentDeleted,
 			AuditAction:  "calendar.attachment.delete",
 			ResourceType: "calendar.attachment",
