@@ -54,9 +54,13 @@ services:
     environment:
       MINIO_ROOT_USER: ${NF_S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${NF_S3_SECRET_KEY:-minioadmin}
+    # The store is reached only by the APIs; the browser gets blobs through
+    # flow-api's /blobs relay. Loopback binding exists only for host-run dev
+    # APIs. Do not widen it to make a blob load: a blob that will not load is
+    # an API or proxy problem.
     ports:
-      - "${NF_S3_PORT:-9000}:9000"
-      - "${NF_S3_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${NF_S3_PORT:-9000}:9000"
+      - "127.0.0.1:${NF_S3_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -162,6 +166,7 @@ services:
       # checked against each other rather than both relying on the default.
       NF_FLOW_METRICS_PORT: "9090"
       NF_FLOW_LOG_LEVEL: ${NF_FLOW_LOG_LEVEL:-info}
+      NF_FLOW_PUBLIC_URL: ${NF_FLOW_PUBLIC_URL:-http://localhost:${NF_API_PORT:-8080}}
       NF_DB_DSN: ${NF_DB_DSN:-nodate:nodatepw@tcp(mysql:3306)/nodate_flow?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27}
       NF_COOKIE_SECURE: "false"
       NF_REDIS_ADDR: ${NF_REDIS_ADDR:-redis:6379}
