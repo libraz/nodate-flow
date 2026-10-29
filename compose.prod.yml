@@ -168,7 +168,6 @@ services:
       NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY}
       NF_S3_BUCKET: ${NF_S3_BUCKET:-nodate}
       NF_S3_USE_SSL: "false"
-      NF_VERSION: ${NF_VERSION:-}
 
   api:
     build:
@@ -283,6 +282,7 @@ services:
       NF_FLOW_WORKER_SHUTDOWN_TIMEOUT: ${NF_FLOW_WORKER_SHUTDOWN_TIMEOUT:-30s}
       NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_ENDPOINT:-}
       NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+      NF_FLOW_VERSION: ${NF_FLOW_VERSION:-}
 
   # Opt in with `--profile presence-discord`. The bot token is optional here
   # so the file interpolates without it; the service refuses to start unset.
@@ -308,6 +308,7 @@ services:
       NF_PRESENCE_SHUTDOWN_TIMEOUT: ${NF_PRESENCE_SHUTDOWN_TIMEOUT:-10s}
       NF_OTEL_EXPORTER_OTLP_ENDPOINT: ${NF_OTEL_ENDPOINT:-}
       NF_OTEL_INSECURE: ${NF_OTEL_INSECURE:-true}
+      NF_FLOW_VERSION: ${NF_FLOW_VERSION:-}
 
 volumes:
   mysql_data:
