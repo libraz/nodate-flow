@@ -1,8 +1,9 @@
 .root {
   display: block;
   inline-size: 100%;
+  min-block-size: var(--nf-control-height);
   padding-inline: var(--nf-space-3);
-  padding-block: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
   border-radius: var(--nf-radius-sm);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-bg-elevated);
@@ -10,6 +11,9 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   line-height: var(--nf-leading-normal);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .root::placeholder {
@@ -22,7 +26,7 @@
 
 .root:focus-visible {
   outline: none;
-  border-color: var(--nf-color-accent);
+  border-color: var(--nf-color-focus-ring);
   box-shadow: var(--nf-shadow-focus);
 }
 
@@ -31,6 +35,9 @@
   cursor: not-allowed;
 }
 
-.invalid {
+/* Invalid holds through hover and focus; the ring alone marks focus. */
+.invalid,
+.invalid:hover:not(:disabled),
+.invalid:focus-visible {
   border-color: var(--nf-color-danger);
 }

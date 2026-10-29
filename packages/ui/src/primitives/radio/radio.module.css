@@ -1,12 +1,45 @@
+/*
+ * Drawn radio: same structure as Checkbox — the dot is `::before`, scaled
+ * in on selection; forced-colours mode gets the native control back.
+ */
 .root {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
   inline-size: var(--nf-space-4);
   block-size: var(--nf-space-4);
   margin: 0;
-  accent-color: var(--nf-color-accent);
   border: var(--nf-space-px) solid var(--nf-color-border-strong);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.root::before {
+  content: "";
+  inline-size: var(--nf-space-1-5);
+  block-size: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-fg-on-accent);
+  scale: 0;
+  transition: scale var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.root:hover:not(:disabled) {
+  border-color: var(--nf-color-accent);
+}
+
+.root:checked {
+  background: var(--nf-color-accent);
+  border-color: var(--nf-color-accent);
+}
+
+.root:checked::before {
+  scale: 1;
 }
 
 .root:focus-visible {
@@ -17,4 +50,14 @@
 .root:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .root {
+    appearance: auto;
+  }
+
+  .root::before {
+    content: none;
+  }
 }

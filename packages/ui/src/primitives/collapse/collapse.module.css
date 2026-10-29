@@ -1,0 +1,51 @@
+/*
+ * 0fr <-> 1fr row animation with a fade. The inner clips only while the
+ * animation runs, so a focus ring is never cut off at rest.
+ */
+
+.root {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.inner {
+  min-block-size: 0;
+}
+
+.root[data-state="closed"] {
+  pointer-events: none;
+  animation: collapse var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.root[data-state="closed"] > .inner {
+  overflow: hidden;
+}
+
+.root[data-state="open"]:not([data-skip-enter]) {
+  animation: expand var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.root[data-state="open"]:not([data-skip-enter]) > .inner {
+  animation: clip var(--nf-duration-base) linear;
+}
+
+@keyframes expand {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+@keyframes collapse {
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+@keyframes clip {
+  from,
+  to {
+    overflow: hidden;
+  }
+}

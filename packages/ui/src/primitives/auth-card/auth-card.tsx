@@ -5,6 +5,7 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
+import styles from './auth-card.module.css';
 
 export interface AuthCardProps {
   children: ReactNode;
@@ -33,6 +34,7 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
     >
       <div
         aria-hidden
+        className={styles.wordmark}
         style={{
           margin: 0,
           fontFamily: 'var(--nf-font-display)',
@@ -53,6 +55,7 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
         nodate-flow
       </div>
       <section
+        className={styles.panel}
         style={{
           inlineSize: `min(${maxWidth}, 100%)`,
           background: 'var(--nf-color-bg-elevated, var(--color-surface))',

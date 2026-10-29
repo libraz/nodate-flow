@@ -12,3 +12,27 @@
 .elevated {
   box-shadow: var(--nf-shadow-md);
 }
+
+/* Only a card that is itself a control lifts on hover; a static card
+   that moved would promise an action it does not have. */
+.root:is(a[href], button, [role="button"]) {
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.root:is(a[href], button, [role="button"]):hover {
+  border-color: var(--nf-color-border-strong);
+  box-shadow: var(--nf-shadow-md);
+}
+
+.elevated:is(a[href], button, [role="button"]):hover {
+  box-shadow: var(--nf-shadow-lg);
+}
+
+.root:is(a[href], button, [role="button"]):focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}

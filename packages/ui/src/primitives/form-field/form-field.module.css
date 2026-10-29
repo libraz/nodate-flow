@@ -22,7 +22,15 @@
   color: var(--nf-color-fg-muted);
 }
 
+/* An empty slot still takes a flex gap; cancel it so no error means no space. */
+.errorSlot:empty {
+  margin-block-start: calc(var(--nf-space-1) * -1);
+}
+
 .error {
+  display: block;
   font-size: var(--nf-text-xs);
   color: var(--nf-color-danger-fg);
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }

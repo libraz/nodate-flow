@@ -108,7 +108,7 @@ export interface ToggleChipGroupProps {
   /** Accessible label announced for the group (`role="group"`, `aria-label`). */
   label: string;
   /** Optional additional class name applied to the group wrapper. */
-  className?: string;
+  className?: string | undefined;
   /** Group children — typically one or more {@link ToggleChip} elements. */
   children: ReactNode;
 }

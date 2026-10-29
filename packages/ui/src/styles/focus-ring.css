@@ -22,6 +22,25 @@
  * default UA outline as a final fallback.
  */
 
+/*
+ * The ring fades in rather than snapping: at rest it is already drawn,
+ * transparent, at its final offset. Forced-colours mode would paint a
+ * transparent outline in a system colour, so it keeps the plain ring.
+ */
+@media (forced-colors: none) {
+  :where(.nf-focus-ring) {
+    outline: var(--nf-focus-ring-width) solid transparent;
+    outline-offset: var(--nf-focus-ring-offset);
+    transition: outline-color var(--nf-duration-fast) var(--nf-ease-out);
+  }
+
+  :where(.nf-focus-ring-inset) {
+    outline: var(--nf-focus-ring-width) solid transparent;
+    outline-offset: calc(var(--nf-focus-ring-offset) * -1);
+    transition: outline-color var(--nf-duration-fast) var(--nf-ease-out);
+  }
+}
+
 :where(.nf-focus-ring):focus-visible {
   outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
   outline-offset: var(--nf-focus-ring-offset);

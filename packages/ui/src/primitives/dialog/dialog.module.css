@@ -7,6 +7,12 @@
   justify-content: center;
   padding: var(--nf-space-4);
   z-index: var(--nf-z-modal);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .dialog {
@@ -20,6 +26,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-4);
+  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] .dialog {
+  animation: global(nf-scale-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .sizeSm {
@@ -54,6 +65,11 @@
     border-block-end: none;
     overflow-y: auto;
     padding-block-end: calc(var(--nf-space-6) + env(safe-area-inset-bottom));
+    animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+  }
+
+  .overlay[data-state="closed"] .dialogMobile {
+    animation: global(nf-slide-out-to-block-end) var(--nf-duration-fast) var(--nf-ease-in) forwards;
   }
 
   .overlayMobile {

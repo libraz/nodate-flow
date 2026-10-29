@@ -50,7 +50,32 @@ export type ButtonAsProps<E extends ElementType> = ButtonOwnProps & { as: E } & 
     keyof ButtonOwnProps | 'as'
   >;
 
-function classFor(variant: ButtonVariant, size: ButtonSize, className: string | undefined): string {
+export interface ButtonClassNameOptions {
+  /** Visual variant. Defaults to `"default"`. */
+  variant?: ButtonVariant | undefined;
+  /** Size scale. Defaults to `"md"`. */
+  size?: ButtonSize | undefined;
+  /** Extra classes appended after the button's own. */
+  className?: string | undefined;
+}
+
+/**
+ * The exact classes {@link Button} renders, for an element Button cannot
+ * be — typically a router link whose typed props `as` would erase. Style
+ * the link itself rather than nesting a button inside it.
+ *
+ * @example
+ * ```tsx
+ * <Link to="/projects/$id" params={{ id }} className={buttonClassName({ variant: 'primary' })}>
+ *   {t('projects.open')}
+ * </Link>
+ * ```
+ */
+export function buttonClassName({
+  variant = 'default',
+  size = 'md',
+  className,
+}: ButtonClassNameOptions = {}): string {
   return cx(
     styles.root,
     variant === 'primary' && styles.primary,
@@ -79,7 +104,7 @@ const Button = forwardRef<HTMLElement, ButtonProps & { as?: ElementType }>(
     return createElement(Component, {
       ref,
       type: buttonType,
-      className: classFor(variant, size, className),
+      className: buttonClassName({ variant, size, className }),
       ...rest,
     });
   },

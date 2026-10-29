@@ -1,0 +1,135 @@
+/*
+ * @nodate-flow/ui — shared motion keyframes.
+ *
+ * Global (unhashed) keyframe names so every CSS module animates with the
+ * same vocabulary. A module references them through `global()`, which
+ * stops CSS-modules from rewriting the name into a local one:
+ *   animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
+ *
+ * Enter keyframes declare only `from` and exit keyframes only `to`, so the
+ * rest state is always the element's own styles. Movement uses the
+ * individual `translate` / `scale` properties, never `transform`, so it
+ * composes with the `transform` floating-ui writes to position a panel.
+ * Durations live at the call site and come from the duration tokens, which
+ * `prefers-reduced-motion` zeroes in tokens/base.css.
+ *
+ * Import this stylesheet exactly once from your app entry CSS, e.g.:
+ *   @import "@nodate-flow/ui/styles/motion.css";
+ */
+
+/* Inline-axis travel flips with the writing direction. */
+:where(:root),
+:where([dir="ltr"]) {
+  --nf-motion-inline-sign: 1;
+}
+
+:where([dir="rtl"]) {
+  --nf-motion-inline-sign: -1;
+}
+
+@keyframes nf-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes nf-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes nf-scale-in {
+  from {
+    opacity: 0;
+    scale: var(--nf-motion-scale);
+  }
+}
+
+@keyframes nf-scale-out {
+  to {
+    opacity: 0;
+    scale: var(--nf-motion-scale);
+  }
+}
+
+/* `slide-in-from-<side>`: starts displaced toward <side>, settles at rest. */
+@keyframes nf-slide-in-from-block-start {
+  from {
+    opacity: 0;
+    translate: 0 calc(var(--nf-motion-shift) * -1);
+  }
+}
+
+@keyframes nf-slide-in-from-block-end {
+  from {
+    opacity: 0;
+    translate: 0 var(--nf-motion-shift);
+  }
+}
+
+@keyframes nf-slide-in-from-inline-start {
+  from {
+    opacity: 0;
+    translate: calc(var(--nf-motion-shift) * -1 * var(--nf-motion-inline-sign, 1)) 0;
+  }
+}
+
+@keyframes nf-slide-in-from-inline-end {
+  from {
+    opacity: 0;
+    translate: calc(var(--nf-motion-shift) * var(--nf-motion-inline-sign, 1)) 0;
+  }
+}
+
+/* `slide-out-to-<side>`: leaves rest toward <side>. */
+@keyframes nf-slide-out-to-block-start {
+  to {
+    opacity: 0;
+    translate: 0 calc(var(--nf-motion-shift) * -1);
+  }
+}
+
+@keyframes nf-slide-out-to-block-end {
+  to {
+    opacity: 0;
+    translate: 0 var(--nf-motion-shift);
+  }
+}
+
+@keyframes nf-slide-out-to-inline-start {
+  to {
+    opacity: 0;
+    translate: calc(var(--nf-motion-shift) * -1 * var(--nf-motion-inline-sign, 1)) 0;
+  }
+}
+
+@keyframes nf-slide-out-to-inline-end {
+  to {
+    opacity: 0;
+    translate: calc(var(--nf-motion-shift) * var(--nf-motion-inline-sign, 1)) 0;
+  }
+}
+
+/* Loading sheen: one pass across the element along the reading direction. */
+@keyframes nf-shimmer {
+  from {
+    translate: calc(-100% * var(--nf-motion-inline-sign, 1)) 0;
+  }
+  to {
+    translate: calc(100% * var(--nf-motion-inline-sign, 1)) 0;
+  }
+}
+
+@keyframes nf-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Agent-working indicator: a slow opacity breath, meant to loop. */
+@keyframes nf-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}

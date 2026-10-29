@@ -6,18 +6,32 @@
 
 .input {
   inline-size: 100%;
+  min-block-size: var(--nf-control-height);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-normal);
   color: var(--nf-color-fg);
   background: var(--nf-color-bg-elevated);
   border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
+  border-radius: var(--nf-radius-sm);
   padding-inline: var(--nf-space-3);
-  padding-block: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.input::placeholder {
+  color: var(--nf-color-fg-subtle);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--nf-color-border-strong);
 }
 
 .input:focus-visible {
   outline: none;
+  border-color: var(--nf-color-focus-ring);
   box-shadow: var(--nf-shadow-focus);
 }
 
@@ -39,14 +53,18 @@
   /* nf-token-override: component dimension, not a spacing step */
   max-block-size: 16rem;
   overflow: auto;
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
 .option {
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-2);
-  border-radius: var(--nf-radius-sm);
+  /* Concentric with the list: its radius less the list's padding. */
+  border-radius: calc(var(--nf-radius-md) - var(--nf-space-1));
   font-size: var(--nf-text-sm);
   cursor: pointer;
+  transition: background var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .optionActive {

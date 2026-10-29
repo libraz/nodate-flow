@@ -41,6 +41,6 @@
 }
 
 .retry:focus-visible {
-  outline: 2px solid var(--nf-color-accent);
-  outline-offset: 2px;
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
 }

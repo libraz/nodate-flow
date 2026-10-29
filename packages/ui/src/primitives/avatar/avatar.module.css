@@ -8,16 +8,20 @@
   background: var(--nf-color-bg-sunken);
   color: var(--nf-color-fg);
   border: var(--nf-space-px) solid var(--nf-color-border);
+  flex-shrink: 0;
   overflow: hidden;
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
+  line-height: 1;
+  user-select: none;
 }
 
 .image {
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .sm {

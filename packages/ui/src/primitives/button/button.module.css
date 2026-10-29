@@ -1,27 +1,52 @@
+/*
+ * `--btn-fg` carries the variant's text colour so the busy spinner can
+ * keep it while the label itself fades to transparent.
+ */
 .root {
+  --btn-fg: var(--nf-color-fg);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--nf-space-2);
   padding-inline: var(--nf-space-4);
-  padding-block: var(--nf-space-2);
+  /* Lands a one-line md button on --nf-control-height, level with Input. */
+  padding-block: calc(
+    (
+      var(--nf-control-height) -
+      var(--nf-text-sm) *
+      var(--nf-leading-tight) -
+      var(--nf-space-px) *
+      2
+    ) /
+    2
+  );
   border-radius: var(--nf-radius-md);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
+  color: var(--btn-fg);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
+  font-variant-numeric: tabular-nums;
   line-height: var(--nf-leading-tight);
+  /* Links styled as buttons (`as="a"`, `buttonClassName`) drop the underline. */
+  text-decoration: none;
   cursor: pointer;
   transition:
-    background var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
     border-color var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
 .root:hover:not(:disabled) {
   background: var(--nf-color-surface-hover);
+}
+
+.root:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .root:focus-visible {
@@ -35,9 +60,9 @@
 }
 
 .primary {
+  --btn-fg: var(--nf-color-fg-on-accent);
   background: var(--nf-color-accent);
   border-color: var(--nf-color-accent);
-  color: var(--nf-color-fg-on-accent);
 }
 
 .primary:hover:not(:disabled) {
@@ -51,9 +76,21 @@
 }
 
 .danger {
+  --btn-fg: var(--nf-color-fg-on-danger);
   background: var(--nf-color-danger);
   border-color: var(--nf-color-danger);
-  color: var(--nf-color-fg-on-accent);
+}
+
+/* No hover/active danger tokens exist; the press overlay tints the fill
+   without touching box-shadow, which the focus ring owns. */
+.danger:hover:not(:disabled) {
+  background-image: linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
+}
+
+.danger:active:not(:disabled) {
+  background-image:
+    linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press)),
+    linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
 }
 
 .ghost {
@@ -75,6 +112,40 @@
   padding-inline: var(--nf-space-5);
   padding-block: var(--nf-space-3);
   font-size: var(--nf-text-base);
+}
+
+/*
+ * Busy (`aria-busy="true"`): the label cross-fades to a spinner in place.
+ * The label stays in the flow, so the button keeps its width; a busy
+ * button is working rather than unavailable, so it skips the disabled fade.
+ */
+.root[aria-busy="true"] {
+  color: transparent;
+  cursor: progress;
+}
+
+.root[aria-busy="true"]:disabled {
+  opacity: 1;
+}
+
+.root[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  border: var(--nf-space-0-5) solid var(--btn-fg);
+  border-block-start-color: transparent;
+  border-radius: var(--nf-radius-pill);
+  animation:
+    global(nf-spin) calc(var(--nf-duration-slow) * 3) var(--nf-ease-linear) infinite,
+    global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.sm[aria-busy="true"]::after {
+  inline-size: var(--nf-space-3);
+  block-size: var(--nf-space-3);
 }
 
 /*

@@ -6,7 +6,7 @@
  * `window.confirm()` with a themed Dialog that honors design tokens.
  */
 
-import { type ReactElement, type ReactNode, useSyncExternalStore } from 'react';
+import { type ReactElement, type ReactNode, useState, useSyncExternalStore } from 'react';
 import Button from '../button/button';
 import Dialog from '../dialog/dialog';
 
@@ -91,8 +91,13 @@ export function useConfirm(): ConfirmState | null {
  * application root.
  */
 export function ConfirmProvider(): ReactElement {
-  const state = useConfirm();
-  const open = state !== null;
+  const pending = useConfirm();
+  const open = pending !== null;
+  // The last request stays on screen while the dialog animates out, so the
+  // title and buttons do not blank in the middle of the exit.
+  const [shown, setShown] = useState(pending);
+  if (pending !== null && pending !== shown) setShown(pending);
+  const state = pending ?? shown;
 
   const handleCancel = (): void => {
     store.resolve(false);

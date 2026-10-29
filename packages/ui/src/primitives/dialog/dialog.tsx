@@ -26,6 +26,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
+import { usePresence } from '../../hooks/use-presence';
 import { cx } from '../../lib/cx';
 import { useOverlayLock } from '../_overlay/overlay-lock';
 import styles from './dialog.module.css';
@@ -103,6 +104,9 @@ function DialogImpl(
   // Escape is routed by the shared overlay stack, which hands the key to
   // the top-most overlay only.
   useOverlayLock(containerRef, open, onClose);
+  // The trap and the lock follow `open`, not presence: once closing, the
+  // dialog is inert and no longer an Escape target while it animates out.
+  const presence = usePresence<HTMLDivElement>(open);
 
   const handleRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -113,14 +117,16 @@ function DialogImpl(
     [ref],
   );
 
-  if (!open) return null;
+  if (!presence.mounted) return null;
   const root = getPortalRoot();
   if (!root) return null;
 
   return createPortal(
-    // biome-ignore lint/a11y/noStaticElementInteractions: overlay dismissal; keyboard handled by document keydown Escape
-    // biome-ignore lint/a11y/useKeyWithClickEvents: overlay dismissal; keyboard handled by document keydown Escape
     <div
+      ref={presence.ref}
+      data-state={presence.state}
+      inert={!open}
+      aria-hidden={!open || undefined}
       className={cx(styles.overlay, fullScreenOnMobile && styles.overlayMobile)}
       /*
        * Dismiss only when the gesture both started and ended on the

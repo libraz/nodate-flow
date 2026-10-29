@@ -24,6 +24,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   type CSSProperties,
   forwardRef,
+  type HTMLAttributes,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
@@ -36,6 +37,20 @@ import {
 } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './data-grid.module.css';
+
+/**
+ * Caller-supplied attributes for one body row — a drop target's ref and
+ * drag handlers, `data-*` markers, an extra class. The grid owns the row's
+ * ARIA attributes and its virtualized position: `className` is merged and
+ * `style` is applied beneath the positioning, never over it.
+ */
+export type DataGridRowProps = Omit<
+  HTMLAttributes<HTMLDivElement>,
+  'role' | 'aria-rowindex' | 'aria-selected' | 'children'
+> & {
+  ref?: Ref<HTMLDivElement>;
+  [dataAttribute: `data-${string}`]: string | number | boolean | undefined;
+};
 
 /**
  * Props for {@link DataGrid}.
@@ -84,10 +99,16 @@ export interface DataGridProps<TData> {
    * pass a translated formatter (e.g. `t('tasks.list.select_row', { index })`).
    */
   selectRowLabel?: (index: number) => string;
+  /**
+   * Extra attributes for each body row, e.g. to make the whole row a drop
+   * target rather than only the cell holding a drag handle. Use
+   * `row.index` for the row's position in `data`.
+   */
+  getRowProps?: ((row: Row<TData>) => DataGridRowProps) | undefined;
   /** Optional class on the scroll container. */
-  className?: string;
+  className?: string | undefined;
   /** Optional inline style on the scroll container. */
-  style?: CSSProperties;
+  style?: CSSProperties | undefined;
 }
 
 interface FocusedCell {
@@ -117,6 +138,7 @@ function DataGridInner<TData>(
     onColumnPinningChange,
     selectAllRowsLabel = 'Select all rows',
     selectRowLabel = (index: number) => `Select row ${index}`,
+    getRowProps,
     className,
     style,
   } = props;
@@ -407,14 +429,17 @@ function DataGridInner<TData>(
             {renderRows.map(({ row, idx, start }) => {
               if (!row) return null;
               const visibleCells = row.getVisibleCells();
+              const rowProps = getRowProps?.(row);
               return (
                 <div
                   key={row.id}
+                  {...rowProps}
                   role="row"
                   aria-rowindex={headerGroups.length + idx + 1}
                   aria-selected={enableRowSelection ? row.getIsSelected() : undefined}
-                  className={styles.row}
+                  className={cx(styles.row, rowProps?.className)}
                   style={{
+                    ...rowProps?.style,
                     position: 'absolute',
                     insetInlineStart: 0,
                     insetInlineEnd: 0,

@@ -61,11 +61,17 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
           </span>
         ) : null}
         {children(control)}
-        {error ? (
-          <span id={errorId} className={styles.error}>
-            {error}
-          </span>
-        ) : null}
+        {/* A live region is only announced if it exists before its content
+            does, so the container stays mounted and the error is inserted
+            into it. Polite, not role="alert": the message is read once on
+            arrival and again via aria-describedby when the field is focused. */}
+        <div aria-live="polite" className={styles.errorSlot}>
+          {error ? (
+            <span id={errorId} className={styles.error}>
+              {error}
+            </span>
+          ) : null}
+        </div>
       </div>
     );
   },

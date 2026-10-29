@@ -24,6 +24,15 @@
   min-inline-size: 16rem;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+}
+
+.action {
+  flex-shrink: 0;
 }
 
 .info {

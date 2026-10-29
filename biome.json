@@ -70,7 +70,8 @@
       },
       "correctness": {
         "noUnusedVariables": "error",
-        "useHookAtTopLevel": "off"
+        "useHookAtTopLevel": "off",
+        "noUnknownFunction": { "level": "error", "options": { "ignore": ["global"] } }
       }
     }
   },

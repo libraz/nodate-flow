@@ -66,7 +66,7 @@ export interface BreadcrumbItemProps {
   /** Optional click handler, mainly for router-link call sites. */
   onClick?: (event: ReactMouseEvent) => void;
   /** Optional className forwarded to the rendered element. */
-  className?: string;
+  className?: string | undefined;
   /**
    * When `true`, the primitive expects a single React element child (e.g.
    * a router `<Link>`) and clones it so the link picks up breadcrumb styling
@@ -80,7 +80,7 @@ export interface BreadcrumbSeparatorProps {
   /** Override the separator glyph. Defaults to U+203A (`›`). */
   children?: ReactNode;
   /** Optional className forwarded to the `<li>` wrapper. */
-  className?: string;
+  className?: string | undefined;
 }
 
 /** Internal marker used by {@link Breadcrumb} to detect separators vs items. */

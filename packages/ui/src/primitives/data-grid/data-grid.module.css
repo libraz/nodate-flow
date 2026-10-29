@@ -8,6 +8,7 @@
   background: var(--nf-color-bg-elevated);
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
 .root:focus-visible {
@@ -37,7 +38,7 @@
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
   text-align: start;
-  font-weight: 600;
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
   cursor: default;
   user-select: none;
@@ -65,10 +66,15 @@
 .row {
   display: flex;
   border-block-end: var(--nf-space-px) solid var(--nf-color-hairline);
+  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .row:hover {
   background: var(--nf-color-surface-hover);
+}
+
+.row[aria-selected="true"] {
+  background: var(--nf-color-accent-subtle);
 }
 
 .cell {

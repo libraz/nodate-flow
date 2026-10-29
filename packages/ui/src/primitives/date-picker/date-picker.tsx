@@ -55,7 +55,7 @@ export interface DatePickerProps {
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
   /** Additional class on the trigger button. */
-  className?: string;
+  className?: string | undefined;
   /**
    * Optional handler that, when provided, renders a "Clear" affordance in the
    * popover footer for unsetting the current selection (e.g. clearing a

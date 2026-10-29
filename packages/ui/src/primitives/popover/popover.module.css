@@ -12,6 +12,33 @@
   min-inline-size: 12rem;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* Enter from the anchor's side. Left / right are physical placements, so
+   the inline keyframes are pinned to the physical axis. */
+.popover[data-side="bottom"] {
+  animation-name: global(nf-slide-in-from-block-start);
+}
+
+.popover[data-side="top"] {
+  animation-name: global(nf-slide-in-from-block-end);
+}
+
+.popover[data-side="left"] {
+  --nf-motion-inline-sign: 1;
+  animation-name: global(nf-slide-in-from-inline-end);
+}
+
+.popover[data-side="right"] {
+  --nf-motion-inline-sign: 1;
+  animation-name: global(nf-slide-in-from-inline-start);
+}
+
+.popover[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-instant) var(--nf-ease-in) forwards;
 }
 
 .popover:focus-visible {

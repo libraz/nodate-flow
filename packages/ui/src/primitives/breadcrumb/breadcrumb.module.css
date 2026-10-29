@@ -40,12 +40,17 @@
   color: var(--nf-color-fg-muted);
   text-decoration: none;
   border-radius: var(--nf-radius-xs);
-  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+  text-underline-offset: 0.2em;
+  text-decoration-color: transparent;
+  transition:
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    text-decoration-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .link:hover {
   color: var(--nf-color-fg);
-  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
 }
 
 .link:focus-visible {

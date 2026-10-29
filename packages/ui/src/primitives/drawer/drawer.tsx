@@ -19,6 +19,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../../hooks/use-focus-trap';
+import { usePresence } from '../../hooks/use-presence';
 import { cx } from '../../lib/cx';
 import { useOverlayLock } from '../_overlay/overlay-lock';
 import styles from './drawer.module.css';
@@ -70,6 +71,9 @@ function DrawerImpl(
   // the top-most overlay only — a dialog opened from inside this drawer
   // closes by itself and leaves the drawer's form intact.
   useOverlayLock(containerRef, open, onClose);
+  // The trap and the lock follow `open`, not presence: once closing, the
+  // drawer is inert and no longer an Escape target while it animates out.
+  const presence = usePresence<HTMLDivElement>(open);
 
   const handleRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -80,7 +84,7 @@ function DrawerImpl(
     [ref],
   );
 
-  if (!open) return null;
+  if (!presence.mounted) return null;
   const root = getPortalRoot();
   if (!root) return null;
 
@@ -94,9 +98,14 @@ function DrawerImpl(
           : styles.inlineEnd;
 
   return createPortal(
-    // biome-ignore lint/a11y/noStaticElementInteractions: overlay dismissal; keyboard handled by document keydown Escape
-    // biome-ignore lint/a11y/useKeyWithClickEvents: overlay dismissal; keyboard handled by document keydown Escape
-    <div className={styles.overlay} onClick={dismissOnOverlayClick ? onClose : undefined}>
+    <div
+      ref={presence.ref}
+      data-state={presence.state}
+      inert={!open}
+      aria-hidden={!open || undefined}
+      className={styles.overlay}
+      onClick={dismissOnOverlayClick ? onClose : undefined}
+    >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: onClick only stops overlay-dismiss propagation; dialog keyboard handled at document level */}
       <div
         ref={handleRef}

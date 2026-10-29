@@ -73,4 +73,29 @@ describe.each(THEMES)('Toast [%s]', (theme) => {
     });
     expect(screen.getByText('Warn').getAttribute('data-tone')).toBe('warning');
   });
+
+  it('renders an action that runs then dismisses the toast', () => {
+    const onAction = vi.fn();
+    render(<ToastProvider label="Notifications" />);
+    act(() => {
+      toaster.show({ message: 'Deleted', action: { label: 'Undo', onAction } });
+    });
+    const button = screen.getByRole('button', { name: 'Undo' });
+    expect(button.getAttribute('type')).toBe('button');
+    act(() => {
+      button.focus();
+      button.click();
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Deleted')).toBeNull();
+  });
+
+  it('has no a11y violations with an action', async () => {
+    render(<ToastProvider label="Notifications" />);
+    act(() => {
+      toaster.show({ message: 'Deleted', action: { label: 'Undo', onAction: () => {} } });
+    });
+    const portal = document.getElementById('nf-toast-root');
+    if (portal) expect(await axe(portal)).toHaveNoViolations();
+  });
 });

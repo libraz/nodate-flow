@@ -1,0 +1,9 @@
+/* Mount-only entrance: the wordmark fades, the panel settles up into place. */
+.wordmark {
+  animation: global(nf-fade-in) var(--nf-duration-slow) var(--nf-ease-out) both;
+}
+
+.panel {
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out) both;
+}

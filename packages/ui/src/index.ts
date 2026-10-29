@@ -10,7 +10,12 @@ export { default as LiveRegion } from './a11y/live-region';
 export { default as SkipLink } from './a11y/skip-link';
 export { default as VisuallyHidden } from './a11y/visually-hidden';
 export { useControllableState } from './hooks/use-controllable-state';
+export { useFirstLoadStagger } from './hooks/use-first-load-stagger';
 export { useFocusTrap } from './hooks/use-focus-trap';
+export type { Presence, PresenceState } from './hooks/use-presence';
+export { usePresence } from './hooks/use-presence';
+export type { PresenceEntry } from './hooks/use-presence-list';
+export { usePresenceList } from './hooks/use-presence-list';
 export type { ThemeId, UseThemeOptions, UseThemeResult } from './hooks/use-theme';
 export { THEME_IDS, useTheme } from './hooks/use-theme';
 export type {

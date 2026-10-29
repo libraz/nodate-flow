@@ -24,10 +24,12 @@ import {
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   useCallback,
   useMemo,
   useRef,
 } from 'react';
+import { useSlidingIndicator } from '../../hooks/use-sliding-indicator';
 import { cx } from '../../lib/cx';
 import styles from './segmented-control.module.css';
 
@@ -85,8 +87,12 @@ export interface SegmentedControlOption<T extends string> {
 
 /** Props for {@link SegmentedControl}. */
 export interface SegmentedControlProps<T extends string> {
-  /** Currently selected segment value (controlled). */
-  value: T;
+  /**
+   * Currently selected segment value (controlled). `null` means no segment
+   * is selected — e.g. a state none of the options describes; the first
+   * enabled segment still takes the tab stop so the group stays reachable.
+   */
+  value: T | null;
   /** Called with the next value when the user activates a different segment. */
   onChange: (next: T) => void;
   /** Segment definitions, in display order. */
@@ -104,18 +110,17 @@ export interface SegmentedControlProps<T extends string> {
   /** Disables the entire group. */
   disabled?: boolean;
   /**
-   * When true, the control fills the parent's inline size and each segment
-   * gets equal width (`flex: 1 1 0`). Use for top-level pickers (kind / mode /
-   * view tabs) where intrinsic-width segments would otherwise produce a
-   * visibly uneven row due to label length variance (notably in Japanese,
-   * where a single row can mix 2-char and 7-char labels). Leave false
-   * (default) for inline toggles whose intrinsic width should hug content.
+   * Segments are always equal width — each as wide as the widest label.
+   * When true, the control also fills the parent's inline size and labels
+   * that exceed their share truncate. Use for top-level pickers (kind /
+   * mode / view tabs) laid out as a full row. Leave false (default) for
+   * inline toggles whose overall width should hug content.
    */
   fullWidth?: boolean;
   /** Root className pass-through for layout / alignment customisation. */
-  className?: string;
+  className?: string | undefined;
   /** Root inline style pass-through. */
-  style?: CSSProperties;
+  style?: CSSProperties | undefined;
 }
 
 /**
@@ -291,6 +296,14 @@ function SegmentedControl<T extends string>({
     return enabledOptions[0]?.value;
   }, [enabledOptions, options, value]);
 
+  // The selected fill slides between segments; colourful mode keeps the
+  // per-segment tone fills instead, and without layout the segment's own fill shows.
+  const thumb = useSlidingIndicator(
+    rootRef,
+    buttonRefs as RefObject<Map<string, HTMLElement>>,
+    colourful || value === null ? null : value,
+  );
+
   return (
     <div
       ref={rootRef}
@@ -300,6 +313,7 @@ function SegmentedControl<T extends string>({
       data-size={size}
       data-colourful={colourful ? 'true' : undefined}
       data-full-width={fullWidth ? 'true' : undefined}
+      data-thumb={thumb ? '' : undefined}
       className={cx(
         styles.root,
         styles[`size-${size}`],
@@ -308,8 +322,15 @@ function SegmentedControl<T extends string>({
       )}
       style={style}
     >
+      {thumb ? (
+        <span
+          aria-hidden="true"
+          className={styles.thumb}
+          style={{ insetInlineStart: thumb.start, inlineSize: thumb.size }}
+        />
+      ) : null}
       {options.map((option) => {
-        const selected = option.value === value;
+        const selected = value !== null && option.value === value;
         const isDisabled = disabled || Boolean(option.disabled);
         const tabIndex = rovingTarget === option.value ? 0 : -1;
         const label = option.ariaLabel ?? stringLabel(option.label) ?? undefined;

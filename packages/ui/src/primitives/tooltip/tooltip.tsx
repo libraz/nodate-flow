@@ -18,6 +18,7 @@ import {
   useFocus,
   useHover,
   useInteractions,
+  useMergeRefs,
   useRole,
 } from '@floating-ui/react';
 import {
@@ -28,6 +29,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { usePresence } from '../../hooks/use-presence';
 import { cx } from '../../lib/cx';
 import styles from './tooltip.module.css';
 
@@ -71,7 +73,7 @@ export interface TooltipProps {
   /** Open delay in ms. Defaults to 200. */
   delay?: number;
   /** Optional className applied to the tooltip body. */
-  className?: string;
+  className?: string | undefined;
 }
 
 /**
@@ -89,7 +91,12 @@ export default function Tooltip({
   // Reduced-motion users get instant tooltips: any easing-in delay reads as
   // visual motion the user has explicitly asked us to suppress.
   const effectiveDelay = reducedMotion ? 0 : delay;
-  const { refs, floatingStyles, context } = useFloating({
+  const {
+    refs,
+    floatingStyles,
+    context,
+    placement: resolvedPlacement,
+  } = useFloating({
     open,
     onOpenChange: setOpen,
     placement,
@@ -106,6 +113,8 @@ export default function Tooltip({
   const role = useRole(context, { role: 'tooltip' });
 
   const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss, role]);
+  const presence = usePresence<HTMLDivElement>(open);
+  const floatingRef = useMergeRefs([refs.setFloating, presence.ref]);
 
   if (!isValidElement(children)) {
     return children;
@@ -119,11 +128,15 @@ export default function Tooltip({
   return (
     <>
       {trigger}
-      {open ? (
+      {presence.mounted ? (
         <FloatingPortal>
           <div
-            ref={refs.setFloating}
+            ref={floatingRef}
             style={floatingStyles}
+            data-state={presence.state}
+            data-side={resolvedPlacement.split('-')[0]}
+            inert={!open}
+            aria-hidden={!open || undefined}
             className={cx(styles.tooltip, className)}
             {...getFloatingProps()}
           >

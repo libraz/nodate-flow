@@ -30,7 +30,7 @@ export interface MarkdownProps {
   /** Raw markdown source. */
   children: string;
   /** Optional extra class on the wrapper. */
-  className?: string;
+  className?: string | undefined;
 }
 
 function MarkdownImpl({ children, className }: MarkdownProps): ReactElement {

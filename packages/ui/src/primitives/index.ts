@@ -19,19 +19,27 @@ export {
   BreadcrumbSeparator,
   default as Breadcrumb,
 } from './breadcrumb/breadcrumb';
-export type { ButtonAsProps, ButtonProps, ButtonSize, ButtonVariant } from './button/button';
-export { default as Button } from './button/button';
+export type {
+  ButtonAsProps,
+  ButtonClassNameOptions,
+  ButtonProps,
+  ButtonSize,
+  ButtonVariant,
+} from './button/button';
+export { buttonClassName, default as Button } from './button/button';
 export type { CardAsProps, CardProps } from './card/card';
 export { default as Card } from './card/card';
 export type { CheckboxProps } from './checkbox/checkbox';
 export { default as Checkbox } from './checkbox/checkbox';
 export type { ChipProps, ChipTone } from './chip/chip';
 export { default as Chip } from './chip/chip';
+export type { CollapseProps } from './collapse/collapse';
+export { default as Collapse } from './collapse/collapse';
 export type { ComboboxOption, ComboboxProps } from './combobox/combobox';
 export { default as Combobox } from './combobox/combobox';
 export type { ConfirmOptions, ConfirmTone } from './confirm/confirm';
 export { ConfirmProvider, confirm, useConfirm } from './confirm/confirm';
-export type { DataGridProps } from './data-grid/data-grid';
+export type { DataGridProps, DataGridRowProps } from './data-grid/data-grid';
 export { default as DataGrid } from './data-grid/data-grid';
 export type { DatePickerProps, WeekStartDay } from './date-picker/date-picker';
 export { default as DatePicker } from './date-picker/date-picker';
@@ -62,6 +70,10 @@ export type { PageSkeletonProps } from './page-skeleton/page-skeleton';
 export { default as PageSkeleton } from './page-skeleton/page-skeleton';
 export type { PopoverProps } from './popover/popover';
 export { default as Popover } from './popover/popover';
+export type { PresenceItemProps } from './presence-item/presence-item';
+export { default as PresenceItem } from './presence-item/presence-item';
+export type { PresenceRowProps } from './presence-row/presence-row';
+export { default as PresenceRow } from './presence-row/presence-row';
 export type { RadioProps } from './radio/radio';
 export { default as Radio } from './radio/radio';
 export type { ScrollAreaProps } from './scroll-area/scroll-area';
@@ -96,7 +108,13 @@ export type {
 export { DEFAULT_THEME_PREVIEWS, default as ThemePicker } from './theme-picker/theme-picker';
 export type { TimePickerProps } from './time-picker/time-picker';
 export { default as TimePicker } from './time-picker/time-picker';
-export type { Toast, ToastOptions, ToastProviderProps, ToastTone } from './toast/toast';
+export type {
+  Toast,
+  ToastAction,
+  ToastOptions,
+  ToastProviderProps,
+  ToastTone,
+} from './toast/toast';
 export { ToastProvider, toaster, useToaster } from './toast/toast';
 export type { ToggleChipGroupProps, ToggleChipProps } from './toggle-chip/toggle-chip';
 export { default as ToggleChip, ToggleChipGroup } from './toggle-chip/toggle-chip';

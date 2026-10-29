@@ -108,3 +108,56 @@ describe.each(THEMES)('Tabs [%s]', (theme) => {
     expect(panel.getAttribute('tabindex')).toBe('0');
   });
 });
+
+describe('Tabs sliding indicator', () => {
+  /** Lay tabs out in a row, each 10px per label character, as a browser would. */
+  function stubTabLayout(): void {
+    const width = (el: HTMLElement): number =>
+      el.getAttribute('role') === 'tab' ? (el.textContent?.length ?? 0) * 10 : 0;
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return width(this);
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      let left = 0;
+      for (let el = this.previousElementSibling; el; el = el.previousElementSibling) {
+        left += width(el as HTMLElement);
+      }
+      return left;
+    });
+  }
+
+  function indicator(container: HTMLElement): HTMLElement {
+    const el = container.querySelector<HTMLElement>('[role="tablist"] > span[aria-hidden]');
+    if (!el) throw new Error('indicator not rendered');
+    return el;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('follows the active tab when a tab is inserted before it', async () => {
+    stubTabLayout();
+    const { container, rerender } = render(<Tabs items={ITEMS} value="b" aria-label="demo" />);
+    expect(indicator(container).style.insetInlineStart).toBe('50px');
+
+    const inserted: TabItem = { value: 'z', label: 'Zu', content: <p>panel-z</p> };
+    rerender(<Tabs items={[inserted, ...ITEMS]} value="b" aria-label="demo" />);
+    await vi.waitFor(() => expect(indicator(container).style.insetInlineStart).toBe('70px'));
+  });
+
+  it('follows the active tab when a sibling label changes width', async () => {
+    stubTabLayout();
+    const { container, rerender } = render(<Tabs items={ITEMS} value="b" aria-label="demo" />);
+    expect(indicator(container).style.insetInlineStart).toBe('50px');
+
+    const relabelled = ITEMS.map((it) => (it.value === 'a' ? { ...it, label: 'Alphabet' } : it));
+    rerender(<Tabs items={relabelled} value="b" aria-label="demo" />);
+    await vi.waitFor(() => expect(indicator(container).style.insetInlineStart).toBe('80px'));
+    expect(indicator(container).style.inlineSize).toBe('50px');
+  });
+});

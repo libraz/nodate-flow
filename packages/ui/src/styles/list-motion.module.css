@@ -1,0 +1,66 @@
+/*
+ * Shared list motion for the task screens.
+ *
+ * `.enter` is the arrival of a row or card. `--stagger-index` (0-8) is set
+ * only on items present at first paint (see use-first-load-stagger.ts),
+ * so an item added later arrives without waiting on its index.
+ *
+ * `.presence` wraps an item rendered through usePresenceList: on removal
+ * it collapses its own height and fades, so the rows below close the gap
+ * instead of jumping. A list with a `gap` sets `--presence-gap` to the
+ * same value so the gap collapses with the item.
+ */
+
+.enter {
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out) both;
+  animation-delay: calc(var(--stagger-index, 0) * var(--nf-duration-base) / 6);
+}
+
+.presence {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.presence > * {
+  min-block-size: 0;
+}
+
+.presence[data-state="closed"] {
+  pointer-events: none;
+  animation: collapse var(--nf-duration-base) var(--nf-ease-in) forwards;
+}
+
+.presence[data-state="closed"] > * {
+  overflow: hidden;
+}
+
+@keyframes collapse {
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    margin-block-end: calc(var(--presence-gap, 0px) * -1);
+  }
+}
+
+/* A table row cannot collapse its height, so a removed one fades in place (presence-row.tsx). */
+.exitRow[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-base) var(--nf-ease-in) forwards;
+}
+
+/* Completion: a barely-there settle so the new state reads as the result of the click. */
+.settle {
+  animation: settle var(--nf-duration-slow) var(--nf-ease-emphasized);
+}
+
+@keyframes settle {
+  0% {
+    scale: var(--nf-motion-scale);
+    opacity: 0.6;
+  }
+  60% {
+    scale: 1.015;
+    opacity: 1;
+  }
+}

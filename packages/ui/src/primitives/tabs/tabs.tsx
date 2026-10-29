@@ -27,6 +27,7 @@ import {
   useRef,
 } from 'react';
 import { useControllableState } from '../../hooks/use-controllable-state';
+import { useSlidingIndicator } from '../../hooks/use-sliding-indicator';
 import { cx } from '../../lib/cx';
 import styles from './tabs.module.css';
 
@@ -106,6 +107,11 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     const currentItem = items.find((it) => it.value === current);
     const activePanelValue = currentItem && !currentItem.disabled ? current : fallback;
 
+    // The underline slides between tabs. Without layout (no measurement),
+    // the selected tab's own border shows instead.
+    const tablistRef = useRef<HTMLDivElement | null>(null);
+    const indicator = useSlidingIndicator(tablistRef, tabRefs, activePanelValue);
+
     const focusValue = useCallback((next: string) => {
       const node = tabRefs.current.get(next);
       node?.focus();
@@ -151,7 +157,13 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
 
     return (
       <div ref={ref} className={cx(styles.root, className)} {...rest}>
-        <div role="tablist" aria-label={ariaLabel} className={styles.tablist}>
+        <div
+          ref={tablistRef}
+          role="tablist"
+          aria-label={ariaLabel}
+          className={styles.tablist}
+          data-indicator={indicator ? '' : undefined}
+        >
           {items.map((item) => {
             const selected = item.value === activePanelValue;
             const tabId = `${baseId}-tab-${item.value}`;
@@ -183,6 +195,13 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
               </button>
             );
           })}
+          {indicator ? (
+            <span
+              aria-hidden="true"
+              className={styles.indicator}
+              style={{ insetInlineStart: indicator.start, inlineSize: indicator.size }}
+            />
+          ) : null}
         </div>
         {items.map((item) => {
           const selected = item.value === activePanelValue;

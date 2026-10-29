@@ -451,14 +451,14 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     }
   });
 
-  it('fullWidth segments share inline size equally via flex: 1 1 0 (memory rule)', () => {
+  it('fullWidth segments share inline size equally (memory rule)', () => {
     // Memory rule: "SegmentedControl picker = equal width". Multi-option
-    // pickers (kind / mode / view) need flex:1 segments — NOT intrinsic
+    // pickers (kind / mode / view) need equal columns — NOT intrinsic
     // width — so e.g. "Free" and "Milestone" do not visually balloon to
     // different sizes. The CSS-module hash is environment-dependent, so we
     // assert on the class is present + data-full-width="true" + that the
-    // root layout switches from inline-flex (intrinsic) to flex
-    // (block-level, fills parent).
+    // root switches from the inline grid (hugs content) to a block grid
+    // that fills the parent.
     const { container } = render(
       <SegmentedControl<View>
         value="week"
@@ -470,13 +470,13 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     );
     const root = container.querySelector('[role="radiogroup"]') as HTMLElement;
     expect(root.getAttribute('data-full-width')).toBe('true');
-    // .rootFullWidth (CSS module) sets `display: flex; inline-size: 100%`,
-    // which is the only way to give .segmentFullWidth's `flex: 1 1 0` a
-    // shared row to balance over.
+    // .rootFullWidth (CSS module) sets `display: grid; inline-size: 100%`
+    // with `minmax(0, 1fr)` columns, so the row it balances over is the
+    // parent's full inline size.
     expect(root.className).toMatch(/rootFullWidth/);
-    // Every segment carries .segmentFullWidth (declared with `flex: 1 1 0;
-    // min-inline-size: 0;` in segmented-control.module.css), so widths are
-    // equal regardless of label length.
+    // Every segment carries .segmentFullWidth (`min-inline-size: 0` in
+    // segmented-control.module.css), so a long label truncates instead of
+    // widening its column.
     for (const name of ['Month', 'Week', 'Day']) {
       const node = screen.getByRole('radio', { name });
       expect(node.className).toMatch(/segmentFullWidth/);
@@ -585,5 +585,54 @@ describe.each(THEMES)('SegmentedControl [%s]', (theme) => {
     await user.keyboard('{ArrowLeft}');
     // The closest [dir] ancestor is the wrapper div with dir="rtl".
     expect(week.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
+describe('SegmentedControl with no selection', () => {
+  it('checks no segment and gives the tab stop to the first enabled one', () => {
+    render(
+      <SegmentedControl<View>
+        value={null}
+        onChange={() => undefined}
+        options={[
+          { ...VIEW_OPTIONS[0], disabled: true } as SegmentedControlOption<View>,
+          ...VIEW_OPTIONS.slice(1),
+        ]}
+        ariaLabel="Zoom"
+      />,
+    );
+    const radios = screen.getAllByRole('radio');
+    for (const radio of radios) {
+      expect(radio.getAttribute('aria-checked')).toBe('false');
+      expect(radio.getAttribute('data-selected')).toBe('false');
+    }
+    expect(screen.getByRole('radio', { name: 'Month' }).tabIndex).toBe(-1);
+    expect(screen.getByRole('radio', { name: 'Week' }).tabIndex).toBe(0);
+    expect(screen.getByRole('radio', { name: 'Day' }).tabIndex).toBe(-1);
+  });
+
+  it('lets a keyboard user enter the group and select from it', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <>
+        <button type="button">before</button>
+        <SegmentedControl<View>
+          value={null}
+          onChange={onChange}
+          options={VIEW_OPTIONS}
+          ariaLabel="Zoom"
+        />
+      </>,
+    );
+    screen.getByRole('button', { name: 'before' }).focus();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Month' }));
+
+    await user.keyboard('{ArrowRight}');
+    expect(onChange).toHaveBeenLastCalledWith('week');
+
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenLastCalledWith('week');
   });
 });

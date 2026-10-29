@@ -39,7 +39,13 @@
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
     border-color var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.root:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .root:hover:not(:disabled) {
@@ -80,6 +86,9 @@
   border-radius: var(--nf-radius-pill);
   background: var(--chip-color, var(--nf-color-fg-muted));
   flex-shrink: 0;
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 /*

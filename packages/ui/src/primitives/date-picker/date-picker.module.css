@@ -5,9 +5,12 @@
   border-radius: var(--nf-radius-md);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-accent-fg);
   background: var(--nf-color-accent-subtle);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .trigger:hover {
@@ -57,6 +60,7 @@
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -103,8 +107,11 @@
   block-size: 2.25rem;
   border-radius: var(--nf-radius-pill);
   font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .day:hover:not([aria-disabled="true"]) {

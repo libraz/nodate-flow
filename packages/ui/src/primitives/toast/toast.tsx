@@ -17,11 +17,20 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cx } from '../../lib/cx';
+import { buttonClassName } from '../button/button';
 import styles from './toast.module.css';
 
 const PORTAL_ID = 'nf-toast-root';
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'danger';
+
+/** Inline toast button, e.g. "Undo" after a reversible destructive action. */
+export interface ToastAction {
+  /** Already-translated button label. */
+  label: string;
+  /** Runs on activation; the toast is dismissed right after. */
+  onAction: () => void;
+}
 
 export interface ToastOptions {
   /** Already-translated toast body. */
@@ -30,10 +39,13 @@ export interface ToastOptions {
   tone?: ToastTone;
   /** Auto-dismiss duration in ms. Defaults to 5000. */
   duration?: number;
+  /** Optional inline action button. */
+  action?: ToastAction;
 }
 
 export interface Toast extends Required<Pick<ToastOptions, 'message'>> {
   id: string;
+  action?: ToastAction;
   tone: ToastTone;
   duration: number;
 }
@@ -66,6 +78,7 @@ class ToastStore {
       message: options.message,
       tone: options.tone ?? 'info',
       duration: options.duration ?? 5000,
+      ...(options.action ? { action: options.action } : {}),
     };
     this.toasts = [...this.toasts, toast];
     this.emit();
@@ -116,7 +129,9 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast }: ToastItemProps): ReactElement {
-  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const paused = hovered || focusWithin;
   const remainingRef = useRef<number>(toast.duration);
   const startedRef = useRef<number>(Date.now());
 
@@ -143,16 +158,30 @@ function ToastItem({ toast }: ToastItemProps): ReactElement {
           : styles.info;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: handlers only pause auto-dismiss on hover/focus; the toast itself is non-interactive content announced via the parent aria-live region
+    // biome-ignore lint/a11y/noStaticElementInteractions: handlers only pause auto-dismiss on hover/focus; the container is not itself a control, its optional action button is
     <div
       className={cx(styles.toast, toneClass)}
       data-tone={toast.tone}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocusWithin(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false);
+      }}
     >
       {toast.message}
+      {toast.action ? (
+        <button
+          type="button"
+          className={cx(buttonClassName({ variant: 'ghost', size: 'sm' }), styles.action)}
+          onClick={() => {
+            toast.action?.onAction();
+            store.dismiss(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      ) : null}
     </div>
   );
 }

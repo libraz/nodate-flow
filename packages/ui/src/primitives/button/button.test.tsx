@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import Button from './button';
+import Button, { buttonClassName } from './button';
 
 const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
 
@@ -108,5 +108,30 @@ describe.each(THEMES)('Button [%s]', (theme) => {
     // At least one class should match the css-module .root hash so the
     // :focus-visible rule actually targets this element.
     expect(classes.some((c) => /root/.test(c))).toBe(true);
+  });
+});
+
+describe('buttonClassName', () => {
+  it('produces exactly the classes Button renders, for every variant and size', () => {
+    const variants = ['default', 'primary', 'danger', 'ghost'] as const;
+    const sizes = ['sm', 'md', 'lg'] as const;
+    for (const variant of variants) {
+      for (const size of sizes) {
+        const { getByRole, unmount } = render(
+          <Button variant={variant} size={size} className="extra">
+            go
+          </Button>,
+        );
+        expect(buttonClassName({ variant, size, className: 'extra' })).toBe(
+          getByRole('button').className,
+        );
+        unmount();
+      }
+    }
+  });
+
+  it('defaults to the default variant at md size', () => {
+    const { getByRole } = render(<Button>go</Button>);
+    expect(buttonClassName()).toBe(getByRole('button').className);
   });
 });

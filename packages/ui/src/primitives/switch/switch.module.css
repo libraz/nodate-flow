@@ -9,7 +9,13 @@
   border: var(--nf-space-px) solid var(--nf-color-border-strong);
   background: var(--nf-color-bg-sunken);
   cursor: pointer;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.root:hover:not(:disabled) {
+  border-color: var(--nf-color-fg-subtle);
 }
 
 .thumb {
@@ -20,11 +26,13 @@
   block-size: var(--nf-space-4);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-fg-on-accent);
+  box-shadow: var(--nf-shadow-sm);
   transform: translateY(-50%);
-  transition: inset-inline-start var(--nf-duration-fast) var(--nf-ease-standard);
+  transition: inset-inline-start var(--nf-duration-base) var(--nf-ease-out);
 }
 
-.root[aria-checked="true"] {
+.root[aria-checked="true"],
+.root[aria-checked="true"]:hover:not(:disabled) {
   background: var(--nf-color-accent);
   border-color: var(--nf-color-accent);
 }

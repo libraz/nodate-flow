@@ -12,4 +12,29 @@
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 16rem;
   pointer-events: none;
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* Enter from the anchor's side; see popover.module.css for the left / right pin. */
+.tooltip[data-side="top"] {
+  animation-name: global(nf-slide-in-from-block-end);
+}
+
+.tooltip[data-side="bottom"] {
+  animation-name: global(nf-slide-in-from-block-start);
+}
+
+.tooltip[data-side="left"] {
+  --nf-motion-inline-sign: 1;
+  animation-name: global(nf-slide-in-from-inline-end);
+}
+
+.tooltip[data-side="right"] {
+  --nf-motion-inline-sign: 1;
+  animation-name: global(nf-slide-in-from-inline-start);
+}
+
+.tooltip[data-state="closed"] {
+  animation: global(nf-fade-out) var(--nf-duration-instant) var(--nf-ease-in) forwards;
 }

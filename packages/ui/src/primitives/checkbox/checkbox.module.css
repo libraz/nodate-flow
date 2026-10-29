@@ -1,12 +1,52 @@
+/*
+ * Drawn checkbox: `appearance: none` hands the box to these rules so the
+ * tick can animate. The tick is a clip-path on `::before`, filled with the
+ * on-accent colour; forced-colours mode gets the native control back.
+ */
 .root {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
   inline-size: var(--nf-space-4);
   block-size: var(--nf-space-4);
   margin: 0;
-  accent-color: var(--nf-color-accent);
   border: var(--nf-space-px) solid var(--nf-color-border-strong);
   border-radius: var(--nf-radius-xs);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.root::before {
+  content: "";
+  inline-size: var(--nf-space-2-5);
+  block-size: var(--nf-space-2-5);
+  background: var(--nf-color-fg-on-accent);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  scale: 0;
+  transition: scale var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+.root:hover:not(:disabled) {
+  border-color: var(--nf-color-accent);
+}
+
+.root:checked,
+.root:indeterminate {
+  background: var(--nf-color-accent);
+  border-color: var(--nf-color-accent);
+}
+
+.root:checked::before {
+  scale: 1;
+}
+
+.root:indeterminate::before {
+  clip-path: inset(40% 5%);
+  scale: 1;
 }
 
 .root:focus-visible {
@@ -17,4 +57,14 @@
 .root:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (forced-colors: active) {
+  .root {
+    appearance: auto;
+  }
+
+  .root::before {
+    content: none;
+  }
 }

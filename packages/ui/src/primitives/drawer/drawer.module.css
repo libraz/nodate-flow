@@ -3,6 +3,12 @@
   inset: 0;
   background: var(--nf-color-overlay);
   z-index: var(--nf-z-modal);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .drawer {
@@ -60,6 +66,39 @@
   max-block-size: 100%;
   border-start-start-radius: var(--nf-radius-lg);
   border-start-end-radius: var(--nf-radius-lg);
+}
+
+/* Each side enters from, and leaves toward, the edge it is attached to. */
+.inlineEnd {
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] .inlineEnd {
+  animation: global(nf-slide-out-to-inline-end) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.inlineStart {
+  animation: global(nf-slide-in-from-inline-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] .inlineStart {
+  animation: global(nf-slide-out-to-inline-start) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.blockStart {
+  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] .blockStart {
+  animation: global(nf-slide-out-to-block-start) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
+.blockEnd {
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.overlay[data-state="closed"] .blockEnd {
+  animation: global(nf-slide-out-to-block-end) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .title {

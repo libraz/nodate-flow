@@ -15,20 +15,7 @@
   inset-inline-start: 0;
   inline-size: 100%;
   background: linear-gradient(90deg, transparent, var(--nf-color-surface-hover), transparent);
-  animation: shimmer var(--nf-duration-slow) var(--nf-ease-standard) infinite;
-}
-
-@keyframes shimmer {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .root::after {
-    animation: none;
-  }
+  /* An ambient loop, not a response: slow enough to read as calm. Still a
+     multiple of a duration token, so reduced motion stills it. */
+  animation: global(nf-shimmer) calc(var(--nf-duration-slow) * 6) var(--nf-ease-standard) infinite;
 }

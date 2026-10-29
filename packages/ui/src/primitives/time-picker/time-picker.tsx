@@ -19,7 +19,7 @@ export interface TimePickerProps {
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
   /** Additional class on the trigger button. */
-  className?: string;
+  className?: string | undefined;
 }
 
 function generateSlots(step: number): string[] {

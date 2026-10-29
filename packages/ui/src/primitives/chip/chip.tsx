@@ -2,6 +2,7 @@
  * Chip — small dismissible tag for active filters and selections.
  */
 
+import { X } from 'lucide-react';
 import { forwardRef, type HTMLAttributes, type ReactElement } from 'react';
 import { cx } from '../../lib/cx';
 import styles from './chip.module.css';
@@ -46,7 +47,7 @@ const Chip = forwardRef<HTMLSpanElement, ChipProps>(
           onClick={onDismiss}
           className={styles.dismiss}
         >
-          {'\u00d7'}
+          <X aria-hidden focusable={false} size="1em" />
         </button>
       )}
     </span>

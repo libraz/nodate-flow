@@ -102,3 +102,39 @@ describe.each(THEMES)('FormField [%s]', (theme) => {
     expect(input.getAttribute('aria-describedby')).toBeNull();
   });
 });
+
+describe('FormField error announcement', () => {
+  it('inserts the error into a live region that existed before it', () => {
+    const { container, rerender } = render(
+      <FormField label="Email">{(c) => <Input {...c} />}</FormField>,
+    );
+    // The region is in the tree, empty, before any error arrives.
+    const region = container.querySelector('[aria-live="polite"]');
+    expect(region).not.toBeNull();
+    expect(region?.textContent).toBe('');
+
+    rerender(
+      <FormField label="Email" error="Required">
+        {(c) => <Input {...c} />}
+      </FormField>,
+    );
+    // Same node, now holding the message: an insertion AT announces.
+    expect(container.querySelector('[aria-live="polite"]')).toBe(region);
+    expect(region?.textContent).toBe('Required');
+
+    // aria-describedby still points at the message itself.
+    const input = screen.getByLabelText('Email');
+    const errorId = input.getAttribute('aria-describedby') ?? '';
+    expect(document.getElementById(errorId)?.textContent).toBe('Required');
+    expect(region?.contains(document.getElementById(errorId))).toBe(true);
+  });
+
+  it('does not add an alert role, so the message is not announced assertively twice', () => {
+    render(
+      <FormField label="Email" error="Required">
+        {(c) => <Input {...c} />}
+      </FormField>,
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

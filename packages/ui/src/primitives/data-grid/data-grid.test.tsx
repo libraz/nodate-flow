@@ -246,3 +246,50 @@ describe.each(THEMES)('DataGrid [%s]', (theme) => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe('DataGrid getRowProps', () => {
+  it('attaches caller ref, handlers and data attributes to every body row', () => {
+    const attached: HTMLElement[] = [];
+    const onDrop = vi.fn();
+    const container = renderGrid({
+      getRowProps: (row) => ({
+        ref: (node) => {
+          if (node) attached.push(node);
+        },
+        'data-drop-index': row.index,
+        className: 'caller-row',
+        onDragOver: (e) => e.preventDefault(),
+        onDrop: () => onDrop(row.index),
+      }),
+    });
+
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>('[role="row"][data-drop-index]'),
+    );
+    expect(rows).toHaveLength(ROWS.length);
+    expect(attached).toEqual(rows);
+    expect(rows[2]?.getAttribute('data-drop-index')).toBe('2');
+    expect(rows[2]?.className).toContain('caller-row');
+
+    // A drop anywhere in the row — not just a handle cell — reaches the row.
+    const nameCell = within(rows[2] as HTMLElement).getByText('Bob');
+    fireEvent.drop(nameCell);
+    expect(onDrop).toHaveBeenCalledWith(2);
+  });
+
+  it('keeps the grid-owned row semantics and position over caller props', () => {
+    const container = renderGrid({
+      enableRowSelection: true,
+      getRowProps: () => ({
+        style: { position: 'static', opacity: 0.5 },
+        'aria-label': 'caller label',
+      }),
+    });
+    const row = container.querySelector<HTMLElement>('[role="row"][aria-label="caller label"]');
+    expect(row).not.toBeNull();
+    expect(row?.getAttribute('role')).toBe('row');
+    expect(row?.getAttribute('aria-selected')).toBe('false');
+    expect(row?.style.position).toBe('absolute');
+    expect(row?.style.opacity).toBe('0.5');
+  });
+});

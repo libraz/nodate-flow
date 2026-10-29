@@ -18,6 +18,7 @@ import {
   useDismiss,
   useFloating,
   useInteractions,
+  useMergeRefs,
   useRole,
 } from '@floating-ui/react';
 import {
@@ -28,6 +29,7 @@ import {
   type ReactNode,
   useState,
 } from 'react';
+import { usePresence } from '../../hooks/use-presence';
 import { cx } from '../../lib/cx';
 import styles from './popover.module.css';
 
@@ -43,7 +45,7 @@ export interface PopoverProps {
   /** Called when the open state changes. */
   onOpenChange?: (open: boolean) => void;
   /** Optional className for the popover panel. */
-  className?: string;
+  className?: string | undefined;
   /**
    * Accessible name for the panel. The panel carries `role="dialog"`, and a
    * dialog without a name is announced as an unlabelled region — the reader
@@ -87,7 +89,12 @@ export default function Popover({
     onOpenChange?.(next);
   };
 
-  const { refs, floatingStyles, context } = useFloating({
+  const {
+    refs,
+    floatingStyles,
+    context,
+    placement: resolvedPlacement,
+  } = useFloating({
     open,
     onOpenChange: setOpen,
     placement,
@@ -100,6 +107,8 @@ export default function Popover({
   const role = useRole(context, { role: 'dialog' });
 
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
+  const presence = usePresence<HTMLDivElement>(open);
+  const floatingRef = useMergeRefs([refs.setFloating, presence.ref]);
 
   if (!isValidElement(children)) {
     return children;
@@ -122,12 +131,18 @@ export default function Popover({
   return (
     <>
       {trigger}
-      {open ? (
+      {presence.mounted ? (
         <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false}>
+          {/* Disabled while closing so focus returns to the trigger at once,
+              not when the exit animation finishes. */}
+          <FloatingFocusManager context={context} modal={false} disabled={!open}>
             <div
-              ref={refs.setFloating}
+              ref={floatingRef}
               style={lockStyle}
+              data-state={presence.state}
+              data-side={resolvedPlacement.split('-')[0]}
+              inert={!open}
+              aria-hidden={!open || undefined}
               className={cx(styles.popover, className)}
               // `useRole` sets the same role through getFloatingProps below;
               // stating it here as well is what lets a static a11y rule see

@@ -20,14 +20,23 @@
  * exception documented in docs/conventions/design-tokens.md).
  */
 
+/*
+ * A grid of equal columns: every segment is as wide as the widest label,
+ * so an ordinal picker never reads as uneven steps. Inline by default so
+ * the group still hugs its content.
+ */
 .root {
-  display: inline-flex;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   align-items: stretch;
   gap: var(--nf-space-1);
   padding: var(--nf-space-1);
   border-radius: var(--nf-radius-md);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: transparent;
+
+  position: relative;
 
   /* Defaults consumed by `.segment` — overridden per-tone for colourful mode. */
   --sc-active-bg: var(--nf-color-accent-subtle);
@@ -37,15 +46,13 @@
 }
 
 /*
- * Opt-in full-width mode. The default `.root` stays `inline-flex` (hugs
- * content) for back-compat with existing inline-toggle call sites; callers
- * that want an equal-width picker (top-level kind / mode / view tabs)
- * pass `fullWidth` to get `display: flex` + `inline-size: 100%` here, which
- * pairs with `.segmentFullWidth` below to make every segment share the
- * available inline size equally (`flex: 1 1 0`).
+ * Opt-in full-width mode: the grid fills the parent and its equal columns
+ * may shrink below their content (`minmax(0, 1fr)`), so long labels
+ * truncate via `.segmentFullWidth` instead of widening their column.
  */
 .rootFullWidth {
-  display: flex;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
   inline-size: 100%;
 }
 
@@ -57,7 +64,20 @@
   min-block-size: var(--nf-space-8);
 }
 
+/* The sliding selected fill; segments paint above it. */
+.thumb {
+  position: absolute;
+  inset-block: var(--nf-space-1);
+  border-radius: var(--nf-radius-sm);
+  background: var(--sc-active-bg);
+  pointer-events: none;
+  transition:
+    inset-inline-start var(--nf-duration-base) var(--nf-ease-out),
+    inline-size var(--nf-duration-base) var(--nf-ease-out);
+}
+
 .segment {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -114,11 +134,15 @@
   font-weight: var(--nf-weight-semibold);
 }
 
+/* Once measured, the sliding thumb replaces the per-segment fill. */
+.root[data-thumb] .segmentActive {
+  background: transparent;
+}
+
 /*
- * Paired with `.rootFullWidth` on the group. Each segment gets an equal
- * share of the available inline size (`flex: 1 1 0`); `min-inline-size: 0`
- * is required so labels that exceed the share truncate via ellipsis rather
- * than pushing siblings wider and undoing the balancing.
+ * Paired with `.rootFullWidth` on the group. `min-inline-size: 0` lets a
+ * label that exceeds its column truncate via ellipsis rather than pushing
+ * the column wider and undoing the balancing.
  *
  * Compound `.segment.segmentFullWidth` selector (specificity 0,2,0) is
  * required because `.size-md .segment` / `.size-sm .segment` (also 0,2,0)
@@ -127,7 +151,6 @@
  * full-width behaviour. Equal specificity + later-in-cascade resolves it.
  */
 .segment.segmentFullWidth {
-  flex: 1 1 0;
   min-inline-size: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -229,11 +252,4 @@
   --sc-inactive-fg: var(--nf-cal-milestone-fg);
   --sc-active-bg: var(--nf-cal-milestone-color);
   --sc-active-fg: var(--nf-color-fg-on-accent);
-}
-
-/* Respect reduced-motion. */
-@media (prefers-reduced-motion: reduce) {
-  .segment {
-    transition: none;
-  }
 }

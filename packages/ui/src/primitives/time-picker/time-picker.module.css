@@ -5,9 +5,12 @@
   border-radius: var(--nf-radius-md);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-accent-fg);
   background: var(--nf-color-accent-subtle);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .trigger:hover {
@@ -38,12 +41,18 @@
   justify-content: center;
   padding: var(--nf-space-2) var(--nf-space-4);
   font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition: background var(--nf-duration-instant) var(--nf-ease-standard);
 }
 
 .slot:hover {
   background: var(--nf-color-surface-hover);
+}
+
+.slot:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: calc(var(--nf-focus-ring-width) * -1);
 }
 
 .slot[data-selected] {

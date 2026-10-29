@@ -189,28 +189,31 @@ function ComboboxImpl(
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPendingSearch = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
 
   const scheduleSearch = useCallback(
     (next: string) => {
       if (!isAsync) return;
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      cancelPendingSearch();
       debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
         onSearchRef.current?.(next);
       }, searchDebounceMs);
     },
-    [isAsync, searchDebounceMs],
+    [cancelPendingSearch, isAsync, searchDebounceMs],
   );
 
-  useEffect(
-    () => () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    },
-    [],
-  );
+  useEffect(() => () => cancelPendingSearch(), [cancelPendingSearch]);
 
   const { refs, floatingStyles, context } = useFloating({
     open,
     onOpenChange: (next) => {
+      if (!next) cancelPendingSearch();
       setOpen(next);
       if (next) {
         if (activeIndex === null) setActiveIndex(0);
@@ -278,6 +281,7 @@ function ComboboxImpl(
 
   const select = (option: ComboboxOption): void => {
     if (option.disabled) return;
+    cancelPendingSearch();
     setSelected(option.value);
     setQuery(option.label);
     setOpen(false);

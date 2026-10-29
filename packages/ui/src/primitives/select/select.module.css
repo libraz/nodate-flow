@@ -1,17 +1,48 @@
+/*
+ * `appearance: none` drops the native arrow, so the chevron is painted
+ * here: two half-filled squares meeting at the centre line. Background
+ * positions have no logical form, hence the RTL override below.
+ */
 .root {
   display: block;
   inline-size: 100%;
+  min-block-size: var(--nf-control-height);
   padding-inline-start: var(--nf-space-3);
   padding-inline-end: var(--nf-space-8);
-  padding-block: var(--nf-space-2);
+  padding-block: var(--nf-space-1-5);
   border-radius: var(--nf-radius-sm);
   border: var(--nf-space-px) solid var(--nf-color-border);
-  background: var(--nf-color-bg-elevated);
+  background-color: var(--nf-color-bg-elevated);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--nf-color-fg-muted) 50%),
+    linear-gradient(135deg, var(--nf-color-fg-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - var(--nf-space-5)) 50%,
+    calc(100% - var(--nf-space-3-5)) 50%;
+  background-size: var(--nf-space-1-5) var(--nf-space-1-5);
+  background-repeat: no-repeat;
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   line-height: var(--nf-leading-normal);
   appearance: none;
+  cursor: pointer;
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+:where([dir="rtl"]) .root {
+  background-position:
+    var(--nf-space-3-5) 50%,
+    var(--nf-space-5) 50%;
+}
+
+/* A list box shows its options in place; it has nothing to drop down. */
+.root:is([multiple], [size]:not([size="1"])) {
+  background-image: none;
+  padding-inline-end: var(--nf-space-3);
+  cursor: default;
 }
 
 .root:hover:not(:disabled) {
@@ -20,7 +51,7 @@
 
 .root:focus-visible {
   outline: none;
-  border-color: var(--nf-color-accent);
+  border-color: var(--nf-color-focus-ring);
   box-shadow: var(--nf-shadow-focus);
 }
 
@@ -29,6 +60,96 @@
   cursor: not-allowed;
 }
 
-.invalid {
+/* Invalid holds through hover and focus; the ring alone marks focus. */
+.invalid,
+.invalid:hover:not(:disabled),
+.invalid:focus-visible {
   border-color: var(--nf-color-danger);
+}
+
+/* The popup list follows the control's surface (color-scheme is inherited from the theme root). */
+.root option {
+  background-color: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+}
+
+/*
+ * Customisable select: the control and its picker are styled directly, so
+ * the painted chevron gives way to ::picker-icon and the list animates in
+ * (enter base/ease-out, exit fast/ease-in). Elsewhere the native popup is used.
+ */
+@supports (appearance: base-select) {
+  .root:not(:is([multiple], [size]:not([size="1"]))) {
+    appearance: base-select;
+    display: flex;
+    align-items: center;
+    gap: var(--nf-space-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-image: none;
+    padding-inline-end: var(--nf-space-3);
+  }
+
+  .root::picker(select) {
+    appearance: base-select;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    margin-block: var(--nf-space-1);
+    padding: var(--nf-space-1);
+    border: var(--nf-space-px) solid var(--nf-color-border);
+    border-radius: var(--nf-radius-md);
+    background: var(--nf-color-bg-elevated);
+    box-shadow: var(--nf-shadow-lg);
+    opacity: 0;
+    scale: var(--nf-motion-scale);
+    transition:
+      opacity var(--nf-duration-fast) var(--nf-ease-in),
+      scale var(--nf-duration-fast) var(--nf-ease-in),
+      display var(--nf-duration-fast) allow-discrete,
+      overlay var(--nf-duration-fast) allow-discrete;
+  }
+
+  .root:open::picker(select) {
+    opacity: 1;
+    scale: 1;
+    transition-duration: var(--nf-duration-base);
+    transition-timing-function: var(--nf-ease-out);
+  }
+
+  @starting-style {
+    .root:open::picker(select) {
+      opacity: 0;
+      scale: var(--nf-motion-scale);
+    }
+  }
+
+  .root::picker-icon {
+    flex: none;
+    margin-inline-start: auto;
+    color: var(--nf-color-fg-muted);
+    transition: rotate var(--nf-duration-fast) var(--nf-ease-standard);
+  }
+
+  .root:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  .root option {
+    padding-block: var(--nf-space-1-5);
+    padding-inline: var(--nf-space-2);
+    border-radius: var(--nf-radius-sm);
+  }
+
+  .root option:hover,
+  .root option:focus-visible {
+    background-color: var(--nf-color-accent-subtle);
+  }
+
+  .root option:checked {
+    color: var(--nf-color-accent-fg);
+    font-weight: var(--nf-weight-semibold);
+  }
 }

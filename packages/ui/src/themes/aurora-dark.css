@@ -79,12 +79,12 @@
   --nf-motion-duration: var(--nf-duration-base);
   --nf-motion-easing: var(--nf-ease-emphasized);
 
-  /* Brand wordmark gradient — mint → violet → warm coral against dark bg. */
+  /* Brand wordmark gradient — tonal teal, one hue family with depth. */
   --nf-gradient-wordmark: linear-gradient(
     115deg,
-    oklch(82% 0.16 180) 0%,
-    oklch(74% 0.18 285) 48%,
-    oklch(80% 0.15 25) 100%
+    oklch(86% 0.11 190) 0%,
+    oklch(80% 0.13 178) 50%,
+    oklch(85% 0.1 166) 100%
   );
 
   /*

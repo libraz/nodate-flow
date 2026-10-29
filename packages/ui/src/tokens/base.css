@@ -143,6 +143,10 @@
   --nf-measure-content: 48rem;
   --nf-measure-narrow: 32rem;
 
+  /* Single-line control height shared by md Button, Input, Select and
+     Combobox, so a field and its action line up in one row. */
+  --nf-control-height: 2.25rem;
+
   /* z-index */
   --nf-z-base: 0;
   --nf-z-dropdown: 1000;
@@ -167,6 +171,20 @@
   --nf-ease-linear: linear;
   --nf-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --nf-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  /* Enter decelerates into rest; exit accelerates away and runs at
+     --nf-duration-fast, so a dismissal never feels slower than its cause. */
+  --nf-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --nf-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /*
+   * motion distances — how far an entering surface travels. A surface
+   * that moves further than a spacing step reads as arriving from
+   * somewhere else rather than settling into place.
+   */
+  --nf-motion-shift: var(--nf-space-2);
+  --nf-motion-shift-sm: var(--nf-space-1);
+  --nf-motion-scale: 0.97;
+  --nf-motion-press-scale: 0.98;
 }
 
 @media (prefers-reduced-motion: reduce) {
