@@ -194,6 +194,8 @@ docker compose -f compose.prod.yml exec -T mysql \
 docker compose -f compose.prod.yml up -d
 ```
 
+`sql/schema.sql` には 3 つの層がすべて入っています。core、nodate-time と共有する time 層、flow 層です。同じデータベースで nodate-time も動いている場合、このファイルを流し直すと nodate-time のデータも消えます。データを残すには、その場で upgrade します。両方のアプリケーションを止め、`sql/core/upgrades/*.sql` を番号順に流し、続けて `sql/time/upgrades/` の time 層の upgrade を流します。最後に `bash sql/core/conformance/run.sh --dsn 'user:pass@host:port/db' --mode schema` で結果を確かめます。手順は `sql/core/PROTOCOL.md` にあります。
+
 ### バックアップ
 
 永続データは `mysql_data` と `storage_data` の 2 つのボリュームにあります。添付ファイルは片方の行がもう片方のオブジェクトを指す関係なので、必ず揃えて取得してください。

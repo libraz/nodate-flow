@@ -201,6 +201,8 @@ docker compose -f compose.prod.yml exec -T mysql \
 docker compose -f compose.prod.yml up -d
 ```
 
+`sql/schema.sql` holds all three schema layers: core, the time layer shared with nodate-time, and flow. When nodate-time runs on the same database, re-applying the file erases its data too. To keep the data, upgrade in place instead: stop both applications, apply `sql/core/upgrades/*.sql` in number order, then the time layer's upgrade in `sql/time/upgrades/`, and check the result with `bash sql/core/conformance/run.sh --dsn 'user:pass@host:port/db' --mode schema`. `sql/core/PROTOCOL.md` describes the order.
+
 ### Backups
 
 Two volumes hold everything durable, `mysql_data` and `storage_data`. Back them up together, because an attachment is a row in one pointing at an object in the other.
