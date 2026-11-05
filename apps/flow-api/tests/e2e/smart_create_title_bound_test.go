@@ -13,10 +13,10 @@ import (
 // identify that subtask and short enough to survive the cut.
 const smartCreateLongTitleSentinel = "Overlong AAAAA"
 
-// tasksTitleMaxLen is the width of tasks.title. Stated here rather than
-// read from the tool so the test fails if the tool's bound is loosened
-// past the column.
-const tasksTitleMaxLen = 255
+// tasksTitleMaxLen is the width of tasks.title in characters. Stated here
+// rather than read from the tool so the test fails if the tool's bound is
+// loosened past the column.
+const tasksTitleMaxLen = 500
 
 // TestMCPSmartCreateBoundsModelTitles holds the boundary between what a
 // model returns and what a column accepts.
@@ -61,8 +61,10 @@ func TestMCPSmartCreateBoundsModelTitles(t *testing.T) {
 		}
 		found = true
 		require.NotEmptyf(t, sub.ID, "the overlong subtask must have been persisted")
-		require.LessOrEqualf(t, len(sub.Title), tasksTitleMaxLen,
-			"the proposed title reached the column unbounded")
+		// Equal rather than at-most: the fixture's title is longer than the
+		// column, so a title at the bound is the proof that the cut ran.
+		require.Equalf(t, tasksTitleMaxLen, utf8.RuneCountInString(sub.Title),
+			"the proposed title was not cut at the column width")
 		require.Truef(t, utf8.ValidString(sub.Title),
 			"the cut severed a multi-byte character: %q", sub.Title)
 
