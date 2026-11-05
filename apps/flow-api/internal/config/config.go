@@ -241,7 +241,7 @@ type Config struct {
 	// SMTPFrom is the default envelope sender address.
 	SMTPFrom string `env:"NF_FLOW_SMTP_FROM" envDefault:"noreply@nodate-flow.local"`
 
-	// FlowWebURL is the origin of the flow-web frontend that hosts the
+	// FlowWebURL is the base URL of the flow-web frontend that hosts the
 	// public /invites/accept RSVP page. Used by calendar handlers when
 	// dispatching event-invite magic-link emails so the recipient can
 	// reach the accept page hosted alongside the rest of the app.
@@ -290,7 +290,7 @@ type Config struct {
 	// local MinIO development should set NF_S3_USE_SSL=false.
 	S3UseSSL bool `env:"NF_S3_USE_SSL" envDefault:"true"`
 
-	// PublicURL is the externally-visible origin of the flow-api (path prefix
+	// PublicURL is the externally-visible base URL of the flow-api (path prefix
 	// preserved), used as the base of the signed blob URLs handed to browsers.
 	PublicURL string `env:"NF_FLOW_PUBLIC_URL" envDefault:"http://localhost:8080"`
 }

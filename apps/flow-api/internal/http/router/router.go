@@ -2241,8 +2241,9 @@ func (g *embedBudgetGuard) Check(ctx context.Context, workspaceID uint32) error 
 }
 
 // scalarHTML is the self-contained HTML page that loads the Scalar API
-// reference UI from their CDN. It points at the co-located /openapi.json
-// route so the spec is always in sync with the running server.
+// reference UI from their CDN. data-url is relative so it resolves to the
+// sibling /openapi.json of /api-reference both at the root and under a
+// path prefix.
 const scalarHTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -2251,7 +2252,7 @@ const scalarHTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-  <script id="api-reference" data-url="/openapi.json"></script>
+  <script id="api-reference" data-url="openapi.json"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`

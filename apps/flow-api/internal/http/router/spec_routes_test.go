@@ -154,8 +154,8 @@ func TestAPIReferenceRenders(t *testing.T) {
 		t.Errorf("GET /api-reference returned Content-Type %q, want text/html", ct)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `data-url="/openapi.json"`) {
-		t.Error("the reference UI does not point at /openapi.json, so it renders nothing or renders a document from somewhere else")
+	if !strings.Contains(body, `data-url="openapi.json"`) {
+		t.Error("the reference UI does not point at the relative openapi.json, so it renders nothing or renders a document from somewhere else")
 	}
 }
 
