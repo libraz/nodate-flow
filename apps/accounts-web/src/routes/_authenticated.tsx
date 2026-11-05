@@ -23,9 +23,10 @@ export function AuthenticatedLayout(): ReactElement | null {
   const navigate = useNavigate();
   const location = useLocation();
   const pageKey = location.pathname.startsWith('/admin') ? '/admin' : location.pathname;
-  // pathname + search + hash, without the origin — /login resolves it
-  // against this app's own origin, so it stays a same-origin target.
-  const returnTo = location.href;
+  // pathname + search + hash including the basepath, without the origin:
+  // /login hands it to window.location, which knows nothing of the router
+  // basepath, and resolves it against this app's own origin.
+  const returnTo = location.publicHref;
   // The layout stays mounted while the bounce is in flight, and
   // `returnTo` follows the location, so without a latch the effect would
   // fire again with `/login?redirect=...` as the new destination and keep

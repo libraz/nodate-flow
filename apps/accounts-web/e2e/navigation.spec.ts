@@ -13,7 +13,7 @@ import { injectAuth } from './fixtures/tenant';
 
 test.describe('public route navigation', () => {
   test('login -> signup -> login round-trip', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('login');
     await page.waitForLoadState('networkidle');
 
     // Login -> Signup
@@ -28,17 +28,17 @@ test.describe('public route navigation', () => {
   });
 
   test('/ redirects to /login', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('');
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
   });
 
   test('unauthenticated /profile redirects to login', async ({ page }) => {
-    await page.goto('/profile');
+    await page.goto('profile');
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
   });
 
   test('unauthenticated /admin redirects to login', async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto('admin');
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
   });
 });
@@ -48,7 +48,7 @@ test.describe('authenticated navigation', () => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /profile/i })).toBeVisible();
 

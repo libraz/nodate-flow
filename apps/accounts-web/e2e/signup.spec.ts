@@ -11,7 +11,7 @@ import { checkA11y } from './helpers/a11y';
 
 test.describe('signup page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/signup');
+    await page.goto('signup');
     await page.waitForLoadState('networkidle');
   });
 

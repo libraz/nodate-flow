@@ -65,7 +65,7 @@ test.describe('admin instance stats dashboard', () => {
   }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/stats');
+    await page.goto('admin/stats');
     await page.waitForLoadState('networkidle');
 
     // Title + subtitle
@@ -100,7 +100,7 @@ test.describe('admin instance stats dashboard', () => {
     const statsPromise = page.waitForResponse(
       (res) => res.url().includes('/admin/instance-stats') && res.status() === 200,
     );
-    await page.goto('/admin/stats');
+    await page.goto('admin/stats');
     const statsRes = await statsPromise;
     const stats = (await statsRes.json()) as { totalUsers: number; totalWorkspaces: number };
     expect(typeof stats.totalUsers).toBe('number');
@@ -131,7 +131,7 @@ test.describe('admin instance stats dashboard', () => {
   }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/stats');
+    await page.goto('admin/stats');
     await page.waitForLoadState('networkidle');
 
     const refreshButton = page.getByRole('button', { name: copy.refresh });
@@ -170,7 +170,7 @@ test.describe('admin instance stats dashboard', () => {
 
     // Land on a sibling admin route so the sub-nav is rendered and
     // we are forced to use the link rather than the URL bar.
-    await page.goto('/admin/users');
+    await page.goto('admin/users');
     await page.waitForLoadState('networkidle');
 
     const statsLink = page.getByRole('link', { name: copy.navStats, exact: true });
@@ -198,7 +198,7 @@ test.describe('admin instance stats dashboard', () => {
       }),
     );
 
-    await page.goto('/admin/stats');
+    await page.goto('admin/stats');
     await page.waitForLoadState('networkidle');
 
     const alert = page.getByRole('alert');
@@ -220,7 +220,7 @@ test.describe('admin instance stats dashboard', () => {
       localStorage.setItem('nf.lang', 'ja');
     });
 
-    await page.goto('/admin/stats');
+    await page.goto('admin/stats');
     await page.waitForLoadState('networkidle');
 
     await expect(page.getByRole('heading', { name: copy.jaPageTitle, level: 1 })).toBeVisible();
@@ -234,7 +234,7 @@ test.describe('admin instance stats dashboard', () => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
 
-      await page.goto('/admin/stats');
+      await page.goto('admin/stats');
       await page.waitForLoadState('networkidle');
 
       const usersLabel = page.getByText(copy.usersTitle, { exact: true });

@@ -13,20 +13,19 @@ import { isSafeRedirect, parseAllowedOrigins } from '@nodate-flow/sdk';
 
 /**
  * Origins other than this app's own that a redirect may point at.
- * Sign-in hands the user back to the product frontend, which runs on a
- * different origin in every deployment (and on a different port in local
- * dev), so the set has to come from configuration:
+ * In production the product frontend shares this app's origin, so its
+ * redirects pass without configuration; in local dev it is another port
+ * of localhost. Extra origins come from
  * `VITE_NF_ALLOWED_REDIRECT_ORIGINS` (comma-separated) plus the product
- * frontend origin the profile page already links to. Anything else is
- * refused and the user lands on /profile instead.
+ * frontend origin the profile page links to. Anything else is refused
+ * and the user lands on /profile instead.
  */
 export const ALLOWED_REDIRECT_ORIGINS = parseAllowedOrigins(
   [
     import.meta.env.VITE_NF_ALLOWED_REDIRECT_ORIGINS ?? '',
     import.meta.env.VITE_FLOW_WEB_URL ?? '',
-    // Local dev serves the two apps on different ports of localhost, so
-    // the hand-off is cross-origin there too. Dev-only: a production
-    // build must name its product origin in the config above.
+    // Dev serves the two apps on different ports, so the hand-off is
+    // cross-origin there. Dev-only; production is same-origin.
     import.meta.env.DEV ? 'http://localhost:5173' : '',
   ].join(','),
 );

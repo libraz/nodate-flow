@@ -16,7 +16,7 @@ test.describe('admin detail pages', () => {
   test('user detail page renders from user list', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/users');
+    await page.goto('admin/users');
     await page.waitForLoadState('networkidle');
 
     // Wait for the user table to load
@@ -50,7 +50,7 @@ test.describe('admin detail pages', () => {
   test('user detail page has sessions section', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/users');
+    await page.goto('admin/users');
     await page.waitForLoadState('networkidle');
 
     await page.waitForSelector('td', { timeout: 10_000 });
@@ -70,7 +70,7 @@ test.describe('admin detail pages', () => {
   test('user detail page back link returns to user list', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/users');
+    await page.goto('admin/users');
     await page.waitForLoadState('networkidle');
 
     await page.waitForSelector('td', { timeout: 10_000 });
@@ -93,7 +93,7 @@ test.describe('admin detail pages', () => {
   test('workspace detail page renders from workspace list', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/workspaces');
+    await page.goto('admin/workspaces');
     await page.waitForLoadState('networkidle');
 
     // globalSetup seeds a workspace for the admin tenant, so the list
@@ -129,7 +129,7 @@ test.describe('admin detail pages', () => {
   test('workspace detail page back link returns to workspace list', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/workspaces');
+    await page.goto('admin/workspaces');
     await page.waitForLoadState('networkidle');
 
     await page.waitForSelector('td', { timeout: 10_000 });
@@ -152,7 +152,7 @@ test.describe('admin detail pages', () => {
   test('accessibility check on user detail page', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/users');
+    await page.goto('admin/users');
     await page.waitForLoadState('networkidle');
 
     await page.waitForSelector('td', { timeout: 10_000 });
@@ -168,7 +168,7 @@ test.describe('admin detail pages', () => {
   test('accessibility check on workspace detail page', async ({ page }) => {
     const { admin } = loadTenants();
     await injectAuth(page.context(), admin);
-    await page.goto('/admin/workspaces');
+    await page.goto('admin/workspaces');
     await page.waitForLoadState('networkidle');
 
     await page.waitForSelector('td', { timeout: 10_000 });

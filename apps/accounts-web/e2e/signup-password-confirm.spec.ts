@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('signup password confirmation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/signup');
+    await page.goto('signup');
     await page.waitForLoadState('networkidle');
   });
 

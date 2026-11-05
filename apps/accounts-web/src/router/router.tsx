@@ -16,6 +16,7 @@ export interface RouterContext {
 export const router = createRouter({
   routeTree,
   context: { queryClient, i18n } satisfies RouterContext,
+  basepath: import.meta.env.BASE_URL,
   defaultPreload: 'intent',
 });
 

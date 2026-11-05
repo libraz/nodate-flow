@@ -17,7 +17,7 @@ test.describe('security page interactions', () => {
   test('password change form has current and new password fields', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // Password section heading
@@ -43,7 +43,7 @@ test.describe('security page interactions', () => {
   test('TOTP section shows an action button for the current status', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // TOTP heading
@@ -69,7 +69,7 @@ test.describe('security page interactions', () => {
   test('active sessions section shows at least one session', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // Sessions heading
@@ -85,7 +85,7 @@ test.describe('security page interactions', () => {
   test('no i18n keys exposed', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // Wait for all sections to finish loading. The TOTP action button is the
@@ -105,7 +105,7 @@ test.describe('security page interactions', () => {
   test('accessibility check', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // Wait for async content to settle. See the TOTP test above for why

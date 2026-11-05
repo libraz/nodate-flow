@@ -9,7 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
-const WEB_BASE_URL = process.env.NF_ACCOUNTS_WEB_URL ?? 'http://localhost:5175';
+const WEB_BASE_URL = process.env.NF_ACCOUNTS_WEB_URL ?? 'http://localhost:5175/accounts/';
 const WEB_PORT = (() => {
   try {
     return new URL(WEB_BASE_URL).port || '5175';

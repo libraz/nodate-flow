@@ -60,7 +60,7 @@ test.describe('magic-link request', () => {
     const tenant = await createTestTenant();
 
     await enableMagicLink(page);
-    await page.goto('/login');
+    await page.goto('login');
     await page.getByRole('button', { name: copy.magicButton, exact: true }).click();
 
     // Magic-link card is visible.
@@ -88,7 +88,7 @@ test.describe('magic-link request', () => {
 
   test('B: unknown email also renders success (enumeration-safe)', async ({ page }) => {
     await enableMagicLink(page);
-    await page.goto('/login');
+    await page.goto('login');
     await page.getByRole('button', { name: copy.magicButton, exact: true }).click();
     await expect(
       page.getByRole('heading', { name: copy.magicTitle, level: 1, exact: true }),
@@ -108,7 +108,7 @@ test.describe('magic-link request', () => {
     const tenant = await createTestTenant();
 
     await enableMagicLink(page);
-    await page.goto('/login');
+    await page.goto('login');
     await page.getByRole('button', { name: copy.magicButton, exact: true }).click();
     await expect(
       page.getByRole('heading', { name: copy.magicTitle, level: 1, exact: true }),

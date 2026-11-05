@@ -25,7 +25,7 @@ test.describe('admin themed confirm dialog', () => {
       void dialog.dismiss();
     });
 
-    await page.goto('/admin/workspaces');
+    await page.goto('admin/workspaces');
     await page.waitForLoadState('networkidle');
 
     // global-setup seeds a workspace for both `user` and `admin`, so

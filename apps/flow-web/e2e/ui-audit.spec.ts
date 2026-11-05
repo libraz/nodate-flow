@@ -37,14 +37,14 @@ test.describe('not-found page', () => {
 test.describe('login page', () => {
   test('redirects to the centralised accounts login', async ({ page }) => {
     await page.goto('/login');
-    await expect(page).toHaveURL(/http:\/\/localhost:5175\/login\?redirect=/);
+    await expect(page).toHaveURL(/http:\/\/localhost:5175\/accounts\/login\?redirect=/);
   });
 });
 
 test.describe('signup page', () => {
   test('redirects to the centralised accounts signup', async ({ page }) => {
     await page.goto('/signup');
-    await expect(page).toHaveURL(/http:\/\/localhost:5175\/signup\?redirect=/);
+    await expect(page).toHaveURL(/http:\/\/localhost:5175\/accounts\/signup\?redirect=/);
   });
 });
 

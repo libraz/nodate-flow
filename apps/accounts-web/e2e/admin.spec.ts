@@ -51,7 +51,7 @@ test.describe('admin pages', () => {
     test('admin layout renders sidebar navigation', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin');
+      await page.goto('admin');
       await page.waitForLoadState('networkidle');
 
       // Should have navigation links for admin sections
@@ -67,7 +67,7 @@ test.describe('admin pages', () => {
     test('renders user list with table headers', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByRole('heading', { name: /user management/i })).toBeVisible();
@@ -86,7 +86,7 @@ test.describe('admin pages', () => {
     test('status badges are readable (text visible on badge background)', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
 
       // Wait for data to load
@@ -108,7 +108,7 @@ test.describe('admin pages', () => {
     test('search input filters users', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
 
       const searchInput = page.getByPlaceholder(/search users/i);
@@ -118,7 +118,7 @@ test.describe('admin pages', () => {
     test('status filter dropdown exposes the three states', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
 
       // The filter is a <select> (combobox), not a tablist. Verify the
@@ -135,7 +135,7 @@ test.describe('admin pages', () => {
     test('user row links to user detail', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
       await page.waitForSelector('td', { timeout: 10_000 });
 
@@ -155,7 +155,7 @@ test.describe('admin pages', () => {
     test('no i18n keys exposed', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/users');
+      await page.goto('admin/users');
       await page.waitForLoadState('networkidle');
 
       const body = await page.locator('body').textContent();
@@ -167,7 +167,7 @@ test.describe('admin pages', () => {
     test('renders workspace list with table headers', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/workspaces');
+      await page.goto('admin/workspaces');
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByRole('heading', { name: /workspace management/i })).toBeVisible();
@@ -181,7 +181,7 @@ test.describe('admin pages', () => {
     test('workspace status badges readable', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/workspaces');
+      await page.goto('admin/workspaces');
       await page.waitForLoadState('networkidle');
 
       // global-setup seeds workspaces for both `user` and `admin`, so
@@ -206,7 +206,7 @@ test.describe('admin pages', () => {
     test('renders admin list and grant section', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByRole('heading', { name: /instance administrators/i })).toBeVisible();
@@ -226,7 +226,7 @@ test.describe('admin pages', () => {
     test('grant UI uses search dropdown instead of raw ID input', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       // There should be NO input asking for a user ID
@@ -240,7 +240,7 @@ test.describe('admin pages', () => {
     test('search dropdown appears on input', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       const searchInput = page.getByPlaceholder(/search by name or email/i);
@@ -268,7 +268,7 @@ test.describe('admin pages', () => {
 
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       // Combobox should expose ARIA combobox role
@@ -325,7 +325,7 @@ test.describe('admin pages', () => {
     test('hint text is descriptive', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       // Should have hint text about searching
@@ -335,7 +335,7 @@ test.describe('admin pages', () => {
     test('revoke buttons present for existing admins', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/admins');
+      await page.goto('admin/admins');
       await page.waitForLoadState('networkidle');
 
       // The shared admin tenant from globalSetup is granted instance
@@ -353,7 +353,7 @@ test.describe('admin pages', () => {
     test('renders audit log page structure', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/audit-logs');
+      await page.goto('admin/audit-logs');
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible();
@@ -366,7 +366,7 @@ test.describe('admin pages', () => {
     test('no i18n keys exposed', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/audit-logs');
+      await page.goto('admin/audit-logs');
       await page.waitForLoadState('networkidle');
 
       const body = await page.locator('body').textContent();
@@ -378,7 +378,7 @@ test.describe('admin pages', () => {
     test('renders settings form', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/settings');
+      await page.goto('admin/settings');
       await page.waitForLoadState('networkidle');
 
       await expect(page.getByRole('heading', { name: /instance settings/i })).toBeVisible();
@@ -394,7 +394,7 @@ test.describe('admin pages', () => {
     test('no i18n keys exposed', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/settings');
+      await page.goto('admin/settings');
       await page.waitForLoadState('networkidle');
 
       const body = await page.locator('body').textContent();
@@ -404,7 +404,7 @@ test.describe('admin pages', () => {
     test('accessibility check', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
-      await page.goto('/admin/settings');
+      await page.goto('admin/settings');
       await page.waitForLoadState('networkidle');
       await checkA11y(page, ['color-contrast']);
     });

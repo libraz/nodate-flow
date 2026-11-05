@@ -139,7 +139,7 @@ test.describe('TOTP login', () => {
       headers: { authorization: `Bearer ${tenant.accessToken}` },
     });
 
-    await page.goto('/login');
+    await page.goto('login');
     await page.locator('input[type="email"]').fill(tenant.email);
     await page.locator('input[type="password"]').fill(tenant.password);
     await page.getByRole('button', { name: copy.signIn, exact: true }).click();
@@ -175,7 +175,7 @@ test.describe('TOTP login', () => {
       headers: { authorization: `Bearer ${tenant.accessToken}` },
     });
 
-    await page.goto('/login');
+    await page.goto('login');
     await page.locator('input[type="email"]').fill(tenant.email);
     await page.locator('input[type="password"]').fill(tenant.password);
     await page.getByRole('button', { name: copy.signIn, exact: true }).click();

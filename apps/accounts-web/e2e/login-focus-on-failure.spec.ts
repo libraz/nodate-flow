@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('login focus management on failure', () => {
   test('focus moves to the email input when the form is submitted empty', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('login');
     await page.waitForLoadState('networkidle');
 
     // Click the submit button without filling anything.
@@ -35,7 +35,7 @@ test.describe('login focus management on failure', () => {
       });
     });
 
-    await page.goto('/login');
+    await page.goto('login');
     await page.waitForLoadState('networkidle');
 
     await page.locator('input[name="email"]').fill('user@example.test');

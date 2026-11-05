@@ -16,7 +16,7 @@ test.describe('profile save', () => {
   test('changing display name persists after reload', async ({ page }) => {
     const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
 
     // Wait for the form to be populated
@@ -58,7 +58,7 @@ test.describe('profile save', () => {
   test('accessibility check on profile page', async ({ page }) => {
     const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
     await checkA11y(page, ['color-contrast', 'region']);
   });

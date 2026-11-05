@@ -42,7 +42,7 @@ test.describe('admin user-detail action mutations', () => {
     const { admin, user2 } = loadTenants();
     await injectAuth(page.context(), admin);
 
-    await page.goto(`/admin/users/${user2.userId}`);
+    await page.goto(`admin/users/${user2.userId}`);
     await expect(page.getByRole('heading', { name: copy.detailHeading })).toBeVisible({
       timeout: 10_000,
     });
@@ -92,7 +92,7 @@ test.describe('admin user-detail action mutations', () => {
     const { admin, user2 } = loadTenants();
     await injectAuth(page.context(), admin);
 
-    await page.goto(`/admin/users/${user2.userId}`);
+    await page.goto(`admin/users/${user2.userId}`);
     await expect(page.getByRole('heading', { name: copy.detailHeading })).toBeVisible({
       timeout: 10_000,
     });

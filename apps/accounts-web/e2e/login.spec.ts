@@ -12,7 +12,7 @@ import { checkA11y } from './helpers/a11y';
 
 test.describe('login page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('login');
     await page.waitForLoadState('networkidle');
   });
 

@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Served under /accounts/ in every mode; the router basepath derives from this.
+  base: '/accounts/',
   plugins: [
     TanStackRouterVite({
       routesDirectory: './src/routes',

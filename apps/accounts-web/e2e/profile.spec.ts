@@ -15,7 +15,7 @@ test.describe('profile page', () => {
   test('renders profile form with user data', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
 
     // Heading
@@ -39,7 +39,7 @@ test.describe('profile page', () => {
   test('theme selector has all expected options', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
 
     const themeSelect = page.getByLabel(/theme/i);
@@ -56,7 +56,7 @@ test.describe('profile page', () => {
   test('security link navigates to security page', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
 
     const secLink = page.getByRole('link', { name: /security/i });
@@ -70,7 +70,7 @@ test.describe('profile page', () => {
   test('no i18n keys exposed', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
 
     const body = await page.locator('body').textContent();
@@ -80,7 +80,7 @@ test.describe('profile page', () => {
   test('accessibility check', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/profile');
+    await page.goto('profile');
     await page.waitForLoadState('networkidle');
     await checkA11y(page, ['color-contrast']);
   });

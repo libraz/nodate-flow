@@ -94,7 +94,8 @@ function AuthenticatedLayout(): ReactElement | null {
   useEffect(() => {
     if (status === 'unauthenticated' && !isAuthenticated) {
       const accountsUrl =
-        (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175';
+        (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ??
+        'http://localhost:5175/accounts';
       const target = `${accountsUrl}/login?redirect=${encodeURIComponent(window.location.href)}`;
       // accountsUrl comes from build-time config, so it is the allowlist
       // here; the check still stops a malformed value from turning into

@@ -16,7 +16,7 @@ test.describe('workspace list page', () => {
   test('renders heading and workspace list or empty state', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     // Main heading "Workspaces"
@@ -33,7 +33,7 @@ test.describe('workspace list page', () => {
   test('shows back-to-profile link', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const profileLink = page.getByRole('link', { name: /back to profile|profile/i });
@@ -43,7 +43,7 @@ test.describe('workspace list page', () => {
   test('no i18n keys exposed', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const body = await page.locator('body').textContent();
@@ -53,7 +53,7 @@ test.describe('workspace list page', () => {
   test('accessibility check', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
     await checkA11y(page, ['color-contrast', 'region']);
   });
@@ -63,7 +63,7 @@ test.describe('workspace edit page', () => {
   test('renders edit form when navigating to workspace detail', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     // global-setup seeds a workspace for `user`, so the link is a hard
@@ -89,7 +89,7 @@ test.describe('workspace edit page', () => {
   test('workspace name field is pre-populated', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
@@ -113,7 +113,7 @@ test.describe('workspace edit page', () => {
   test('timezone selector exists on edit page', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
@@ -132,7 +132,7 @@ test.describe('workspace edit page', () => {
   test('no i18n keys exposed on edit page', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();
@@ -151,7 +151,7 @@ test.describe('workspace edit page', () => {
   test('accessibility check on edit page', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/workspaces');
+    await page.goto('workspaces');
     await page.waitForLoadState('networkidle');
 
     const wsLink = page.locator('a[href*="/workspaces/"]').first();

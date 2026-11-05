@@ -38,7 +38,7 @@ test.describe('login rate-limit countdown', () => {
       });
     });
 
-    await page.goto('/login');
+    await page.goto('login');
     await page.waitForLoadState('networkidle');
 
     await page.locator('input[name="email"]').fill('user@example.test');

@@ -15,7 +15,7 @@ test.describe('security page', () => {
   test('renders security sections', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     // Main heading
@@ -36,7 +36,7 @@ test.describe('security page', () => {
   test('back to profile link works', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     const backLink = page.getByRole('link', { name: /back to profile|profile/i });
@@ -49,7 +49,7 @@ test.describe('security page', () => {
   test('no i18n keys exposed', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
 
     const body = await page.locator('body').textContent();
@@ -59,7 +59,7 @@ test.describe('security page', () => {
   test('accessibility check', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
-    await page.goto('/security');
+    await page.goto('security');
     await page.waitForLoadState('networkidle');
     await checkA11y(page, ['color-contrast']);
   });
