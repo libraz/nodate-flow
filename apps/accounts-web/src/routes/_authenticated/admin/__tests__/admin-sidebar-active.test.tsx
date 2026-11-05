@@ -111,6 +111,7 @@ beforeEach(() => {
     country: 'US',
     themePreference: 'system',
     isInstanceAdmin: true,
+    hasPassword: true,
   });
 });
 

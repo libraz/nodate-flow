@@ -89,6 +89,7 @@ function makeUser(id: string): AuthUser {
     country: 'JP',
     themePreference: 'aurora-light',
     isInstanceAdmin: false,
+    hasPassword: true,
   };
 }
 

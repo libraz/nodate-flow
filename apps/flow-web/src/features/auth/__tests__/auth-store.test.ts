@@ -21,6 +21,7 @@ describe('authStore', () => {
     country: '',
     themePreference: 'aurora-dark',
     isInstanceAdmin: false,
+    hasPassword: true,
   };
 
   it('stores themePreference via setSession', () => {

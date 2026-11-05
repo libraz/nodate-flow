@@ -56,6 +56,15 @@ type Config struct {
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
 
+	// PasswordLoginEnabled controls whether email+password accounts are
+	// available: registration, password login, password change and TOTP
+	// management (TOTP is the second factor of a password account; the
+	// challenge endpoint stays so accounts enrolled earlier remain
+	// protected). Set to false for an OAuth/OIDC-only instance. The routes are then not
+	// registered at all, so RegistrationOpen=true only opens OIDC
+	// auto-provisioning (still subject to the OAuth sign-in allowlist).
+	PasswordLoginEnabled bool `env:"NF_PASSWORD_LOGIN_ENABLED" envDefault:"true"`
+
 	// OAuthAllowedDomains is an opt-in sign-in allowlist of email
 	// domains permitted to authenticate via OAuth/OIDC (e.g.
 	// "example.com,corp.example.org"). Entries are normalized to lower

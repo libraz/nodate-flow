@@ -22,7 +22,7 @@ import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import type { ReactElement, ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import enAuth from '../../../locales/en/auth.json';
 
@@ -55,8 +55,10 @@ vi.mock('../../lib/sdk', () => ({
   },
 }));
 
-vi.mock('../../features/auth/use-capabilities', () => ({
-  useCapabilities: () => capsMocks.current,
+vi.mock('../../features/auth/use-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/auth/use-capabilities')>()),
+  useCapabilities: () =>
+    capsMocks.current ? { status: 'ready', caps: capsMocks.current } : { status: 'loading' },
 }));
 
 import { Route as LoginRoute } from '../login';
@@ -140,5 +142,32 @@ describe('<LoginPage> after OAuthButtonRow extraction (W7)', () => {
   it('still renders the SSO divider copy from the login namespace', async () => {
     mountLogin();
     await screen.findByText(enAuth.login.sso_divider);
+  });
+});
+
+describe('<LoginPage> on an instance without password accounts', () => {
+  const allCaps = { ...capsMocks.current };
+
+  beforeEach(() => {
+    capsMocks.current = { ...allCaps, passwordLogin: false };
+  });
+
+  afterEach(() => {
+    capsMocks.current = allCaps;
+  });
+
+  it('renders the provider buttons and no password form', async () => {
+    mountLogin();
+    expect(await screen.findByRole('button', { name: enAuth.login.sso_google })).toBeDefined();
+    expect(screen.queryByLabelText(new RegExp(enAuth.login.email))).toBeNull();
+    expect(screen.queryByLabelText(new RegExp(enAuth.login.password))).toBeNull();
+    expect(screen.queryByRole('button', { name: enAuth.login.submit })).toBeNull();
+  });
+
+  it('offers no sign-up link or divider above the provider buttons', async () => {
+    mountLogin();
+    await screen.findByRole('button', { name: enAuth.login.sso_google });
+    expect(screen.queryByText(enAuth.login.signup_link)).toBeNull();
+    expect(screen.queryByText(enAuth.login.sso_divider)).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
 
@@ -36,6 +37,8 @@ func rateLimitDeps(t *testing.T, authMax int) Deps {
 		Queries:                   generated.New(db),
 		JWT:                       issuer,
 		DisableRateLimit:          false,
+		PasswordLoginEnabled:      true,
+		EmailSender:               &email.MemorySender{},
 		RateLimitGlobalMax:        10000,
 		RateLimitGlobalWindowSec:  60,
 		RateLimitAuthMax:          authMax,

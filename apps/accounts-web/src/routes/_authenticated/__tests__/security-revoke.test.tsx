@@ -52,6 +52,22 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   ToastProvider: () => null,
 }));
 
+vi.mock('../../../features/auth/use-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/auth/use-capabilities')>()),
+  useCapabilities: () => ({
+    status: 'ready',
+    caps: {
+      passwordLogin: true,
+      oidcGoogle: false,
+      oidcGithub: false,
+      oidcMicrosoft: false,
+      magicLink: false,
+      totp: true,
+      registrationOpen: true,
+    },
+  }),
+}));
+
 import { SecurityPage } from '../security';
 
 function buildI18n(): ReturnType<typeof i18n.createInstance> {
@@ -106,6 +122,7 @@ beforeEach(() => {
     country: 'US',
     themePreference: 'system',
     isInstanceAdmin: false,
+    hasPassword: true,
   });
 });
 

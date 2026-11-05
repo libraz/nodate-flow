@@ -7,6 +7,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -18,6 +19,7 @@ import AuthCard from '../components/auth-card';
 import { type SignupFormValues, signupSchema } from '../features/auth/auth-schemas';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
+import { capsOf, useCapabilities } from '../features/auth/use-capabilities';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
 import { apiRequest } from '../lib/api';
@@ -30,10 +32,16 @@ import { useSubmitGuard } from '../lib/use-submit-guard';
  */
 type RegisterResponse = components['schemas']['AuthTokens'];
 
-function SignupPage(): ReactElement {
+function SignupPage(): ReactElement | null {
   const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const isAuthenticated = useAuth(selectIsAuthenticated);
+  const capsState = useCapabilities();
+  const caps = capsOf(capsState);
+  // Sign-up here creates a password account, so an instance without
+  // password accounts sends visitors to the sign-in page, which offers the
+  // identity providers.
+  const passwordLoginDisabled = caps !== null && !caps.passwordLogin;
 
   const {
     register,
@@ -65,6 +73,12 @@ function SignupPage(): ReactElement {
       void navigate({ to: '/profile', replace: true });
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (passwordLoginDisabled) {
+      void navigate({ to: '/login', replace: true });
+    }
+  }, [passwordLoginDisabled, navigate]);
 
   useEffect(() => {
     if (serverError) {
@@ -126,6 +140,18 @@ function SignupPage(): ReactElement {
       }
     },
   );
+
+  if (capsState.status === 'error') {
+    return (
+      <AuthCard>
+        <ErrorFallback
+          title={t('fatal.title')}
+          action={{ label: t('fatal.retry'), onClick: capsState.retry }}
+        />
+      </AuthCard>
+    );
+  }
+  if (caps === null || passwordLoginDisabled) return null;
 
   return (
     <AuthCard>

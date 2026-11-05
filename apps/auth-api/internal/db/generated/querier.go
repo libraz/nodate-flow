@@ -413,6 +413,9 @@ type Querier interface {
 	// avatar_storage_object_id is the FK for a self-hosted (uploaded) avatar;
 	// avatar_url stays for externally hosted avatars (e.g. OIDC provider). The
 	// handler resolves the storage object public_id / signed URL separately.
+	// has_password is true when the account holds a local password the caller can
+	// reauthenticate with; an OIDC-only account has none, so password change and
+	// TOTP management are refused for it.
 	FindUserProfileById(ctx context.Context, id uint32) (FindUserProfileByIdRow, error)
 	// Resolve the public UUID for an internal users.id, excluding disabled rows.
 	FindUserPublicIdById(ctx context.Context, id uint32) (types.PublicID, error)

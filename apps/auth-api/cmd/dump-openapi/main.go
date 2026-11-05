@@ -13,6 +13,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/router"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/openapiutil"
 )
 
@@ -28,7 +29,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	res := router.BuildResult(router.Deps{JWT: issuer})
+	// The published document describes the full surface, so every
+	// optional route group (password accounts, magic link) is switched on.
+	res := router.BuildResult(router.Deps{
+		JWT:                  issuer,
+		PasswordLoginEnabled: true,
+		EmailSender:          &email.MemorySender{},
+	})
 	// The fold lives in go-shared because flow-api needs the same one:
 	// two hand-written folds can only be compared after they have already
 	// drifted, and the comparison cannot say which one was right. It

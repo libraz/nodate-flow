@@ -23,7 +23,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiRequest } from '../../lib/api';
 import { type AuthErrorI18nKey, mapAuthThrown } from '../../lib/auth-errors';
-import { useCapabilities } from '../auth/use-capabilities';
+import { capsOf, useCapabilities } from '../auth/use-capabilities';
 import styles from './oauth-button-row.module.css';
 import { rememberOidcRedirect } from './oidc-redirect';
 
@@ -75,7 +75,7 @@ export interface OAuthButtonRowProps {
  */
 function OAuthButtonRow({ mode, redirect, onError }: OAuthButtonRowProps): ReactElement | null {
   const { t } = useTranslation('auth');
-  const caps = useCapabilities();
+  const caps = capsOf(useCapabilities());
   // Tracks the in-flight provider so we can disable every button while a
   // start call is pending. We do not use `useSubmitGuard()` here because
   // the success path navigates via `window.location` and never releases
@@ -127,11 +127,14 @@ function OAuthButtonRow({ mode, redirect, onError }: OAuthButtonRowProps): React
   // does not influence rendering today.
   return (
     <div data-mode={mode}>
-      <div className={styles.divider}>
-        <hr className={styles.dividerRule} />
-        <span>{t('login.sso_divider')}</span>
-        <hr className={styles.dividerRule} />
-      </div>
+      {/* The divider separates the buttons from the password form above; without one it has nothing to divide. */}
+      {caps.passwordLogin && (
+        <div className={styles.divider}>
+          <hr className={styles.dividerRule} />
+          <span>{t('login.sso_divider')}</span>
+          <hr className={styles.dividerRule} />
+        </div>
+      )}
 
       <div className={styles.providers}>
         {caps.oidcGoogle && (

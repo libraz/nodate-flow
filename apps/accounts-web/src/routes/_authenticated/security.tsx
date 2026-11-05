@@ -8,6 +8,7 @@ import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagge
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
@@ -24,7 +25,9 @@ import {
   type ChangePasswordFormValues,
   changePasswordSchema,
 } from '../../features/auth/auth-schemas';
+import { selectUser, useAuth } from '../../features/auth/auth-store';
 import PasswordInput from '../../features/auth/password-input';
+import { capsOf, useCapabilities } from '../../features/auth/use-capabilities';
 import { useCapsLockHint } from '../../features/auth/use-caps-lock-hint';
 import { apiRequest } from '../../lib/api';
 import { type AuthErrorI18nKey, mapAuthThrown, refusalCode } from '../../lib/auth-errors';
@@ -164,6 +167,14 @@ function formatRelative(ts: number, locale: string): string {
 export function SecurityPage(): ReactElement {
   const { t, i18n } = useTranslation('auth');
   const locale = i18n.resolvedLanguage ?? 'en';
+  // Password change and two-factor management depend on the capabilities
+  // and on the account holding a local password; they render only once
+  // both are known.
+  const capsState = useCapabilities();
+  const caps = capsOf(capsState);
+  const hasPassword = useAuth(selectUser)?.hasPassword === true;
+  const passwordLogin = caps?.passwordLogin === true && hasPassword;
+  const totpManagement = caps?.totp === true && hasPassword;
 
   // -- Password change --
   const [passwordError, setPasswordError] = useState<AuthErrorI18nKey | null>(null);
@@ -265,76 +276,100 @@ export function SecurityPage(): ReactElement {
     <AuthCard>
       <h1 className="aw-page-title">{t('security.title')}</h1>
 
-      {/* Password change */}
-      <section className="aw-stack aw-stack-4">
-        <h2 className="aw-section-title">{t('security.password_title')}</h2>
-        <form
-          onSubmit={(e) => {
-            void handleSubmit(onChangePassword)(e);
-          }}
-          noValidate
-          className="aw-stack aw-stack-4"
-        >
-          <FormField
-            label={t('security.current_password')}
-            required
-            {...(errors.currentPassword?.message
-              ? { error: t(errors.currentPassword.message) }
-              : {})}
-          >
-            {(control) => {
-              const { ref, ...field } = register('currentPassword');
-              return (
-                <PasswordInput {...control} {...field} ref={ref} autoComplete="current-password" />
-              );
-            }}
-          </FormField>
+      {capsState.status === 'error' && (
+        <>
+          <ErrorFallback
+            title={t('fatal.title')}
+            action={{ label: t('fatal.retry'), onClick: capsState.retry }}
+          />
 
-          <FormField
-            label={t('security.new_password')}
-            required
-            {...(errors.newPassword?.message ? { error: t(errors.newPassword.message) } : {})}
-          >
-            {(control) => {
-              const { ref, ...field } = register('newPassword');
-              return (
-                <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />
-              );
-            }}
-          </FormField>
+          <hr className="aw-rule" />
+        </>
+      )}
 
-          {passwordError ? (
-            <p role="alert" className="aw-error">
-              {t(passwordError)}
-            </p>
-          ) : null}
-
-          {passwordSuccess ? (
-            <output className="aw-success">{t('security.password_changed')}</output>
-          ) : null}
-
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              aria-busy={isSubmitting || undefined}
-              disabled={isSubmitting}
+      {passwordLogin && (
+        <>
+          {/* Password change */}
+          <section className="aw-stack aw-stack-4">
+            <h2 className="aw-section-title">{t('security.password_title')}</h2>
+            <form
+              onSubmit={(e) => {
+                void handleSubmit(onChangePassword)(e);
+              }}
+              noValidate
+              className="aw-stack aw-stack-4"
             >
-              {t('security.password_change')}
-            </Button>
-          </div>
-        </form>
-      </section>
+              <FormField
+                label={t('security.current_password')}
+                required
+                {...(errors.currentPassword?.message
+                  ? { error: t(errors.currentPassword.message) }
+                  : {})}
+              >
+                {(control) => {
+                  const { ref, ...field } = register('currentPassword');
+                  return (
+                    <PasswordInput
+                      {...control}
+                      {...field}
+                      ref={ref}
+                      autoComplete="current-password"
+                    />
+                  );
+                }}
+              </FormField>
 
-      <hr className="aw-rule" />
+              <FormField
+                label={t('security.new_password')}
+                required
+                {...(errors.newPassword?.message ? { error: t(errors.newPassword.message) } : {})}
+              >
+                {(control) => {
+                  const { ref, ...field } = register('newPassword');
+                  return (
+                    <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />
+                  );
+                }}
+              </FormField>
 
-      {/* TOTP management */}
-      <section className="aw-stack aw-stack-4">
-        <h2 className="aw-section-title">{t('security.totp.title')}</h2>
-        <TotpSection />
-      </section>
+              {passwordError ? (
+                <p role="alert" className="aw-error">
+                  {t(passwordError)}
+                </p>
+              ) : null}
 
-      <hr className="aw-rule" />
+              {passwordSuccess ? (
+                <output className="aw-success">{t('security.password_changed')}</output>
+              ) : null}
+
+              <div>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  aria-busy={isSubmitting || undefined}
+                  disabled={isSubmitting}
+                >
+                  {t('security.password_change')}
+                </Button>
+              </div>
+            </form>
+          </section>
+
+          <hr className="aw-rule" />
+        </>
+      )}
+
+      {totpManagement && (
+        <>
+          {/* TOTP management */}
+          <section className="aw-stack aw-stack-4">
+            <h2 className="aw-section-title">{t('security.totp.title')}</h2>
+            <TotpSection />
+          </section>
+
+          <hr className="aw-rule" />
+        </>
+      )}
 
       {/* Active sessions */}
       <section className="aw-stack aw-stack-4">

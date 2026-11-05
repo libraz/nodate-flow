@@ -69,6 +69,7 @@ const PROFILE = {
   country: 'JP',
   themePreference: 'system',
   isInstanceAdmin: false,
+  hasPassword: true,
 };
 
 beforeEach(() => {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 )
 
 // stubDeps returns the minimal Deps the router needs to build with
@@ -35,6 +36,9 @@ func stubDeps(t *testing.T) Deps {
 		Queries:          generated.New(db),
 		JWT:              issuer,
 		DisableRateLimit: true,
+		// Full route surface: every optional group is registered.
+		PasswordLoginEnabled: true,
+		EmailSender:          &email.MemorySender{},
 	}
 }
 

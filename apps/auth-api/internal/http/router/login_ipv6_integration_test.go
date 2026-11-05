@@ -18,6 +18,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
+	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
 
@@ -55,11 +56,13 @@ func ipv6Deps(t *testing.T, db *sql.DB) Deps {
 	issuer, err := auth.NewJWTIssuer(nil, "nodate-auth", "api", 15*time.Minute)
 	require.NoError(t, err)
 	return Deps{
-		DB:                db,
-		Queries:           generated.New(db),
-		JWT:               issuer,
-		DisableRateLimit:  true,
-		MinPasswordLength: 8,
+		DB:                   db,
+		Queries:              generated.New(db),
+		JWT:                  issuer,
+		DisableRateLimit:     true,
+		MinPasswordLength:    8,
+		PasswordLoginEnabled: true,
+		EmailSender:          &email.MemorySender{},
 	}
 }
 

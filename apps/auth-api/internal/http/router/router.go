@@ -42,14 +42,19 @@ type Deps struct {
 	Sessions                  sessionstore.Store
 	// SingleUse records redeemed one-time token identifiers. Nil selects
 	// the in-process default, which is correct for a single replica.
-	SingleUse         authn.SingleUseStore
-	Cipher            *crypto.Cipher
-	CookieSecure      bool
-	CookiePathPrefix  string
-	RegistrationOpen  bool
-	MinPasswordLength int
-	DisableRateLimit  bool
-	TrustedProxyHops  int
+	SingleUse        authn.SingleUseStore
+	Cipher           *crypto.Cipher
+	CookieSecure     bool
+	CookiePathPrefix string
+	RegistrationOpen bool
+	// PasswordLoginEnabled registers the email+password routes (register,
+	// login, password change) and the TOTP management routes, TOTP being
+	// the second factor of a password account. POST /auth/login/totp stays
+	// registered. When false only OAuth/OIDC sign-in is offered.
+	PasswordLoginEnabled bool
+	MinPasswordLength    int
+	DisableRateLimit     bool
+	TrustedProxyHops     int
 
 	// OAuthAllowedDomains / OAuthAllowedEmails carry the environment half
 	// of the opt-in OAuth/OIDC sign-in allowlist (normalized in
@@ -224,6 +229,7 @@ func BuildResult(deps Deps) Result {
 		CookieSecure:              deps.CookieSecure,
 		CookiePathPrefix:          deps.CookiePathPrefix,
 		RegistrationOpen:          deps.RegistrationOpen,
+		PasswordLoginEnabled:      deps.PasswordLoginEnabled,
 		OAuthAllowedDomains:       deps.OAuthAllowedDomains,
 		OAuthAllowedEmails:        deps.OAuthAllowedEmails,
 		MinPasswordLength:         deps.MinPasswordLength,
@@ -276,20 +282,23 @@ func BuildResult(deps Deps) Result {
 			sub.Use(authRateLimiter.Middleware())
 		}
 		subAPI := newSubAPI(sub)
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "auth-register",
-			Method:      http.MethodPost,
-			Path:        "/auth/register",
-			Summary:     "Register a new local-password account",
-			Description: "Creates a new local user account from email + password. Refuses when registration is closed (RegistrationOpen=false) and validates against MinPasswordLength. On success issues an access token and sets the refresh cookie. Rate-limited.",
-		}, authhandlers.Register(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "auth-login",
-			Method:      http.MethodPost,
-			Path:        "/auth/login",
-			Summary:     "Log in with email and password",
-			Description: "Authenticates a local-password user. When TOTP is enabled returns a step-up challenge instead of a session; otherwise issues an access token and sets the refresh cookie. Rate-limited per IP.",
-		}, authhandlers.Login(authDeps))
+		// Password accounts exist only when password login is enabled.
+		if authDeps.PasswordLoginEnabled {
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "auth-register",
+				Method:      http.MethodPost,
+				Path:        "/auth/register",
+				Summary:     "Register a new local-password account",
+				Description: "Creates a new local user account from email + password. Refuses when registration is closed (RegistrationOpen=false) and validates against MinPasswordLength. On success issues an access token and sets the refresh cookie. Rate-limited.",
+			}, authhandlers.Register(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "auth-login",
+				Method:      http.MethodPost,
+				Path:        "/auth/login",
+				Summary:     "Log in with email and password",
+				Description: "Authenticates a local-password user. When TOTP is enabled returns a step-up challenge instead of a session; otherwise issues an access token and sets the refresh cookie. Rate-limited per IP.",
+			}, authhandlers.Login(authDeps))
+		}
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "auth-oidc-google-start",
 			Method:      http.MethodGet,
@@ -332,20 +341,24 @@ func BuildResult(deps Deps) Result {
 			Summary:     "Complete a Microsoft OIDC login flow",
 			Description: "Receives the authorization code from Microsoft, exchanges it for ID tokens, upserts the user, and bounces back to the web app with a session cookie. Validates the state nonce minted by /start.",
 		}, authhandlers.OIDCMicrosoftCallback(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "auth-magic-link-request",
-			Method:      http.MethodPost,
-			Path:        "/auth/magic-link/request",
-			Summary:     "Request a passwordless magic link",
-			Description: "Issues a single-use signed token by email so the recipient can log in without a password. Always returns 200 to avoid revealing whether the address is registered. Rate-limited per IP.",
-		}, authhandlers.MagicLinkRequest(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "auth-magic-link-verify",
-			Method:      http.MethodGet,
-			Path:        "/auth/magic-link/verify",
-			Summary:     "Verify a magic link token and issue session",
-			Description: "Consumes the one-time token from /auth/magic-link/request, marks it spent, and issues an access token plus refresh cookie. Tokens expire quickly and can be redeemed only once.",
-		}, authhandlers.MagicLinkVerify(authDeps))
+		// A magic link needs a mailer to deliver it; without one the request
+		// would succeed and send nothing.
+		if authDeps.MailerConfigured() {
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "auth-magic-link-request",
+				Method:      http.MethodPost,
+				Path:        "/auth/magic-link/request",
+				Summary:     "Request a passwordless magic link",
+				Description: "Issues a single-use signed token by email so the recipient can log in without a password. Always returns 200 to avoid revealing whether the address is registered. Rate-limited per IP.",
+			}, authhandlers.MagicLinkRequest(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "auth-magic-link-verify",
+				Method:      http.MethodGet,
+				Path:        "/auth/magic-link/verify",
+				Summary:     "Verify a magic link token and issue session",
+				Description: "Consumes the one-time token from /auth/magic-link/request, marks it spent, and issues an access token plus refresh cookie. Tokens expire quickly and can be redeemed only once.",
+			}, authhandlers.MagicLinkVerify(authDeps))
+		}
 	})
 
 	// Cookie-auth endpoints (refresh / logout / totp).
@@ -461,57 +474,62 @@ func BuildResult(deps Deps) Result {
 		}, authhandlers.RevokeAllOtherSessions(authDeps))
 
 		// Password
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-password-change",
-			Method:      http.MethodPost,
-			Path:        "/me/password",
-			Summary:     "Change the authenticated user's password",
-			Description: "Requires the current password to match before storing a new bcrypt hash. The new password is validated against MinPasswordLength. Does not revoke other sessions automatically.",
-		}, authhandlers.ChangePassword(authDeps))
+		if authDeps.PasswordLoginEnabled {
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-password-change",
+				Method:      http.MethodPost,
+				Path:        "/me/password",
+				Summary:     "Change the authenticated user's password",
+				Description: "Requires the current password to match before storing a new bcrypt hash. The new password is validated against MinPasswordLength. Does not revoke other sessions automatically.",
+			}, authhandlers.ChangePassword(authDeps))
+		}
 
-		// TOTP
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-status",
-			Method:      http.MethodGet,
-			Path:        "/me/totp",
-			Summary:     "Return TOTP 2FA status",
-			Description: "Reports whether TOTP is enrolled and confirmed for the caller, plus the count of remaining recovery codes. Used by the security panel to show enrollment state.",
-		}, authhandlers.TotpStatus(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-enroll",
-			Method:      http.MethodPost,
-			Path:        "/me/totp/enroll",
-			Summary:     "Begin TOTP 2FA enrollment",
-			Description: "After password reverification, generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
-		}, authhandlers.TotpEnroll(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-confirm",
-			Method:      http.MethodPost,
-			Path:        "/me/totp/confirm",
-			Summary:     "Confirm TOTP 2FA enrollment",
-			Description: "After password reverification, validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
-		}, authhandlers.TotpConfirm(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-disable",
-			Method:      http.MethodDelete,
-			Path:        "/me/totp",
-			Summary:     "Disable TOTP 2FA",
-			Description: "Removes the TOTP secret and recovery codes for the caller. Requires the current password to authorize the change.",
-		}, authhandlers.TotpDisable(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-recovery-status",
-			Method:      http.MethodGet,
-			Path:        "/me/totp/recovery-codes",
-			Summary:     "Return remaining recovery code count",
-			Description: "Reports how many unused recovery codes the caller has left. Does not return the codes themselves; those are only shown at generation time.",
-		}, authhandlers.TotpRecoveryCodesStatus(authDeps))
-		huma.Register(subAPI, huma.Operation{
-			OperationID: "me-totp-recovery-regenerate",
-			Method:      http.MethodPost,
-			Path:        "/me/totp/recovery-codes",
-			Summary:     "Regenerate TOTP recovery codes",
-			Description: "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires the current password.",
-		}, authhandlers.TotpRegenerateRecoveryCodes(authDeps))
+		// TOTP management reauthenticates with the local password, so it goes
+		// with password accounts.
+		if authDeps.TotpManagementRegistered() {
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-status",
+				Method:      http.MethodGet,
+				Path:        "/me/totp",
+				Summary:     "Return TOTP 2FA status",
+				Description: "Reports whether TOTP is enrolled and confirmed for the caller, plus the count of remaining recovery codes. Used by the security panel to show enrollment state.",
+			}, authhandlers.TotpStatus(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-enroll",
+				Method:      http.MethodPost,
+				Path:        "/me/totp/enroll",
+				Summary:     "Begin TOTP 2FA enrollment",
+				Description: "After password reverification, generates a fresh TOTP secret and otpauth:// provisioning URL for the caller to scan. The secret is stored as pending until /me/totp/confirm validates a code.",
+			}, authhandlers.TotpEnroll(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-confirm",
+				Method:      http.MethodPost,
+				Path:        "/me/totp/confirm",
+				Summary:     "Confirm TOTP 2FA enrollment",
+				Description: "After password reverification, validates a 6-digit code against the pending secret from /me/totp/enroll. On success activates TOTP for the caller and returns a fresh batch of recovery codes (shown once).",
+			}, authhandlers.TotpConfirm(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-disable",
+				Method:      http.MethodDelete,
+				Path:        "/me/totp",
+				Summary:     "Disable TOTP 2FA",
+				Description: "Removes the TOTP secret and recovery codes for the caller. Requires the current password to authorize the change.",
+			}, authhandlers.TotpDisable(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-recovery-status",
+				Method:      http.MethodGet,
+				Path:        "/me/totp/recovery-codes",
+				Summary:     "Return remaining recovery code count",
+				Description: "Reports how many unused recovery codes the caller has left. Does not return the codes themselves; those are only shown at generation time.",
+			}, authhandlers.TotpRecoveryCodesStatus(authDeps))
+			huma.Register(subAPI, huma.Operation{
+				OperationID: "me-totp-recovery-regenerate",
+				Method:      http.MethodPost,
+				Path:        "/me/totp/recovery-codes",
+				Summary:     "Regenerate TOTP recovery codes",
+				Description: "Replaces the caller's recovery code batch with a fresh set, invalidating any unused old codes. Returns the new codes (shown once) and requires the current password.",
+			}, authhandlers.TotpRegenerateRecoveryCodes(authDeps))
+		}
 	})
 
 	// Admin setup endpoint (auth-only, no admin check — for bootstrap).

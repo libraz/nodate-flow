@@ -46,14 +46,15 @@ func BuildTestRouterWithStorage(db *sql.DB, jwtKey ed25519.PrivateKey, cipherKey
 		}
 	}
 	return router.Build(router.Deps{
-		DB:               db,
-		Queries:          queries,
-		JWT:              jwtIssuer,
-		Cipher:           cipher,
-		CookieSecure:     false,
-		RegistrationOpen: true,
-		DisableRateLimit: true,
-		Storage:          storageClient,
+		DB:                   db,
+		Queries:              queries,
+		JWT:                  jwtIssuer,
+		Cipher:               cipher,
+		CookieSecure:         false,
+		RegistrationOpen:     true,
+		PasswordLoginEnabled: true,
+		DisableRateLimit:     true,
+		Storage:              storageClient,
 	}), nil
 }
 

@@ -274,14 +274,23 @@ LIMIT 1;
 -- avatar_storage_object_id is the FK for a self-hosted (uploaded) avatar;
 -- avatar_url stays for externally hosted avatars (e.g. OIDC provider). The
 -- handler resolves the storage object public_id / signed URL separately.
+-- has_password is true when the account holds a local password the caller can
+-- reauthenticate with; an OIDC-only account has none, so password change and
+-- TOTP management are refused for it.
 SELECT public_id, email, display_name, locale, timezone, country, week_start, theme_preference, calendar_shift_default,
        avatar_url, avatar_storage_object_id,
        notif_email_digest_enabled, notif_email_mention_enabled,
        notif_email_assignment_enabled, notif_email_due_soon_enabled,
-       notif_web_push_enabled
+       notif_web_push_enabled,
+       EXISTS (
+         SELECT 1 FROM identities
+         WHERE identities.user_id = users.id
+           AND identities.provider = 'local'
+           AND identities.password_hash IS NOT NULL
+       ) AS has_password
 FROM users
-WHERE id = ?
-  AND enabled = TRUE
+WHERE users.id = ?
+  AND users.enabled = TRUE
 LIMIT 1;
 
 -- name: PatchMe :exec

@@ -102,12 +102,25 @@ Compose プラグイン付きの Docker と、ホストにインストールし�
 - `NF_SECRET_KEY`
 - `NF_S3_ACCESS_KEY`、`NF_S3_SECRET_KEY`
 - `NF_FLOW_API_SIGNAL_TOKEN`
-- `NF_SMTP_HOST`、`NF_SMTP_FROM`
 - `NF_FLOW_GH_WEBHOOK_SECRET`、`NF_FLOW_SLACK_SIGNING_SECRET`、`NF_FLOW_GOOGLE_CHANNEL_TOKEN`
 
 秘密の値はすべて `openssl rand -hex 32` で生成してください。flow-api は 3 つの Webhook 秘密がそろっていないと起動しないため、使わない連携の分にも乱数を入れます。誰も知らない乱数であれば、その連携に対するリクエストを偽造できる人はいません。
 
-`NF_SMTP_HOST` が必須なのは、未設定だとマジックリンクの要求が成功を返すだけでメールが送られないためです。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
+SMTP は任意です（`NF_SMTP_HOST`、`NF_SMTP_FROM` と、それに付随する認証情報）。ホストを設定しない場合、マジックリンクでのサインインは提供されず、招待や通知のメールも送られません。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
+
+### OIDC のみのサインイン
+
+パスワードアカウントも SMTP も使わず、IdP 経由のサインインだけを許可するには、`.env` に次を書きます。
+
+```sh
+NF_PASSWORD_LOGIN_ENABLED=false
+NF_AUTH_GOOGLE_CLIENT_ID=...
+NF_AUTH_GOOGLE_CLIENT_SECRET=...
+NF_OAUTH_ALLOWED_DOMAINS=example.com        # または NF_OAUTH_ALLOWED_EMAILS=ceo@example.com
+NF_REGISTRATION_OPEN=true
+```
+
+`NF_PASSWORD_LOGIN_ENABLED=false` にすると、auth-api は `POST /auth/register`、`POST /auth/login`、`POST /me/password` と `/me/totp` 配下の TOTP 管理ルートを登録せず、Web アプリにはプロバイダーのボタンだけが表示されます。二要素目は IdP 側のものを使います。切り替え前に TOTP を登録していたアカウントは、チャレンジ（`POST /auth/login/totp`）とリカバリーコードをそのまま使えますが、パスワードログインを再び有効にするまで TOTP を管理できません。このとき `NF_REGISTRATION_OPEN=true` が開くのは OIDC の自動プロビジョニングだけで、許可リストに載ったドメインとアドレスに限られます。許可リストがないと、プロバイダー上で検証済みのアドレスなら誰でもアカウントを作れるため、必ず設定してください。`NF_SMTP_HOST` を未設定のままにすれば、マジックリンクでのサインインも無効のままです。
 
 ### 証明書
 
@@ -149,7 +162,16 @@ docker run --rm --network $NET curlimages/curl -fsS \
   -H "Authorization: Bearer $token"
 ```
 
-続けて edge を起動します。公開しないインスタンスなら、先に `.env` で `NF_REGISTRATION_OPEN=false` にしておいてください。
+OIDC のみのインスタンスには、登録に使うパスワードがありません。許可リストに自分のアドレスだけを設定したうえで、スタック全体を起動します。プロバイダー経由で一度サインインしてアカウントを作り、そのアカウントに管理者権限を付与します。このコマンドは繰り返し実行しても安全です。
+
+```sh
+docker compose -f compose.prod.yml up -d --build
+docker compose -f compose.prod.yml exec auth-api /grant-admin -email admin@example.com
+```
+
+そのアドレスのユーザーがまだいない場合、`grant-admin` は 0 以外の終了コードで失敗します。
+
+パスワード方式のインスタンスでは、続けて edge を起動します。公開しないインスタンスなら、先に `.env` で `NF_REGISTRATION_OPEN=false` にしておいてください。
 
 ```sh
 docker compose -f compose.prod.yml up -d --build

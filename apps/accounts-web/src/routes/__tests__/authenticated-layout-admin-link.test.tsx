@@ -63,6 +63,7 @@ function makeAdmin(): AuthUser {
     country: 'US',
     themePreference: 'system',
     isInstanceAdmin: true,
+    hasPassword: true,
   };
 }
 

@@ -10,6 +10,7 @@
 import type { components } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router';
@@ -21,7 +22,7 @@ import AuthStep from '../features/auth/auth-step';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import PasswordInput from '../features/auth/password-input';
 import TotpChallengeForm, { type TotpCredential } from '../features/auth/totp-challenge-form';
-import { useCapabilities } from '../features/auth/use-capabilities';
+import { capsOf, useCapabilities } from '../features/auth/use-capabilities';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
@@ -282,7 +283,11 @@ function LoginPage(): ReactElement {
   const navigate = useNavigate();
   const isAuthenticated = useAuth(selectIsAuthenticated);
   const { redirect: redirectTarget } = useSearch({ from: '/login' });
-  const caps = useCapabilities();
+  // The sections below that depend on the capabilities render once they
+  // are known; until then the page shows its title alone.
+  const capsState = useCapabilities();
+  const caps = capsOf(capsState);
+  const passwordLogin = caps?.passwordLogin === true;
 
   const {
     register,
@@ -520,62 +525,77 @@ function LoginPage(): ReactElement {
         >
           <h1 className="aw-page-title">{t('login.title')}</h1>
 
-          {rateLimited ? (
-            <output aria-live="polite" data-testid="login-rate-limit-banner" className="aw-warning">
-              {t('rate_limit.banner', {
-                minutes: rateLimitMinutes,
-                seconds: rateLimitSeconds,
-              })}
-            </output>
-          ) : null}
+          {capsState.status === 'error' && (
+            <ErrorFallback
+              title={t('fatal.title')}
+              action={{ label: t('fatal.retry'), onClick: capsState.retry }}
+            />
+          )}
 
-          <FormField
-            label={t('login.email')}
-            required
-            {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
-          >
-            {(control) => {
-              const { ref: rhfRef, ...field } = register('email');
-              return (
-                <Input
-                  {...control}
-                  {...field}
-                  ref={(el) => {
-                    rhfRef(el);
-                    emailRef.current = el;
-                  }}
-                  type="email"
-                  autoComplete="username"
-                  inputMode="email"
-                  spellCheck={false}
-                  autoFocus
-                  disabled={rateLimited}
-                />
-              );
-            }}
-          </FormField>
+          {passwordLogin && (
+            <>
+              {rateLimited ? (
+                <output
+                  aria-live="polite"
+                  data-testid="login-rate-limit-banner"
+                  className="aw-warning"
+                >
+                  {t('rate_limit.banner', {
+                    minutes: rateLimitMinutes,
+                    seconds: rateLimitSeconds,
+                  })}
+                </output>
+              ) : null}
 
-          <FormField
-            label={t('login.password')}
-            required
-            {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
-          >
-            {(control) => {
-              const { ref: rhfRef, ...field } = register('password');
-              return (
-                <PasswordInput
-                  {...control}
-                  {...field}
-                  ref={(el) => {
-                    rhfRef(el);
-                    passwordRef.current = el;
-                  }}
-                  autoComplete="current-password"
-                  disabled={rateLimited}
-                />
-              );
-            }}
-          </FormField>
+              <FormField
+                label={t('login.email')}
+                required
+                {...(errors.email?.message ? { error: t(errors.email.message) } : {})}
+              >
+                {(control) => {
+                  const { ref: rhfRef, ...field } = register('email');
+                  return (
+                    <Input
+                      {...control}
+                      {...field}
+                      ref={(el) => {
+                        rhfRef(el);
+                        emailRef.current = el;
+                      }}
+                      type="email"
+                      autoComplete="username"
+                      inputMode="email"
+                      spellCheck={false}
+                      autoFocus
+                      disabled={rateLimited}
+                    />
+                  );
+                }}
+              </FormField>
+
+              <FormField
+                label={t('login.password')}
+                required
+                {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
+              >
+                {(control) => {
+                  const { ref: rhfRef, ...field } = register('password');
+                  return (
+                    <PasswordInput
+                      {...control}
+                      {...field}
+                      ref={(el) => {
+                        rhfRef(el);
+                        passwordRef.current = el;
+                      }}
+                      autoComplete="current-password"
+                      disabled={rateLimited}
+                    />
+                  );
+                }}
+              </FormField>
+            </>
+          )}
 
           {serverError ? (
             <p
@@ -589,14 +609,16 @@ function LoginPage(): ReactElement {
             </p>
           ) : null}
 
-          <Button
-            type="submit"
-            variant="primary"
-            aria-busy={isSubmitting || undefined}
-            disabled={isSubmitting || rateLimited}
-          >
-            {t('login.submit')}
-          </Button>
+          {passwordLogin && (
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={isSubmitting || undefined}
+              disabled={isSubmitting || rateLimited}
+            >
+              {t('login.submit')}
+            </Button>
+          )}
 
           <OAuthButtonRow
             mode="login"
@@ -618,7 +640,7 @@ function LoginPage(): ReactElement {
             </>
           )}
 
-          {caps?.registrationOpen !== false && (
+          {passwordLogin && caps?.registrationOpen && (
             <p className="aw-flush aw-muted aw-text-sm aw-text-center">
               {t('login.no_account')}{' '}
               <Link to="/signup" className="aw-link">
@@ -627,7 +649,7 @@ function LoginPage(): ReactElement {
             </p>
           )}
 
-          {DEV_MODE && (
+          {DEV_MODE && passwordLogin && (
             <section className="dql-panel" aria-label={t('login.devQuickLogin.title')}>
               <style>{DEV_PANEL_STYLES}</style>
 

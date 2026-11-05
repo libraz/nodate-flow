@@ -6853,6 +6853,9 @@
           "email": {
             "type": "string"
           },
+          "hasPassword": {
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -6912,6 +6915,7 @@
           "notifEmailAssignment",
           "notifEmailDueSoon",
           "notifWebPush",
+          "hasPassword",
           "isInstanceAdmin"
         ],
         "type": "object"

@@ -72,6 +72,7 @@ function signIn(): void {
     country: 'JP',
     themePreference: 'system',
     isInstanceAdmin: false,
+    hasPassword: true,
     avatarUrl: null,
   });
 }

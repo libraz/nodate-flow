@@ -230,6 +230,8 @@
   },
   "security": {
     "title": "Security",
+    "load_error": "Could not load the security settings.",
+    "retry": "Try again",
     "password": {
       "title": "Password",
       "description": "Change your password. Every other device will be signed out.",

@@ -94,5 +94,6 @@ func rowToMe(row generated.FindUserProfileByIdRow, publicBaseURL string) MeBody 
 		NotifEmailAssignment: row.NotifEmailAssignmentEnabled,
 		NotifEmailDueSoon:    row.NotifEmailDueSoonEnabled,
 		NotifWebPush:         row.NotifWebPushEnabled,
+		HasPassword:          row.HasPassword,
 	}
 }

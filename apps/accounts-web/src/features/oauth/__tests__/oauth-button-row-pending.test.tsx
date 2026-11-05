@@ -42,8 +42,10 @@ vi.mock('../../../lib/sdk', () => ({
   },
 }));
 
-vi.mock('../../auth/use-capabilities', () => ({
-  useCapabilities: () => capsMocks.current,
+vi.mock('../../auth/use-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../auth/use-capabilities')>()),
+  useCapabilities: () =>
+    capsMocks.current ? { status: 'ready', caps: capsMocks.current } : { status: 'loading' },
 }));
 
 import OAuthButtonRow from '../oauth-button-row';

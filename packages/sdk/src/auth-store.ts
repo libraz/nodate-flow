@@ -28,6 +28,12 @@ export interface AuthUser {
   weekStart?: string;
   isInstanceAdmin: boolean;
   /**
+   * Whether the account holds a local password. Password change and
+   * two-factor management reauthenticate with it, so they are offered
+   * only when this is true.
+   */
+  hasPassword: boolean;
+  /**
    * Public avatar URL served by the auth-api proxy
    * ({@code /avatars/<userId>?v=<hash>}) or an external OIDC URL.
    * Undefined when the user has not uploaded a picture.

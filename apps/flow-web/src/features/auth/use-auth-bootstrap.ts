@@ -87,6 +87,7 @@ async function runBootstrap(): Promise<AuthBootstrapStatus> {
     themePreference: data.themePreference,
     weekStart: data.weekStart,
     isInstanceAdmin: data.isInstanceAdmin,
+    hasPassword: data.hasPassword,
     avatarUrl: data.avatarUrl ?? null,
   };
   authStore.getState().setSession(token, user);

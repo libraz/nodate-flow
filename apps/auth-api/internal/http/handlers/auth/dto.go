@@ -87,6 +87,12 @@ type Deps struct {
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	// When false, POST /auth/register returns 403.
 	RegistrationOpen bool
+	// PasswordLoginEnabled reports whether email+password accounts are
+	// available. The router does not register the password routes or the
+	// TOTP management routes (TOTP is the second factor of a password
+	// account) when false; Capabilities echoes it so the web apps can hide
+	// the UI.
+	PasswordLoginEnabled bool
 	// OAuthAllowedDomains / OAuthAllowedEmails carry the environment half
 	// of the opt-in OAuth/OIDC sign-in allowlist, normalized (lower-cased,
 	// trimmed, "@" stripped from domains) in config.Load. They are a floor:
@@ -140,7 +146,8 @@ type CapabilitiesOutput struct {
 // on this instance. Only boolean flags are exposed — no client IDs,
 // secrets, or internal configuration details.
 type CapabilitiesBody struct {
-	// PasswordLogin is always true; local password auth cannot be disabled.
+	// PasswordLogin indicates whether email+password sign-in and
+	// registration are enabled (NF_PASSWORD_LOGIN_ENABLED).
 	PasswordLogin bool `json:"passwordLogin"`
 	// OIDCGoogle indicates whether Google SSO is configured.
 	OIDCGoogle bool `json:"oidcGoogle"`
@@ -350,6 +357,11 @@ type MeBody struct {
 	NotifEmailAssignment bool `json:"notifEmailAssignment"`
 	NotifEmailDueSoon    bool `json:"notifEmailDueSoon"`
 	NotifWebPush         bool `json:"notifWebPush"`
+
+	// HasPassword reports whether the account holds a local password.
+	// Password change and TOTP management reauthenticate with it, so an
+	// OIDC-only account (false) is refused both.
+	HasPassword bool `json:"hasPassword"`
 
 	// IsInstanceAdmin is true when the user has an active instance admin grant.
 	IsInstanceAdmin bool `json:"isInstanceAdmin"`

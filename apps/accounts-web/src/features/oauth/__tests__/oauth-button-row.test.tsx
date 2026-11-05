@@ -45,8 +45,10 @@ vi.mock('../../../lib/sdk', () => ({
   },
 }));
 
-vi.mock('../../auth/use-capabilities', () => ({
-  useCapabilities: () => capsMocks.current,
+vi.mock('../../auth/use-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../auth/use-capabilities')>()),
+  useCapabilities: () =>
+    capsMocks.current ? { status: 'ready', caps: capsMocks.current } : { status: 'loading' },
 }));
 
 import OAuthButtonRow from '../oauth-button-row';
@@ -163,6 +165,27 @@ describe('<OAuthButtonRow>', () => {
     expect(screen.queryByRole('button', { name: enAuth.login.sso_github })).not.toBeNull();
     // Microsoft is disabled in caps — must not render.
     expect(screen.queryByRole('button', { name: enAuth.login.sso_microsoft })).toBeNull();
+  });
+
+  it('draws the divider only when a password form sits above the buttons', () => {
+    const caps = {
+      passwordLogin: true,
+      oidcGoogle: true,
+      oidcGithub: false,
+      oidcMicrosoft: false,
+      magicLink: false,
+      totp: false,
+      registrationOpen: true,
+    };
+    capsMocks.current = caps;
+    const { unmount } = render(<OAuthButtonRow mode="login" />, { wrapper: Wrapper });
+    expect(screen.queryByText(enAuth.login.sso_divider)).not.toBeNull();
+    unmount();
+
+    capsMocks.current = { ...caps, passwordLogin: false };
+    render(<OAuthButtonRow mode="login" />, { wrapper: Wrapper });
+    expect(screen.queryByText(enAuth.login.sso_divider)).toBeNull();
+    expect(screen.queryByRole('button', { name: enAuth.login.sso_google })).not.toBeNull();
   });
 
   it('exposes the mode discriminator as data-mode on the root element', () => {

@@ -78,6 +78,7 @@ function makeUser(overrides: Partial<AuthUser> & { workspaces?: readonly unknown
     country: 'US',
     themePreference: 'system',
     isInstanceAdmin: false,
+    hasPassword: true,
     ...overrides,
   };
 }

@@ -230,6 +230,8 @@
   },
   "security": {
     "title": "安全",
+    "load_error": "无法加载安全设置。",
+    "retry": "重试",
     "password": {
       "title": "密码",
       "description": "更改密码后，所有其他设备都将被注销。",

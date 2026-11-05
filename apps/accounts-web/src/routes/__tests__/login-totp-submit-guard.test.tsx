@@ -62,8 +62,10 @@ vi.mock('../../lib/sdk', () => ({
   },
 }));
 
-vi.mock('../../features/auth/use-capabilities', () => ({
-  useCapabilities: () => capsMocks.current,
+vi.mock('../../features/auth/use-capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../features/auth/use-capabilities')>()),
+  useCapabilities: () =>
+    capsMocks.current ? { status: 'ready', caps: capsMocks.current } : { status: 'loading' },
 }));
 
 import { Route as LoginRoute } from '../login';

@@ -8157,6 +8157,7 @@ export interface components {
             country: string;
             displayName: string;
             email: string;
+            hasPassword: boolean;
             id: string;
             isInstanceAdmin: boolean;
             locale: string;

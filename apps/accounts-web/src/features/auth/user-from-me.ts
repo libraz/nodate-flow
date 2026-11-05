@@ -13,6 +13,7 @@ export function userFromMe(me: MeResponse): AuthUser {
     themePreference: me.themePreference,
     weekStart: me.weekStart,
     isInstanceAdmin: me.isInstanceAdmin,
+    hasPassword: me.hasPassword,
     avatarUrl: me.avatarUrl ?? null,
   };
 }

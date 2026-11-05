@@ -219,6 +219,7 @@ func main() {
 		CookieSecure:              cfg.CookieSecure,
 		CookiePathPrefix:          cfg.CookiePathPrefix,
 		RegistrationOpen:          cfg.RegistrationOpen,
+		PasswordLoginEnabled:      cfg.PasswordLoginEnabled,
 		OAuthAllowedDomains:       cfg.OAuthAllowedDomains,
 		OAuthAllowedEmails:        cfg.OAuthAllowedEmails,
 		MinPasswordLength:         cfg.MinPasswordLength,

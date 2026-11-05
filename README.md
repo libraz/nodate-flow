@@ -109,12 +109,25 @@ Put the settings in a `.env` beside `compose.prod.yml`. These have no default, a
 - `NF_SECRET_KEY`
 - `NF_S3_ACCESS_KEY`, `NF_S3_SECRET_KEY`
 - `NF_FLOW_API_SIGNAL_TOKEN`
-- `NF_SMTP_HOST`, `NF_SMTP_FROM`
 - `NF_FLOW_GH_WEBHOOK_SECRET`, `NF_FLOW_SLACK_SIGNING_SECRET`, `NF_FLOW_GOOGLE_CHANNEL_TOKEN`
 
 Generate every secret with `openssl rand -hex 32`. flow-api refuses to start unless all three webhook secrets are set, so give the ones for integrations you do not use a random value too. A random value that nobody knows means no one can forge a request for that integration.
 
-`NF_SMTP_HOST` is required because without it a magic-link request succeeds and sends nothing. `NF_PUBLIC_SCHEME` defaults to `https`. The public URLs are derived from the two: `NF_AUTH_PUBLIC_URL` is `https://<host>/auth-api`, `NF_FLOW_PUBLIC_URL` is `https://<host>/api`, and accounts-web is at `https://<host>/accounts`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
+SMTP is optional (`NF_SMTP_HOST`, `NF_SMTP_FROM`, and the credentials beside them). Without a host, magic-link sign-in is not offered and no mail is sent: no invitation or notification emails. `NF_PUBLIC_SCHEME` defaults to `https`. The public URLs are derived from the two: `NF_AUTH_PUBLIC_URL` is `https://<host>/auth-api`, `NF_FLOW_PUBLIC_URL` is `https://<host>/api`, and accounts-web is at `https://<host>/accounts`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
+
+### OIDC-only sign-in
+
+To allow sign-in through an identity provider only, with no password accounts and no SMTP, set these in `.env`:
+
+```sh
+NF_PASSWORD_LOGIN_ENABLED=false
+NF_AUTH_GOOGLE_CLIENT_ID=...
+NF_AUTH_GOOGLE_CLIENT_SECRET=...
+NF_OAUTH_ALLOWED_DOMAINS=example.com        # and/or NF_OAUTH_ALLOWED_EMAILS=ceo@example.com
+NF_REGISTRATION_OPEN=true
+```
+
+With `NF_PASSWORD_LOGIN_ENABLED=false`, auth-api does not register `POST /auth/register`, `POST /auth/login`, `POST /me/password` or the TOTP management routes under `/me/totp`, and the web apps show only the provider buttons. The second factor is the identity provider's own. An account that enrolled TOTP before the switch keeps its challenge (`POST /auth/login/totp`) and its recovery codes, but cannot manage TOTP until password login is enabled again. `NF_REGISTRATION_OPEN=true` then opens only OIDC auto-provisioning, which the allowlist restricts to the listed domains and addresses. Without an allowlist, any verified address at the provider can create an account, so set one. Leave `NF_SMTP_HOST` unset and magic-link sign-in stays off too.
 
 ### Certificates
 
@@ -156,7 +169,16 @@ docker run --rm --network $NET curlimages/curl -fsS \
   -H "Authorization: Bearer $token"
 ```
 
-Now start the edge. If the instance is closed to the public, set `NF_REGISTRATION_OPEN=false` in `.env` first:
+On an OIDC-only instance there is no password to register with. Start the whole stack instead, with the allowlist set so that only your own address can sign in. Sign in once through the provider to create the account, then grant it administrator rights. The command is safe to repeat:
+
+```sh
+docker compose -f compose.prod.yml up -d --build
+docker compose -f compose.prod.yml exec auth-api /grant-admin -email admin@example.com
+```
+
+`grant-admin` fails with a non-zero exit code if no user has that address yet.
+
+On a password instance, now start the edge. If the instance is closed to the public, set `NF_REGISTRATION_OPEN=false` in `.env` first:
 
 ```sh
 docker compose -f compose.prod.yml up -d --build

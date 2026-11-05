@@ -6,8 +6,10 @@
 import type { components } from '@nodate-flow/sdk';
 import {
   type UseMutationResult,
+  type UseQueryResult,
   type UseSuspenseQueryResult,
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
@@ -17,11 +19,13 @@ import { authApiRequest } from '../../lib/api';
 export type Me = components['schemas']['MeBody'];
 export type PatchMeInput = components['schemas']['PatchMeInputBody'];
 export type SessionSummary = components['schemas']['SessionSummary'];
+export type AuthCapabilities = components['schemas']['CapabilitiesBody'];
 
 /** Query key factory for the settings feature. */
 export const settingsKeys = {
   me: ['me'] as const,
   sessions: ['me', 'sessions'] as const,
+  capabilities: ['auth', 'capabilities'] as const,
 };
 
 import { ApiError } from '../../lib/api-error';
@@ -36,6 +40,23 @@ export function useMeQuery(): UseSuspenseQueryResult<Me> {
       const data = await authApiRequest((client) => client.GET('/me'), 'Failed to load profile');
       return data;
     },
+  });
+}
+
+/**
+ * GET /auth/capabilities — which sign-in methods this instance offers.
+ * Fixed for the life of the server process, so it is fetched once. The
+ * sections that depend on it render only once it has resolved.
+ */
+export function useAuthCapabilitiesQuery(): UseQueryResult<AuthCapabilities> {
+  return useQuery({
+    queryKey: settingsKeys.capabilities,
+    queryFn: async (): Promise<AuthCapabilities> =>
+      authApiRequest(
+        (client) => client.GET('/auth/capabilities'),
+        'Failed to load auth capabilities',
+      ),
+    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
