@@ -4,32 +4,6 @@
 
 server {
     listen 80;
-    server_name ${NF_ACCOUNTS_HOST};
-    access_log /var/log/nginx/access.log edge;
-    root /usr/share/nginx/accounts;
-    include /etc/nginx/conf.d/snippets/csp-accounts.conf;
-    include /etc/nginx/conf.d/snippets/spa-accounts.conf;
-}
-
-server {
-    listen 80;
-    server_name ${NF_APP_HOST};
-    access_log /var/log/nginx/access.log edge;
-    root /usr/share/nginx/flow;
-    include /etc/nginx/conf.d/snippets/csp-flow.conf;
-    include /etc/nginx/conf.d/snippets/spa-flow.conf;
-}
-
-server {
-    listen 80;
-    server_name ${NF_AUTH_HOST};
-    access_log /var/log/nginx/access.log edge;
-    include /etc/nginx/conf.d/snippets/auth.conf;
-}
-
-server {
-    listen 80;
-    server_name ${NF_API_HOST};
-    access_log /var/log/nginx/access.log edge;
-    include /etc/nginx/conf.d/snippets/api.conf;
+    server_name ${NF_PUBLIC_HOST};
+    include /etc/nginx/conf.d/snippets/site.conf;
 }

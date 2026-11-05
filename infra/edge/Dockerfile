@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Edge image: serves both SPAs and fronts the two APIs with nginx.
+# Edge image: serves both SPAs and fronts the two APIs on one host with nginx.
 # The build context is the repository root: the lockfile, the shared
 # TypeScript configuration and the workspace packages live there.
 
@@ -28,7 +28,7 @@ COPY apps/accounts-web ./apps/accounts-web
 COPY apps/flow-web ./apps/flow-web
 
 # Origins are compiled into the bundles by Vite, so moving a deployment to
-# other hostnames means rebuilding. Compose always passes all of them.
+# another hostname means rebuilding. Compose always passes all of them.
 ARG VITE_API_BASE_URL=""
 ARG VITE_AUTH_API_BASE_URL=""
 ARG VITE_ACCOUNTS_WEB_URL=""
@@ -53,8 +53,8 @@ RUN cd apps/flow-web \
 # from the build rather than copied into the config where it would go stale.
 COPY infra/edge/nginx/csp-script-hash.mjs /tmp/csp-script-hash.mjs
 RUN mkdir /csp \
- && bun /tmp/csp-script-hash.mjs apps/accounts-web/dist/index.html > /csp/csp-accounts.conf \
- && bun /tmp/csp-script-hash.mjs apps/flow-web/dist/index.html > /csp/csp-flow.conf
+ && bun /tmp/csp-script-hash.mjs apps/accounts-web/dist/index.html spa_script_hash_accounts > /csp/csp-accounts.conf \
+ && bun /tmp/csp-script-hash.mjs apps/flow-web/dist/index.html spa_script_hash_flow > /csp/csp-flow.conf
 
 FROM nginx:1.30-alpine
 
@@ -72,16 +72,19 @@ COPY infra/edge/nginx/conf.d/00-maps.conf /etc/nginx/templates/00-maps.conf.temp
 # as they are. Both end up in conf.d/snippets/.
 COPY infra/edge/nginx/snippets/security-headers-accounts.conf /etc/nginx/templates/snippets/security-headers-accounts.conf.template
 COPY infra/edge/nginx/snippets/security-headers-flow.conf /etc/nginx/templates/snippets/security-headers-flow.conf.template
-COPY infra/edge/nginx/snippets/proxy-common.conf infra/edge/nginx/snippets/api.conf infra/edge/nginx/snippets/auth.conf /etc/nginx/conf.d/snippets/
+COPY infra/edge/nginx/snippets/proxy-common.conf infra/edge/nginx/snippets/api.conf infra/edge/nginx/snippets/auth.conf infra/edge/nginx/snippets/site.conf /etc/nginx/conf.d/snippets/
 # spa.conf includes its app's security headers from every location, which
 # add_header inheritance forces; one copy per app names the right file.
 COPY infra/edge/nginx/snippets/spa.conf /tmp/spa.conf
-RUN for app in accounts flow; do \
-      sed "s/@APP@/$app/g" /tmp/spa.conf > /etc/nginx/conf.d/snippets/spa-$app.conf; \
-    done \
+RUN sed -e 's|@APP@|accounts|g' -e 's|@PREFIX@|/accounts|g' -e 's|@ROOT@|/usr/share/nginx/accounts-root|g' \
+      /tmp/spa.conf > /etc/nginx/conf.d/snippets/spa-accounts.conf \
+ && sed -e 's|@APP@|flow|g' -e 's|@PREFIX@||g' -e 's|@ROOT@|/usr/share/nginx/flow|g' \
+      /tmp/spa.conf > /etc/nginx/conf.d/snippets/spa-flow.conf \
  && rm /tmp/spa.conf
 COPY --from=build /csp/ /etc/nginx/conf.d/snippets/
 
-COPY --from=build /src/apps/accounts-web/dist /usr/share/nginx/accounts
+# accounts-web is built with base /accounts/, so its files sit under that
+# subdirectory of its root.
+COPY --from=build /src/apps/accounts-web/dist /usr/share/nginx/accounts-root/accounts
 COPY --from=build /src/apps/flow-web/dist /usr/share/nginx/flow
 EXPOSE 80 443

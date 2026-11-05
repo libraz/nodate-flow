@@ -2,7 +2,9 @@
 # surface; everything else lives on the compose network. The required .env
 # values are listed in README `## Deployment`; ci/compose-prod.env names them all.
 #
-# Origins are derived once from NF_PUBLIC_SCHEME and the four NF_*_HOST names.
+# One public hostname (NF_PUBLIC_HOST) and one certificate serve everything:
+# / is flow-web, /accounts/ is accounts-web, /api/ is flow-api and /auth-api/ is
+# auth-api. Origins are derived from NF_PUBLIC_SCHEME and NF_PUBLIC_HOST.
 name: nodate-flow-prod
 
 x-db-dsn: &db-dsn ${NF_DB_USER:-nodate}:${NF_DB_PASSWORD:?database user password}@tcp(mysql:3306)/${NF_DB_NAME:-nodate_flow}?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci&time_zone=%27%2B00%3A00%27
@@ -12,15 +14,15 @@ services:
     build:
       context: .
       dockerfile: infra/edge/Dockerfile
-      # Baked into the bundles: changing a host or the scheme needs
+      # Baked into the bundles: changing the host or the scheme needs
       # `up -d --build edge`, not a restart.
       args:
-        VITE_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_API_HOST:?public hostname of flow-api}
-        VITE_AUTH_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST:?public hostname of auth-api}
-        VITE_ACCOUNTS_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST:?public hostname of accounts-web}
-        VITE_PUBLIC_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST:?public hostname of flow-web}
-        VITE_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
-        VITE_NF_ALLOWED_REDIRECT_ORIGINS: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
+        VITE_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}/api
+        VITE_AUTH_API_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}/auth-api
+        VITE_ACCOUNTS_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}/accounts
+        VITE_PUBLIC_BASE_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}
+        VITE_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}
+        VITE_NF_ALLOWED_REDIRECT_ORIGINS: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST:?public hostname}
     restart: unless-stopped
     depends_on:
       api:
@@ -31,11 +33,8 @@ services:
       # Substituted into the templates; the filter leaves nginx's own $host alone.
       NGINX_ENVSUBST_FILTER: "^NF_"
       NF_PUBLIC_SCHEME: ${NF_PUBLIC_SCHEME:-https}
-      NF_ACCOUNTS_HOST: ${NF_ACCOUNTS_HOST}
-      NF_APP_HOST: ${NF_APP_HOST}
-      NF_AUTH_HOST: ${NF_AUTH_HOST}
-      NF_API_HOST: ${NF_API_HOST}
-      NF_TLS_CERT_NAME: ${NF_TLS_CERT_NAME:-${NF_ACCOUNTS_HOST}}
+      NF_PUBLIC_HOST: ${NF_PUBLIC_HOST}
+      NF_TLS_CERT_NAME: ${NF_TLS_CERT_NAME:-${NF_PUBLIC_HOST}}
       NF_EMBED_FRAME_ANCESTORS: ${NF_EMBED_FRAME_ANCESTORS:-*}
     volumes:
       # Replaces the plain-HTTP template baked into the image. Drop this mount
@@ -138,11 +137,11 @@ services:
       NF_AUTH_RATE_LIMIT_AUTH_WINDOW: ${NF_AUTH_RATE_LIMIT_AUTH_WINDOW:-900}
       NF_AUTH_RATE_LIMIT_SESSION_MAX: ${NF_AUTH_RATE_LIMIT_SESSION_MAX:-60}
       NF_AUTH_RATE_LIMIT_SESSION_WINDOW: ${NF_AUTH_RATE_LIMIT_SESSION_WINDOW:-900}
-      NF_AUTH_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST},${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
-      NF_AUTH_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST}
-      NF_AUTH_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_ACCOUNTS_HOST}
-      NF_AUTH_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
-      NF_AUTH_DISCORD_REDIRECT_URI: ${NF_PUBLIC_SCHEME:-https}://${NF_AUTH_HOST}/oauth/callback/discord
+      NF_AUTH_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}
+      NF_AUTH_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}/auth-api
+      NF_AUTH_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}/accounts
+      NF_AUTH_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}
+      NF_AUTH_DISCORD_REDIRECT_URI: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}/auth-api/oauth/callback/discord
       NF_AUTH_GOOGLE_CLIENT_ID: ${NF_AUTH_GOOGLE_CLIENT_ID:-}
       NF_AUTH_GOOGLE_CLIENT_SECRET: ${NF_AUTH_GOOGLE_CLIENT_SECRET:-}
       NF_AUTH_GITHUB_OIDC_CLIENT_ID: ${NF_AUTH_GITHUB_OIDC_CLIENT_ID:-}
@@ -242,9 +241,9 @@ services:
       NF_FLOW_SMTP_USERNAME: ${NF_SMTP_USERNAME:-}
       NF_FLOW_SMTP_PASSWORD: ${NF_SMTP_PASSWORD:-}
       NF_FLOW_SMTP_FROM: ${NF_SMTP_FROM}
-      NF_FLOW_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
-      NF_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_APP_HOST}
-      NF_FLOW_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_API_HOST}
+      NF_FLOW_CORS: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}
+      NF_FLOW_WEB_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}
+      NF_FLOW_PUBLIC_URL: ${NF_PUBLIC_SCHEME:-https}://${NF_PUBLIC_HOST}/api
       NF_S3_ENDPOINT: storage:7070
       NF_S3_ACCESS_KEY: ${NF_S3_ACCESS_KEY}
       NF_S3_SECRET_KEY: ${NF_S3_SECRET_KEY}
