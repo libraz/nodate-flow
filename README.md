@@ -13,7 +13,7 @@ A single monorepo ships two products served by **one combined backend** (`flow-a
 
 > **About the name:** a pun on _"no date"_ (work free from deadline pressure) and Japanese **野点 (nodate)** — preparing tea outdoors, unhurried.
 
-**Status:** alpha | **License:** [AGPL-3.0](./LICENSE) | **Stack:** Go · MySQL 9.6 · React 19 · OpenAPI 3.1
+**Status:** alpha | **License:** [AGPL-3.0](./LICENSE) | **Stack:** Go · MySQL 9.7 · React 19 · OpenAPI 3.1
 
 ---
 

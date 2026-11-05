@@ -49,7 +49,7 @@ import (
 )
 
 const (
-	mysqlImage    = "mysql:9.6"
+	mysqlImage    = "mysql:9.7"
 	mysqlDatabase = "nodate_flow"
 	mysqlUser     = "nodate"
 	mysqlPassword = "nodate"

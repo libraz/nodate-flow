@@ -63,7 +63,7 @@ type SimilarTask struct {
 
 // RankSimilarTasks is the one similarity search over stored task
 // embeddings: thresholds from ai_settings, a write-time embedding when
-// the source has none, Go-side cosine over the candidate pool (MySQL 9.6
+// the source has none, Go-side cosine over the candidate pool (MySQL 9.7
 // Community lacks VEC_DISTANCE_COSINE), score-descending and capped.
 //
 // A nil client has no embeddings and yields [ErrNoSourceVector].

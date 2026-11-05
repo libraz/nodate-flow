@@ -34,7 +34,7 @@ import (
 // MySQLImage is the testcontainers image tag used across all
 // services. Kept as a package variable so a single CI override can
 // re-pin every service's integration tests in one place.
-var MySQLImage = "mysql:9.6"
+var MySQLImage = "mysql:9.7"
 
 // MySQLConfig controls MySQL container startup. Zero value is valid:
 // the defaults match the flow-api helper's historical behavior.

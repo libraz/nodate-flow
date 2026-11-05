@@ -49,7 +49,7 @@ services:
       - "443:443"
 
   mysql:
-    image: mysql:9.6
+    image: mysql:9.7
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${NF_DB_ROOT_PASSWORD:?database root password}
