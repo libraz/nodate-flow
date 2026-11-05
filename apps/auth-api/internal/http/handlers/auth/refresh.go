@@ -88,7 +88,7 @@ func Refresh(deps Deps) func(context.Context, *RefreshInput) (*RefreshOutput, er
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &RefreshOutput{
-			SetCookie: newRefreshCookie(newPlain, deps.CookieSecure),
+			SetCookie: deps.newRefreshCookie(newPlain),
 			Body: AuthTokens{
 				AccessToken: access,
 				ExpiresAt:   exp.Unix(),

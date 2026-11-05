@@ -184,7 +184,7 @@ func MagicLinkVerify(deps Deps) func(context.Context, *MagicLinkVerifyInput) (*M
 			return nil, err
 		}
 		return &MagicLinkVerifyOutput{
-			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			SetCookie: deps.newRefreshCookie(refresh),
 			Body: LoginBody{
 				Step:        "complete",
 				AccessToken: tokens.AccessToken,

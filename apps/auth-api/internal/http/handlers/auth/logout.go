@@ -18,7 +18,7 @@ import (
 func Logout(deps Deps) func(context.Context, *LogoutInput) (*LogoutOutput, error) {
 	return func(ctx context.Context, in *LogoutInput) (*LogoutOutput, error) {
 		out := &LogoutOutput{
-			SetCookie: clearedRefreshCookie(deps.CookieSecure),
+			SetCookie: deps.clearedRefreshCookie(),
 		}
 		out.Body.Ok = true
 		plain := in.RefreshCookie.Value

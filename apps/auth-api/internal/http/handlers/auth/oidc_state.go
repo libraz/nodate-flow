@@ -19,7 +19,7 @@ func (d Deps) startOIDCState(ctx context.Context, out *OIDCStartOutput, nonce, p
 			slog.String("provider", provider), slog.String("err", err.Error()))
 		return "", httpErr(apierrors.InternalUnexpected)
 	}
-	out.SetCookie = newOIDCStateCookie(binding.CookieValue, binding.ExpiresAt, d.CookieSecure)
+	out.SetCookie = d.newOIDCStateCookie(binding.CookieValue, binding.ExpiresAt)
 	out.Body.State = binding.State
 	return binding.State, nil
 }

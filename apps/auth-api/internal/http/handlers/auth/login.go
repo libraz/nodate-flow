@@ -119,7 +119,7 @@ func Login(deps Deps) func(context.Context, *LoginInput) (*LoginOutput, error) {
 			return nil, err
 		}
 		return &LoginOutput{
-			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			SetCookie: deps.newRefreshCookie(refresh),
 			Body: LoginBody{
 				Step:        "complete",
 				AccessToken: tokens.AccessToken,
@@ -305,7 +305,7 @@ func LoginTotp(deps Deps) func(context.Context, *LoginTotpInput) (*LoginTotpOutp
 			return nil, err
 		}
 		return &LoginTotpOutput{
-			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			SetCookie: deps.newRefreshCookie(refresh),
 			Body:      tokens,
 		}, nil
 	}

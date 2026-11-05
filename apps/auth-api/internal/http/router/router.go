@@ -45,6 +45,7 @@ type Deps struct {
 	SingleUse         authn.SingleUseStore
 	Cipher            *crypto.Cipher
 	CookieSecure      bool
+	CookiePathPrefix  string
 	RegistrationOpen  bool
 	MinPasswordLength int
 	DisableRateLimit  bool
@@ -221,6 +222,7 @@ func BuildResult(deps Deps) Result {
 		MicrosoftAllowedTenantIDs: deps.MicrosoftAllowedTenantIDs,
 		Cipher:                    deps.Cipher,
 		CookieSecure:              deps.CookieSecure,
+		CookiePathPrefix:          deps.CookiePathPrefix,
 		RegistrationOpen:          deps.RegistrationOpen,
 		OAuthAllowedDomains:       deps.OAuthAllowedDomains,
 		OAuthAllowedEmails:        deps.OAuthAllowedEmails,

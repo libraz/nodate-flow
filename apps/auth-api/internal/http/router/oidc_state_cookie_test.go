@@ -164,11 +164,9 @@ func TestOIDCStateCookieSurvivesPlainHTTPDev(t *testing.T) {
 	assert.Equal(t, verifier.Value, sent[0].Value)
 }
 
-// TestOIDCStateCookieIsCrossSiteCapableInProd covers the other half of
-// the derivation: over https the cookie is written by a cross-site fetch
-// from accounts-web, so it needs SameSite=None, which the spec only
-// permits together with Secure.
-func TestOIDCStateCookieIsCrossSiteCapableInProd(t *testing.T) {
+// TestOIDCStateCookieIsSecureAndLaxInProd covers the https half: the
+// deployment is same-origin, so the cookie is Secure and SameSite=Lax.
+func TestOIDCStateCookieIsSecureAndLaxInProd(t *testing.T) {
 	t.Parallel()
 	deps := oidcCookieDeps(t)
 	deps.CookieSecure = true
@@ -177,15 +175,7 @@ func TestOIDCStateCookieIsCrossSiteCapableInProd(t *testing.T) {
 	_, verifier := startGithubOIDC(t, h)
 	require.NotNil(t, verifier)
 	assert.True(t, verifier.Secure)
-	assert.Equal(t, http.SameSiteNoneMode, verifier.SameSite,
-		"SameSite=None is what lets accounts-web on another origin receive the cookie")
-
-	// The two attributes are coupled: a browser rejects SameSite=None
-	// without Secure outright, so this pairing is the only valid shape
-	// for the https deployment — and the reason the dev build must take
-	// the other branch instead of simply dropping Secure here.
-	assert.Truef(t, verifier.Secure || verifier.SameSite != http.SameSiteNoneMode,
-		"SameSite=None requires Secure; got Secure=%v SameSite=%v", verifier.Secure, verifier.SameSite)
+	assert.Equal(t, http.SameSiteLaxMode, verifier.SameSite)
 }
 
 // TestOIDCCallbackAcceptsTheCookieTheDevBrowserStored closes the loop:

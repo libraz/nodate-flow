@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -134,12 +135,19 @@ type Config struct {
 	MicrosoftOIDCClientSecret   string   `env:"NF_AUTH_MICROSOFT_OIDC_CLIENT_SECRET" envDefault:""`
 	MicrosoftOIDCAllowedTenants []string `env:"NF_AUTH_MICROSOFT_OIDC_ALLOWED_TENANTS" envSeparator:"," envDefault:""`
 
-	// PublicBaseURL is the externally-visible origin of the auth-api,
-	// used to build OIDC callback URLs.
+	// PublicBaseURL is the externally-visible base URL of the auth-api
+	// (a path prefix such as https://host/auth-api is allowed), used to
+	// build OIDC callback URLs. It must be an absolute http(s) URL without
+	// query or fragment.
 	PublicBaseURL string `env:"NF_AUTH_PUBLIC_URL" envDefault:"http://localhost:8082"`
 
-	// AccountsWebURL is the origin of the accounts-web frontend.
-	AccountsWebURL string `env:"NF_AUTH_WEB_URL" envDefault:"http://localhost:5175"`
+	// CookiePathPrefix is the path component of PublicBaseURL without a
+	// trailing slash (empty at the root). Derived in Load; not an env var.
+	CookiePathPrefix string `env:"-"`
+
+	// AccountsWebURL is the base URL of the accounts-web frontend (a path
+	// prefix is allowed).
+	AccountsWebURL string `env:"NF_AUTH_WEB_URL" envDefault:"http://localhost:5175/accounts"`
 
 	// FlowWebURL is the origin of the flow-web frontend, used in
 	// workspace invite links.
@@ -211,7 +219,28 @@ func Load() (*Config, error) {
 	if err := validateEnums(cfg); err != nil {
 		return nil, err
 	}
+	prefix, err := publicPathPrefix(cfg.PublicBaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("config: NF_AUTH_PUBLIC_URL: %w", err)
+	}
+	cfg.CookiePathPrefix = prefix
 	return cfg, nil
+}
+
+// publicPathPrefix validates raw as an absolute http(s) URL with no query
+// or fragment and returns its path with trailing slashes trimmed.
+func publicPathPrefix(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL %q: %w", raw, err)
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("must be an absolute http(s) URL, got %q", raw)
+	}
+	if u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(raw, "#") {
+		return "", fmt.Errorf("must not carry a query or fragment, got %q", raw)
+	}
+	return strings.TrimRight(u.Path, "/"), nil
 }
 
 // normalizeAllowlist lower-cases and trims each entry, drops blanks, and

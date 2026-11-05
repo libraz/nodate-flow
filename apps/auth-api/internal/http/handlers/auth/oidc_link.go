@@ -185,7 +185,7 @@ func (d Deps) finishOIDCLogin(ctx context.Context, userID uint32, userPub types.
 					"step":           []string{"totp_required"},
 					"challengeToken": []string{challenge},
 				}),
-				SetCookie: []http.Cookie{clearedOIDCStateCookie(d.CookieSecure)},
+				SetCookie: []http.Cookie{d.clearedOIDCStateCookie()},
 				Body: LoginBody{
 					Step:           "totp_required",
 					ChallengeToken: challenge,
@@ -209,8 +209,8 @@ func (d Deps) finishOIDCLogin(ctx context.Context, userID uint32, userPub types.
 		// stale cookie from lingering in the browser for the rest of the
 		// state's lifetime.
 		SetCookie: []http.Cookie{
-			clearedOIDCStateCookie(d.CookieSecure),
-			newRefreshCookie(refresh, d.CookieSecure),
+			d.clearedOIDCStateCookie(),
+			d.newRefreshCookie(refresh),
 		},
 		Body: LoginBody{
 			Step:        "complete",

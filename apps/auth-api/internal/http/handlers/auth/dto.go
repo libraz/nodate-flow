@@ -80,6 +80,10 @@ type Deps struct {
 	// defaults to true in production; local http dev can disable it via
 	// NF_COOKIE_SECURE=false.
 	CookieSecure bool
+	// CookiePathPrefix is the path component of the public auth-api URL
+	// (no trailing slash; empty when served at the root). Cookie Paths are
+	// this prefix plus /auth..., matching what the browser requests.
+	CookiePathPrefix string
 	// RegistrationOpen controls whether new user sign-up is allowed.
 	// When false, POST /auth/register returns 403.
 	RegistrationOpen bool
@@ -100,7 +104,8 @@ type Deps struct {
 	// EmailSender sends transactional emails (magic link). Nil when
 	// SMTP is not configured.
 	EmailSender email.Sender
-	// AccountsWebURL is the origin of the accounts-web frontend, used
+	// AccountsWebURL is the base URL of the accounts-web frontend (a path
+	// prefix is allowed), used
 	// to build magic link verification URLs.
 	AccountsWebURL string
 	// MinPasswordLength is the minimum password length for registration
@@ -111,8 +116,8 @@ type Deps struct {
 	// unset; the handlers return AUTH.AVATAR.STORAGE_UNAVAILABLE in
 	// that case so the rest of the api still boots.
 	Storage *storage.Client
-	// PublicBaseURL is the externally-visible origin of the auth-api,
-	// used to build proxy URLs returned by /me (e.g.
+	// PublicBaseURL is the externally-visible base URL of the auth-api (a
+	// path prefix is allowed), used to build proxy URLs returned by /me (e.g.
 	// "https://auth.example.com/avatars/{userPublicId}?v=...").
 	PublicBaseURL string
 }

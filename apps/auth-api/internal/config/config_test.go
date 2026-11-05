@@ -160,3 +160,38 @@ func TestValidateDevModeSkipsGuards(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicPathPrefix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		raw     string
+		want    string
+		wantErr bool
+	}{
+		{"http://localhost:8082", "", false},
+		{"http://localhost:8082/", "", false},
+		{"https://h/auth-api", "/auth-api", false},
+		{"https://h/auth-api/", "/auth-api", false},
+		{"https://h/a/b", "/a/b", false},
+		{"/auth-api", "", true},
+		{"h/auth-api", "", true},
+		{"ftp://h/auth-api", "", true},
+		{"https://h/auth-api?x=1", "", true},
+		{"https://h/auth-api?", "", true},
+		{"https://h/auth-api#frag", "", true},
+		{"https://h/auth-api#", "", true},
+		{"", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			t.Parallel()
+			got, err := publicPathPrefix(tt.raw)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("publicPathPrefix(%q) error = %v, wantErr = %v", tt.raw, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Fatalf("publicPathPrefix(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}

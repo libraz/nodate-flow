@@ -110,7 +110,7 @@ func Register(deps Deps) func(context.Context, *RegisterInput) (*RegisterOutput,
 			return nil, err
 		}
 		return &RegisterOutput{
-			SetCookie: newRefreshCookie(refresh, deps.CookieSecure),
+			SetCookie: deps.newRefreshCookie(refresh),
 			Body:      tokens,
 		}, nil
 	}

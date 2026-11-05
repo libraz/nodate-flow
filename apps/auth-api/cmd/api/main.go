@@ -217,6 +217,7 @@ func main() {
 		MicrosoftAllowedTenantIDs: cfg.MicrosoftOIDCAllowedTenants,
 		Cipher:                    cipher,
 		CookieSecure:              cfg.CookieSecure,
+		CookiePathPrefix:          cfg.CookiePathPrefix,
 		RegistrationOpen:          cfg.RegistrationOpen,
 		OAuthAllowedDomains:       cfg.OAuthAllowedDomains,
 		OAuthAllowedEmails:        cfg.OAuthAllowedEmails,

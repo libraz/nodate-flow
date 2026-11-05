@@ -98,7 +98,7 @@ func configVariables() map[string]string {
 				walk(f.Type)
 				continue
 			}
-			if name, _, _ := strings.Cut(f.Tag.Get("env"), ","); name != "" {
+			if name, _, _ := strings.Cut(f.Tag.Get("env"), ","); name != "" && name != "-" {
 				out[name] = f.Tag.Get("envDefault")
 			}
 		}
