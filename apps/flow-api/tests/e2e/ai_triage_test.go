@@ -1,12 +1,40 @@
 package e2e
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
+
+// seedTriageFixtureItems inserts an inbox item for every id the mock's
+// triage fixture names. The suggestion list only replays suggestions about
+// items that exist in the workspace, so the canned ids must be real ones.
+func seedTriageFixtureItems(t *testing.T, tt *helpers.TestTenant) {
+	t.Helper()
+	raw, err := os.ReadFile("../../testdata/ai/inbox_triage.json")
+	require.NoError(t, err)
+	var fixture []struct {
+		InboxItemID string `json:"inboxItemId"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &fixture))
+	require.NotEmpty(t, fixture)
+
+	wsID := helpers.ResolveWorkspaceInternalID(t, testDB, tt.WorkspacePublicID)
+	for _, f := range fixture {
+		id := uuid.MustParse(f.InboxItemID)
+		_, err := testDB.Exec(
+			`INSERT INTO signals (public_id, workspace_id, source, kind, payload_json, received_at)
+			 VALUES (?, ?, 'manual', 'manual', JSON_OBJECT(), NOW(3))`,
+			id[:], wsID)
+		require.NoError(t, err)
+	}
+}
 
 // TestAiTriageSuggestionLifecycle exercises the AI suggestion lifecycle
 // end to end against the mock AI provider: triage proposes 3 fixture
@@ -23,6 +51,7 @@ func TestAiTriageSuggestionLifecycle(t *testing.T) {
 	t.Parallel()
 
 	tt := newTenant(t)
+	seedTriageFixtureItems(t, tt)
 
 	// Triage. The mock provider ignores the prompt and returns the
 	// canned 3-item fixture from apps/flow-api/testdata/ai/inbox_triage.json.
