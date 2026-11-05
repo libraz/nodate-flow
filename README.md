@@ -90,19 +90,21 @@ infra/            # Docker, Prometheus, Grafana, OTel, edge (nginx)
 
 ## Deployment
 
-`compose.prod.yml` runs the whole stack on one host: MySQL, object storage, auth-api, flow-api, flow-worker and an nginx edge container that serves both SPAs and proxies the two APIs. The images are built from this repository rather than pulled, because the SPAs compile their API origins into the bundle. The edge container is the only service that publishes ports (80 and 443). The database, object storage, API ports and metrics stay on the compose network.
+`compose.prod.yml` runs the whole stack on one host: MySQL, object storage, auth-api, flow-api, flow-worker and an nginx edge container that serves both SPAs and proxies the two APIs. The images are built from this repository rather than pulled, because the SPAs compile their API origins into the bundle.
+
+One hostname, one certificate, and nothing else published. The edge container is the only way in and the only service that publishes ports (80 and 443). It terminates TLS and routes by path: `/` to flow-web, `/accounts/` to accounts-web, `/api/` to flow-api and `/auth-api/` to auth-api. The two API prefixes are stripped before the request is proxied. The database, object storage, API ports and metrics stay on the compose network.
 
 ### Prerequisites
 
 Docker with the Compose plugin, and certbot on the host.
 
-Four DNS names that point at the host and share one registrable domain, for example `accounts.example.com`, `app.example.com`, `auth.example.com` and `api.example.com`. The refresh cookie is set by the auth host and read from the app host, so hosts on different registrable domains break sign-in in browsers that block third-party cookies.
+One DNS name that points at the host, for example `flow.example.com`. Everything is served from that origin, so the refresh cookie is first-party.
 
 ### Configuration
 
 Put the settings in a `.env` beside `compose.prod.yml`. These have no default, and Compose stops and names whichever is missing:
 
-- `NF_ACCOUNTS_HOST`, `NF_APP_HOST`, `NF_AUTH_HOST`, `NF_API_HOST`
+- `NF_PUBLIC_HOST`
 - `NF_DB_ROOT_PASSWORD`, `NF_DB_PASSWORD`
 - `NF_SECRET_KEY`
 - `NF_S3_ACCESS_KEY`, `NF_S3_SECRET_KEY`
@@ -112,19 +114,18 @@ Put the settings in a `.env` beside `compose.prod.yml`. These have no default, a
 
 Generate every secret with `openssl rand -hex 32`. flow-api refuses to start unless all three webhook secrets are set, so give the ones for integrations you do not use a random value too. A random value that nobody knows means no one can forge a request for that integration.
 
-`NF_SMTP_HOST` is required because without it a magic-link request succeeds and sends nothing. `NF_PUBLIC_SCHEME` defaults to `https`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
+`NF_SMTP_HOST` is required because without it a magic-link request succeeds and sends nothing. `NF_PUBLIC_SCHEME` defaults to `https`. The public URLs are derived from the two: `NF_AUTH_PUBLIC_URL` is `https://<host>/auth-api`, `NF_FLOW_PUBLIC_URL` is `https://<host>/api`, and accounts-web is at `https://<host>/accounts`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
 
 ### Certificates
 
-The certificate has to exist before the stack starts, because nginx will not load a server block whose certificate is missing. Obtain one SAN certificate for all four names first, with port 80 free:
+The certificate has to exist before the stack starts, because nginx will not load a server block whose certificate is missing. Obtain one first, with port 80 free:
 
 ```sh
 mkdir -p acme
-certbot certonly --standalone \
-  -d accounts.example.com -d app.example.com -d auth.example.com -d api.example.com
+certbot certonly --standalone -d flow.example.com
 ```
 
-The edge reads the certificate from the directory named after the first `-d` name. If you put another name first, set `NF_TLS_CERT_NAME` to it; the default is `NF_ACCOUNTS_HOST`. `NF_TLS_DIR` (default `/etc/letsencrypt`) and `NF_ACME_WEBROOT` (default `./acme`) move the certificate directory and the challenge directory.
+The edge reads the certificate from `/etc/letsencrypt/live/<NF_TLS_CERT_NAME>/`, which defaults to `NF_PUBLIC_HOST`, the directory certbot names after the `-d` name. `NF_TLS_DIR` (default `/etc/letsencrypt`) and `NF_ACME_WEBROOT` (default `./acme`) move the certificate directory and the challenge directory.
 
 Renewal is answered by the running edge out of the webroot, so nothing has to be stopped. nginx keeps the old certificate until it is told to reload:
 
@@ -163,7 +164,7 @@ docker compose -f compose.prod.yml up -d --build
 
 ### Identity provider redirect URIs
 
-Register these with each provider, with `<auth>` being `https://` plus `NF_AUTH_HOST`.
+Register these with each provider, with `<auth>` being `https://` plus `NF_PUBLIC_HOST` plus `/auth-api`.
 
 Sign-in:
 
@@ -182,9 +183,9 @@ Workspace integrations:
 
 To terminate TLS somewhere else, drop the `tls.conf.template` mount and the two certificate mounts from the `edge` service and publish `127.0.0.1:8081:80` instead of `80:80` and `443:443`. Keep `NF_PUBLIC_SCHEME=https`, since browsers still see HTTPS, and set `NF_TRUSTED_PROXY_HOPS=2` so the client address is read past both proxies. The host proxy must append to `X-Forwarded-For` rather than replace it, must not buffer responses (the workspace stream is server-sent events), and must accept request bodies up to 128 MB.
 
-### Changing hostnames or the scheme
+### Changing the hostname or the scheme
 
-The hostnames and the scheme are compiled into the SPA bundles. After changing any of them in `.env`, rebuild the edge:
+The hostname and the scheme are compiled into the SPA bundles. After changing any of them in `.env`, rebuild the edge:
 
 ```sh
 docker compose -f compose.prod.yml up -d --build edge

@@ -83,19 +83,21 @@ infra/            # Docker, Prometheus, Grafana, OTel, edge (nginx)
 
 ## デプロイ
 
-`compose.prod.yml` は、MySQL、オブジェクトストレージ、auth-api、flow-api、flow-worker、そして 2 つの SPA を配信して 2 つの API へプロキシする nginx の edge コンテナを、1 台のホストでまとめて動かします。SPA は API のオリジンをバンドルに埋め込むため、イメージは pull せずこのリポジトリからビルドします。ポートを公開するのは edge コンテナ（80 と 443）だけです。データベース、オブジェクトストレージ、API のポート、メトリクスは compose ネットワークの内側にとどまります。
+`compose.prod.yml` は、MySQL、オブジェクトストレージ、auth-api、flow-api、flow-worker、そして 2 つの SPA を配信して 2 つの API へプロキシする nginx の edge コンテナを、1 台のホストでまとめて動かします。SPA は API のオリジンをバンドルに埋め込むため、イメージは pull せずこのリポジトリからビルドします。
+
+ホスト名は 1 つ、証明書も 1 つで、公開するものは他にありません。入口は edge コンテナだけで、公開するポートも edge（80 と 443）だけです。edge は TLS を終端し、パスで振り分けます。`/` は flow-web、`/accounts/` は accounts-web、`/api/` は flow-api、`/auth-api/` は auth-api です。2 つの API のプレフィックスは、プロキシの前に取り除かれます。データベース、オブジェクトストレージ、API のポート、メトリクスは compose ネットワークの内側にとどまります。
 
 ### 前提
 
 Compose プラグイン付きの Docker と、ホストにインストールした certbot が必要です。
 
-ホストを指す DNS 名が 4 つ必要です。4 つは同じ registrable domain 配下に置いてください。例えば `accounts.example.com`、`app.example.com`、`auth.example.com`、`api.example.com` です。リフレッシュ用 cookie は auth ホストが発行して app ホストから送られるため、別の registrable domain にまたがると、サードパーティ cookie を遮断するブラウザでサインインできなくなります。
+ホストを指す DNS 名が 1 つ必要です。例えば `flow.example.com` です。すべてを同じオリジンから配信するので、リフレッシュ用 cookie はファーストパーティになります。
 
 ### 設定
 
 設定は `compose.prod.yml` と同じ場所の `.env` に書きます。次の値には既定値がなく、欠けていると Compose が名前を挙げて停止します。
 
-- `NF_ACCOUNTS_HOST`、`NF_APP_HOST`、`NF_AUTH_HOST`、`NF_API_HOST`
+- `NF_PUBLIC_HOST`
 - `NF_DB_ROOT_PASSWORD`、`NF_DB_PASSWORD`
 - `NF_SECRET_KEY`
 - `NF_S3_ACCESS_KEY`、`NF_S3_SECRET_KEY`
@@ -105,19 +107,18 @@ Compose プラグイン付きの Docker と、ホストにインストールし�
 
 秘密の値はすべて `openssl rand -hex 32` で生成してください。flow-api は 3 つの Webhook 秘密がそろっていないと起動しないため、使わない連携の分にも乱数を入れます。誰も知らない乱数であれば、その連携に対するリクエストを偽造できる人はいません。
 
-`NF_SMTP_HOST` が必須なのは、未設定だとマジックリンクの要求が成功を返すだけでメールが送られないためです。`NF_PUBLIC_SCHEME` の既定は `https` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
+`NF_SMTP_HOST` が必須なのは、未設定だとマジックリンクの要求が成功を返すだけでメールが送られないためです。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
 
 ### 証明書
 
-nginx は証明書のない server ブロックを読み込めないため、スタックを起動する前に証明書を取得しておく必要があります。80 番ポートを空けた状態で、4 つの名前をまとめた SAN 証明書を取得します。
+nginx は証明書のない server ブロックを読み込めないため、スタックを起動する前に証明書を取得しておく必要があります。80 番ポートを空けた状態で取得します。
 
 ```sh
 mkdir -p acme
-certbot certonly --standalone \
-  -d accounts.example.com -d app.example.com -d auth.example.com -d api.example.com
+certbot certonly --standalone -d flow.example.com
 ```
 
-edge は最初の `-d` の名前のディレクトリから証明書を読みます。別の名前を先頭にした場合は `NF_TLS_CERT_NAME` にその名前を指定してください。既定は `NF_ACCOUNTS_HOST` です。証明書ディレクトリは `NF_TLS_DIR`（既定 `/etc/letsencrypt`）、チャレンジ用ディレクトリは `NF_ACME_WEBROOT`（既定 `./acme`）で変えられます。
+edge は `/etc/letsencrypt/live/<NF_TLS_CERT_NAME>/` から証明書を読みます。既定は `NF_PUBLIC_HOST` で、certbot が `-d` の名前で作るディレクトリと一致します。証明書ディレクトリは `NF_TLS_DIR`（既定 `/etc/letsencrypt`）、チャレンジ用ディレクトリは `NF_ACME_WEBROOT`（既定 `./acme`）で変えられます。
 
 更新は、動作中の edge が webroot から応答するので、何も止める必要はありません。nginx は再読み込みを指示されるまで古い証明書を使い続けます。
 
@@ -156,7 +157,7 @@ docker compose -f compose.prod.yml up -d --build
 
 ### IdP に登録するリダイレクト URI
 
-各プロバイダーに次を登録します。`<auth>` は `https://` に `NF_AUTH_HOST` を続けたものです。
+各プロバイダーに次を登録します。`<auth>` は `https://` に `NF_PUBLIC_HOST`、`/auth-api` を続けたものです。
 
 サインイン用:
 
