@@ -114,6 +114,8 @@
   /* surface effects: backdrop blur + saturate for translucent surfaces; 0px / 1 on solid themes */
   --nf-surface-blur: 40px;
   --nf-surface-saturation: 1.8;
+  /* Decorative backdrop (drifting accent orbs, film grain, brand-mark halo) on signed-out pages: 1 shows it, 0 hides it. */
+  --nf-atmosphere-opacity: 1;
 
   /* brand gradient */
   --nf-gradient-wordmark: linear-gradient(

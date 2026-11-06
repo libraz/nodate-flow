@@ -1,26 +1,246 @@
-/* Mount-only entrance: the wordmark fades, the panel settles up into place. */
-.wordmark {
+/*
+ * Signed-out page chrome. The page paints nothing itself so the body's
+ * `--nf-app-bg` shows through; the atmosphere layer sits above that and
+ * below the content, faded by `--nf-atmosphere-opacity` (0 on solid themes).
+ * Loops take their duration from the motion tokens, so reduced motion stops them.
+ */
+.root {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-8);
+  min-block-size: 100dvh;
+  padding: var(--nf-space-6);
+}
+
+/* ---- Atmosphere ---- */
+
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--nf-atmosphere-opacity);
+}
+
+.orb {
+  position: absolute;
+  border-radius: var(--nf-radius-pill);
+  filter: blur(4rem);
+  opacity: 0.5;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.orb1 {
+  /* nf-token-override: decorative orb size and offset, not a spacing step */
+  inline-size: 23.75rem;
+  /* nf-token-override: decorative orb size, not a spacing step */
+  block-size: 23.75rem;
+  /* nf-token-override: decorative orb offset past the viewport edge */
+  inset-inline-start: -5.625rem;
+  /* nf-token-override: decorative orb offset past the viewport edge */
+  inset-block-start: -4.375rem;
+  background: radial-gradient(
+    circle at 35% 35%,
+    color-mix(in srgb, var(--nf-color-accent) 60%, transparent),
+    transparent 70%
+  );
+  animation-name: float-a;
+  animation-duration: calc(var(--nf-duration-slow) * 80);
+}
+
+.orb2 {
+  /* nf-token-override: decorative orb size, not a spacing step */
+  inline-size: 20rem;
+  /* nf-token-override: decorative orb size, not a spacing step */
+  block-size: 20rem;
+  /* nf-token-override: decorative orb offset past the viewport edge */
+  inset-inline-end: -5.625rem;
+  inset-block-start: 14%;
+  background: radial-gradient(
+    circle at 40% 40%,
+    color-mix(
+      in srgb,
+      color-mix(in oklch, var(--nf-color-accent) 35%, var(--nf-cal-color-7)) 45%,
+      transparent
+    ),
+    transparent 70%
+  );
+  animation-name: float-b;
+  animation-duration: calc(var(--nf-duration-slow) * 96);
+}
+
+.orb3 {
+  /* nf-token-override: decorative orb size, not a spacing step */
+  inline-size: 27.5rem;
+  /* nf-token-override: decorative orb size, not a spacing step */
+  block-size: 27.5rem;
+  inset-inline-start: 28%;
+  /* nf-token-override: decorative orb offset past the viewport edge */
+  inset-block-end: -11.875rem;
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(
+      in srgb,
+      color-mix(in oklch, var(--nf-color-accent) 30%, var(--nf-color-success)) 36%,
+      transparent
+    ),
+    transparent 70%
+  );
+  animation-name: float-c;
+  animation-duration: calc(var(--nf-duration-slow) * 112);
+}
+
+/* Fine film grain. */
+.grain {
+  position: absolute;
+  inset: -50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+}
+
+@keyframes float-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.75rem, 2.125rem, 0) scale(1.14);
+  }
+}
+
+@keyframes float-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+  to {
+    transform: translate3d(-3.25rem, 2.625rem, 0) scale(1);
+  }
+}
+
+@keyframes float-c {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.125rem, -2.75rem, 0) scale(1.12);
+  }
+}
+
+/* ---- Brand ---- */
+
+.brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nf-space-4);
+  max-inline-size: 100%;
   animation: global(nf-fade-in) var(--nf-duration-slow) var(--nf-ease-out) both;
 }
 
-.panel {
-  --nf-motion-shift: var(--nf-motion-shift-sm);
-  animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out) both;
-}
-
-.brand {
-  display: flex;
-  flex-wrap: wrap;
+.mark {
+  position: relative;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--nf-space-3);
-  max-inline-size: 100%;
+  inline-size: var(--nf-space-16);
+  block-size: var(--nf-space-16);
+  border-radius: var(--nf-radius-md);
+  background: linear-gradient(135deg, var(--nf-color-accent), var(--nf-color-accent-hover));
+  color: var(--nf-color-fg-on-accent);
+  box-shadow:
+    var(--nf-shadow-lg),
+    0 0.625rem 1.875rem -0.375rem
+    color-mix(in srgb, var(--nf-color-accent) calc(55% * var(--nf-atmosphere-opacity)), transparent);
+}
+
+/* Soft pulsing accent glow behind the tile; painted below it within .brand. */
+.halo {
+  position: absolute;
+  /* nf-token-override: the glow's spread past the tile edge, not a spacing step */
+  inset: -0.5625rem;
+  z-index: -1;
+  border-radius: var(--nf-radius-lg);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--nf-color-accent) 45%, transparent),
+    transparent 70%
+  );
+  filter: blur(0.5625rem);
+  opacity: calc(0.5 * var(--nf-atmosphere-opacity));
+  animation: halo-pulse calc(var(--nf-duration-slow) * 15) ease-in-out infinite;
+}
+
+@keyframes halo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: calc(0.5 * var(--nf-atmosphere-opacity));
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: calc(0.85 * var(--nf-atmosphere-opacity));
+  }
+}
+
+.glyph {
+  /* nf-token-override: icon size inside the brand tile */
+  inline-size: 1.875rem;
+  /* nf-token-override: icon size inside the brand tile */
+  block-size: 1.875rem;
 }
 
 .logo {
-  block-size: var(--nf-space-12);
+  block-size: var(--nf-space-16);
   inline-size: auto;
   /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: min(16rem, 100%);
+  max-inline-size: min(15rem, 100%);
   object-fit: contain;
+}
+
+.wordmark {
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-2xl);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  letter-spacing: var(--nf-text-tracking);
+  color: var(--nf-color-fg);
+  text-align: center;
+}
+
+/* ---- Card ---- */
+
+.panel {
+  --nf-motion-shift: var(--nf-motion-shift-sm);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  padding: var(--nf-space-8);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+  background: var(--nf-color-surface);
+  backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  box-shadow: var(--nf-shadow-lg);
+  animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out)
+    var(--nf-duration-instant) both;
+}
+
+.narrow {
+  /* nf-token-override: card width for single-column auth flows */
+  inline-size: min(26.25rem, 100%);
+}
+
+.wide {
+  /* nf-token-override: card width for settings forms with long values */
+  inline-size: min(36rem, 100%);
 }

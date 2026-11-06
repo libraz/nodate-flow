@@ -75,6 +75,7 @@
 
   --nf-surface-blur: 40px;
   --nf-surface-saturation: 1.8;
+  --nf-atmosphere-opacity: 1;
 
   --nf-gradient-wordmark: linear-gradient(
     115deg,
