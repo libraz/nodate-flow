@@ -25,6 +25,8 @@ Generate every secret with `openssl rand -hex 32`. flow-api refuses to start unl
 
 SMTP is optional (`NF_SMTP_HOST`, `NF_SMTP_FROM`, and the credentials beside them). Without a host, magic-link sign-in is not offered and no mail is sent: no invitation or notification emails. `NF_PUBLIC_SCHEME` defaults to `https`. The public URLs are derived from the two: `NF_AUTH_PUBLIC_URL` is `https://<host>/auth-api`, `NF_FLOW_PUBLIC_URL` is `https://<host>/api`, and accounts-web is at `https://<host>/accounts`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
 
+`NF_APP_NAME` sets the product name shown in both web apps, the tab title, the subject of the magic-link mail, the issuer in authenticator apps and the title of the product API reference. It defaults to `nodate-flow` and may be up to 64 characters, with no `:` and no control characters. `NF_APP_LOGO_URL` sets a logo for the sign-in pages, the sidebar and the public share pages, and it is also used as the favicon; it takes an `https://` URL or a `data:image/...` URI of up to 32 KiB. Both are compiled into the SPA bundles, so after changing either, rebuild the edge as described in [Changing the hostname or the scheme](#changing-the-hostname-or-the-scheme). The sender address of outgoing mail is set separately with `NF_SMTP_FROM`. After a rename, people who re-enrol two-factor authentication may see a second entry in their authenticator app; codes from the existing entry keep working.
+
 ## OIDC-only sign-in
 
 To allow sign-in through an identity provider only, with no password accounts and no SMTP, set these in `.env`:

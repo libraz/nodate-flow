@@ -25,6 +25,8 @@ Compose プラグイン付きの Docker と、ホストにインストールし�
 
 SMTP は任意です（`NF_SMTP_HOST`、`NF_SMTP_FROM` と、それに付随する認証情報）。ホストを設定しない場合、マジックリンクでのサインインは提供されず、招待や通知のメールも送られません。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
 
+`NF_APP_NAME` は、2 つの Web アプリに表示される製品名、タブのタイトル、マジックリンクのメールの件名、認証アプリに表示される発行者名、製品 API リファレンスのタイトルを設定します。既定は `nodate-flow` で、64 文字までです。`:` と制御文字は使えません。`NF_APP_LOGO_URL` は、サインイン画面、サイドバー、公開共有ページに表示するロゴを設定し、favicon にも使われます。`https://` の URL か、32 KiB までの `data:image/...` URI を指定できます。どちらも SPA のバンドルに組み込まれるため、変更したら [ホスト名やスキームを変える場合](#ホスト名やスキームを変える場合) の手順で edge を再ビルドしてください。送信メールの差出人アドレスは、別に `NF_SMTP_FROM` で設定します。名前を変えたあとに 2 要素認証を再登録した人は、認証アプリに項目が 2 つ並ぶことがあります。既存の項目のコードはそのまま使えます。
+
 ## OIDC のみのサインイン
 
 パスワードアカウントも SMTP も使わず、IdP 経由のサインインだけを許可するには、`.env` に次を書きます。
