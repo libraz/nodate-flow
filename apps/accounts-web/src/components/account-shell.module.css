@@ -38,9 +38,17 @@
   letter-spacing: -0.01em;
   color: var(--nf-color-fg);
   white-space: nowrap;
+  min-inline-size: 0;
+}
+
+.brandName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brandLogo {
+  flex-shrink: 0;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 8rem;
   block-size: var(--nf-space-6);

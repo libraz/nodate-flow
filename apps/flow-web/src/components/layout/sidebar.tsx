@@ -430,7 +430,9 @@ export default function Sidebar(): ReactElement {
       >
         <div className={styles.brand}>
           {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
-          <span className={styles.brandLabel}>{APP_NAME}</span>
+          <span className={styles.brandLabel} title={APP_NAME}>
+            {APP_NAME}
+          </span>
         </div>
         <Collapse open={!collapsed}>
           <div className={styles.workspaceSwitcherSlot}>

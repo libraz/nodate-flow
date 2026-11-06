@@ -51,7 +51,9 @@ export default function AccountShell({ user, wide, children }: AccountShellProps
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
-          {APP_NAME}
+          <span className={styles.brandName} title={APP_NAME}>
+            {APP_NAME}
+          </span>
         </div>
 
         <nav className={styles.nav} aria-label={t('account.nav_label')}>

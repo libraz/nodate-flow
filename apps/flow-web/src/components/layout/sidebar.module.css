@@ -61,6 +61,7 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
   white-space: nowrap;
+  min-inline-size: 0;
 }
 
 /*
@@ -153,10 +154,15 @@
 }
 
 .brandLabel {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .brandLogo {
+  flex-shrink: 0;
   block-size: var(--nf-space-6);
   inline-size: auto;
   /* nf-token-override: component dimension, not a spacing step */
@@ -165,7 +171,7 @@
 }
 
 .collapsed .brandLogo {
-  max-inline-size: 100%;
+  display: none;
 }
 
 /*
