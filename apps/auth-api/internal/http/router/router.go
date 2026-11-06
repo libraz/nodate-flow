@@ -32,6 +32,7 @@ import (
 
 // Deps is the dependency bundle Build needs.
 type Deps struct {
+	AppName                   string
 	DB                        *sql.DB
 	Queries                   *generated.Queries
 	JWT                       *auth.JWTIssuer
@@ -219,6 +220,7 @@ func BuildResult(deps Deps) Result {
 	}
 	auditRec := audit.New(deps.Queries)
 	authDeps := authhandlers.Deps{
+		AppName:                   deps.AppName,
 		SingleUse:                 singleUse,
 		DB:                        deps.DB,
 		Queries:                   deps.Queries,

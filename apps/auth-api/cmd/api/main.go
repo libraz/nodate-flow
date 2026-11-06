@@ -207,6 +207,7 @@ func main() {
 	}
 
 	inner := router.Build(router.Deps{
+		AppName:                   cfg.AppName,
 		DB:                        db,
 		Queries:                   queries,
 		Sessions:                  sessions,

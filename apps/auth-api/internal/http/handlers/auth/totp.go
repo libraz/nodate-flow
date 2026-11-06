@@ -33,6 +33,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/brand"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 )
 
@@ -108,7 +109,7 @@ func TotpEnroll(deps Deps) func(context.Context, *TotpEnrollInput) (*TotpEnrollO
 		if account == "" {
 			account = "user"
 		}
-		otpURL := auth.TotpOtpauthURL("nodate-flow", account, secret)
+		otpURL := auth.TotpOtpauthURL(brand.NameOrDefault(deps.AppName), account, secret)
 		recordTotpEnrolledAudit(ctx, deps, uid)
 		out := &TotpEnrollOutput{}
 		out.Body.OtpauthURL = otpURL

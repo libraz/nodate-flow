@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -624,4 +626,60 @@ func TestIssueMagicLink_SendFailureIsReported(t *testing.T) {
 
 	assert.NoError(t, issueMagicLink(context.Background(), deps, "nobody-"+types.New().String()+"@example.test"),
 		"an address with no account is not a failure")
+}
+
+// TestMagicLinkSubjectUsesAppName covers the configured name and the
+// empty-name fallback in the mail subject.
+func TestMagicLinkSubjectUsesAppName(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	for _, tc := range []struct{ appName, want string }{
+		{"Acme", "Sign in to Acme"},
+		{"", "Sign in to nodate-flow"},
+	} {
+		deps, _ := b2Deps(t, db)
+		sender := &email.MemorySender{}
+		deps.EmailSender = sender
+		deps.AppName = tc.appName
+
+		_, _, addr := b2NewUser(t, deps.Queries)
+		require.NoError(t, issueMagicLink(context.Background(), deps, addr))
+		require.Len(t, sender.Sent, 1)
+		assert.Equal(t, tc.want, sender.Sent[0].Subject)
+	}
+}
+
+// TestTotpIssuerUsesAppName covers the configured name and the
+// empty-name fallback in the otpauth label and issuer.
+func TestTotpIssuerUsesAppName(t *testing.T) {
+	t.Parallel()
+	db := requireB2DB(t)
+	const password = "correct horse battery staple"
+	hash, err := internauth.HashPassword(password)
+	require.NoError(t, err)
+
+	for _, tc := range []struct{ appName, want string }{
+		{"Acme", "Acme"},
+		{"", "nodate-flow"},
+	} {
+		deps, _ := b2Deps(t, db)
+		deps.AppName = tc.appName
+		uid, _, _ := b2NewUser(t, deps.Queries)
+		ident, err := deps.Queries.FindLocalIdentityByUserId(context.Background(), uid)
+		require.NoError(t, err)
+		require.NoError(t, deps.Queries.UpdateIdentityPasswordHash(context.Background(), generated.UpdateIdentityPasswordHashParams{
+			PasswordHash: sql.NullString{String: hash, Valid: true},
+			ID:           ident.ID,
+		}))
+
+		in := &TotpEnrollInput{}
+		in.Body.Password = password
+		out, err := TotpEnroll(deps)(authn.WithActor(context.Background(), uid), in)
+		require.NoError(t, err)
+
+		u, err := url.Parse(out.Body.OtpauthURL)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, u.Query().Get("issuer"))
+		assert.True(t, strings.HasPrefix(strings.TrimPrefix(u.Path, "/"), tc.want+":"), "label %q", u.Path)
+	}
 }

@@ -47,6 +47,9 @@ type MicrosoftExchanger interface {
 
 // Deps is the dependency bundle passed to each handler.
 type Deps struct {
+	// AppName is the product name shown in emails and authenticator
+	// apps. Empty falls back to brand.DefaultAppName.
+	AppName  string
 	DB       *sql.DB
 	Queries  *generated.Queries
 	Sessions sessionstore.Store

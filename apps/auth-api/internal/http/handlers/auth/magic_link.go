@@ -16,6 +16,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/brand"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	sharedtoken "github.com/libraz/nodate-flow/packages/go-shared/token"
@@ -99,7 +100,7 @@ func issueMagicLink(ctx context.Context, deps Deps, addr string) error {
 	verifyURL := deps.AccountsWebURL + "/magic-link?token=" + plaintext
 	if err := deps.EmailSender.Send(ctx, email.Message{
 		To:      []string{addr},
-		Subject: "Sign in to nodate-flow",
+		Subject: "Sign in to " + brand.NameOrDefault(deps.AppName),
 		Body:    "Click the link below to sign in. This link expires in 15 minutes.\n\n" + verifyURL + "\n\nIf you didn't request this, you can safely ignore this email.",
 	}); err != nil {
 		return fmt.Errorf("send: %w", err)
