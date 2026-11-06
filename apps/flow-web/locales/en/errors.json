@@ -164,8 +164,6 @@
   "INSTANCE.ADMIN.SELF_REVOKE": "Cannot revoke your own administrator privileges",
   "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND": "OAuth sign-in allowlist entry not found",
   "INSTANCE.SESSION.NOT_FOUND": "Session not found",
-  "INSTANCE.SETTINGS.INVALID_KEY": "Unknown setting key",
-  "INSTANCE.SETTINGS.INVALID_VALUE": "Invalid value for setting",
   "INSTANCE.SETUP.ALREADY_INITIALIZED": "Instance has already been initialized",
   "INSTANCE.USER.NOT_FOUND": "User not found",
   "INSTANCE.USER.SELF_SUSPEND": "Cannot suspend your own account",

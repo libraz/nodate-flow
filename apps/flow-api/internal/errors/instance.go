@@ -14,10 +14,6 @@ var (
 	InstanceOauthAllowlistNotFound = &Spec{Code: "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND", Status: 404, Message: "OAuth sign-in allowlist entry not found", Description: "Returned when an admin endpoint references an OAuth sign-in allowlist entry that does not exist, was already removed, or is not a well-formed identifier.", UserAction: "Refresh the allowlist and try again."}
 	// INSTANCE.SESSION.NOT_FOUND — Session not found
 	InstanceSessionNotFound = &Spec{Code: "INSTANCE.SESSION.NOT_FOUND", Status: 404, Message: "Session not found", Description: "Returned when an admin revoke references a session that does not exist or was already revoked.", UserAction: "Refresh the session list and try again."}
-	// INSTANCE.SETTINGS.INVALID_KEY — Unknown setting key
-	InstanceSettingsInvalidKey = &Spec{Code: "INSTANCE.SETTINGS.INVALID_KEY", Status: 400, Message: "Unknown setting key", Description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized.", UserAction: "Use one of the supported setting keys."}
-	// INSTANCE.SETTINGS.INVALID_VALUE — Invalid value for setting
-	InstanceSettingsInvalidValue = &Spec{Code: "INSTANCE.SETTINGS.INVALID_VALUE", Status: 400, Message: "Invalid value for setting", Description: "Returned when a setting value does not pass validation for its key.", UserAction: "Check the expected format for this setting."}
 	// INSTANCE.SETUP.ALREADY_INITIALIZED — Instance has already been initialized
 	InstanceSetupAlreadyInitialized = &Spec{Code: "INSTANCE.SETUP.ALREADY_INITIALIZED", Status: 409, Message: "Instance has already been initialized", Description: "Returned when the initial setup endpoint is called after the instance has already been bootstrapped with an admin account.", UserAction: "Sign in with the existing admin account instead of running setup again."}
 	// INSTANCE.USER.NOT_FOUND — User not found

@@ -38,8 +38,6 @@ type Querier interface {
 	// purge by design targets soft-disabled workspaces. sql.ErrNoRows means
 	// the workspace is already gone and the caller maps it to a 404.
 	AdminFindWorkspaceIdByPublicId(ctx context.Context, publicID types.PublicID) (uint32, error)
-	// Get a single setting by key.
-	AdminGetInstanceSetting(ctx context.Context, settingKey string) (AdminGetInstanceSettingRow, error)
 	// Find a single user by public_id for admin detail view.
 	AdminGetUser(ctx context.Context, publicID types.PublicID) (AdminGetUserRow, error)
 	// Find a single workspace by public_id for admin detail view.
@@ -54,8 +52,6 @@ type Querier interface {
 	// filter_action: pass '' to skip, otherwise exact match on action.
 	// filter_from / filter_to: pass NULL to skip date bounds.
 	AdminListInstanceAuditLogs(ctx context.Context, arg AdminListInstanceAuditLogsParams) ([]AdminListInstanceAuditLogsRow, error)
-	// List all instance settings.
-	AdminListInstanceSettings(ctx context.Context) ([]AdminListInstanceSettingsRow, error)
 	// List all sessions for a user by their internal user_id, across every
 	// audience: an operator sees (and may revoke) sessions of any application.
 	AdminListUserSessions(ctx context.Context, arg AdminListUserSessionsParams) ([]AdminListUserSessionsRow, error)
@@ -80,8 +76,6 @@ type Querier interface {
 	AdminSuspendUser(ctx context.Context, publicID types.PublicID) (int64, error)
 	// Disable a workspace (soft-delete).
 	AdminSuspendWorkspace(ctx context.Context, publicID types.PublicID) (int64, error)
-	// Insert or update an instance setting.
-	AdminUpsertInstanceSetting(ctx context.Context, arg AdminUpsertInstanceSettingParams) error
 	// Append a workspace-scoped audit row. metadata_json MUST be redacted.
 	AppendAuditLog(ctx context.Context, arg AppendAuditLogParams) (int64, error)
 	// Append an instance-wide audit row. payload_json MUST be redacted.

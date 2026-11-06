@@ -1,6 +1,6 @@
 // Package admin contains Huma operation handlers for the instance
 // administration panel: user management, workspace management, session
-// oversight, audit log viewing, instance admin grants, and settings.
+// oversight, audit log viewing, and instance admin grants.
 //
 //nolint:revive // DTO names intentionally keep admin/workspace prefixes for stable generated OpenAPI schema names.
 package admin
@@ -356,36 +356,6 @@ type ListAuditLogsOutput struct {
 	Body struct {
 		Total int64        `json:"total"`
 		Items []AuditEntry `json:"items"`
-	}
-}
-
-// --- Settings ---
-
-// InstanceSetting is the public DTO for an instance setting.
-type InstanceSetting struct {
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	UpdatedAt *int64 `json:"updatedAt,omitempty"`
-}
-
-// ListSettingsOutput is the response for GET /admin/settings.
-type ListSettingsOutput struct {
-	Body struct {
-		Items []InstanceSetting `json:"items"`
-	}
-}
-
-// PatchSettingsInput binds the body for PATCH /admin/settings.
-type PatchSettingsInput struct {
-	Body struct {
-		Settings map[string]string `json:"settings" doc:"Key-value pairs to upsert"`
-	}
-}
-
-// PatchSettingsOutput is the response for PATCH /admin/settings.
-type PatchSettingsOutput struct {
-	Body struct {
-		Ok bool `json:"ok"`
 	}
 }
 

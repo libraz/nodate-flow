@@ -96,23 +96,3 @@ resources:
         message_zh: "未找到会话"
         description: "Returned when an admin revoke references a session that does not exist or was already revoked."
         userAction: "Refresh the session list and try again."
-
-  settings:
-    breadcrumb: "Instance > Settings"
-    errors:
-      invalid_key:
-        code: INSTANCE.SETTINGS.INVALID_KEY
-        status: 400
-        message: "Unknown setting key"
-        message_ja: "未知の設定キーです"
-        message_zh: "未知的设置键"
-        description: "Returned when a PATCH /admin/settings request references a setting key that is not recognized."
-        userAction: "Use one of the supported setting keys."
-      invalid_value:
-        code: INSTANCE.SETTINGS.INVALID_VALUE
-        status: 400
-        message: "Invalid value for setting"
-        message_ja: "設定値が不正です"
-        message_zh: "设置值无效"
-        description: "Returned when a setting value does not pass validation for its key."
-        userAction: "Check the expected format for this setting."

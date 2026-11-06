@@ -177,25 +177,6 @@ func Register(api huma.API, deps Deps) {
 		Description: "Returns aggregate counts (users, workspaces, sessions, tasks) for the admin overview page. Computed on the fly; safe to call frequently.",
 		Tags:        []string{"Admin"},
 	}, InstanceStats(deps))
-
-	// --- Settings ---
-	huma.Register(api, huma.Operation{
-		OperationID: "admin-list-settings",
-		Method:      http.MethodGet,
-		Path:        "/admin/settings",
-		Summary:     "List instance settings",
-		Description: "Returns the stored instance-level settings whose key the server accepts. No key is accepted today: registration, MFA policy and workspace/member limits are governed by deployment configuration, so the list is empty.",
-		Tags:        []string{"Admin"},
-	}, ListSettings(deps))
-
-	huma.Register(api, huma.Operation{
-		OperationID: "admin-patch-settings",
-		Method:      http.MethodPatch,
-		Path:        "/admin/settings",
-		Summary:     "Update instance settings",
-		Description: "Patches instance-level settings whose key the server accepts. No key is accepted today, so any key is refused with 400 INSTANCE.SETTINGS.INVALID_KEY; an accepted change would be recorded in the audit log.",
-		Tags:        []string{"Admin"},
-	}, PatchSettings(deps))
 }
 
 // RegisterSetup registers the bootstrap endpoint on a separate API instance

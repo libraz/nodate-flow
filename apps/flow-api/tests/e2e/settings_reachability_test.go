@@ -22,8 +22,7 @@ type settingInventory struct {
 		Consumers   map[string]settingConsumer `json:"consumers"`
 		NotSettings map[string]string          `json:"notSettings"`
 	} `json:"tables"`
-	ConstraintOps    map[string]settingConsumer `json:"constraintOps"`
-	InstanceSettings map[string]settingConsumer `json:"instanceSettings"`
+	ConstraintOps map[string]settingConsumer `json:"constraintOps"`
 }
 
 var (
@@ -31,14 +30,12 @@ var (
 	sqlColumn = regexp.MustCompile(`(?m)^\s+([a-z_][a-z0-9_]*)\s+[A-Z]`)
 	// constraintOpDecl matches one `OpX Op = "name"` declaration.
 	constraintOpDecl = regexp.MustCompile(`\bOp[A-Za-z]+\s+Op\s*=\s*"([^"]+)"`)
-	// quotedKey matches a quoted map key.
-	quotedKey = regexp.MustCompile(`"([^"]+)"\s*:`)
 )
 
 // TestEveryStoredSettingHasAConsumer holds each value a user can store
 // that claims to change behaviour to the code that reads it. The columns
-// of every inventoried table, the constraint DSL ops and the instance
-// setting keys the admin API accepts are read from the sources; each has
+// of every inventoried table and the constraint DSL ops are read from the
+// sources; each has
 // to be mapped in scripts/setting-consumers.json to a file that still
 // contains its consumer symbol, or be declared as changing no behaviour.
 // A value added without a reader, or a reader removed, fails here.
@@ -110,38 +107,5 @@ func TestEveryStoredSettingHasAConsumer(t *testing.T) {
 			continue
 		}
 		checkConsumer("constraint op "+m[1], c)
-	}
-
-	settings := read("apps/auth-api/internal/http/handlers/admin/settings.go")
-	start := strings.Index(settings, "var settingValidators")
-	if start < 0 {
-		t.Fatal("settingValidators not found in the admin settings handler")
-	}
-	block := settings[start:]
-	open := strings.Index(block, "bool{")
-	if open < 0 {
-		t.Fatal("settingValidators literal not found in the admin settings handler")
-	}
-	block = block[open+len("bool"):]
-	depth, end := 0, 0
-	for i, r := range block {
-		if r == '{' {
-			depth++
-		} else if r == '}' {
-			depth--
-			if depth == 0 {
-				end = i + 1
-				break
-			}
-		}
-	}
-	block = block[:end]
-	for _, m := range quotedKey.FindAllStringSubmatch(block, -1) {
-		c, ok := inv.InstanceSettings[m[1]]
-		if !ok {
-			t.Errorf("instance setting %q is accepted by PATCH /admin/settings but has no consumer in scripts/setting-consumers.json", m[1])
-			continue
-		}
-		checkConsumer("instance setting "+m[1], c)
 	}
 }

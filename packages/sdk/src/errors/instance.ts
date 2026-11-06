@@ -26,16 +26,6 @@ export const InstanceErrors = {
     status: 404,
     message: "Session not found",
   },
-  INSTANCE_SETTINGS_INVALID_KEY: {
-    code: "INSTANCE.SETTINGS.INVALID_KEY",
-    status: 400,
-    message: "Unknown setting key",
-  },
-  INSTANCE_SETTINGS_INVALID_VALUE: {
-    code: "INSTANCE.SETTINGS.INVALID_VALUE",
-    status: 400,
-    message: "Invalid value for setting",
-  },
   INSTANCE_SETUP_ALREADY_INITIALIZED: {
     code: "INSTANCE.SETUP.ALREADY_INITIALIZED",
     status: 409,

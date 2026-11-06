@@ -152,30 +152,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List instance settings
-         * @description Returns the stored instance-level settings whose key the server accepts. No key is accepted today: registration, MFA policy and workspace/member limits are governed by deployment configuration, so the list is empty.
-         */
-        get: operations["admin-list-settings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update instance settings
-         * @description Patches instance-level settings whose key the server accepts. No key is accepted today, so any key is refused with 400 INSTANCE.SETTINGS.INVALID_KEY; an accepted change would be recorded in the audit log.
-         */
-        patch: operations["admin-patch-settings"];
-        trace?: never;
-    };
     "/admin/setup": {
         parameters: {
             query?: never;
@@ -7430,12 +7406,6 @@ export interface components {
             id: string;
             userId: string;
         };
-        InstanceSetting: {
-            key: string;
-            /** Format: int64 */
-            updatedAt?: number;
-            value: string;
-        };
         InstanceStatsOutputBody: {
             /**
              * Format: uri
@@ -8182,15 +8152,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["SessionSummary"][] | null;
-        };
-        ListSettingsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListSettingsOutputBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["InstanceSetting"][] | null;
         };
         ListStateSuggestionsOutputBody: {
             /**
@@ -9081,27 +9042,6 @@ export interface components {
             sortWeight?: number;
             timezone?: string;
             title?: string;
-        };
-        PatchSettingsInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchSettingsInputBody.json
-             */
-            readonly $schema?: string;
-            /** @description Key-value pairs to upsert */
-            settings: {
-                [key: string]: string;
-            };
-        };
-        PatchSettingsOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchSettingsOutputBody.json
-             */
-            readonly $schema?: string;
-            ok: boolean;
         };
         PatchTaskBody: {
             /**
@@ -11733,68 +11673,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminRevokeSessionOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "admin-list-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListSettingsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "admin-patch-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatchSettingsInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatchSettingsOutputBody"];
                 };
             };
             /** @description Error */

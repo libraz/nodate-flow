@@ -164,8 +164,6 @@
   "INSTANCE.ADMIN.SELF_REVOKE": "自身の管理者権限は取り消せません",
   "INSTANCE.OAUTH_ALLOWLIST.NOT_FOUND": "OAuth サインイン許可リストの項目が見つかりません",
   "INSTANCE.SESSION.NOT_FOUND": "セッションが見つかりません",
-  "INSTANCE.SETTINGS.INVALID_KEY": "未知の設定キーです",
-  "INSTANCE.SETTINGS.INVALID_VALUE": "設定値が不正です",
   "INSTANCE.SETUP.ALREADY_INITIALIZED": "インスタンスは既に初期化済みです",
   "INSTANCE.USER.NOT_FOUND": "ユーザーが見つかりません",
   "INSTANCE.USER.SELF_SUSPEND": "自分のアカウントは停止できません",

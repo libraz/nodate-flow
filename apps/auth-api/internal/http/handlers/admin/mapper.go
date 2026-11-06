@@ -189,11 +189,3 @@ func rowToAuditEntry(r generated.AdminListInstanceAuditLogsRow) AuditEntry {
 		OccurredAt:             r.OccurredAt.Unix(),
 	}
 }
-
-func rowToSetting(r generated.AdminListInstanceSettingsRow) InstanceSetting {
-	return InstanceSetting{
-		Key:       r.SettingKey,
-		Value:     r.SettingValue,
-		UpdatedAt: nullTimeUnix(r.UpdatedAt),
-	}
-}

@@ -1,5 +1,5 @@
 {
-  "description": "Every value a user can store that claims to change behaviour, mapped to the code that reads it. apps/flow-api/tests/e2e/settings_reachability_test.go enumerates the columns of each table below, the constraint DSL ops and the accepted instance setting keys, and fails when one is neither mapped to a consumer whose symbol still appears in the named file nor listed under notSettings with the reason it changes no behaviour.",
+  "description": "Every value a user can store that claims to change behaviour, mapped to the code that reads it. apps/flow-api/tests/e2e/settings_reachability_test.go enumerates the columns of each table below, and the constraint DSL ops, and fails when one is neither mapped to a consumer whose symbol still appears in the named file nor listed under notSettings with the reason it changes no behaviour.",
   "tables": {
     "ai_settings": {
       "consumers": {
@@ -218,6 +218,5 @@
       "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
       "symbol": "ListSignalKindsForTaskForEngine"
     }
-  },
-  "instanceSettings": {}
+  }
 }
