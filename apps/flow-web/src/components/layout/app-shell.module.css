@@ -14,7 +14,7 @@
   grid-template-rows: auto auto minmax(0, 1fr);
   block-size: 100dvh;
   inline-size: 100%;
-  background: var(--nf-color-bg);
+  /* Transparent so the body's --nf-app-bg canvas shows through. */
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
 }

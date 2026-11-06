@@ -6,7 +6,18 @@ import { axe } from 'vitest-axe';
 import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
 import Dialog from './dialog';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 function Harness({ onClose }: { onClose?: () => void }) {
   const [open, setOpen] = useState(true);

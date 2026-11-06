@@ -206,6 +206,7 @@
         "react-hook-form": "7.91.0",
         "tsx": "4.23.15",
         "typescript": "7.0.2",
+        "vite": "8.3.6",
         "vitest": "^5.1.0",
         "vitest-axe": "0.1.0",
         "zod": "4.6.7",

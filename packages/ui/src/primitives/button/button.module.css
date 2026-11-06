@@ -29,6 +29,8 @@
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
   font-variant-numeric: tabular-nums;
+  text-transform: var(--nf-control-case);
+  letter-spacing: var(--nf-control-tracking);
   line-height: var(--nf-leading-tight);
   /* Links styled as buttons (`as="a"`, `buttonClassName`) drop the underline. */
   text-decoration: none;

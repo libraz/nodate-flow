@@ -3,26 +3,28 @@
  * bootstrap is in progress we render nothing. On unauthenticated state
  * the user is redirected to /login, carrying where they were headed so
  * an expired session does not turn a bookmark or an emailed link to
- * /security or /workspaces/... into a trip to /profile.
+ * /security or /workspaces/... into a trip to /profile. Every signed-in
+ * page renders inside the account shell.
  */
 
-import { createFileRoute, Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
+import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
+import { createFileRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 
+import AccountShell from '../components/account-shell';
 import { selectIsAuthenticated, selectUser, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../hooks/use-auth-bootstrap';
 
 import styles from './_authenticated.module.css';
 
 export function AuthenticatedLayout(): ReactElement | null {
-  const { t } = useTranslation('admin');
   const { status } = useAuthBootstrap();
   const isAuthenticated = useAuth(selectIsAuthenticated);
   const user = useAuth(selectUser);
   const navigate = useNavigate();
   const location = useLocation();
-  const pageKey = location.pathname.startsWith('/admin') ? '/admin' : location.pathname;
+  const isAdmin = location.pathname.startsWith('/admin');
+  const pageKey = isAdmin ? '/admin' : location.pathname;
   // pathname + search + hash including the basepath, without the origin:
   // /login hands it to window.location, which knows nothing of the router
   // basepath, and resolves it against this app's own origin.
@@ -42,21 +44,16 @@ export function AuthenticatedLayout(): ReactElement | null {
 
   if (status === 'loading') return null;
   if (!isAuthenticated) return null;
+  // A token without a hydrated user: hold the shell's place until /me lands.
+  if (!user) return <PageSkeleton sidebar />;
 
   return (
-    <>
-      {user?.isInstanceAdmin ? (
-        <nav className={styles.adminNav}>
-          <Link to="/admin/users" className={styles.adminLink}>
-            {t('title')}
-          </Link>
-        </nav>
-      ) : null}
+    <AccountShell user={user} wide={isAdmin}>
       {/* Keyed so each page fades in as it replaces the last; the admin shell keeps one key and fades its own pages. */}
       <div key={pageKey} className={styles.page}>
         <Outlet />
       </div>
-    </>
+    </AccountShell>
   );
 }
 

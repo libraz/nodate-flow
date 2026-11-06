@@ -19,7 +19,7 @@ describe('authStore', () => {
     locale: 'en',
     timezone: 'UTC',
     country: '',
-    themePreference: 'aurora-dark',
+    themePreference: 'glass-dark',
     isInstanceAdmin: false,
     hasPassword: true,
   };
@@ -28,7 +28,7 @@ describe('authStore', () => {
     authStore.getState().setSession('tok_1', fullUser);
     const user = authStore.getState().user;
     expect(user).not.toBeNull();
-    expect(user?.themePreference).toBe('aurora-dark');
+    expect(user?.themePreference).toBe('glass-dark');
   });
 
   it('stores isInstanceAdmin via setSession', () => {

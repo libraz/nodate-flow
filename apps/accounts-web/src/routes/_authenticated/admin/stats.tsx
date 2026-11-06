@@ -74,15 +74,7 @@ function StatsPage(): ReactElement {
       }}
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-sans)',
-            fontSize: 'var(--nf-text-2xl)',
-            margin: 0,
-          }}
-        >
-          {t('page.title')}
-        </h1>
+        <h1 style={{ margin: 0 }}>{t('page.title')}</h1>
         <p
           style={{
             margin: 0,

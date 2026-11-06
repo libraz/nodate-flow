@@ -9,29 +9,29 @@ describe('useTheme', () => {
   });
 
   it('applies the default theme to <html data-theme>', () => {
-    const { result } = renderHook(() => useTheme({ defaultTheme: 'dotline-dark' }));
-    expect(result.current.theme).toBe('dotline-dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dotline-dark');
+    const { result } = renderHook(() => useTheme({ defaultTheme: 'modern-dark' }));
+    expect(result.current.theme).toBe('modern-dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('modern-dark');
   });
 
   it('updates the attribute when setTheme is called', () => {
-    const { result } = renderHook(() => useTheme({ defaultTheme: 'aurora-light' }));
-    act(() => result.current.setTheme('aurora-dark'));
-    expect(result.current.theme).toBe('aurora-dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('aurora-dark');
+    const { result } = renderHook(() => useTheme({ defaultTheme: 'glass-light' }));
+    act(() => result.current.setTheme('glass-dark'));
+    expect(result.current.theme).toBe('glass-dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('glass-dark');
   });
 
   it('persists to localStorage when storageKey is provided', () => {
     const { result } = renderHook(() =>
-      useTheme({ defaultTheme: 'aurora-light', storageKey: 'nf:theme' }),
+      useTheme({ defaultTheme: 'glass-light', storageKey: 'nf:theme' }),
     );
-    act(() => result.current.setTheme('dotline-light'));
-    expect(localStorage.getItem('nf:theme')).toBe('dotline-light');
+    act(() => result.current.setTheme('modern-light'));
+    expect(localStorage.getItem('nf:theme')).toBe('modern-light');
   });
 
   it('reads existing data-theme on mount', () => {
-    document.documentElement.setAttribute('data-theme', 'dotline-light');
+    document.documentElement.setAttribute('data-theme', 'modern-light');
     const { result } = renderHook(() => useTheme());
-    expect(result.current.theme).toBe('dotline-light');
+    expect(result.current.theme).toBe('modern-light');
   });
 });

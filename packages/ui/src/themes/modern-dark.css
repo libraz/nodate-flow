@@ -1,0 +1,128 @@
+/*
+ * modern-dark — deep slate, solid surfaces, luminous iris accent with dark labels.
+ */
+
+[data-theme="modern-dark"] {
+  color-scheme: dark;
+
+  --nf-color-bg: oklch(17.89% 0.0104 276.38);
+  --nf-color-bg-elevated: oklch(26.9% 0.0155 269.1);
+  --nf-color-bg-sunken: oklch(20.91% 0.0104 268.19);
+  --nf-color-surface: oklch(22.7% 0.012 270.84);
+  --nf-color-surface-hover: oklch(26.9% 0.0155 269.1);
+  --nf-color-overlay: oklch(0% 0 0 / 0.6);
+
+  --nf-color-fg: oklch(96.4% 0.0029 264.54);
+  --nf-color-fg-muted: oklch(70.8% 0.0188 264.45);
+  --nf-color-fg-subtle: oklch(55.1% 0.0234 264.36);
+  --nf-color-fg-on-accent: oklch(20.08% 0.0124 270.73);
+  --nf-color-fg-on-danger: oklch(20.08% 0.0124 270.73);
+
+  --nf-color-border: oklch(29.79% 0.0169 270.8);
+  --nf-color-border-strong: oklch(35.68% 0.0198 269.58);
+  --nf-color-hairline: oklch(26.9% 0.0155 269.1);
+
+  --nf-color-accent: oklch(64.6% 0.1935 280.51);
+  --nf-color-accent-hover: oklch(69.68% 0.1639 282.47);
+  --nf-color-accent-active: oklch(74.68% 0.1339 282.47);
+  --nf-color-accent-subtle: oklch(64.6% 0.1935 280.51 / 0.24);
+  --nf-color-accent-fg: oklch(74.1% 0.1345 280.51);
+
+  --nf-color-success: oklch(77.94% 0.1655 157.29);
+  --nf-color-success-subtle: oklch(77.94% 0.1655 157.29 / 0.18);
+  --nf-color-success-fg: oklch(77.94% 0.1655 157.29);
+  --nf-color-warning: oklch(86.17% 0.173 89.02);
+  --nf-color-warning-subtle: oklch(86.17% 0.173 89.02 / 0.18);
+  --nf-color-warning-fg: oklch(86.17% 0.173 89.02);
+  --nf-color-danger: oklch(70.13% 0.1901 21.2);
+  --nf-color-danger-subtle: oklch(70.13% 0.1901 21.2 / 0.16);
+  --nf-color-danger-fg: oklch(72.13% 0.1719 21.2);
+  --nf-color-info: oklch(68.84% 0.1693 251.4);
+  --nf-color-info-subtle: oklch(68.84% 0.1693 251.4 / 0.18);
+  --nf-color-info-fg: oklch(71.84% 0.15 251.4);
+
+  --nf-color-focus-ring: oklch(64.6% 0.1935 280.51);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  --nf-radius-xs: 0.5rem;
+  --nf-radius-sm: 0.625rem;
+  --nf-radius-md: 0.875rem;
+  --nf-radius-lg: 1.125rem;
+  --nf-radius-pill: 9999px;
+
+  --nf-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4);
+  --nf-shadow-md: 0 2px 4px oklch(0% 0 0 / 0.4), 0 4px 12px oklch(0% 0 0 / 0.45);
+  --nf-shadow-lg: 0 4px 8px oklch(0% 0 0 / 0.45), 0 12px 28px oklch(0% 0 0 / 0.55);
+  --nf-shadow-elevated: 0 8px 16px oklch(0% 0 0 / 0.5), 0 24px 48px oklch(0% 0 0 / 0.6);
+  --nf-shadow-focus:
+    0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg),
+    0 0 0 calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-overlay-press: oklch(100% 0 0 / 0.06);
+  --nf-overlay-hover: oklch(100% 0 0 / 0.03);
+
+  --nf-color-state-open-bg: oklch(37.58% 0.0595 252.11);
+  --nf-color-state-open-fg: oklch(74.84% 0.1329 251.4);
+  --nf-color-state-waiting-bg: oklch(38.34% 0.0489 53.47);
+  --nf-color-state-waiting-fg: oklch(76.27% 0.1547 50.86);
+  --nf-color-state-review-bg: oklch(37.21% 0.0648 316.83);
+  --nf-color-state-review-fg: oklch(75.98% 0.2004 327.49);
+  --nf-color-state-done-bg: oklch(39.88% 0.0486 173.43);
+  --nf-color-state-done-fg: oklch(77.94% 0.1655 157.29);
+  --nf-color-state-cancelled-bg: oklch(34.09% 0.0184 268.14);
+  --nf-color-state-cancelled-fg: oklch(71.1% 0.0234 264.36);
+
+  --nf-surface-blur: 0px;
+  --nf-surface-saturation: 1;
+
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(65.6% 0.1859 280.51) 0%,
+    oklch(70.91% 0.1656 291.52) 50%,
+    oklch(68.48% 0.2004 327.49) 100%
+  );
+
+  --nf-motion-duration: var(--nf-duration-fast);
+  --nf-motion-easing: var(--nf-ease-standard);
+
+  --nf-font-sans:
+    "Hanken Grotesk", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  --nf-font-display: var(--nf-font-sans);
+  --nf-text-tracking: -0.01em;
+  --nf-control-case: none;
+  --nf-control-tracking: normal;
+
+  --nf-app-bg: radial-gradient(
+    120% 80% at 50% -10%,
+    oklch(23.1% 0.0366 280.81) 0%,
+    oklch(17.89% 0.0104 276.38) 55%
+  );
+
+  --nf-cal-task-color: oklch(64.6% 0.1935 280.51);
+  --nf-cal-task-subtle: oklch(64.6% 0.1935 280.51 / 0.2);
+  --nf-cal-task-fg: oklch(72.6% 0.1429 280.51);
+  --nf-cal-event-color: oklch(68.84% 0.1693 251.4);
+  --nf-cal-event-subtle: oklch(68.84% 0.1693 251.4 / 0.2);
+  --nf-cal-event-fg: oklch(72.84% 0.1441 251.4);
+  --nf-cal-block-color: oklch(73.27% 0.1818 50.86);
+  --nf-cal-block-subtle: oklch(73.27% 0.1818 50.86 / 0.2);
+  --nf-cal-block-fg: oklch(74.27% 0.1711 50.86);
+  --nf-cal-free-color: oklch(77.94% 0.1655 157.29);
+  --nf-cal-free-subtle: oklch(77.94% 0.1655 157.29 / 0.2);
+  --nf-cal-free-fg: oklch(77.94% 0.1655 157.29);
+  --nf-cal-milestone-color: oklch(68.48% 0.2004 327.49);
+  --nf-cal-milestone-subtle: oklch(68.48% 0.2004 327.49 / 0.2);
+  --nf-cal-milestone-fg: oklch(73.98% 0.2004 327.49);
+
+  --nf-cal-color-1: oklch(62.31% 0.188 259.81);
+  --nf-cal-color-2: oklch(71.48% 0.1257 215.22);
+  --nf-cal-color-3: oklch(72.27% 0.192 149.58);
+  --nf-cal-color-4: oklch(76.86% 0.1647 70.08);
+  --nf-cal-color-5: oklch(70.49% 0.1867 47.6);
+  --nf-cal-color-6: oklch(63.68% 0.2078 25.33);
+  --nf-cal-color-7: oklch(65.59% 0.2118 354.31);
+  --nf-cal-color-8: oklch(62.68% 0.2325 303.9);
+  --nf-cal-color-9: oklch(55.1% 0.0234 264.36);
+  --nf-cal-color-10: oklch(87.17% 0.0093 258.34);
+}

@@ -4,37 +4,42 @@
  * Every theme MUST define every variable declared here.
  * scripts/check-theme-parity.ts parses this file and asserts parity across all themes.
  *
- * This file ALSO provides safe defaults (matching aurora-light) so that an unthemed
+ * This file ALSO provides safe defaults (matching glass-light) so that an unthemed
  * document still renders. Real apps must apply a [data-theme] attribute on <html>.
  */
 
 :where(:root) {
   /* surface */
-  --nf-color-bg: oklch(97% 0.01 80);
-  --nf-color-bg-elevated: oklch(99% 0.005 80);
-  --nf-color-bg-sunken: oklch(94% 0.012 80);
-  --nf-color-surface: oklch(98% 0.008 80 / 0.72);
-  --nf-color-surface-hover: oklch(96% 0.01 80 / 0.85);
-  --nf-color-overlay: oklch(20% 0.02 260 / 0.4);
+  --nf-color-bg: oklch(92.45% 0.0201 267.28);
+  --nf-color-bg-elevated: oklch(97.87% 0.0057 264.53);
+  --nf-color-bg-sunken: oklch(90.32% 0.0202 267.28);
+  --nf-color-surface: oklch(100% 0 0 / 0.6);
+  --nf-color-surface-hover: oklch(96.13% 0.0083 271.33 / 0.85);
+  --nf-color-overlay: oklch(0% 0 0 / 0.25);
 
-  /* foreground */
-  --nf-color-fg: oklch(20% 0.02 260);
-  --nf-color-fg-muted: oklch(45% 0.015 260);
-  --nf-color-fg-subtle: oklch(60% 0.012 260);
-  --nf-color-fg-on-accent: oklch(99% 0.005 80);
-  --nf-color-fg-on-danger: oklch(99% 0.005 80);
+  /*
+   * foreground. `-on-accent` / `-on-danger` hold 4.5:1 on their fill: white
+   * (or the theme's light ink) where it can, the theme's dark ink where the
+   * fill is too light for it. accent-hover, accent-active and the five
+   * `--nf-cal-*-color` fills carry `-on-accent` text too and are held to it.
+   */
+  --nf-color-fg: oklch(0% 0 0);
+  --nf-color-fg-muted: oklch(51.47% 0.0059 286.23);
+  --nf-color-fg-subtle: oklch(60.9% 0.0028 286.34);
+  --nf-color-fg-on-accent: oklch(100% 0 0);
+  --nf-color-fg-on-danger: oklch(100% 0 0);
 
   /* border */
-  --nf-color-border: oklch(88% 0.01 80);
-  --nf-color-border-strong: oklch(78% 0.012 80);
-  --nf-color-hairline: oklch(88% 0.01 80);
+  --nf-color-border: oklch(35.88% 0.012 285.78 / 0.15);
+  --nf-color-border-strong: oklch(35.88% 0.012 285.78 / 0.28);
+  --nf-color-hairline: oklch(35.88% 0.012 285.78 / 0.08);
 
   /* accent / brand */
-  --nf-color-accent: oklch(72% 0.13 175);
-  --nf-color-accent-hover: oklch(66% 0.14 175);
-  --nf-color-accent-active: oklch(60% 0.15 175);
-  --nf-color-accent-subtle: oklch(92% 0.05 175);
-  --nf-color-accent-fg: oklch(42% 0.0975 175);
+  --nf-color-accent: oklch(57.28% 0.2049 257.42);
+  --nf-color-accent-hover: oklch(52.96% 0.1899 257.24);
+  --nf-color-accent-active: oklch(47.96% 0.1716 257.24);
+  --nf-color-accent-subtle: oklch(60.28% 0.2177 257.42 / 0.14);
+  --nf-color-accent-fg: oklch(48.29% 0.1739 257.35);
 
   /*
    * status
@@ -42,40 +47,40 @@
    * Each status has three roles. The base is a fill, bright enough to
    * read as the status at a glance; `-subtle` is its wash for a chip or
    * row background; `-fg` is the one that carries text. Text needs
-   * contrast the fill cannot give — a 70% lightness green on a 97%
-   * background is around 2:1 — so `-fg` drops to 42% and trades away a
-   * quarter of the chroma to stay inside sRGB at that lightness.
+   * contrast the fill cannot give, so `-fg` is the base hue moved darker
+   * (lighter on dark themes) until it holds 4.5:1 on bg, bg-elevated and
+   * its own `-subtle` wash.
    */
-  --nf-color-success: oklch(70% 0.16 150);
-  --nf-color-success-subtle: oklch(95% 0.04 150);
-  --nf-color-success-fg: oklch(42% 0.12 150);
-  --nf-color-warning: oklch(78% 0.15 75);
-  --nf-color-warning-subtle: oklch(95% 0.04 75);
-  --nf-color-warning-fg: oklch(42% 0.112 75);
-  --nf-color-danger: oklch(58.5% 0.21 25);
-  --nf-color-danger-subtle: oklch(95% 0.04 25);
-  --nf-color-danger-fg: oklch(42% 0.158 25);
-  --nf-color-info: oklch(70% 0.13 240);
-  --nf-color-info-subtle: oklch(95% 0.04 240);
-  --nf-color-info-fg: oklch(42% 0.098 240);
+  --nf-color-success: oklch(73.03% 0.1944 147.44);
+  --nf-color-success-subtle: oklch(73.03% 0.1944 147.44 / 0.1);
+  --nf-color-success-fg: oklch(48.53% 0.1407 147.44);
+  --nf-color-warning: oklch(76.52% 0.1752 62.57);
+  --nf-color-warning-subtle: oklch(76.52% 0.1752 62.57 / 0.1);
+  --nf-color-warning-fg: oklch(50.52% 0.1146 62.57);
+  --nf-color-danger: oklch(59.42% 0.2321 28.66);
+  --nf-color-danger-subtle: oklch(65.42% 0.2321 28.66 / 0.1);
+  --nf-color-danger-fg: oklch(50.99% 0.2058 28.68);
+  --nf-color-info: oklch(60.28% 0.2177 257.42);
+  --nf-color-info-subtle: oklch(60.28% 0.2177 257.42 / 0.1);
+  --nf-color-info-fg: oklch(49.28% 0.1779 257.42);
 
   /* focus ring */
-  --nf-color-focus-ring: oklch(66% 0.18 240);
+  --nf-color-focus-ring: oklch(57.29% 0.2044 257.35);
   --nf-focus-ring-width: 2px;
   --nf-focus-ring-offset: 2px;
 
   /* radii */
-  --nf-radius-xs: 0.25rem;
-  --nf-radius-sm: 0.375rem;
-  --nf-radius-md: 0.625rem;
-  --nf-radius-lg: 1.125rem;
+  --nf-radius-xs: 0.75rem;
+  --nf-radius-sm: 1rem;
+  --nf-radius-md: 1.25rem;
+  --nf-radius-lg: 1.75rem;
   --nf-radius-pill: 9999px;
 
   /* shadows */
-  --nf-shadow-sm: 0 1px 2px oklch(20% 0.02 260 / 0.06);
-  --nf-shadow-md: 0 4px 12px oklch(20% 0.02 260 / 0.08);
-  --nf-shadow-lg: 0 12px 32px oklch(20% 0.02 260 / 0.12);
-  --nf-shadow-elevated: 0 4px 12px oklch(20% 0.02 260 / 0.12);
+  --nf-shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.04);
+  --nf-shadow-md: 0 4px 16px oklch(0% 0 0 / 0.06);
+  --nf-shadow-lg: 0 8px 32px oklch(0% 0 0 / 0.08), 0 0 0 0.5px oklch(100% 0 0 / 0.5);
+  --nf-shadow-elevated: 0 16px 48px oklch(0% 0 0 / 0.12), 0 0 0 0.5px oklch(100% 0 0 / 0.4);
   --nf-shadow-focus:
     0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg),
     0 0 0 calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
@@ -95,32 +100,76 @@
    * (open / waiting / review / done / cancelled) to a colour. Each state has a
    * `-bg` tint (light backdrop) and a `-fg` saturated tone (border / label).
    */
-  --nf-color-state-open-bg: oklch(92% 0.04 250);
-  --nf-color-state-open-fg: oklch(55% 0.15 250);
-  --nf-color-state-waiting-bg: oklch(92% 0.06 70);
-  --nf-color-state-waiting-fg: oklch(55% 0.15 70);
-  --nf-color-state-review-bg: oklch(92% 0.05 300);
-  --nf-color-state-review-fg: oklch(55% 0.15 300);
-  --nf-color-state-done-bg: oklch(92% 0.05 155);
-  --nf-color-state-done-fg: oklch(55% 0.15 155);
-  --nf-color-state-cancelled-bg: oklch(92% 0.02 30);
-  --nf-color-state-cancelled-fg: oklch(55% 0.08 30);
+  --nf-color-state-open-bg: oklch(91.83% 0.0357 253.45);
+  --nf-color-state-open-fg: oklch(51.28% 0.1852 257.42);
+  --nf-color-state-waiting-bg: oklch(94.28% 0.0266 74.76);
+  --nf-color-state-waiting-fg: oklch(53.52% 0.1218 62.57);
+  --nf-color-state-review-bg: oklch(92.53% 0.0329 307.16);
+  --nf-color-state-review-fg: oklch(53.99% 0.2129 312.41);
+  --nf-color-state-done-bg: oklch(93.86% 0.0282 162.08);
+  --nf-color-state-done-fg: oklch(51.03% 0.1495 147.44);
+  --nf-color-state-cancelled-bg: oklch(93.36% 0.0058 264.53);
+  --nf-color-state-cancelled-fg: oklch(51.83% 0.0073 286.19);
 
-  /* surface effects */
-  --nf-surface-blur: 24px;
-  --nf-surface-saturation: 1.4;
+  /* surface effects: backdrop blur + saturate for translucent surfaces; 0px / 1 on solid themes */
+  --nf-surface-blur: 40px;
+  --nf-surface-saturation: 1.8;
 
   /* brand gradient */
   --nf-gradient-wordmark: linear-gradient(
     115deg,
-    oklch(46% 0.1 195) 0%,
-    oklch(42% 0.1 180) 50%,
-    oklch(48% 0.11 168) 100%
+    oklch(51.78% 0.1852 257.42) 0%,
+    oklch(52.95% 0.191 278.34) 50%,
+    oklch(53.99% 0.2129 312.41) 100%
   );
 
   /* motion profile */
   --nf-motion-duration: var(--nf-duration-base);
   --nf-motion-easing: var(--nf-ease-emphasized);
+
+  /*
+   * typography — part of a theme's character, not of the scale.
+   * `--nf-font-display` is the heading face; every theme points it at the
+   * body face. `--nf-text-tracking` is body letter-spacing.
+   * `--nf-control-case` / `--nf-control-tracking` set the labels of
+   * buttons, segmented controls and toggle chips.
+   */
+  --nf-font-sans:
+    -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  --nf-font-display: var(--nf-font-sans);
+  --nf-text-tracking: -0.01em;
+  --nf-control-case: none;
+  --nf-control-tracking: normal;
+
+  /*
+   * App canvas: a complete `background` value, layers allowed. Apps apply
+   * it on body with `background-attachment: fixed`.
+   */
+  --nf-app-bg:
+    radial-gradient(
+      ellipse 43.75rem 31.25rem at 10% 15%,
+      oklch(58.54% 0.2041 277.12 / 0.15),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 37.5rem 31.25rem at 85% 25%,
+      oklch(65.59% 0.2118 354.31 / 0.1),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 31.25rem 25rem at 50% 85%,
+      oklch(72.27% 0.192 149.58 / 0.08),
+      transparent
+    ),
+    linear-gradient(
+      160deg,
+      oklch(90.53% 0.0396 265.06) 0%,
+      oklch(90.87% 0.0361 299.71) 28%,
+      oklch(94.46% 0.0192 338.72) 52%,
+      oklch(93.04% 0.0276 258.37) 76%,
+      oklch(93.02% 0.0303 175.91) 100%
+    );
 
   /*
    * Calendar layer colors — domain-specific swatches used by the unified
@@ -132,28 +181,28 @@
    * and for event pill fills) plus a `-subtle` companion (used for the
    * inactive segmented background and for the calendar grid pill backdrop).
    */
-  --nf-cal-task-color: oklch(64% 0.18 175);
-  --nf-cal-task-subtle: oklch(94% 0.04 175);
-  --nf-cal-task-fg: oklch(42% 0.135 175);
-  --nf-cal-event-color: oklch(62% 0.17 240);
-  --nf-cal-event-subtle: oklch(94% 0.04 240);
-  --nf-cal-event-fg: oklch(42% 0.1275 240);
-  --nf-cal-block-color: oklch(60% 0.14 60);
-  --nf-cal-block-subtle: oklch(94% 0.04 60);
-  --nf-cal-block-fg: oklch(42% 0.105 60);
-  --nf-cal-free-color: oklch(70% 0.12 145);
-  --nf-cal-free-subtle: oklch(94% 0.04 145);
-  --nf-cal-free-fg: oklch(42% 0.09 145);
-  --nf-cal-milestone-color: oklch(60% 0.18 290);
-  --nf-cal-milestone-subtle: oklch(94% 0.04 290);
-  --nf-cal-milestone-fg: oklch(42% 0.135 290);
+  --nf-cal-task-color: oklch(57.28% 0.2049 257.42);
+  --nf-cal-task-subtle: oklch(57.29% 0.2044 257.35 / 0.12);
+  --nf-cal-task-fg: oklch(48.29% 0.1739 257.35);
+  --nf-cal-event-color: oklch(56.18% 0.1152 233.88);
+  --nf-cal-event-subtle: oklch(56.23% 0.1154 233.86 / 0.12);
+  --nf-cal-event-fg: oklch(47.73% 0.0982 233.86);
+  --nf-cal-block-color: oklch(57.52% 0.1294 62.57);
+  --nf-cal-block-subtle: oklch(57.54% 0.1288 63.02 / 0.12);
+  --nf-cal-block-fg: oklch(49.04% 0.1118 63.02);
+  --nf-cal-free-color: oklch(55.03% 0.1588 147.44);
+  --nf-cal-free-subtle: oklch(55.02% 0.1586 147.47 / 0.12);
+  --nf-cal-free-fg: oklch(46.52% 0.135 147.47);
+  --nf-cal-milestone-color: oklch(58.99% 0.2129 312.41);
+  --nf-cal-milestone-subtle: oklch(59.05% 0.2129 312.23 / 0.12);
+  --nf-cal-milestone-fg: oklch(50.55% 0.2129 312.23);
 
   /*
    * Calendar palette — fixed 10-swatch picker for the per-calendar color
    * chooser (calendar settings → general). Stable hue order across themes
    * (blue, cyan, green, amber, orange, red, pink, purple, slate, ink) so a
-   * given calendar's chosen index renders the "same" color identity in
-   * every theme, while lightness/chroma adapt for contrast on each canvas.
+   * given calendar's chosen index renders the same colour in every theme;
+   * only ink (10) lifts to a light grey on dark canvases.
    *
    * These have no `-fg` counterpart, unlike the five kind colours above,
    * and they do not need one: every consumer paints a swatch, a chip fill
@@ -161,16 +210,16 @@
    * no pairing to hold to a contrast ratio. Adding ten more tokens for a
    * use that does not exist would only invite someone to find one.
    */
-  --nf-cal-color-1: oklch(54% 0.18 250);
-  --nf-cal-color-2: oklch(58% 0.13 210);
-  --nf-cal-color-3: oklch(60% 0.16 145);
-  --nf-cal-color-4: oklch(70% 0.14 85);
-  --nf-cal-color-5: oklch(64% 0.18 50);
-  --nf-cal-color-6: oklch(58% 0.21 25);
-  --nf-cal-color-7: oklch(60% 0.2 355);
-  --nf-cal-color-8: oklch(54% 0.2 300);
-  --nf-cal-color-9: oklch(50% 0.03 260);
-  --nf-cal-color-10: oklch(28% 0.02 260);
+  --nf-cal-color-1: oklch(62.31% 0.188 259.81);
+  --nf-cal-color-2: oklch(71.48% 0.1257 215.22);
+  --nf-cal-color-3: oklch(72.27% 0.192 149.58);
+  --nf-cal-color-4: oklch(76.86% 0.1647 70.08);
+  --nf-cal-color-5: oklch(70.49% 0.1867 47.6);
+  --nf-cal-color-6: oklch(63.68% 0.2078 25.33);
+  --nf-cal-color-7: oklch(65.59% 0.2118 354.31);
+  --nf-cal-color-8: oklch(62.68% 0.2325 303.9);
+  --nf-cal-color-9: oklch(55.1% 0.0234 264.36);
+  --nf-cal-color-10: oklch(37.29% 0.0306 259.73);
 }
 
 @media (prefers-reduced-motion: reduce) {

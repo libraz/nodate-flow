@@ -9,20 +9,28 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type ThemeId =
-  | 'aurora-light'
-  | 'aurora-dark'
-  | 'dotline-light'
-  | 'dotline-dark'
   | 'glass-light'
-  | 'glass-dark';
+  | 'glass-dark'
+  | 'modern-light'
+  | 'modern-dark'
+  | 'washi-light'
+  | 'washi-dark'
+  | 'classic-light'
+  | 'classic-dark'
+  | 'nothing-light'
+  | 'nothing-dark';
 
 export const THEME_IDS: readonly ThemeId[] = [
-  'aurora-light',
-  'aurora-dark',
-  'dotline-light',
-  'dotline-dark',
   'glass-light',
   'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
 ] as const;
 
 export interface UseThemeOptions {
@@ -43,7 +51,7 @@ function isThemeId(value: unknown): value is ThemeId {
 
 function readInitial(options: UseThemeOptions): ThemeId {
   if (typeof document === 'undefined') {
-    return options.defaultTheme ?? 'aurora-light';
+    return options.defaultTheme ?? 'glass-light';
   }
   const fromAttr = document.documentElement.getAttribute('data-theme');
   if (isThemeId(fromAttr)) return fromAttr;
@@ -55,7 +63,7 @@ function readInitial(options: UseThemeOptions): ThemeId {
       /* localStorage may be unavailable */
     }
   }
-  return options.defaultTheme ?? 'aurora-light';
+  return options.defaultTheme ?? 'glass-light';
 }
 
 /**

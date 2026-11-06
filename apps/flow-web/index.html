@@ -7,21 +7,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <script>
       (() => {
         try {
           let theme = localStorage.getItem('nf.theme');
-          if (!theme || theme === 'system') {
+          if (!theme || !/^(glass|modern|washi|classic|nothing)-(light|dark)$/.test(theme)) {
             theme = window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'aurora-dark'
-              : 'aurora-light';
+              ? 'glass-dark'
+              : 'glass-light';
           }
           document.documentElement.setAttribute('data-theme', theme);
         } catch {
-          document.documentElement.setAttribute('data-theme', 'aurora-dark');
+          document.documentElement.setAttribute('data-theme', 'glass-dark');
         }
         try {
           const storedLang = localStorage.getItem('nf.lang');

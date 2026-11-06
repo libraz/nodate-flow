@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import SegmentedControl, { type SegmentedControlOption } from './segmented-control';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 

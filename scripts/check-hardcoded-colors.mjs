@@ -118,8 +118,8 @@ function vacuous(lines) {
  * enough to read as the thing they mean at a glance, which is the
  * opposite of what text needs. Measured against the surface each one is
  * actually paired with, the status colours land between 1.87:1 and
- * 6.01:1, the accent reaches 2.14:1 in the aurora light theme, and the
- * five calendar tones sit between 2.17:1 and 3.50:1 there. The `-fg`
+ * 6.01:1, the accent reaches 2.08:1 in the classic light theme, and the
+ * five calendar tones sit between 2.03:1 and 3.58:1 there. The `-fg`
  * counterparts exist for exactly this and clear 4.5:1 everywhere.
  *
  * It went unnoticed because it is not a bug you can see in one theme: the

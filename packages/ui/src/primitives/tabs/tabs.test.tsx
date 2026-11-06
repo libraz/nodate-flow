@@ -4,7 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import Tabs, { type TabItem } from './tabs';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 const ITEMS: TabItem[] = [
   { value: 'a', label: 'Alpha', content: <p>panel-a</p> },

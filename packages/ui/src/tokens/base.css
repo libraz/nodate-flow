@@ -39,17 +39,15 @@
   --nf-space-24: 6rem;
 
   /*
-   * Font families.
+   * Font families. Sans and display are theme tokens (semantic.css);
+   * only mono is theme-agnostic.
    *
-   * These name the faces both apps actually load — see the Google Fonts
-   * link in each `index.html`, which fetches Fraunces, Instrument Sans
-   * and JetBrains Mono. Naming anything else here does not fall back
-   * gracefully; it means the download is paid for on every cold load and
-   * the text renders in a system face regardless.
+   * The apps load Hanken Grotesk, Noto Sans JP and JetBrains Mono (see
+   * the font link in each `index.html`). Naming a face neither loaded nor
+   * installed does not fall back gracefully: the download is paid for on
+   * every cold load and the text renders in a system face regardless.
    */
-  --nf-font-sans: "Instrument Sans", "Noto Sans JP", system-ui, sans-serif;
   --nf-font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --nf-font-display: "Fraunces", Georgia, "Times New Roman", serif;
 
   /* font sizes */
   --nf-text-xs: 0.75rem;
@@ -107,9 +105,9 @@
    * when the numbers are retuned; "28-to-36" would not.
    */
   --nf-space-page: clamp(var(--nf-space-6), 4vw, var(--nf-space-10));
-  --nf-text-page-title: clamp(1.75rem, 3vw, var(--nf-text-4xl));
-  --nf-text-section-title: clamp(var(--nf-text-2xl), 2.5vw, 2rem);
-  --nf-text-subsection-title: clamp(var(--nf-text-xl), 2vw, var(--nf-text-2xl));
+  --nf-text-page-title: clamp(1.375rem, 2vw + 0.5rem, 1.75rem);
+  --nf-text-section-title: clamp(var(--nf-text-xl), 1.5vw + 0.5rem, var(--nf-text-2xl));
+  --nf-text-subsection-title: clamp(var(--nf-text-lg), 1vw + 0.625rem, var(--nf-text-xl));
   /* The oversized decorative glyph on a status screen (404 / 403 / no
      workspace): display face, gradient fill, aria-hidden. */
   --nf-text-status-glyph: clamp(5rem, 14vw, 9rem);
@@ -131,7 +129,7 @@
   /*
    * layout measures — content max-widths used to constrain reading-line
    * length on standalone / public pages. Theme-invariant: the readable
-   * column width does not change between aurora / dotline / glass.
+   * column width does not change between theme families.
    *
    * - content (48rem ~ 768px): primary content column. Suits long-form
    *   marketing pages, public share/event pages, and centred article
@@ -141,6 +139,8 @@
    *   intended for one-column flows like invite acceptance.
    */
   --nf-measure-content: 48rem;
+  /* Max width of a standard page in the main panel. */
+  --nf-measure-page: 80rem;
   --nf-measure-narrow: 32rem;
 
   /* Single-line control height shared by md Button, Input, Select and

@@ -226,11 +226,17 @@ export default function ProfileForm(): ReactElement {
 
   const themeEntries: ThemeFamilyEntry[] = [
     { id: 'glass', label: t('profile.theme_glass'), preview: DEFAULT_THEME_PREVIEWS.glass },
-    { id: 'aurora', label: t('profile.theme_aurora'), preview: DEFAULT_THEME_PREVIEWS.aurora },
+    { id: 'modern', label: t('profile.theme_modern'), preview: DEFAULT_THEME_PREVIEWS.modern },
+    { id: 'washi', label: t('profile.theme_washi'), preview: DEFAULT_THEME_PREVIEWS.washi },
     {
-      id: 'dotline',
-      label: t('profile.theme_dotline'),
-      preview: DEFAULT_THEME_PREVIEWS.dotline,
+      id: 'classic',
+      label: t('profile.theme_classic'),
+      preview: DEFAULT_THEME_PREVIEWS.classic,
+    },
+    {
+      id: 'nothing',
+      label: t('profile.theme_nothing'),
+      preview: DEFAULT_THEME_PREVIEWS.nothing,
     },
   ];
 

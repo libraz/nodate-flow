@@ -4,7 +4,9 @@
   block-size: 100%;
   /* nf-token-override: component dimension, not a spacing step */
   inline-size: 16rem;
-  background: var(--nf-color-bg-elevated);
+  background: var(--nf-color-surface);
+  backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  -webkit-backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
   border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
   /*
    * The grid slot snaps to the final width (app-shell.module.css) while the

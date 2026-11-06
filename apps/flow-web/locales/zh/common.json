@@ -117,17 +117,23 @@
     "unavailable": "AI 建议暂不可用"
   },
   "theme": {
-    "aurora-light": "Aurora 浅色",
-    "aurora-dark": "Aurora 深色",
-    "dotline-light": "Dotline 浅色",
-    "dotline-dark": "Dotline 深色",
     "glass-light": "Glass 浅色",
     "glass-dark": "Glass 深色",
+    "modern-light": "Modern 浅色",
+    "modern-dark": "Modern 深色",
+    "washi-light": "和 浅色",
+    "washi-dark": "和 深色",
+    "classic-light": "Classic 浅色",
+    "classic-dark": "Classic 深色",
+    "nothing-light": "Nothing 浅色",
+    "nothing-dark": "Nothing 深色",
     "system": "跟随系统",
     "family": {
-      "aurora": "Aurora",
-      "dotline": "Dotline",
-      "glass": "Glass"
+      "glass": "Glass",
+      "modern": "Modern",
+      "washi": "和",
+      "classic": "Classic",
+      "nothing": "Nothing"
     },
     "mode": {
       "light": "浅色",

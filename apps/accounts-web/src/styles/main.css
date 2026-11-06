@@ -2,12 +2,16 @@
 
 @import "@nodate-flow/ui/tokens/base.css";
 @import "@nodate-flow/ui/tokens/semantic.css";
-@import "@nodate-flow/ui/themes/aurora-light.css";
-@import "@nodate-flow/ui/themes/aurora-dark.css";
-@import "@nodate-flow/ui/themes/dotline-light.css";
-@import "@nodate-flow/ui/themes/dotline-dark.css";
 @import "@nodate-flow/ui/themes/glass-light.css";
 @import "@nodate-flow/ui/themes/glass-dark.css";
+@import "@nodate-flow/ui/themes/modern-light.css";
+@import "@nodate-flow/ui/themes/modern-dark.css";
+@import "@nodate-flow/ui/themes/washi-light.css";
+@import "@nodate-flow/ui/themes/washi-dark.css";
+@import "@nodate-flow/ui/themes/classic-light.css";
+@import "@nodate-flow/ui/themes/classic-dark.css";
+@import "@nodate-flow/ui/themes/nothing-light.css";
+@import "@nodate-flow/ui/themes/nothing-dark.css";
 
 /*
  * The `nf-focus-ring` utility. Imported unconditionally, alongside the same
@@ -24,7 +28,7 @@
  * The scheme to use before a theme is applied. `:where()` is
  * load-bearing — see the same rule in flow-web's main.css: `:root` and
  * `[data-theme="…"]` have equal specificity, so this rule was winning
- * over all six themes on source order and pinning the UA widgets to the
+ * over every theme on source order and pinning the UA widgets to the
  * OS preference regardless of which theme the reader chose.
  */
 :where(:root) {
@@ -39,9 +43,11 @@ body,
 
 body {
   margin: 0;
-  background: var(--nf-color-bg);
+  background: var(--nf-app-bg);
+  background-attachment: fixed;
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
+  letter-spacing: var(--nf-text-tracking);
   -webkit-font-smoothing: antialiased;
   transition:
     background-color var(--nf-motion-duration) var(--nf-motion-easing),

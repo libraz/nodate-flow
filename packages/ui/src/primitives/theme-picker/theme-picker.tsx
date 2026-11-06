@@ -32,7 +32,7 @@ export interface ThemePreviewStyle {
 
 /** One theme family entry. */
 export interface ThemeFamilyEntry {
-  /** Family id (e.g. 'glass', 'aurora', 'dotline'). */
+  /** Family id (e.g. 'glass', 'washi'). */
   id: ThemeFamily;
   /** Localised display label. */
   label: string;
@@ -72,7 +72,8 @@ export interface ThemePickerProps {
 // ---------------------------------------------------------------------------
 
 /**
- * Default preview styles for the built-in theme families.
+ * Default preview styles for the built-in theme families. Each preview is
+ * split diagonally: the family's light canvas, then its dark one.
  *
  * nf-color-override-file: a preview has to paint a family that is not the
  * active one, so it cannot read that family's tokens — the swatches are
@@ -81,18 +82,28 @@ export interface ThemePickerProps {
  */
 export const DEFAULT_THEME_PREVIEWS: Record<ThemeFamily, ThemePreviewStyle> = {
   glass: {
-    bg: 'linear-gradient(135deg, oklch(96% 0.01 260), oklch(94% 0.008 280))',
-    accent: 'oklch(52% 0.12 260)',
+    bg: 'linear-gradient(135deg, oklch(90.53% 0.0396 265.06) 0%, oklch(94.46% 0.0192 338.72) 50%, oklch(19.29% 0.0691 300.44) 50%, oklch(19.98% 0.0403 258.29) 100%)',
+    accent: 'oklch(57.28% 0.2049 257.42)',
+    radius: '12px',
+  },
+  modern: {
+    bg: 'linear-gradient(135deg, oklch(97.02% 0.0041 271.37) 50%, oklch(17.89% 0.0104 276.38) 50%)',
+    accent: 'oklch(53.49% 0.1918 279.09)',
+    radius: '8px',
+  },
+  washi: {
+    bg: 'linear-gradient(135deg, oklch(94.45% 0.0213 85.94) 50%, oklch(18.38% 0.0052 67.5) 50%)',
+    accent: 'oklch(52.35% 0.1709 27.73)',
+    radius: '4px',
+  },
+  classic: {
+    bg: 'linear-gradient(135deg, oklch(100% 0 0) 50%, oklch(21.78% 0 0) 50%)',
+    accent: 'oklch(75.01% 0.1616 158.67)',
     radius: '6px',
   },
-  aurora: {
-    bg: 'linear-gradient(135deg, oklch(92% 0.04 150), oklch(90% 0.04 175))',
-    accent: 'oklch(72% 0.13 175)',
-    radius: '10px',
-  },
-  dotline: {
-    bg: 'oklch(94% 0.002 0)',
-    accent: 'oklch(60% 0.21 25)',
+  nothing: {
+    bg: 'linear-gradient(135deg, oklch(95.51% 0 0) 50%, oklch(0% 0 0) 50%)',
+    accent: 'oklch(56.07% 0.2177 26.79)',
     radius: '0',
   },
 };

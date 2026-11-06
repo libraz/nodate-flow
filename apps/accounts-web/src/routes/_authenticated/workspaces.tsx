@@ -13,7 +13,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import AuthCard from '../../components/auth-card';
+import PageHeader from '../../components/page-header';
 import { apiRequest } from '../../lib/api';
 
 import styles from './workspaces.module.css';
@@ -67,8 +67,8 @@ function WorkspacesPage(): ReactElement {
   }, [t]);
 
   return (
-    <AuthCard width="wide">
-      <h1 className="aw-page-title">{t('workspaces.title')}</h1>
+    <>
+      <PageHeader title={t('workspaces.title')} description={t('workspaces.description')} />
 
       {error ? (
         <p role="alert" className="aw-error">
@@ -109,11 +109,7 @@ function WorkspacesPage(): ReactElement {
           ))}
         </ul>
       )}
-
-      <Link to="/profile" className="aw-muted aw-text-sm">
-        {t('workspaces.profile_link')}
-      </Link>
-    </AuthCard>
+    </>
   );
 }
 

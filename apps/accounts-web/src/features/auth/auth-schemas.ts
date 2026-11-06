@@ -50,12 +50,16 @@ export const profileSchema = z.object({
     .regex(/^([A-Z]{2})?$/, 'validation.country_invalid')
     .or(z.literal('')),
   themePreference: z.enum([
-    'aurora-light',
-    'aurora-dark',
-    'dotline-light',
-    'dotline-dark',
     'glass-light',
     'glass-dark',
+    'modern-light',
+    'modern-dark',
+    'washi-light',
+    'washi-dark',
+    'classic-light',
+    'classic-dark',
+    'nothing-light',
+    'nothing-dark',
     'system',
   ]),
   // Mirrors the `MeBody.weekStart` enum from the auth-api OpenAPI spec.

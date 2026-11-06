@@ -110,7 +110,7 @@ func TestIndexShapingColumnsAreNotSerialized(t *testing.T) {
 // A master table's own `id` is deliberately not exempt. sqlc applies an
 // override by column name across every table at once, so exempting `id`
 // would exempt every table's primary key; and the convention answers a
-// master row with its string key ("member", "aurora-light") rather than
+// master row with its string key ("member", "glass-light") rather than
 // its sequence position anyway, so nothing needs the number.
 func masterForeignKeyColumns(t *testing.T) map[string]string {
 	t.Helper()

@@ -93,7 +93,7 @@ function makeUser(id: string): AuthUser {
     locale: 'en',
     timezone: 'UTC',
     country: 'JP',
-    themePreference: 'aurora-light',
+    themePreference: 'glass-light',
     isInstanceAdmin: false,
     hasPassword: true,
   };

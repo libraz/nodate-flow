@@ -2,7 +2,9 @@
  * check-theme-parity
  *
  * Asserts that every CSS custom property declared in src/tokens/semantic.css
- * is also declared in each of the 6 theme files. Exits non-zero on any miss.
+ * is also declared in each theme file, and that a theme declares nothing
+ * else except overrides of the base scale in src/tokens/base.css (e.g. a
+ * theme whose face needs other weights). Exits non-zero on any miss.
  *
  * Intentionally avoids regular expressions: we walk the file character by character
  * looking for `--nf-` identifiers preceded by start-of-line / whitespace and
@@ -12,7 +14,7 @@
  * read, and a failure among them stops the run. The extractor is the whole
  * check: if it stopped recognising a declaration it would read every theme
  * as empty, and the empty-semantic guard below is the only thing standing
- * between that and a green run over six themes nobody compared.
+ * between that and a green run over themes nobody compared.
  */
 
 import assert from 'node:assert/strict';
@@ -24,14 +26,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
 const semanticPath = resolve(root, 'src/tokens/semantic.css');
+const basePath = resolve(root, 'src/tokens/base.css');
 const themePaths = [
-  resolve(root, 'src/themes/aurora-light.css'),
-  resolve(root, 'src/themes/aurora-dark.css'),
-  resolve(root, 'src/themes/dotline-light.css'),
-  resolve(root, 'src/themes/dotline-dark.css'),
-  resolve(root, 'src/themes/glass-light.css'),
-  resolve(root, 'src/themes/glass-dark.css'),
-];
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+].map((id) => resolve(root, `src/themes/${id}.css`));
 
 /**
  * Extract the set of declared `--nf-*` custom properties from a CSS source.
@@ -75,12 +82,13 @@ function extractNfVars(source: string): Set<string> {
 }
 
 /**
- * Which tokens a theme is missing, and which it declares that the semantic
- * layer never named.
+ * Which tokens a theme is missing, and which it declares that neither the
+ * semantic contract nor the overridable base scale names.
  */
 function parity(
   expected: ReadonlySet<string>,
   have: ReadonlySet<string>,
+  overridable: ReadonlySet<string> = new Set(),
 ): { missing: string[]; extra: string[] } {
   const missing: string[] = [];
   for (const name of expected) {
@@ -88,7 +96,7 @@ function parity(
   }
   const extra: string[] = [];
   for (const name of have) {
-    if (!expected.has(name)) extra.push(name);
+    if (!expected.has(name) && !overridable.has(name)) extra.push(name);
   }
   return { missing, extra };
 }
@@ -128,6 +136,17 @@ function selfCheck(): string[] {
         assert.deepEqual(parity(expected, expected), { missing: [], extra: [] });
       },
     ],
+    [
+      'accepts a base-scale override but not an unknown token',
+      () => {
+        const expected = new Set(['--nf-color-fg']);
+        const base = new Set(['--nf-weight-bold']);
+        assert.deepEqual(
+          parity(expected, new Set(['--nf-color-fg', '--nf-weight-bold', '--nf-color-ink']), base),
+          { missing: [], extra: ['--nf-color-ink'] },
+        );
+      },
+    ],
   ];
 
   const failures: string[] = [];
@@ -162,10 +181,12 @@ function main(): void {
     process.exit(1);
   }
 
+  const overridable = extractNfVars(readFileSync(basePath, 'utf8'));
+
   let failed = false;
   for (const path of themePaths) {
     const source = readFileSync(path, 'utf8');
-    const { missing, extra } = parity(expected, extractNfVars(source));
+    const { missing, extra } = parity(expected, extractNfVars(source), overridable);
     if (missing.length > 0 || extra.length > 0) {
       failed = true;
       console.error(`\n[theme-parity] ${path}`);

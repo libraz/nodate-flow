@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 import Checkbox from './checkbox';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 function Controlled(): ReactElement {
   const [on, setOn] = useState(false);

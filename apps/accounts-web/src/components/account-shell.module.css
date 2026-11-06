@@ -1,0 +1,230 @@
+/*
+ * Account shell: sidebar + content column over the theme canvas
+ * (`--nf-app-bg`, painted on <body>). Below 768px the sidebar becomes a
+ * sticky top bar whose second row is the navigation as a tab strip.
+ */
+
+.shell {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-block-size: 100dvh;
+}
+
+.sidebar {
+  position: sticky;
+  inset-block-start: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  block-size: 100dvh;
+  padding-block: var(--nf-space-4);
+  padding-inline: var(--nf-space-3);
+  background: var(--nf-color-surface);
+  backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  -webkit-backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
+  overflow-y: auto;
+}
+
+.brand {
+  padding-block: var(--nf-space-1) var(--nf-space-5);
+  padding-inline: var(--nf-space-3);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--nf-color-fg);
+  white-space: nowrap;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+}
+
+.item,
+.back {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  /* nf-token-override: component dimension, not a spacing step */
+  min-block-size: 2.25rem;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.item:hover,
+.back:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.item > svg,
+.back > svg {
+  flex-shrink: 0;
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+}
+
+.itemActive,
+.itemActive:hover {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.itemActive > svg {
+  color: var(--nf-color-accent-fg);
+}
+
+.label,
+.backLabel {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.back {
+  margin-block-start: auto;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  margin-block-start: var(--nf-space-2);
+  padding-block: var(--nf-space-3) var(--nf-space-1);
+  padding-inline: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.userText {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  line-height: var(--nf-leading-snug);
+}
+
+.userName,
+.userEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userName {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.userEmail {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.main {
+  min-inline-size: 0;
+  padding: var(--nf-space-page);
+}
+
+.main:focus {
+  outline: none;
+}
+
+.content {
+  max-inline-size: var(--nf-measure-content);
+  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* Data tables need more than a reading measure; still capped so rows stay scannable. */
+.contentWide {
+  max-inline-size: calc(var(--nf-measure-content) * 1.5);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    z-index: var(--nf-z-sticky);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "brand back user"
+      "nav nav nav";
+    align-items: center;
+    gap: var(--nf-space-2) var(--nf-space-1);
+    block-size: auto;
+    padding-block: var(--nf-space-2) 0;
+    padding-inline: var(--nf-space-3);
+    border-inline-end: none;
+    border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+    overflow: visible;
+  }
+
+  .brand {
+    grid-area: brand;
+    padding-block: 0;
+    padding-inline: var(--nf-space-1);
+  }
+
+  .nav {
+    grid-area: nav;
+    flex-direction: row;
+    gap: var(--nf-space-1);
+    margin-inline: calc(var(--nf-space-3) * -1);
+    padding-inline: var(--nf-space-3);
+    padding-block-end: var(--nf-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .item {
+    flex-shrink: 0;
+  }
+
+  .back {
+    grid-area: back;
+    margin-block-start: 0;
+  }
+
+  /* The top bar keeps the icon; the label stays for assistive technology. */
+  .backLabel,
+  .userText {
+    position: absolute;
+    inline-size: var(--nf-space-px);
+    block-size: var(--nf-space-px);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .user {
+    grid-area: user;
+    margin-block-start: 0;
+    padding: 0;
+    padding-inline-start: var(--nf-space-1);
+    border-block-start: none;
+  }
+
+  .main {
+    padding: var(--nf-space-5) var(--nf-space-4);
+  }
+
+  .contentWide {
+    max-inline-size: none;
+  }
+}

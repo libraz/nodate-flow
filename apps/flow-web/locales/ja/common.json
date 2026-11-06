@@ -117,17 +117,23 @@
     "unavailable": "AI 提案は利用できません"
   },
   "theme": {
-    "aurora-light": "オーロラ ライト",
-    "aurora-dark": "オーロラ ダーク",
-    "dotline-light": "ドットライン ライト",
-    "dotline-dark": "ドットライン ダーク",
-    "glass-light": "グラス ライト",
-    "glass-dark": "グラス ダーク",
+    "glass-light": "Glass ライト",
+    "glass-dark": "Glass ダーク",
+    "modern-light": "Modern ライト",
+    "modern-dark": "Modern ダーク",
+    "washi-light": "和 ライト",
+    "washi-dark": "和 ダーク",
+    "classic-light": "Classic ライト",
+    "classic-dark": "Classic ダーク",
+    "nothing-light": "Nothing ライト",
+    "nothing-dark": "Nothing ダーク",
     "system": "システム",
     "family": {
-      "aurora": "オーロラ",
-      "dotline": "ドットライン",
-      "glass": "グラス"
+      "glass": "Glass",
+      "modern": "Modern",
+      "washi": "和",
+      "classic": "Classic",
+      "nothing": "Nothing"
     },
     "mode": {
       "light": "ライト",

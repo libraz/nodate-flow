@@ -11,13 +11,12 @@
  *     rendered by `ProfileForm` using the shared `ThemePicker` primitive
  *     (`role="radiogroup" aria-label="Theme"` with `role="radio"` family
  *     buttons + a separate `Color mode` radiogroup).
- *   - Six concrete themes exist: aurora-{dark,light}, glass-{dark,light},
- *     dotline-{dark,light}. The picker exposes 3 family buttons and 3 mode
- *     buttons (light / dark / system); we cycle every (family, mode) pair to
- *     visit all six.
+ *   - Ten concrete themes exist: {glass,modern,washi,classic,nothing}-{light,dark}.
+ *     The picker exposes 5 family buttons and 3 mode buttons (light / dark /
+ *     system); we cycle every (family, mode) pair to visit all ten.
  *   - Persistence: `nf.theme` localStorage key + `PATCH /me` with
  *     `{ themePreference }`. The OpenAPI enum is
- *     `aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system`.
+ *     `glass-light,glass-dark,modern-light,modern-dark,washi-light,washi-dark,classic-light,classic-dark,nothing-light,nothing-dark,system`.
  *   - Calendar tokens differ across themes: `--nf-cal-task-color`,
  *     `--nf-cal-task-subtle`, `--nf-cal-color-1` ... `-10`.
  *   - Flash prevention: an inline IIFE in `apps/flow-web/index.html`
@@ -29,14 +28,16 @@ import { expect, type Page, test } from '@playwright/test';
 import { loadTenants } from './fixtures/load-tenants';
 import { AUTH_API_URL, injectAuth, type TestTenant } from './fixtures/tenant';
 
-type Family = 'aurora' | 'glass' | 'dotline';
+type Family = 'glass' | 'modern' | 'washi' | 'classic' | 'nothing';
 type Mode = 'light' | 'dark';
 type ThemeId = `${Family}-${Mode}`;
 
 const FAMILY_LABEL: Record<Family, RegExp> = {
-  aurora: /^aurora$/i,
   glass: /^glass$/i,
-  dotline: /^dotline$/i,
+  modern: /^modern$/i,
+  washi: /^washi$/i,
+  classic: /^classic$/i,
+  nothing: /^nothing$/i,
 };
 
 const MODE_LABEL: Record<Mode, RegExp> = {
@@ -47,12 +48,16 @@ const MODE_LABEL: Record<Mode, RegExp> = {
 };
 
 const ALL_THEMES: ThemeId[] = [
-  'aurora-light',
-  'aurora-dark',
   'glass-light',
   'glass-dark',
-  'dotline-light',
-  'dotline-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
 ];
 
 /**
@@ -97,7 +102,7 @@ async function readVar(page: Page, name: string): Promise<string> {
 }
 
 test.describe('theme switching', () => {
-  test('theme attribute reflects each of the six concrete selections', async ({ page }) => {
+  test('theme attribute reflects each of the ten concrete selections', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await openSettings(page, tenant);
 
@@ -123,7 +128,7 @@ test.describe('theme switching', () => {
       '--nf-color-success',
     ];
 
-    for (const family of ['aurora', 'glass', 'dotline'] as Family[]) {
+    for (const family of ['glass', 'modern', 'washi', 'classic', 'nothing'] as Family[]) {
       await selectTheme(page, family, 'dark');
       const dark: Record<string, string> = {};
       for (const t of TOKENS) dark[t] = await readVar(page, t);
@@ -148,38 +153,38 @@ test.describe('theme switching', () => {
     // of the same family use different oklch lightness values, so the
     // computed value must change. We don't pin a specific oklch literal —
     // any non-empty difference is enough.
-    const family: Family = 'aurora';
+    const family: Family = 'washi';
     await selectTheme(page, family, 'dark');
     const darkVal = await readVar(page, '--nf-cal-task-color');
-    expect(darkVal, '--nf-cal-task-color must be defined in aurora-dark').not.toBe('');
+    expect(darkVal, '--nf-cal-task-color must be defined in washi-dark').not.toBe('');
 
     await selectTheme(page, family, 'light');
     const lightVal = await readVar(page, '--nf-cal-task-color');
-    expect(lightVal, '--nf-cal-task-color must be defined in aurora-light').not.toBe('');
+    expect(lightVal, '--nf-cal-task-color must be defined in washi-light').not.toBe('');
     expect(
       lightVal,
       `--nf-cal-task-color must differ between dark (${darkVal}) and light (${lightVal})`,
     ).not.toBe(darkVal);
 
-    // Cross-family comparison too: aurora-light vs glass-light should
+    // Cross-family comparison too: washi-light vs glass-light should
     // also differ because each family defines its own calendar palette.
     await selectTheme(page, 'glass', 'light');
     const glassLight = await readVar(page, '--nf-cal-task-color');
     expect(glassLight).not.toBe('');
-    expect(glassLight, 'aurora-light vs glass-light must differ').not.toBe(lightVal);
+    expect(glassLight, 'washi-light vs glass-light must differ').not.toBe(lightVal);
   });
 
   test('persists themePreference on the server via PATCH /me', async ({ page }) => {
     const { user: tenant } = loadTenants();
     await openSettings(page, tenant);
 
-    await selectTheme(page, 'dotline', 'dark');
+    await selectTheme(page, 'washi', 'dark');
 
     // The provider writes localStorage in the same useEffect that sets
     // data-theme, but the server PATCH is fire-and-forget, so poll until
     // the server reflects our pick (or fail loudly).
     const stored = await page.evaluate(() => window.localStorage.getItem('nf.theme'));
-    expect(stored).toBe('dotline-dark');
+    expect(stored).toBe('washi-dark');
 
     let serverPref: string | null = null;
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -191,13 +196,13 @@ test.describe('theme switching', () => {
       });
       expect(res.ok, `GET /me -> ${res.status}`).toBeTruthy();
       const body = (await res.json()) as { themePreference?: string };
-      if (body.themePreference === 'dotline-dark') {
+      if (body.themePreference === 'washi-dark') {
         serverPref = body.themePreference;
         break;
       }
       await new Promise((r) => setTimeout(r, 250));
     }
-    expect(serverPref, 'PATCH /me must persist themePreference').toBe('dotline-dark');
+    expect(serverPref, 'PATCH /me must persist themePreference').toBe('washi-dark');
   });
 
   test('no flash on reload — data-theme is set before React mounts', async ({ page }) => {
@@ -205,11 +210,11 @@ test.describe('theme switching', () => {
     await openSettings(page, tenant);
 
     // Pick a non-default theme so the boot script has something to do.
-    await selectTheme(page, 'dotline', 'light');
+    await selectTheme(page, 'washi', 'light');
 
     // Confirm localStorage carries the pick before reload.
     const stored = await page.evaluate(() => window.localStorage.getItem('nf.theme'));
-    expect(stored).toBe('dotline-light');
+    expect(stored).toBe('washi-light');
 
     // `domcontentloaded` fires AFTER the HTML head is parsed (so the
     // inline IIFE in index.html that sets data-theme has executed) but
@@ -222,7 +227,7 @@ test.describe('theme switching', () => {
     await page.goto('/settings/profile', { waitUntil: 'domcontentloaded' });
     const initial = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     expect(initial, 'data-theme must be set by inline boot IIFE before React renders').toBe(
-      'dotline-light',
+      'washi-light',
     );
     // Defence-in-depth: at DOMContentLoaded the React root must still
     // be empty (or at least not hydrated past the <head> script). The
@@ -236,7 +241,7 @@ test.describe('theme switching', () => {
 
     // Ensure the React mount converges to the same value rather than
     // overwriting with a default.
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dotline-light', {
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'washi-light', {
       timeout: 10_000,
     });
   });

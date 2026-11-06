@@ -117,17 +117,23 @@
     "unavailable": "AI suggestions unavailable"
   },
   "theme": {
-    "aurora-light": "Aurora Light",
-    "aurora-dark": "Aurora Dark",
-    "dotline-light": "Dotline Light",
-    "dotline-dark": "Dotline Dark",
     "glass-light": "Glass Light",
     "glass-dark": "Glass Dark",
+    "modern-light": "Modern Light",
+    "modern-dark": "Modern Dark",
+    "washi-light": "Washi Light",
+    "washi-dark": "Washi Dark",
+    "classic-light": "Classic Light",
+    "classic-dark": "Classic Dark",
+    "nothing-light": "Nothing Light",
+    "nothing-dark": "Nothing Dark",
     "system": "System",
     "family": {
-      "aurora": "Aurora",
-      "dotline": "Dotline",
-      "glass": "Glass"
+      "glass": "Glass",
+      "modern": "Modern",
+      "washi": "Washi",
+      "classic": "Classic",
+      "nothing": "Nothing"
     },
     "mode": {
       "light": "Light",

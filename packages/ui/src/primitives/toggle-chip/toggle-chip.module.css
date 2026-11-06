@@ -34,6 +34,8 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
+  text-transform: var(--nf-control-case);
+  letter-spacing: var(--nf-control-tracking);
   line-height: var(--nf-leading-tight);
   cursor: pointer;
   transition:

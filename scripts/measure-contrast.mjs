@@ -27,12 +27,16 @@ const repo = join(here, '..');
 
 const THEMES = [
   'packages/ui/src/tokens/semantic.css',
-  'packages/ui/src/themes/aurora-light.css',
-  'packages/ui/src/themes/aurora-dark.css',
-  'packages/ui/src/themes/dotline-light.css',
-  'packages/ui/src/themes/dotline-dark.css',
   'packages/ui/src/themes/glass-light.css',
   'packages/ui/src/themes/glass-dark.css',
+  'packages/ui/src/themes/modern-light.css',
+  'packages/ui/src/themes/modern-dark.css',
+  'packages/ui/src/themes/washi-light.css',
+  'packages/ui/src/themes/washi-dark.css',
+  'packages/ui/src/themes/classic-light.css',
+  'packages/ui/src/themes/classic-dark.css',
+  'packages/ui/src/themes/nothing-light.css',
+  'packages/ui/src/themes/nothing-dark.css',
 ];
 
 /** oklch(L% C H[ / A]) -> [L, C, H], alpha dropped. */

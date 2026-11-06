@@ -1,0 +1,83 @@
+/* Page header and section cards shared by the signed-in account pages. */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  margin-block-end: var(--nf-space-8);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--nf-color-fg);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+  text-wrap: pretty;
+  word-break: auto-phrase;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  padding: var(--nf-space-6);
+  background: var(--nf-color-surface);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-lg);
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.sectionDescription {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+  text-wrap: pretty;
+  word-break: auto-phrase;
+}
+
+/* Trailing row of a form: status message at the start, actions at the end. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nf-space-3);
+}
+
+.actionsStatus {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .header {
+    margin-block-end: var(--nf-space-6);
+  }
+
+  .section {
+    padding: var(--nf-space-5) var(--nf-space-4);
+  }
+}

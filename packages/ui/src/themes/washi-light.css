@@ -1,0 +1,150 @@
+/*
+ * washi-light — warm paper, sumi ink, vermilion accent, Mincho type.
+ */
+
+[data-theme="washi-light"] {
+  color-scheme: light;
+
+  --nf-color-bg: oklch(94.45% 0.0213 85.94);
+  --nf-color-bg-elevated: oklch(99.42% 0.0069 88.64);
+  --nf-color-bg-sunken: oklch(93.24% 0.0214 85.95);
+  --nf-color-surface: oklch(97.7% 0.0114 84.58);
+  --nf-color-surface-hover: oklch(93.55% 0.0213 85.94);
+  --nf-color-overlay: oklch(25.26% 0.0208 76.41 / 0.32);
+
+  --nf-color-fg: oklch(21.89% 0.0065 78.18);
+  --nf-color-fg-muted: oklch(50.15% 0.0193 70.3);
+  --nf-color-fg-subtle: oklch(62.31% 0.027 83.38);
+  --nf-color-fg-on-accent: oklch(97.58% 0.0152 77.07);
+  --nf-color-fg-on-danger: oklch(97.58% 0.0152 77.07);
+
+  --nf-color-border: oklch(88.82% 0.0278 83.53);
+  --nf-color-border-strong: oklch(80.96% 0.0375 82.15);
+  --nf-color-hairline: oklch(90.07% 0.0305 83.63);
+
+  --nf-color-accent: oklch(52.35% 0.1709 27.73);
+  --nf-color-accent-hover: oklch(46.11% 0.1535 28.58);
+  --nf-color-accent-active: oklch(41.11% 0.1535 28.58);
+  --nf-color-accent-subtle: oklch(52.35% 0.1709 27.73 / 0.13);
+  --nf-color-accent-fg: oklch(50.35% 0.1709 27.73);
+
+  --nf-color-success: oklch(51.64% 0.1057 159.7);
+  --nf-color-success-subtle: oklch(51.64% 0.1057 159.7 / 0.1);
+  --nf-color-success-fg: oklch(48.64% 0.1057 159.7);
+  --nf-color-warning: oklch(67.91% 0.135 74.87);
+  --nf-color-warning-subtle: oklch(67.91% 0.135 74.87 / 0.1);
+  --nf-color-warning-fg: oklch(51.41% 0.1081 74.87);
+  --nf-color-danger: oklch(48.6% 0.163 28.76);
+  --nf-color-danger-subtle: oklch(48.6% 0.163 28.76 / 0.09);
+  --nf-color-danger-fg: oklch(48.6% 0.163 28.76);
+  --nf-color-info: oklch(42.44% 0.1162 262.54);
+  --nf-color-info-subtle: oklch(42.44% 0.1162 262.54 / 0.1);
+  --nf-color-info-fg: oklch(42.44% 0.1162 262.54);
+
+  --nf-color-focus-ring: oklch(52.35% 0.1709 27.73);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  --nf-radius-xs: 0.25rem;
+  --nf-radius-sm: 0.375rem;
+  --nf-radius-md: 0.5rem;
+  --nf-radius-lg: 0.75rem;
+  --nf-radius-pill: 9999px;
+
+  --nf-shadow-sm: 0 1px 2px oklch(32.35% 0.0287 77.54 / 0.05);
+  --nf-shadow-md: 0 2px 8px oklch(32.35% 0.0287 77.54 / 0.07);
+  --nf-shadow-lg: 0 6px 20px oklch(32.35% 0.0287 77.54 / 0.09);
+  --nf-shadow-elevated: 0 12px 32px oklch(32.35% 0.0287 77.54 / 0.13);
+  --nf-shadow-focus:
+    0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg),
+    0 0 0 calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-overlay-press: oklch(0% 0 0 / 0.04);
+  --nf-overlay-hover: oklch(0% 0 0 / 0.02);
+
+  --nf-color-state-open-bg: oklch(91.8% 0.0075 260.73);
+  --nf-color-state-open-fg: oklch(42.44% 0.1162 262.54);
+  --nf-color-state-waiting-bg: oklch(94.87% 0.0285 84.59);
+  --nf-color-state-waiting-fg: oklch(53.41% 0.1126 74.87);
+  --nf-color-state-review-bg: oklch(92.58% 0.0101 335.48);
+  --nf-color-state-review-fg: oklch(47.99% 0.1068 308.82);
+  --nf-color-state-done-bg: oklch(92.83% 0.0185 150.55);
+  --nf-color-state-done-fg: oklch(50.64% 0.1057 159.7);
+  --nf-color-state-cancelled-bg: oklch(94.37% 0.0086 84.57);
+  --nf-color-state-cancelled-fg: oklch(52.81% 0.027 83.38);
+
+  --nf-surface-blur: 0px;
+  --nf-surface-saturation: 1;
+
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(21.89% 0.0065 78.18) 0%,
+    oklch(37.79% 0.0943 31.67) 50%,
+    oklch(52.35% 0.1709 27.73) 100%
+  );
+
+  --nf-motion-duration: var(--nf-duration-base);
+  --nf-motion-easing: var(--nf-ease-standard);
+
+  --nf-font-sans:
+    "Hiragino Mincho ProN", "Hiragino Mincho Pro", "YuMincho", "Yu Mincho", "Noto Serif JP",
+    "Songti SC", "Source Han Serif", serif;
+  --nf-font-display: var(--nf-font-sans);
+  --nf-text-tracking: 0.01em;
+  --nf-control-case: none;
+  --nf-control-tracking: 0.08em;
+
+  /* Layers, top first: paper grain, column rules (1px hairline exception), top light, floor shade, paper. */
+  --nf-app-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.18 0 0 0 0 0.1 -0.175 0 0 0 0.175'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")
+    0 0 / 10rem 10rem,
+    repeating-linear-gradient(
+      to right,
+      oklch(48.95% 0.0685 72.99 / 0.016) 0,
+      oklch(48.95% 0.0685 72.99 / 0.016) 1px,
+      transparent 1px,
+      transparent 7.5rem
+    ),
+    radial-gradient(120% 90% at 50% -5%, oklch(98.82% 0.0151 90.23 / 0.7), transparent 55%),
+    radial-gradient(110% 80% at 50% 105%, oklch(48.95% 0.0685 72.99 / 0.06), transparent 55%),
+    oklch(94.45% 0.0213 85.94);
+
+  --nf-cal-task-color: oklch(52.35% 0.1709 27.73);
+  --nf-cal-task-subtle: oklch(52.35% 0.1709 27.73 / 0.12);
+  --nf-cal-task-fg: oklch(50.85% 0.1709 27.73);
+  --nf-cal-event-color: oklch(42.44% 0.1162 262.54);
+  --nf-cal-event-subtle: oklch(42.44% 0.1162 262.54 / 0.12);
+  --nf-cal-event-fg: oklch(42.44% 0.1162 262.54);
+  --nf-cal-block-color: oklch(55.41% 0.1149 74.87);
+  --nf-cal-block-subtle: oklch(55.32% 0.1146 74.96 / 0.12);
+  --nf-cal-block-fg: oklch(49.82% 0.1036 74.96);
+  --nf-cal-free-color: oklch(51.64% 0.1057 159.7);
+  --nf-cal-free-subtle: oklch(51.64% 0.1057 159.7 / 0.12);
+  --nf-cal-free-fg: oklch(47.64% 0.1057 159.7);
+  --nf-cal-milestone-color: oklch(47.99% 0.1068 308.82);
+  --nf-cal-milestone-subtle: oklch(47.99% 0.1068 308.82 / 0.12);
+  --nf-cal-milestone-fg: oklch(47.99% 0.1068 308.82);
+
+  --nf-cal-color-1: oklch(62.31% 0.188 259.81);
+  --nf-cal-color-2: oklch(71.48% 0.1257 215.22);
+  --nf-cal-color-3: oklch(72.27% 0.192 149.58);
+  --nf-cal-color-4: oklch(76.86% 0.1647 70.08);
+  --nf-cal-color-5: oklch(70.49% 0.1867 47.6);
+  --nf-cal-color-6: oklch(63.68% 0.2078 25.33);
+  --nf-cal-color-7: oklch(65.59% 0.2118 354.31);
+  --nf-cal-color-8: oklch(62.68% 0.2325 303.9);
+  --nf-cal-color-9: oklch(55.1% 0.0234 264.36);
+  --nf-cal-color-10: oklch(37.29% 0.0306 259.73);
+
+  /* System Mincho ships two real weights (about W3 / W6); anything else is synthesised. */
+  --nf-weight-medium: 600;
+  --nf-weight-semibold: 600;
+  --nf-weight-bold: 600;
+
+  /* Mincho reads finer than a sans at the same size: headline steps go up 1px. */
+  --nf-text-lg: 1.1875rem;
+  --nf-text-xl: 1.3125rem;
+  --nf-text-2xl: 1.5625rem;
+  --nf-text-3xl: 1.9375rem;
+  --nf-text-4xl: 2.3125rem;
+}

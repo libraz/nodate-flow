@@ -5,9 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import ThemePicker, { DEFAULT_THEME_PREVIEWS, type ThemeFamilyEntry } from './theme-picker';
 
 const THEMES: ThemeFamilyEntry[] = [
-  { id: 'aurora', label: 'Aurora', preview: DEFAULT_THEME_PREVIEWS.aurora },
-  { id: 'dotline', label: 'Dotline', preview: DEFAULT_THEME_PREVIEWS.dotline },
   { id: 'glass', label: 'Glass', preview: DEFAULT_THEME_PREVIEWS.glass },
+  { id: 'modern', label: 'Modern', preview: DEFAULT_THEME_PREVIEWS.modern },
+  { id: 'washi', label: 'Washi', preview: DEFAULT_THEME_PREVIEWS.washi },
+  { id: 'classic', label: 'Classic', preview: DEFAULT_THEME_PREVIEWS.classic },
+  { id: 'nothing', label: 'Nothing', preview: DEFAULT_THEME_PREVIEWS.nothing },
 ];
 
 describe('ThemePicker', () => {
@@ -15,15 +17,15 @@ describe('ThemePicker', () => {
     render(
       <ThemePicker
         themes={THEMES}
-        selectedTheme="dotline"
+        selectedTheme="modern"
         selectedColorMode="dark"
         onThemeChange={() => {}}
         onColorModeChange={() => {}}
       />,
     );
 
-    expect(screen.getByRole('radio', { name: 'Aurora' }).getAttribute('tabindex')).toBe('-1');
-    expect(screen.getByRole('radio', { name: 'Dotline' }).getAttribute('tabindex')).toBe('0');
+    expect(screen.getByRole('radio', { name: 'Glass' }).getAttribute('tabindex')).toBe('-1');
+    expect(screen.getByRole('radio', { name: 'Modern' }).getAttribute('tabindex')).toBe('0');
     expect(screen.getByRole('radio', { name: 'Light' }).getAttribute('tabindex')).toBe('-1');
     expect(screen.getByRole('radio', { name: 'Dark' }).getAttribute('tabindex')).toBe('0');
   });
@@ -34,18 +36,18 @@ describe('ThemePicker', () => {
     render(
       <ThemePicker
         themes={THEMES}
-        selectedTheme="aurora"
+        selectedTheme="glass"
         selectedColorMode="light"
         onThemeChange={onThemeChange}
         onColorModeChange={() => {}}
       />,
     );
 
-    screen.getByRole('radio', { name: 'Aurora' }).focus();
+    screen.getByRole('radio', { name: 'Glass' }).focus();
     await user.keyboard('{ArrowRight}');
 
-    expect(onThemeChange).toHaveBeenCalledWith('dotline');
-    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Dotline' }));
+    expect(onThemeChange).toHaveBeenCalledWith('modern');
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Modern' }));
   });
 
   /*
@@ -63,7 +65,7 @@ describe('ThemePicker', () => {
           themes={THEMES.slice(0, 2)}
           // A theme family the host app no longer lists — e.g. restored
           // from a profile written by an older build.
-          selectedTheme="glass"
+          selectedTheme="washi"
           selectedColorMode={'sepia' as never}
           onThemeChange={onThemeChange}
           onColorModeChange={() => {}}
@@ -76,7 +78,7 @@ describe('ThemePicker', () => {
       renderOrphanSelection();
 
       await user.tab();
-      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Aurora' }));
+      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Glass' }));
     });
 
     it('still lets Tab reach the color mode group', async () => {
@@ -95,8 +97,8 @@ describe('ThemePicker', () => {
 
       await user.tab();
       await user.keyboard('{ArrowRight}');
-      expect(onThemeChange).toHaveBeenCalledWith('dotline');
-      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Dotline' }));
+      expect(onThemeChange).toHaveBeenCalledWith('modern');
+      expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'Modern' }));
     });
 
     it('checks none of the entries, so the fallback is not a silent selection', () => {
@@ -114,7 +116,7 @@ describe('ThemePicker', () => {
       <div dir="rtl">
         <ThemePicker
           themes={THEMES}
-          selectedTheme="aurora"
+          selectedTheme="glass"
           selectedColorMode="light"
           onThemeChange={() => {}}
           onColorModeChange={onColorModeChange}

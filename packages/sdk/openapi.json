@@ -7334,12 +7334,16 @@
           },
           "themePreference": {
             "enum": [
-              "aurora-light",
-              "aurora-dark",
-              "dotline-light",
-              "dotline-dark",
               "glass-light",
               "glass-dark",
+              "modern-light",
+              "modern-dark",
+              "washi-light",
+              "washi-dark",
+              "classic-light",
+              "classic-dark",
+              "nothing-light",
+              "nothing-dark",
               "system"
             ],
             "type": "string"
@@ -8461,12 +8465,16 @@
           },
           "themePreference": {
             "enum": [
-              "aurora-light",
-              "aurora-dark",
-              "dotline-light",
-              "dotline-dark",
               "glass-light",
               "glass-dark",
+              "modern-light",
+              "modern-dark",
+              "washi-light",
+              "washi-dark",
+              "classic-light",
+              "classic-dark",
+              "nothing-light",
+              "nothing-dark",
               "system"
             ],
             "type": "string"

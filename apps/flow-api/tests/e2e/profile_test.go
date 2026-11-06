@@ -62,8 +62,8 @@ func TestProfileUpdateTheme(t *testing.T) {
 		ThemePreference string `json:"themePreference"`
 	}
 	doJSON(t, http.MethodPatch, testServerURL+"/me", tt.AccessToken,
-		map[string]any{"themePreference": "aurora-dark"}, &patched)
-	require.Equal(t, "aurora-dark", patched.ThemePreference)
+		map[string]any{"themePreference": "washi-dark"}, &patched)
+	require.Equal(t, "washi-dark", patched.ThemePreference)
 }
 
 // TestProfileGetReturnsRegisteredEmail verifies that GET /me returns

@@ -15,12 +15,13 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import AuthCard from '../../components/auth-card';
+import PageHeader from '../../components/page-header';
+import SectionCard from '../../components/section-card';
 import {
   type ChangePasswordFormValues,
   changePasswordSchema,
@@ -273,25 +274,21 @@ export function SecurityPage(): ReactElement {
   };
 
   return (
-    <AuthCard>
-      <h1 className="aw-page-title">{t('security.title')}</h1>
-
-      {capsState.status === 'error' && (
-        <>
+    <>
+      <PageHeader title={t('security.title')} description={t('security.description')} />
+      <div className="aw-stack aw-stack-6">
+        {capsState.status === 'error' && (
           <ErrorFallback
             title={t('fatal.title')}
             action={{ label: t('fatal.retry'), onClick: capsState.retry }}
           />
+        )}
 
-          <hr className="aw-rule" />
-        </>
-      )}
-
-      {passwordLogin && (
-        <>
-          {/* Password change */}
-          <section className="aw-stack aw-stack-4">
-            <h2 className="aw-section-title">{t('security.password_title')}</h2>
+        {passwordLogin && (
+          <SectionCard
+            title={t('security.password_title')}
+            description={t('security.sections.password_description')}
+          >
             <form
               onSubmit={(e) => {
                 void handleSubmit(onChangePassword)(e);
@@ -353,98 +350,83 @@ export function SecurityPage(): ReactElement {
                 </Button>
               </div>
             </form>
-          </section>
-
-          <hr className="aw-rule" />
-        </>
-      )}
-
-      {totpManagement && (
-        <>
-          {/* TOTP management */}
-          <section className="aw-stack aw-stack-4">
-            <h2 className="aw-section-title">{t('security.totp.title')}</h2>
-            <TotpSection />
-          </section>
-
-          <hr className="aw-rule" />
-        </>
-      )}
-
-      {/* Active sessions */}
-      <section className="aw-stack aw-stack-4">
-        <h2 className="aw-section-title">{t('security.sessions_title')}</h2>
-        {sessionsLoading ? (
-          <div className="aw-stack aw-stack-3" aria-busy="true">
-            <Skeleton />
-            <Skeleton />
-          </div>
-        ) : sessions.length === 0 ? (
-          <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_empty')}</p>
-        ) : (
-          <ul className="aw-list">
-            {sessionPresence.entries.map(({ key, item: session, present }, index) => (
-              <PresenceItem
-                key={key}
-                as="li"
-                present={present}
-                onExited={() => {
-                  sessionPresence.onExited(key);
-                }}
-                className={`aw-presence-item ${motion.enter}`}
-                style={stagger(index)}
-              >
-                <div
-                  className={`aw-row-between aw-surface ${session.current ? 'aw-surface-elevated' : ''}`}
-                >
-                  <div>
-                    <p
-                      className={`aw-flush aw-text-sm ${session.current ? 'aw-weight-semibold' : ''}`}
-                      title={session.userAgent || undefined}
-                    >
-                      {session.userAgent
-                        ? formatDevice(session.userAgent)
-                        : t('security.session_unknown_agent')}
-                      {session.current ? ` (${t('security.session_current')})` : ''}
-                    </p>
-                    <p className="aw-flush aw-muted aw-text-xs">{session.ipAddress}</p>
-                    <p className="aw-flush aw-muted aw-text-xs">
-                      {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
-                      {' · '}
-                      {t('security.session_last_active')}:{' '}
-                      {session.lastUsedAt !== undefined && session.lastUsedAt !== null
-                        ? formatRelative(session.lastUsedAt, locale)
-                        : t('security.session_last_active_unknown')}
-                    </p>
-                  </div>
-                  {!session.current ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      aria-busy={revokingId === session.id || undefined}
-                      disabled={revokingId === session.id}
-                      onClick={() => {
-                        void handleRevokeSession(session.id);
-                      }}
-                    >
-                      {t('security.session_revoke')}
-                    </Button>
-                  ) : null}
-                </div>
-              </PresenceItem>
-            ))}
-          </ul>
+          </SectionCard>
         )}
-      </section>
 
-      <hr className="aw-rule" />
+        {totpManagement && (
+          <SectionCard title={t('security.totp.title')}>
+            <TotpSection />
+          </SectionCard>
+        )}
 
-      <p className="aw-flush aw-muted aw-text-sm">
-        <Link to="/profile" className="aw-link">
-          {t('security.profile_link')}
-        </Link>
-      </p>
-    </AuthCard>
+        <SectionCard
+          title={t('security.sessions_title')}
+          description={t('security.sections.sessions_description')}
+        >
+          {sessionsLoading ? (
+            <div className="aw-stack aw-stack-3" aria-busy="true">
+              <Skeleton />
+              <Skeleton />
+            </div>
+          ) : sessions.length === 0 ? (
+            <p className="aw-flush aw-muted aw-text-sm">{t('security.sessions_empty')}</p>
+          ) : (
+            <ul className="aw-list">
+              {sessionPresence.entries.map(({ key, item: session, present }, index) => (
+                <PresenceItem
+                  key={key}
+                  as="li"
+                  present={present}
+                  onExited={() => {
+                    sessionPresence.onExited(key);
+                  }}
+                  className={`aw-presence-item ${motion.enter}`}
+                  style={stagger(index)}
+                >
+                  <div
+                    className={`aw-row-between aw-surface ${session.current ? 'aw-surface-elevated' : ''}`}
+                  >
+                    <div>
+                      <p
+                        className={`aw-flush aw-text-sm ${session.current ? 'aw-weight-semibold' : ''}`}
+                        title={session.userAgent || undefined}
+                      >
+                        {session.userAgent
+                          ? formatDevice(session.userAgent)
+                          : t('security.session_unknown_agent')}
+                        {session.current ? ` (${t('security.session_current')})` : ''}
+                      </p>
+                      <p className="aw-flush aw-muted aw-text-xs">{session.ipAddress}</p>
+                      <p className="aw-flush aw-muted aw-text-xs">
+                        {t('security.session_created')}: {formatRelative(session.createdAt, locale)}
+                        {' · '}
+                        {t('security.session_last_active')}:{' '}
+                        {session.lastUsedAt !== undefined && session.lastUsedAt !== null
+                          ? formatRelative(session.lastUsedAt, locale)
+                          : t('security.session_last_active_unknown')}
+                      </p>
+                    </div>
+                    {!session.current ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-busy={revokingId === session.id || undefined}
+                        disabled={revokingId === session.id}
+                        onClick={() => {
+                          void handleRevokeSession(session.id);
+                        }}
+                      >
+                        {t('security.session_revoke')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </PresenceItem>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
+    </>
   );
 }
 

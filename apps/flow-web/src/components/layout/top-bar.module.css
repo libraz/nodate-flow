@@ -41,7 +41,9 @@
   gap: var(--nf-space-3);
   padding-block: var(--nf-space-3);
   padding-inline: var(--nf-space-4);
-  background: var(--nf-color-bg-elevated);
+  background: var(--nf-color-surface);
+  backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
+  -webkit-backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 3.5rem;

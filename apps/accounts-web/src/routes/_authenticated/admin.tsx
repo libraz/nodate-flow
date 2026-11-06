@@ -4,7 +4,7 @@
  * The guard renders three states:
  *   1. user undefined: a page skeleton (auth bootstrap not done).
  *   2. user known + non-admin: emit a one-shot redirect to /profile, render null.
- *   3. user known + admin: render the admin shell.
+ *   3. user known + admin: render the admin section nav and the page.
  *
  * Previous implementation flashed `null` for one frame while the auth state
  * was loading, which produced a brief blank page on direct /admin loads.
@@ -12,7 +12,7 @@
 
 import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import { createFileRoute, Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useEffect } from 'react';
+import { type ReactElement, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { selectUser, useAuth } from '../../features/auth/auth-store';
@@ -23,6 +23,7 @@ export function AdminLayout(): ReactElement | null {
   const navigate = useNavigate();
   const { t } = useTranslation('admin');
   const { pathname } = useLocation();
+  const navLabelId = useId();
 
   // _authenticated guards on session; `user === null` here means the /me
   // hydrate has not landed yet, so we render a loading skeleton instead of
@@ -44,68 +45,66 @@ export function AdminLayout(): ReactElement | null {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.aside}>
-        <h2 className={styles.title}>{t('title')}</h2>
-        <Link
-          to="/admin/users"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.users')}
-        </Link>
-        <Link
-          to="/admin/workspaces"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.workspaces')}
-        </Link>
-        <Link
-          to="/admin/audit-logs"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.audit_logs')}
-        </Link>
-        <Link
-          to="/admin/admins"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.admins')}
-        </Link>
-        <Link
-          to="/admin/signin-allowlist"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.signin_allowlist')}
-        </Link>
-        <Link
-          to="/admin/stats"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.stats')}
-        </Link>
-        <Link
-          to="/admin/settings"
-          className={styles.navLink}
-          activeProps={{ className: `${styles.navLink} ${styles.navLinkActive}` }}
-        >
-          {t('nav.settings')}
-        </Link>
-        <div className={styles.spacer} />
-        <Link to="/profile" className={styles.backLink}>
-          {t('common.back_to_profile')}
-        </Link>
-      </aside>
-      <main className={styles.main}>
-        {/* Keyed on the path so each admin page fades in as it replaces the last. */}
-        <div key={pathname} className={styles.page}>
-          <Outlet />
+      <p id={navLabelId} className={styles.eyebrow}>
+        {t('title')}
+      </p>
+      <nav className={styles.nav} aria-labelledby={navLabelId}>
+        <div className={styles.navTrack}>
+          <Link
+            to="/admin/users"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.users')}
+          </Link>
+          <Link
+            to="/admin/workspaces"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.workspaces')}
+          </Link>
+          <Link
+            to="/admin/audit-logs"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.audit_logs')}
+          </Link>
+          <Link
+            to="/admin/admins"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.admins')}
+          </Link>
+          <Link
+            to="/admin/signin-allowlist"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.signin_allowlist')}
+          </Link>
+          <Link
+            to="/admin/stats"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.stats')}
+          </Link>
+          <Link
+            to="/admin/settings"
+            className={`${styles.navLink} nf-focus-ring-inset`}
+            activeProps={{ className: styles.navLinkActive }}
+          >
+            {t('nav.settings')}
+          </Link>
         </div>
-      </main>
+      </nav>
+      {/* Keyed on the path so each admin page fades in as it replaces the last. */}
+      <div key={pathname} className={styles.page}>
+        <Outlet />
+      </div>
     </div>
   );
 }

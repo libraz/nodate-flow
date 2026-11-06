@@ -341,7 +341,7 @@ type MeBody struct {
 	// WeekStart is the user's preferred first day of the week for calendar grids.
 	// One of "mon" (default), "sun", "sat".
 	WeekStart       string `json:"weekStart" enum:"mon,sun,sat"`
-	ThemePreference string `json:"themePreference" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
+	ThemePreference string `json:"themePreference" enum:"glass-light,glass-dark,modern-light,modern-dark,washi-light,washi-dark,classic-light,classic-dark,nothing-light,nothing-dark,system"`
 	// CalendarShiftDefault controls how shifting a calendar event behaves
 	// by default when the event has linked tasks. "ask" prompts the user
 	// each time, "sync_always" shifts every linked task by the same delta,
@@ -390,7 +390,7 @@ type PatchMeInputBody struct {
 	// WeekStart is the user's preferred first day of the week for calendar grids.
 	// One of "mon", "sun", "sat".
 	WeekStart       *string `json:"weekStart,omitempty" enum:"mon,sun,sat"`
-	ThemePreference *string `json:"themePreference,omitempty" enum:"aurora-light,aurora-dark,dotline-light,dotline-dark,glass-light,glass-dark,system"`
+	ThemePreference *string `json:"themePreference,omitempty" enum:"glass-light,glass-dark,modern-light,modern-dark,washi-light,washi-dark,classic-light,classic-dark,nothing-light,nothing-dark,system"`
 	// CalendarShiftDefault controls how shifting a calendar event behaves
 	// by default when the event has linked tasks. "ask" prompts the user
 	// each time, "sync_always" shifts every linked task by the same delta,

@@ -57,7 +57,7 @@ function makeAdmin(): AuthUser {
   return {
     id: 'admin-1',
     email: 'admin@example.test',
-    displayName: 'Admin',
+    displayName: 'Ada Lovelace',
     locale: 'en',
     timezone: 'UTC',
     country: 'US',

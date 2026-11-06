@@ -62,7 +62,7 @@ afterEach(() => {
 function ThemeProbe({
   capture,
 }: {
-  capture: (setPref: (p: 'aurora-dark' | 'aurora-light') => void) => void;
+  capture: (setPref: (p: 'glass-dark' | 'glass-light') => void) => void;
 }): null {
   const { setPreference } = useTheme();
   capture(setPreference);
@@ -71,7 +71,7 @@ function ThemeProbe({
 
 describe('ThemeProvider syncServerTheme target', () => {
   it('PATCHes /me on authSdk (auth-api), not the product sdk (flow-api)', async () => {
-    let setPref: ((p: 'aurora-dark' | 'aurora-light') => void) | null = null;
+    let setPref: ((p: 'glass-dark' | 'glass-light') => void) | null = null;
     render(
       <ThemeProvider>
         <ThemeProbe
@@ -87,14 +87,14 @@ describe('ThemeProvider syncServerTheme target', () => {
     // skipped by the provider (`isFirstRender`), so a single explicit
     // change is what causes the sync to fire.
     await act(async () => {
-      setPref?.('aurora-dark');
+      setPref?.('glass-dark');
       // Yield once so the fire-and-forget promise resolves before assertions.
       await Promise.resolve();
     });
 
     expect(sdkMocks.authPatch).toHaveBeenCalledTimes(1);
     expect(sdkMocks.authPatch).toHaveBeenCalledWith('/me', {
-      body: { themePreference: 'aurora-dark' },
+      body: { themePreference: 'glass-dark' },
     });
     expect(sdkMocks.productPatch).not.toHaveBeenCalled();
   });

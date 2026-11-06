@@ -2,12 +2,16 @@
 
 @import "@nodate-flow/ui/tokens/base.css";
 @import "@nodate-flow/ui/tokens/semantic.css";
-@import "@nodate-flow/ui/themes/aurora-light.css";
-@import "@nodate-flow/ui/themes/aurora-dark.css";
-@import "@nodate-flow/ui/themes/dotline-light.css";
-@import "@nodate-flow/ui/themes/dotline-dark.css";
 @import "@nodate-flow/ui/themes/glass-light.css";
 @import "@nodate-flow/ui/themes/glass-dark.css";
+@import "@nodate-flow/ui/themes/modern-light.css";
+@import "@nodate-flow/ui/themes/modern-dark.css";
+@import "@nodate-flow/ui/themes/washi-light.css";
+@import "@nodate-flow/ui/themes/washi-dark.css";
+@import "@nodate-flow/ui/themes/classic-light.css";
+@import "@nodate-flow/ui/themes/classic-dark.css";
+@import "@nodate-flow/ui/themes/nothing-light.css";
+@import "@nodate-flow/ui/themes/nothing-dark.css";
 
 @import "@nodate-flow/ui/styles/focus-ring.css";
 @import "@nodate-flow/ui/styles/motion.css";
@@ -20,9 +24,9 @@
  * `color-scheme` under `[data-theme="…"]`, and an attribute selector and
  * `:root` have the same specificity, so the winner is decided by source
  * order alone: this rule sits after the theme imports and was quietly
- * beating all six of them. `light dark` means "either, follow the OS",
+ * beating all of them. `light dark` means "either, follow the OS",
  * which is precisely what choosing a theme is supposed to override — so
- * a reader on a dark OS who picked aurora-light got dark scrollbars,
+ * a reader on a dark OS who picked a light theme got dark scrollbars,
  * dark date pickers and dark autofill on a light page. Wrapping the
  * selector drops it to zero specificity, so every theme wins over it and
  * the outcome no longer depends on the order of the imports above.
@@ -37,11 +41,17 @@ body,
   block-size: 100%;
 }
 
+html,
+body {
+  font-family: var(--nf-font-sans);
+  letter-spacing: var(--nf-text-tracking);
+}
+
 body {
   margin: 0;
-  background: var(--nf-color-bg);
+  background: var(--nf-app-bg);
+  background-attachment: fixed;
   color: var(--nf-color-fg);
-  font-family: var(--nf-font-sans);
   -webkit-font-smoothing: antialiased;
   transition:
     background-color var(--nf-motion-duration) var(--nf-motion-easing),

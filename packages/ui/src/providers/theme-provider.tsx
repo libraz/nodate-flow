@@ -29,7 +29,7 @@ export type { ThemeId };
 // ---------------------------------------------------------------------------
 
 /** Theme "family" — the visual design, independent of light/dark. */
-export type ThemeFamily = 'aurora' | 'dotline' | 'glass';
+export type ThemeFamily = 'glass' | 'modern' | 'washi' | 'classic' | 'nothing';
 
 /** Color mode preference. */
 export type ColorMode = 'light' | 'dark' | 'system';
@@ -41,7 +41,13 @@ export type ThemePreference = ThemeId | 'system';
 export const THEME_PREFERENCES: readonly ThemePreference[] = [...THEME_IDS, 'system'] as const;
 
 /** Theme families available in the design system. */
-export const THEME_FAMILIES: readonly ThemeFamily[] = ['aurora', 'dotline', 'glass'] as const;
+export const THEME_FAMILIES: readonly ThemeFamily[] = [
+  'glass',
+  'modern',
+  'washi',
+  'classic',
+  'nothing',
+] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,7 +102,7 @@ export interface ThemeContextValue {
   family: ThemeFamily;
   /** Current color mode preference ('light' | 'dark' | 'system'). */
   colorMode: ColorMode;
-  /** Set combined preference (e.g. 'aurora-dark' or 'system'). */
+  /** Set combined preference (e.g. 'glass-dark' or 'system'). */
   setPreference: (p: ThemePreference) => void;
   /** Set theme family, keeping current color mode. */
   setFamily: (f: ThemeFamily) => void;
@@ -123,7 +129,7 @@ export interface ThemeProviderProps {
   storageKey?: string;
   /**
    * Default theme family when no preference is stored.
-   * Defaults to `'aurora'`.
+   * Defaults to `'glass'`.
    */
   defaultFamily?: ThemeFamily;
   /**
@@ -151,7 +157,7 @@ export interface ThemeProviderProps {
 export function ThemeProvider({
   children,
   storageKey = 'nf.theme',
-  defaultFamily = 'aurora',
+  defaultFamily = 'glass',
   fetchServerTheme,
   syncServerTheme,
   legacyKeys,

@@ -91,10 +91,10 @@ describe('ThemeProvider context identity', () => {
         <button
           type="button"
           onClick={() => {
-            setFamily('glass');
+            setFamily('washi');
           }}
         >
-          glass
+          washi
         </button>
       );
     }
@@ -107,10 +107,10 @@ describe('ThemeProvider context identity', () => {
     const before = contextValues.at(-1);
 
     act(() => {
-      screen.getByRole('button', { name: 'glass' }).click();
+      screen.getByRole('button', { name: 'washi' }).click();
     });
 
     expect(contextValues.at(-1)).not.toBe(before);
-    expect(screen.getByTestId('family').textContent).toBe('glass');
+    expect(screen.getByTestId('family').textContent).toBe('washi');
   });
 });

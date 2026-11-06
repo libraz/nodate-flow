@@ -13,3 +13,14 @@
   color: var(--nf-color-accent-fg);
   font-size: var(--nf-text-xs);
 }
+
+/* Return link above the workspace settings header. */
+.back {
+  display: inline-block;
+  margin-block-end: var(--nf-space-4);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--nf-color-fg);
+}

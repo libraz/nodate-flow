@@ -19,18 +19,20 @@ import Input from '@nodate-flow/ui/primitives/input';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import AuthCard from '../../components/auth-card';
+import PageHeader from '../../components/page-header';
+import SectionCard, { SectionActions } from '../../components/section-card';
 import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { userFromMe } from '../../features/auth/user-from-me';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiRequest } from '../../lib/api';
 import { mapAuthThrown } from '../../lib/auth-errors';
+import { flowWebUrl } from '../../lib/flow-web-url';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 
@@ -130,19 +132,6 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
   }, [inlineLen, user]);
 
   return inlineLen ?? fetched;
-}
-
-/**
- * Origin of the flow-web app where /setup lives. Configurable via the
- * `VITE_FLOW_WEB_URL` env var; defaults to a same-origin path so the
- * common mono-deploy case "just works".
- */
-function flowWebSetupUrl(): string {
-  const base = import.meta.env.VITE_FLOW_WEB_URL as string | undefined;
-  if (typeof base === 'string' && base.length > 0) {
-    return `${base.replace(/\/$/, '')}/setup`;
-  }
-  return '/setup';
 }
 
 export function ProfilePage(): ReactElement {
@@ -345,16 +334,9 @@ export function ProfilePage(): ReactElement {
   };
 
   return (
-    <AuthCard width="wide">
-      <form
-        onSubmit={(e) => {
-          void handleSubmit(onSubmit)(e);
-        }}
-        noValidate
-        className="aw-stack aw-stack-5"
-      >
-        <h1 className="aw-page-title">{t('profile.title')}</h1>
-
+    <>
+      <PageHeader title={t('profile.title')} description={t('profile.description')} />
+      <div className="aw-stack aw-stack-6">
         {showEmptyWorkspacesCta ? (
           <Card
             data-testid="empty-workspaces-cta"
@@ -388,7 +370,7 @@ export function ProfilePage(): ReactElement {
               type="button"
               variant="primary"
               onClick={() => {
-                window.location.href = flowWebSetupUrl();
+                window.location.href = flowWebUrl('/setup');
               }}
             >
               {t('profile.empty_workspaces.cta')}
@@ -396,143 +378,164 @@ export function ProfilePage(): ReactElement {
           </Card>
         ) : null}
 
-        <FormField
-          label={t('profile.display_name')}
-          required
-          {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
-        >
-          {(control) => {
-            const { ref, ...field } = register('displayName');
-            return <Input {...control} {...field} ref={ref} type="text" autoComplete="name" />;
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(onSubmit)(e);
           }}
-        </FormField>
+          noValidate
+          className="aw-stack aw-stack-6"
+        >
+          <SectionCard
+            title={t('profile.sections.personal_title')}
+            description={t('profile.sections.personal_description')}
+          >
+            <FormField
+              label={t('profile.display_name')}
+              required
+              {...(errors.displayName?.message ? { error: t(errors.displayName.message) } : {})}
+            >
+              {(control) => {
+                const { ref, ...field } = register('displayName');
+                return <Input {...control} {...field} ref={ref} type="text" autoComplete="name" />;
+              }}
+            </FormField>
+          </SectionCard>
 
-        <FormField label={t('profile.locale.label')}>
-          {() => (
-            <Controller
-              name="locale"
-              control={control}
-              render={({ field }) => (
-                <SegmentedControl<SupportedLanguage>
-                  fullWidth
-                  value={field.value}
-                  onChange={handleLocaleChange}
-                  options={localeOptions}
-                  ariaLabel={t('profile.locale.label')}
+          <SectionCard
+            title={t('profile.sections.region_title')}
+            description={t('profile.sections.region_description')}
+          >
+            <FormField label={t('profile.locale.label')}>
+              {() => (
+                <Controller
+                  name="locale"
+                  control={control}
+                  render={({ field }) => (
+                    <SegmentedControl<SupportedLanguage>
+                      fullWidth
+                      value={field.value}
+                      onChange={handleLocaleChange}
+                      options={localeOptions}
+                      ariaLabel={t('profile.locale.label')}
+                    />
+                  )}
                 />
               )}
-            />
-          )}
-        </FormField>
+            </FormField>
 
-        <FormField label={t('profile.week_start.label')} description={t('profile.week_start.help')}>
-          {() => (
-            <Controller
-              name="weekStart"
-              control={control}
-              render={({ field }) => (
-                <SegmentedControl<WeekStart>
-                  fullWidth
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={weekStartOptions}
-                  ariaLabel={t('profile.week_start.label')}
+            <FormField
+              label={t('profile.week_start.label')}
+              description={t('profile.week_start.help')}
+            >
+              {() => (
+                <Controller
+                  name="weekStart"
+                  control={control}
+                  render={({ field }) => (
+                    <SegmentedControl<WeekStart>
+                      fullWidth
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={weekStartOptions}
+                      ariaLabel={t('profile.week_start.label')}
+                    />
+                  )}
                 />
               )}
-            />
-          )}
-        </FormField>
+            </FormField>
 
-        <FormField
-          label={t('profile.timezone')}
-          {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
-        >
-          {(control2) => (
-            <Controller
-              name="timezone"
-              control={control}
-              render={({ field }) => (
-                <Combobox
-                  id={control2.id}
-                  options={timezoneOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  aria-label={t('profile.timezone')}
+            <FormField
+              label={t('profile.timezone')}
+              {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
+            >
+              {(control2) => (
+                <Controller
+                  name="timezone"
+                  control={control}
+                  render={({ field }) => (
+                    <Combobox
+                      id={control2.id}
+                      options={timezoneOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      aria-label={t('profile.timezone')}
+                    />
+                  )}
                 />
               )}
-            />
-          )}
-        </FormField>
+            </FormField>
 
-        <FormField
-          label={t('profile.country')}
-          {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
-        >
-          {(control2) => (
-            <Controller
-              name="country"
-              control={control}
-              render={({ field }) => (
-                <Combobox
-                  id={control2.id}
-                  options={countryOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  aria-label={t('profile.country')}
+            <FormField
+              label={t('profile.country')}
+              {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
+            >
+              {(control2) => (
+                <Controller
+                  name="country"
+                  control={control}
+                  render={({ field }) => (
+                    <Combobox
+                      id={control2.id}
+                      options={countryOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      aria-label={t('profile.country')}
+                    />
+                  )}
                 />
               )}
-            />
-          )}
-        </FormField>
+            </FormField>
+          </SectionCard>
 
-        <FormField label={t('profile.theme')}>
-          {(control) => {
-            const { ref, ...field } = register('themePreference');
-            return (
-              <select {...control} {...field} ref={ref} className="aw-select">
-                <option value="system">{t('profile.theme_system')}</option>
-                <option value="aurora-light">{t('profile.theme_aurora_light')}</option>
-                <option value="aurora-dark">{t('profile.theme_aurora_dark')}</option>
-                <option value="dotline-light">{t('profile.theme_dotline_light')}</option>
-                <option value="dotline-dark">{t('profile.theme_dotline_dark')}</option>
-                <option value="glass-light">{t('profile.theme_glass_light')}</option>
-                <option value="glass-dark">{t('profile.theme_glass_dark')}</option>
-              </select>
-            );
-          }}
-        </FormField>
+          <SectionCard
+            title={t('profile.sections.appearance_title')}
+            description={t('profile.sections.appearance_description')}
+          >
+            <FormField label={t('profile.theme')}>
+              {(control) => {
+                const { ref, ...field } = register('themePreference');
+                return (
+                  <select {...control} {...field} ref={ref} className="aw-select">
+                    <option value="system">{t('profile.theme_system')}</option>
+                    <option value="glass-light">{t('profile.theme_glass_light')}</option>
+                    <option value="glass-dark">{t('profile.theme_glass_dark')}</option>
+                    <option value="modern-light">{t('profile.theme_modern_light')}</option>
+                    <option value="modern-dark">{t('profile.theme_modern_dark')}</option>
+                    <option value="washi-light">{t('profile.theme_washi_light')}</option>
+                    <option value="washi-dark">{t('profile.theme_washi_dark')}</option>
+                    <option value="classic-light">{t('profile.theme_classic_light')}</option>
+                    <option value="classic-dark">{t('profile.theme_classic_dark')}</option>
+                    <option value="nothing-light">{t('profile.theme_nothing_light')}</option>
+                    <option value="nothing-dark">{t('profile.theme_nothing_dark')}</option>
+                  </select>
+                );
+              }}
+            </FormField>
+          </SectionCard>
 
-        {serverError ? (
-          <p role="alert" className="aw-error">
-            {serverError}
-          </p>
-        ) : null}
-
-        {success && !isDirty ? <output className="aw-success">{t('profile.saved')}</output> : null}
-
-        <Button
-          type="submit"
-          variant="primary"
-          aria-busy={isSubmitting || submitGuard.submitting || undefined}
-          disabled={isSubmitting || submitGuard.submitting || !isDirty}
-        >
-          {t('profile.save')}
-        </Button>
-
-        <p
-          style={{
-            margin: 0,
-            fontSize: 'var(--nf-text-sm)',
-            color: 'var(--nf-color-fg-muted)',
-            display: 'flex',
-            gap: 'var(--nf-space-4)',
-          }}
-        >
-          <Link to="/security">{t('profile.security_link')}</Link>
-          <Link to="/workspaces">{t('profile.workspaces_link')}</Link>
-        </p>
-      </form>
-    </AuthCard>
+          <SectionActions
+            status={
+              serverError ? (
+                <p role="alert" className="aw-error">
+                  {serverError}
+                </p>
+              ) : success && !isDirty ? (
+                <output className="aw-success">{t('profile.saved')}</output>
+              ) : null
+            }
+          >
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={isSubmitting || submitGuard.submitting || undefined}
+              disabled={isSubmitting || submitGuard.submitting || !isDirty}
+            >
+              {t('profile.save')}
+            </Button>
+          </SectionActions>
+        </form>
+      </div>
+    </>
   );
 }
 
