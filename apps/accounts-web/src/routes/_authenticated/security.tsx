@@ -4,6 +4,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { brandFileStem } from '@nodate-flow/ui/brand';
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
@@ -32,6 +33,7 @@ import { capsOf, useCapabilities } from '../../features/auth/use-capabilities';
 import { useCapsLockHint } from '../../features/auth/use-caps-lock-hint';
 import { apiRequest } from '../../lib/api';
 import { type AuthErrorI18nKey, mapAuthThrown, refusalCode } from '../../lib/auth-errors';
+import { APP_NAME } from '../../lib/brand';
 import { logError } from '../../lib/log';
 
 import recoveryStyles from './recovery-codes.module.css';
@@ -886,7 +888,7 @@ export function RecoveryCodesView({
 }): ReactElement {
   const { t } = useTranslation('auth');
   const date = todayLocalDate();
-  const fileHeader = t('security.totp.recovery.file_header', { date });
+  const fileHeader = t('security.totp.recovery.file_header', { date, appName: APP_NAME });
 
   const handleCopyAll = async (): Promise<void> => {
     try {
@@ -906,7 +908,7 @@ export function RecoveryCodesView({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `nodate-flow-recovery-codes-${date}.txt`;
+    anchor.download = `${brandFileStem(APP_NAME)}-recovery-codes-${date}.txt`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);

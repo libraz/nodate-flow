@@ -156,6 +156,18 @@
   transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
+.brandLogo {
+  block-size: var(--nf-space-6);
+  inline-size: auto;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 8rem;
+  object-fit: contain;
+}
+
+.collapsed .brandLogo {
+  max-inline-size: 100%;
+}
+
 /*
  * Labels fade rather than disappear so the rail narrows under them; the
  * links keep their `aria-label`, so the hidden text is not needed by AT.

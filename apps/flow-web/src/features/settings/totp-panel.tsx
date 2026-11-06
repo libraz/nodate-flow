@@ -10,6 +10,7 @@
  *   enabled   → shows "2FA is on" + disable form (password reverify)
  */
 
+import { brandFileStem } from '@nodate-flow/ui/brand';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -18,6 +19,7 @@ import QRCode from 'qrcode';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { APP_NAME } from '../../lib/brand';
 import { confirmAction } from '../../lib/confirm-action';
 import {
   type SettingsApiError,
@@ -48,7 +50,7 @@ function RecoveryCodesView({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'nodate-flow-recovery-codes.txt';
+    a.download = `${brandFileStem(APP_NAME)}-recovery-codes.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };

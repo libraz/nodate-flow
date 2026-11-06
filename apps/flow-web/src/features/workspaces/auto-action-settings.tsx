@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
+import { APP_NAME } from '../../lib/brand';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
 import ui from '../settings/settings-ui.module.css';
@@ -106,7 +107,7 @@ export default function AutoActionSettingsPage({
     <div className={ui.page}>
       <PageHeader
         title={t('workspace.auto_actions.title')}
-        description={t('workspace.auto_actions.description')}
+        description={t('workspace.auto_actions.description', { appName: APP_NAME })}
       />
 
       <form

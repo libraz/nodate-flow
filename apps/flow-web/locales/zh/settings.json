@@ -29,7 +29,7 @@
   },
   "integrations": {
     "title": "集成",
-    "description": "连接你的 GitHub、Slack、Google 日历和 Discord 个人账户，让 nodate-flow 可以代你执行操作。令牌将以加密形式存储。",
+    "description": "连接你的 GitHub、Slack、Google 日历和 Discord 个人账户，让 {appName} 可以代你执行操作。令牌将以加密形式存储。",
     "connect": "连接",
     "disconnect": "断开",
     "disconnect_confirm": "断开 {provider}？再次使用前需要重新授权。",
@@ -518,7 +518,7 @@
     },
     "auto_actions": {
       "title": "自动操作",
-      "description": "配置 nodate-flow 如何自主管理本工作区中的任务。启用后，系统会定期评估任务并应用诸如升级逾期项目或关闭长期未动审核等操作。",
+      "description": "配置 {appName} 如何自主管理本工作区中的任务。启用后，系统会定期评估任务并应用诸如升级逾期项目或关闭长期未动审核等操作。",
       "enabled": {
         "label": "启用自动操作",
         "description": "允许系统自动对任务应用操作。"

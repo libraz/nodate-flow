@@ -9,6 +9,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { APP_NAME } from '../../lib/brand';
 import { confirmAction } from '../../lib/confirm-action';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import {
@@ -87,7 +88,7 @@ export default function IntegrationsPanel(): ReactElement {
 
   return (
     <div className={styles.section}>
-      <p className={styles.description}>{t('integrations.description')}</p>
+      <p className={styles.description}>{t('integrations.description', { appName: APP_NAME })}</p>
       <ul className={styles.list}>
         {PROVIDER_ORDER.map((name) => {
           const p = byName.get(name);

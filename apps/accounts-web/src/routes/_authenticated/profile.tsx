@@ -32,6 +32,7 @@ import { userFromMe } from '../../features/auth/user-from-me';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiRequest } from '../../lib/api';
 import { mapAuthThrown } from '../../lib/auth-errors';
+import { APP_NAME } from '../../lib/brand';
 import { flowWebUrl } from '../../lib/flow-web-url';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { type ThemePreference, useTheme } from '../../providers/theme-provider';
@@ -335,7 +336,10 @@ export function ProfilePage(): ReactElement {
 
   return (
     <>
-      <PageHeader title={t('profile.title')} description={t('profile.description')} />
+      <PageHeader
+        title={t('profile.title')}
+        description={t('profile.description', { appName: APP_NAME })}
+      />
       <div className="aw-stack aw-stack-6">
         {showEmptyWorkspacesCta ? (
           <Card

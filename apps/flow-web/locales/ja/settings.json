@@ -29,7 +29,7 @@
   },
   "integrations": {
     "title": "連携",
-    "description": "個人の GitHub / Slack / Google カレンダー / Discord アカウントを接続すると、nodate-flow がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
+    "description": "個人の GitHub / Slack / Google カレンダー / Discord アカウントを接続すると、{appName} がユーザーとして操作できるようになります。トークンは暗号化して保存されます。",
     "connect": "接続",
     "disconnect": "切断",
     "disconnect_confirm": "{provider} を切断しますか？再度利用するには認可し直す必要があります。",
@@ -518,7 +518,7 @@
     },
     "auto_actions": {
       "title": "自動アクション",
-      "description": "このワークスペースで nodate-flow がタスクを自律的に管理する方法を設定します。有効にすると、システムが定期的にタスクを評価し、期限超過のエスカレーションやレビューの自動クローズなどを実行します。",
+      "description": "このワークスペースで {appName} がタスクを自律的に管理する方法を設定します。有効にすると、システムが定期的にタスクを評価し、期限超過のエスカレーションやレビューの自動クローズなどを実行します。",
       "enabled": {
         "label": "自動アクションを有効にする",
         "description": "タスクへの自動アクションの適用を許可します。"

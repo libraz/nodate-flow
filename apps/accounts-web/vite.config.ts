@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
+import { brandPlugin } from '@nodate-flow/ui/brand/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
@@ -17,6 +18,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
+    brandPlugin(),
   ],
   resolve: {
     alias: {

@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "インスタンス統計",
-    "subtitle": "この nodate-flow インスタンスの全体的な状況。"
+    "subtitle": "この {appName} インスタンスの全体的な状況。"
   },
   "kpi": {
     "users": {

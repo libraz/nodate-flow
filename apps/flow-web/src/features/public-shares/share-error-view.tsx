@@ -9,8 +9,8 @@
 import { Calendar as CalendarIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { ApiError, isNetworkError } from '../../lib/api-error';
+import { APP_NAME } from '../../lib/brand';
 
 export interface ShareErrorViewProps {
   error: unknown;
@@ -91,7 +91,7 @@ export default function ShareErrorView({
             fontSize: 'var(--nf-text-sm)',
           }}
         >
-          {t('share.error.back')}
+          {t('share.error.back', { appName: APP_NAME })}
         </a>
       ) : null}
     </div>

@@ -15,7 +15,6 @@
     "cancel": "取消"
   },
   "landing": {
-    "wordmark": "nodate-flow",
     "hello": "你好。",
     "tagline": "工作自然流转，你只需观察。",
     "shortcuts": "快捷键"
@@ -1132,7 +1131,6 @@
     }
   },
   "share": {
-    "brand": "nodate-flow",
     "no_upcoming_events": "暂无可显示的事件。",
     "event_undated": "日期待定",
     "holidays_country": "节假日：{country}",
@@ -1141,7 +1139,7 @@
       "title_expired": "此分享链接已过期。",
       "body": "该链接可能已过期或被移除。",
       "body_network": "无法连接到服务器。请检查您的连接并重试。",
-      "back": "返回 nodate-flow"
+      "back": "返回 {appName}"
     },
     "grid": {
       "today": "今天",

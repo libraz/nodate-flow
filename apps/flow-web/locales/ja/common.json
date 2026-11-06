@@ -15,7 +15,6 @@
     "cancel": "キャンセル"
   },
   "landing": {
-    "wordmark": "nodate-flow",
     "hello": "こんにちは。",
     "tagline": "タスクは自走する。あなたは見守る。",
     "shortcuts": "ショートカット"
@@ -1132,7 +1131,6 @@
     }
   },
   "share": {
-    "brand": "nodate-flow",
     "no_upcoming_events": "表示できる予定はありません。",
     "event_undated": "日程未定",
     "holidays_country": "祝日: {country}",
@@ -1141,7 +1139,7 @@
       "title_expired": "この共有リンクは有効期限が切れています。",
       "body": "このリンクは期限切れか削除された可能性があります。",
       "body_network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
-      "back": "nodate-flow に戻る"
+      "back": "{appName} に戻る"
     },
     "grid": {
       "today": "今日",

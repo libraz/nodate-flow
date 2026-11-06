@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Instance stats",
-    "subtitle": "High-level health of this nodate-flow instance."
+    "subtitle": "High-level health of this {appName} instance."
   },
   "kpi": {
     "users": {

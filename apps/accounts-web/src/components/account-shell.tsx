@@ -11,6 +11,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AuthUser } from '../features/auth/auth-store';
+import { APP_LOGO_URL, APP_NAME } from '../lib/brand';
 import { flowWebUrl } from '../lib/flow-web-url';
 
 import {
@@ -48,7 +49,10 @@ export default function AccountShell({ user, wide, children }: AccountShellProps
     <div className={styles.shell}>
       <SkipLink targetId={MAIN_ID}>{t('account.skip_to_content')}</SkipLink>
       <aside className={styles.sidebar}>
-        <div className={styles.brand}>nodate-flow</div>
+        <div className={styles.brand}>
+          {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
+          {APP_NAME}
+        </div>
 
         <nav className={styles.nav} aria-label={t('account.nav_label')}>
           <Link to="/profile" {...itemProps}>
@@ -73,7 +77,9 @@ export default function AccountShell({ user, wide, children }: AccountShellProps
 
         <a href={flowWebUrl('/')} className={`${styles.back} nf-focus-ring-inset`}>
           <BackIcon />
-          <span className={styles.backLabel}>{t('account.back_to_flow')}</span>
+          <span className={styles.backLabel}>
+            {t('account.back_to_flow', { appName: APP_NAME })}
+          </span>
         </a>
 
         <div className={styles.user}>

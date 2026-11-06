@@ -12,7 +12,8 @@
 
 import { Calendar as CalendarIcon } from 'lucide-react';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+
+import { APP_LOGO_URL, APP_NAME } from '../lib/brand';
 
 /** Width preset for the main column. Maps to the global measure tokens. */
 export type PublicPageMeasure = 'content' | 'narrow';
@@ -83,8 +84,7 @@ export default function PublicPageLayout({
   busy = false,
   alignMain = 'flow',
 }: PublicPageLayoutProps): ReactElement {
-  const { t } = useTranslation();
-  const labelledBy = mainLabel ?? t('share.brand');
+  const labelledBy = mainLabel ?? APP_NAME;
   const maxInlineSize = measureToken[measure];
 
   const rootStyle: CSSProperties = {
@@ -157,12 +157,26 @@ export default function PublicPageLayout({
               textDecoration: 'none',
             }}
           >
-            <CalendarIcon
-              size={20}
-              style={{ color: 'var(--nf-color-accent-fg)' }}
-              aria-hidden="true"
-            />
-            {t('share.brand')}
+            {APP_LOGO_URL ? (
+              <img
+                src={APP_LOGO_URL}
+                alt=""
+                style={{
+                  blockSize: 'var(--nf-space-5)',
+                  inlineSize: 'auto',
+                  // nf-token-override: component dimension, not a spacing step
+                  maxInlineSize: '8rem',
+                  objectFit: 'contain',
+                }}
+              />
+            ) : (
+              <CalendarIcon
+                size={20}
+                style={{ color: 'var(--nf-color-accent-fg)' }}
+                aria-hidden="true"
+              />
+            )}
+            {APP_NAME}
           </a>
         </header>
       ) : null}

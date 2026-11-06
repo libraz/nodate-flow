@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "实例统计",
-    "subtitle": "该 nodate-flow 实例的整体运行状况。"
+    "subtitle": "该 {appName} 实例的整体运行状况。"
   },
   "kpi": {
     "users": {

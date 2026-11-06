@@ -19,6 +19,7 @@ import {
 } from '../../../features/admin-stats/api';
 import KpiCard from '../../../features/admin-stats/kpi-card';
 import PlaceholderSection from '../../../features/admin-stats/placeholder-section';
+import { APP_NAME } from '../../../lib/brand';
 
 /**
  * Resolves a locale string suitable for `Intl.DateTimeFormat` from the
@@ -82,7 +83,7 @@ function StatsPage(): ReactElement {
             fontSize: 'var(--nf-text-sm)',
           }}
         >
-          {t('page.subtitle')}
+          {t('page.subtitle', { appName: APP_NAME })}
         </p>
       </header>
 

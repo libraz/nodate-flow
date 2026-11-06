@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
 import { useProjectsQuery } from '../../features/projects/api';
+import { APP_LOGO_URL, APP_NAME } from '../../lib/brand';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import styles from './sidebar.module.css';
 import WorkspaceSwitcher from './workspace-switcher';
@@ -428,7 +429,8 @@ export default function Sidebar(): ReactElement {
         }}
       >
         <div className={styles.brand}>
-          <span className={styles.brandLabel}>nodate-flow</span>
+          {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
+          <span className={styles.brandLabel}>{APP_NAME}</span>
         </div>
         <Collapse open={!collapsed}>
           <div className={styles.workspaceSwitcherSlot}>
