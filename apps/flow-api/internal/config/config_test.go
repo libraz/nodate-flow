@@ -315,3 +315,43 @@ func TestValidateDevModeSkipsGuards(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadRejectsInvalidAppName(t *testing.T) {
+	t.Setenv("NF_DB_DSN", "user:pass@tcp(127.0.0.1:3306)/nodate_flow")
+	t.Setenv("NF_FLOW_WEBHOOKS_INSECURE", "true")
+
+	for name, v := range map[string]string{
+		"LF":       "a\nb",
+		"CR":       "a\rb",
+		"colon":    "a:b",
+		"65 runes": strings.Repeat("a", 65),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("NF_APP_NAME", v)
+			if _, err := Load(); err == nil {
+				t.Fatalf("Load() accepted NF_APP_NAME %q", v)
+			}
+		})
+	}
+
+	t.Run("unset defaults", func(t *testing.T) {
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.AppName != "nodate-flow" {
+			t.Fatalf("AppName = %q, want nodate-flow", cfg.AppName)
+		}
+	})
+
+	t.Run("custom kept", func(t *testing.T) {
+		t.Setenv("NF_APP_NAME", "Acme")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.AppName != "Acme" {
+			t.Fatalf("AppName = %q, want Acme", cfg.AppName)
+		}
+	})
+}

@@ -38,6 +38,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -99,6 +100,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
+	"github.com/libraz/nodate-flow/packages/go-shared/brand"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
 	"github.com/libraz/nodate-flow/packages/go-shared/email"
 	"github.com/libraz/nodate-flow/packages/go-shared/httputil"
@@ -110,6 +112,9 @@ import (
 // route in the API. All fields are required except Cipher and
 // DefaultWorkspaceID.
 type Deps struct {
+	// AppName is the display name published in the OpenAPI title and the
+	// reference page. Empty falls back to brand.DefaultAppName.
+	AppName string
 	// DB is the live database handle. It MUST be non-nil in tests.
 	DB *sql.DB
 	// Queries is a sqlc Queries handle wrapping DB. Callers should pass
@@ -452,6 +457,7 @@ func Build(deps Deps) http.Handler {
 // used. It mirrors cmd/api/main.go so that the integration test harness
 // can exercise the full API surface without duplicating the wiring.
 func BuildResult(deps Deps) Result {
+	appName := brand.NameOrDefault(deps.AppName)
 	// Before any operation is registered: Huma's stock validation
 	// envelope echoes the rejected value back to the caller, which for a
 	// credential-bearing field means answering a refusal with the
@@ -539,6 +545,11 @@ func BuildResult(deps Deps) Result {
 		apis = append(apis, g.api)
 	}
 
+	// Group APIs are built without Deps in reach; stamp the display name here.
+	for _, a := range apis {
+		a.OpenAPI().Info.Title = appName
+	}
+
 	// Every operation is registered by now, so the schema registries are
 	// populated and the write-only members can be read off them.
 	errormodel.LearnWriteOnlyFields(apis)
@@ -551,7 +562,7 @@ func BuildResult(deps Deps) Result {
 	// mux, so the registration below is what decides the answer instead of
 	// leaving it to whichever group happened to be constructed last.
 	merged := mergeOpenAPI(apis)
-	specJSON := marshalOpenAPI(merged)
+	specJSON := marshalOpenAPI(merged, appName)
 	r.Get("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(specJSON) //nolint:errcheck // best-effort write to HTTP client
@@ -559,7 +570,7 @@ func BuildResult(deps Deps) Result {
 	mountSchemasRoute(r, merged)
 	r.Get("/api-reference", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(scalarHTML)) //nolint:errcheck // best-effort write to HTTP client
+		w.Write([]byte(scalarHTML(appName))) //nolint:errcheck // best-effort write to HTTP client
 	})
 
 	return Result{
@@ -851,14 +862,14 @@ func (r *recordingAPI) DocumentOperation(op *huma.Operation) {
 // sub-APIs would point every group at the same registry and panic on
 // duplicate anonymous "ListOutputBody" style schema names.
 func newSubAPI(sub chi.Router) huma.API {
-	return &recordingAPI{API: humachi.New(sub, newAPIConfig(true))}
+	return &recordingAPI{API: humachi.New(sub, newAPIConfig(brand.DefaultAppName, true))}
 }
 
 // newPublicSubAPI is newSubAPI for a group that carries no auth
 // middleware. Its operations are documented without a security
 // requirement, because a bearer changes nothing about what they return.
 func newPublicSubAPI(sub chi.Router) huma.API {
-	return &recordingAPI{API: humachi.New(sub, newAPIConfig(false))}
+	return &recordingAPI{API: humachi.New(sub, newAPIConfig(brand.DefaultAppName, false))}
 }
 
 // bearerSchemeName is the OpenAPI key under which the API's JWT bearer
@@ -881,8 +892,8 @@ const bearerSchemeName = "bearerAuth"
 // group's config instead means the spec follows the middleware: an
 // operation is documented as authenticated exactly when it was
 // registered on a group that authenticates.
-func newAPIConfig(authenticated bool) huma.Config {
-	cfg := huma.DefaultConfig("nodate-flow", "0.0.0")
+func newAPIConfig(appName string, authenticated bool) huma.Config {
+	cfg := huma.DefaultConfig(appName, "0.0.0")
 
 	// Every sub-API is built from this config and mounted on the same mux,
 	// so any path the config carries is registered once per group and the
@@ -2263,10 +2274,14 @@ func (g *embedBudgetGuard) Check(ctx context.Context, workspaceID uint32) error 
 // reference UI from their CDN. data-url is relative so it resolves to the
 // sibling /openapi.json of /api-reference both at the root and under a
 // path prefix.
-const scalarHTML = `<!DOCTYPE html>
+func scalarHTML(appName string) string {
+	return fmt.Sprintf(scalarHTMLTemplate, html.EscapeString(appName))
+}
+
+const scalarHTMLTemplate = `<!DOCTYPE html>
 <html>
 <head>
-  <title>nodate-flow API Reference</title>
+  <title>%s API Reference</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
@@ -2296,13 +2311,14 @@ func mergeOpenAPI(apis []huma.API) *huma.OpenAPI {
 
 // marshalOpenAPI renders the merged document as the bytes /openapi.json
 // serves.
-func marshalOpenAPI(merged *huma.OpenAPI) []byte {
+func marshalOpenAPI(merged *huma.OpenAPI, appName string) []byte {
 	buf, err := json.Marshal(merged)
 	if err != nil {
 		// Should never happen: Huma's OpenAPI types are always
 		// serializable. Fall back to a minimal valid document so
 		// /openapi.json never 500s.
-		return []byte(`{"openapi":"3.1.0","info":{"title":"nodate-flow","version":"0.0.0"},"paths":{}}`)
+		title, _ := json.Marshal(appName)
+		return []byte(`{"openapi":"3.1.0","info":{"title":` + string(title) + `,"version":"0.0.0"},"paths":{}}`)
 	}
 	return buf
 }

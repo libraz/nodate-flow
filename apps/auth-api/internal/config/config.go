@@ -9,12 +9,18 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/libraz/nodate-flow/packages/go-shared/brand"
 )
 
 // Config holds runtime configuration for the auth-api server.
 type Config struct {
 	Port     string `env:"NF_AUTH_PORT" envDefault:"8082"`
 	LogLevel string `env:"NF_AUTH_LOG_LEVEL" envDefault:"info"`
+
+	// AppName is the product name shown in mail subjects and as the TOTP
+	// issuer (NF_APP_NAME); empty means brand.DefaultAppName. Resolved and
+	// validated by Load.
+	AppName string `env:"NF_APP_NAME"`
 
 	// MetricsPort is the port for the internal-only Prometheus metrics
 	// HTTP server. Metrics are served on a separate listener so they are
@@ -233,6 +239,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: NF_AUTH_PUBLIC_URL: %w", err)
 	}
 	cfg.CookiePathPrefix = prefix
+	name, err := brand.ResolveAppName(cfg.AppName)
+	if err != nil {
+		return nil, err
+	}
+	cfg.AppName = name
 	return cfg, nil
 }
 

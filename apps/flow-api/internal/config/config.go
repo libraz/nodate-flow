@@ -9,12 +9,16 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/libraz/nodate-flow/packages/go-shared/brand"
 )
 
 // Config holds runtime configuration for the api server.
 type Config struct {
 	Port     string `env:"NF_FLOW_PORT" envDefault:"8080"`
 	LogLevel string `env:"NF_FLOW_LOG_LEVEL" envDefault:"info"`
+
+	// AppName is the display name (NF_APP_NAME); resolved and validated by Load.
+	AppName string `env:"NF_APP_NAME"`
 
 	// Env selects the runtime environment. "development"/"dev" enables
 	// developer conveniences (ephemeral JWT key fallback, permissive CORS).
@@ -305,6 +309,11 @@ func Load() (*Config, error) {
 	if err := validateEnums(cfg); err != nil {
 		return nil, err
 	}
+	name, err := brand.ResolveAppName(cfg.AppName)
+	if err != nil {
+		return nil, err
+	}
+	cfg.AppName = name
 	return cfg, nil
 }
 
