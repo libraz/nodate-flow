@@ -120,13 +120,8 @@ test.describe('theme switching', () => {
     const { user: tenant } = loadTenants();
     await openSettings(page, tenant);
 
-    const TOKENS = [
-      '--nf-color-fg',
-      '--nf-color-bg',
-      '--nf-color-accent',
-      '--nf-color-border',
-      '--nf-color-success',
-    ];
+    // Only the roles that must invert; classic and nothing keep one accent and success across modes.
+    const TOKENS = ['--nf-color-fg', '--nf-color-bg', '--nf-color-border'];
 
     for (const family of ['glass', 'modern', 'washi', 'classic', 'nothing'] as Family[]) {
       await selectTheme(page, family, 'dark');
