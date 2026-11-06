@@ -181,18 +181,12 @@
   },
   "settings": {
     "title": "Instance Settings",
-    "registration_open": "Registration Open",
-    "registration_open_desc": "Allow new users to register.",
-    "mfa_enforcement": "MFA Enforcement",
-    "mfa_enforcement_desc": "Two-factor authentication policy.",
-    "mfa_none": "None",
-    "mfa_optional": "Optional",
-    "mfa_required": "Required",
-    "max_workspaces_per_user": "Max Workspaces per User",
-    "max_members_per_workspace": "Max Members per Workspace",
-    "unlimited_placeholder": "0 = unlimited",
-    "save": "Save Settings",
-    "saved": "Settings saved successfully."
+    "description": "These settings come from the deployment configuration. To change one, set its environment variable on the server and restart it.",
+    "registration_open": "New user registration",
+    "registration_open_desc": "Whether new users can sign up. Set with NF_REGISTRATION_OPEN.",
+    "registration_state_open": "Open",
+    "registration_state_closed": "Closed",
+    "unavailable": "Could not load the current settings."
   },
   "setup": {
     "title": "Instance Setup",

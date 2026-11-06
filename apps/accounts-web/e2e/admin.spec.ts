@@ -375,7 +375,7 @@ test.describe('admin pages', () => {
   });
 
   test.describe('instance settings', () => {
-    test('renders settings form', async ({ page }) => {
+    test('renders the registration state read-only', async ({ page }) => {
       const { admin } = loadTenants();
       await injectAuth(page.context(), admin);
       await page.goto('admin/settings');
@@ -383,12 +383,16 @@ test.describe('admin pages', () => {
 
       await expect(page.getByRole('heading', { name: /instance settings/i })).toBeVisible();
 
-      // Key settings
-      await expect(page.getByText(/registration open/i)).toBeVisible();
-      await expect(page.getByText(/mfa/i)).toBeVisible();
+      // Registration state row
+      await expect(page.getByText('New user registration')).toBeVisible();
+      await expect(page.getByText(/^(Open|Closed)$/)).toBeVisible();
 
-      // Save button
-      await expect(page.getByRole('button', { name: /save/i })).toBeVisible();
+      // Read-only: no save button, no form controls
+      const main = page.getByRole('main');
+      await expect(page.getByRole('button', { name: /save/i })).toHaveCount(0);
+      await expect(main.getByRole('textbox')).toHaveCount(0);
+      await expect(main.getByRole('combobox')).toHaveCount(0);
+      await expect(main.getByRole('spinbutton')).toHaveCount(0);
     });
 
     test('no i18n keys exposed', async ({ page }) => {

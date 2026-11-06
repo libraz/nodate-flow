@@ -1,21 +1,37 @@
 /*
- * Instance settings form. A settings form reads down one column; stretched
- * across the admin content width its selects and number fields lose their
- * relation to the labels above them.
+ * Read-only instance settings. One column, capped so the term, value and
+ * helper text stay visually related at wide admin content widths.
  */
 
-.form {
+.description {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.panel {
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 36rem;
+  margin: 0;
+  padding: var(--nf-space-4);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
 }
 
-.number {
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 12rem;
-  font-variant-numeric: tabular-nums;
+.term {
+  font-weight: 600;
 }
 
-/* Placeholder sized to a label above a control. */
-.fieldSkeleton {
+.value {
+  margin: 0;
+  margin-block-start: var(--nf-space-1);
+}
+
+.help {
+  margin: 0;
+  margin-block-start: var(--nf-space-1);
+  color: var(--nf-color-fg-muted);
+}
+
+.rowSkeleton {
   block-size: var(--nf-space-12);
 }

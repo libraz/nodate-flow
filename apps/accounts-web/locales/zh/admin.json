@@ -181,18 +181,12 @@
   },
   "settings": {
     "title": "实例设置",
-    "registration_open": "开放注册",
-    "registration_open_desc": "允许新用户注册。",
-    "mfa_enforcement": "MFA 策略",
-    "mfa_enforcement_desc": "两步验证策略。",
-    "mfa_none": "无",
-    "mfa_optional": "可选",
-    "mfa_required": "必需",
-    "max_workspaces_per_user": "每位用户的最大工作区数",
-    "max_members_per_workspace": "每个工作区的最大成员数",
-    "unlimited_placeholder": "0 表示不限",
-    "save": "保存设置",
-    "saved": "设置已保存。"
+    "description": "这些设置来自部署配置。如需更改，请在服务器上设置对应的环境变量并重启服务器。",
+    "registration_open": "新用户注册",
+    "registration_open_desc": "是否允许新用户注册。通过 NF_REGISTRATION_OPEN 设置。",
+    "registration_state_open": "开放",
+    "registration_state_closed": "关闭",
+    "unavailable": "无法加载当前设置。"
   },
   "setup": {
     "title": "实例初始化",

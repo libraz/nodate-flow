@@ -181,18 +181,12 @@
   },
   "settings": {
     "title": "インスタンス設定",
-    "registration_open": "登録受付",
-    "registration_open_desc": "新規ユーザーの登録を許可します。",
-    "mfa_enforcement": "MFAポリシー",
-    "mfa_enforcement_desc": "二要素認証のポリシー。",
-    "mfa_none": "なし",
-    "mfa_optional": "任意",
-    "mfa_required": "必須",
-    "max_workspaces_per_user": "ユーザーあたりの最大ワークスペース数",
-    "max_members_per_workspace": "ワークスペースあたりの最大メンバー数",
-    "unlimited_placeholder": "0 で無制限",
-    "save": "設定を保存",
-    "saved": "設定を保存しました。"
+    "description": "これらの設定はデプロイ構成から読み込まれます。変更するには、サーバーで該当する環境変数を設定し、サーバーを再起動してください。",
+    "registration_open": "新規ユーザー登録",
+    "registration_open_desc": "新規ユーザーがサインアップできるかどうか。NF_REGISTRATION_OPEN で設定します。",
+    "registration_state_open": "受付中",
+    "registration_state_closed": "停止中",
+    "unavailable": "現在の設定を読み込めませんでした。"
   },
   "setup": {
     "title": "インスタンスセットアップ",
