@@ -7,7 +7,7 @@
 reject:
   # 3.14.21 and later render no rows under jsdom: the flow-web test
   # task-spreadsheet-edit-identity finds none of its cells (3.14.20 passes;
-  # 3.14.21, 3.14.22 and 3.14.23 fail). Pinned exactly at 3.14.20 in the
+  # 3.14.21 through 3.14.26 fail). Pinned exactly at 3.14.20 in the
   # package.json files that declare it until the test setup is adapted.
   - "@tanstack/react-virtual"
 
