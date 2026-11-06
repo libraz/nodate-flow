@@ -12,7 +12,8 @@ import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import PageFrame from '../../components/page-frame';
+import PageHeader from '../../components/page-header';
 import { formatEpoch } from '../../lib/format';
 import { useWorkspacesQuery, type Workspace } from './api';
 import WorkspaceCreateDialog from './workspace-create-dialog';
@@ -72,13 +73,15 @@ export default function WorkspaceList(): ReactElement {
   ];
 
   return (
-    <section className={styles.page}>
-      <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{t('workspaces.title')}</h1>
-        <Button variant="primary" onClick={handleCreate}>
-          {t('workspaces.new')}
-        </Button>
-      </header>
+    <PageFrame>
+      <PageHeader
+        title={t('workspaces.title')}
+        actions={
+          <Button variant="primary" onClick={handleCreate}>
+            {t('workspaces.new')}
+          </Button>
+        }
+      />
 
       <DataGrid<Workspace>
         aria-label={t('workspaces.title')}
@@ -105,6 +108,6 @@ export default function WorkspaceList(): ReactElement {
           setCreateOpen(false);
         }}
       />
-    </section>
+    </PageFrame>
   );
 }

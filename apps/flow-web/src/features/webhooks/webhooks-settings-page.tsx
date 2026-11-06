@@ -47,6 +47,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { MoreHorizontal } from 'lucide-react';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import CopyButton from '../settings/copy-button';
@@ -739,15 +740,15 @@ export default function WebhooksSettingsPage(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('settings.webhooks.title')}</h1>
-          <p className={ui.lede}>{t('settings.webhooks.description')}</p>
-        </div>
-        <Button type="button" variant="primary" onClick={openCreate}>
-          {t('settings.webhooks.new')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('settings.webhooks.title')}
+        description={t('settings.webhooks.description')}
+        actions={
+          <Button type="button" variant="primary" onClick={openCreate}>
+            {t('settings.webhooks.new')}
+          </Button>
+        }
+      />
 
       {webhooksQuery.isPending ? (
         <div className={ui.skeletonStack} aria-hidden="true">

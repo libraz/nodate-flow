@@ -12,6 +12,7 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../../components/page-header';
 import styles from './archived.module.css';
 import { formatTimeAgo } from './relative-time';
 
@@ -35,20 +36,21 @@ export default function ArchivedHeader({
   const { t } = useTranslation('archive');
   const ago = formatTimeAgo(lastArchivedAt, locale);
   return (
-    <header className={styles.header}>
-      <h1 id="archive-title" className={styles.title}>
-        {t('page.title')}
-      </h1>
-      <p className={styles.subtitle}>{t('page.subtitle')}</p>
-      {ago ? (
-        <p className={styles.countLine} aria-live="polite">
-          {t('page.countWithLast', { count, ago })}
-        </p>
-      ) : (
-        <p className={styles.countLine} aria-live="polite">
-          {t('page.countWithLast', { count, ago: '—' })}
-        </p>
-      )}
-    </header>
+    <PageHeader
+      titleId="archive-title"
+      title={t('page.title')}
+      description={t('page.subtitle')}
+      actions={
+        ago ? (
+          <p className={styles.countLine} aria-live="polite">
+            {t('page.countWithLast', { count, ago })}
+          </p>
+        ) : (
+          <p className={styles.countLine} aria-live="polite">
+            {t('page.countWithLast', { count, ago: '—' })}
+          </p>
+        )
+      }
+    />
   );
 }

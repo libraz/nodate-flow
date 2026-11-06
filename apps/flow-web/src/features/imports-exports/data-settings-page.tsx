@@ -45,6 +45,7 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import { ApiError, formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type Project, useProjectsQuery } from '../projects/api';
@@ -652,12 +653,7 @@ export default function DataSettingsPage(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('settings.data.title')}</h1>
-          <p className={ui.lede}>{t('settings.data.description')}</p>
-        </div>
-      </header>
+      <PageHeader title={t('settings.data.title')} description={t('settings.data.description')} />
       <ExportsCard workspaceId={id} />
       <ImportsCard workspaceId={id} />
     </div>

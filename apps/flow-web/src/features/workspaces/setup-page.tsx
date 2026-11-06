@@ -110,8 +110,7 @@ export default function SetupPage(): ReactElement {
           <h1
             style={{
               margin: 0,
-              fontFamily: 'var(--nf-font-display)',
-              fontWeight: 500,
+              fontWeight: 'var(--nf-weight-semibold)',
               fontSize: 'var(--nf-text-section-title)',
               lineHeight: 1.15,
               letterSpacing: '-0.01em',

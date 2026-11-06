@@ -17,13 +17,13 @@ import { type ReactElement, Suspense } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../components/page-header';
 import styles from '../features/ai-metrics/ai-metrics.module.css';
 import { type AiMetricsWindow, coerceWindowDays, DEFAULT_WINDOW } from '../features/ai-metrics/api';
 import MetricsDashboard from '../features/ai-metrics/metrics-dashboard';
 import MetricsError from '../features/ai-metrics/metrics-error';
 import MetricsSkeleton from '../features/ai-metrics/metrics-skeleton';
 import WindowSelector from '../features/ai-metrics/window-selector';
-import ui from '../features/settings/settings-ui.module.css';
 import AccessRestricted from '../features/workspaces/access-restricted';
 import { ApiError } from '../lib/api-error';
 
@@ -61,12 +61,7 @@ function AiMetricsRoute(): ReactElement {
 
   return (
     <section className={styles.root}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('page.title')}</h1>
-          <p className={ui.lede}>{t('page.description')}</p>
-        </div>
-      </header>
+      <PageHeader title={t('page.title')} description={t('page.description')} />
       <WindowSelector value={windowDays} onChange={handleWindowChange} />
       <ErrorBoundary FallbackComponent={MetricsErrorFallback} resetKeys={[windowDays]}>
         <Suspense fallback={<MetricsSkeleton />}>

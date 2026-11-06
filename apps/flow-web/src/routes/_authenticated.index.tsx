@@ -27,6 +27,8 @@ import {
 import { type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
+import PageFrame from '../components/page-frame';
+import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import { useWorkspacesQuery } from '../features/workspaces/api';
@@ -258,11 +260,8 @@ function HomePage(): ReactElement {
   };
 
   return (
-    <section className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.greeting}>{greeting}</h1>
-        <p className={styles.tagline}>{t('landing.tagline')}</p>
-      </header>
+    <PageFrame>
+      <PageHeader title={greeting} description={t('landing.tagline')} />
 
       <div className={styles.quickActions}>
         <button
@@ -297,7 +296,7 @@ function HomePage(): ReactElement {
       <Suspense fallback={<Skeleton className={styles.dashboardSkeleton} />}>
         <HomeDashboard />
       </Suspense>
-    </section>
+    </PageFrame>
   );
 }
 

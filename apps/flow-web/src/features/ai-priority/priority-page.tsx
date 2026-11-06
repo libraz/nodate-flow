@@ -39,6 +39,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { type TaskPriority, useUpdateTask } from '../tasks/api';
 import { aiPriorityKeys, type PrioritySuggestion, useAiPrioritySuggestionsQuery } from './api';
@@ -274,36 +275,38 @@ function PriorityImpl(): ReactElement {
 
   return (
     <section className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('page.title')}</h1>
-        <p className={styles.subtitle}>{t('page.subtitle', { shown, total: totalEvaluated })}</p>
-        <div className={styles.kpiRow}>
-          <span className={styles.kpi}>
-            <span className={styles.kpiValue}>{shown}</span>
-            <span className={styles.kpiLabel}>{t('kpi.suggestions')}</span>
-          </span>
-          <span className={styles.kpiSeparator} aria-hidden>
-            /
-          </span>
-          <span className={styles.kpi}>
-            <span className={styles.kpiValue}>{totalEvaluated}</span>
-            <span className={styles.kpiLabel}>{t('kpi.evaluated')}</span>
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              void refetch();
-            }}
-            disabled={isFetching}
-            aria-busy={isFetching || undefined}
-            className={styles.refreshButton}
-          >
-            {t('action.refresh')}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={t('page.title')}
+        description={t('page.subtitle', { shown, total: totalEvaluated })}
+        actions={
+          <div className={styles.kpiRow}>
+            <span className={styles.kpi}>
+              <span className={styles.kpiValue}>{shown}</span>
+              <span className={styles.kpiLabel}>{t('kpi.suggestions')}</span>
+            </span>
+            <span className={styles.kpiSeparator} aria-hidden>
+              /
+            </span>
+            <span className={styles.kpi}>
+              <span className={styles.kpiValue}>{totalEvaluated}</span>
+              <span className={styles.kpiLabel}>{t('kpi.evaluated')}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                void refetch();
+              }}
+              disabled={isFetching}
+              aria-busy={isFetching || undefined}
+              className={styles.refreshButton}
+            >
+              {t('action.refresh')}
+            </Button>
+          </div>
+        }
+      />
       {content}
     </section>
   );

@@ -12,6 +12,7 @@ import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
@@ -68,15 +69,15 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('workspace.mcp_tokens.title')}</h1>
-          <p className={ui.lede}>{t('workspace.mcp_tokens.description')}</p>
-        </div>
-        <Button type="button" variant="primary" onClick={openCreate}>
-          {t('workspace.mcp_tokens.create')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('workspace.mcp_tokens.title')}
+        description={t('workspace.mcp_tokens.description')}
+        actions={
+          <Button type="button" variant="primary" onClick={openCreate}>
+            {t('workspace.mcp_tokens.create')}
+          </Button>
+        }
+      />
 
       {tokens.length === 0 ? (
         <EmptyState

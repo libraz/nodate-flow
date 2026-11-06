@@ -6,27 +6,8 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-5);
+  gap: var(--nf-space-6);
   inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display, inherit);
-  font-size: var(--nf-text-subsection-title);
-  color: var(--nf-color-fg);
-}
-
-.subtitle {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
 }
 
 .count {

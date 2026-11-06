@@ -3,8 +3,8 @@
  *
  * All visual values resolve from design tokens (`--nf-color-*`,
  * `--nf-space-*`, `--nf-radius-*`, `--nf-shadow-*`, `--nf-text-*`,
- * `--nf-cal-*`). Avoid hardcoded colors here so the four-theme
- * switcher keeps working.
+ * `--nf-cal-*`). Avoid hardcoded colors here so theme switching keeps
+ * working.
  */
 
 .section {
@@ -12,33 +12,7 @@
      whatever height the chrome above it leaves (see `.layoutFill`). A
      minimum rather than a size: once the cells hit their floor the page
      grows and <main> scrolls. */
-  box-sizing: border-box;
   min-block-size: 100%;
-  padding: var(--nf-space-page);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-6);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: min(120rem, 100%);
-  margin-inline: auto;
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
 }
 
 .toolbar {

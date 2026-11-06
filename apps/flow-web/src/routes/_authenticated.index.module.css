@@ -1,46 +1,5 @@
 /* Authenticated home — greeting, quick actions, task summary, workspaces, widgets. */
 
-.page {
-  min-block-size: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-8);
-  padding-block: var(--nf-space-8);
-  /* nf-token-override: upper bound of a fluid range; the gutter stops widening here so the dashboard columns keep their measure */
-  padding-inline: clamp(var(--nf-space-6), 6vw, 3.5rem);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 72rem;
-  margin-inline: auto;
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.greeting {
-  font-family: var(--nf-font-display);
-  font-optical-sizing: auto;
-  font-weight: var(--nf-weight-regular);
-  /* nf-token-override: the dashboard greeting is the one heading set in the display face, sized as a fluid range rather than against the page-title step */
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  line-height: var(--nf-leading-tight);
-  letter-spacing: -0.02em;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--nf-color-fg);
-}
-
-.tagline {
-  font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-micro);
-  letter-spacing: 0.18em;
-  color: var(--nf-color-fg-muted);
-  margin: 0;
-}
-
 .sectionTitle {
   margin: 0 0 var(--nf-space-3);
   font-size: var(--nf-text-supporting);

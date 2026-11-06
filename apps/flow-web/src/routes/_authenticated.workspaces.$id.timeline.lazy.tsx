@@ -6,6 +6,7 @@ import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../components/page-header';
 import TimelineSkeleton from '../features/timeline/timeline-skeleton';
 import TimelineView from '../features/timeline/timeline-view';
 
@@ -15,12 +16,8 @@ function WorkspaceTimelineRoute(): ReactElement {
   const { id } = routeApi.useParams();
   const { t: tTimeline } = useTranslation('timeline');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <header>
-        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)', color: 'var(--nf-color-fg)' }}>
-          {tTimeline('view.title')}
-        </h1>
-      </header>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
+      <PageHeader title={tTimeline('view.title')} />
       <Suspense fallback={<TimelineSkeleton />}>
         <TimelineView scope={{ kind: 'workspace', id }} />
       </Suspense>

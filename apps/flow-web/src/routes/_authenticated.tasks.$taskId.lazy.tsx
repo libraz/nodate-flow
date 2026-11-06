@@ -34,6 +34,7 @@ import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
 import { X } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageFrame from '../components/page-frame';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
@@ -228,10 +229,14 @@ function TitleEditor({
   const update = useUpdateTask();
   const errorId = useId();
 
+  // Same type as PageHeader's title; the heading sits inline with its edit controls.
   const headingStyle = {
     margin: 0,
     fontFamily: 'var(--nf-font-display)',
     fontSize: 'var(--nf-text-page-title)',
+    fontWeight: 'var(--nf-weight-semibold)',
+    letterSpacing: '-0.01em',
+    lineHeight: 'var(--nf-leading-tight)',
   } as const;
 
   /**
@@ -940,7 +945,7 @@ function Sidebar({
                 width: '0.5rem',
                 // nf-token-override: component dimension, not a spacing step
                 height: '0.5rem',
-                // nf-token-override: the corner of an 8px priority dot. At --nf-radius-xs the glass themes would round it into a circle and aurora would leave it square, and the shape is what distinguishes it from the status dots beside it
+                // nf-token-override: a fixed corner for an 8px priority dot; --nf-radius-xs varies per theme, and the shape is what distinguishes it from the status dots beside it
                 borderRadius: '0.125rem',
                 background: PRIORITY_COLOR[priority],
               }}
@@ -1347,7 +1352,6 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
     <section
       className={css.panel}
       style={{
-        padding: 'var(--nf-space-page)',
         display: 'grid',
         gridTemplateColumns: isNarrow ? '1fr' : 'minmax(0, 1fr) minmax(16rem, 22rem)',
         gap: 'var(--nf-space-6)',
@@ -1427,28 +1431,30 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
 function TaskDetailRoute(): ReactElement {
   const { taskId } = routeApi.useParams();
   return (
-    <Suspense
-      fallback={
-        <div className={css.fallback}>
-          <div className={css.fallbackColumn}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '1rem', inlineSize: '12rem' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '2.25rem', inlineSize: '60%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '10rem', inlineSize: '100%' }} />
+    <PageFrame>
+      <Suspense
+        fallback={
+          <div className={css.fallback}>
+            <div className={css.fallbackColumn}>
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+              <Skeleton style={{ blockSize: '1rem', inlineSize: '12rem' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+              <Skeleton style={{ blockSize: '2.25rem', inlineSize: '60%' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+              <Skeleton style={{ blockSize: '10rem', inlineSize: '100%' }} />
+            </div>
+            <div className={css.fallbackColumn}>
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+              <Skeleton style={{ blockSize: '14rem', inlineSize: '100%' }} />
+              {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+              <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
+            </div>
           </div>
-          <div className={css.fallbackColumn}>
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '14rem', inlineSize: '100%' }} />
-            {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-            <Skeleton style={{ blockSize: '6rem', inlineSize: '100%' }} />
-          </div>
-        </div>
-      }
-    >
-      <TaskDetailPanel id={taskId} />
-    </Suspense>
+        }
+      >
+        <TaskDetailPanel id={taskId} />
+      </Suspense>
+    </PageFrame>
   );
 }
 

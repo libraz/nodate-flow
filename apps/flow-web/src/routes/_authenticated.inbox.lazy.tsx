@@ -16,6 +16,8 @@ import { createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageFrame from '../components/page-frame';
+import PageHeader from '../components/page-header';
 import InboxList from '../features/inbox/inbox-list';
 import IntakeList from '../features/inbox/intake/intake-list';
 import styles from './_authenticated.inbox.module.css';
@@ -33,11 +35,8 @@ function InboxRoute(): ReactElement {
   );
 
   return (
-    <section className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('view.title')}</h1>
-        <p className={styles.subtitle}>{t('view.subtitle')}</p>
-      </header>
+    <PageFrame>
+      <PageHeader title={t('view.title')} description={t('view.subtitle')} />
       <Tabs
         aria-label={t('view.title')}
         defaultValue="inbox"
@@ -54,7 +53,7 @@ function InboxRoute(): ReactElement {
           },
         ]}
       />
-    </section>
+    </PageFrame>
   );
 }
 

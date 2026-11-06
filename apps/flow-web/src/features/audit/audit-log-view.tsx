@@ -15,6 +15,7 @@ import Select from '@nodate-flow/ui/primitives/select';
 import { type ChangeEvent, type ReactElement, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import { formatDate, formatEpochDateTime } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
 import ui from '../settings/settings-ui.module.css';
@@ -348,15 +349,15 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('audit_log.title')}</h1>
-          <p className={ui.lede}>{t('audit_log.description')}</p>
-        </div>
-        <Button variant="default" onClick={handleExport} disabled={data.entries.length === 0}>
-          {t('audit_log.export_csv')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('audit_log.title')}
+        description={t('audit_log.description')}
+        actions={
+          <Button variant="default" onClick={handleExport} disabled={data.entries.length === 0}>
+            {t('audit_log.export_csv')}
+          </Button>
+        }
+      />
 
       <div className={styles.filters}>
         <div className={styles.filter}>

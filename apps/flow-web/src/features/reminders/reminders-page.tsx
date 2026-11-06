@@ -38,6 +38,7 @@ import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { type CSSProperties, type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { type TaskReminder, useRemindersQuery } from './api';
 import styles from './reminders-page.module.css';
 
@@ -243,13 +244,15 @@ export default function RemindersPage(): ReactElement {
 
   return (
     <section className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('reminders.page_title')}</h1>
-        <p className={styles.subtitle}>{t('reminders.page_subtitle')}</p>
-        <p className={styles.count}>
-          {remindersQuery.isPending ? null : t('reminders.count', { count: total })}
-        </p>
-      </div>
+      <PageHeader
+        title={t('reminders.page_title')}
+        description={t('reminders.page_subtitle')}
+        actions={
+          <p className={styles.count}>
+            {remindersQuery.isPending ? null : t('reminders.count', { count: total })}
+          </p>
+        }
+      />
       {remindersQuery.isPending ? (
         <RemindersSkeleton />
       ) : remindersQuery.isError ? (

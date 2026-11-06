@@ -1,33 +1,5 @@
 /* /today — cross-workspace focus list grouped by due date. */
 
-.page {
-  padding: var(--nf-space-page);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-6);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 60rem;
-  margin-inline: auto;
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-}
-
 .empty {
   border: var(--nf-space-px) dashed var(--nf-color-border);
   border-radius: var(--nf-radius-lg);

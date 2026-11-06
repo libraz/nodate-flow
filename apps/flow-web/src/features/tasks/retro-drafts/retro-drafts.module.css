@@ -14,31 +14,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
-  padding-block: var(--nf-space-6);
-  padding-inline: var(--nf-space-6);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 56rem;
-  margin-inline: auto;
-  inline-size: 100%;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.title {
-  font-size: var(--nf-text-2xl);
-  font-weight: var(--nf-weight-semibold);
-  color: var(--nf-color-fg);
-  margin: 0;
-}
-
-.subtitle {
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-  margin: 0;
 }
 
 .list {

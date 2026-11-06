@@ -31,6 +31,7 @@ import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import PageFrame from '../components/page-frame';
 import { useWorkspaceQuery } from '../features/workspaces/api';
 import WorkspaceDetail, { type WorkspaceDetailTab } from '../features/workspaces/workspace-detail';
 import styles from '../features/workspaces/workspaces.module.css';
@@ -131,19 +132,12 @@ function WorkspaceDetailRoute(): ReactElement {
     return (
       <Suspense
         fallback={
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-4)',
-              padding: 'var(--nf-space-6)',
-            }}
-          >
+          <PageFrame>
             {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '2rem', inlineSize: '16rem' }} />
             {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
             <Skeleton style={{ blockSize: '12rem', inlineSize: '100%' }} />
-          </div>
+          </PageFrame>
         }
       >
         <Outlet />
@@ -152,26 +146,8 @@ function WorkspaceDetailRoute(): ReactElement {
   }
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-        padding: 'var(--nf-space-page)',
-      }}
-    >
-      {hasChildRoute ? (
-        <p
-          style={{
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-section-title)',
-            margin: 0,
-            color: 'var(--nf-color-fg)',
-          }}
-        >
-          {workspace.name}
-        </p>
-      ) : null}
+    <PageFrame>
+      {hasChildRoute ? <p className={styles.workspaceContext}>{workspace.name}</p> : null}
       <nav aria-label={t('workspaces.nav.label')} className={styles.subNav}>
         {SUB_NAV.map((item) => (
           <Link
@@ -214,7 +190,7 @@ function WorkspaceDetailRoute(): ReactElement {
           />
         )}
       </Suspense>
-    </section>
+    </PageFrame>
   );
 }
 

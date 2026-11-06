@@ -1,44 +1,12 @@
 /**
  * Timeboxes page styles. Token-only colors / spacing, logical
- * properties throughout. The page mirrors the reminders / settings
- * pages in container framing and section grouping.
+ * properties throughout. The page sits inside the workspace page frame.
  */
 
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
-  padding: var(--nf-space-page);
-  block-size: 100%;
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--nf-space-4);
-  flex-wrap: wrap;
-}
-
-.headerText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-  min-inline-size: 0;
-  flex: 1 1 auto;
-}
-
-.title {
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-  margin: 0;
-  color: var(--nf-color-fg);
-}
-
-.subtitle {
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
-  margin: 0;
 }
 
 /* Section heading + collapsible archive */

@@ -9,6 +9,7 @@ import { createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import { useAuthCapabilitiesQuery } from '../features/settings/api';
 import PasswordPanel from '../features/settings/password-panel';
@@ -28,9 +29,7 @@ function SecurityRoute(): ReactElement {
   const totpManagement = capabilities.data?.totp === true && hasPassword;
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <h1 className={ui.title}>{t('security.title')}</h1>
-      </header>
+      <PageHeader title={t('security.title')} />
 
       {capabilities.isError && (
         <ErrorFallback

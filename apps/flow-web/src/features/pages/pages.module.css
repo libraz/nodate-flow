@@ -6,7 +6,7 @@
 
 .layout {
   display: flex;
-  block-size: 100%;
+  flex: 1;
   min-block-size: 0;
 }
 
@@ -22,7 +22,8 @@
   max-inline-size: 20rem;
   border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
   padding-block: var(--nf-space-4);
-  padding-inline: var(--nf-space-3);
+  /* Flush with the frame edge so the tree aligns under the page title. */
+  padding-inline: 0 var(--nf-space-3);
   overflow-y: auto;
 }
 
@@ -30,7 +31,7 @@
   flex: 1;
   min-inline-size: 0;
   overflow-y: auto;
-  padding: var(--nf-space-page);
+  padding-inline-start: var(--nf-space-6);
   animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
@@ -197,9 +198,10 @@
 .detailTitle {
   min-inline-size: 0;
   overflow-wrap: anywhere;
-  font-family: var(--nf-font-display);
   font-size: var(--nf-text-section-title);
-  font-weight: var(--nf-weight-bold);
+  font-weight: var(--nf-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: var(--nf-leading-tight);
   margin: 0;
   color: var(--nf-color-fg);
 }
@@ -416,8 +418,8 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
-  padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-3);
+  padding-block-end: var(--nf-space-2);
+  padding-inline: 0 var(--nf-space-3);
 }
 
 .searchInput {
@@ -448,23 +450,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-4);
+  flex: 1;
+  min-block-size: 0;
+}
+
+/* Fills <main> so the tree and the content pane scroll independently. */
+.frame {
   block-size: 100%;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--nf-space-4);
-  padding-block-end: var(--nf-space-4);
-  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
-}
-
-.title {
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-  margin: 0;
-  color: var(--nf-color-fg);
 }
 
 /* ---------------------------------------------------------------------------
@@ -511,7 +503,7 @@
 }
 
 .searchResultsWrap {
-  padding-inline: var(--nf-space-3);
+  padding-inline: 0 var(--nf-space-3);
 }
 
 .searchSkeleton {

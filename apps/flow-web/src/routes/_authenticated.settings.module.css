@@ -1,5 +1,6 @@
 /*
- * Layout for /settings and /workspaces/$id/settings: a desktop two-column
+ * Layout for /settings and /workspaces/$id/settings, inside the page frame
+ * of the enclosing route: a desktop two-column
  * shell (sub-nav + outlet) that collapses into a horizontally scrollable
  * tab strip stacked above the form on viewports < 768px. The mobile
  * breakpoint matches the convention used elsewhere in the app (see
@@ -10,11 +11,6 @@
   display: grid;
   grid-template-columns: 14rem minmax(0, 1fr);
   gap: var(--nf-space-8);
-  padding: var(--nf-space-page);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 72rem;
-  margin-inline: auto;
-  inline-size: 100%;
 }
 
 .nav {

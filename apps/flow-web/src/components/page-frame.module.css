@@ -1,0 +1,58 @@
+/* Shared frame and header for authenticated top-level pages. */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+  padding: var(--nf-space-page);
+  inline-size: 100%;
+  min-inline-size: 0;
+  box-sizing: border-box;
+}
+
+.standard {
+  max-inline-size: var(--nf-measure-page);
+  margin-inline: auto;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-3) var(--nf-space-4);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  /* nf-token-override: basis at which actions wrap under the title, not a spacing step */
+  flex: 1 1 20rem;
+  min-inline-size: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-page-title);
+  font-weight: var(--nf-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: var(--nf-leading-tight);
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+}

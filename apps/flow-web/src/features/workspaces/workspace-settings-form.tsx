@@ -26,6 +26,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -351,12 +352,10 @@ export default function WorkspaceSettingsForm({
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('workspace.general.title')}</h1>
-          <p className={ui.lede}>{t('workspace.general.description')}</p>
-        </div>
-      </header>
+      <PageHeader
+        title={t('workspace.general.title')}
+        description={t('workspace.general.description')}
+      />
 
       <form
         onSubmit={(e) => {

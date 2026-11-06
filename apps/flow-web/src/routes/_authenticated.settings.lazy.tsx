@@ -10,6 +10,7 @@ import { createLazyFileRoute, Link, Outlet, useRouterState } from '@tanstack/rea
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageFrame from '../components/page-frame';
 import styles from './_authenticated.settings.module.css';
 
 interface SubNavItem {
@@ -48,23 +49,25 @@ function SettingsLayout(): ReactElement {
   };
 
   return (
-    <section className={styles.layout}>
-      <nav aria-label={t('settings_sections_label')} className={styles.nav}>
-        {SUB_NAV.map((item) => (
-          <Link
-            key={item.key}
-            to={item.to}
-            className={styles.link}
-            activeProps={{ 'aria-current': 'page' }}
-          >
-            {t(labelKeyFor(item.key))}
-          </Link>
-        ))}
-      </nav>
-      <div key={pathname} className={styles.outlet}>
-        <Outlet />
-      </div>
-    </section>
+    <PageFrame>
+      <section className={styles.layout}>
+        <nav aria-label={t('settings_sections_label')} className={styles.nav}>
+          {SUB_NAV.map((item) => (
+            <Link
+              key={item.key}
+              to={item.to}
+              className={styles.link}
+              activeProps={{ 'aria-current': 'page' }}
+            >
+              {t(labelKeyFor(item.key))}
+            </Link>
+          ))}
+        </nav>
+        <div key={pathname} className={styles.outlet}>
+          <Outlet />
+        </div>
+      </section>
+    </PageFrame>
   );
 }
 

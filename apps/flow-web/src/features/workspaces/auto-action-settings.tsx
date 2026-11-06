@@ -20,6 +20,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
@@ -103,12 +104,10 @@ export default function AutoActionSettingsPage({
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('workspace.auto_actions.title')}</h1>
-          <p className={ui.lede}>{t('workspace.auto_actions.description')}</p>
-        </div>
-      </header>
+      <PageHeader
+        title={t('workspace.auto_actions.title')}
+        description={t('workspace.auto_actions.description')}
+      />
 
       <form
         onSubmit={(e) => {

@@ -25,6 +25,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../components/page-header';
 import {
   AGENT_SCHEDULE_KINDS,
   type AgentScheduleKind,
@@ -483,17 +484,17 @@ function AiAgentsRoute(): ReactElement {
   };
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('agents.title')}</h1>
-          <p className={ui.lede}>{t('agents.subtitle')}</p>
-        </div>
-        {creating ? null : (
-          <Button type="button" variant="primary" onClick={openCreate}>
-            {t('agents.create.open')}
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        title={t('agents.title')}
+        description={t('agents.subtitle')}
+        actions={
+          creating ? null : (
+            <Button type="button" variant="primary" onClick={openCreate}>
+              {t('agents.create.open')}
+            </Button>
+          )
+        }
+      />
       {creating ? (
         <Suspense fallback={<Skeleton className={styles.skeletonForm} />}>
           <CreateAgentForm

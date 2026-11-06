@@ -11,6 +11,7 @@ import { createLazyFileRoute, useRouter } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../components/page-header';
 import IntegrationsPanel from '../features/settings/integrations-panel';
 import panelStyles from '../features/settings/integrations-panel.module.css';
 import ui from '../features/settings/settings-ui.module.css';
@@ -49,9 +50,7 @@ function IntegrationsRoute(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <h1 className={ui.title}>{t('integrations.title')}</h1>
-      </header>
+      <PageHeader title={t('integrations.title')} />
       <Suspense
         fallback={
           <div className={ui.skeletonStack} aria-hidden="true">

@@ -12,6 +12,7 @@ import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import type { CSSProperties, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { formatEpochDateTime } from '../../lib/format';
 import ui from '../settings/settings-ui.module.css';
 import { type AiInvocation, useAiInvocationsQuery } from './invocations-api';
@@ -54,12 +55,7 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
   const staggerFor = useFirstLoadStagger();
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('ai_activity.title')}</h1>
-          <p className={ui.lede}>{t('ai_activity.description')}</p>
-        </div>
-      </header>
+      <PageHeader title={t('ai_activity.title')} description={t('ai_activity.description')} />
       {data.length === 0 ? (
         <EmptyState titleAs="p" title={t('ai_activity.empty')} className={ui.empty} />
       ) : (

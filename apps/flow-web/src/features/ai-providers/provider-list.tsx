@@ -11,6 +11,7 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import ui from '../settings/settings-ui.module.css';
@@ -102,15 +103,15 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
 
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('providers.title')}</h1>
-          <p className={ui.lede}>{t('providers.write_only_notice')}</p>
-        </div>
-        <Button variant="primary" disabled={isError} onClick={openAdd}>
-          {t('providers.add')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('providers.title')}
+        description={t('providers.write_only_notice')}
+        actions={
+          <Button variant="primary" disabled={isError} onClick={openAdd}>
+            {t('providers.add')}
+          </Button>
+        }
+      />
 
       {isError ? (
         <EmptyState

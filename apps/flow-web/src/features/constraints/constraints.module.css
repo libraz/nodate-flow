@@ -50,7 +50,6 @@
 }
 
 .caption {
-  font-family: var(--nf-font-display);
   font-size: var(--nf-text-base);
   font-weight: var(--nf-weight-semibold);
   margin-block-end: var(--nf-space-3);

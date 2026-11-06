@@ -22,6 +22,8 @@ import { CheckCircle } from 'lucide-react';
 import { type CSSProperties, type ReactElement, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
+import PageFrame from '../components/page-frame';
+import PageHeader from '../components/page-header';
 import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
 import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
 import { apiRequest } from '../lib/api';
@@ -124,11 +126,8 @@ function TodayRoute(): ReactElement {
   const totalCount = SECTION_ORDER.reduce((sum, k) => sum + sections[k].length, 0);
 
   return (
-    <section className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('today.title')}</h1>
-        <p className={styles.subtitle}>{t('today.subtitle')}</p>
-      </header>
+    <PageFrame>
+      <PageHeader title={t('today.title')} description={t('today.subtitle')} />
 
       {totalCount === 0 ? (
         <EmptyState
@@ -201,7 +200,7 @@ function TodayRoute(): ReactElement {
           </section>
         );
       })}
-    </section>
+    </PageFrame>
   );
 }
 

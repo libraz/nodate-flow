@@ -13,6 +13,7 @@ import { Link } from '@tanstack/react-router';
 import { ChevronRight } from 'lucide-react';
 import { type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../components/page-header';
 import { useProjectsQuery } from '../projects/api';
 import ProjectCreateDialog from '../projects/project-create-dialog';
 import { useWorkspaceQuery } from './api';
@@ -146,14 +147,7 @@ export default function WorkspaceDetail({
 
   return (
     <article aria-labelledby={headingId} className={styles.detail}>
-      <header className={styles.detailHeader}>
-        <h1 id={headingId} className={styles.detailTitle}>
-          {workspace.name}
-        </h1>
-        {workspace.description ? (
-          <p className={styles.detailDescription}>{workspace.description}</p>
-        ) : null}
-      </header>
+      <PageHeader titleId={headingId} title={workspace.name} description={workspace.description} />
 
       <Tabs
         items={items}

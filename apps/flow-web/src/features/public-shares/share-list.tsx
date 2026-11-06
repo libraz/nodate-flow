@@ -12,7 +12,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
@@ -76,22 +76,22 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
 
   return (
     <section className={styles.section}>
-      <header className={styles.header}>
-        <div className={styles.headerIdentity}>
-          <h1 className={styles.title}>{t('workspace.public_shares.title')}</h1>
-          <p className={styles.description}>{t('workspace.public_shares.description')}</p>
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          data-testid="public-share-create-open"
-          onClick={() => {
-            setCreateOpen(true);
-          }}
-        >
-          {t('workspace.public_shares.create')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('workspace.public_shares.title')}
+        description={t('workspace.public_shares.description')}
+        actions={
+          <Button
+            type="button"
+            variant="primary"
+            data-testid="public-share-create-open"
+            onClick={() => {
+              setCreateOpen(true);
+            }}
+          >
+            {t('workspace.public_shares.create')}
+          </Button>
+        }
+      />
 
       {entries.length === 0 ? (
         <p className={styles.empty}>{t('workspace.public_shares.empty')}</p>

@@ -10,6 +10,7 @@ import { createLazyFileRoute, getRouteApi } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../components/page-header';
 import ActivityFeed from '../features/activity/activity-feed';
 import type { ActivitySourceFilter } from '../features/activity/api';
 
@@ -21,15 +22,8 @@ function WorkspaceActivityRoute(): ReactElement {
   const [source, setSource] = useState<ActivitySourceFilter>('all');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h1 style={{ margin: 0, fontSize: 'var(--nf-text-xl)', color: 'var(--nf-color-fg)' }}>
-          {t('view.title')}
-        </h1>
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('view.description')}
-        </p>
-      </header>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
+      <PageHeader title={t('view.title')} description={t('view.description')} />
       <ActivityFeed workspaceId={id} source={source} onSourceChange={setSource} />
     </div>
   );

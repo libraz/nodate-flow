@@ -6,7 +6,7 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import PageHeader from '../components/page-header';
 import NotificationsForm, {
   NotificationsFormSkeleton,
 } from '../features/settings/notifications-form';
@@ -16,9 +16,7 @@ function NotificationsRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <h1 className={ui.title}>{t('notifications.title')}</h1>
-      </header>
+      <PageHeader title={t('notifications.title')} />
       <Suspense fallback={<NotificationsFormSkeleton />}>
         <NotificationsForm />
       </Suspense>

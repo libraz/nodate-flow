@@ -15,6 +15,8 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
+
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 
 type SectionTitleKey =
@@ -38,20 +40,11 @@ export default function AccessRestricted({ sectionTitleKey }: AccessRestrictedPr
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
+        gap: 'var(--nf-space-6)',
         inlineSize: '100%',
       }}
     >
-      <h1
-        style={{
-          fontFamily: 'var(--nf-font-display)',
-          fontSize: 'var(--nf-text-section-title)',
-          margin: 0,
-        }}
-      >
-        {t(sectionTitleKey)}
-      </h1>
-      <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{t('access_restricted.body')}</p>
+      <PageHeader title={t(sectionTitleKey)} description={t('access_restricted.body')} />
       <p style={{ margin: 0 }}>
         <Link
           to="/workspaces/$id/settings/general"

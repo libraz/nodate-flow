@@ -4,8 +4,7 @@
  * Every colour, spacing, radius, and shadow comes from a design token.
  * No hex literals, no Tailwind-style utilities, no gray-* references.
  * Colours that need a translucent variant compose with `color-mix()` so
- * the four themes (aurora / dotline / glass-light / glass-dark) inherit
- * the right accent without per-theme overrides.
+ * every theme inherits the right accent without per-theme overrides.
  *
  * Motion durations come from the tokens, which reduced motion zeroes.
  */
@@ -14,36 +13,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
-  padding: var(--nf-space-page);
   /* nf-token-override: upper bound of a fluid range, sized so the last row clears the floating action bar; an endpoint is not a step */
   padding-block-end: clamp(var(--nf-space-24), 12vh, 9rem);
-  background: var(--nf-color-bg);
-  min-block-size: 100%;
 }
 
 /* ── Header ──────────────────────────────────────────────────── */
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.title {
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-  margin: 0;
-  color: var(--nf-color-fg);
-  letter-spacing: -0.01em;
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 42rem;
-}
 
 .countLine {
   margin: 0;
@@ -362,8 +336,8 @@
 
 .emptyTitle {
   margin: 0;
-  font-family: var(--nf-font-display);
   font-size: var(--nf-text-xl);
+  font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
 }
 

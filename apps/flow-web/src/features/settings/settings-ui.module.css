@@ -1,6 +1,6 @@
 /*
  * Shared layout vocabulary for every settings screen (account and
- * workspace): page header, bordered sections, a footer that pairs the
+ * workspace): header skeleton shape, bordered sections, a footer that pairs the
  * save status with the one primary action, the danger zone, and the
  * list table. One rhythm across screens is the point; a screen adds
  * its own module only for what is genuinely specific to it.
@@ -26,22 +26,6 @@
   flex-direction: column;
   gap: var(--nf-space-1-5);
   min-inline-size: 0;
-}
-
-.title {
-  margin: 0;
-  font-size: var(--nf-text-2xl);
-  font-weight: var(--nf-weight-semibold);
-  line-height: var(--nf-leading-tight);
-  color: var(--nf-color-fg);
-}
-
-.lede {
-  margin: 0;
-  font-size: var(--nf-text-sm);
-  line-height: var(--nf-leading-normal);
-  color: var(--nf-color-fg-muted);
-  max-inline-size: var(--nf-measure-content);
 }
 
 .section {

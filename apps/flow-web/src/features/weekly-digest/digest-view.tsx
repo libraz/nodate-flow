@@ -11,6 +11,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import CopyButton from '../settings/copy-button';
 import ui from '../settings/settings-ui.module.css';
 import TruncatedText from '../settings/truncated-text';
@@ -67,12 +68,7 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   const overdue = data.overdueOpen ?? [];
   return (
     <div className={ui.page}>
-      <header className={ui.header}>
-        <div className={ui.headerText}>
-          <h1 className={ui.title}>{t('weekly_digest.title')}</h1>
-          <p className={ui.lede}>{t('weekly_digest.description')}</p>
-        </div>
-      </header>
+      <PageHeader title={t('weekly_digest.title')} description={t('weekly_digest.description')} />
 
       <CountsRow counts={data.counts} />
 

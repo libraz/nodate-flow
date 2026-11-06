@@ -37,6 +37,7 @@ import { ChevronRight } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import type { TaskDerivedState } from '../tasks/api';
@@ -497,15 +498,15 @@ export default function TimeboxesPage(): ReactElement {
 
   return (
     <section className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerText}>
-          <h1 className={styles.title}>{t('timeboxes.title')}</h1>
-          <p className={styles.subtitle}>{t('timeboxes.description')}</p>
-        </div>
-        <Button type="button" variant="primary" onClick={openCreate}>
-          {t('timeboxes.new')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('timeboxes.title')}
+        description={t('timeboxes.description')}
+        actions={
+          <Button type="button" variant="primary" onClick={openCreate}>
+            {t('timeboxes.new')}
+          </Button>
+        }
+      />
 
       {hasAny ? (
         <div className={styles.sections}>

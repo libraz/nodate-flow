@@ -285,7 +285,7 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
   }
 
   return (
-    <main className={styles.page} aria-labelledby="archive-title">
+    <section className={styles.page} aria-labelledby="archive-title">
       <ArchivedHeader count={filteredRows.length} lastArchivedAt={lastArchivedAt} locale={locale} />
 
       <ArchivedFilters
@@ -319,6 +319,6 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
         }}
         onCancel={bulk.clear}
       />
-    </main>
+    </section>
   );
 }

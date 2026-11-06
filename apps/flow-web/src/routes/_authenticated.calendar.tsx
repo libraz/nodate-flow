@@ -63,6 +63,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import PageFrame from '../components/page-frame';
+import PageHeader from '../components/page-header';
 import {
   type PatchEventInput,
   type RecurrenceScope,
@@ -1291,11 +1293,8 @@ function CalendarRoute(): ReactElement {
   );
 
   return (
-    <section className={styles.section}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{t('calendar.title')}</h1>
-        <p className={styles.subtitle}>{t('calendar.subtitle')}</p>
-      </header>
+    <PageFrame width="full" className={styles.section}>
+      <PageHeader title={t('calendar.title')} description={t('calendar.subtitle')} />
 
       <div className={styles.toolbar}>
         <div className={styles.monthNav}>
@@ -1721,7 +1720,7 @@ function CalendarRoute(): ReactElement {
       <p aria-live="polite" className={styles.srOnly}>
         {dragTargetLabel ?? ''}
       </p>
-    </section>
+    </PageFrame>
   );
 }
 

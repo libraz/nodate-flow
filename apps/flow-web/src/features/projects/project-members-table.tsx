@@ -135,8 +135,8 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2
           style={{
-            fontFamily: 'var(--nf-font-display)',
             fontSize: 'var(--nf-text-xl)',
+            fontWeight: 'var(--nf-weight-semibold)',
             margin: 0,
           }}
         >

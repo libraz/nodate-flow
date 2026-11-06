@@ -13,11 +13,13 @@
  * under the wrong workspace.
  */
 
-import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useChildMatches } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Forbidden from '../components/forbidden';
+import PageFrame from '../components/page-frame';
+import PageHeader from '../components/page-header';
 import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
@@ -96,6 +98,10 @@ function ProjectLayout(): ReactElement {
   const { t } = useTranslation('common');
   const { id, projectId } = Route.useParams();
   const { data: project } = useProjectQuery(projectId);
+  // Task list/board/spreadsheet and gantt are grid surfaces; overview and timeline read as pages.
+  const gridView = useChildMatches().some(
+    (m) => m.routeId.includes('/tasks') || m.routeId.includes('/gantt'),
+  );
   // ProjectLayout always renders the project name as the page-level h1;
   // child routes (overview / tasks / gantt / timeline) do not re-emit
   // their own name heading.
@@ -107,41 +113,16 @@ function ProjectLayout(): ReactElement {
     return <Forbidden />;
   }
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-4)',
-        padding:
-          'clamp(var(--nf-space-4), 3vw, var(--nf-space-8)) clamp(var(--nf-space-4), 3vw, var(--nf-space-8)) 0',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--nf-space-2)',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: 'var(--nf-font-display)',
-            fontSize: 'var(--nf-text-section-title)',
-            margin: 0,
-            flex: 1,
-            minInlineSize: 0,
-          }}
-        >
-          {project.name}
-        </h1>
-        <Suspense fallback={null}>
-          <ProjectFavoriteStar projectId={projectId} workspaceId={id} />
-        </Suspense>
-      </div>
-      {project.description ? (
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>{project.description}</p>
-      ) : null}
+    <PageFrame width={gridView ? 'full' : 'standard'}>
+      <PageHeader
+        title={project.name}
+        description={project.description}
+        actions={
+          <Suspense fallback={null}>
+            <ProjectFavoriteStar projectId={projectId} workspaceId={id} />
+          </Suspense>
+        }
+      />
       <nav aria-label={t('projects.nav.label')} className={styles.subNav}>
         {PROJECT_SUB_NAV.map((item) => (
           <Link
@@ -157,7 +138,7 @@ function ProjectLayout(): ReactElement {
         ))}
       </nav>
       <Outlet />
-    </section>
+    </PageFrame>
   );
 }
 

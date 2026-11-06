@@ -32,6 +32,7 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../../components/page-header';
 import { formatApiError } from '../../../lib/api-error';
 import RetroDraftRow from './retro-draft-row';
 import styles from './retro-drafts.module.css';
@@ -246,14 +247,13 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
   }
 
   return (
-    <main className={styles.page} aria-labelledby="retro-drafts-title">
-      <header className={styles.header}>
-        <h1 id="retro-drafts-title" className={styles.title}>
-          {t('tasks.retro.queue.title')}
-        </h1>
-        <p className={styles.subtitle}>{t('tasks.retro.queue.description')}</p>
-      </header>
+    <section className={styles.page} aria-labelledby="retro-drafts-title">
+      <PageHeader
+        titleId="retro-drafts-title"
+        title={t('tasks.retro.queue.title')}
+        description={t('tasks.retro.queue.description')}
+      />
       {body}
-    </main>
+    </section>
   );
 }

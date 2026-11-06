@@ -4,15 +4,7 @@
  * workspace and project layouts.
  */
 
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-6);
-  padding: var(--nf-space-page);
-  block-size: 100%;
-}
-
-/* A list page nested in a layout that already pads the page. */
+/* A list page nested in a layout that already provides the page frame. */
 .section {
   display: flex;
   flex-direction: column;
@@ -20,18 +12,13 @@
   block-size: 100%;
 }
 
+/* Header row of the list skeleton, sized like PageHeader with one action. */
 .pageHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--nf-space-4);
   min-block-size: var(--nf-control-height);
-}
-
-.pageTitle {
-  margin: 0;
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
 }
 
 .grid {
@@ -282,8 +269,8 @@
 }
 
 .invitesTitle {
-  font-family: var(--nf-font-display);
   font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
   margin: 0;
 }
 
@@ -292,26 +279,18 @@
   block-size: 16rem;
 }
 
-/* Workspace detail header. */
+/* Workspace context above the sub-nav on child routes. */
+.workspaceContext {
+  margin: 0;
+  font-size: var(--nf-text-section-title);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  color: var(--nf-color-fg);
+}
+
+/* Workspace detail. */
 .detail {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
-}
-
-.detailHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
-}
-
-.detailTitle {
-  font-family: var(--nf-font-display);
-  font-size: var(--nf-text-page-title);
-  margin: 0;
-}
-
-.detailDescription {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
 }

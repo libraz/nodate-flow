@@ -2,8 +2,8 @@
  * Styles for the workspace AI metrics dashboard.
  *
  * Token-only: every colour, spacing, radius, and shadow comes from
- * `var(--nf-*)` so the four themes (aurora / dotline / glass-light /
- * glass-dark) inherit the correct palette without per-theme overrides.
+ * `var(--nf-*)` so every theme inherits the correct palette without
+ * per-theme overrides.
  */
 
 .root {

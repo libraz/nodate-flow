@@ -5,31 +5,7 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--nf-space-5);
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--nf-space-4);
-}
-
-.headerIdentity {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.title {
-  margin: 0;
-  font-size: var(--nf-text-2xl);
-}
-
-.description {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
+  gap: var(--nf-space-6);
 }
 
 .empty {

@@ -12,7 +12,7 @@ import { Link } from '@tanstack/react-router';
 import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import PageHeader from '../../components/page-header';
 import { formatEpoch } from '../../lib/format';
 import styles from '../workspaces/workspaces.module.css';
 import { type Project, useProjectsQuery } from './api';
@@ -77,12 +77,14 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
 
   return (
     <section className={styles.section}>
-      <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{t('projects.title')}</h1>
-        <Button variant="primary" onClick={handleCreate}>
-          {t('projects.new')}
-        </Button>
-      </header>
+      <PageHeader
+        title={t('projects.title')}
+        actions={
+          <Button variant="primary" onClick={handleCreate}>
+            {t('projects.new')}
+          </Button>
+        }
+      />
 
       <DataGrid<Project>
         aria-label={t('projects.title')}

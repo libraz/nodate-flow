@@ -39,7 +39,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowLeft, GripVertical, Plus } from 'lucide-react';
 import { type CSSProperties, type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import AddEventsDialog from './add-events-dialog';
 import {
@@ -263,24 +263,22 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
         </Link>
       </div>
 
-      <header className={styles.header}>
-        <div className={styles.headerIdentity}>
-          <h1 className={styles.title}>{data.share.title}</h1>
-          {data.share.description ? (
-            <p className={styles.headerDescription}>{data.share.description}</p>
-          ) : null}
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => {
-            setPickerOpen(true);
-          }}
-        >
-          <Plus size={14} aria-hidden className={styles.addIcon} />
-          {t('workspace.public_shares.detail.add_events')}
-        </Button>
-      </header>
+      <PageHeader
+        title={data.share.title}
+        description={data.share.description}
+        actions={
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              setPickerOpen(true);
+            }}
+          >
+            <Plus size={14} aria-hidden className={styles.addIcon} />
+            {t('workspace.public_shares.detail.add_events')}
+          </Button>
+        }
+      />
 
       <div>
         <h2 className={styles.eventsHeading}>{t('workspace.public_shares.detail.events_title')}</h2>
