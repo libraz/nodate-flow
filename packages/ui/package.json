@@ -78,6 +78,7 @@
     "./primitives/error-fallback": "./src/primitives/error-fallback/error-fallback.tsx",
     "./primitives/page-skeleton": "./src/primitives/page-skeleton/page-skeleton.tsx",
     "./primitives/auth-card": "./src/primitives/auth-card/auth-card.tsx",
+    "./primitives/brand-mark": "./src/primitives/brand-mark/brand-mark.tsx",
     "./primitives/theme-picker": "./src/primitives/theme-picker/theme-picker.tsx",
     "./primitives/time-picker": "./src/primitives/time-picker/time-picker.tsx",
     "./time": "./src/time/index.ts",

@@ -5,8 +5,8 @@
  * themes switch on with `--nf-atmosphere-opacity`.
  */
 
-import { Route } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
+import BrandMark from '../brand-mark/brand-mark';
 import styles from './auth-card.module.css';
 
 export interface AuthCardProps {
@@ -38,14 +38,7 @@ export default function AuthCard({
         <span className={styles.grain} />
       </div>
       <div className={styles.brand}>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className={styles.logo} />
-        ) : (
-          <div aria-hidden className={styles.mark}>
-            <span className={styles.halo} />
-            <Route aria-hidden className={styles.glyph} />
-          </div>
-        )}
+        {logoUrl ? <img src={logoUrl} alt="" className={styles.logo} /> : <BrandMark size="lg" />}
         <div aria-hidden className={styles.wordmark}>
           {appName}
         </div>

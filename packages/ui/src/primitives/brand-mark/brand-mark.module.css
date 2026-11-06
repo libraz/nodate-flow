@@ -1,0 +1,70 @@
+.mark {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--nf-color-accent), var(--nf-color-accent-hover));
+  color: var(--nf-color-fg-on-accent);
+}
+
+.lg {
+  inline-size: var(--nf-space-16);
+  block-size: var(--nf-space-16);
+  border-radius: var(--nf-radius-md);
+  box-shadow:
+    var(--nf-shadow-lg),
+    0 0.625rem 1.875rem -0.375rem
+    color-mix(in srgb, var(--nf-color-accent) calc(55% * var(--nf-atmosphere-opacity)), transparent);
+}
+
+.sm {
+  /* nf-token-override: compact tile sized to sit beside a 14-15px name */
+  inline-size: 1.75rem;
+  /* nf-token-override: compact tile sized to sit beside a 14-15px name */
+  block-size: 1.75rem;
+  /* Keeps the lg 28/64 ratio; radius-sm would turn the tile into a circle on glass themes. */
+  border-radius: calc(var(--nf-radius-md) * 0.4375);
+  box-shadow: var(--nf-shadow-sm);
+}
+
+/* Soft pulsing accent glow behind the tile; painted below it within the caller's stacking context. */
+.halo {
+  position: absolute;
+  /* nf-token-override: the glow's spread past the tile edge, not a spacing step */
+  inset: -0.5625rem;
+  z-index: -1;
+  border-radius: var(--nf-radius-lg);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--nf-color-accent) 45%, transparent),
+    transparent 70%
+  );
+  filter: blur(0.5625rem);
+  opacity: calc(0.5 * var(--nf-atmosphere-opacity));
+  animation: halo-pulse calc(var(--nf-duration-slow) * 15) ease-in-out infinite;
+}
+
+@keyframes halo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: calc(0.5 * var(--nf-atmosphere-opacity));
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: calc(0.85 * var(--nf-atmosphere-opacity));
+  }
+}
+
+.glyph {
+  /* nf-token-override: icon size inside the brand tile */
+  inline-size: 1.875rem;
+  /* nf-token-override: icon size inside the brand tile */
+  block-size: 1.875rem;
+}
+
+.sm .glyph {
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+}

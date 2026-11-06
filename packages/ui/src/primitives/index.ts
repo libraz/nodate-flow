@@ -9,6 +9,8 @@ export type { AvatarProps, AvatarSize } from './avatar/avatar';
 export { default as Avatar } from './avatar/avatar';
 export type { BadgeAsProps, BadgeProps, BadgeTone } from './badge/badge';
 export { default as Badge } from './badge/badge';
+export type { BrandMarkProps } from './brand-mark/brand-mark';
+export { default as BrandMark } from './brand-mark/brand-mark';
 export type {
   BreadcrumbItemProps,
   BreadcrumbProps,

@@ -146,58 +146,6 @@
   animation: global(nf-fade-in) var(--nf-duration-slow) var(--nf-ease-out) both;
 }
 
-.mark {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--nf-space-16);
-  block-size: var(--nf-space-16);
-  border-radius: var(--nf-radius-md);
-  background: linear-gradient(135deg, var(--nf-color-accent), var(--nf-color-accent-hover));
-  color: var(--nf-color-fg-on-accent);
-  box-shadow:
-    var(--nf-shadow-lg),
-    0 0.625rem 1.875rem -0.375rem
-    color-mix(in srgb, var(--nf-color-accent) calc(55% * var(--nf-atmosphere-opacity)), transparent);
-}
-
-/* Soft pulsing accent glow behind the tile; painted below it within .brand. */
-.halo {
-  position: absolute;
-  /* nf-token-override: the glow's spread past the tile edge, not a spacing step */
-  inset: -0.5625rem;
-  z-index: -1;
-  border-radius: var(--nf-radius-lg);
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--nf-color-accent) 45%, transparent),
-    transparent 70%
-  );
-  filter: blur(0.5625rem);
-  opacity: calc(0.5 * var(--nf-atmosphere-opacity));
-  animation: halo-pulse calc(var(--nf-duration-slow) * 15) ease-in-out infinite;
-}
-
-@keyframes halo-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: calc(0.5 * var(--nf-atmosphere-opacity));
-  }
-  50% {
-    transform: scale(1.14);
-    opacity: calc(0.85 * var(--nf-atmosphere-opacity));
-  }
-}
-
-.glyph {
-  /* nf-token-override: icon size inside the brand tile */
-  inline-size: 1.875rem;
-  /* nf-token-override: icon size inside the brand tile */
-  block-size: 1.875rem;
-}
-
 .logo {
   block-size: var(--nf-space-16);
   inline-size: auto;
