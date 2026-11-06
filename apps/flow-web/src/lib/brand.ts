@@ -4,4 +4,5 @@ import { resolveBrand } from '@nodate-flow/ui/brand';
 const brand = resolveBrand(import.meta.env);
 
 export const APP_NAME = brand.appName;
-export const APP_LOGO_URL = brand.logoUrl;
+export const APP_LOGO = brand.logo;
+export const APP_ICON = brand.icon;

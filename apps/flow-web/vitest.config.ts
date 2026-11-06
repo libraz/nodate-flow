@@ -11,6 +11,12 @@ export default defineConfig({
       VITE_APP_NAME: '',
       // biome-ignore lint/style/useNamingConvention: env variable name
       VITE_APP_LOGO_URL: '',
+      // biome-ignore lint/style/useNamingConvention: env variable name
+      VITE_APP_LOGO_DARK_URL: '',
+      // biome-ignore lint/style/useNamingConvention: env variable name
+      VITE_APP_ICON_URL: '',
+      // biome-ignore lint/style/useNamingConvention: env variable name
+      VITE_APP_ICON_DARK_URL: '',
     },
     setupFiles: ['./tests/setup.ts'],
     include: [

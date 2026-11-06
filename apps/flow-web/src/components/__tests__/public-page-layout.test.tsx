@@ -64,9 +64,13 @@ describe('<PublicPageLayout>', () => {
     expect(banner.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
-  it('replaces the calendar icon with a decorative logo when configured', async () => {
+  it('shows only the logo, named by the app name, when a logo is configured', async () => {
     vi.resetModules();
-    vi.doMock('../../lib/brand', () => ({ APP_NAME: 'Acme Flow', APP_LOGO_URL: '/logo.svg' }));
+    vi.doMock('../../lib/brand', () => ({
+      APP_NAME: 'Acme Flow',
+      APP_LOGO: { src: '/logo.svg', darkSrc: undefined },
+      APP_ICON: undefined,
+    }));
     const { default: Layout } = await import('../public-page-layout');
     renderWithProviders(
       <Layout showBrandHeader>
@@ -74,7 +78,31 @@ describe('<PublicPageLayout>', () => {
       </Layout>,
     );
     const banner = screen.getByRole('banner');
-    expect(banner.querySelector('img[alt=""]')?.getAttribute('src')).toBe('/logo.svg');
+    const img = banner.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/logo.svg');
+    expect(img?.getAttribute('alt')).toBe('Acme Flow');
+    expect(banner.querySelector('[data-brand-mark]')).toBeNull();
+    expect(banner.textContent).toBe('');
+    vi.doUnmock('../../lib/brand');
+  });
+
+  it('shows a decorative icon plus the name when only an icon is configured', async () => {
+    vi.resetModules();
+    vi.doMock('../../lib/brand', () => ({
+      APP_NAME: 'Acme Flow',
+      APP_LOGO: undefined,
+      APP_ICON: { src: '/icon.svg', darkSrc: undefined },
+    }));
+    const { default: Layout } = await import('../public-page-layout');
+    renderWithProviders(
+      <Layout showBrandHeader>
+        <p>x</p>
+      </Layout>,
+    );
+    const banner = screen.getByRole('banner');
+    const img = banner.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/icon.svg');
+    expect(img?.getAttribute('alt')).toBe('');
     expect(banner.querySelector('[data-brand-mark]')).toBeNull();
     expect(banner.textContent).toBe('Acme Flow');
     vi.doUnmock('../../lib/brand');

@@ -148,10 +148,13 @@
 
 .logo {
   block-size: var(--nf-space-16);
-  inline-size: auto;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: min(15rem, 100%);
-  object-fit: contain;
+}
+
+.icon {
+  inline-size: var(--nf-space-16);
+  block-size: var(--nf-space-16);
 }
 
 .wordmark {

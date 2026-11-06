@@ -10,10 +10,11 @@
  * and the production public routes without smuggling globals.
  */
 
+import { BrandImage } from '@nodate-flow/ui/primitives';
 import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 
-import { APP_LOGO_URL, APP_NAME } from '../lib/brand';
+import { APP_ICON, APP_LOGO, APP_NAME } from '../lib/brand';
 
 /** Width preset for the main column. Maps to the global measure tokens. */
 export type PublicPageMeasure = 'content' | 'narrow';
@@ -67,6 +68,9 @@ const measureToken: Record<PublicPageMeasure, string> = {
   content: 'var(--nf-measure-content)',
   narrow: 'var(--nf-measure-narrow)',
 };
+
+// nf-token-override: component dimension, not a spacing step
+const logoBlockSize = '1.75rem';
 
 /**
  * Renders the shared public-page chrome. See {@link PublicPageLayoutProps}
@@ -157,22 +161,30 @@ export default function PublicPageLayout({
               textDecoration: 'none',
             }}
           >
-            {APP_LOGO_URL ? (
-              <img
-                src={APP_LOGO_URL}
-                alt=""
-                style={{
-                  blockSize: 'var(--nf-space-5)',
-                  inlineSize: 'auto',
-                  // nf-token-override: component dimension, not a spacing step
-                  maxInlineSize: '8rem',
-                  objectFit: 'contain',
-                }}
-              />
+            {APP_LOGO ? (
+              <span
+                style={{ display: 'inline-flex', blockSize: logoBlockSize, maxInlineSize: '100%' }}
+              >
+                <BrandImage asset={APP_LOGO} alt={APP_NAME} />
+              </span>
             ) : (
-              <BrandMark size="sm" />
+              <>
+                {APP_ICON ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      blockSize: logoBlockSize,
+                      inlineSize: logoBlockSize,
+                    }}
+                  >
+                    <BrandImage asset={APP_ICON} alt="" />
+                  </span>
+                ) : (
+                  <BrandMark size="sm" />
+                )}
+                {APP_NAME}
+              </>
             )}
-            {APP_NAME}
           </a>
         </header>
       ) : null}

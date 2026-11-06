@@ -1,11 +1,13 @@
 /**
  * AuthCard -- centered card layout for authentication and account management
- * pages. Renders the brand mark (or the deployment logo) and the wordmark
- * above a single translucent panel, over a decorative atmosphere layer that
+ * pages. Renders the deployment logo, or the icon (or brand mark) with the
+ * wordmark, above a single translucent panel, over a decorative atmosphere layer that
  * themes switch on with `--nf-atmosphere-opacity`.
  */
 
 import type { ReactElement, ReactNode } from 'react';
+import type { BrandAsset } from '../../brand/brand';
+import BrandImage from '../brand-image/brand-image';
 import BrandMark from '../brand-mark/brand-mark';
 import styles from './auth-card.module.css';
 
@@ -13,8 +15,10 @@ export interface AuthCardProps {
   children: ReactNode;
   /** Deployment product name shown as the wordmark. */
   appName: string;
-  /** Optional logo shown in place of the brand mark; decorative (empty alt). */
-  logoUrl?: string | undefined;
+  /** Wordmark-bearing logo; replaces the brand mark and the wordmark (alt = appName). */
+  logo?: BrandAsset | undefined;
+  /** Square icon; replaces the brand mark, shown above the wordmark. */
+  icon?: BrandAsset | undefined;
   /**
    * Controls the card width. 'narrow' (default) uses ~26rem and fits auth
    * flows; 'wide' uses ~36rem for settings pages with longer form fields
@@ -26,7 +30,8 @@ export interface AuthCardProps {
 export default function AuthCard({
   children,
   appName,
-  logoUrl,
+  logo,
+  icon,
   width = 'narrow',
 }: AuthCardProps): ReactElement {
   return (
@@ -38,10 +43,20 @@ export default function AuthCard({
         <span className={styles.grain} />
       </div>
       <div className={styles.brand}>
-        {logoUrl ? <img src={logoUrl} alt="" className={styles.logo} /> : <BrandMark size="lg" />}
-        <div aria-hidden className={styles.wordmark}>
-          {appName}
-        </div>
+        {logo ? (
+          <BrandImage asset={logo} alt={appName} className={styles.logo} />
+        ) : (
+          <>
+            {icon ? (
+              <BrandImage asset={icon} alt="" className={styles.icon} />
+            ) : (
+              <BrandMark size="lg" />
+            )}
+            <div aria-hidden className={styles.wordmark}>
+              {appName}
+            </div>
+          </>
+        )}
       </div>
       <section className={`${styles.panel} ${width === 'wide' ? styles.wide : styles.narrow}`}>
         {children}

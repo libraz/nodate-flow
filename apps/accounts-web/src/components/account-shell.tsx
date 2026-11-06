@@ -5,6 +5,7 @@
  */
 
 import SkipLink from '@nodate-flow/ui/a11y/skip-link';
+import { BrandImage } from '@nodate-flow/ui/primitives';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import { Link } from '@tanstack/react-router';
@@ -12,7 +13,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AuthUser } from '../features/auth/auth-store';
-import { APP_LOGO_URL, APP_NAME } from '../lib/brand';
+import { APP_ICON, APP_LOGO, APP_NAME } from '../lib/brand';
 import { flowWebUrl } from '../lib/flow-web-url';
 
 import {
@@ -51,14 +52,20 @@ export default function AccountShell({ user, wide, children }: AccountShellProps
       <SkipLink targetId={MAIN_ID}>{t('account.skip_to_content')}</SkipLink>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          {APP_LOGO_URL ? (
-            <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} />
+          {APP_LOGO ? (
+            <BrandImage asset={APP_LOGO} alt={APP_NAME} className={styles.brandLogo} />
           ) : (
-            <BrandMark size="sm" />
+            <>
+              {APP_ICON ? (
+                <BrandImage asset={APP_ICON} alt="" className={styles.brandIcon} />
+              ) : (
+                <BrandMark size="sm" />
+              )}
+              <span className={styles.brandName} title={APP_NAME}>
+                {APP_NAME}
+              </span>
+            </>
           )}
-          <span className={styles.brandName} title={APP_NAME}>
-            {APP_NAME}
-          </span>
         </div>
 
         <nav className={styles.nav} aria-label={t('account.nav_label')}>

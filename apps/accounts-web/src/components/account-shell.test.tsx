@@ -11,7 +11,8 @@ import type { AuthUser } from '../features/auth/auth-store';
 
 const brand = vi.hoisted(() => ({
   APP_NAME: 'nodate-flow',
-  APP_LOGO_URL: undefined as string | undefined,
+  APP_LOGO: undefined as { src: string; darkSrc: string | undefined } | undefined,
+  APP_ICON: undefined as { src: string; darkSrc: string | undefined } | undefined,
 }));
 
 vi.mock('@/lib/brand', () => brand);
@@ -34,7 +35,8 @@ const user = {
 describe('AccountShell brand', () => {
   beforeEach(() => {
     brand.APP_NAME = DEFAULT_APP_NAME;
-    brand.APP_LOGO_URL = undefined;
+    brand.APP_LOGO = undefined;
+    brand.APP_ICON = undefined;
   });
 
   it('shows the default name without a logo', () => {
@@ -44,13 +46,24 @@ describe('AccountShell brand', () => {
     expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
-  it('shows the configured name and a decorative logo', () => {
+  it('shows only the logo, named by the app name, when a logo is configured', () => {
     brand.APP_NAME = 'Acme Tasks';
-    brand.APP_LOGO_URL = 'https://example.com/logo.svg';
+    brand.APP_LOGO = { src: 'https://example.com/logo.svg', darkSrc: undefined };
     const { container } = render(<AccountShell user={user}>x</AccountShell>);
-    expect(screen.getByText('Acme Tasks')).toBeTruthy();
     const img = container.querySelector('img[src="https://example.com/logo.svg"]');
+    expect(img?.getAttribute('alt')).toBe('Acme Tasks');
+    expect(screen.queryByText('Acme Tasks')).toBeNull();
+    expect(container.querySelector('[title="Acme Tasks"]')).toBeNull();
+    expect(container.querySelector('[data-brand-mark]')).toBeNull();
+  });
+
+  it('shows a decorative icon plus the name when only an icon is configured', () => {
+    brand.APP_NAME = 'Acme Tasks';
+    brand.APP_ICON = { src: 'https://example.com/icon.svg', darkSrc: undefined };
+    const { container } = render(<AccountShell user={user}>x</AccountShell>);
+    const img = container.querySelector('img[src="https://example.com/icon.svg"]');
     expect(img?.getAttribute('alt')).toBe('');
+    expect(screen.getByText('Acme Tasks')).toBeTruthy();
     expect(container.querySelector('[data-brand-mark]')).toBeNull();
   });
 });

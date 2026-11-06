@@ -1,6 +1,8 @@
+import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import { BrandImage } from '@nodate-flow/ui/primitives';
 import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
@@ -32,7 +34,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
 import { useProjectsQuery } from '../../features/projects/api';
-import { APP_LOGO_URL, APP_NAME } from '../../lib/brand';
+import { APP_ICON, APP_LOGO, APP_NAME } from '../../lib/brand';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import styles from './sidebar.module.css';
 import WorkspaceSwitcher from './workspace-switcher';
@@ -432,14 +434,30 @@ export default function Sidebar(): ReactElement {
         }}
       >
         <div className={styles.brand}>
-          {APP_LOGO_URL ? (
-            <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} />
+          {APP_LOGO ? (
+            <>
+              <BrandImage asset={APP_LOGO} alt={APP_NAME} className={styles.brandLogo} />
+              <span className={styles.railBrand}>
+                {APP_ICON ? (
+                  <BrandImage asset={APP_ICON} alt="" className={styles.brandIcon} />
+                ) : (
+                  <BrandMark size="sm" />
+                )}
+                <VisuallyHidden>{APP_NAME}</VisuallyHidden>
+              </span>
+            </>
           ) : (
-            <BrandMark size="sm" />
+            <>
+              {APP_ICON ? (
+                <BrandImage asset={APP_ICON} alt="" className={styles.brandIcon} />
+              ) : (
+                <BrandMark size="sm" />
+              )}
+              <span className={styles.brandLabel} title={APP_NAME}>
+                {APP_NAME}
+              </span>
+            </>
           )}
-          <span className={styles.brandLabel} title={APP_NAME}>
-            {APP_NAME}
-          </span>
         </div>
         <Collapse open={!railCollapsed}>
           <div className={styles.workspaceSwitcherSlot}>

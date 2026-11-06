@@ -31,7 +31,19 @@ function renderSidebar(Sidebar: () => ReactElement) {
   );
 }
 
+const RAIL = '[class*="railBrand"]';
+const LOGO = '[class*="brandLogo"]';
+
+function mockBrand({ logo = false, icon = false }: { logo?: boolean; icon?: boolean }) {
+  vi.doMock('../../../lib/brand', () => ({
+    APP_NAME: 'Acme Flow',
+    APP_LOGO: logo ? { src: '/logo.svg', darkSrc: undefined } : undefined,
+    APP_ICON: icon ? { src: '/icon.svg', darkSrc: undefined } : undefined,
+  }));
+}
+
 afterEach(() => {
+  window.localStorage.removeItem('nf.sidebar-collapsed');
   vi.resetModules();
   vi.doUnmock('../../../lib/brand');
 });
@@ -45,13 +57,25 @@ describe('Sidebar brand row', () => {
     expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
-  it('renders a decorative logo before the label when configured', async () => {
-    vi.doMock('../../../lib/brand', () => ({ APP_NAME: 'Acme Flow', APP_LOGO_URL: '/logo.svg' }));
+  it('renders only the logo, named by the app name, when a logo is configured', async () => {
+    mockBrand({ logo: true });
     const { default: Sidebar } = await import('../sidebar');
     const { container } = renderSidebar(Sidebar);
-    const img = container.querySelector('img[alt=""]');
-    expect(img?.getAttribute('src')).toBe('/logo.svg');
-    expect(screen.getByText('Acme Flow')).toBeDefined();
+    const logo = container.querySelector('img[src="/logo.svg"]');
+    expect(logo?.getAttribute('alt')).toBe('Acme Flow');
+    expect(container.querySelector('[title="Acme Flow"]')).toBeNull();
+    expect(container.querySelector('[data-collapsed]')).toBeNull();
+    expect(container.querySelector(RAIL)).not.toBeNull();
+    expect(container.querySelector(`${RAIL} [data-brand-mark="sm"]`)).not.toBeNull();
+  });
+
+  it('shows the icon plus the name when only an icon is configured', async () => {
+    mockBrand({ icon: true });
+    const { default: Sidebar } = await import('../sidebar');
+    const { container } = renderSidebar(Sidebar);
+    expect(container.querySelector('img[src="/icon.svg"]')?.getAttribute('alt')).toBe('');
+    expect(screen.getByText('Acme Flow').getAttribute('title')).toBe('Acme Flow');
+    expect(container.querySelector(RAIL)).toBeNull();
     expect(container.querySelector('[data-brand-mark]')).toBeNull();
   });
 
@@ -61,6 +85,32 @@ describe('Sidebar brand row', () => {
     const { container } = renderSidebar(Sidebar);
     expect(container.querySelector('[data-collapsed]')).not.toBeNull();
     expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
-    window.localStorage.removeItem('nf.sidebar-collapsed');
+    expect(container.querySelector(RAIL)).toBeNull();
+  });
+
+  it('collapsed with a logo only: the rail brand holds the mark and the hidden name', async () => {
+    window.localStorage.setItem('nf.sidebar-collapsed', '1');
+    mockBrand({ logo: true });
+    const { default: Sidebar } = await import('../sidebar');
+    const { container } = renderSidebar(Sidebar);
+    const aside = container.querySelector('[data-collapsed]');
+    expect(aside?.className).toContain('collapsed');
+    expect(container.querySelector(LOGO)).not.toBeNull();
+    const rail = container.querySelector(RAIL);
+    expect(rail?.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
+    expect(rail?.textContent).toBe('Acme Flow');
+  });
+
+  it('collapsed with logo and icon: the rail brand holds the icon', async () => {
+    window.localStorage.setItem('nf.sidebar-collapsed', '1');
+    mockBrand({ logo: true, icon: true });
+    const { default: Sidebar } = await import('../sidebar');
+    const { container } = renderSidebar(Sidebar);
+    expect(container.querySelector('[data-collapsed]')?.className).toContain('collapsed');
+    const icon = container.querySelector(`${RAIL} img`);
+    expect(icon?.getAttribute('src')).toBe('/icon.svg');
+    expect(icon?.getAttribute('alt')).toBe('');
+    expect(container.querySelector(`${RAIL} [data-brand-mark]`)).toBeNull();
+    expect(container.querySelector(RAIL)?.textContent).toBe('Acme Flow');
   });
 });

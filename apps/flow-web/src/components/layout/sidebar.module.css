@@ -162,12 +162,24 @@
 }
 
 .brandLogo {
-  flex-shrink: 0;
-  block-size: var(--nf-space-6);
-  inline-size: auto;
   /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 8rem;
-  object-fit: contain;
+  block-size: 1.75rem;
+  max-inline-size: 100%;
+}
+
+.brandIcon {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.75rem;
+}
+
+/* Shown only while the rail is collapsed; the logo is shown only while expanded. */
+.railBrand {
+  display: none;
+  align-items: center;
+  justify-content: center;
 }
 
 .collapsed .brand {
@@ -178,6 +190,10 @@
 
 .collapsed .brandLogo {
   display: none;
+}
+
+.collapsed .railBrand {
+  display: inline-flex;
 }
 
 .collapsed .brandLabel {

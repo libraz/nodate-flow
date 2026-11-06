@@ -4,8 +4,8 @@
  * package self-reference rather than a relative path.
  */
 
-import { resolveBrand } from '@nodate-flow/ui/brand';
-import type { Plugin } from 'vite';
+import { type BrandAsset, resolveBrand } from '@nodate-flow/ui/brand';
+import type { HtmlTagDescriptor, Plugin } from 'vite';
 
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -21,23 +21,30 @@ function escapeHtml(s: string): string {
 
 export function brandPlugin(): Plugin {
   let appName = '';
-  let logoUrl: string | undefined;
+  let icon: BrandAsset | undefined;
   return {
     name: 'nodate-flow-brand',
     configResolved(config) {
       const brand = resolveBrand(config.env);
       appName = brand.appName;
-      logoUrl = brand.logoUrl;
+      icon = brand.icon;
     },
     transformIndexHtml(html) {
       const out = html.replaceAll('%APP_NAME%', () => escapeHtml(appName));
-      if (logoUrl === undefined) {
+      if (icon === undefined) {
         return out;
       }
-      return {
-        html: out,
-        tags: [{ tag: 'link', attrs: { rel: 'icon', href: logoUrl }, injectTo: 'head' }],
-      };
+      const tags: HtmlTagDescriptor[] = [
+        { tag: 'link', attrs: { rel: 'icon', href: icon.src }, injectTo: 'head' },
+      ];
+      if (icon.darkSrc !== undefined) {
+        tags.push({
+          tag: 'link',
+          attrs: { rel: 'icon', href: icon.darkSrc, media: '(prefers-color-scheme: dark)' },
+          injectTo: 'head',
+        });
+      }
+      return { html: out, tags };
     },
   };
 }

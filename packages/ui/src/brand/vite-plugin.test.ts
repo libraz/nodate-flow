@@ -28,8 +28,8 @@ describe('brandPlugin', () => {
     expect(out).toBe('<title>&lt;A&gt;&amp;&quot;&#39;$&amp;</title>');
   });
 
-  it('adds an icon link only when a logo is set', () => {
-    const out = setup({ VITE_APP_LOGO_URL: 'https://cdn.example.com/logo.svg' }).transformIndexHtml(
+  it('adds one icon link from the icon', () => {
+    const out = setup({ VITE_APP_ICON_URL: 'https://cdn.example.com/icon.svg' }).transformIndexHtml(
       '<title>%APP_NAME%</title>',
     );
     expect(out).toEqual({
@@ -37,11 +37,44 @@ describe('brandPlugin', () => {
       tags: [
         {
           tag: 'link',
-          attrs: { rel: 'icon', href: 'https://cdn.example.com/logo.svg' },
+          attrs: { rel: 'icon', href: 'https://cdn.example.com/icon.svg' },
           injectTo: 'head',
         },
       ],
     });
+  });
+
+  it('adds the dark link after the base link with a dark media query', () => {
+    const out = setup({
+      VITE_APP_ICON_URL: 'https://cdn.example.com/icon.svg',
+      VITE_APP_ICON_DARK_URL: 'https://cdn.example.com/icon-dark.svg',
+    }).transformIndexHtml('x');
+    expect(out).toEqual({
+      html: 'x',
+      tags: [
+        {
+          tag: 'link',
+          attrs: { rel: 'icon', href: 'https://cdn.example.com/icon.svg' },
+          injectTo: 'head',
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'icon',
+            href: 'https://cdn.example.com/icon-dark.svg',
+            media: '(prefers-color-scheme: dark)',
+          },
+          injectTo: 'head',
+        },
+      ],
+    });
+  });
+
+  it('adds no link when only a logo is set', () => {
+    const out = setup({ VITE_APP_LOGO_URL: 'https://cdn.example.com/logo.svg' }).transformIndexHtml(
+      'x',
+    );
+    expect(out).toBe('x');
   });
 
   it('throws from configResolved on an invalid value', () => {

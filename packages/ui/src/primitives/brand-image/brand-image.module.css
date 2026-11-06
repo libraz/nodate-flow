@@ -1,0 +1,25 @@
+.root {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  max-inline-size: 100%;
+}
+
+.img {
+  block-size: 100%;
+  inline-size: auto;
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+
+.dark {
+  display: none;
+}
+
+:root[data-theme$="-dark"] .light {
+  display: none;
+}
+
+:root[data-theme$="-dark"] .dark {
+  display: block;
+}
