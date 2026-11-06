@@ -344,6 +344,16 @@ SET avatar_url = NULL
 WHERE id = ?
   AND enabled = TRUE;
 
+-- name: SeedOAuthAvatarURL :exec
+-- Seed avatar_url from the sign-in provider's profile picture. A no-op when
+-- the user already has an external or uploaded avatar.
+UPDATE users
+SET avatar_url = ?
+WHERE id = ?
+  AND enabled = TRUE
+  AND avatar_url IS NULL
+  AND avatar_storage_object_id IS NULL;
+
 -- name: SetMyAvatarStorageObject :exec
 -- Bind the authenticated user's avatar to a freshly inserted (or dedup-hit)
 -- storage_objects row. Used by POST /me/avatar after a successful upload to

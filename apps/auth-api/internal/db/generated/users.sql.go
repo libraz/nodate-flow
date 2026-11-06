@@ -968,6 +968,27 @@ func (q *Queries) ResetIdentityFailedAttempts(ctx context.Context, id uint32) er
 	return err
 }
 
+const seedOAuthAvatarURL = `-- name: SeedOAuthAvatarURL :exec
+UPDATE users
+SET avatar_url = ?
+WHERE id = ?
+  AND enabled = TRUE
+  AND avatar_url IS NULL
+  AND avatar_storage_object_id IS NULL
+`
+
+type SeedOAuthAvatarURLParams struct {
+	AvatarUrl sql.NullString `json:"avatarUrl"`
+	ID        uint32         `json:"-"`
+}
+
+// Seed avatar_url from the sign-in provider's profile picture. A no-op when
+// the user already has an external or uploaded avatar.
+func (q *Queries) SeedOAuthAvatarURL(ctx context.Context, arg SeedOAuthAvatarURLParams) error {
+	_, err := q.db.ExecContext(ctx, seedOAuthAvatarURL, arg.AvatarUrl, arg.ID)
+	return err
+}
+
 const setIdentityMfaSecret = `-- name: SetIdentityMfaSecret :exec
 UPDATE identities
 SET mfa_secret_ciphertext = ?,

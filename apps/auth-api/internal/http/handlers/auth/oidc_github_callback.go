@@ -81,6 +81,7 @@ func OIDCGithubCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			Email:          claims.Email,
 			DisplayName:    name,
 			Locale:         "en",
+			AvatarURL:      claims.AvatarURL,
 			AllowEmailLink: true,
 		})
 		if err != nil {

@@ -66,6 +66,7 @@ func OIDCGoogleCallback(deps Deps) func(context.Context, *OIDCCallbackInput) (*O
 			Email:          claims.Email,
 			DisplayName:    claims.Name,
 			Locale:         claims.Locale,
+			AvatarURL:      claims.Picture,
 			AllowEmailLink: true,
 		})
 		if err != nil {

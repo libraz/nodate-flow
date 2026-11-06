@@ -16,6 +16,7 @@ type GoogleClaims struct {
 	Sub           string `json:"sub"`
 	Name          string `json:"name"`
 	Locale        string `json:"locale"`
+	Picture       string `json:"picture"`
 	EmailVerified bool   `json:"email_verified"`
 }
 

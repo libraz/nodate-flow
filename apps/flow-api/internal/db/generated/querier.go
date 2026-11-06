@@ -2354,6 +2354,9 @@ type Querier interface {
 	// soft-disabled row, matching the propagation enforced by the list and
 	// get queries so search cannot surface a child of a disabled subtree.
 	SearchPages(ctx context.Context, arg SearchPagesParams) ([]SearchPagesRow, error)
+	// Seed avatar_url from the sign-in provider's profile picture. A no-op when
+	// the user already has an external or uploaded avatar.
+	SeedOAuthAvatarURL(ctx context.Context, arg SeedOAuthAvatarURLParams) error
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error

@@ -53,6 +53,8 @@ type GithubClaims struct {
 	Login string `json:"login"` // GitHub username
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	// AvatarURL is the profile image URL from /user.
+	AvatarURL string `json:"avatar_url"`
 }
 
 // GithubOAuthClient wraps golang.org/x/oauth2 for GitHub login.
@@ -127,10 +129,11 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 	// GitHub returns id as a number; we need it as a string for the
 	// identities.subject column.
 	var raw struct {
-		ID    int64  `json:"id"`
-		Login string `json:"login"`
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		ID        int64  `json:"id"`
+		Login     string `json:"login"`
+		Name      string `json:"name"`
+		Email     string `json:"email"`
+		AvatarURL string `json:"avatar_url"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("github: decode user: %w", err)
@@ -146,10 +149,11 @@ func (c *GithubOAuthClient) Exchange(ctx context.Context, code, _ string) (*Gith
 		return nil, err
 	}
 	return &GithubClaims{
-		Sub:   fmt.Sprintf("%d", raw.ID),
-		Login: raw.Login,
-		Name:  raw.Name,
-		Email: email,
+		Sub:       fmt.Sprintf("%d", raw.ID),
+		Login:     raw.Login,
+		Name:      raw.Name,
+		Email:     email,
+		AvatarURL: raw.AvatarURL,
 	}, nil
 }
 

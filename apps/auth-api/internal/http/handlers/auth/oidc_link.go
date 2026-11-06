@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,6 +38,8 @@ type oidcProvisionParams struct {
 	// Locale seeds users.locale on first provisioning. Defaults to "en"
 	// when empty.
 	Locale string
+	// AvatarURL is the provider profile picture; seeded only at first attach.
+	AvatarURL string
 	// AllowEmailLink controls whether this provider may bind a new
 	// identity onto an existing same-email account. Microsoft disables
 	// this because email_verified alone is not enough cross-tenant
@@ -98,6 +101,7 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 			if cerr := d.createOIDCIdentity(ctx, existing.ID, p.Provider, p.Subject); cerr != nil {
 				return 0, types.PublicID{}, cerr
 			}
+			d.seedOIDCAvatar(ctx, existing.ID, p.AvatarURL)
 			return existing.ID, existing.PublicID, nil
 		case errors.Is(ferr, sql.ErrNoRows):
 			// No user holds this email: fall through to fresh provisioning.
@@ -147,6 +151,7 @@ func (d Deps) resolveOIDCUser(ctx context.Context, p oidcProvisionParams) (uint3
 	if cerr := d.createOIDCIdentity(ctx, userID, p.Provider, p.Subject); cerr != nil {
 		return 0, types.PublicID{}, cerr
 	}
+	d.seedOIDCAvatar(ctx, userID, p.AvatarURL)
 	if verr := d.Queries.MarkUserEmailVerified(ctx, userID); verr != nil {
 		return 0, types.PublicID{}, httpErr(apierrors.InternalUnexpected)
 	}
@@ -274,4 +279,31 @@ func (d Deps) createOIDCIdentity(ctx context.Context, userID uint32, provider ge
 		return httpErr(apierrors.InternalUnexpected)
 	}
 	return nil
+}
+
+// maxOIDCAvatarURLLen caps the provider picture URL accepted for seeding.
+const maxOIDCAvatarURLLen = 2048
+
+// validOIDCAvatarURL reports whether raw is an https URL with a host and a
+// bounded length.
+func validOIDCAvatarURL(raw string) bool {
+	if raw == "" || len(raw) > maxOIDCAvatarURLLen {
+		return false
+	}
+	u, err := url.Parse(raw)
+	return err == nil && strings.EqualFold(u.Scheme, "https") && u.Host != ""
+}
+
+// seedOIDCAvatar stores the provider picture as the user's avatar. The
+// no-overwrite rule lives in the query; a failure never fails the sign-in.
+func (d Deps) seedOIDCAvatar(ctx context.Context, userID uint32, raw string) {
+	if !validOIDCAvatarURL(raw) {
+		return
+	}
+	if err := d.Queries.SeedOAuthAvatarURL(ctx, generated.SeedOAuthAvatarURLParams{
+		AvatarUrl: sql.NullString{String: raw, Valid: true},
+		ID:        userID,
+	}); err != nil {
+		slog.WarnContext(ctx, "oidc: avatar seeding failed", slog.Uint64("user_id", uint64(userID)))
+	}
 }

@@ -752,6 +752,9 @@ type Querier interface {
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error)
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
+	// Seed avatar_url from the sign-in provider's profile picture. A no-op when
+	// the user already has an external or uploaded avatar.
+	SeedOAuthAvatarURL(ctx context.Context, arg SeedOAuthAvatarURLParams) error
 	// Begin (or restart) TOTP enrollment by writing a fresh encrypted
 	// secret and clearing any previous confirmation timestamp.
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
