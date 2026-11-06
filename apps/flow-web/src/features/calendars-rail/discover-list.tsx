@@ -29,6 +29,7 @@ import { type ChangeEvent, type KeyboardEvent, type ReactElement, useMemo, useSt
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import {
   type DiscoverableCalendar,
   useDiscoverableCalendarsQuery,
@@ -152,43 +153,46 @@ export default function DiscoverList({ workspaceId, onClose }: DiscoverListProps
         </p>
       ) : (
         <ul key="list" className={`${styles.discoverList} ${styles.discoverState}`}>
-          {filtered.map((row) => (
-            <li key={row.id} className={styles.discoverRow}>
-              <Avatar
-                {...(row.ownerAvatarUrl ? { src: row.ownerAvatarUrl } : {})}
-                alt={row.ownerDisplayName}
-                initials={initialsFor(row.ownerDisplayName)}
-                size="md"
-              />
-              <div className={styles.discoverIdentity}>
-                <span className={styles.discoverDisplayName} title={row.ownerDisplayName}>
-                  {row.ownerDisplayName}
-                </span>
-                <span className={styles.discoverCalendarMeta}>
-                  <span
-                    aria-hidden
-                    className={styles.discoverDot}
-                    style={{ background: row.color }}
-                  />
-                  <span className={styles.discoverCalendarName} title={row.name}>
-                    {row.name}
+          {filtered.map((row) => {
+            const avatarSrc = resolveAvatarUrl(row.ownerAvatarUrl);
+            return (
+              <li key={row.id} className={styles.discoverRow}>
+                <Avatar
+                  {...(avatarSrc ? { src: avatarSrc } : {})}
+                  alt={row.ownerDisplayName}
+                  initials={initialsFor(row.ownerDisplayName)}
+                  size="md"
+                />
+                <div className={styles.discoverIdentity}>
+                  <span className={styles.discoverDisplayName} title={row.ownerDisplayName}>
+                    {row.ownerDisplayName}
                   </span>
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => handleSubscribe(row.id)}
-                disabled={subscribe.isPending}
-                aria-busy={
-                  (subscribe.isPending && subscribe.variables?.calId === row.id) || undefined
-                }
-              >
-                {t('calendars_rail.discover.subscribe')}
-              </Button>
-            </li>
-          ))}
+                  <span className={styles.discoverCalendarMeta}>
+                    <span
+                      aria-hidden
+                      className={styles.discoverDot}
+                      style={{ background: row.color }}
+                    />
+                    <span className={styles.discoverCalendarName} title={row.name}>
+                      {row.name}
+                    </span>
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleSubscribe(row.id)}
+                  disabled={subscribe.isPending}
+                  aria-busy={
+                    (subscribe.isPending && subscribe.variables?.calId === row.id) || undefined
+                  }
+                >
+                  {t('calendars_rail.discover.subscribe')}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

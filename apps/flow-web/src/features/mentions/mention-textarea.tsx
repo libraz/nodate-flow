@@ -33,6 +33,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 
 import { filterCandidates, type MentionCandidate, useMentionCandidatesQuery } from './api';
 import { type CaretRect, caretRect } from './caret-rect';
@@ -388,12 +389,13 @@ function MentionPopup({
 
 /** Avatar image when the member has one, initials otherwise. */
 function MemberAvatar({ candidate }: { candidate: MentionCandidate }): ReactElement {
+  const avatarSrc = resolveAvatarUrl(candidate.avatarUrl);
   return (
     <Avatar
       alt={candidate.displayName}
       initials={initialsFrom(candidate.displayName)}
       size="sm"
-      {...(candidate.avatarUrl ? { src: candidate.avatarUrl } : {})}
+      {...(avatarSrc ? { src: avatarSrc } : {})}
     />
   );
 }

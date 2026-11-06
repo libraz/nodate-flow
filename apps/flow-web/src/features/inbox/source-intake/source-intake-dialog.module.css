@@ -1,0 +1,198 @@
+/*
+ * The form has a fixed block-size so the dialog frame does not jump when
+ * the destination switches between the create and link panes; the body
+ * scrolls inside it and the footer stays anchored (same as EventDialog).
+ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: min(36rem, 75vh);
+}
+
+.bodyScroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  /* Small inset so the scrollbar does not crowd field controls. */
+  padding-inline-end: var(--nf-space-1);
+}
+
+.bodyScroll > * {
+  flex-shrink: 0;
+}
+
+.sourceSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
+}
+
+.sourceTitle {
+  margin: 0;
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.sourceBody {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sourceActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-block-end: var(--nf-space-2);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.memberList,
+.taskResults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  max-block-size: calc(var(--nf-space-24) * 2);
+  overflow: auto;
+}
+
+.memberOption {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  cursor: pointer;
+}
+
+.memberOption:hover,
+.taskOption:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.taskOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  inline-size: 100%;
+  padding: var(--nf-space-2);
+  border: var(--nf-space-px) solid transparent;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.taskOptionSelected,
+.taskOptionSelected:hover {
+  border-color: color-mix(in oklch, var(--nf-color-accent) 28%, var(--nf-color-border));
+  background: color-mix(in oklch, var(--nf-color-accent) 10%, var(--nf-color-surface));
+}
+
+.taskTitle {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.taskOptionSelected .taskTitle {
+  font-weight: var(--nf-weight-medium);
+}
+
+.taskId {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted,
+.error {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.muted {
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  color: var(--nf-color-danger-fg);
+}
+
+.success {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border: var(--nf-space-px) solid
+    color-mix(in oklch, var(--nf-color-success) 28%, var(--nf-color-border));
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--nf-color-success) 10%, var(--nf-color-surface));
+  color: var(--nf-color-success-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.successLink {
+  color: var(--nf-color-accent-fg);
+  font-weight: var(--nf-weight-medium);
+  text-underline-offset: 0.2em;
+}
+
+.sourceLink {
+  align-self: flex-start;
+  color: var(--nf-color-accent-fg);
+  font-size: var(--nf-text-sm);
+  text-underline-offset: 0.2em;
+}

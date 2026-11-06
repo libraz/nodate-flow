@@ -20,20 +20,21 @@ import { Day, type Zone } from '@nodate-flow/ui/time';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
-import { type ReactElement, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
-import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 
-import {
-  type AiSuggestion,
-  useAiSuggestionsQuery,
-  useApplyAiSuggestion,
-  useDismissAiSuggestion,
-} from '../ai-suggestions/api';
+import { useAiSuggestionsQuery } from '../ai-suggestions/api';
+import EditSuggestionDialog, {
+  type EditSuggestionPatch,
+} from '../ai-suggestions/edit-suggestion-dialog';
+import { recommendedActionLabel } from '../ai-suggestions/recommended-action-label';
+import type { Suggestion } from '../ai-suggestions/store';
 import SuggestionActions from '../ai-suggestions/suggestion-actions';
+import { useSuggestionActionExecutor } from '../ai-suggestions/use-suggestion-action-executor';
+import { selectUser, useAuth } from '../auth/auth-store';
 import { type TaskAutoAction, useAutoActionsQuery } from '../auto-actions/api';
 import { type CompileLensResult, NlQueryError, useCompileLens } from '../nl-query/api';
 import { type StateSuggestion, useStateSuggestionsQuery } from '../nl-query/state-suggestions';
@@ -314,20 +315,26 @@ function GlassDockSuggestionRow({
   suggestion,
   disabled,
   onApply,
+  onEdit,
   onDismiss,
 }: {
-  suggestion: AiSuggestion;
+  suggestion: Suggestion;
   disabled: boolean;
-  onApply: (inboxItemId: string) => void;
-  onDismiss: (inboxItemId: string) => void;
+  onApply: (suggestion: Suggestion) => void;
+  onEdit: (suggestion: Suggestion) => void;
+  onDismiss: (suggestion: Suggestion) => void;
 }): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const handleApply = (): void => {
-    onApply(suggestion.inboxItemId);
+    onApply(suggestion);
+  };
+  const handleEdit = (): void => {
+    onEdit(suggestion);
   };
   const handleDismiss = (): void => {
-    onDismiss(suggestion.inboxItemId);
+    onDismiss(suggestion);
   };
+  const needsRefresh = suggestion.sourceVersionStatus !== 'captured' || !suggestion.proposalId;
   return (
     <Card className={styles.suggestionCard}>
       <div className={styles.suggestionBody}>
@@ -339,16 +346,21 @@ function GlassDockSuggestionRow({
           >
             {confidenceLabel(suggestion.score, t)}
           </Badge>
-          <span className={styles.suggestionAction}>{suggestion.recommendedAction}</span>
+          <span className={styles.suggestionAction}>
+            {recommendedActionLabel(suggestion.recommendedAction, t)}
+          </span>
         </div>
         <p className={styles.suggestionReasoning}>{suggestion.reasoning}</p>
+        {needsRefresh ? (
+          <p role="note" className={styles.suggestionAction} style={{ margin: 0 }}>
+            {t('triage.legacy_notice')}
+          </p>
+        ) : null}
         <SuggestionActions
-          disabled={disabled}
+          disabled={disabled || needsRefresh}
           onApply={handleApply}
           onDismiss={handleDismiss}
-          onEdit={() => {
-            /* edit modal — follow-up */
-          }}
+          onEdit={handleEdit}
         />
       </div>
     </Card>
@@ -577,22 +589,31 @@ function AutoActionsPanel({
 function GlassDockImpl(): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const { t: tCommon } = useTranslation('common');
+  const { t: tInbox } = useTranslation('inbox');
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const workspaceId = useCurrentWorkspaceId() ?? undefined;
+  const actorId = useAuth(selectUser)?.id;
   useWorkspaceStream(workspaceId);
   const { data, isError: suggestionsFailed } = useAiSuggestionsQuery(workspaceId);
-  const suggestions: AiSuggestion[] = data ?? [];
+  const suggestions: Suggestion[] =
+    workspaceId && actorId
+      ? (data ?? []).map((suggestion) => ({ ...suggestion, workspaceId, actorId }))
+      : [];
   // A resolved row stays mounted for its exit; the empty state waits for it.
   const suggestionPresence = usePresenceList(suggestions, (s) => s.inboxItemId);
-  const applyMutation = useApplyAiSuggestion(workspaceId ?? '');
-  const dismissMutation = useDismissAiSuggestion(workspaceId ?? '');
-  const pendingInboxItemId = applyMutation.isPending
-    ? applyMutation.variables
-    : dismissMutation.isPending
-      ? dismissMutation.variables
-      : undefined;
+  const suggestionAction = useSuggestionActionExecutor(workspaceId, (taskId) =>
+    navigate({ to: '/tasks/$taskId', params: { taskId } }),
+  );
+  const pendingInboxItemId = suggestionAction.pendingInboxItemId;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reset the draft when the workspace or actor changes.
+  useEffect(() => {
+    setEditingSuggestion(null);
+  }, [workspaceId, actorId]);
 
   useFocusTrap(panelRef, open);
 
@@ -601,31 +622,34 @@ function GlassDockImpl(): ReactElement {
 
   const handleToggle = (): void => {
     restoreFocusRef.current = open;
+    if (open) setEditingSuggestion(null);
     setOpen((prev) => !prev);
   };
 
-  const handleApply = (inboxItemId: string): void => {
-    if (!workspaceId) return;
-    applyMutation.mutate(inboxItemId, {
-      onError: (err) => {
-        toaster.show({
-          tone: 'danger',
-          message: formatApiError(err, t, 'glass_dock.errors.apply_failed'),
-        });
-      },
+  const handleApply = (suggestion: Suggestion): void => {
+    void suggestionAction.execute(suggestion).then((result) => {
+      if (result.status !== 'executed') return;
+      if (result.action === 'archive') {
+        toaster.show({ tone: 'success', message: tInbox('toast.archived') });
+      } else if (result.action === 'snooze') {
+        toaster.show({ tone: 'success', message: tInbox('toast.snoozed') });
+      }
     });
   };
 
-  const handleDismiss = (inboxItemId: string): void => {
-    if (!workspaceId) return;
-    dismissMutation.mutate(inboxItemId, {
-      onError: (err) => {
-        toaster.show({
-          tone: 'danger',
-          message: formatApiError(err, t, 'glass_dock.errors.dismiss_failed'),
-        });
-      },
-    });
+  const handleEdit = (suggestion: Suggestion): void => {
+    setEditingSuggestion(suggestion);
+  };
+
+  const handleSaveEdit = async (patch: EditSuggestionPatch): Promise<void> => {
+    if (!editingSuggestion) return;
+    if (await suggestionAction.saveEdit(editingSuggestion, patch)) {
+      setEditingSuggestion(null);
+    }
+  };
+
+  const handleDismiss = (suggestion: Suggestion): void => {
+    void suggestionAction.dismiss(suggestion);
   };
 
   const countBadge =
@@ -710,8 +734,9 @@ function GlassDockImpl(): ReactElement {
               >
                 <GlassDockSuggestionRow
                   suggestion={item}
-                  disabled={pendingInboxItemId === item.inboxItemId}
+                  disabled={pendingInboxItemId !== undefined || suggestionAction.decisionPending}
                   onApply={handleApply}
+                  onEdit={handleEdit}
                   onDismiss={handleDismiss}
                 />
               </PresenceItem>
@@ -719,6 +744,13 @@ function GlassDockImpl(): ReactElement {
           )}
         </div>
       </div>
+      <EditSuggestionDialog
+        suggestion={editingSuggestion}
+        open={editingSuggestion !== null}
+        onClose={() => setEditingSuggestion(null)}
+        onSave={handleSaveEdit}
+        saving={suggestionAction.decisionPending}
+      />
     </div>
   );
 }

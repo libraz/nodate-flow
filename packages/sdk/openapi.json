@@ -669,10 +669,20 @@
       "AiSuggestionSummary": {
         "additionalProperties": false,
         "properties": {
+          "decisionExpiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decisionState": {
+            "type": "string"
+          },
           "eventId": {
             "type": "string"
           },
           "inboxItemId": {
+            "type": "string"
+          },
+          "proposalId": {
             "type": "string"
           },
           "proposedAt": {
@@ -685,14 +695,26 @@
           "recommendedAction": {
             "type": "string"
           },
+          "revision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
           "score": {
             "format": "float",
             "type": "number"
+          },
+          "sourceVersionStatus": {
+            "enum": ["captured", "legacy"],
+            "type": "string"
           }
         },
         "required": [
           "eventId",
+          "proposalId",
           "inboxItemId",
+          "revision",
+          "sourceVersionStatus",
           "score",
           "recommendedAction",
           "reasoning",
@@ -773,6 +795,10 @@
           },
           "description": {
             "maxLength": 50000,
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "YYYY-MM-DD",
             "type": "string"
           },
           "priority": {
@@ -1404,6 +1430,55 @@
         ],
         "type": "object"
       },
+      "CaptureAsIntakeBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CaptureAsIntakeBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "intakeItemId": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["intakeItemId", "title", "created"],
+        "type": "object"
+      },
+      "CaptureAsIntakeRequestBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CaptureAsIntakeRequestBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "existingTaskId": {
+            "description": "Optional task public id to link this source to. Requires current task visibility and project-editor permission.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ChangePasswordInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1597,6 +1672,59 @@
         "required": ["prompt", "lens"],
         "type": "object"
       },
+      "CompletionPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompletionPolicy.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "policy": {
+            "type": "string"
+          },
+          "requiredConstraintIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "workRevision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["policy", "workRevision", "requiredConstraintIds"],
+        "type": "object"
+      },
+      "CompletionPolicyBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CompletionPolicyBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "policy": {
+            "enum": ["manual", "review_required"],
+            "type": "string"
+          },
+          "requiredConstraintIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["policy"],
+        "type": "object"
+      },
       "ConfirmAttachmentOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1731,12 +1859,34 @@
             "readOnly": true,
             "type": "string"
           },
+          "assigneeUserIds": {
+            "description": "Optional explicit workspace-member assignees by public user UUID",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": ["array", "null"]
+          },
+          "body": {
+            "description": "Optional task description override; defaults to the source body",
+            "maxLength": 50000,
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "Optional task due date (YYYY-MM-DD)",
+            "format": "date",
+            "type": "string"
+          },
           "projectId": {
-            "description": "Project public id (UUID v7) to create the task in",
+            "description": "Project public id (UUID v7) to create the task in; required for a new conversion and ignored when returning an existing conversion",
+            "type": "string"
+          },
+          "title": {
+            "description": "Optional task title override; defaults to the source title",
+            "maxLength": 500,
             "type": "string"
           }
         },
-        "required": ["projectId"],
         "type": "object"
       },
       "ConvertIntakeItemOutputBody": {
@@ -2187,6 +2337,37 @@
           }
         },
         "required": ["workspaceId", "targetType", "targetId"],
+        "type": "object"
+      },
+      "CreateHandoffBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateHandoffBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "dueAt": {
+            "description": "Optional Unix timestamp in seconds",
+            "format": "int64",
+            "type": "integer"
+          },
+          "fromUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "enum": ["assignee", "reviewer", "approver"],
+            "type": "string"
+          },
+          "toUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["role", "toUserId"],
         "type": "object"
       },
       "CreateImportBody": {
@@ -2650,6 +2831,46 @@
         "required": ["emoji"],
         "type": "object"
       },
+      "CreateSubmissionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/CreateSubmissionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceCriteria": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "type": ["array", "null"]
+          },
+          "attachmentIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": ["array", "null"]
+          },
+          "evidenceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": ["array", "null"]
+          },
+          "reviewerUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["reviewerUserId", "acceptanceCriteria"],
+        "type": "object"
+      },
       "CreateTaskActorInput": {
         "additionalProperties": false,
         "properties": {
@@ -3043,6 +3264,73 @@
         ],
         "type": "object"
       },
+      "DecisionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DecisionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "decidedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "submissionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["id", "submissionId", "decision", "decidedAt"],
+        "type": "object"
+      },
+      "DecisionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/DecisionResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "decisionExpiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "proposalId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": ["proposalId", "revision", "state", "decisionExpiresAt"],
+        "type": "object"
+      },
       "DeleteAttachmentOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -3394,6 +3682,12 @@
       "DescriptionVersion": {
         "additionalProperties": false,
         "properties": {
+          "authorAgentId": {
+            "type": "string"
+          },
+          "authorAgentName": {
+            "type": "string"
+          },
           "authorDisplayName": {
             "type": "string"
           },
@@ -3427,6 +3721,12 @@
             "examples": ["https://example.com/schemas/DescriptionVersionFull.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "authorAgentId": {
+            "type": "string"
+          },
+          "authorAgentName": {
             "type": "string"
           },
           "authorDisplayName": {
@@ -3472,6 +3772,22 @@
           }
         },
         "required": ["removed"],
+        "type": "object"
+      },
+      "Detail": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["title"],
         "type": "object"
       },
       "DisableLabelOutputBody": {
@@ -3866,6 +4182,9 @@
           "actorAgentName": {
             "type": "string"
           },
+          "actorAvatarUrl": {
+            "type": "string"
+          },
           "actorDisplayName": {
             "type": "string"
           },
@@ -4043,6 +4362,62 @@
           "allDay",
           "timezone",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "ExecuteResult": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ExecuteResult.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "executedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inboxItemId": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "proposalId": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "revision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "snoozeUntil": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "proposalId",
+          "revision",
+          "action",
+          "status",
+          "inboxItemId",
+          "replayed"
         ],
         "type": "object"
       },
@@ -4303,6 +4678,72 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "HandoffBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/HandoffBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dueAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fromUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resolvedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "toUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["id", "taskId", "role", "toUserId", "status", "createdAt"],
+        "type": "object"
+      },
+      "HandoffDecisionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/HandoffDecisionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "decision": {
+            "enum": ["accept", "decline", "cancel"],
+            "type": "string"
+          }
+        },
+        "required": ["decision"],
         "type": "object"
       },
       "HandoffToAgentBody": {
@@ -4718,6 +5159,9 @@
           "source": {
             "type": "string"
           },
+          "sourceDetail": {
+            "$ref": "#/components/schemas/Detail"
+          },
           "taskId": {
             "type": "string"
           },
@@ -4728,7 +5172,15 @@
             "type": "string"
           }
         },
-        "required": ["id", "workspaceId", "source", "kind", "receivedAt", "createdAt"],
+        "required": [
+          "id",
+          "workspaceId",
+          "source",
+          "kind",
+          "sourceDetail",
+          "receivedAt",
+          "createdAt"
+        ],
         "type": "object"
       },
       "Label": {
@@ -9306,6 +9758,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "sourceUrl": {
+            "description": "Validated HTTP(S) URL to the originating signal, if one exists",
+            "type": "string"
+          },
           "title": {
             "type": "string"
           },
@@ -9795,6 +10251,28 @@
           }
         },
         "required": ["publicId", "occurredAt"],
+        "type": "object"
+      },
+      "ReviewDecisionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReviewDecisionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "decision": {
+            "enum": ["approve", "reject"],
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "type": "string"
+          }
+        },
+        "required": ["decision"],
         "type": "object"
       },
       "RevokeAdminOutputBody": {
@@ -10447,6 +10925,87 @@
         "required": ["taskId", "title", "state", "transition", "confidence", "reason"],
         "type": "object"
       },
+      "SubmissionAttachment": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "sha256"],
+        "type": "object"
+      },
+      "SubmissionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SubmissionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "acceptanceCriteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionAttachment"
+            },
+            "type": ["array", "null"]
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "evidenceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewerUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "submitterUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "taskId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "revision",
+          "submitterUserId",
+          "reviewerUserId",
+          "acceptanceCriteria",
+          "evidenceUrls",
+          "attachments",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "SubtaskProposal": {
         "additionalProperties": false,
         "properties": {
@@ -10464,6 +11023,45 @@
           }
         },
         "required": ["title", "description", "priority"],
+        "type": "object"
+      },
+      "SuggestionCommandBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SuggestionCommandBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "action": {
+            "enum": ["archive", "snooze", "open"],
+            "type": "string"
+          },
+          "expectedRevision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "operationKey": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "proposalId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "snoozeUntil": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["operationKey", "expectedRevision", "action"],
         "type": "object"
       },
       "SuggestionDTO": {
@@ -10519,6 +11117,44 @@
           "targetTaskTitle",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "SuggestionDecisionBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/SuggestionDecisionBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "action": {
+            "enum": ["archive", "snooze", "open"],
+            "type": "string"
+          },
+          "deferUntil": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expectedRevision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "proposalId": {
+            "type": "string"
+          },
+          "reasoning": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "state": {
+            "enum": ["edited", "dismissed", "deferred"],
+            "type": "string"
+          }
+        },
+        "required": ["proposalId", "expectedRevision", "state"],
         "type": "object"
       },
       "Task": {
@@ -10875,6 +11511,9 @@
             "readOnly": true,
             "type": "string"
           },
+          "authorAgentId": {
+            "type": "string"
+          },
           "authorAvatarUrl": {
             "type": "string"
           },
@@ -10882,6 +11521,9 @@
             "type": "string"
           },
           "authorId": {
+            "type": "string"
+          },
+          "authorKind": {
             "type": "string"
           },
           "body": {
@@ -11288,6 +11930,58 @@
           }
         },
         "required": ["taskId", "title", "state", "dueOn", "kind", "daysUntilDue", "message"],
+        "type": "object"
+      },
+      "TaskSource": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "intakeItemId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "signalId": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["intakeItemId", "title", "createdAt"],
+        "type": "object"
+      },
+      "TaskSourcesBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskSourcesBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/TaskSource"
+            },
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["sources"],
         "type": "object"
       },
       "TestDeliveryOutputBody": {
@@ -12746,6 +13440,206 @@
           }
         },
         "required": ["ok"],
+        "type": "object"
+      },
+      "WorkflowCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "canDecideCurrentSubmission": {
+            "type": "boolean"
+          },
+          "canRequestHandoffRoles": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "canSetPolicy": {
+            "type": "boolean"
+          },
+          "canSubmit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canSetPolicy",
+          "canSubmit",
+          "canDecideCurrentSubmission",
+          "canRequestHandoffRoles"
+        ],
+        "type": "object"
+      },
+      "WorkflowDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "decidedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decidedByUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["decision"],
+        "type": "object"
+      },
+      "WorkflowHandoff": {
+        "additionalProperties": false,
+        "properties": {
+          "canCancel": {
+            "type": "boolean"
+          },
+          "canDecide": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "dueAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fromUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resolvedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "toUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["id", "role", "status", "createdAt", "canDecide", "canCancel"],
+        "type": "object"
+      },
+      "WorkflowSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/WorkflowSnapshot.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/WorkflowCapabilities"
+          },
+          "completionPolicy": {
+            "type": "string"
+          },
+          "currentSubmission": {
+            "$ref": "#/components/schemas/WorkflowSubmission"
+          },
+          "handoffs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowHandoff"
+            },
+            "type": ["array", "null"]
+          },
+          "recentSubmissions": {
+            "items": {
+              "$ref": "#/components/schemas/WorkflowSubmission"
+            },
+            "type": ["array", "null"]
+          },
+          "requiredConstraintIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "workRevision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "completionPolicy",
+          "workRevision",
+          "requiredConstraintIds",
+          "recentSubmissions",
+          "handoffs",
+          "capabilities"
+        ],
+        "type": "object"
+      },
+      "WorkflowSubmission": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptanceCriteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/SubmissionAttachment"
+            },
+            "type": ["array", "null"]
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/WorkflowDecision"
+          },
+          "evidenceUrls": {
+            "items": {
+              "type": "string"
+            },
+            "type": ["array", "null"]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewerUserId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "submitterUserId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "createdAt",
+          "acceptanceCriteria",
+          "evidenceUrls",
+          "attachments"
+        ],
         "type": "object"
       },
       "Workspace": {
@@ -18793,6 +19687,62 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/completion-policy": {
+      "post": {
+        "description": "Enables manual or review-required completion. Only explicitly selected required constraints gate completion; other task constraints remain advisory.",
+        "operationId": "tasks-completion-policy-set",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionPolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionPolicy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set the completion policy for a task",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/constraints": {
       "post": {
         "description": "Persists a constraint DSL expression on the task. The expression is parsed up front and an unparseable expression is rejected with a CONSTRAINT.PARSE.* error before persisting. Subsequent transitions and the constraint engine evaluate against this rule.",
@@ -19510,6 +20460,127 @@
           }
         ],
         "summary": "Hand a task back to a human user",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/handoffs": {
+      "post": {
+        "description": "Creates one pending handoff per role. The recipient must already be able to read the task; responsibility remains with the current holder until the recipient accepts.",
+        "operationId": "tasks-human-handoffs-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHandoffBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request a human task-role handoff",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/handoffs/{handoffId}/decision": {
+      "post": {
+        "description": "Only the pending recipient may accept or decline; the requester, the source holder, a project lead or a workspace admin may cancel. Current task visibility is rechecked. Accepting at or after the due time expires the handoff instead; accepting atomically transfers the role and appends the actor and handoff events.",
+        "operationId": "tasks-human-handoffs-decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "handoffId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffDecisionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Accept, decline or cancel a human task-role handoff",
         "tags": ["Tasks"]
       }
     },
@@ -20237,6 +21308,172 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/sources": {
+      "get": {
+        "description": "Returns bounded source details from enabled intake items linked to this task. Raw signal payloads are not exposed.",
+        "operationId": "tasks-sources-list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSourcesBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List captured sources for a task",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/submissions": {
+      "post": {
+        "description": "Creates an immutable snapshot of acceptance criteria, evidence links and attachment digests for the current task work revision. The selected reviewer must already hold a human reviewer or approver role and be able to read the task.",
+        "operationId": "tasks-submissions-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubmissionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Submit the current task work for review",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/submissions/{submissionId}/decision": {
+      "post": {
+        "description": "Only the selected reviewer, who must still hold the task reviewer or approver role, may decide a submission. Decisions are immutable.",
+        "operationId": "tasks-submissions-decide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "submissionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Approve or reject a task submission",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/timeline": {
       "get": {
         "description": "Returns the chronological event log for the task (state transitions, comments, link changes, AI suggestions). Backs the activity tab on the task detail view.",
@@ -20425,6 +21662,52 @@
           }
         ],
         "summary": "Unarchive a task",
+        "tags": ["Tasks"]
+      }
+    },
+    "/tasks/{id}/workflow": {
+      "get": {
+        "description": "Returns persisted completion policy, current-revision submission and decision, pending/recent human handoffs, and capabilities derived from the current task roles.",
+        "operationId": "tasks-workflow-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get review and human handoff state for a task",
         "tags": ["Tasks"]
       }
     },
@@ -22093,7 +23376,7 @@
     },
     "/workspaces/{wsId}/ai/suggestions": {
       "get": {
-        "description": "Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Sourced from the events table per ADR 0002 so the Glass Dock can resume across devices.",
+        "description": "Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Includes the persisted proposal identity and the caller's actor-scoped decision revision.",
         "operationId": "ai-suggestions-list",
         "parameters": [
           {
@@ -22136,10 +23419,10 @@
         "tags": ["Tasks"]
       }
     },
-    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
-      "post": {
-        "description": "Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.",
-        "operationId": "ai-suggestions-apply",
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/decision": {
+      "patch": {
+        "description": "Persists an edit, dismissal, or deferral for the selected proposal revision. Other workspace members keep their own decision state.",
+        "operationId": "ai-suggestion-decision",
         "parameters": [
           {
             "in": "path",
@@ -22158,9 +23441,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionDecisionBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionResult"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -22178,14 +23478,14 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Mark an AI suggestion as applied",
+        "summary": "Save an actor-specific AI suggestion decision",
         "tags": ["Tasks"]
       }
     },
-    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/execute": {
       "post": {
-        "description": "Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.",
-        "operationId": "ai-suggestions-dismiss",
+        "description": "Atomically applies archive or snooze with its events and idempotency receipt. Open returns a currently authorized navigation target without resolving the suggestion.",
+        "operationId": "ai-suggestion-execute",
         "parameters": [
           {
             "in": "path",
@@ -22204,9 +23504,26 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionCommandBody"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
-          "204": {
-            "description": "No Content"
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResult"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -22224,7 +23541,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Dismiss an AI suggestion",
+        "summary": "Execute a persisted AI inbox suggestion",
         "tags": ["Tasks"]
       }
     },
@@ -26668,6 +27985,68 @@
         "tags": ["Tasks"]
       }
     },
+    "/workspaces/{wsId}/inbox/{signalId}/intake": {
+      "post": {
+        "description": "Creates or returns the workspace's unique intake item for an inbox signal. The source preview is derived from the authenticated signal payload; callers never submit replacement source data.",
+        "operationId": "inbox-capture-intake",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "signalId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureAsIntakeRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureAsIntakeBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Capture an inbox source as intake",
+        "tags": ["Tasks"]
+      }
+    },
     "/workspaces/{wsId}/intake": {
       "get": {
         "description": "Returns intake items pending triage (signals + manual submissions) ordered by priority. Backs the workspace Intake board.",
@@ -27033,7 +28412,7 @@
         "tags": ["Integration"]
       },
       "post": {
-        "description": "Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.",
+        "description": "Requires workspace-admin access and instance-admin privileges. Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.",
         "operationId": "integration-mappings-create",
         "parameters": [
           {
@@ -27090,7 +28469,7 @@
     },
     "/workspaces/{wsId}/integration-mappings/{id}": {
       "delete": {
-        "description": "Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.",
+        "description": "Requires workspace-admin access and instance-admin privileges. Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.",
         "operationId": "integration-mappings-delete",
         "parameters": [
           {
@@ -27145,7 +28524,7 @@
         "tags": ["Integration"]
       },
       "patch": {
-        "description": "Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.",
+        "description": "Requires workspace-admin access and instance-admin privileges. Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.",
         "operationId": "integration-mappings-patch",
         "parameters": [
           {

@@ -179,3 +179,20 @@ describe('formatEpochDateTime', () => {
     expect(formatEpochDateTime(0, 'en')).toBeNull();
   });
 });
+
+describe('epoch formatting in a named zone', () => {
+  // 2026-03-15T20:00:00Z is already the 16th in Tokyo and still the 15th in New York.
+  const instant = Date.UTC(2026, 2, 15, 20) / 1000;
+
+  it('reads the calendar date in the given zone', () => {
+    expect(formatEpoch(instant, 'en-US', Zone.resolve('Asia/Tokyo'))).toBe('Mar 16, 2026');
+    expect(formatEpoch(instant, 'en-US', Zone.resolve('America/New_York'))).toBe('Mar 15, 2026');
+  });
+
+  it('reads the wall clock in the given zone', () => {
+    expect(formatEpochDateTime(instant, 'en-US', Zone.resolve('Asia/Tokyo'))).toContain('5:00');
+    expect(formatEpochDateTime(instant, 'en-US', Zone.resolve('America/New_York'))).toContain(
+      '4:00',
+    );
+  });
+});

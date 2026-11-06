@@ -35,6 +35,9 @@
     "ok": "成功",
     "error": "失敗"
   },
+  "task_comment": {
+    "deactivated_author": "削除された AI エージェント"
+  },
   "error": {
     "detail": "詳細を表示",
     "hide": "閉じる",

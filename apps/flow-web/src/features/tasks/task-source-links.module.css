@@ -1,0 +1,70 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block-start: var(--nf-space-4);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Title and body on the start side, the source link pinned to the end. */
+.source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-1) var(--nf-space-3);
+  min-inline-size: 0;
+  padding-block: var(--nf-space-2);
+}
+
+.source + .source {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--nf-space-1);
+  color: var(--nf-color-accent-fg);
+  font-size: var(--nf-text-sm);
+  white-space: nowrap;
+  text-underline-offset: 0.2em;
+}

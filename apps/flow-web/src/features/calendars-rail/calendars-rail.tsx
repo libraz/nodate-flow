@@ -45,6 +45,7 @@ import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import CalendarMemosPanel from '../calendar-memos/calendar-memos-panel';
 import CalendarSettingsDrawer from '../calendars/calendar-settings-drawer';
+import { calendarEventKeys } from '../events/api';
 import { type RailCalendar, usePatchOwnSubscriptionMutation, useUnsubscribeMutation } from './api';
 import styles from './calendars-rail.module.css';
 import DiscoverList from './discover-list';
@@ -79,7 +80,7 @@ export default function CalendarsRail({
   // `useCalendarsQuery` so both surfaces share the same cache row.
   const calendarQueries = useQueries({
     queries: workspaces.map((w) => ({
-      queryKey: ['calendar-events', 'calendars', w.id] as const,
+      queryKey: calendarEventKeys.calendars(w.id),
       staleTime: 60_000,
       queryFn: async (): Promise<RailCalendar[]> => {
         // The rail fans out one query per workspace; a workspace the

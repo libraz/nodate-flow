@@ -4,7 +4,11 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
-import { type UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
+import {
+  type UseSuspenseQueryResult,
+  useSuspenseInfiniteQuery,
+  useSuspenseQuery,
+} from '@tanstack/react-query';
 
 import { apiRequest } from '../../lib/api';
 
@@ -21,6 +25,10 @@ export const TIMELINE_KINDS = [
   'task.comment.added',
   'task.comment.edited',
   'task.comment.removed',
+  'task.submission.created',
+  'task.review.decided',
+  'task.handoff.requested',
+  'task.handoff.decided',
   'task.attachment.added',
   'task.attachment.removed',
   'task.actor.added',
@@ -61,6 +69,10 @@ export const timelineKeys = {
   all: ['timeline'] as const,
   scoped: (scope: TimelineScope, id: string, filters?: TimelineFilters) =>
     [...timelineKeys.all, scope, id, filters ?? {}] as const,
+  infinite: (scope: TimelineScope, id: string, filters?: TimelineFilters) => {
+    const { offset: _offset, ...stableFilters } = filters ?? {};
+    return [...timelineKeys.all, scope, id, 'infinite', stableFilters] as const;
+  },
 };
 
 import { ApiError } from '../../lib/api-error';
@@ -93,18 +105,73 @@ export interface TimelinePage {
   offset: number;
 }
 
-function normalize(data: {
-  events?: TimelineEvent[] | null;
-  total?: number;
-  limit?: number;
-  offset?: number;
-}): TimelinePage {
+function normalize(
+  data: {
+    events?: TimelineEvent[] | null;
+    total?: number;
+    limit?: number;
+    offset?: number;
+  },
+  requestFilters?: TimelineFilters,
+): TimelinePage {
   return {
     events: data.events ?? [],
     total: data.total ?? 0,
-    limit: data.limit ?? 0,
-    offset: data.offset ?? 0,
+    limit: requestFilters?.limit ?? data.limit ?? 0,
+    offset: requestFilters?.offset ?? data.offset ?? 0,
   };
+}
+
+async function fetchTimelinePage(
+  scope: TimelineScope,
+  id: string,
+  filters: TimelineFilters | undefined,
+): Promise<TimelinePage> {
+  const query = buildQuery(filters);
+  const data = await apiRequest((client) => {
+    switch (scope) {
+      case 'task':
+        return client.GET('/tasks/{id}/timeline', {
+          params: { path: { id }, query },
+        });
+      case 'project':
+        return client.GET('/projects/{prjId}/timeline', {
+          params: { path: { prjId: id }, query },
+        });
+      case 'workspace':
+        return client.GET('/workspaces/{wsId}/timeline', {
+          params: { path: { wsId: id }, query },
+        });
+    }
+  }, `Failed to load ${scope} timeline`);
+  return normalize(data, filters);
+}
+
+function useTimelineInfiniteQuery(scope: TimelineScope, id: string, filters?: TimelineFilters) {
+  return useSuspenseInfiniteQuery({
+    queryKey: timelineKeys.infinite(scope, id, filters),
+    initialPageParam: filters?.offset ?? 0,
+    queryFn: ({ pageParam }) => fetchTimelinePage(scope, id, { ...filters, offset: pageParam }),
+    getNextPageParam: (lastPage) => {
+      const nextOffset = lastPage.offset + lastPage.events.length;
+      return lastPage.events.length > 0 && nextOffset < lastPage.total ? nextOffset : undefined;
+    },
+  });
+}
+
+/** Query all timeline pages while retaining their page data in the query cache. */
+export function useTaskTimelineInfiniteQuery(taskId: string, filters?: TimelineFilters) {
+  return useTimelineInfiniteQuery('task', taskId, filters);
+}
+
+/** Query all timeline pages while retaining their page data in the query cache. */
+export function useProjectTimelineInfiniteQuery(projectId: string, filters?: TimelineFilters) {
+  return useTimelineInfiniteQuery('project', projectId, filters);
+}
+
+/** Query all timeline pages while retaining their page data in the query cache. */
+export function useWorkspaceTimelineInfiniteQuery(workspaceId: string, filters?: TimelineFilters) {
+  return useTimelineInfiniteQuery('workspace', workspaceId, filters);
 }
 
 export function useTaskTimelineQuery(

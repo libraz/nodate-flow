@@ -1,0 +1,66 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: var(--nf-control-height);
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.pickerInput,
+.pickerEmpty {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.muted,
+.pickerEmpty,
+.error {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.muted,
+.pickerEmpty {
+  color: var(--nf-color-fg-muted);
+}
+
+.error {
+  color: var(--nf-color-danger-fg);
+}

@@ -8,8 +8,10 @@ import Card from '@nodate-flow/ui/primitives/card';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { recommendedActionLabel } from '../ai-suggestions/recommended-action-label';
 import type { Suggestion } from '../ai-suggestions/store';
 import SuggestionActions from '../ai-suggestions/suggestion-actions';
+import styles from './triage-suggestion-row.module.css';
 
 export interface TriageSuggestionRowProps {
   suggestion: Suggestion;
@@ -32,44 +34,31 @@ export default function TriageSuggestionRow({
   onEdit,
   disabled = false,
 }: TriageSuggestionRowProps): ReactElement {
-  const { t } = useTranslation('ai-suggestions');
+  const { t, i18n } = useTranslation('ai-suggestions');
   const tone = scoreTone(suggestion.score);
+  const needsRefresh = suggestion.sourceVersionStatus !== 'captured' || !suggestion.proposalId;
+  const score = new Intl.NumberFormat(i18n.resolvedLanguage ?? 'en', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(suggestion.score);
   return (
-    <Card style={{ padding: 'var(--nf-space-3-5) var(--nf-space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--nf-space-3-5)' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-1-5)',
-            minInlineSize: 0,
-            flex: 1,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-2)',
-              flexWrap: 'wrap',
-            }}
-          >
-            <Badge tone={tone}>
-              {t('triage.score')}: {suggestion.score.toFixed(2)}
+    <Card className={styles.card}>
+      <div className={styles.inner}>
+        <div className={styles.body}>
+          <div className={styles.meta}>
+            <Badge tone={tone} className={styles.score}>
+              {t('triage.score')}: {score}
             </Badge>
-            <span
-              style={{
-                fontFamily: 'var(--nf-font-mono)',
-                fontSize: 'var(--nf-text-supporting)',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {suggestion.recommendedAction}
+            <span className={styles.action}>
+              {recommendedActionLabel(suggestion.recommendedAction, t)}
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: 'var(--nf-text-sm)', color: 'var(--nf-color-fg)' }}>
-            {suggestion.reasoning}
-          </p>
+          <p className={styles.reasoning}>{suggestion.reasoning}</p>
+          {needsRefresh ? (
+            <p role="note" className={styles.note}>
+              {t('triage.legacy_notice')}
+            </p>
+          ) : null}
         </div>
         <SuggestionActions
           onApply={() => {
@@ -81,7 +70,7 @@ export default function TriageSuggestionRow({
           onEdit={() => {
             onEdit(suggestion);
           }}
-          disabled={disabled}
+          disabled={disabled || needsRefresh}
         />
       </div>
     </Card>

@@ -141,13 +141,18 @@ export interface ConvertIntakeItemArgs {
   wsId: string;
   id: string;
   projectId: string;
+  title?: string;
+  body?: string;
+  assigneeUserIds?: string[];
+  dueOn?: string;
 }
 
 /**
  * POST /workspaces/{wsId}/intake/{id}/convert — promote an intake item
- * to a task in the chosen project. The backend marks the source row
+ * to a task in the chosen project, preserving the edited title/body,
+ * selected assignees, and due date. The backend marks the source row
  * `accepted` and stores the new task's id, so we invalidate both the
- * intake list and the workspace's task list cache.
+ * intake list and task-list cache.
  */
 export function useConvertIntakeItemMutation(): UseMutationResult<
   { taskId: string },
@@ -156,12 +161,26 @@ export function useConvertIntakeItemMutation(): UseMutationResult<
 > {
   const qc = useQueryClient();
   return useMutation<{ taskId: string }, ApiError, ConvertIntakeItemArgs>({
-    mutationFn: async ({ wsId, id, projectId }): Promise<{ taskId: string }> => {
+    mutationFn: async ({
+      wsId,
+      id,
+      projectId,
+      title,
+      body,
+      assigneeUserIds,
+      dueOn,
+    }): Promise<{ taskId: string }> => {
       const data = await apiRequest(
         (client) =>
           client.POST('/workspaces/{wsId}/intake/{id}/convert', {
             params: { path: { wsId, id } },
-            body: { projectId },
+            body: {
+              projectId,
+              ...(title !== undefined ? { title } : {}),
+              ...(body !== undefined ? { body } : {}),
+              ...(assigneeUserIds !== undefined ? { assigneeUserIds } : {}),
+              ...(dueOn ? { dueOn } : {}),
+            },
           }),
         'Failed to convert intake item',
       );

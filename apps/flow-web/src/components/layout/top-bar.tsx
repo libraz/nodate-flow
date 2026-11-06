@@ -11,6 +11,7 @@ import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
 import { authApiRequest } from '../../lib/api';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import CommandPalette from './command-palette';
 import { paletteShortcutLabel } from './palette-shortcut';
@@ -35,7 +36,7 @@ export default function TopBar(): ReactElement {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const user = useAuth(selectUser);
   const initials = initialsFrom(user?.displayName);
-  const avatarUrl = user?.avatarUrl ?? null;
+  const avatarUrl = resolveAvatarUrl(user?.avatarUrl);
   const avatarLabel = t('topbar.user_menu.avatar_alt', { name: user?.displayName ?? '' });
 
   const handleLogout = async (): Promise<void> => {
@@ -133,7 +134,7 @@ export default function TopBar(): ReactElement {
               <button
                 type="button"
                 className={cx(styles.searchButton, 'nf-focus-ring')}
-                aria-label={t('topbar.search.placeholder')}
+                aria-label={`${t('topbar.search.placeholder')} ${paletteShortcutLabel()}`}
                 data-search-trigger
                 aria-keyshortcuts="Meta+K Control+K"
                 onClick={() => {

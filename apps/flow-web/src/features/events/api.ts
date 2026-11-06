@@ -33,9 +33,19 @@ import type { ApiError } from '../../lib/api-error';
 export type Event = components['schemas']['EventResponse'];
 export type PatchEventBody = components['schemas']['PatchEventInputBody'];
 
+export const calendarEventKeys = {
+  all: ['calendar-events'] as const,
+  calendars: (wsId: string) => [...calendarEventKeys.all, 'calendars', wsId] as const,
+  list: (wsId: string, calId: string) => [...calendarEventKeys.all, 'list', wsId, calId] as const,
+  meEvents: ['calendar', 'me-events'] as const,
+  meTasks: ['calendar', 'me-tasks'] as const,
+  myTasks: ['me', 'tasks'] as const,
+};
+
 export const eventDetailKeys = {
+  all: ['events', 'detail'] as const,
   detail: (wsId: string, calId: string, evtId: string) =>
-    ['events', 'detail', wsId, calId, evtId] as const,
+    [...eventDetailKeys.all, wsId, calId, evtId] as const,
 };
 
 /**
@@ -50,8 +60,8 @@ function invalidate(
   evtId: string,
 ): void {
   void qc.invalidateQueries({ queryKey: eventDetailKeys.detail(wsId, calId, evtId) });
-  void qc.invalidateQueries({ queryKey: ['calendar-events', 'list', wsId, calId] });
-  void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.list(wsId, calId) });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.meEvents });
 }
 
 /** GET /workspaces/{wsId}/calendars/{calId}/events/{evtId}. */

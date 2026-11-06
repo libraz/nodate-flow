@@ -40,6 +40,19 @@ function seededClient(body: string): QueryClient {
 }
 
 describe('the description-history drawer', () => {
+  it('shows the retained agent byline on an authored version', () => {
+    const client = seededClient('Ship it');
+    client.setQueryData(descriptionHistoryKeys.all(TASK_ID), [
+      { ...VERSION, authorDisplayName: '', authorAgentName: 'Review Agent' },
+    ]);
+    renderWithProviders(
+      <DescriptionHistoryDrawer taskId={TASK_ID} currentBody="Ship it" open onClose={vi.fn()} />,
+      { queryClient: client },
+    );
+
+    expect(screen.getByText(/Review Agent/)).toBeTruthy();
+  });
+
   it('closes from a named control in the drawer itself', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

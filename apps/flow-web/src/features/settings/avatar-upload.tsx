@@ -25,6 +25,7 @@ import { type ChangeEvent, type ReactElement, useEffect, useId, useRef, useState
 import { useTranslation } from 'react-i18next';
 
 import { type ApiError, formatApiError } from '../../lib/api-error';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { confirmAction } from '../../lib/confirm-action';
 import { authStore } from '../auth/auth-store';
 import { type Me, settingsKeys } from './api';
@@ -123,8 +124,9 @@ export default function AvatarUpload({ user }: AvatarUploadProps): ReactElement 
   });
 
   const busy = uploadMut.isPending || removeMut.isPending;
-  const hasRemoteAvatar = Boolean(user.avatarUrl) && !imgError;
-  const previewSrc = localPreview ?? (hasRemoteAvatar ? (user.avatarUrl ?? null) : null);
+  const remotePreview = resolveAvatarUrl(user.avatarUrl);
+  const hasRemoteAvatar = Boolean(remotePreview) && !imgError;
+  const previewSrc = localPreview ?? (hasRemoteAvatar ? remotePreview : null);
   const initials = initialsFrom(user.displayName);
   const altText = previewSrc
     ? t('settings:profile.avatar.alt', { name: user.displayName })

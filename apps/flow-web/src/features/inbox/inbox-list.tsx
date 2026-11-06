@@ -16,29 +16,25 @@ import ToggleChip from '@nodate-flow/ui/primitives/toggle-chip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
 import { Inbox as InboxIcon } from 'lucide-react';
-import { type ChangeEvent, type ReactElement, useId, useState } from 'react';
+import { type ChangeEvent, type ReactElement, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { formatApiError } from '../../lib/api-error';
-import { useApplyAiSuggestion, useDismissAiSuggestion } from '../ai-suggestions/api';
 import EditSuggestionDialog, {
   type EditSuggestionPatch,
 } from '../ai-suggestions/edit-suggestion-dialog';
-import {
-  type Suggestion,
-  selectSuggestions,
-  suggestionsStore,
-  useSuggestions,
-} from '../ai-suggestions/store';
+import { type Suggestion, selectSuggestionsFor, useSuggestions } from '../ai-suggestions/store';
+import { useSuggestionActionExecutor } from '../ai-suggestions/use-suggestion-action-executor';
+import { selectUser, useAuth } from '../auth/auth-store';
 import { useWorkspacesQuery } from '../workspaces/api';
 import { useArchiveInboxItem, useInboxQuery, useSnoozeInboxItem } from './api';
 import styles from './inbox.module.css';
 import InboxItemRow from './inbox-item-row';
-import { useInboxTriageMutation } from './triage-api';
+import { SuggestionActorChangedError, useInboxTriageMutation } from './triage-api';
 import TriageSuggestionRow from './triage-suggestion-row';
 
 type WorkspaceFilter = string | 'all';
 
-const SNOOZE_ONE_HOUR_SEC = 60 * 60;
 const HANDOFF_KIND = 'agent.task.handoff_to_user';
 
 export default function InboxList(): ReactElement {
@@ -47,6 +43,7 @@ export default function InboxList(): ReactElement {
   const navigate = useNavigate();
   const { data: items } = useInboxQuery();
   const { data: workspaces } = useWorkspacesQuery();
+  const actorId = useAuth(selectUser)?.id ?? '';
   const archive = useArchiveInboxItem();
   const snooze = useSnoozeInboxItem();
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<WorkspaceFilter>('all');
@@ -55,15 +52,21 @@ export default function InboxList(): ReactElement {
   const triageWorkspaceId =
     selectedWorkspaceId === 'all' ? (workspaces[0]?.id ?? '') : selectedWorkspaceId;
   const triage = useInboxTriageMutation(triageWorkspaceId);
-  const applySuggestion = useApplyAiSuggestion(triageWorkspaceId);
-  const dismissSuggestion = useDismissAiSuggestion(triageWorkspaceId);
-  const suggestions = useSuggestions(selectSuggestions);
+  const suggestionAction = useSuggestionActionExecutor(triageWorkspaceId || undefined, (taskId) =>
+    navigate({ to: '/tasks/$taskId', params: { taskId } }),
+  );
+  const suggestions = useSuggestions(useShallow(selectSuggestionsFor(triageWorkspaceId, actorId)));
   // Both lists keep a removed row mounted for its exit; the filters apply to
   // the entries afterwards so the hook always sees the stable cached arrays.
   const itemPresence = usePresenceList(items, (item) => item.id);
   const suggestionPresence = usePresenceList(suggestions, (s) => s.inboxItemId);
   const stagger = useFirstLoadStagger();
   const workspaceSelectId = useId();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Reset the draft when the workspace or actor changes.
+  useEffect(() => {
+    setEditingSuggestion(null);
+  }, [triageWorkspaceId, actorId]);
 
   const handleArchive = (id: string): void => {
     archive.mutate(id, {
@@ -107,63 +110,28 @@ export default function InboxList(): ReactElement {
         });
       },
       onError: (err) => {
+        if (err instanceof SuggestionActorChangedError) {
+          toaster.show({ tone: 'danger', message: tAi('glass_dock.errors.identity_changed') });
+          return;
+        }
         toaster.show({ tone: 'danger', message: formatApiError(err, tAi, 'error') });
       },
     });
   };
 
-  const recordApply = (inboxItemId: string): void => {
-    if (!triageWorkspaceId) return;
-    // error-toast-exempt: bookkeeping after the acted-on mutation already reported its outcome
-    applySuggestion.mutate(inboxItemId);
-  };
-
   const handleApplySuggestion = (suggestion: Suggestion): void => {
-    const item = items.find((it) => it.id === suggestion.inboxItemId);
-    if (!item) {
-      toaster.show({ tone: 'danger', message: tAi('triage.missing_item') });
-      return;
-    }
-    const action = suggestion.recommendedAction;
-    if (action === 'archive') {
-      archive.mutate(item.id, {
-        onSuccess: () => {
-          toaster.show({ tone: 'success', message: t('toast.archived') });
-          recordApply(suggestion.inboxItemId);
-        },
-        onError: (err) => {
-          toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
-        },
-      });
-    } else if (action === 'snooze') {
-      const until = Math.floor(Date.now() / 1000) + SNOOZE_ONE_HOUR_SEC;
-      snooze.mutate(
-        { id: item.id, snoozeUntil: until },
-        {
-          onSuccess: () => {
-            toaster.show({ tone: 'success', message: t('toast.snoozed') });
-            recordApply(suggestion.inboxItemId);
-          },
-          onError: (err) => {
-            toaster.show({ tone: 'danger', message: formatApiError(err, t, 'toast.error') });
-          },
-        },
-      );
-    } else if (action === 'open' && item.taskId) {
-      void navigate({ to: '/tasks/$taskId', params: { taskId: item.taskId } });
-      recordApply(suggestion.inboxItemId);
-    } else {
-      recordApply(suggestion.inboxItemId);
-    }
-    suggestionsStore.getState().dismissSuggestion(suggestion.inboxItemId);
+    void suggestionAction.execute(suggestion).then((result) => {
+      if (result.status !== 'executed') return;
+      if (result.action === 'archive') {
+        toaster.show({ tone: 'success', message: t('toast.archived') });
+      } else if (result.action === 'snooze') {
+        toaster.show({ tone: 'success', message: t('toast.snoozed') });
+      }
+    });
   };
 
   const handleDismissSuggestion = (suggestion: Suggestion): void => {
-    suggestionsStore.getState().dismissSuggestion(suggestion.inboxItemId);
-    if (triageWorkspaceId) {
-      // error-toast-exempt: bookkeeping only; the suggestion is already gone from the local store
-      dismissSuggestion.mutate(suggestion.inboxItemId);
-    }
+    void suggestionAction.dismiss(suggestion);
   };
 
   const handleEditSuggestion = (suggestion: Suggestion): void => {
@@ -174,10 +142,11 @@ export default function InboxList(): ReactElement {
     setEditingSuggestion(null);
   };
 
-  const handleSaveEdit = (patch: EditSuggestionPatch): void => {
+  const handleSaveEdit = async (patch: EditSuggestionPatch): Promise<void> => {
     if (!editingSuggestion) return;
-    suggestionsStore.getState().updateSuggestion(editingSuggestion.inboxItemId, patch);
-    setEditingSuggestion(null);
+    if (await suggestionAction.saveEdit(editingSuggestion, patch)) {
+      setEditingSuggestion(null);
+    }
   };
 
   const visibleEntries = itemPresence.entries.filter(
@@ -239,6 +208,10 @@ export default function InboxList(): ReactElement {
                   onApply={handleApplySuggestion}
                   onDismiss={handleDismissSuggestion}
                   onEdit={handleEditSuggestion}
+                  disabled={
+                    suggestionAction.pendingInboxItemId !== undefined ||
+                    suggestionAction.decisionPending
+                  }
                 />
               </PresenceItem>
             ))}
@@ -275,6 +248,7 @@ export default function InboxList(): ReactElement {
         open={editingSuggestion !== null}
         onClose={handleCloseEdit}
         onSave={handleSaveEdit}
+        saving={suggestionAction.decisionPending}
       />
     </div>
   );

@@ -113,17 +113,22 @@ export function isZeroTime(iso: string): boolean {
  *
  * @param epochSec - Unix timestamp in seconds.
  * @param locale - BCP 47 language tag.
+ * @param zone - Zone the calendar date is read in; the host zone when omitted.
  * @returns Formatted date string, or `null` for zero/falsy values.
  */
 export function formatEpoch(
   epochSec: number | string | null | undefined,
   locale: string,
+  zone?: Zone,
 ): string | null {
   if (!epochSec) return null;
   const n = typeof epochSec === 'string' ? Number(epochSec) : epochSec;
   if (Number.isNaN(n)) return null;
   try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(n * 1000));
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      ...(zone ? { timeZone: zone.name } : {}),
+    }).format(new Date(n * 1000));
   } catch {
     return null;
   }
@@ -134,19 +139,23 @@ export function formatEpoch(
  *
  * @param epochSec - Unix timestamp in seconds.
  * @param locale - BCP 47 language tag.
+ * @param zone - Zone the wall clock is read in; the host zone when omitted.
  * @returns Formatted date+time string, or `null` for zero/falsy values.
  */
 export function formatEpochDateTime(
   epochSec: number | string | null | undefined,
   locale: string,
+  zone?: Zone,
 ): string | null {
   if (!epochSec) return null;
   const n = typeof epochSec === 'string' ? Number(epochSec) : epochSec;
   if (Number.isNaN(n)) return null;
   try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(n * 1000),
-    );
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(zone ? { timeZone: zone.name } : {}),
+    }).format(new Date(n * 1000));
   } catch {
     return null;
   }

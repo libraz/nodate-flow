@@ -4,16 +4,17 @@
  * `<details>` block when non-empty.
  */
 
-import { buildAvatarUrl } from '@nodate-flow/sdk';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { TFunction } from 'i18next';
 import { Bot } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { authApiBaseUrl } from '../../lib/sdk';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { INTEGRATION_SOURCE_COLORS } from '../../lib/source-colors';
 import type { TimelineEvent } from './api';
+
+export { resolveAvatarUrl as resolveActorAvatarUrl };
 
 export interface EventCardProps {
   event: TimelineEvent;
@@ -402,13 +403,11 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
   const payloadVisible = hasPayload(event.payload);
   const tag = eventSourceTag(event.type, event.payload);
 
-  // Actor avatar URL: only resolve when the event carries a real user
-  // id. Agent / MCP / system events have no user behind them, so they
-  // fall through to the initials placeholder rendered by the Avatar
-  // primitive — agent events get a bot glyph in place of the avatar.
+  // Only use the optional API projection. Agent / MCP / system events
+  // have no user avatar, so they retain the bot glyph or initials path.
   const actorAvatarSrc =
     !isAgent && event.actorUserId && event.actorUserId.length > 0
-      ? buildAvatarUrl(event.actorUserId, authApiBaseUrl)
+      ? resolveAvatarUrl(event.actorAvatarUrl)
       : undefined;
 
   return (

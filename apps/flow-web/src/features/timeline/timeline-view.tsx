@@ -13,9 +13,10 @@ import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import {
   type TimelineEvent,
   type TimelineFilters,
-  useProjectTimelineQuery,
-  useTaskTimelineQuery,
-  useWorkspaceTimelineQuery,
+  type TimelinePage,
+  useProjectTimelineInfiniteQuery,
+  useTaskTimelineInfiniteQuery,
+  useWorkspaceTimelineInfiniteQuery,
 } from './api';
 import EventCard from './event-card';
 import EventFilterBar from './event-filter-bar';
@@ -39,18 +40,14 @@ export interface TimelineViewProps {
 
 interface InnerProps {
   events: TimelineEvent[];
-  total: number;
   filters: TimelineFilters;
   onChange: (next: TimelineFilters) => void;
-  /** True while the next filter or page is loading behind the current one. */
+  /** True while a filter is loading behind the current results. */
   pending: boolean;
+  hasMore: boolean;
+  fetchingMore: boolean;
+  onLoadMore: () => void;
   workspaceId?: string;
-}
-
-interface Accumulated {
-  events: TimelineEvent[];
-  filters: TimelineFilters;
-  list: TimelineEvent[];
 }
 
 /**
@@ -102,35 +99,39 @@ function clusterBySignal(events: TimelineEvent[]): SignalCluster[] {
   return out;
 }
 
+/** Flatten loaded pages in server order, replacing duplicate IDs in place. */
+function mergeTimelinePages(pages: readonly TimelinePage[]): TimelineEvent[] {
+  const merged: TimelineEvent[] = [];
+  const positions = new Map<string, number>();
+  for (const page of pages) {
+    for (const event of page.events) {
+      const position = positions.get(event.id);
+      if (position === undefined) {
+        positions.set(event.id, merged.length);
+        merged.push(event);
+      } else {
+        merged[position] = event;
+      }
+    }
+  }
+  return merged;
+}
+
 function TimelineInner({
   events,
-  total,
   filters,
   onChange,
   pending,
+  hasMore,
+  fetchingMore,
+  onLoadMore,
   workspaceId,
 }: InnerProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
   const zone = useEffectiveZone();
 
-  // Accumulate events across pages. When filters change (kind, actor)
-  // we reset; when only offset advances we append the new page. The merge
-  // runs during render so the first paint already carries the events.
-  const [accumulated, setAccumulated] = useState<Accumulated>({ events, filters, list: events });
-  let allEvents = accumulated.list;
-  if (accumulated.events !== events || accumulated.filters !== filters) {
-    const prev = accumulated.filters;
-    const filtersChanged =
-      prev.kind !== filters.kind || prev.actor !== filters.actor || prev.limit !== filters.limit;
-    if (filtersChanged || (filters.offset ?? 0) === 0) {
-      allEvents = events;
-    } else {
-      const existingIds = new Set(accumulated.list.map((e) => e.id));
-      allEvents = [...accumulated.list, ...events.filter((e) => !existingIds.has(e.id))];
-    }
-    setAccumulated({ events, filters, list: allEvents });
-  }
+  const allEvents = events;
 
   /** Group events by local-time day, preserving server order. */
   const groups = useMemo<{ key: string; label: string; items: TimelineEvent[] }[]>(() => {
@@ -160,15 +161,9 @@ function TimelineInner({
     return out;
   }, [allEvents, locale, t, zone]);
 
-  const hasMore = allEvents.length < total;
-
-  const handleLoadMore = (): void => {
-    onChange({ ...filters, offset: allEvents.length });
-  };
-
   return (
     <div
-      aria-busy={pending || undefined}
+      aria-busy={pending || fetchingMore || undefined}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -195,7 +190,7 @@ function TimelineInner({
             gap: 'var(--nf-space-5)',
             paddingInlineEnd: 'var(--nf-space-2)',
             // The previous result stays readable, dimmed, while the next one loads.
-            opacity: pending ? 0.6 : 1,
+            opacity: pending || fetchingMore ? 0.6 : 1,
             transition: 'opacity var(--nf-duration-fast) var(--nf-ease-out)',
           }}
         >
@@ -264,9 +259,9 @@ function TimelineInner({
           <Button
             type="button"
             variant="default"
-            onClick={handleLoadMore}
-            aria-busy={pending || undefined}
-            disabled={pending}
+            onClick={onLoadMore}
+            aria-busy={pending || fetchingMore || undefined}
+            disabled={pending || fetchingMore}
           >
             {t('view.load_more')}
           </Button>
@@ -285,14 +280,17 @@ interface ScopedProps {
 }
 
 function TaskTimeline({ id, filters, onChange, pending, workspaceId }: ScopedProps): ReactElement {
-  const { data } = useTaskTimelineQuery(id, filters);
+  const query = useTaskTimelineInfiniteQuery(id, filters);
+  const events = mergeTimelinePages(query.data.pages);
   return (
     <TimelineInner
-      events={data.events}
-      total={data.total}
+      events={events}
       filters={filters}
       onChange={onChange}
       pending={pending}
+      hasMore={Boolean(query.hasNextPage)}
+      fetchingMore={query.isFetchingNextPage}
+      onLoadMore={() => void query.fetchNextPage()}
       {...(workspaceId !== undefined ? { workspaceId } : {})}
     />
   );
@@ -305,28 +303,34 @@ function ProjectTimeline({
   pending,
   workspaceId,
 }: ScopedProps): ReactElement {
-  const { data } = useProjectTimelineQuery(id, filters);
+  const query = useProjectTimelineInfiniteQuery(id, filters);
+  const events = mergeTimelinePages(query.data.pages);
   return (
     <TimelineInner
-      events={data.events}
-      total={data.total}
+      events={events}
       filters={filters}
       onChange={onChange}
       pending={pending}
+      hasMore={Boolean(query.hasNextPage)}
+      fetchingMore={query.isFetchingNextPage}
+      onLoadMore={() => void query.fetchNextPage()}
       {...(workspaceId !== undefined ? { workspaceId } : {})}
     />
   );
 }
 
 function WorkspaceTimeline({ id, filters, onChange, pending }: ScopedProps): ReactElement {
-  const { data } = useWorkspaceTimelineQuery(id, filters);
+  const query = useWorkspaceTimelineInfiniteQuery(id, filters);
+  const events = mergeTimelinePages(query.data.pages);
   return (
     <TimelineInner
-      events={data.events}
-      total={data.total}
+      events={events}
       filters={filters}
       onChange={onChange}
       pending={pending}
+      hasMore={Boolean(query.hasNextPage)}
+      fetchingMore={query.isFetchingNextPage}
+      onLoadMore={() => void query.fetchNextPage()}
       workspaceId={id}
     />
   );
@@ -340,12 +344,14 @@ export default function TimelineView({
   const [filters, setFilters] = useState<TimelineFilters>(
     initialFilters ?? { limit: 50, offset: 0 },
   );
-  // A transition keeps the current events on screen while the next filter
-  // or page suspends, instead of dropping back to the route's fallback.
+  // A transition keeps the current events on screen while a new filter
+  // query suspends, instead of dropping back to the route's fallback.
   const [pending, startTransition] = useTransition();
   const handleChange = (next: TimelineFilters): void => {
+    const filtersChanged =
+      filters.kind !== next.kind || filters.actor !== next.actor || filters.limit !== next.limit;
     startTransition(() => {
-      setFilters(next);
+      setFilters(filtersChanged ? { ...next, offset: 0 } : next);
     });
   };
 

@@ -64,6 +64,10 @@
     "recommended": "Recommended",
     "reasoning": "Reasoning",
     "missing_item": "Inbox item not found",
+    "legacy_notice": "This suggestion predates source tracking. Run triage again before applying it.",
+    "source_changed": "The source changed. Run triage again and review the updated suggestion.",
+    "already_resolved": "This suggestion was already resolved. Refresh the suggestions before continuing.",
+    "opened": "Task opened. The suggestion remains pending until you choose an action.",
     "success": "{count, plural, one {# AI suggestion ready} other {# AI suggestions ready}}",
     "success_empty": "Triage complete — no suggestions"
   },
@@ -73,6 +77,7 @@
     "reasoning_label": "Reasoning",
     "reasoning_required": "Reasoning is required",
     "save": "Save",
+    "saving": "Saving...",
     "cancel": "Cancel",
     "action": {
       "open": "Open",
@@ -83,11 +88,13 @@
   "glass_dock": {
     "title": "AI suggestions",
     "empty": "No pending suggestions",
-    "expand": "Expand suggestions panel",
+    "expand": "AI suggestions: expand panel",
     "collapse": "Collapse suggestions panel",
     "errors": {
       "apply_failed": "Could not apply the suggestion",
-      "dismiss_failed": "Could not dismiss the suggestion"
+      "dismiss_failed": "Could not dismiss the suggestion",
+      "edit_failed": "Could not save the suggestion",
+      "identity_changed": "Your account or workspace changed. Reopen the suggestion before trying again."
     }
   },
   "state_suggestions": {

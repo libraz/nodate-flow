@@ -30,6 +30,7 @@ import {
 } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
 import type { ApiError } from '../../lib/api-error';
+import { calendarEventKeys } from '../events/api';
 
 /**
  * Subscribed calendar row as returned by
@@ -72,9 +73,9 @@ export const calendarsRailKeys = {
  * one back), and the cross-workspace event aggregate.
  */
 function invalidateRailCaches(qc: ReturnType<typeof useQueryClient>, wsId: string): void {
-  void qc.invalidateQueries({ queryKey: ['calendar-events', 'calendars', wsId] });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.calendars(wsId) });
   void qc.invalidateQueries({ queryKey: calendarsRailKeys.discoverable(wsId) });
-  void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.meEvents });
 }
 
 /**
@@ -172,8 +173,8 @@ export function usePatchOwnSubscriptionMutation(): UseMutationResult<
       // PATCH does not change discoverability, so we only refresh the
       // subscribed list + the event aggregate (visibility flips drop
       // events out of the grid).
-      void qc.invalidateQueries({ queryKey: ['calendar-events', 'calendars', wsId] });
-      void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.calendars(wsId) });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.meEvents });
     },
   });
 }

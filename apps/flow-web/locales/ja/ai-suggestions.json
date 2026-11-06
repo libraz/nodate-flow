@@ -64,6 +64,10 @@
     "recommended": "推奨アクション",
     "reasoning": "理由",
     "missing_item": "対応する受信トレイ項目が見つかりません",
+    "legacy_notice": "この提案はソース追跡に対応する前に作成されました。適用する前にもう一度仕分けしてください。",
+    "source_changed": "ソースが変更されています。もう一度仕分けし、更新された提案を確認してください。",
+    "already_resolved": "この提案は既に処理されています。続ける前に提案一覧を更新してください。",
+    "opened": "タスクを開きました。アクションを選ぶまで提案は保留中のままです。",
     "success": "AI の提案を {count} 件受信しました",
     "success_empty": "仕分けが完了しました — 提案はありません"
   },
@@ -73,6 +77,7 @@
     "reasoning_label": "理由",
     "reasoning_required": "理由を入力してください",
     "save": "保存",
+    "saving": "保存中...",
     "cancel": "キャンセル",
     "action": {
       "open": "開く",
@@ -83,11 +88,13 @@
   "glass_dock": {
     "title": "AI 提案",
     "empty": "保留中の提案はありません",
-    "expand": "提案パネルを展開",
+    "expand": "AI 提案パネルを展開",
     "collapse": "提案パネルを折りたたむ",
     "errors": {
       "apply_failed": "提案を適用できませんでした",
-      "dismiss_failed": "提案を却下できませんでした"
+      "dismiss_failed": "提案を却下できませんでした",
+      "edit_failed": "提案を保存できませんでした",
+      "identity_changed": "アカウントまたはワークスペースが切り替わりました。提案を開き直してから再度お試しください。"
     }
   },
   "state_suggestions": {

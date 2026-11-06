@@ -37,6 +37,7 @@ import { type ReactElement, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError, formatApiError } from '../../../lib/api-error';
+import { resolveAvatarUrl } from '../../../lib/avatar-url';
 import { useProjectsQuery } from '../../projects/api';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskListItem, useUnarchiveTask } from '../api';
@@ -144,7 +145,8 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
   const archiverAvatarById = useMemo(() => {
     const map = new Map<string, string>();
     for (const m of membersQuery.data) {
-      if (m.avatarUrl) map.set(m.userId, m.avatarUrl);
+      const avatarSrc = resolveAvatarUrl(m.avatarUrl);
+      if (avatarSrc) map.set(m.userId, avatarSrc);
     }
     return map;
   }, [membersQuery.data]);

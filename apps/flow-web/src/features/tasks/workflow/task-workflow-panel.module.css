@@ -1,0 +1,214 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-4);
+  min-inline-size: 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+}
+
+.heading {
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--nf-text-base);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block-start: var(--nf-space-3);
+  border-block-start: 1px solid var(--nf-color-border);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.row > * {
+  min-inline-size: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.dividedList {
+  gap: 0;
+}
+
+/* Wraps so the decision buttons drop below the summary on narrow widths. */
+.handoffItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  padding-block: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.handoffItem:first-child {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+/* A row error spans the row so it sits under both the summary and the buttons. */
+.rowError {
+  flex-basis: 100%;
+}
+
+.itemHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  font-size: var(--nf-text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Trailing action row, aligned like a dialog footer. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.checkId {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: 0;
+  padding: var(--nf-space-2);
+  border: var(--nf-space-px) solid
+    color-mix(in oklch, var(--nf-color-warning) 28%, var(--nf-color-border));
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--nf-color-warning) 10%, var(--nf-color-surface));
+  color: var(--nf-color-warning-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.historySummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+  cursor: pointer;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.historyItem {
+  padding-block: var(--nf-space-2);
+  border-block-start: 1px solid var(--nf-color-border);
+}
+
+.muted {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.label {
+  margin-inline-end: var(--nf-space-1);
+}
+
+.error {
+  margin: 0;
+  color: var(--nf-color-danger-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+}
+
+.safeLink {
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  border: var(--nf-space-px) solid
+    color-mix(in oklch, var(--nf-color-warning) 28%, var(--nf-color-border));
+  border-radius: var(--nf-radius-sm);
+  background: color-mix(in oklch, var(--nf-color-warning) 10%, var(--nf-color-surface));
+  padding: var(--nf-space-2);
+}

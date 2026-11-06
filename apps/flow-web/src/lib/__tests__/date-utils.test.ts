@@ -1,7 +1,7 @@
 import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it } from 'vitest';
 
-import { dateKey, eventDateKey, eventStartOfDay, todayKey } from '../date-utils';
+import { dateKey, endOfDayUnix, eventDateKey, eventStartOfDay, todayKey } from '../date-utils';
 
 const utc = Zone.utc();
 const tokyo = Zone.resolve('Asia/Tokyo');
@@ -107,5 +107,23 @@ describe('todayKey', () => {
     const noonUTC = new Date(Date.UTC(2027, 7, 5, 22, 0, 0, 0));
     expect(todayKey(tokyo, noonUTC)).toBe('2027-08-06');
     expect(todayKey(newYork, noonUTC)).toBe('2027-08-05');
+  });
+});
+
+describe('endOfDayUnix', () => {
+  it('ends the day at local midnight in a zone east of UTC', () => {
+    expect(new Date((endOfDayUnix('2026-03-15', tokyo) + 1) * 1000).toISOString()).toBe(
+      '2026-03-15T15:00:00.000Z',
+    );
+  });
+
+  it('ends the day at local midnight in a zone west of UTC', () => {
+    expect(new Date((endOfDayUnix('2026-03-15', newYork) + 1) * 1000).toISOString()).toBe(
+      '2026-03-16T04:00:00.000Z',
+    );
+  });
+
+  it('ends a UTC day one second before midnight UTC', () => {
+    expect(endOfDayUnix('2026-03-15', utc)).toBe(Date.UTC(2026, 2, 16) / 1000 - 1);
   });
 });

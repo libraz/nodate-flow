@@ -18,12 +18,13 @@ import {
   Pencil,
   Webhook,
 } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InboxItem } from './api';
 import styles from './inbox.module.css';
 import SnoozePopover from './snooze-popover';
+import SourceIntakeDialog from './source-intake/source-intake-dialog';
 
 export interface InboxItemRowProps {
   item: InboxItem;
@@ -71,6 +72,7 @@ export default function InboxItemRow({
   onSnooze,
 }: InboxItemRowProps): ReactElement {
   const { t, i18n } = useTranslation('inbox');
+  const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
   const locale = i18n.resolvedLanguage ?? 'en';
   const icon = SOURCE_ICON[item.source] ?? InboxIcon;
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
@@ -102,10 +104,28 @@ export default function InboxItemRow({
             >
               {item.taskTitle ?? item.taskId}
             </Link>
+          ) : item.sourceDetail?.title ? (
+            <span
+              title={item.sourceDetail.title}
+              style={{
+                maxInlineSize: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontWeight: 'var(--nf-weight-medium)',
+              }}
+            >
+              {item.sourceDetail.title}
+            </span>
           ) : null}
           <span className={styles.time}>{formatRelative(item.receivedAt, locale)}</span>
         </div>
         <div className={styles.actions}>
+          {item.sourceDetail?.title && !item.taskId ? (
+            <Button type="button" size="sm" onClick={() => setSourceDialogOpen(true)}>
+              {t('sourceIntake.review')}
+            </Button>
+          ) : null}
           <SnoozePopover onSnooze={handleSnooze}>
             <Button type="button" variant="ghost" size="sm">
               {t('action.snooze')}
@@ -116,6 +136,16 @@ export default function InboxItemRow({
           </Button>
         </div>
       </div>
+      {sourceDialogOpen ? (
+        <Suspense fallback={null}>
+          <SourceIntakeDialog
+            workspaceId={item.workspaceId}
+            item={item}
+            open={sourceDialogOpen}
+            onClose={() => setSourceDialogOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </Card>
   );
 }

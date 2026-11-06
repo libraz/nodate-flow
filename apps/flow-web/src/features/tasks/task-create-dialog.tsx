@@ -187,6 +187,7 @@ export default function TaskCreateDialog({
         title: title.trim(),
         description: description.trim(),
         priority,
+        ...(dueOn ? { dueOn } : {}),
         assigneeUserIds: [...selectedAssignees],
         subtasks,
       });

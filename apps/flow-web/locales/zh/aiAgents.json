@@ -35,6 +35,9 @@
     "ok": "成功",
     "error": "失败"
   },
+  "task_comment": {
+    "deactivated_author": "已删除的 AI 代理"
+  },
   "error": {
     "detail": "显示详情",
     "hide": "隐藏",

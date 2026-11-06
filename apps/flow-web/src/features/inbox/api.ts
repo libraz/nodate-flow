@@ -30,14 +30,17 @@ import { ApiError } from '../../lib/api-error';
 
 export { ApiError as InboxApiError };
 
+/** GET /inbox — fetch the current inbox snapshot. */
+export async function fetchInboxItems(): Promise<InboxItem[]> {
+  const data = await apiRequest((client) => client.GET('/inbox'), 'Failed to load inbox');
+  return data.items ?? [];
+}
+
 /** GET /inbox — list items for the caller. */
 export function useInboxQuery(): UseSuspenseQueryResult<InboxItem[]> {
   return useSuspenseQuery({
     queryKey: inboxKeys.list(),
-    queryFn: async (): Promise<InboxItem[]> => {
-      const data = await apiRequest((client) => client.GET('/inbox'), 'Failed to load inbox');
-      return data.items ?? [];
-    },
+    queryFn: fetchInboxItems,
   });
 }
 

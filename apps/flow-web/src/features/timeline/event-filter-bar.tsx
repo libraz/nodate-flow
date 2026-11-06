@@ -77,6 +77,14 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
       chip('task.transition.cancel'),
     ],
   },
+  {
+    key: 'review',
+    chips: [chip('task.submission.created'), chip('task.review.decided')],
+  },
+  {
+    key: 'handoff',
+    chips: [chip('task.handoff.requested'), chip('task.handoff.decided')],
+  },
   // A mention is its own group rather than a chip under `comment`: the
   // backend emits it from a description edit as well as from a comment,
   // so folding it into `comment` would make the chip claim a scope it

@@ -6,13 +6,10 @@
  *
  *   1. Top-bar account-menu trigger renders an Avatar whose
  *      underlying <img src> matches the proxy URL pattern.
- *   2. When the proxy returns 404 (user has no uploaded avatar — the
- *      default state for a fresh tenant), the primitive falls back to
- *      the initials text without surfacing a console error.
- *   3. Timeline event-card uses the same proxy URL for the actor
- *      avatar of a real user-emitted event (`task.created`), and AI /
- *      system actors fall through to the initials placeholder because
- *      `actorUserId` is empty.
+ *   2. A fresh user with no avatar renders initials without requesting
+ *      the proxy; the direct proxy endpoint still returns 404.
+ *   3. Timeline event cards use only an avatar URL returned by the API,
+ *      and an uploaded image successfully decodes with its cache tag.
  *
  * All preconditions are seeded via REST (CLAUDE.md rule 7) and each
  * spec uses an isolated tenant created in this file so the parallel
@@ -20,7 +17,9 @@
  * surfaced during page navigation fail the spec.
  */
 
-import { type ConsoleMessage, expect, type Page, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
+import { deflateSync } from 'node:zlib';
+import { expect, type Page, test } from '@playwright/test';
 
 import {
   AUTH_API_URL,
@@ -32,31 +31,11 @@ import {
 } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 
-/**
- * Filter for console messages worth failing the test on.
- *
- * Browsers log `Failed to load resource: ... 404` at error level for
- * any <img> whose request 404s. The Avatar fallback under test is
- * *exactly* that case — the image fails, the primitive swaps in
- * initials, and no JS-side error is raised. We must therefore exclude
- * the resource-load 404 noise; everything else (uncaught exceptions,
- * React warnings, runtime errors logged via console.error) still
- * fails the spec.
- */
-function isFailableConsoleError(msg: ConsoleMessage): boolean {
-  if (msg.type() !== 'error') return false;
-  const text = msg.text();
-  // Network-level 404s for static assets (the avatar proxy) are
-  // expected when the user has no uploaded avatar.
-  if (text.includes('Failed to load resource') && text.includes('404')) return false;
-  return true;
-}
-
 /** Collects failable console errors over the lifetime of a Page. */
 function attachConsoleGuard(page: Page): { errors: string[] } {
   const errors: string[] = [];
   page.on('console', (msg) => {
-    if (isFailableConsoleError(msg)) {
+    if (msg.type() === 'error') {
       errors.push(`[${msg.type()}] ${msg.text()}`);
     }
   });
@@ -131,21 +110,26 @@ test.describe('avatar proxy integration', () => {
     const proxyResp = await page.request.get(`${AUTH_API_URL}/avatars/${tenant.userId}`);
     expect(proxyResp.status(), `proxy GET -> ${proxyResp.status()}`).toBe(200);
 
+    // The shell can mount before the Today route finishes loading.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
     // a11y on the rendered shell with the avatar visible.
     await checkA11y(page, ['color-contrast', 'region', 'landmark-complementary-is-top-level']);
 
     expect(guard.errors, 'no failable console errors').toEqual([]);
   });
 
-  test('avatar 404 falls back to initials without console errors', async ({ page }) => {
+  test('a fresh user has initials and makes no avatar request', async ({ page }) => {
     tenant = await createTestTenant();
     const guard = attachConsoleGuard(page);
+    const avatarRequests: string[] = [];
+    const avatarURL = avatarUrlPattern(tenant.userId);
+    page.on('request', (request) => {
+      if (avatarURL.test(request.url())) avatarRequests.push(request.url());
+    });
 
-    // Fresh tenants have NULL avatar_url, so /avatars/{userId} returns
-    // 404 if the top-bar ever asked for it. /me does NOT emit an
-    // avatarUrl in that case, so the Avatar primitive renders the
-    // initials text directly. We assert both — no <img> is mounted
-    // and the initials are visible — to lock in the contract.
+    // Fresh tenants have no avatar, so /me omits avatarUrl and the
+    // account-menu Avatar renders initials without contacting the proxy.
     await injectAuth(page.context(), tenant);
     await page.goto('/today');
 
@@ -162,25 +146,27 @@ test.describe('avatar proxy integration', () => {
     const initials = computeInitials(tenant.displayName);
     await expect(avatarTrigger).toContainText(initials);
 
-    // Independently confirm the proxy itself returns 404 for the
-    // same user, so the fallback contract isn't accidentally satisfied
-    // by a misconfigured base URL.
+    expect(avatarRequests, 'a user without an avatar makes zero image requests').toEqual([]);
+
+    // Keep the endpoint contract as a direct control. The UI must avoid
+    // requesting this URL when no avatar was supplied.
     const proxyResp = await page.request.get(`${AUTH_API_URL}/avatars/${tenant.userId}`);
     expect(proxyResp.status(), 'expected 404 from avatar proxy').toBe(404);
 
-    // Console must stay clean — the fallback path takes effect at
-    // render time, not via an <img onError>, so no resource-level
-    // 404 should ever fire either.
     expect(guard.errors, 'no failable console errors').toEqual([]);
   });
 
-  test('timeline event-card renders actor avatar via proxy URL', async ({ page }) => {
+  test('timeline event-card keeps initials when its actor has no avatar', async ({ page }) => {
     tenant = await createTestTenant();
     const guard = attachConsoleGuard(page);
+    const avatarRequests: string[] = [];
+    const avatarURL = avatarUrlPattern(tenant.userId);
+    page.on('request', (request) => {
+      if (avatarURL.test(request.url())) avatarRequests.push(request.url());
+    });
 
-    // Seed a `task.created` event; the workspace timeline picks it up
-    // with actorUserId = tenant.userId so the EventCard mounts an
-    // <img src=...> through the avatar proxy.
+    // Seed a `task.created` event. Its actor has no avatar URL, so the
+    // event card should keep initials instead of asking the proxy.
     const taskTitle = `Avatar timeline ${Date.now().toString(36)}`;
     await createTask(tenant, taskTitle);
 
@@ -199,17 +185,69 @@ test.describe('avatar proxy integration', () => {
       .first();
     await expect(eventRow).toBeVisible({ timeout: 15_000 });
 
-    // The event-card's actor avatar mounts an <img src=...> when
-    // actorUserId is non-empty. With a NULL avatar_url the image
-    // 404s but the src attribute we want to assert is set BEFORE the
-    // network round-trip — so the URL pattern check is deterministic.
-    const actorImg = eventRow.locator('img').first();
-    await expect(actorImg).toHaveAttribute('src', avatarUrlPattern(tenant.userId), {
-      timeout: 10_000,
-    });
+    const actorAvatars = eventRow.locator(`[role="img"][aria-label="${tenant.displayName}"]`);
+    const actorAvatarCount = await actorAvatars.count();
+    expect(
+      actorAvatarCount,
+      'the seeded actor must appear in the visible timeline group',
+    ).toBeGreaterThan(0);
+    const initials = computeTimelineInitials(tenant.displayName);
+    for (let i = 0; i < actorAvatarCount; i++) {
+      const actorAvatar = actorAvatars.nth(i);
+      await expect(actorAvatar).toContainText(initials);
+      await expect(actorAvatar.locator('img')).toHaveCount(0);
+    }
+    expect(avatarRequests, 'an actor without an avatar makes zero image requests').toEqual([]);
 
-    // Console must stay clean of JS-level errors.
     expect(guard.errors, 'no failable console errors').toEqual([]);
+  });
+
+  test('timeline event-card loads an uploaded avatar with its cache tag', async ({ page }) => {
+    tenant = await createTestTenant();
+    const uploaded = await uploadAvatar(tenant);
+    test.skip(
+      !uploaded,
+      'auth-api avatar storage is not configured (NF_S3_ENDPOINT). Start minio to exercise this path.',
+    );
+
+    const guard = attachConsoleGuard(page);
+    const avatarResponse = page.waitForResponse(
+      (response) =>
+        avatarUrlPattern(tenant.userId).test(response.url()) && response.status() === 200,
+      { timeout: 15_000 },
+    );
+    const taskTitle = `Avatar timeline uploaded ${Date.now().toString(36)}`;
+    await createTask(tenant, taskTitle);
+    await injectAuth(page.context(), tenant);
+    await page.goto(`/workspaces/${tenant.workspaceId}/timeline`);
+
+    const eventRow = page
+      .locator('section[aria-label]')
+      .filter({ hasText: tenant.displayName })
+      .first();
+    await expect(eventRow).toBeVisible({ timeout: 15_000 });
+    const actorImages = eventRow.locator(`[role="img"][aria-label="${tenant.displayName}"] img`);
+    const actorImageCount = await actorImages.count();
+    expect(actorImageCount, 'uploaded user avatars must appear in the timeline').toBeGreaterThan(0);
+    const response = await avatarResponse;
+    expect(response.status()).toBe(200);
+
+    for (let i = 0; i < actorImageCount; i++) {
+      const actorImg = actorImages.nth(i);
+      await expect(actorImg).toHaveAttribute('src', avatarUrlPattern(tenant.userId), {
+        timeout: 10_000,
+      });
+      const avatarSrc = await actorImg.getAttribute('src');
+      expect(avatarSrc).not.toBeNull();
+      expect(new URL(avatarSrc ?? '').searchParams.get('v')).toMatch(/^[0-9a-f]{8}$/);
+      await expect
+        .poll(() => actorImg.evaluate((img: HTMLImageElement) => img.naturalWidth), {
+          timeout: 10_000,
+        })
+        .toBeGreaterThan(0);
+    }
+
+    expect(guard.errors, 'no console errors while loading an uploaded image').toEqual([]);
   });
 });
 
@@ -231,8 +269,19 @@ function computeInitials(displayName: string): string {
   return ((first + last).toUpperCase() || '?').trim();
 }
 
+/** Compute the initials used by EventCard from the first two name parts. */
+function computeTimelineInitials(displayName: string): string {
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 /**
- * Uploads a 1×1 PNG as the tenant's avatar via the public upload
+ * Uploads a valid 8×8 PNG as the tenant's avatar via the public upload
  * endpoint. The auth-api stores it under
  * `avatars/<userId>/<attachmentId>.png` and points the user row's
  * avatar_url at that storage key, which makes /me emit a proxy URL on
@@ -244,15 +293,7 @@ function computeInitials(displayName: string): string {
  * other failure is thrown so the spec surfaces the real cause.
  */
 async function uploadAvatar(tenant: TestTenant): Promise<boolean> {
-  // 1×1 transparent PNG. Smallest legal payload accepted by the
-  // upload handler's image MIME sniff.
-  const pngBytes = Uint8Array.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-    0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
-    0x42, 0x60, 0x82,
-  ]);
+  const pngBytes = createAvatarPNG();
 
   const form = new FormData();
   form.append('file', new Blob([pngBytes], { type: 'image/png' }), 'avatar.png');
@@ -274,4 +315,71 @@ async function uploadAvatar(tenant: TestTenant): Promise<boolean> {
     return false;
   }
   throw new Error(`POST /me/avatar -> ${res.status} ${body}`);
+}
+
+/** Build a small valid RGBA PNG for the real auth-api upload endpoint. */
+function createAvatarPNG(): Uint8Array {
+  const width = 8;
+  const height = 8;
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, width);
+  headerView.setUint32(4, height);
+  header[8] = 8; // bit depth
+  header[9] = 6; // RGBA
+
+  const scanlines = new Uint8Array(height * (1 + width * 4));
+  for (let y = 0; y < height; y++) {
+    const row = y * (1 + width * 4);
+    scanlines[row] = 0; // PNG filter: None
+    for (let x = 0; x < width; x++) {
+      const pixel = row + 1 + x * 4;
+      scanlines[pixel] = 40;
+      scanlines[pixel + 1] = 100;
+      scanlines[pixel + 2] = 220;
+      scanlines[pixel + 3] = 255;
+    }
+  }
+
+  const signature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const chunks = [
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(scanlines)),
+    pngChunk('IEND', new Uint8Array()),
+  ];
+  const output = new Uint8Array(
+    signature.length + chunks.reduce((length, chunk) => length + chunk.length, 0),
+  );
+  let offset = 0;
+  output.set(signature, offset);
+  offset += signature.length;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return output;
+}
+
+/** Encode a PNG chunk with the CRC required by the decoder. */
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const typeBytes = Buffer.from(type, 'ascii');
+  const chunk = new Uint8Array(12 + data.length);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, data.length);
+  chunk.set(typeBytes, 4);
+  chunk.set(data, 8);
+  view.setUint32(8 + data.length, pngCRC32(chunk.subarray(4, 8 + data.length)));
+  return chunk;
+}
+
+/** PNG's reflected CRC-32 polynomial, applied to chunk type and data. */
+function pngCRC32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ ((crc & 1) === 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }

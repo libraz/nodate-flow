@@ -31,6 +31,7 @@ import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { confirmAction } from '../../lib/confirm-action';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import { useWorkspaceMembersQuery } from '../workspaces/api';
@@ -280,6 +281,7 @@ export default function AttendeesSection({
           {entries.map(({ key, item: a, present }) => {
             const isSelf = a.userId === selfUserId;
             const canRemove = isOwner || isSelf;
+            const avatarSrc = resolveAvatarUrl(a.avatarUrl);
             return (
               <PresenceItem
                 key={key}
@@ -293,7 +295,7 @@ export default function AttendeesSection({
                     size="sm"
                     alt={a.displayName}
                     initials={initialsOf(a.displayName)}
-                    {...(a.avatarUrl ? { src: a.avatarUrl } : {})}
+                    {...(avatarSrc ? { src: avatarSrc } : {})}
                   />
                   <div className={styles.identity}>
                     <span className={styles.name}>

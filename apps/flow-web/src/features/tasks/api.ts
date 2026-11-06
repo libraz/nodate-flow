@@ -127,6 +127,8 @@ export const tasksKeys = {
     [...tasksKeys.all, 'list', projectId, 'infinite', filters ?? {}] as const,
   myInfinite: () => [...tasksKeys.all, 'list', 'me', 'infinite'] as const,
   detail: (id: string) => [...tasksKeys.all, 'detail', id] as const,
+  workflow: (id: string) => [...tasksKeys.detail(id), 'workflow'] as const,
+  sources: (id: string) => [...tasksKeys.detail(id), 'sources'] as const,
   comments: (id: string) => [...tasksKeys.all, 'detail', id, 'comments'] as const,
   actors: (id: string) => [...tasksKeys.all, 'detail', id, 'actors'] as const,
   agentActors: (id: string) => [...tasksKeys.all, 'detail', id, 'agent-actors'] as const,

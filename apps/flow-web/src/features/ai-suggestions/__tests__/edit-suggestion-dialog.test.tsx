@@ -3,10 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it, vi } from 'vitest';
 import EditSuggestionDialog from '../edit-suggestion-dialog';
-import type { Suggestion } from '../store';
+import type { AiSuggestion } from '../store';
 
-const baseSuggestion: Suggestion = {
+const baseSuggestion: AiSuggestion = {
+  eventId: 'proposal-1',
+  proposalId: 'proposal-1',
   inboxItemId: 'inbox-1',
+  revision: 0,
+  sourceVersionStatus: 'captured',
+  proposedAt: 1_700_000_000,
   recommendedAction: 'open',
   reasoning: 'Initial reasoning',
   score: 0.9,

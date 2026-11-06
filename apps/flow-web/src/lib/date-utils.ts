@@ -161,3 +161,9 @@ export function endOfDayIso(dayKey: string, zone: Zone): string {
   const day = Day.parse(dayKey) ?? Day.of(1970, 1, 1);
   return day.endExclusive(zone).minus({ milliseconds: 1 }).toUTC().toISO() ?? '';
 }
+
+/** Unix seconds for the last whole second of `dayKey` in `zone`, for a "due by end of day" deadline. */
+export function endOfDayUnix(dayKey: string, zone: Zone): number {
+  const day = Day.parse(dayKey) ?? Day.of(1970, 1, 1);
+  return Math.floor(day.endExclusive(zone).toSeconds()) - 1;
+}

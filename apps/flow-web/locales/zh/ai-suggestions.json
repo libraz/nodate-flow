@@ -64,6 +64,10 @@
     "recommended": "推荐操作",
     "reasoning": "理由",
     "missing_item": "未找到对应的收件箱项目",
+    "legacy_notice": "此建议创建于来源追踪上线之前。请重新分类后再应用。",
+    "source_changed": "来源已更改。请重新分类并查看更新后的建议。",
+    "already_resolved": "此建议已处理。请先刷新建议列表再继续。",
+    "opened": "已打开任务。选择操作之前，此建议仍会保持待处理状态。",
     "success": "{count, plural, other {已生成 # 条 AI 建议}}",
     "success_empty": "分类完成 — 暂无建议"
   },
@@ -73,6 +77,7 @@
     "reasoning_label": "理由",
     "reasoning_required": "请填写理由",
     "save": "保存",
+    "saving": "正在保存...",
     "cancel": "取消",
     "action": {
       "open": "打开",
@@ -83,11 +88,13 @@
   "glass_dock": {
     "title": "AI 建议",
     "empty": "暂无待处理建议",
-    "expand": "展开建议面板",
+    "expand": "展开 AI 建议面板",
     "collapse": "折叠建议面板",
     "errors": {
       "apply_failed": "无法应用该建议",
-      "dismiss_failed": "无法忽略该建议"
+      "dismiss_failed": "无法忽略该建议",
+      "edit_failed": "无法保存该建议",
+      "identity_changed": "账号或工作区已切换。请重新打开该建议后再试。"
     }
   },
   "state_suggestions": {

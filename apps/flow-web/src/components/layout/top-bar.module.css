@@ -378,6 +378,10 @@
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 767px) {
+  .topBar {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
   /*
    * Hide the topbar left slot (workspace switcher) at mobile widths.
    * The switcher is rendered inside the sidebar drawer header so it
@@ -389,6 +393,32 @@
    */
   .left {
     display: none;
+  }
+
+  /*
+   * One line only: a wrapped trail would grow the header. Crumbs shrink
+   * and ellipsize; separators keep their size.
+   */
+  .breadcrumb ol {
+    flex-wrap: nowrap;
+    min-inline-size: 0;
+  }
+
+  .breadcrumb ol > li {
+    flex: 0 1 auto;
+  }
+
+  .breadcrumb ol > li[aria-hidden="true"] {
+    flex-shrink: 0;
+  }
+
+  .breadcrumb ol > li > a,
+  .breadcrumb ol > li > span {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .searchLabel,

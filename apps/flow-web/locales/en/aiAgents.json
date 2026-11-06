@@ -35,6 +35,9 @@
     "ok": "OK",
     "error": "Error"
   },
+  "task_comment": {
+    "deactivated_author": "Deleted AI agent"
+  },
   "error": {
     "detail": "Show details",
     "hide": "Hide",

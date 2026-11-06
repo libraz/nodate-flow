@@ -75,6 +75,7 @@ export interface ApplySmartArgs {
   title: string;
   description: string;
   priority: number;
+  dueOn?: string;
   assigneeUserIds: string[];
   subtasks: ApplySmartSubtask[];
 }
@@ -94,18 +95,20 @@ export function useApplySmartTask() {
   const qc = useQueryClient();
   return useMutation<ApplySmartResult, ApiError, ApplySmartArgs>({
     mutationFn: async (args) => {
+      const body = {
+        projectId: args.projectId,
+        title: args.title,
+        description: args.description,
+        priority: args.priority,
+        ...(args.dueOn ? { dueOn: args.dueOn } : {}),
+        assigneeUserIds: args.assigneeUserIds,
+        subtasks: args.subtasks,
+      };
       const data = await apiRequest(
         (client) =>
           client.POST('/workspaces/{wsId}/tasks/apply-smart', {
             params: { path: { wsId: args.workspaceId } },
-            body: {
-              projectId: args.projectId,
-              title: args.title,
-              description: args.description,
-              priority: args.priority,
-              assigneeUserIds: args.assigneeUserIds,
-              subtasks: args.subtasks,
-            },
+            body,
           }),
         'Failed to apply smart create',
       );

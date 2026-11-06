@@ -20,6 +20,7 @@
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 
 import styles from './creator-chip.module.css';
 
@@ -54,6 +55,7 @@ export default function CreatorChip({
   if (!name) return null;
 
   const label = t('event.creator.createdBy', { name });
+  const avatarSrc = resolveAvatarUrl(avatarUrl);
 
   return (
     <div className={styles.root} role="group" aria-label={label}>
@@ -62,7 +64,7 @@ export default function CreatorChip({
         size="sm"
         alt={name}
         initials={initialsOf(name)}
-        {...(avatarUrl ? { src: avatarUrl } : {})}
+        {...(avatarSrc ? { src: avatarSrc } : {})}
       />
       <span className={styles.name}>{name}</span>
     </div>

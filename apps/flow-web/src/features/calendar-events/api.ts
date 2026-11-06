@@ -35,7 +35,7 @@ import {
 } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
 import type { ApiError } from '../../lib/api-error';
-import { eventDetailKeys } from '../events/api';
+import { calendarEventKeys, eventDetailKeys } from '../events/api';
 
 export type Calendar = components['schemas']['CalendarResponse'];
 export type CalendarEventResponse = components['schemas']['EventResponse'];
@@ -87,7 +87,7 @@ function readRemembered(workspaceId: string): string | null {
 export function useCalendarsQuery(workspaceId: string | null): UseQueryResult<Calendar[], Error> {
   const wsId = workspaceId ?? '';
   return useQuery<Calendar[], Error>({
-    queryKey: ['calendar-events', 'calendars', wsId] as const,
+    queryKey: calendarEventKeys.calendars(wsId),
     enabled: wsId.length > 0,
     staleTime: 60_000,
     queryFn: async (): Promise<Calendar[]> => {
@@ -186,8 +186,8 @@ export function useEventDetailQuery(
 
 /** Invalidate the two aggregate calendar query roots after any event write. */
 function invalidateCalendarAggregates(qc: ReturnType<typeof useQueryClient>): void {
-  void qc.invalidateQueries({ queryKey: ['calendar', 'me-events'] });
-  void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.meEvents });
+  void qc.invalidateQueries({ queryKey: calendarEventKeys.meTasks });
 }
 
 /**
@@ -355,8 +355,8 @@ export function useCreateCalendarTask(): UseMutationResult<FlowTask, ApiError, C
       return data;
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['calendar', 'me-tasks'] });
-      void qc.invalidateQueries({ queryKey: ['me', 'tasks'] });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.meTasks });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.myTasks });
     },
   });
 }

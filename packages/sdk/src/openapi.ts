@@ -1798,6 +1798,26 @@ export interface paths {
         patch: operations["tasks-comments-edit"];
         trace?: never;
     };
+    "/tasks/{id}/completion-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the completion policy for a task
+         * @description Enables manual or review-required completion. Only explicitly selected required constraints gate completion; other task constraints remain advisory.
+         */
+        post: operations["tasks-completion-policy-set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/constraints": {
         parameters: {
             query?: never;
@@ -2062,6 +2082,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a human task-role handoff
+         * @description Creates one pending handoff per role. The recipient must already be able to read the task; responsibility remains with the current holder until the recipient accepts.
+         */
+        post: operations["tasks-human-handoffs-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/handoffs/{handoffId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept, decline or cancel a human task-role handoff
+         * @description Only the pending recipient may accept or decline; the requester, the source holder, a project lead or a workspace admin may cancel. Current task visibility is rechecked. Accepting at or after the due time expires the handoff instead; accepting atomically transfers the role and appends the actor and handoff events.
+         */
+        post: operations["tasks-human-handoffs-decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/infer-state": {
         parameters: {
             query?: never;
@@ -2290,6 +2350,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List captured sources for a task
+         * @description Returns bounded source details from enabled intake items linked to this task. Raw signal payloads are not exposed.
+         */
+        get: operations["tasks-sources-list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit the current task work for review
+         * @description Creates an immutable snapshot of acceptance criteria, evidence links and attachment digests for the current task work revision. The selected reviewer must already hold a human reviewer or approver role and be able to read the task.
+         */
+        post: operations["tasks-submissions-create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/submissions/{submissionId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject a task submission
+         * @description Only the selected reviewer, who must still hold the task reviewer or approver role, may decide a submission. Decisions are immutable.
+         */
+        post: operations["tasks-submissions-decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/timeline": {
         parameters: {
             query?: never;
@@ -2344,6 +2464,26 @@ export interface paths {
          * @description Restores an archived task to active state. Idempotent.
          */
         post: operations["tasks-unarchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/workflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get review and human handoff state for a task
+         * @description Returns persisted completion policy, current-revision submission and decision, pending/recent human handoffs, and capabilities derived from the current task roles.
+         */
+        get: operations["tasks-workflow-get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2831,7 +2971,7 @@ export interface paths {
         };
         /**
          * List pending AI suggestions for a workspace
-         * @description Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Sourced from the events table per ADR 0002 so the Glass Dock can resume across devices.
+         * @description Returns AI inbox triage suggestions that have been proposed but not yet applied or dismissed. Includes the persisted proposal identity and the caller's actor-scoped decision revision.
          */
         get: operations["ai-suggestions-list"];
         put?: never;
@@ -2842,7 +2982,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/apply": {
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -2851,18 +2991,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Mark an AI suggestion as applied
-         * @description Appends an ai.suggestion.applied reaction event so the suggestion drops out of the pending list. The actual side-effect (e.g. archive or assign) is performed separately by the client; this endpoint only records the user's choice.
-         */
-        post: operations["ai-suggestions-apply"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Save an actor-specific AI suggestion decision
+         * @description Persists an edit, dismissal, or deferral for the selected proposal revision. Other workspace members keep their own decision state.
+         */
+        patch: operations["ai-suggestion-decision"];
         trace?: never;
     };
-    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/dismiss": {
+    "/workspaces/{wsId}/ai/suggestions/{inboxItemId}/execute": {
         parameters: {
             query?: never;
             header?: never;
@@ -2872,10 +3012,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Dismiss an AI suggestion
-         * @description Appends an ai.suggestion.dismissed reaction event so the suggestion drops out of the pending list and the AI metrics counter records the negative signal.
+         * Execute a persisted AI inbox suggestion
+         * @description Atomically applies archive or snooze with its events and idempotency receipt. Open returns a currently authorized navigation target without resolving the suggestion.
          */
-        post: operations["ai-suggestions-dismiss"];
+        post: operations["ai-suggestion-execute"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3858,6 +3998,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{wsId}/inbox/{signalId}/intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Capture an inbox source as intake
+         * @description Creates or returns the workspace's unique intake item for an inbox signal. The source preview is derived from the authenticated signal payload; callers never submit replacement source data.
+         */
+        post: operations["inbox-capture-intake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{wsId}/intake": {
         parameters: {
             query?: never;
@@ -3941,7 +4101,7 @@ export interface paths {
         put?: never;
         /**
          * Route an external webhook source to this workspace
-         * @description Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.
+         * @description Requires workspace-admin access and instance-admin privileges. Claims an external source so its inbound webhook deliveries are filed in this workspace. A source belongs to exactly one workspace instance-wide; claiming one that is already mapped fails with INTEGRATION.MAPPING.SOURCE_ALREADY_MAPPED.
          */
         post: operations["integration-mappings-create"];
         delete?: never;
@@ -3962,14 +4122,14 @@ export interface paths {
         post?: never;
         /**
          * Release a webhook source mapping
-         * @description Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.
+         * @description Requires workspace-admin access and instance-admin privileges. Removes the mapping and releases the claim on the external source so another workspace may map it. Deliveries from that source stop being accepted immediately.
          */
         delete: operations["integration-mappings-delete"];
         options?: never;
         head?: never;
         /**
          * Rename or pause a webhook source mapping
-         * @description Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.
+         * @description Requires workspace-admin access and instance-admin privileges. Updates the display label, or sets enabled=false to stop routing deliveries from the source while keeping the claim on it. The provider and external key are immutable.
          */
         patch: operations["integration-mappings-patch"];
         trace?: never;
@@ -5260,14 +5420,22 @@ export interface components {
             suggestions: components["schemas"]["AiSuggestionSummary"][] | null;
         };
         AiSuggestionSummary: {
+            /** Format: int64 */
+            decisionExpiresAt?: number;
+            decisionState?: string;
             eventId: string;
             inboxItemId: string;
+            proposalId: string;
             /** Format: int64 */
             proposedAt: number;
             reasoning: string;
             recommendedAction: string;
+            /** Format: int32 */
+            revision: number;
             /** Format: float */
             score: number;
+            /** @enum {string} */
+            sourceVersionStatus: "captured" | "legacy";
         };
         ApplyShiftBody: {
             /**
@@ -5308,6 +5476,8 @@ export interface components {
             readonly $schema?: string;
             assigneeUserIds?: string[] | null;
             description?: string;
+            /** @description YYYY-MM-DD */
+            dueOn?: string;
             /** Format: int32 */
             priority: number;
             projectId: string;
@@ -5570,6 +5740,30 @@ export interface components {
             registrationOpen: boolean;
             totp: boolean;
         };
+        CaptureAsIntakeBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CaptureAsIntakeBody.json
+             */
+            readonly $schema?: string;
+            body?: string;
+            created: boolean;
+            intakeItemId: string;
+            sourceUrl?: string;
+            taskId?: string;
+            title: string;
+        };
+        CaptureAsIntakeRequestBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CaptureAsIntakeRequestBody.json
+             */
+            readonly $schema?: string;
+            /** @description Optional task public id to link this source to. Requires current task visibility and project-editor permission. */
+            existingTaskId?: string;
+        };
         ChangePasswordInputBody: {
             /**
              * Format: uri
@@ -5664,6 +5858,29 @@ export interface components {
             lens: components["schemas"]["Lens"];
             prompt: string;
         };
+        CompletionPolicy: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompletionPolicy.json
+             */
+            readonly $schema?: string;
+            policy: string;
+            requiredConstraintIds: string[] | null;
+            /** Format: int32 */
+            workRevision: number;
+        };
+        CompletionPolicyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CompletionPolicyBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            policy: "manual" | "review_required";
+            requiredConstraintIds?: string[] | null;
+        };
         ConfirmAttachmentOutputBody: {
             /**
              * Format: uri
@@ -5731,8 +5948,19 @@ export interface components {
              * @example https://example.com/schemas/ConvertIntakeItemBody.json
              */
             readonly $schema?: string;
-            /** @description Project public id (UUID v7) to create the task in */
-            projectId: string;
+            /** @description Optional explicit workspace-member assignees by public user UUID */
+            assigneeUserIds?: string[] | null;
+            /** @description Optional task description override; defaults to the source body */
+            body?: string;
+            /**
+             * Format: date
+             * @description Optional task due date (YYYY-MM-DD)
+             */
+            dueOn?: string;
+            /** @description Project public id (UUID v7) to create the task in; required for a new conversion and ignored when returning an existing conversion */
+            projectId?: string;
+            /** @description Optional task title override; defaults to the source title */
+            title?: string;
         };
         ConvertIntakeItemOutputBody: {
             /**
@@ -5972,6 +6200,25 @@ export interface components {
             /** @description Workspace public id (UUID v7) */
             workspaceId: string;
         };
+        CreateHandoffBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateHandoffBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Optional Unix timestamp in seconds
+             */
+            dueAt?: number;
+            /** Format: uuid */
+            fromUserId?: string;
+            /** @enum {string} */
+            role: "assignee" | "reviewer" | "approver";
+            /** Format: uuid */
+            toUserId: string;
+        };
         CreateImportBody: {
             /**
              * Format: uri
@@ -6187,6 +6434,19 @@ export interface components {
             readonly $schema?: string;
             emoji: string;
         };
+        CreateSubmissionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CreateSubmissionBody.json
+             */
+            readonly $schema?: string;
+            acceptanceCriteria: string[] | null;
+            attachmentIds?: string[] | null;
+            evidenceUrls?: string[] | null;
+            /** Format: uuid */
+            reviewerUserId: string;
+        };
         CreateTaskActorInput: {
             /**
              * @default assignee
@@ -6365,6 +6625,38 @@ export interface components {
             /** Format: int64 */
             updatedAt?: number;
             visibility: string;
+        };
+        DecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DecisionBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            decidedAt: number;
+            decision: string;
+            /** Format: uuid */
+            id: string;
+            reason?: string;
+            /** Format: uuid */
+            submissionId: string;
+        };
+        DecisionResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DecisionResult.json
+             */
+            readonly $schema?: string;
+            action?: string;
+            /** Format: int64 */
+            decisionExpiresAt: number;
+            proposalId: string;
+            reasoning?: string;
+            /** Format: int32 */
+            revision: number;
+            state: string;
         };
         DeleteAttachmentOutputBody: {
             /**
@@ -6552,6 +6844,8 @@ export interface components {
             storageObjectsDeleted: number;
         };
         DescriptionVersion: {
+            authorAgentId?: string;
+            authorAgentName?: string;
             authorDisplayName?: string;
             authorId?: string;
             /** Format: int64 */
@@ -6569,6 +6863,8 @@ export interface components {
              * @example https://example.com/schemas/DescriptionVersionFull.json
              */
             readonly $schema?: string;
+            authorAgentId?: string;
+            authorAgentName?: string;
             authorDisplayName?: string;
             authorId?: string;
             body: string;
@@ -6588,6 +6884,11 @@ export interface components {
              */
             readonly $schema?: string;
             removed: boolean;
+        };
+        Detail: {
+            body?: string;
+            sourceUrl?: string;
+            title: string;
         };
         DisableLabelOutputBody: {
             /**
@@ -6781,6 +7082,7 @@ export interface components {
         Event: {
             actorAgentId?: string;
             actorAgentName?: string;
+            actorAvatarUrl?: string;
             actorDisplayName?: string;
             actorSystemSource?: string;
             actorUserId?: string;
@@ -6852,6 +7154,27 @@ export interface components {
             updatedAt?: number;
             url?: string;
             visibility: string;
+        };
+        ExecuteResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExecuteResult.json
+             */
+            readonly $schema?: string;
+            action: string;
+            /** Format: int64 */
+            executedAt?: number;
+            inboxItemId: string;
+            operationId: string;
+            proposalId: string;
+            replayed: boolean;
+            /** Format: int32 */
+            revision: number;
+            /** Format: int64 */
+            snoozeUntil?: number;
+            status: string;
+            taskId?: string;
         };
         ExplainConstraintBody: {
             /**
@@ -6985,6 +7308,40 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        HandoffBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandoffBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            dueAt?: number;
+            /** Format: uuid */
+            fromUserId?: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            resolvedAt?: number;
+            role: string;
+            status: string;
+            /** Format: uuid */
+            taskId: string;
+            /** Format: uuid */
+            toUserId: string;
+        };
+        HandoffDecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandoffDecisionBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            decision: "accept" | "decline" | "cancel";
         };
         HandoffToAgentBody: {
             /**
@@ -7178,6 +7535,7 @@ export interface components {
             /** Format: int64 */
             receivedAt: number;
             source: string;
+            sourceDetail: components["schemas"]["Detail"];
             taskId?: string;
             taskTitle?: string;
             workspaceId: string;
@@ -9235,6 +9593,8 @@ export interface components {
             id: string;
             /** Format: int64 */
             snoozeUntil?: number;
+            /** @description Validated HTTP(S) URL to the originating signal, if one exists */
+            sourceUrl?: string;
             title: string;
             triageStatus: string;
             triagedByDisplayName?: string;
@@ -9479,6 +9839,17 @@ export interface components {
             occurredAt: number;
             /** @description Public id (UUID v7) of the newly appended compensating event */
             publicId: string;
+        };
+        ReviewDecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReviewDecisionBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            reason?: string;
         };
         RevokeAdminOutputBody: {
             /**
@@ -9793,11 +10164,56 @@ export interface components {
             title: string;
             transition: string;
         };
+        SubmissionAttachment: {
+            /** Format: uuid */
+            id: string;
+            sha256: string;
+        };
+        SubmissionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SubmissionBody.json
+             */
+            readonly $schema?: string;
+            acceptanceCriteria: string[] | null;
+            attachments: components["schemas"]["SubmissionAttachment"][] | null;
+            /** Format: int64 */
+            createdAt: number;
+            evidenceUrls: string[] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            reviewerUserId: string;
+            /** Format: int32 */
+            revision: number;
+            /** Format: uuid */
+            submitterUserId: string;
+            /** Format: uuid */
+            taskId: string;
+        };
         SubtaskProposal: {
             assignee?: components["schemas"]["AssigneeSuggestion"];
             description: string;
             priority: string;
             title: string;
+        };
+        SuggestionCommandBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SuggestionCommandBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            action: "archive" | "snooze" | "open";
+            /** Format: int32 */
+            expectedRevision: number;
+            operationKey: string;
+            proposalId?: string;
+            reasoning?: string;
+            /** Format: int64 */
+            snoozeUntil?: number;
         };
         SuggestionDTO: {
             /**
@@ -9824,6 +10240,24 @@ export interface components {
             targetTaskId: string;
             /** @description Target task title */
             targetTaskTitle: string;
+        };
+        SuggestionDecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SuggestionDecisionBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            action?: "archive" | "snooze" | "open";
+            /** Format: int64 */
+            deferUntil?: number;
+            /** Format: int32 */
+            expectedRevision: number;
+            proposalId: string;
+            reasoning?: string;
+            /** @enum {string} */
+            state: "edited" | "dismissed" | "deferred";
         };
         Task: {
             /**
@@ -9964,9 +10398,11 @@ export interface components {
              * @example https://example.com/schemas/TaskComment.json
              */
             readonly $schema?: string;
+            authorAgentId?: string;
             authorAvatarUrl?: string;
             authorDisplayName: string;
             authorId: string;
+            authorKind?: string;
             body: string;
             /** Format: int64 */
             createdAt: number;
@@ -10122,6 +10558,26 @@ export interface components {
             state: string;
             taskId: string;
             title: string;
+        };
+        TaskSource: {
+            body?: string;
+            /** Format: int64 */
+            createdAt: number;
+            intakeItemId: string;
+            kind?: string;
+            signalId?: string;
+            source?: string;
+            sourceUrl?: string;
+            title: string;
+        };
+        TaskSourcesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskSourcesBody.json
+             */
+            readonly $schema?: string;
+            sources: components["schemas"]["TaskSource"][] | null;
         };
         TestDeliveryOutputBody: {
             /**
@@ -10809,6 +11265,70 @@ export interface components {
              */
             readonly $schema?: string;
             ok: boolean;
+        };
+        WorkflowCapabilities: {
+            canDecideCurrentSubmission: boolean;
+            canRequestHandoffRoles: string[] | null;
+            canSetPolicy: boolean;
+            canSubmit: boolean;
+        };
+        WorkflowDecision: {
+            /** Format: int64 */
+            decidedAt?: number;
+            /** Format: uuid */
+            decidedByUserId?: string;
+            decision: string;
+            reason?: string;
+        };
+        WorkflowHandoff: {
+            canCancel: boolean;
+            canDecide: boolean;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            dueAt?: number;
+            /** Format: uuid */
+            fromUserId?: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            resolvedAt?: number;
+            role: string;
+            status: string;
+            /** Format: uuid */
+            toUserId?: string;
+        };
+        WorkflowSnapshot: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WorkflowSnapshot.json
+             */
+            readonly $schema?: string;
+            capabilities: components["schemas"]["WorkflowCapabilities"];
+            completionPolicy: string;
+            currentSubmission?: components["schemas"]["WorkflowSubmission"];
+            handoffs: components["schemas"]["WorkflowHandoff"][] | null;
+            recentSubmissions: components["schemas"]["WorkflowSubmission"][] | null;
+            requiredConstraintIds: string[] | null;
+            /** Format: int32 */
+            workRevision: number;
+        };
+        WorkflowSubmission: {
+            acceptanceCriteria: string[] | null;
+            attachments: components["schemas"]["SubmissionAttachment"][] | null;
+            /** Format: int64 */
+            createdAt: number;
+            decision?: components["schemas"]["WorkflowDecision"];
+            evidenceUrls: string[] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            reviewerUserId?: string;
+            /** Format: int32 */
+            revision: number;
+            /** Format: uuid */
+            submitterUserId?: string;
         };
         Workspace: {
             /**
@@ -14528,6 +15048,41 @@ export interface operations {
             };
         };
     };
+    "tasks-completion-policy-set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompletionPolicyBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionPolicy"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-constraints-add": {
         parameters: {
             query?: never;
@@ -14990,6 +15545,77 @@ export interface operations {
             };
         };
     };
+    "tasks-human-handoffs-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHandoffBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-human-handoffs-decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                handoffId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-infer-state": {
         parameters: {
             query?: never;
@@ -15427,6 +16053,108 @@ export interface operations {
             };
         };
     };
+    "tasks-sources-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskSourcesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-submissions-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubmissionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-submissions-decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-timeline-list": {
         parameters: {
             query?: {
@@ -15518,6 +16246,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnarchiveTaskOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tasks-workflow-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSnapshot"];
                 };
             };
             /** @description Error */
@@ -16574,7 +17333,7 @@ export interface operations {
             };
         };
     };
-    "ai-suggestions-apply": {
+    "ai-suggestion-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -16584,14 +17343,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionDecisionBody"];
+            };
+        };
         responses: {
-            /** @description No Content */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DecisionResult"];
+                };
             };
             /** @description Error */
             default: {
@@ -16604,7 +17369,7 @@ export interface operations {
             };
         };
     };
-    "ai-suggestions-dismiss": {
+    "ai-suggestion-execute": {
         parameters: {
             query?: never;
             header?: never;
@@ -16614,14 +17379,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionCommandBody"];
+            };
+        };
         responses: {
-            /** @description No Content */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ExecuteResult"];
+                };
             };
             /** @description Error */
             default: {
@@ -18991,6 +19762,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TriageOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "inbox-capture-intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+                signalId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CaptureAsIntakeRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureAsIntakeBody"];
                 };
             };
             /** @description Error */

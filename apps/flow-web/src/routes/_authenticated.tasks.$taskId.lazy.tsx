@@ -71,7 +71,10 @@ import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-ta
 import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import TaskAttachments from '../features/tasks/task-attachments';
+import TaskSourceLinks from '../features/tasks/task-source-links';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
+import TaskRoleAssignments from '../features/tasks/workflow/task-role-assignments';
+import TaskWorkflowPanel from '../features/tasks/workflow/task-workflow-panel';
 import { useTaskTimelineQuery } from '../features/timeline/api';
 import ReplayPanel from '../features/timeline/replay-panel';
 import TaskMiniTimeline from '../features/timeline/task-mini-timeline';
@@ -1049,6 +1052,22 @@ function Sidebar({
         }}
       >
         <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
+          {t('taskWorkflow.rolesHeading')}
+        </h2>
+        <Suspense fallback={<SectionSkeleton />}>
+          <TaskRoleAssignments key={id} taskId={id} workspaceId={workspaceId} />
+        </Suspense>
+      </Card>
+
+      <Card
+        style={{
+          padding: 'var(--nf-space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-2)',
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
           {tAgents('task_detail.agent.assign.title')}
         </h2>
         <Suspense fallback={<SectionSkeleton />}>
@@ -1353,6 +1372,15 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           id={id}
           initial={task.description ?? ''}
           workspaceId={task.workspaceId}
+        />
+        <Suspense fallback={<SectionSkeleton />}>
+          <TaskSourceLinks taskId={id} />
+        </Suspense>
+        <TaskWorkflowPanel
+          key={id}
+          taskId={id}
+          workspaceId={task.workspaceId}
+          projectId={task.projectId}
         />
         {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>

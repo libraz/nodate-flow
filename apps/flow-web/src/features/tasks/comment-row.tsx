@@ -64,6 +64,7 @@ export default function CommentRow({
   locale,
 }: CommentRowProps): ReactElement {
   const { t } = useTranslation('common');
+  const { t: tAI } = useTranslation('aiAgents');
   const edit = useEditTaskComment();
   const del = useDeleteTaskComment();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,6 +73,11 @@ export default function CommentRow({
 
   const isAuthor = currentUserId != null && comment.authorId === currentUserId;
   const edited = isEdited(comment);
+  const authorName =
+    comment.authorDisplayName ||
+    (comment.authorKind === 'agent' && !comment.authorAgentId
+      ? tAI('task_comment.deactivated_author')
+      : t('common.deactivated_user'));
 
   const enterEdit = (): void => {
     setDraft(comment.body);
@@ -119,7 +125,12 @@ export default function CommentRow({
   return (
     <Card className={styles.card}>
       <header className={styles.header}>
-        <strong>{comment.authorDisplayName || t('common.deactivated_user')}</strong>
+        <strong
+          data-author-kind={comment.authorKind ?? 'user'}
+          data-author-agent-id={comment.authorAgentId || undefined}
+        >
+          {authorName}
+        </strong>
         <div className={styles.headerRight}>
           <span className={styles.timestamp}>{formatEpochDateTime(comment.createdAt, locale)}</span>
           {edited ? <span className={styles.editedHint}>{t('tasks.comments.edited')}</span> : null}

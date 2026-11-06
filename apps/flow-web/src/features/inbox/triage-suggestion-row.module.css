@@ -1,0 +1,51 @@
+.card {
+  padding-block: var(--nf-space-3-5);
+  padding-inline: var(--nf-space-4);
+}
+
+.inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nf-space-3-5);
+}
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+  min-inline-size: 0;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.score {
+  font-variant-numeric: tabular-nums;
+}
+
+.action {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-medium);
+}
+
+.reasoning,
+.note {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.reasoning {
+  color: var(--nf-color-fg);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  color: var(--nf-color-fg-muted);
+}

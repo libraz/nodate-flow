@@ -7,9 +7,11 @@
 import { type UseMutationResult, useMutation } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
+import { fetchAiSuggestions, SuggestionActorChangedError } from '../ai-suggestions/api';
 import { type Suggestion, suggestionsStore } from '../ai-suggestions/store';
+import { authStore, selectUser, useAuth } from '../auth/auth-store';
 
-export { ApiError as InboxApiError };
+export { ApiError as InboxApiError, SuggestionActorChangedError };
 
 export interface InboxTriageArgs {
   /** Optional cap on items to score. Backend default 20, max 50. */
@@ -23,9 +25,17 @@ export interface InboxTriageArgs {
  */
 export function useInboxTriageMutation(
   workspaceId: string,
-): UseMutationResult<Suggestion[], ApiError, InboxTriageArgs | undefined> {
+): UseMutationResult<
+  Suggestion[],
+  ApiError | SuggestionActorChangedError,
+  InboxTriageArgs | undefined
+> {
+  const actorId = useAuth(selectUser)?.id ?? '';
   return useMutation({
     mutationFn: async (args: InboxTriageArgs | undefined): Promise<Suggestion[]> => {
+      if (!workspaceId || !actorId || authStore.getState().user?.id !== actorId) {
+        throw new SuggestionActorChangedError();
+      }
       const body: InboxTriageArgs = args ?? {};
       const data = await apiRequest(
         (client) =>
@@ -35,7 +45,19 @@ export function useInboxTriageMutation(
           }),
         'Failed to triage inbox',
       );
-      return data.suggestions ?? [];
+      const triagedItemIDs = new Set(
+        (data.suggestions ?? []).map((suggestion) => suggestion.inboxItemId),
+      );
+      if (authStore.getState().user?.id !== actorId) {
+        throw new SuggestionActorChangedError();
+      }
+      const persistedSuggestions = await fetchAiSuggestions(workspaceId);
+      if (authStore.getState().user?.id !== actorId) {
+        throw new SuggestionActorChangedError();
+      }
+      return persistedSuggestions
+        .filter((suggestion) => triagedItemIDs.has(suggestion.inboxItemId))
+        .map((suggestion) => ({ ...suggestion, workspaceId, actorId }));
     },
     onSuccess: (suggestions) => {
       suggestionsStore.getState().pushSuggestions(suggestions);

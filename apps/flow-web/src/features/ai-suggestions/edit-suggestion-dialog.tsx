@@ -1,7 +1,6 @@
 /**
  * EditSuggestionDialog — modal form for editing an AI triage suggestion's
- * `recommendedAction` and `reasoning` before applying. Local edits
- * only; the `ai.suggestion.edited` event is wired in a later polish.
+ * `recommendedAction` and `reasoning` before saving an actor-scoped decision.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -14,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import styles from './edit-suggestion-dialog.module.css';
-import type { Suggestion } from './store';
+import type { AiSuggestion } from './store';
 
 const ACTIONS = ['open', 'snooze', 'archive'] as const;
 type Action = (typeof ACTIONS)[number];
@@ -27,10 +26,11 @@ const editSchema = z.object({
 export type EditSuggestionPatch = z.infer<typeof editSchema>;
 
 export interface EditSuggestionDialogProps {
-  suggestion: Suggestion | null;
+  suggestion: AiSuggestion | null;
   open: boolean;
   onClose: () => void;
-  onSave: (patch: EditSuggestionPatch) => void;
+  onSave: (patch: EditSuggestionPatch) => void | Promise<void>;
+  saving?: boolean;
 }
 
 function isAction(value: string): value is Action {
@@ -42,6 +42,7 @@ export default function EditSuggestionDialog({
   open,
   onClose,
   onSave,
+  saving = false,
 }: EditSuggestionDialogProps): ReactElement {
   const { t } = useTranslation('ai-suggestions');
   const [action, setAction] = useState<Action>('open');
@@ -65,7 +66,7 @@ export default function EditSuggestionDialog({
       setError(t('edit.reasoning_required'));
       return;
     }
-    onSave(result.data);
+    void onSave(result.data);
   };
 
   return (
@@ -76,6 +77,7 @@ export default function EditSuggestionDialog({
             <Select
               {...control}
               value={action}
+              disabled={saving}
               onChange={(e) => {
                 const v = e.target.value;
                 if (isAction(v)) setAction(v);
@@ -93,16 +95,17 @@ export default function EditSuggestionDialog({
               {...control}
               value={reasoning}
               rows={4}
+              disabled={saving}
               onChange={(e) => setReasoning(e.target.value)}
             />
           )}
         </FormField>
         <div className={styles.actions}>
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
             {t('edit.cancel')}
           </Button>
-          <Button type="submit" variant="primary" size="sm">
-            {t('edit.save')}
+          <Button type="submit" variant="primary" size="sm" disabled={saving}>
+            {saving ? t('edit.saving') : t('edit.save')}
           </Button>
         </div>
       </form>

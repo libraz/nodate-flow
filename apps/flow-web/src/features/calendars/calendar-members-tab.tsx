@@ -24,6 +24,7 @@ import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'r
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { confirmAction } from '../../lib/confirm-action';
 import styles from './calendar-members-tab.module.css';
 import {
@@ -138,6 +139,7 @@ export default function CalendarMembersTab({
           {entries.map(({ key, item: member, present }) => {
             const tone = ROLE_TONE[member.role] ?? 'neutral';
             const lockOwner = isLastOwner(member);
+            const avatarSrc = resolveAvatarUrl(member.avatarUrl);
             return (
               <PresenceItem
                 key={key}
@@ -151,7 +153,7 @@ export default function CalendarMembersTab({
                     alt={member.displayName}
                     initials={member.displayName.slice(0, 2).toUpperCase()}
                     size="sm"
-                    {...(member.avatarUrl ? { src: member.avatarUrl } : {})}
+                    {...(avatarSrc ? { src: avatarSrc } : {})}
                   />
                   <div className={styles.identity}>
                     <span className={styles.displayName}>{member.displayName}</span>

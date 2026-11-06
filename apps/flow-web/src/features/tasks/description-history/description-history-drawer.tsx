@@ -171,7 +171,8 @@ function VersionEntry({ version, active, locale, onSelect }: VersionEntryProps):
     ? `${styles.versionItem} ${styles.versionItemActive}`
     : styles.versionItem;
   const label = t('tasks.history.version_label', { number: version.versionNumber });
-  const author = version.authorDisplayName ?? t('tasks.history.unknown_author');
+  const author =
+    version.authorDisplayName || version.authorAgentName || t('tasks.history.unknown_author');
   const when = formatDateTime(new Date(version.createdAt * 1000).toISOString(), locale);
   return (
     <button type="button" className={className} onClick={onSelect}>

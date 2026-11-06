@@ -48,17 +48,18 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
     const controller = new AbortController();
     let cancelled = false;
     let reconnectDelayMs = RECONNECT_BASE_MS;
+    let receivedResync = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const armFallback = (): void => {
-      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (fallbackTimer !== null) return;
       fallbackTimer = setTimeout(() => {
         setStreamHealthy(false);
       }, FALLBACK_AFTER_MS);
     };
 
     const clearFallback = (): void => {
-      if (fallbackTimer) {
+      if (fallbackTimer !== null) {
         clearTimeout(fallbackTimer);
         fallbackTimer = null;
       }
@@ -78,7 +79,11 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
           toaster.show({ tone: 'info', message: i18n.t('realtime.ai_invocation') });
           break;
         case 'resync':
-          toaster.show({ tone: 'warning', message: i18n.t('realtime.resync'), duration: 3_000 });
+          // The first resync of every subscription refreshes silently; later ones notify.
+          if (receivedResync) {
+            toaster.show({ tone: 'warning', message: i18n.t('realtime.resync'), duration: 3_000 });
+          }
+          receivedResync = true;
           break;
         // task.changed — intentionally no toast (too noisy)
       }
@@ -103,6 +108,8 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
 
     const connect = async (): Promise<void> => {
       while (!cancelled) {
+        // The outage clock runs across failed retries; only a successful connect clears it.
+        armFallback();
         const token = authStore.getState().accessToken;
         if (!token) {
           // No access token yet. Wait a beat and retry.
@@ -111,7 +118,6 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
           continue;
         }
 
-        armFallback();
         try {
           const res = await fetch(`${apiBaseUrl}/workspaces/${workspaceId}/stream`, {
             method: 'GET',
@@ -156,6 +162,9 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
         }
 
         if (cancelled) return;
+        // The reader may end after an established stream closes. Start the
+        // next outage clock now, before waiting for the reconnect backoff.
+        armFallback();
         await sleep(reconnectDelayMs);
         reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS);
       }
@@ -166,7 +175,7 @@ export function useWorkspaceStream(workspaceId: string | undefined): void {
     return () => {
       cancelled = true;
       controller.abort();
-      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
       // Do not set streamHealthy to true — the stream is disconnecting,
       // not healthy. Let the next mount's connect() manage the state.
     };

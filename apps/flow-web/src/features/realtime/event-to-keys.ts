@@ -1,16 +1,35 @@
 /**
- * event-to-keys — pure mapping from wire-format stream events to the
- * TanStack Query key prefixes they should invalidate.
- *
- * Single source of truth for "what does each SSE event kind mean to
- * the UI layer". Keeping the mapping here (and not inside
- * `use-workspace-stream.ts`) makes it trivial to unit test without a
- * running fetch reader.
- *
- * Keys are returned as **prefixes**: the caller passes each one to
- * `queryClient.invalidateQueries({ queryKey })` and TanStack Query's
- * prefix-match semantics take care of the rest.
+ * event-to-keys — map wire-format stream events to prefixes from the
+ * query-key factories owned by the features that read the changed data.
  */
+
+import { agentsKeys } from '../ai-providers/agents-api';
+import { aiInvocationsKeys } from '../ai-providers/invocations-api';
+import { aiSuggestionsKeys } from '../ai-suggestions/api';
+import { autoActionsKeys } from '../auto-actions/api';
+import { calendarMemosKeys } from '../calendar-memos/api';
+import { calendarSettingsKeys } from '../calendars/api';
+import { calendarMembersKeys } from '../calendars/members-api';
+import { calendarsRailKeys } from '../calendars-rail/api';
+import { dashboardKeys } from '../dashboard/api';
+import { calendarEventKeys, eventDetailKeys } from '../events/api';
+import { favoritesKeys } from '../favorites/api';
+import { importsKeys } from '../imports-exports/api';
+import { inboxKeys } from '../inbox/api';
+import { intakeKeys } from '../inbox/intake/api';
+import { labelsKeys } from '../labels/api';
+import { stateSuggestionsKeys } from '../nl-query/state-suggestions';
+import { notificationKeys } from '../notifications/api';
+import { pageKeys } from '../pages/api';
+import { publicSharesKeys } from '../public-shares/api';
+import { reactionsKeys } from '../reactions/api';
+import { relationKeys } from '../relations/api';
+import { remindersKeys } from '../reminders/api';
+import { tasksKeys } from '../tasks/api';
+import { lensesKeys } from '../tasks/lens-api';
+import { timeboxKeys } from '../timeboxes/api';
+import { timelineKeys } from '../timeline/api';
+import { weeklyDigestKeys } from '../weekly-digest/api';
 
 export type StreamKind =
   | 'task.changed'
@@ -37,103 +56,94 @@ export interface StreamEvent {
   at: number;
 }
 
-/**
- * keysForEvent returns the list of queryKey prefixes that should be
- * invalidated in response to the given stream event. The returned
- * keys are ordered from most specific to least specific so the caller
- * can stop early if desired.
- */
-export function keysForEvent(evt: StreamEvent): readonly (readonly unknown[])[] {
-  const ws = evt.workspaceId;
-  switch (evt.kind) {
-    case 'task.changed':
-      return [
-        ['auto-actions', 'list', ws],
-        ['reminders', 'list', ws],
-        ['state-suggestions', 'list', ws],
-        ['weekly-digest', 'workspace', ws],
-        // Task lists + task detail caches don't namespace by workspace
-        // today, so fall back to the root prefix.
-        ['tasks'],
-      ];
-    case 'ai.suggestion.changed':
-      return [['ai-suggestions', 'list', ws]];
-    case 'ai.invocation.written':
-      return [['ai-invocations', 'list', ws]];
-    case 'notification.changed':
-      return [
-        ['notifications', 'list'],
-        ['notifications', 'unread-count'],
-      ];
-    case 'timebox.changed':
-      return [
-        ['timeboxes', 'list', ws],
-        ['timeboxes', 'detail'],
-      ];
-    case 'relation.changed':
-      return [
-        ['relation-suggestions', 'list', ws],
-        ['relation-suggestions', 'task'],
-      ];
-    case 'lens.changed':
-      return [['lenses', 'list', ws]];
-    case 'page.changed':
-      return [['pages', 'list', ws]];
-    case 'dashboard.changed':
-      return [['dashboard', 'list', ws]];
-    case 'label.changed':
-      return [['labels', 'list', ws], ['tasks']];
-    case 'reaction.changed':
-      return [['reactions']];
-    case 'favorite.changed':
-      return [['favorites', 'list', ws]];
-    case 'intake.changed':
-      // The intake list is cached per (workspace, status), so the
-      // workspace prefix is what reaches every status tab. A longer
-      // prefix would match nothing and leave the open tab stale.
-      return [['intake', ws]];
-    case 'import.changed':
-      return [['imports', 'list', ws]];
-    case 'calendar.changed':
-      // calendar.* and share.* appends: public-shares, calendars,
-      // events, members, memos. Invalidations are no-ops for pages
-      // that don't subscribe.
-      return [
-        ['calendars', ws],
-        ['events', ws],
-        ['public-shares', ws],
-      ];
-    case 'item.changed':
-      // item.* is itemkit's atomic task+event mutation. Because one
-      // transaction touches both sides of the link, invalidate both
-      // caches plus any derived views the reconciler emits to.
-      return [['tasks'], ['calendars', ws], ['events', ws]];
-    case 'resync':
-      return [
-        ['auto-actions', 'list', ws],
-        ['reminders', 'list', ws],
-        ['state-suggestions', 'list', ws],
-        ['weekly-digest', 'workspace', ws],
-        ['ai-suggestions', 'list', ws],
-        ['ai-invocations', 'list', ws],
-        ['notifications', 'list'],
-        ['notifications', 'unread-count'],
-        ['timeboxes', 'list', ws],
-        ['timeboxes', 'detail'],
-        ['relation-suggestions', 'list', ws],
-        ['relation-suggestions', 'task'],
-        ['lenses', 'list', ws],
-        ['pages', 'list', ws],
-        ['dashboard', 'list', ws],
-        ['labels', 'list', ws],
-        ['reactions'],
-        ['favorites', 'list', ws],
-        ['intake', ws],
-        ['imports', 'list', ws],
-        ['calendars', ws],
-        ['events', ws],
-        ['public-shares', ws],
-        ['tasks'],
-      ];
+type QueryKeyPrefix = readonly unknown[];
+type EventKind = Exclude<StreamKind, 'resync'>;
+type EventKeyFactory = (workspaceId: string) => readonly QueryKeyPrefix[];
+
+function workspaceIntakePrefix(workspaceId: string): QueryKeyPrefix {
+  return intakeKeys.list(workspaceId, 'pending').slice(0, 2);
+}
+
+function workspaceMemoPrefix(workspaceId: string): QueryKeyPrefix {
+  return calendarMemosKeys.list(workspaceId, '').slice(0, 2);
+}
+
+function workspaceCalendarMemberPrefix(workspaceId: string): QueryKeyPrefix {
+  return calendarMembersKeys.list(workspaceId, '').slice(0, 3);
+}
+
+function workspaceCalendarDetailPrefix(workspaceId: string): QueryKeyPrefix {
+  return calendarSettingsKeys.detail(workspaceId, '').slice(0, 3);
+}
+
+function workspaceCalendarCountPrefix(workspaceId: string): QueryKeyPrefix {
+  return calendarSettingsKeys.eventCount(workspaceId, '').slice(0, 3);
+}
+
+function calendarPrefixes(workspaceId: string): readonly QueryKeyPrefix[] {
+  return [
+    calendarEventKeys.all,
+    calendarEventKeys.meEvents,
+    calendarEventKeys.meTasks,
+    eventDetailKeys.all,
+    calendarsRailKeys.discoverable(workspaceId),
+    workspaceCalendarDetailPrefix(workspaceId),
+    workspaceCalendarCountPrefix(workspaceId),
+    workspaceMemoPrefix(workspaceId),
+    workspaceCalendarMemberPrefix(workspaceId),
+    publicSharesKeys.list(workspaceId),
+  ];
+}
+
+/** The compiler requires a factory mapping for each accepted stream kind. */
+const eventKeyRegistry: Record<EventKind, EventKeyFactory> = {
+  'task.changed': (ws) => [
+    inboxKeys.all,
+    workspaceIntakePrefix(ws),
+    agentsKeys.list(ws),
+    autoActionsKeys.list(ws),
+    remindersKeys.list(ws),
+    stateSuggestionsKeys.list(ws),
+    weeklyDigestKeys.forWorkspace(ws),
+    tasksKeys.all,
+    timelineKeys.all,
+  ],
+  'ai.suggestion.changed': (ws) => [aiSuggestionsKeys.listPrefix(ws), timelineKeys.all],
+  'ai.invocation.written': (ws) => [aiInvocationsKeys.list(ws)],
+  'notification.changed': () => [notificationKeys.list(), notificationKeys.unreadCount()],
+  'timebox.changed': (ws) => [timeboxKeys.list(ws)],
+  'relation.changed': () => [relationKeys.all],
+  'lens.changed': () => [lensesKeys.all],
+  'page.changed': () => [pageKeys.all, timelineKeys.all],
+  'dashboard.changed': (ws) => [dashboardKeys.list(ws)],
+  'label.changed': () => [labelsKeys.all, tasksKeys.all],
+  'reaction.changed': () => [reactionsKeys.all],
+  'favorite.changed': (ws) => [favoritesKeys.list(ws)],
+  'intake.changed': (ws) => [workspaceIntakePrefix(ws), tasksKeys.all, timelineKeys.all],
+  'import.changed': () => [importsKeys.all],
+  'calendar.changed': (ws) => [...calendarPrefixes(ws), timelineKeys.all],
+  'item.changed': (ws) => [tasksKeys.all, ...calendarPrefixes(ws), timelineKeys.all],
+};
+
+function uniquePrefixes(keys: readonly QueryKeyPrefix[]): QueryKeyPrefix[] {
+  const seen = new Set<string>();
+  return keys.filter((key) => {
+    const serialized = JSON.stringify(key);
+    if (seen.has(serialized)) return false;
+    seen.add(serialized);
+    return true;
+  });
+}
+
+/** Return prefixes from feature factories; resync combines the full registry. */
+export function keysForEvent(evt: StreamEvent): readonly QueryKeyPrefix[] {
+  if (evt.kind === 'resync') {
+    return uniquePrefixes(
+      Object.values(eventKeyRegistry).flatMap((factory) => factory(evt.workspaceId)),
+    );
   }
+  const factory = Object.hasOwn(eventKeyRegistry, evt.kind)
+    ? eventKeyRegistry[evt.kind as EventKind]
+    : undefined;
+  return factory?.(evt.workspaceId) ?? [];
 }

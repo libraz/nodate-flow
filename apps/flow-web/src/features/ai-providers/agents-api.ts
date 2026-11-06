@@ -38,12 +38,16 @@ export interface AgentSummary {
   updatedAt?: number;
 }
 
+export const agentsKeys = {
+  list: (workspaceId: string) => ['ai-agents', workspaceId] as const,
+};
+
 /** useAgentsQuery lists the workspace's AI agents. */
 export function useAgentsQuery(
   workspaceId: string,
 ): UseSuspenseQueryResult<{ total: number; agents: AgentSummary[] }> {
   return useSuspenseQuery({
-    queryKey: ['ai-agents', workspaceId],
+    queryKey: agentsKeys.list(workspaceId),
     queryFn: async () => {
       const data = await apiRequest(
         (client) =>
@@ -135,7 +139,7 @@ export function useCreateAgent(): UseMutationResult<AgentSummary, Error, CreateA
       return data as AgentSummary;
     },
     onSuccess: (_res, { workspaceId }) => {
-      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+      qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
     },
   });
 }
@@ -195,7 +199,7 @@ export function useUpdateAgentSchedule(): UseMutationResult<
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
-      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+      qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
     },
   });
 }
@@ -229,7 +233,7 @@ export function useUpdateAgentEventTriggers(): UseMutationResult<
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
-      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+      qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
     },
   });
 }
@@ -256,7 +260,7 @@ export function usePauseAgent(): UseMutationResult<{ ok: true }, Error, PauseAge
       return { ok: true };
     },
     onSuccess: (_res, { workspaceId }) => {
-      qc.invalidateQueries({ queryKey: ['ai-agents', workspaceId] });
+      qc.invalidateQueries({ queryKey: agentsKeys.list(workspaceId) });
     },
   });
 }
