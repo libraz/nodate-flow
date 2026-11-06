@@ -295,7 +295,7 @@ func run(check bool) (checkResult, error) {
 	// longer exists anywhere in the product. So the pages that are no
 	// longer produced are part of the answer too: deleted on a real run,
 	// reported as drift by --check.
-	docsRoot := filepath.Join(root, "docs", "errors")
+	docsRoot := filepath.Join(root, "backup", "docs", "errors")
 	for _, name := range fileNames {
 		for _, r := range byFile[name] {
 			outputs[filepath.Join(docsRoot, name, r.Code+".md")] = genDoc(r)

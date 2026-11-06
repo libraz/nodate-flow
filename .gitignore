@@ -87,10 +87,7 @@ blob-report/
 CLAUDE.md
 .serena/
 
-# ---- Docs (local only) ----
-docs/
-
-# ---- Local-only backups ----
+# ---- Local-only backups and design notes ----
 backup/
 
 apps/flow-api/seed-dev

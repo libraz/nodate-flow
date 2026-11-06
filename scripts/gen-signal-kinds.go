@@ -9,7 +9,7 @@
 //   - apps/flow-api/internal/signalkinds/signalkinds.go (typed Go consts + table)
 //   - packages/sdk/src/signal-kinds/index.ts             (TS consts + lookup helper)
 //   - apps/flow-web/locales/{en,ja,zh}/signal-kinds.json (i18n stubs)
-//   - docs/signal-kinds/<source>.md                      (per-source catalogue)
+//   - backup/docs/signal-kinds/<source>.md                (per-source catalogue)
 //
 //go:build ignore
 
@@ -71,7 +71,7 @@ type record struct {
 	I18nKey            string
 }
 
-// Allowed enum values. Mirrors ADR 0008 D1/D2.
+// Allowed enum values. Mirrors the signal-kind schema.
 var (
 	validRetention = map[string]bool{
 		"stateful": true,
@@ -282,7 +282,7 @@ func run(check bool) (checkResult, error) {
 	}
 
 	// 4) Per-source Markdown docs.
-	docsDir := filepath.Join(root, "docs", "signal-kinds")
+	docsDir := filepath.Join(root, "backup", "docs", "signal-kinds")
 	for _, src := range sourceNames {
 		outputs[filepath.Join(docsDir, src+".md")] = genDoc(src, bySource[src])
 	}

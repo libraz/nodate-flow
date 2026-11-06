@@ -1,6 +1,6 @@
 # Production stack: one TLS-terminating edge container is the only published
 # surface; everything else lives on the compose network. The required .env
-# values are listed in README `## Deployment`; ci/compose-prod.env names them all.
+# values are listed in docs/en/deployment.md; ci/compose-prod.env names them all.
 #
 # One public hostname (NF_PUBLIC_HOST) and one certificate serve everything:
 # / is flow-web, /accounts/ is accounts-web, /api/ is flow-api and /auth-api/ is
@@ -64,7 +64,7 @@ services:
       - --default-time-zone=+00:00
     volumes:
       - mysql_data:/var/lib/mysql
-      # Applied on first boot of an empty volume only; see README for re-apply.
+      # Applied on first boot of an empty volume only; see docs/en/deployment.md for re-apply.
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       # TCP, not the socket: the init-time server listens only on the socket.
