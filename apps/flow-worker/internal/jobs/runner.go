@@ -38,17 +38,13 @@ type Runner struct {
 	Interval time.Duration
 	// Logger receives structured tick / error events. Required.
 	Logger *slog.Logger
-	// ShutdownTimeout caps how long Stop waits for an in-flight tick to
-	// finish before returning. The caller is expected to abandon the
-	// goroutine after that ceiling; in-flight ticks observe ctx cancel
-	// and bail on their own.
-	ShutdownTimeout time.Duration
 
 	jobs []Job
 
 	mu      sync.Mutex
 	running bool
 	done    chan struct{}
+	cancel  context.CancelFunc
 }
 
 // Register adds a job to the runner. MUST be called before Start; the
@@ -88,13 +84,16 @@ func (r *Runner) Names() []string {
 }
 
 // Start launches the tick loop in its own goroutine and returns. The loop
-// exits when ctx is cancelled; callers MUST then call Stop to wait for
+// exits when ctx is cancelled; callers MUST then call Shutdown to wait for
 // any in-flight tick to drain.
 //
 // When no jobs are registered Start still runs the loop, logging a debug
 // "tick" line per interval. This is intentional so the binary stays
 // observably alive even with no job registered.
 func (r *Runner) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	r.mu.Lock()
 	if r.running {
 		r.mu.Unlock()
@@ -110,10 +109,12 @@ func (r *Runner) Start(ctx context.Context) error {
 	}
 	r.running = true
 	r.done = make(chan struct{})
+	runCtx, cancel := context.WithCancel(ctx)
+	r.cancel = cancel
 	jobs := append([]Job(nil), r.jobs...)
 	r.mu.Unlock()
 
-	go r.loop(ctx, jobs)
+	go r.loop(runCtx, jobs)
 	return nil
 }
 
@@ -162,25 +163,27 @@ func (r *Runner) runOnce(ctx context.Context, jobs []Job, now time.Time) {
 	}
 }
 
-// Stop blocks until the in-flight tick (if any) finishes, capped by
-// r.ShutdownTimeout. Safe to call even if Start was never invoked or has
-// already returned.
-func (r *Runner) Stop() {
+// Shutdown cancels the runner and waits for the whole loop to return, or
+// until ctx ends. It is safe to call if Start was never invoked or if
+// Shutdown is called concurrently more than once.
+func (r *Runner) Shutdown(ctx context.Context) error {
 	r.mu.Lock()
 	done := r.done
+	cancel := r.cancel
 	r.mu.Unlock()
-	if done == nil {
-		return
+	if cancel != nil {
+		cancel()
 	}
-	timeout := r.ShutdownTimeout
-	if timeout <= 0 {
-		timeout = 30 * time.Second
+	if done == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	select {
 	case <-done:
-	case <-time.After(timeout):
-		r.Logger.Warn("jobs: shutdown timeout exceeded; abandoning in-flight tick",
-			"timeout", timeout,
-		)
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }

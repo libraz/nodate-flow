@@ -98,6 +98,9 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	if cfg == nil {
 		return errors.New("lifecycle: cfg is required")
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if logger == nil {
 		logger = NewLogger(cfg.LogLevel)
 	}
@@ -116,26 +119,20 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	if err != nil {
 		return fmt.Errorf("otel tracer init: %w", err)
 	}
-	defer func() {
-		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if shutErr := traceShutdown(shutCtx); shutErr != nil {
-			logger.Error("otel tracer shutdown failed", "err", shutErr)
-		}
-	}()
 	if cfg.OTelEndpoint != "" {
 		logger.Info("otel tracing enabled", "endpoint", cfg.OTelEndpoint)
 	}
 
 	db, err := openAndPingDB(cfg, logger)
 	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn("db close failed", "err", closeErr)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cleanupErr := runContextBound(cleanupCtx, traceShutdown)
+		cleanupCancel()
+		if cleanupErr != nil {
+			logger.Error("otel tracer shutdown failed after db startup error", "err", cleanupErr)
 		}
-	}()
+		return errors.Join(err, cleanupErr)
+	}
 
 	// Internal-only Prometheus listener. Worker has no public HTTP
 	// surface, so this is the only network port we open.
@@ -148,21 +145,37 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	metricsErr := make(chan error, 1)
+	metricsDone := make(chan struct{})
 	go func() {
+		defer close(metricsDone)
 		logger.Info("metrics server listening", "addr", metricsAddr)
 		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			metricsErr <- err
 		}
 		close(metricsErr)
 	}()
+	shutdownMetrics := func(ctx context.Context) error {
+		shutdownErr := metricsSrv.Shutdown(ctx)
+		if shutdownErr != nil {
+			closeErr := metricsSrv.Close()
+			if closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+				shutdownErr = errors.Join(shutdownErr, closeErr)
+			}
+		}
+		select {
+		case <-metricsDone:
+		case <-ctx.Done():
+			shutdownErr = errors.Join(shutdownErr, ctx.Err())
+		}
+		return shutdownErr
+	}
 
 	// Job runner. Jobs are registered before the up gauge is decided,
 	// because whether this process is doing anything is part of what
 	// "up" means here.
 	runner := &jobs.Runner{
-		Interval:        cfg.JobTickInterval,
-		Logger:          logger,
-		ShutdownTimeout: cfg.JobShutdownTimeout,
+		Interval: cfg.JobTickInterval,
+		Logger:   logger,
 	}
 	if opts.Register != nil {
 		opts.Register(runner, db)
@@ -174,9 +187,12 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 	}
 
 	runnerCtx, runnerCancel := context.WithCancel(context.Background())
-	defer runnerCancel()
 	if err := runner.Start(runnerCtx); err != nil {
-		return fmt.Errorf("job runner start: %w", err)
+		startupErr := fmt.Errorf("job runner start: %w", err)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cleanupErr := finishShutdown(cleanupCtx, runnerCancel, runner.Shutdown, shutdownMetrics, traceShutdown, db.Close)
+		cleanupCancel()
+		return errors.Join(startupErr, cleanupErr)
 	}
 	logger.Info("job runner started",
 		"interval", cfg.JobTickInterval,
@@ -197,22 +213,113 @@ func Run(ctx context.Context, cfg *config.Config, logger *slog.Logger, opts *Run
 		logger.Info("shutdown signal received")
 	}
 
-	// Graceful shutdown. Cancel the runner's context so the next tick
-	// boundary observes ctx.Done(), then wait for the in-flight tick to
-	// finish (capped by JobShutdownTimeout). Finally drain the metrics
-	// server and close the DB. Order matches flow-api.
-	runnerCancel()
-	runner.Stop()
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.JobShutdownTimeout)
-	defer shutdownCancel()
-	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("metrics server shutdown failed", "err", err)
+	// The configured shutdown budget covers the runner, metrics listener,
+	// tracing provider, and DB close together. Create it before signaling
+	// any component so later drains cannot reset the deadline.
+	obs.UpGauge.Set(0)
+	shutdownBudget := cfg.JobShutdownTimeout
+	if shutdownBudget <= 0 {
+		shutdownBudget = 30 * time.Second
 	}
-
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownBudget)
+	shutdownErr := finishShutdown(shutdownCtx, runnerCancel, runner.Shutdown, shutdownMetrics, traceShutdown, db.Close)
+	shutdownCancel()
+	if shutdownErr != nil {
+		logger.Error("graceful shutdown incomplete", "err", shutdownErr)
+	}
 	obs.UpGauge.Set(0)
 	logger.Info("shutdown complete")
-	return runErr
+	return errors.Join(runErr, shutdownErr)
+}
+
+// finishShutdown applies one deadline to every flow-worker drain. It sends
+// the runner cancellation before starting either wait, joins the runner and
+// metrics drains, and closes tracing and the DB only after those drains have
+// completed or the shared deadline has expired.
+func finishShutdown(
+	ctx context.Context,
+	cancelRunner func(),
+	waitRunner func(context.Context) error,
+	shutdownMetrics func(context.Context) error,
+	shutdownTracing func(context.Context) error,
+	closeDB func() error,
+) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if cancelRunner != nil {
+		cancelRunner()
+	}
+
+	shutdownErr := runConcurrent(ctx, waitRunner, shutdownMetrics)
+	shutdownErr = errors.Join(shutdownErr, runContextBound(ctx, shutdownTracing))
+	if closeDB != nil {
+		shutdownErr = errors.Join(shutdownErr, runWithoutContext(ctx, closeDB))
+	}
+	if ctx.Err() != nil {
+		shutdownErr = errors.Join(shutdownErr, ctx.Err())
+	}
+	return shutdownErr
+}
+
+// runConcurrent starts every drain before waiting, so each receives the
+// same shutdown context and deadline.
+func runConcurrent(ctx context.Context, drains ...func(context.Context) error) error {
+	results := make(chan error, len(drains))
+	remaining := 0
+	for _, drain := range drains {
+		if drain == nil {
+			continue
+		}
+		remaining++
+		go func(drain func(context.Context) error) {
+			results <- drain(ctx)
+		}(drain)
+	}
+	if remaining == 0 {
+		return nil
+	}
+
+	var drainErr error
+	for remaining > 0 {
+		select {
+		case err := <-results:
+			remaining--
+			drainErr = errors.Join(drainErr, err)
+		case <-ctx.Done():
+			return errors.Join(drainErr, ctx.Err())
+		}
+	}
+	return drainErr
+}
+
+// runContextBound calls a context-aware shutdown function without allowing
+// it to hold up process exit beyond ctx's deadline.
+func runContextBound(ctx context.Context, shutdown func(context.Context) error) error {
+	if shutdown == nil {
+		return nil
+	}
+	result := make(chan error, 1)
+	go func() { result <- shutdown(ctx) }()
+	select {
+	case err := <-result:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// runWithoutContext bounds a legacy close operation with the same caller
+// deadline. The DB close remains the final resource action.
+func runWithoutContext(ctx context.Context, closeResource func() error) error {
+	result := make(chan error, 1)
+	go func() { result <- closeResource() }()
+	select {
+	case err := <-result:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // expectedJobs names the jobs a complete flow-worker runs. A deployment
