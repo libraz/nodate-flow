@@ -6,6 +6,7 @@
 
 import SkipLink from '@nodate-flow/ui/a11y/skip-link';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
+import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import { Link } from '@tanstack/react-router';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,7 +51,11 @@ export default function AccountShell({ user, wide, children }: AccountShellProps
       <SkipLink targetId={MAIN_ID}>{t('account.skip_to_content')}</SkipLink>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
-          {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
+          {APP_LOGO_URL ? (
+            <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} />
+          ) : (
+            <BrandMark size="sm" />
+          )}
           <span className={styles.brandName} title={APP_NAME}>
             {APP_NAME}
           </span>

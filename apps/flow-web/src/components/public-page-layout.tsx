@@ -10,7 +10,7 @@
  * and the production public routes without smuggling globals.
  */
 
-import { Calendar as CalendarIcon } from 'lucide-react';
+import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 
 import { APP_LOGO_URL, APP_NAME } from '../lib/brand';
@@ -170,11 +170,7 @@ export default function PublicPageLayout({
                 }}
               />
             ) : (
-              <CalendarIcon
-                size={20}
-                style={{ color: 'var(--nf-color-accent-fg)' }}
-                aria-hidden="true"
-              />
+              <BrandMark size="sm" />
             )}
             {APP_NAME}
           </a>

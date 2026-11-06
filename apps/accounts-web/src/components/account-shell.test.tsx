@@ -41,6 +41,7 @@ describe('AccountShell brand', () => {
     const { container } = render(<AccountShell user={user}>x</AccountShell>);
     expect(screen.getByText(DEFAULT_APP_NAME)).toBeTruthy();
     expect(container.querySelector('img[src]')).toBeNull();
+    expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
   it('shows the configured name and a decorative logo', () => {
@@ -50,5 +51,6 @@ describe('AccountShell brand', () => {
     expect(screen.getByText('Acme Tasks')).toBeTruthy();
     const img = container.querySelector('img[src="https://example.com/logo.svg"]');
     expect(img?.getAttribute('alt')).toBe('');
+    expect(container.querySelector('[data-brand-mark]')).toBeNull();
   });
 });

@@ -61,7 +61,7 @@ describe('<PublicPageLayout>', () => {
     const banner = screen.getByRole('banner');
     expect(banner.textContent).toBe(DEFAULT_APP_NAME);
     expect(banner.querySelector('img')).toBeNull();
-    expect(banner.querySelector('svg')).not.toBeNull();
+    expect(banner.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
   it('replaces the calendar icon with a decorative logo when configured', async () => {
@@ -75,7 +75,7 @@ describe('<PublicPageLayout>', () => {
     );
     const banner = screen.getByRole('banner');
     expect(banner.querySelector('img[alt=""]')?.getAttribute('src')).toBe('/logo.svg');
-    expect(banner.querySelector('svg')).toBeNull();
+    expect(banner.querySelector('[data-brand-mark]')).toBeNull();
     expect(banner.textContent).toBe('Acme Flow');
     vi.doUnmock('../../lib/brand');
   });

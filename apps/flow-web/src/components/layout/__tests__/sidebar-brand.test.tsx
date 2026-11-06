@@ -42,6 +42,7 @@ describe('Sidebar brand row', () => {
     const { container } = renderSidebar(Sidebar);
     expect(screen.getAllByText(DEFAULT_APP_NAME).length).toBeGreaterThan(0);
     expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
   });
 
   it('renders a decorative logo before the label when configured', async () => {
@@ -51,5 +52,15 @@ describe('Sidebar brand row', () => {
     const img = container.querySelector('img[alt=""]');
     expect(img?.getAttribute('src')).toBe('/logo.svg');
     expect(screen.getByText('Acme Flow')).toBeDefined();
+    expect(container.querySelector('[data-brand-mark]')).toBeNull();
+  });
+
+  it('keeps the mark when the desktop rail is collapsed', async () => {
+    window.localStorage.setItem('nf.sidebar-collapsed', '1');
+    const { default: Sidebar } = await import('../sidebar');
+    const { container } = renderSidebar(Sidebar);
+    expect(container.querySelector('[data-collapsed]')).not.toBeNull();
+    expect(container.querySelector('[data-brand-mark="sm"]')).not.toBeNull();
+    window.localStorage.removeItem('nf.sidebar-collapsed');
   });
 });

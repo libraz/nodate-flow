@@ -1,6 +1,7 @@
 import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
@@ -327,6 +328,8 @@ export default function Sidebar(): ReactElement {
   const [collapsed, setCollapsed] = useState<boolean>(() => readInitialCollapsed());
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
+  // A persisted collapsed state must not leak into the full-width mobile drawer.
+  const railCollapsed = collapsed && !isMobile;
   const currentWorkspaceId = useCurrentWorkspaceId();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const drawerOpen = isMobile && mobileOpen;
@@ -418,10 +421,10 @@ export default function Sidebar(): ReactElement {
       <aside
         className={cx(
           styles.sidebar,
-          collapsed && styles.collapsed,
+          railCollapsed && styles.collapsed,
           isMobile && mobileOpen && styles.mobileOpen,
         )}
-        data-collapsed={collapsed || undefined}
+        data-collapsed={railCollapsed || undefined}
         // Off-canvas on mobile: keep its links out of the tab order until opened.
         inert={isMobile && !mobileOpen}
         onKeyDown={(e) => {
@@ -429,12 +432,16 @@ export default function Sidebar(): ReactElement {
         }}
       >
         <div className={styles.brand}>
-          {APP_LOGO_URL ? <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} /> : null}
+          {APP_LOGO_URL ? (
+            <img src={APP_LOGO_URL} alt="" className={styles.brandLogo} />
+          ) : (
+            <BrandMark size="sm" />
+          )}
           <span className={styles.brandLabel} title={APP_NAME}>
             {APP_NAME}
           </span>
         </div>
-        <Collapse open={!collapsed}>
+        <Collapse open={!railCollapsed}>
           <div className={styles.workspaceSwitcherSlot}>
             <Suspense fallback={null}>
               <WorkspaceSwitcher />
@@ -476,14 +483,14 @@ export default function Sidebar(): ReactElement {
             if (item.key === 'workspaces') {
               return (
                 <div key={item.key}>
-                  {collapsed ? (
+                  {railCollapsed ? (
                     <Tooltip content={label} placement="right">
                       {linkEl}
                     </Tooltip>
                   ) : (
                     linkEl
                   )}
-                  <Collapse open={!collapsed && Boolean(currentWorkspaceId)}>
+                  <Collapse open={!railCollapsed && Boolean(currentWorkspaceId)}>
                     {shownWorkspaceId ? (
                       <>
                         <WorkspaceActivityLink workspaceId={shownWorkspaceId} />
@@ -503,7 +510,7 @@ export default function Sidebar(): ReactElement {
                 </div>
               );
             }
-            if (collapsed) {
+            if (railCollapsed) {
               return (
                 <Tooltip key={item.key} content={label} placement="right">
                   {linkEl}
@@ -518,10 +525,10 @@ export default function Sidebar(): ReactElement {
             type="button"
             className={cx(styles.toggle, 'nf-focus-ring')}
             onClick={handleToggle}
-            aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
-            aria-expanded={!collapsed}
+            aria-label={railCollapsed ? t('nav.expand') : t('nav.collapse')}
+            aria-expanded={!railCollapsed}
           >
-            <Icon icon={isMobile ? X : collapsed ? ChevronsRight : ChevronsLeft} decorative />
+            <Icon icon={isMobile ? X : railCollapsed ? ChevronsRight : ChevronsLeft} decorative />
           </button>
         </div>
       </aside>

@@ -170,8 +170,19 @@
   object-fit: contain;
 }
 
+.collapsed .brand {
+  gap: 0;
+  justify-content: center;
+  padding-inline: 0;
+}
+
 .collapsed .brandLogo {
   display: none;
+}
+
+.collapsed .brandLabel {
+  inline-size: 0;
+  overflow: hidden;
 }
 
 /*
