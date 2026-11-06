@@ -108,11 +108,11 @@ type Sweeper struct {
 	// recording it when absent. Empty skips the check.
 	Location string
 
-	locationOK atomic.Bool
-	stopOnce   sync.Once
-	doneOnce   sync.Once
-	stopCh     chan struct{}
-	done       chan struct{}
+	locationOK  atomic.Bool
+	lifecycleMu sync.Mutex
+	handle      *bgloop.Handle
+	started     bool
+	stopped     bool
 }
 
 // New builds a sweeper with the default cadence.
@@ -122,8 +122,6 @@ func New(db *sql.DB, q *generated.Queries, store ObjectRemover, logger *slog.Log
 		Queries: q,
 		Storage: store,
 		Logger:  logger,
-		stopCh:  make(chan struct{}),
-		done:    make(chan struct{}),
 	}
 }
 
@@ -135,29 +133,51 @@ func New(db *sql.DB, q *generated.Queries, store ObjectRemover, logger *slog.Log
 // never restarted leaves the ceiling off for every tenant, and the
 // only symptom is a bucket that keeps growing — the same silence the
 // missing sweeper produced in the first place.
+//
+// A Start after [Sweeper.BeginStop] is a no-op: a stopped sweeper stays
+// stopped.
 func (s *Sweeper) Start(ctx context.Context) {
-	go bgloop.Run(ctx, "storage.sweeper", s.Logger, s.loop)
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if s.started || s.stopped {
+		return
+	}
+	s.started = true
+	s.handle = bgloop.StartManaged(ctx, "storage.sweeper", s.Logger, s.loop)
 	s.Logger.Info("storage sweeper started",
 		slog.Duration("interval", s.interval()),
 		slog.Duration("reservation_ttl", s.reservationTTL()),
 	)
 }
 
-// Stop signals the loop to exit and waits for the in-flight pass.
-func (s *Sweeper) Stop() {
-	s.stopOnce.Do(func() { close(s.stopCh) })
-	select {
-	case <-s.done:
-	case <-time.After(30 * time.Second):
-		s.Logger.Warn("storage sweeper: shutdown timeout exceeded; abandoning in-flight pass")
+// BeginStop cancels the supervisor without waiting. Call it for every
+// resident before beginning any shutdown waits.
+func (s *Sweeper) BeginStop() {
+	s.lifecycleMu.Lock()
+	s.stopped = true
+	h := s.handle
+	s.lifecycleMu.Unlock()
+	if h != nil {
+		h.Stop()
 	}
 }
 
+// Wait waits for the whole supervisor to return, including any restarted
+// pass after a panic.
+func (s *Sweeper) Wait(ctx context.Context) error {
+	s.lifecycleMu.Lock()
+	h := s.handle
+	s.lifecycleMu.Unlock()
+	return h.Wait(ctx)
+}
+
+// Shutdown cancels the loop and waits for the in-flight pass within ctx.
+func (s *Sweeper) Shutdown(ctx context.Context) error {
+	s.BeginStop()
+	return s.Wait(ctx)
+}
+
 func (s *Sweeper) loop(ctx context.Context) {
-	// Once, not on every return: the supervisor restarts the loop after
-	// a panic, and a second close would take the process down by the
-	// route the supervisor exists to prevent.
-	defer s.doneOnce.Do(func() { close(s.done) })
 	// Checked up front so a mismatch is reported at start-up rather than
 	// one interval later.
 	if err := s.checkLocation(ctx); err != nil {
@@ -169,8 +189,6 @@ func (s *Sweeper) loop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-s.stopCh:
 			return
 		case <-ticker.C:
 			if _, err := s.RunOnce(ctx); err != nil {
@@ -345,7 +363,8 @@ func (s *Sweeper) sweep(ctx context.Context, kind reclaimKind, reason string, li
 				return done, skipped, err
 			}
 			after = c.id
-			switch s.reclaim(ctx, c.id, c.key, kind, reason) {
+			// Cancellation stops between objects; the one in hand is finished.
+			switch s.reclaim(context.WithoutCancel(ctx), c.id, c.key, kind, reason) {
 			case reclaimed:
 				done++
 			case referenced:
@@ -379,7 +398,9 @@ func (s *Sweeper) drainQueuedRemovals(ctx context.Context) (int, error) {
 		if err := ctx.Err(); err != nil {
 			return removed, err
 		}
-		if err := s.Storage.RemoveObject(ctx, row.StorageKey); err != nil {
+		// Cancellation stops between records; the one in hand is finished.
+		unit := context.WithoutCancel(ctx)
+		if err := s.Storage.RemoveObject(unit, row.StorageKey); err != nil {
 			s.Logger.Warn("storage sweeper: queued blob remove failed; kept for retry",
 				slog.String("storage_key", row.StorageKey),
 				slog.String("err", err.Error()))
@@ -388,7 +409,7 @@ func (s *Sweeper) drainQueuedRemovals(ctx context.Context) (int, error) {
 		// affected-rows: not-applicable — a teardown clearing its own
 		// records after a clean sweep can take this row first; the blob is
 		// gone either way.
-		if _, err := s.Queries.DeleteStorageBlobRemoval(ctx, row.ID); err != nil {
+		if _, err := s.Queries.DeleteStorageBlobRemoval(unit, row.ID); err != nil {
 			s.Logger.Error("storage sweeper: drop queued removal", slog.String("err", err.Error()))
 			continue
 		}

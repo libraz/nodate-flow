@@ -292,3 +292,45 @@ func TestWorkspaceStream_RequiresAuth(t *testing.T) {
 	require.GreaterOrEqual(t, resp.StatusCode, 400)
 	require.Less(t, resp.StatusCode, 500)
 }
+
+// A signal without a task binding must wake an already-open Inbox session.
+func TestWorkspaceStreamReceivesManualSignalChange(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	tenant := newTenant(t)
+	ctx, cancel := context.WithTimeout(context.Background(), streamReadBudget)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, testServerURL+"/workspaces/"+tenant.WorkspacePublicID+"/stream", nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Authorization", "Bearer "+tenant.AccessToken)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	scanner := bufio.NewScanner(resp.Body)
+	readKind := func() string {
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "data:") {
+				var event struct {
+					Kind        string `json:"kind"`
+					WorkspaceID string `json:"workspaceId"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))), &event))
+				require.Equal(t, tenant.WorkspacePublicID, event.WorkspaceID)
+				return event.Kind
+			}
+		}
+		require.NoError(t, scanner.Err())
+		t.Fatal("stream ended before the awaited workflow hint")
+		return ""
+	}
+	require.Equal(t, "resync", readKind(), "subscription must be registered before posting")
+	status, body, err := sendJSONStatus(http.MethodPost, testServerURL+"/signals", tenant.AccessToken, map[string]any{
+		"workspaceId": tenant.WorkspacePublicID, "source": "manual", "kind": "manual",
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, status, "signal post: %s", body)
+	require.Equal(t, "task.changed", readKind(), "existing clients must receive a compatible refresh hint")
+}

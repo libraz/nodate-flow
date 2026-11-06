@@ -277,12 +277,28 @@ func appendItemEvents(
 	taskID *uint32,
 	payload map[string]any,
 ) error {
+	return appendItemEventsWithActor(ctx, tx, kind, workspaceID, actorUserID, nil, taskID, payload)
+}
+
+func appendItemEventsWithActor(
+	ctx context.Context,
+	tx TX,
+	kind eventbus.Kind,
+	workspaceID uint32,
+	actorUserID, actorAgentID *uint32,
+	taskID *uint32,
+	payload map[string]any,
+) error {
+	if actorUserID != nil && actorAgentID != nil {
+		return fmt.Errorf("itemkit: event actor cannot be both a user and an agent")
+	}
 	if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-		Type:        kind,
-		WorkspaceID: workspaceID,
-		ActorUserID: actorUserID,
-		TaskID:      taskID,
-		Payload:     payload,
+		Type:         kind,
+		WorkspaceID:  workspaceID,
+		ActorUserID:  actorUserID,
+		ActorAgentID: actorAgentID,
+		TaskID:       taskID,
+		Payload:      payload,
 	}); err != nil {
 		return fmt.Errorf("itemkit: append item event: %w", err)
 	}
@@ -293,11 +309,12 @@ func appendItemEvents(
 	if eventbus.SubjectOf(legacy) == "" {
 		// A legacy kind about no calendar event (task.disabled).
 		if _, err := eventlog.Append(ctx, tx, eventlog.Event{
-			Type:        legacy,
-			WorkspaceID: workspaceID,
-			ActorUserID: actorUserID,
-			TaskID:      taskID,
-			Payload:     payload,
+			Type:         legacy,
+			WorkspaceID:  workspaceID,
+			ActorUserID:  actorUserID,
+			ActorAgentID: actorAgentID,
+			TaskID:       taskID,
+			Payload:      payload,
 		}); err != nil {
 			return fmt.Errorf("itemkit: append legacy event: %w", err)
 		}
@@ -318,6 +335,7 @@ func appendItemEvents(
 			Type:            legacy,
 			WorkspaceID:     workspaceID,
 			ActorUserID:     actorUserID,
+			ActorAgentID:    actorAgentID,
 			TaskID:          taskID,
 			Payload:         legacyPayload,
 			SubjectPublicID: subject.publicID,

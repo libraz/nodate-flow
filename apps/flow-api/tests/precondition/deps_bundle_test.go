@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+// freeformOutputOmissions names the two request paths that intentionally
+// omit airequest.Args.Output: both return natural-language prose, so a JSON
+// schema would incorrectly constrain the product output. Structured callers
+// remain subject to the derived Output wiring requirement.
+var freeformOutputOmissions = map[string]string{
+	"apps/flow-api/internal/ai/agent_executor.go": "agent responses are freeform text consumed by the action parser",
+	"apps/flow-api/internal/ai/page.go":           "page content is freeform prose",
+}
+
 // TestBundleWiringSetsEverySilentDependency holds the wiring that
 // assembles a handler's dependency bundle to the fields that bundle's own
 // package calls through.
@@ -48,11 +57,26 @@ func TestBundleWiringSetsEverySilentDependency(t *testing.T) {
 		if !lit.Reportable() {
 			continue
 		}
+		if _, freeform := freeformOutputOmissions[lit.File]; freeform && onlyOmittedField(lit, "Output") {
+			continue
+		}
 		t.Errorf("%s builds %s and leaves %s.\n"+
 			"  A nil there is not a fault: the collaborator answers for a nil receiver, so the "+
 			"request succeeds and the rows it was supposed to write are simply absent.\n"+
 			"  Set the field, or route this literal through the constructor that does.",
 			lit.Location(), lit.Type.Name, lit.Names())
+	}
+	for file, reason := range freeformOutputOmissions {
+		found := false
+		for _, lit := range literals {
+			if lit.File == file && onlyOmittedField(lit, "Output") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("freeformOutputOmissions lists %s, but no request literal still omits only Output; remove the stale exception (%s)", file, reason)
+		}
 	}
 
 	// A derived check reports nothing when its derivation stops matching,
@@ -102,6 +126,13 @@ func TestBundleWiringSetsEverySilentDependency(t *testing.T) {
 		t.Errorf("signals.Deps.Queries is not derived as enforcing (enforcing: %v); a bundle built inside a test case can no longer be judged, and the inbound webhook path is where that matters",
 			enforcing)
 	}
+}
+
+func onlyOmittedField(lit BundleLiteral, name string) bool {
+	if len(lit.ExplicitNil) != 0 || len(lit.Omitted) != 1 {
+		return false
+	}
+	return lit.Omitted[0].Name == name
 }
 
 // TestOptionalWiringIsNotHeldToTheRule is the other half of the same

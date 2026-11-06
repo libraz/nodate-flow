@@ -162,7 +162,7 @@ SELECT
   v.updated_at,
   v.created_at,
   COUNT(*) OVER() AS total
-FROM v_inbox v
+FROM v_inbox_all v
 WHERE v.workspace_id = ?
   AND v.task_public_id = ?
   -- The task title rides on every row, so the signals are listable only
@@ -215,7 +215,8 @@ type ListSignalsForTaskRow struct {
 	Total        interface{}     `json:"total"`
 }
 
-// List signals attached to a task via v_inbox.
+// List signals attached to a task via v_inbox_all; a task lists its
+// snoozed signals too, since snooze only hides them from the inbox.
 func (q *Queries) ListSignalsForTask(ctx context.Context, arg ListSignalsForTaskParams) ([]ListSignalsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listSignalsForTask,
 		arg.WorkspaceID,
@@ -271,7 +272,7 @@ SELECT
   v.updated_at,
   v.created_at,
   COUNT(*) OVER() AS total
-FROM v_inbox v
+FROM v_inbox_all v
 WHERE v.workspace_id = ?
   AND v.task_public_id IS NULL
 ORDER BY v.received_at DESC, v.public_id DESC
@@ -296,7 +297,7 @@ type ListUnattachedSignalsRow struct {
 	Total       interface{}     `json:"total"`
 }
 
-// List signals in a workspace that have no task linkage yet.
+// List signals in a workspace that have no task linkage yet, snoozed or not.
 func (q *Queries) ListUnattachedSignals(ctx context.Context, arg ListUnattachedSignalsParams) ([]ListUnattachedSignalsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listUnattachedSignals, arg.WorkspaceID, arg.Limit, arg.Offset)
 	if err != nil {

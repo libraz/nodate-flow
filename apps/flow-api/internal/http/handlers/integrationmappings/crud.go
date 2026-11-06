@@ -3,7 +3,9 @@ package integrationmappings
 import (
 	"context"
 	"database/sql"
+	"errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -40,6 +42,9 @@ func Create(deps Deps) func(context.Context, *CreateIntegrationMappingInput) (*C
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		if err := requireInstanceAdmin(ctx, deps); err != nil {
+			return nil, err
 		}
 		provider, ok := parseProvider(in.Body.Provider)
 		if !ok {
@@ -99,6 +104,9 @@ func Patch(deps Deps) func(context.Context, *PatchIntegrationMappingInput) (*Pat
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+		}
+		if err := requireInstanceAdmin(ctx, deps); err != nil {
+			return nil, err
 		}
 		pub, err := types.Parse(in.ID)
 		if err != nil {
@@ -169,6 +177,9 @@ func Delete(deps Deps) func(context.Context, *DeleteInput) (*DeleteOutput, error
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		if err := requireInstanceAdmin(ctx, deps); err != nil {
+			return nil, err
+		}
 		pub, err := types.Parse(in.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.IntegrationMappingNotFound)
@@ -200,6 +211,25 @@ func Delete(deps Deps) func(context.Context, *DeleteInput) (*DeleteOutput, error
 		out.Body.Ok = true
 		return out, nil
 	}
+}
+
+// requireInstanceAdmin keeps the instance-wide source claim behind the
+// operator boundary. Workspace membership and admin checks still run in the
+// router before the handler, so this check adds authority without replacing
+// the workspace floor. Database failures fail closed as INTERNAL.UNEXPECTED.
+func requireInstanceAdmin(ctx context.Context, deps Deps) error {
+	actorID, ok := middleware.ActorFromContext(ctx)
+	if !ok {
+		return httpErr(apierrors.AuthSessionUnauthorized)
+	}
+	if err := acl.CheckInstanceAdmin(ctx, deps.DB, actorID); err != nil {
+		var apiError *apierr.APIError
+		if errors.As(err, &apiError) && apiError.Spec == apierrors.AuthPermissionInstanceAdminRequired {
+			return httpErr(apierrors.AuthPermissionInstanceAdminRequired)
+		}
+		return httpErr(apierrors.InternalUnexpected)
+	}
+	return nil
 }
 
 // parseProvider maps the request enum onto the DB enum. Huma has already

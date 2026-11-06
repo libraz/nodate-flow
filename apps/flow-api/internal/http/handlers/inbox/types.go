@@ -9,6 +9,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sourceintake"
 )
 
 // Deps is the dependency bundle for handlers in this package.
@@ -30,16 +31,17 @@ var nullStr = handlerutil.NullStr
 
 // Item is the public DTO for an inbox row (a signal projected through v_inbox).
 type Item struct {
-	ID          string          `json:"id" doc:"Inbox item public id (UUID v7)"`
-	WorkspaceID string          `json:"workspaceId"`
-	TaskID      string          `json:"taskId,omitempty"`
-	TaskTitle   string          `json:"taskTitle,omitempty"`
-	Source      string          `json:"source"`
-	Kind        string          `json:"kind"`
-	ExternalID  string          `json:"externalId,omitempty"`
-	Payload     json.RawMessage `json:"payload,omitempty"`
-	ReceivedAt  int64           `json:"receivedAt"`
-	CreatedAt   int64           `json:"createdAt"`
+	ID           string              `json:"id" doc:"Inbox item public id (UUID v7)"`
+	WorkspaceID  string              `json:"workspaceId"`
+	TaskID       string              `json:"taskId,omitempty"`
+	TaskTitle    string              `json:"taskTitle,omitempty"`
+	Source       string              `json:"source"`
+	Kind         string              `json:"kind"`
+	ExternalID   string              `json:"externalId,omitempty"`
+	Payload      json.RawMessage     `json:"payload,omitempty"`
+	SourceDetail sourceintake.Detail `json:"sourceDetail"`
+	ReceivedAt   int64               `json:"receivedAt"`
+	CreatedAt    int64               `json:"createdAt"`
 }
 
 // ListInboxInput is the query for GET /inbox.

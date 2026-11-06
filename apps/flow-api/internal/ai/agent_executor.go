@@ -147,22 +147,10 @@ func (e *AgentExecutor) ExecuteAgent(ctx context.Context, workspaceID, agentID u
 		System: row.SystemPrompt,
 		Prompt: agentPrompt(agentruntime.TriggerFromContext(ctx)),
 	})
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	accounting := &Orchestrator{LogInvoke: e.Log, OnInvocation: e.OnInvocation}
+	resp, err := accounting.CompleteAndRecord(ctx, workspaceID, "agent_tick", prov, req, nil)
 	if err != nil {
-		if e.OnInvocation != nil {
-			e.OnInvocation(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		}
-		if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
-			o.logFailure(ctx, workspaceID, "agent_tick", req, err)
-		}
 		return result, fmt.Errorf("ai: agent provider call failed: %w", err)
-	}
-	if e.OnInvocation != nil {
-		e.OnInvocation(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	}
-	if o := (&Orchestrator{LogInvoke: e.Log}); o.LogInvoke != nil {
-		o.logSuccess(ctx, workspaceID, "agent_tick", req, resp)
 	}
 	result.CostMicros = resp.EstimatedCostMicros()
 	result.CostCents = resp.EstimatedCostCents()

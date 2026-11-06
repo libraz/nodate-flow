@@ -10,8 +10,8 @@
 //     emit TaskAutoCompleted. A second auto-complete on the already-done
 //     task is idempotent (no error, the state stays 'done').
 //   - add_comment under autonomy=auto must persist a real comments row
-//     authored by a resolvable workspace member, with the body carrying
-//     the signal-judge attribution prefix.
+//     authored by the judging agent (author_kind='agent', no human
+//     author), with the body carrying the signal-judge attribution prefix.
 //
 // All tests gate on NF_TEST_INTEGRATION via bootstrap(t) and skip
 // cleanly on machines without Docker.
@@ -100,6 +100,12 @@ func TestApplierCompleteTaskMovesDerivedStateToDone(t *testing.T) {
 		"TaskAutoCompleted must be emitted by the Applier")
 	require.Equal(t, 1, countTransitionCompleteEvents(t, testDB, wsID, srcInternalID),
 		"the canonical task.transition.complete event must be appended exactly once")
+
+	// 3. The transition row names the judging agent, not a person.
+	actorUser, actorAgent := loadTransitionCompleteActor(t, testDB, wsID, srcInternalID)
+	require.False(t, actorUser.Valid, "an agent-judged completion must not carry a human actor")
+	require.True(t, actorAgent.Valid, "the transition event must carry the judging agent")
+	require.Equal(t, int64(agent.AgentID), int64(actorAgent.Int32))
 }
 
 // TestApplierCompleteTaskIsIdempotent pins that re-running an
@@ -166,8 +172,9 @@ func TestApplierCompleteTaskIsIdempotent(t *testing.T) {
 
 // TestApplierAddCommentPersistsRealCommentRow pins that an
 // add_comment verdict under autonomy=auto writes a real comments row
-// (not a silent no-op). The row is authored by a resolvable workspace
-// member and the body carries the signal-judge attribution prefix.
+// (not a silent no-op). The row is authored by the judging agent, the REST
+// list shows that agent as the byline, and the body carries the
+// signal-judge attribution prefix.
 func TestApplierAddCommentPersistsRealCommentRow(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -216,12 +223,30 @@ func TestApplierAddCommentPersistsRealCommentRow(t *testing.T) {
 	require.Equal(t, before+1, countCommentsForTask(t, testDB, wsID, srcInternalID),
 		"add_comment must persist exactly one real comments row")
 
-	body, authorID := loadLatestComment(t, testDB, wsID, srcInternalID)
-	require.NotZero(t, authorID, "the comment must be authored by a real workspace member")
-	require.True(t, strings.HasPrefix(body, "[signal judge] "),
-		"the comment body must carry the signal-judge attribution prefix; got %q", body)
-	require.Contains(t, body, reasoning,
+	row := loadLatestComment(t, testDB, wsID, srcInternalID)
+	require.False(t, row.AuthorID.Valid, "an agent comment must not be attributed to a person")
+	require.Equal(t, "agent", row.AuthorKind)
+	require.True(t, row.AuthorAgentID.Valid, "the comment must name the judging agent")
+	require.Equal(t, int64(agent.AgentID), int64(row.AuthorAgentID.Int32))
+	require.True(t, strings.HasPrefix(row.Body, "[signal judge] "),
+		"the comment body must carry the signal-judge attribution prefix; got %q", row.Body)
+	require.Contains(t, row.Body, reasoning,
 		"the comment body must preserve the judge's reasoning excerpt")
+
+	var listed struct {
+		Comments []struct {
+			AuthorID          string `json:"authorId"`
+			AuthorKind        string `json:"authorKind"`
+			AuthorAgentID     string `json:"authorAgentId"`
+			AuthorDisplayName string `json:"authorDisplayName"`
+		} `json:"comments"`
+	}
+	doRetroJSON(t, "GET", tt.BaseURL+"/tasks/"+srcPub+"/comments", tt.AccessToken, nil, &listed)
+	require.Len(t, listed.Comments, 1)
+	require.Equal(t, "agent", listed.Comments[0].AuthorKind)
+	require.Empty(t, listed.Comments[0].AuthorID)
+	require.Equal(t, agent.AgentPublicID, listed.Comments[0].AuthorAgentID)
+	require.Equal(t, agent.Name, listed.Comments[0].AuthorDisplayName)
 }
 
 // ----- test helpers ----------------------------------------------------------
@@ -284,21 +309,42 @@ func countCommentsForTask(t *testing.T, db *sql.DB, workspaceID uint32, taskInte
 	return n
 }
 
-// loadLatestComment returns the body and author_id of the most recently
+// latestComment is the authorship projection of one comments row.
+type latestComment struct {
+	Body          string
+	AuthorID      sql.NullInt32
+	AuthorKind    string
+	AuthorAgentID sql.NullInt32
+}
+
+// loadLatestComment returns the body and authorship of the most recently
 // created comment on a task.
-func loadLatestComment(t *testing.T, db *sql.DB, workspaceID uint32, taskInternalID int64) (string, uint32) {
+func loadLatestComment(t *testing.T, db *sql.DB, workspaceID uint32, taskInternalID int64) latestComment {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	var (
-		body     string
-		authorID uint32
-	)
+	var c latestComment
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT body, author_id FROM comments
+		`SELECT body, author_id, author_kind, author_agent_id FROM comments
 		 WHERE workspace_id = ? AND task_id = ? AND enabled = TRUE
 		 ORDER BY id DESC LIMIT 1`,
 		workspaceID, taskInternalID,
-	).Scan(&body, &authorID))
-	return body, authorID
+	).Scan(&c.Body, &c.AuthorID, &c.AuthorKind, &c.AuthorAgentID))
+	return c
+}
+
+// loadTransitionCompleteActor returns the actor columns of the task's
+// task.transition.complete event.
+func loadTransitionCompleteActor(t *testing.T, db *sql.DB, workspaceID uint32, taskInternalID int64) (sql.NullInt32, sql.NullInt32) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var actorUser, actorAgent sql.NullInt32
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT actor_user_id, actor_agent_id FROM events
+		 WHERE workspace_id = ? AND task_id = ? AND type = ?
+		 ORDER BY id DESC LIMIT 1`,
+		workspaceID, taskInternalID, string(eventbus.TaskTransition("complete")),
+	).Scan(&actorUser, &actorAgent))
+	return actorUser, actorAgent
 }

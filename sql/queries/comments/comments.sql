@@ -1,12 +1,46 @@
 -- name: AddComment :execlastid
--- Append a comment to a task.
+-- Append a comment to a task. A human comment sets author_id; an agent
+-- comment sets author_agent_id plus the public id and name snapshot that
+-- keep the byline after the agent is deleted.
 INSERT INTO comments (
   public_id,
   workspace_id,
   task_id,
   author_id,
+  author_kind,
+  author_agent_id,
+  author_agent_public_id,
+  author_agent_name,
   body
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, NULLIF(sqlc.arg('author_agent_public_id'), 0x00000000000000000000000000000000), ?, ?);
+
+-- name: LockCommentHumanAuthor :one
+-- Read an enabled human author's byline and share-lock the row so a
+-- concurrent suspension cannot interleave with the comment insert.
+SELECT public_id, display_name
+FROM users
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1
+FOR SHARE;
+
+-- name: GetCommentAgentByline :one
+-- Read the enabled agent's public id and name to snapshot onto an agent
+-- comment.
+SELECT public_id, name
+FROM ai_agents
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+LIMIT 1;
+
+-- name: GetCommentCreatedAt :one
+-- Read back the server-assigned creation time of a just-inserted comment.
+SELECT created_at
+FROM comments
+WHERE workspace_id = ?
+  AND public_id = ?
+LIMIT 1;
 
 -- name: ListCommentsForTask :many
 -- List comments on a task joined with author display fields.
@@ -14,7 +48,9 @@ INSERT INTO comments (
 -- users JOINs and `enabled` propagation shared with the keyset variant.
 SELECT
   v.public_id,
+  v.author_kind,
   v.author_public_id,
+  v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
   v.body,
@@ -42,7 +78,9 @@ LIMIT ? OFFSET ?;
 -- on the underlying comments table; the view is MERGEd by the optimizer.
 SELECT
   v.public_id,
+  v.author_kind,
   v.author_public_id,
+  v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
   v.body,

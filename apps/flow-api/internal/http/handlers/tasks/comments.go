@@ -47,7 +47,8 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
 				TaskID:      handlerutil.NullInt32From(task.ID),
-				AuthorID:    actorID,
+				AuthorID:    handlerutil.NullInt32From(actorID),
+				AuthorKind:  generated.CommentsAuthorKindUser,
 				Body:        in.Body.Body,
 			})
 			if e != nil {
@@ -170,8 +171,10 @@ func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
 	return TaskComment{
 		ID:                r.PublicID.String(),
 		AuthorID:          publicIDOrEmpty(r.AuthorPublicID),
-		AuthorDisplayName: bylineDisplayName(r.AuthorDisplayName),
-		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
+		AuthorKind:        string(r.AuthorKind),
+		AuthorAgentID:     commentAuthorAgentID(r.AuthorAgentPublicID),
+		AuthorDisplayName: r.AuthorDisplayName,
+		AuthorAvatarURL:   handlerutil.AvatarURL(r.AuthorAvatarUrl, r.AuthorPublicID),
 		Body:              r.Body,
 		EditedAt:          nullTimeUnix(r.EditedAt),
 		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
@@ -179,15 +182,15 @@ func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
 	}
 }
 
-// loadCommentForWrite returns the internal id and the author internal id
-// for a comment in this workspace. ErrNoRows when the comment does not
-// exist or is disabled.
+// loadCommentForWrite returns the internal id and nullable human-author
+// internal id for a comment in this workspace. Agent comments have no human
+// author id. ErrNoRows when the comment does not exist or is disabled.
 //
 // The internal id is read here rather than at each caller because both
 // writers need it for the same thing: the mention sync addresses a comment
 // by its internal id, and the public id the request carries is the only
 // name the transport has.
-func loadCommentForWrite(ctx context.Context, db *sql.DB, wsID uint32, cid types.PublicID) (commentID, authorID uint32, err error) {
+func loadCommentForWrite(ctx context.Context, db *sql.DB, wsID uint32, cid types.PublicID) (commentID uint32, authorID sql.NullInt32, err error) {
 	const q = `SELECT id, author_id FROM comments
 WHERE workspace_id = ? AND public_id = ? AND enabled = TRUE LIMIT 1`
 	err = db.QueryRowContext(ctx, q, wsID, cid).Scan(&commentID, &authorID)
@@ -217,7 +220,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
-		if author != actorID {
+		if !author.Valid || uint32(author.Int32) != actorID { //#nosec G115 -- users.id is INT UNSIGNED and fits uint32 within realistic deployments
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		// The body, the mentions it names and the event share a commit
@@ -233,7 +236,7 @@ func EditComment(deps Deps) func(context.Context, *EditTaskCommentInput) (*EditT
 				Body:        in.Body.Body,
 				WorkspaceID: ws.ID,
 				PublicID:    cid,
-				AuthorID:    actorID,
+				AuthorID:    handlerutil.NullInt32From(actorID),
 			}); e != nil {
 				return e
 			}
@@ -284,7 +287,8 @@ func DeleteComment(deps Deps) func(context.Context, *DeleteTaskCommentInput) (*D
 		if err != nil {
 			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsTaskNotFound, apierrors.InternalUnexpected))
 		}
-		if author != actorID && !ws.Role.AtLeast(middleware.WorkspaceRoleAdmin) {
+		isAuthor := author.Valid && uint32(author.Int32) == actorID //#nosec G115 -- users.id is INT UNSIGNED and fits uint32 within realistic deployments
+		if !isAuthor && !ws.Role.AtLeast(middleware.WorkspaceRoleAdmin) {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		var gone bool

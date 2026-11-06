@@ -83,15 +83,15 @@ type Worker struct {
 	db      *sql.DB
 	queries *generated.Queries
 	client  *http.Client
-	// doneOnce guards the close of done. Shutdown reaches Stop from
-	// more than one direction — a signal handler and an explicit call
-	// on the same worker — and closing a closed channel would panic the
-	// process in the middle of its own teardown.
-	doneOnce sync.Once
-	done     chan struct{}
-	// cancel stops the supervised delivery loop. Set by Start, called
-	// by Stop.
-	cancel context.CancelFunc
+	// done is a component stop signal. The managed supervisor's done
+	// channel is separate so signaling exit cannot be mistaken for the
+	// worker having completely returned.
+	doneOnce    sync.Once
+	done        chan struct{}
+	lifecycleMu sync.Mutex
+	handle      *bgloop.Handle
+	started     bool
+	stopped     bool
 
 	// StrandedAfter overrides [defaultStrandedAfter]. Tests set it low
 	// so the reaper is observable; production leaves it zero.
@@ -165,11 +165,11 @@ func (w *Worker) hooks() *bgloop.HookRunner {
 	return w.runner
 }
 
-// Shutdown stops accepting hook jobs and waits for the accepted ones, or
-// until ctx is done. It is separate from [Worker.Stop], which ends the
-// delivery loop: the rows the hooks are still writing are what that loop
-// would deliver next.
-func (w *Worker) Shutdown(ctx context.Context) error {
+// DrainHooks stops accepting hook jobs and waits for the accepted ones,
+// or until ctx is done. It is separate from [Worker.Shutdown], which ends
+// the delivery loop: the rows the hooks are still writing are what that
+// loop would deliver next.
+func (w *Worker) DrainHooks(ctx context.Context) error {
 	return w.hooks().Shutdown(ctx)
 }
 
@@ -382,37 +382,58 @@ func buildPayload(deliveryID, eventPublicID types.PublicID, eventType string, oc
 }
 
 // Start launches the periodic delivery processing loop in a supervised
-// background goroutine. Call [Worker.Stop] to terminate it.
+// background goroutine. Call [Worker.Shutdown] to terminate it. A Start
+// after [Worker.BeginStop] is a no-op: a stopped worker stays stopped.
 //
 // The loop runs under bgloop so a panic while building a delivery
 // payload — bad JSON from one workspace's event, say — cannot take the
 // whole process down with it.
 func (w *Worker) Start(ctx context.Context) {
-	runCtx, cancel := context.WithCancel(ctx)
-	w.cancel = cancel
-	go bgloop.Run(runCtx, "webhook.worker", nil, w.loop)
+	w.lifecycleMu.Lock()
+	defer w.lifecycleMu.Unlock()
+	if w.started || w.stopped {
+		return
+	}
+	w.started = true
+	w.handle = bgloop.StartManaged(ctx, "webhook.worker", nil, w.loop)
 	slog.Info("webhook worker started", slog.Duration("interval", pollInterval))
 }
 
-// Stop signals the delivery loop to exit. It is safe to call more than
-// once.
+// BeginStop signals the delivery loop to exit without waiting. It is
+// safe to call more than once.
 //
-// Cancelling the loop's context is what makes the stop clean: the
-// supervisor restarts a loop that returns on its own, so signalling
-// through w.done alone would look like a loop dying and be restarted
-// forever after shutdown.
-func (w *Worker) Stop() {
-	if w.cancel != nil {
-		w.cancel()
+// The loop's context is cancelled before w.done closes. The supervisor
+// restarts a loop that returns while its context is still live, so a
+// loop woken by w.done first would look like one dying and be restarted
+// in the middle of the shutdown.
+func (w *Worker) BeginStop() {
+	w.lifecycleMu.Lock()
+	w.stopped = true
+	h := w.handle
+	w.lifecycleMu.Unlock()
+	if h != nil {
+		h.Stop()
 	}
 	w.doneOnce.Do(w.closeDone)
-	slog.Info("webhook worker stopped")
+	slog.Info("webhook worker stop signaled")
 }
 
-// closeDone closes the loop's done channel. Stop passes it to doneOnce
-// as a method value rather than wrapping it in a closure the way the
-// sibling workers do: a func literal in Stop makes the gosec
-// cancel-func check stop seeing the w.cancel() call above it.
+// Wait waits for the full delivery-loop supervisor to return.
+func (w *Worker) Wait(ctx context.Context) error {
+	w.lifecycleMu.Lock()
+	h := w.handle
+	w.lifecycleMu.Unlock()
+	return h.Wait(ctx)
+}
+
+// Shutdown signals the delivery loop and waits within ctx.
+func (w *Worker) Shutdown(ctx context.Context) error {
+	w.BeginStop()
+	return w.Wait(ctx)
+}
+
+// closeDone closes the component stop signal. It remains separate from
+// bgloop.Handle.Done, which represents full supervisor completion.
 func (w *Worker) closeDone() { close(w.done) }
 
 // loop is the main ticker that periodically processes pending deliveries.

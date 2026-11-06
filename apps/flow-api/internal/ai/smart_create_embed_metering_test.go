@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -53,6 +54,73 @@ func (emptySmartCreateReader) ListWorkspaceMembersForSmartCreate(context.Context
 	return nil, nil
 }
 
+func (emptySmartCreateReader) GetProposalCacheWorkspaceAccess(context.Context, generated.GetProposalCacheWorkspaceAccessParams) (interface{}, error) {
+	return "owner", nil
+}
+
+func (emptySmartCreateReader) ListProposalCacheTaskInputs(context.Context, generated.ListProposalCacheTaskInputsParams) ([]generated.ListProposalCacheTaskInputsRow, error) {
+	return nil, nil
+}
+
+type noProposalCacheInputReader struct{}
+
+func (noProposalCacheInputReader) ListCandidateTaskEmbeddings(context.Context, generated.ListCandidateTaskEmbeddingsParams) ([]generated.ListCandidateTaskEmbeddingsRow, error) {
+	return nil, nil
+}
+
+func (noProposalCacheInputReader) ListTasksWithAssigneesForSmartCreate(context.Context, generated.ListTasksWithAssigneesForSmartCreateParams) ([]generated.ListTasksWithAssigneesForSmartCreateRow, error) {
+	return nil, nil
+}
+
+func (noProposalCacheInputReader) ListWorkspaceMembersForSmartCreate(context.Context, uint32) ([]generated.ListWorkspaceMembersForSmartCreateRow, error) {
+	return nil, nil
+}
+
+func TestProposalRequiresCacheInputReaderEvenWithoutCache(t *testing.T) {
+	responses := map[string]string{
+		"smart create": `{"suggestedAssignees":[],"subtasks":[{"title":"Step 1","description":"d","priority":"low"},{"title":"Step 2","description":"d","priority":"low"}]}`,
+		"steps":        `[{"title":"Step 1","description":"d","priority":"low"},{"title":"Step 2","description":"d","priority":"low"},{"title":"Step 3","description":"d","priority":"low"},{"title":"Step 4","description":"d","priority":"low"},{"title":"Step 5","description":"d","priority":"low"}]`,
+	}
+	for method, response := range responses {
+		for _, cacheEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/cache_enabled_%t", method, cacheEnabled), func(t *testing.T) {
+				embedProvider := &stubEmbedProvider{}
+				provider := &labelProvider{
+					model: "test-model",
+					resp:  &providers.Response{Termination: providers.TerminationComplete, Model: "test-model", Text: response},
+				}
+				orchestrator := &Orchestrator{
+					Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
+						return provider, nil
+					}),
+				}
+				if cacheEnabled {
+					orchestrator.ProposalCache = NewProposalCache(time.Minute)
+				}
+				var logged []embed.InvocationRecord
+				var samples []sample
+				client := meteredEmbedClient(embedProvider, &logged, &samples)
+				var err error
+				switch method {
+				case "smart create":
+					_, err = orchestrator.ProposeSmartCreate(context.Background(), 42, "title", "description", client, noProposalCacheInputReader{}, acl.VisibilityArgs{})
+				case "steps":
+					_, err = orchestrator.ProposeSteps(context.Background(), 42, "title", "description", GranularityStandard, nil, client, noProposalCacheInputReader{}, acl.VisibilityArgs{})
+				}
+				if err == nil {
+					t.Fatal("proposal succeeded without a current-workspace/task-input validation reader")
+				}
+				if provider.req.Model != "" {
+					t.Errorf("provider was called before fail-closed validation: model=%q", provider.req.Model)
+				}
+				if embedProvider.calls != 0 {
+					t.Errorf("embedding provider calls = %d, want 0 before fail-closed validation", embedProvider.calls)
+				}
+			})
+		}
+	}
+}
+
 // meteredEmbedClient builds the embed client the proposal methods take,
 // with its metering wired to the collectors the caller inspects.
 func meteredEmbedClient(prov *stubEmbedProvider, logged *[]embed.InvocationRecord, samples *[]sample) *embed.Client {
@@ -83,7 +151,7 @@ func TestProposalEmbeddingsAreMetered(t *testing.T) {
 	}{
 		{
 			name:     "smart create",
-			response: `{"suggestedAssignees":[],"subtasks":[{"title":"t","description":"d","priority":"low"}]}`,
+			response: `{"suggestedAssignees":[],"subtasks":[{"title":"Task 1","description":"d","priority":"low"},{"title":"Task 2","description":"d","priority":"low"}]}`,
 			call: func(o *Orchestrator, ec EmbedClient) error {
 				_, err := o.ProposeSmartCreate(context.Background(), workspaceID,
 					"ship the thing", "with a description",
@@ -93,7 +161,7 @@ func TestProposalEmbeddingsAreMetered(t *testing.T) {
 		},
 		{
 			name:     "propose steps",
-			response: `[{"title":"t","description":"d","priority":"low"}]`,
+			response: `[{"title":"Step 1","description":"d","priority":"low"},{"title":"Step 2","description":"d","priority":"low"},{"title":"Step 3","description":"d","priority":"low"},{"title":"Step 4","description":"d","priority":"low"},{"title":"Step 5","description":"d","priority":"low"}]`,
 			call: func(o *Orchestrator, ec EmbedClient) error {
 				_, err := o.ProposeSteps(context.Background(), workspaceID,
 					"ship the thing", "with a description",
@@ -115,7 +183,7 @@ func TestProposalEmbeddingsAreMetered(t *testing.T) {
 
 			llm := &labelProvider{
 				model: "claude-sonnet-4-6",
-				resp:  &providers.Response{Model: "claude-sonnet-4-6", Text: tc.response},
+				resp:  &providers.Response{Termination: providers.TerminationComplete, Model: "claude-sonnet-4-6", Text: tc.response},
 			}
 			o := &Orchestrator{
 				Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {
@@ -183,7 +251,7 @@ func TestProposalEmbeddingsRespectTheBudget(t *testing.T) {
 		},
 		{
 			name:     "propose steps",
-			response: `[{"title":"t","description":"d","priority":"low"}]`,
+			response: `[{"title":"Step 1","description":"d","priority":"low"},{"title":"Step 2","description":"d","priority":"low"},{"title":"Step 3","description":"d","priority":"low"},{"title":"Step 4","description":"d","priority":"low"},{"title":"Step 5","description":"d","priority":"low"}]`,
 			call: func(o *Orchestrator, ec EmbedClient) error {
 				_, err := o.ProposeSteps(context.Background(), workspaceID,
 					"ship the thing", "with a description",
@@ -207,7 +275,7 @@ func TestProposalEmbeddingsRespectTheBudget(t *testing.T) {
 
 			llm := &labelProvider{
 				model: "claude-sonnet-4-6",
-				resp:  &providers.Response{Model: "claude-sonnet-4-6", Text: tc.response},
+				resp:  &providers.Response{Termination: providers.TerminationComplete, Model: "claude-sonnet-4-6", Text: tc.response},
 			}
 			o := &Orchestrator{
 				Resolver: ProviderResolverFunc(func(context.Context, uint32) (providers.Provider, error) {

@@ -126,3 +126,46 @@ func TestIsKnownTransition(t *testing.T) {
 		}
 	}
 }
+
+func TestCompletionAllowedPreservesManualPolicyAndRequiresReviewGate(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		policy     generated.TasksCompletionPolicy
+		reviewGate bool
+		want       bool
+	}{
+		{"manual ignores review gate", generated.TasksCompletionPolicyManual, false, true},
+		{"review required without approval is blocked", generated.TasksCompletionPolicyReviewRequired, false, false},
+		{"review required with approval and constraints is allowed", generated.TasksCompletionPolicyReviewRequired, true, true},
+		{"unknown policy fails closed", generated.TasksCompletionPolicy("future"), true, false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := completionAllowed(tc.policy, tc.reviewGate); got != tc.want {
+				t.Fatalf("completionAllowed(%q, %v) = %v, want %v", tc.policy, tc.reviewGate, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateActorRequiresExclusiveHumanOrAgent(t *testing.T) {
+	t.Parallel()
+
+	humanID, agentID := int64(7), int64(41)
+	if err := validateActor(ApplyParams{ActorUserID: &humanID, ActorAgentID: &agentID}); err == nil {
+		t.Fatal("validateActor accepted both a human and agent actor")
+	}
+	if err := validateActor(ApplyParams{ActorUserID: &humanID}); err != nil {
+		t.Fatalf("validateActor rejected a human actor: %v", err)
+	}
+	if err := validateActor(ApplyParams{ActorAgentID: &agentID}); err != nil {
+		t.Fatalf("validateActor rejected an agent actor: %v", err)
+	}
+	if err := validateActor(ApplyParams{}); err != nil {
+		t.Fatalf("validateActor rejected a system actor: %v", err)
+	}
+}

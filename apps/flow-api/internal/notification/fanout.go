@@ -528,7 +528,7 @@ func (f *Fanout) recipientsFor(ctx context.Context, workspaceID uint32, c classi
 		named, err = f.memberUserIDs(ctx, workspaceID, p.MentionedUserIDs)
 	case audienceTaskActor:
 		named, err = f.taskActorUserIDs(ctx, workspaceID, taskID, row.payloadJSON)
-	case audienceTargetUser:
+	case audienceTargetUser, audienceRequiredTargetUser:
 		var p struct {
 			TargetUserPublicID string `json:"targetUserPublicId"`
 		}
@@ -537,6 +537,9 @@ func (f *Fanout) recipientsFor(ctx context.Context, workspaceID uint32, c classi
 		}
 		if p.TargetUserPublicID != "" {
 			named, err = f.memberUserIDs(ctx, workspaceID, []string{p.TargetUserPublicID})
+			break
+		}
+		if c.To == audienceRequiredTargetUser {
 			break
 		}
 		resolve := f.resolveTaskOwners
@@ -858,6 +861,9 @@ const (
 	// when the handoff names nobody, the task's assignees (else creator) —
 	// the people it is handed back to, never every reader.
 	audienceTargetUser
+	// Workflow decisions have an explicit recipient; a removed account
+	// must not turn a personal notification into one for other task actors.
+	audienceRequiredTargetUser
 )
 
 // silent is the classification of a kind that deliberately notifies
@@ -909,8 +915,12 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.TaskCommentEdited:  notify("A comment was edited", "task", generated.NotificationsSeverityLow),
 	eventbus.TaskCommentRemoved: notify("A comment was removed", "task", generated.NotificationsSeverityLow),
 
-	eventbus.TaskActorAdded:   notify("You were added to a task", "task", generated.NotificationsSeverityNormal).to(audienceTaskActor),
-	eventbus.TaskActorRemoved: notify("You were removed from a task", "task", generated.NotificationsSeverityNormal).to(audienceRemovedTaskActor),
+	eventbus.TaskActorAdded:        notify("You were added to a task", "task", generated.NotificationsSeverityNormal).to(audienceTaskActor),
+	eventbus.TaskActorRemoved:      notify("You were removed from a task", "task", generated.NotificationsSeverityNormal).to(audienceRemovedTaskActor),
+	eventbus.TaskSubmissionCreated: notify("Work is ready for your review", "task", generated.NotificationsSeverityNormal).to(audienceRequiredTargetUser),
+	eventbus.TaskReviewDecided:     notify("Your submitted work was reviewed", "task", generated.NotificationsSeverityNormal).to(audienceRequiredTargetUser),
+	eventbus.TaskHandoffRequested:  notify("A task handoff needs your response", "task", generated.NotificationsSeverityHigh).to(audienceRequiredTargetUser),
+	eventbus.TaskHandoffDecided:    notify("Your task handoff was resolved", "task", generated.NotificationsSeverityNormal).to(audienceRequiredTargetUser),
 
 	eventbus.TaskTransitionStart:    notify("A task was started", "task", generated.NotificationsSeverityNormal),
 	eventbus.TaskTransitionComplete: notify("A task was completed", "task", generated.NotificationsSeverityNormal),

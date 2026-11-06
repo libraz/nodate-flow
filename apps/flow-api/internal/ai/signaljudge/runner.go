@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/outputcontract"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -34,42 +36,12 @@ type CostGuard interface {
 	Check(ctx context.Context, workspaceID uint32) error
 }
 
-// InvocationLogger persists a redacted record of the LLM call. The
-// signature matches [ai.InvocationLogger] verbatim so production
-// wiring can pass the same logger to both the task-agent and judge
-// paths and ai_invocations stays a single, uniform audit surface.
-//
-// The logger receives the redacted prompt and response together with
-// the provider / model identifiers and the workspace id. agentID is
-// set to the signal_judge agent so judge runs are filterable in the
-// invocation log UI.
-type InvocationLogger func(ctx context.Context, rec InvocationRecord)
-
-// InvocationRecord is the redacted ai_invocations payload the judge
-// emits. Field shape mirrors [ai.InvocationRecord] so callers can
-// pass a shared logger without translating between two structs.
-type InvocationRecord struct {
-	WorkspaceID      uint32
-	AgentID          uint32
-	Purpose          string
-	Model            string
-	PromptRedacted   string
-	ResponseRedacted string
-	TokensInput      int
-	TokensOutput     int
-	CostMicros       int64
-	CostCents        int64
-	Status           string
-	ErrorCode        string
-}
-
-// InvocationMetricsHook is called after each LLM provider call. Same
-// shape as [ai.InvocationMetricsHook] so the obs package's
-// RecordAIInvocation can be reused without an adapter. elapsed measures
-// the provider call alone; the token counts come from the response that
-// attempt produced and are 0 on a failure. err is nil on a successful call
-// and carries the provider's error on a failed one.
-type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
+// InvocationLogger, InvocationRecord and InvocationMetricsHook alias the
+// shared AI contracts so signal judge audit rows retain agent, task,
+// audience and input-resource provenance without a lossy conversion.
+type InvocationLogger = ai.InvocationLogger
+type InvocationRecord = ai.InvocationRecord
+type InvocationMetricsHook = ai.InvocationMetricsHook
 
 // AgentLookup is the narrow surface the runner needs to read an
 // agent's system prompt + kind by internal id. The production wiring
@@ -194,12 +166,6 @@ var ErrAgentPaused = errors.New("signaljudge: agent is paused")
 // failure.
 var ErrSignalMissing = errors.New("signaljudge: signal not found")
 
-// errRetryNoResponse stands in for the failure of a parse retry that
-// returned neither an error nor a response. It never leaves the runner —
-// it exists so that case is metered and audited as the failure it is
-// rather than as a zero-cost success.
-var errRetryNoResponse = errors.New("signaljudge: retry returned no response")
-
 // ExecuteJudge runs one judge tick for the given (agent, signal)
 // pair. It loads the agent + signal snapshots, enforces the cost
 // guard, resolves the workspace's default LLM provider, builds the
@@ -261,157 +227,118 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 		return result, fmt.Errorf("signaljudge: compose prompt: %w", perr)
 	}
 
+	ctx = ai.WithAgentID(ctx, agentID)
+	ctx = ai.WithInputResources(ctx, offeredTaskResources(offered)...)
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
+	outputSpec, err := VerdictOutputSpec()
+	if err != nil {
+		return result, err
+	}
 	req := airequest.ForAgent(prov, agent.Settings, airequest.Args{
 		System: systemPrompt,
 		Prompt: userPrompt,
+		Output: outputSpec,
 	})
-	// Pre-compose the combined prompt for redaction so both branches
-	// (success / failure) below see the same shape and any registered
-	// SecretPrefixes are scrubbed before the ai_invocations write.
-	combinedPrompt := logutil.Redact(strings.TrimSpace(req.System + "\n" + req.Prompt))
-	// time.Since is taken inside each branch rather than bound to a local
-	// here: the latency this reports must cover the provider call and
-	// nothing else, and the error check has to stay adjacent to the call
-	// it checks.
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
-	if err != nil {
-		if r.OnInvocation != nil {
-			r.OnInvocation(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
+	ref := SignalRef{
+		InternalID:  signal.SignalID,
+		PublicID:    signal.PublicID,
+		WorkspaceID: signal.WorkspaceID,
+		Kind:        signal.Kind,
+		// Only tasks the model was shown may become a verdict target.
+		OfferedTasks: offered,
+	}
+	agentRef := AgentRef{InternalID: agentID}
+	runID := uint32(0)
+	if r.RunIDFromContext != nil {
+		runID = r.RunIDFromContext(ctx)
+	}
+
+	accounting := &ai.Orchestrator{
+		LogInvoke:    r.Log,
+		OnInvocation: r.OnInvocation,
+	}
+
+	var verdict Verdict
+	validationAttempted := false
+	validate := func(response *providers.Response) error {
+		validationAttempted = true
+		parsed, validateErr := validateSignalVerdictResponse(outputSpec, response)
+		if validateErr != nil {
+			return validateErr
 		}
-		r.logInvocation(ctx, InvocationRecord{
-			WorkspaceID:    workspaceID,
-			AgentID:        agentID,
-			Purpose:        "signal_judge",
-			Model:          req.Model,
-			PromptRedacted: combinedPrompt,
-			Status:         "error",
-			ErrorCode:      logutil.Redact(err.Error()),
-		})
-		return result, fmt.Errorf("signaljudge: provider call: %w", err)
+		verdict = parsed
+		return nil
 	}
-
-	if r.OnInvocation != nil {
-		r.OnInvocation(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	}
-	model := resp.Model
-	if model == "" {
-		model = req.Model
-	}
-	r.logInvocation(ctx, InvocationRecord{
-		WorkspaceID:      workspaceID,
-		AgentID:          agentID,
-		Purpose:          "signal_judge",
-		Model:            model,
-		PromptRedacted:   combinedPrompt,
-		ResponseRedacted: logutil.Redact(resp.Text),
-		TokensInput:      resp.InputTokens,
-		TokensOutput:     resp.OutputTokens,
-		CostMicros:       resp.EstimatedCostMicros(),
-		CostCents:        resp.EstimatedCostCents(),
-		Status:           "ok",
-	})
-	result.CostMicros = resp.EstimatedCostMicros()
-	result.CostCents = resp.EstimatedCostCents()
-	// LastThought is persisted to agent_memo and exposed via the API; the
-	// raw parse text (verdictText) stays unredacted below since it must
-	// round-trip through the JSON verdict parser.
-	result.LastThought = logutil.Redact(resp.Text)
-
-	// If the response does not parse into a valid Verdict, retry
-	// once with the same prompt plus a stern reminder appended.
-	// Both attempts count against the workspace's per-signal cost
-	// guard budget; the runner does not loop more than once because
-	// a persistent parse failure usually means the model is
-	// fundamentally misconfigured (wrong system prompt override,
-	// non-JSON-capable model) — additional retries just burn budget.
-	verdictText := resp.Text
-	if r.shouldRetry(verdictText) {
-		// Re-ask the same question rather than rebuilding the request:
-		// the retry has to run on the agent's model, cap, and
-		// temperature exactly as the first attempt did, or the second
-		// answer is not comparable to the first.
-		retryReq := airequest.WithPrompt(req, userPrompt+"\n\n"+retryReminder)
-		retryStart := time.Now()
-		retryResp, retryErr := prov.Complete(ctx, retryReq)
-		if retryErr == nil && retryResp != nil {
-			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, retryResp.InputTokens, retryResp.OutputTokens, retryResp.EstimatedCostMicros(), time.Since(retryStart), nil)
+	response, outcomeErr := accounting.CompleteAndRecord(ctx, workspaceID, "signal_judge", prov, req, validate)
+	addResponseCost(&result, response)
+	if outcomeErr != nil {
+		if validationAttempted && isRepairableVerdictFailure(response, outcomeErr) {
+			capHit, budgetErr := ai.CheckBudget(ctx, r.Guard, workspaceID)
+			if budgetErr == nil {
+				budgetErr = r.Agents.CheckCostCap(ctx, agentID)
+				capHit = errors.Is(budgetErr, ai.ErrAgentCostCapExceeded)
 			}
-			retryModel := retryResp.Model
-			if retryModel == "" {
-				retryModel = retryReq.Model
+			if budgetErr != nil {
+				result.CostCapHit = capHit
+				if rejectErr := r.rejectOutput(ctx, ref, agentRef, outcomeErr); rejectErr != nil {
+					return result, rejectErr
+				}
+				return result, fmt.Errorf("signaljudge: repair budget check: %w", budgetErr)
 			}
-			r.logInvocation(ctx, InvocationRecord{
-				WorkspaceID:      workspaceID,
-				AgentID:          agentID,
-				Purpose:          "signal_judge",
-				Model:            retryModel,
-				PromptRedacted:   logutil.Redact(strings.TrimSpace(retryReq.System + "\n" + retryReq.Prompt)),
-				ResponseRedacted: logutil.Redact(retryResp.Text),
-				TokensInput:      retryResp.InputTokens,
-				TokensOutput:     retryResp.OutputTokens,
-				CostMicros:       retryResp.EstimatedCostMicros(),
-				CostCents:        retryResp.EstimatedCostCents(),
-				Status:           "ok",
-			})
-			result.CostMicros += retryResp.EstimatedCostMicros()
-			result.CostCents = result.CostMicros / 10_000
-			result.LastThought = logutil.Redact(retryResp.Text)
-			verdictText = retryResp.Text
+
+			retryReq := airequest.WithPrompt(req, userPrompt+"\n\n"+retryReminder)
+			var retryVerdict Verdict
+			retryValidate := func(retryResponse *providers.Response) error {
+				parsed, validateErr := validateSignalVerdictResponse(outputSpec, retryResponse)
+				if validateErr != nil {
+					return validateErr
+				}
+				retryVerdict = parsed
+				return nil
+			}
+			retryResponse, retryErr := accounting.CompleteAndRecord(ctx, workspaceID, "signal_judge", prov, retryReq, retryValidate)
+			addResponseCost(&result, retryResponse)
+			if retryErr != nil {
+				// A second unusable answer is terminal. Preserve the first
+				// invalid response as the rejection reason if the repair call
+				// failed before it returned a decoded response.
+				rejectionErr := retryErr
+				if retryResponse == nil && !isProviderOutputFailure(retryErr) {
+					rejectionErr = outcomeErr
+				}
+				if rejectErr := r.rejectOutput(ctx, ref, agentRef, rejectionErr); rejectErr != nil {
+					return result, rejectErr
+				}
+				if r.Applier == nil {
+					return result, fmt.Errorf("signaljudge: repair output: %w", retryErr)
+				}
+				return result, nil
+			}
+			verdict = retryVerdict
+			response = retryResponse
 		} else {
-			// The retry is a provider call that happened, so it is
-			// metered and audited like any other — a second attempt
-			// that fails must not be invisible to the metric or to
-			// ai_invocations just because its answer is unusable. A
-			// nil error with a nil response is a failure too, and is
-			// reported under an error of its own rather than as a
-			// zero-cost success.
-			failure := retryErr
-			if failure == nil {
-				failure = errRetryNoResponse
+			if !isProviderOutputFailure(outcomeErr) {
+				return result, fmt.Errorf("signaljudge: provider call: %w", outcomeErr)
 			}
-			if r.OnInvocation != nil {
-				r.OnInvocation(string(prov.Kind()), retryReq.Model, 0, 0, 0, time.Since(retryStart), failure)
+			if rejectErr := r.rejectOutput(ctx, ref, agentRef, outcomeErr); rejectErr != nil {
+				return result, rejectErr
 			}
-			r.logInvocation(ctx, InvocationRecord{
-				WorkspaceID:    workspaceID,
-				AgentID:        agentID,
-				Purpose:        "signal_judge",
-				Model:          retryReq.Model,
-				PromptRedacted: logutil.Redact(strings.TrimSpace(retryReq.System + "\n" + retryReq.Prompt)),
-				Status:         "error",
-				ErrorCode:      logutil.Redact(failure.Error()),
-			})
+			if r.Applier == nil {
+				return result, fmt.Errorf("signaljudge: provider output: %w", outcomeErr)
+			}
+			return result, nil
 		}
-		// A retry that also errors is treated like an unparseable
-		// response: the synthesised noop verdict below routes
-		// through the Applier's SignalRejected path.
+	}
+	if response != nil {
+		result.LastThought = logutil.Redact(response.Text)
 	}
 
-	// Once an Applier is wired, translate the LLM
-	// response into a [Verdict] and let the Applier reify it. The
-	// runner stays write-free for events/signals; everything from
-	// here on is the Applier's responsibility.
+	// The model attempt is complete and the output contract passed. Domain
+	// authorization, autonomy, and workflow checks remain in Apply; an
+	// application failure is therefore distinct from model validation.
 	if r.Applier != nil {
-		ref := SignalRef{
-			InternalID:  signal.SignalID,
-			PublicID:    signal.PublicID,
-			WorkspaceID: signal.WorkspaceID,
-			Kind:        signal.Kind,
-			// Only tasks the model was shown may become a verdict target.
-			OfferedTasks: offered,
-		}
-		agentRef := AgentRef{InternalID: agentID}
-		runID := uint32(0)
-		if r.RunIDFromContext != nil {
-			runID = r.RunIDFromContext(ctx)
-		}
-		applyRes, applyErr := r.applyVerdict(ctx, ref, agentRef, runID, verdictText)
+		applyRes, applyErr := r.Applier.Apply(ctx, ref, agentRef, runID, verdict)
 		if applyErr != nil {
-			// Apply failure is a server bug, not an LLM bug — return
-			// it so the OrchestratorRunner records the run as failed.
 			return result, fmt.Errorf("signaljudge: applier: %w", applyErr)
 		}
 		if applyRes != nil {
@@ -425,28 +352,78 @@ func (r *Runner) ExecuteJudge(ctx context.Context, workspaceID, agentID uint32, 
 }
 
 // retryReminder is the user-message suffix the runner appends on the
-// second attempt when the first response did not parse. Kept
+// repair attempt when the first complete response failed validation. Kept
 // intentionally short and procedural — the model must understand the
 // constraint without spending tokens on a polite re-explanation.
 const retryReminder = "Your previous response was not valid JSON matching the schema. Please respond with valid JSON only, no prose, no markdown fences."
 
-// shouldRetry reports whether the LLM's first response is malformed
-// enough to justify a single retry. The decision is intentionally
-// cheap: parse the trimmed text as a [Verdict] and run
-// [ValidateVerdict]; if either step fails, retry. Cost-guard budget
-// is checked once per ExecuteJudge call (not per attempt) so an
-// already-charged retry is free of further accounting; the upstream
-// provider cost is what we are spending.
-func (r *Runner) shouldRetry(text string) bool {
-	trimmed := strings.TrimSpace(text)
-	if trimmed == "" {
-		return true
+func validateSignalVerdictResponse(spec *providers.OutputSpec, response *providers.Response) (Verdict, error) {
+	if response == nil {
+		return Verdict{}, providers.ErrResponseSchemaMismatch
 	}
-	var v Verdict
-	if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
-		return true
+	if err := outputcontract.Validate(spec, []byte(response.Text)); err != nil {
+		switch {
+		case errors.Is(err, outputcontract.ErrInvalidJSON):
+			return Verdict{}, providers.ErrResponseInvalidJSON
+		case errors.Is(err, outputcontract.ErrValidationFailed):
+			return Verdict{}, providers.ErrResponseSchemaMismatch
+		default:
+			// A broken static contract is a code/configuration failure. It
+			// must not spend a repair call or expose validator internals.
+			return Verdict{}, errors.New("signaljudge: output contract unavailable")
+		}
 	}
-	return ValidateVerdict(v) != nil
+	var verdict Verdict
+	if err := json.Unmarshal([]byte(strings.TrimSpace(response.Text)), &verdict); err != nil {
+		return Verdict{}, providers.ErrResponseInvalidJSON
+	}
+	if err := ValidateVerdict(verdict); err != nil {
+		return Verdict{}, providers.ErrResponseSchemaMismatch
+	}
+	return verdict, nil
+}
+
+func isRepairableVerdictFailure(response *providers.Response, err error) bool {
+	if response == nil || response.Termination != providers.TerminationComplete {
+		return false
+	}
+	return errors.Is(err, providers.ErrResponseInvalidJSON) || errors.Is(err, providers.ErrResponseSchemaMismatch)
+}
+
+func isProviderOutputFailure(err error) bool {
+	return errors.Is(err, providers.ErrGenerationIncomplete) ||
+		errors.Is(err, providers.ErrModelRefused) ||
+		errors.Is(err, providers.ErrResponseInvalidJSON) ||
+		errors.Is(err, providers.ErrResponseSchemaMismatch)
+}
+
+func addResponseCost(result *agentruntime.ExecutionResult, response *providers.Response) {
+	if response == nil {
+		return
+	}
+	result.CostMicros += response.EstimatedCostMicros()
+	result.CostCents = result.CostMicros / 10_000
+}
+
+func offeredTaskResources(offered map[string]struct{}) []ai.InvocationResource {
+	ids := make([]string, 0, len(offered))
+	for publicID := range offered {
+		ids = append(ids, publicID)
+	}
+	sort.Strings(ids)
+	resources := make([]ai.InvocationResource, 0, len(ids))
+	for _, publicID := range ids {
+		resources = append(resources, ai.TaskInputResource(publicID))
+	}
+	return resources
+}
+
+func (r *Runner) rejectOutput(ctx context.Context, sig SignalRef, agent AgentRef, failure error) error {
+	if r.Applier == nil {
+		return nil
+	}
+	_, err := r.Applier.RejectOutput(ctx, sig, agent, failure)
+	return err
 }
 
 // renderUserPrompt builds the user-message body. When the [Runner]
@@ -467,49 +444,6 @@ func (r *Runner) renderUserPrompt(ctx context.Context, sig SignalSnapshot) (stri
 	}
 	prompt, offered := RenderUserPromptOffered(pc)
 	return prompt, offered, nil
-}
-
-// applyVerdict parses the LLM response into a [Verdict] and forwards
-// it to the Applier. A parse error is itself a verdict-shape failure
-// and routes through the Applier so SignalRejected is emitted with a
-// "parse_error" reason — the timeline must surface "the LLM said
-// something we could not consume" just like it surfaces a schema
-// violation.
-//
-// The runner's 1-retry loop in ExecuteJudge already gave the LLM a
-// second chance with the retry reminder appended; by the time we
-// reach this function we are committed to either reifying a verdict
-// or recording a rejection. Synthesising a Verdict shell (with empty
-// Action so [ValidateVerdict] refuses it) routes through the Applier's
-// reject path which emits SignalRejected and persists the
-// pseudo-verdict on the signals row, completing the audit trail.
-func (r *Runner) applyVerdict(ctx context.Context, sig SignalRef, agent AgentRef, runID uint32, llmText string) (*ApplyResult, error) {
-	trimmed := strings.TrimSpace(llmText)
-	var verdict Verdict
-	if uerr := json.Unmarshal([]byte(trimmed), &verdict); uerr != nil {
-		// Synthesize a verdict shell so the Applier's reject path
-		// has something to record. Action stays the zero value
-		// ("") which ValidateVerdict will refuse, and the synthetic
-		// reasoning excerpt explains the parse failure in-line so
-		// operators can see it without opening the agent_runs row.
-		verdict = Verdict{
-			Action:           "",
-			Confidence:       0,
-			ReasoningExcerpt: fmt.Sprintf("Judge response could not be parsed (parse_error): %s", uerr.Error()),
-		}
-	}
-	return r.Applier.Apply(ctx, sig, agent, runID, verdict)
-}
-
-// logInvocation forwards to the configured InvocationLogger when
-// present. A nil logger is silently dropped — single-binary smoke
-// deployments may not have an ai_invocations writer wired and we do
-// not want that to wedge the judge.
-func (r *Runner) logInvocation(ctx context.Context, rec InvocationRecord) {
-	if r.Log == nil {
-		return
-	}
-	r.Log(ctx, rec)
 }
 
 // composeJudgePrompt assembles the fallback user-prompt body the judge

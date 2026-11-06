@@ -253,7 +253,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-			resp.CreatorAvatarURL = dbtype.PtrFromNullString(r.CreatorAvatarUrl)
+			resp.CreatorAvatarURL = handlerutil.AvatarURLPtr(r.CreatorAvatarUrl, r.CreatorPublicID)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
 			scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
@@ -283,7 +283,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			}
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-			resp.CreatorAvatarURL = dbtype.PtrFromNullString(r.CreatorAvatarUrl)
+			resp.CreatorAvatarURL = handlerutil.AvatarURLPtr(r.CreatorAvatarUrl, r.CreatorPublicID)
 			if r.RecurrenceRule != nil {
 				raw := json.RawMessage(r.RecurrenceRule)
 				resp.RecurrenceRule = &raw

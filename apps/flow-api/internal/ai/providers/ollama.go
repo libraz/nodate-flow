@@ -29,10 +29,11 @@ func (p *ollamaProvider) Model() string {
 }
 
 type ollamaReq struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	System string `json:"system,omitempty"`
-	Stream bool   `json:"stream"`
+	Model  string          `json:"model"`
+	Prompt string          `json:"prompt"`
+	System string          `json:"system,omitempty"`
+	Stream bool            `json:"stream"`
+	Format json.RawMessage `json:"format,omitempty"`
 	// Options is Ollama's sampling block. Omitted entirely when the
 	// caller chose neither knob.
 	Options *ollamaOptions `json:"options,omitempty"`
@@ -59,6 +60,8 @@ func ollamaOptionsFor(req Request) *ollamaOptions {
 
 type ollamaResp struct {
 	Response        string `json:"response"`
+	Done            *bool  `json:"done"`
+	DoneReason      string `json:"done_reason"`
 	PromptEvalCount int    `json:"prompt_eval_count"`
 	EvalCount       int    `json:"eval_count"`
 	Error           string `json:"error,omitempty"`
@@ -69,11 +72,13 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if model == "" {
 		model = p.Model()
 	}
+	outputMode, nativeSchema := nativeSchemaFor(KindOllama, model, chooseBaseURL(p.cfg.BaseURL, defaultOllamaBaseURL), req.Output)
 	body, err := json.Marshal(ollamaReq{
 		Model:   model,
 		Prompt:  req.Prompt,
 		System:  req.System,
 		Stream:  false,
+		Format:  nativeSchema,
 		Options: ollamaOptionsFor(req),
 	})
 	if err != nil {
@@ -108,6 +113,7 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if or.Error != "" {
 		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
+	termination, stopReason := classifyOllamaCompletion(or.Done, or.DoneReason)
 	// Ollama runs on hardware the operator already owns, so the call has
 	// no per-token price to report. Saying so explicitly — model named,
 	// cost zero — is the whole point: a response that named neither left
@@ -117,9 +123,27 @@ func (p *ollamaProvider) Complete(ctx context.Context, req Request) (*Response, 
 	return &Response{
 		Model:        model,
 		Text:         or.Response,
+		Termination:  termination,
+		StopReason:   stopReason,
+		OutputMode:   outputMode,
 		InputTokens:  or.PromptEvalCount,
 		OutputTokens: or.EvalCount,
 		CostMicros:   0,
 		CostCents:    0,
 	}, nil
+}
+
+func classifyOllamaCompletion(done *bool, reason string) (Termination, string) {
+	if done == nil || !*done {
+		return TerminationUnknown, boundedStopReason(reason)
+	}
+	bounded := boundedStopReason(reason)
+	switch reason {
+	case "stop":
+		return TerminationComplete, bounded
+	case "length":
+		return TerminationIncomplete, bounded
+	default:
+		return TerminationUnknown, bounded
+	}
 }

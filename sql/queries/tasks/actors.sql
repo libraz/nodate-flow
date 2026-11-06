@@ -86,5 +86,6 @@ LIMIT 1;
 UPDATE task_actors
 SET enabled = FALSE
 WHERE workspace_id = ?
+  AND task_id = ?
   AND public_id = ?
   AND enabled = TRUE;

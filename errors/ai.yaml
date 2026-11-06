@@ -2,6 +2,47 @@ domain: ai
 breadcrumb: "AI"
 
 resources:
+  suggestion:
+    breadcrumb: "AI > Suggestion"
+    errors:
+      evidence_changed:
+        code: AI.SUGGESTION.EVIDENCE_CHANGED
+        status: 409
+        message: "The suggestion evidence has changed"
+        message_ja: "提案の根拠が更新されています"
+        message_zh: "建议的依据已更新"
+        description: "The supplied proposal revision no longer matches the current evidence."
+        userAction: "Refresh the suggestion and review its current evidence before retrying."
+      already_resolved:
+        code: AI.SUGGESTION.ALREADY_RESOLVED
+        status: 409
+        message: "The suggestion has already been resolved"
+        message_ja: "この提案は既に処理されています"
+        message_zh: "此建议已处理"
+        description: "A new command targets a proposal whose source has already been resolved."
+        userAction: "Refresh the inbox to see the current result."
+  proposal:
+    breadcrumb: "AI > Proposal"
+    errors:
+      inputs_changed:
+        code: AI.PROPOSAL.INPUTS_CHANGED
+        status: 409
+        message: "The proposal inputs changed while it was being generated"
+        message_ja: "提案の生成中に入力内容が変更されました"
+        message_zh: "生成建议期间输入内容已发生变化"
+        description: "Tasks quoted in the proposal prompt, or the caller's access to them, changed while the proposal was being generated, so the result was discarded."
+        userAction: "Retry the request to generate a proposal from the current tasks."
+  operation:
+    breadcrumb: "AI > Operation"
+    errors:
+      key_conflict:
+        code: AI.OPERATION.KEY_CONFLICT
+        status: 409
+        message: "The operation key was used for different arguments"
+        message_ja: "操作キーが異なる内容の操作に使われています"
+        message_zh: "操作键已用于不同的参数"
+        description: "A retry reused an operation key with arguments different from the committed command."
+        userAction: "Retry the original command or start a new operation with a new key."
   provider:
     breadcrumb: "AI > Provider"
     errors:
@@ -101,6 +142,22 @@ resources:
   response:
     breadcrumb: "AI > Response"
     errors:
+      generation_incomplete:
+        code: AI.RESPONSE.GENERATION_INCOMPLETE
+        status: 502
+        message: "AI generation ended before the response was complete"
+        message_ja: "AI の応答生成が完了前に終了しました"
+        message_zh: "AI 响应尚未完成就已结束"
+        description: "The provider reported a generation limit or another incomplete termination; the response was not applied."
+        userAction: "Review the request size and output limit before retrying."
+      model_refused:
+        code: AI.RESPONSE.MODEL_REFUSED
+        status: 422
+        message: "The AI provider declined to generate this response"
+        message_ja: "AI プロバイダがこの応答の生成を拒否しました"
+        message_zh: "AI 服务提供商拒绝生成此响应"
+        description: "The provider reported a refusal or blocked response; no generated action was applied."
+        userAction: "Review the request and provide suitable context before trying again."
       invalid_json:
         code: AI.RESPONSE.INVALID_JSON
         status: 502

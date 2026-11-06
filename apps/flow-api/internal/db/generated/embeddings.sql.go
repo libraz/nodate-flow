@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -28,6 +29,32 @@ WHERE task_id = ?
 func (q *Queries) DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskEmbeddingsForTask, taskID)
 	return err
+}
+
+const getProposalCacheWorkspaceAccess = `-- name: GetProposalCacheWorkspaceAccess :one
+SELECT CAST(wm.role AS CHAR) AS role
+FROM workspaces w
+JOIN workspace_members wm
+  ON wm.workspace_id = w.id
+  AND wm.enabled = TRUE
+WHERE w.id = ?
+  AND w.enabled = TRUE
+  AND wm.user_id = ?
+LIMIT 1
+`
+
+type GetProposalCacheWorkspaceAccessParams struct {
+	ID     uint32 `json:"-"`
+	UserID uint32 `json:"-"`
+}
+
+// Current authority used by prompt snapshots and proposal-cache hits. An
+// absent or disabled workspace membership is intentionally no row.
+func (q *Queries) GetProposalCacheWorkspaceAccess(ctx context.Context, arg GetProposalCacheWorkspaceAccessParams) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getProposalCacheWorkspaceAccess, arg.ID, arg.UserID)
+	var role interface{}
+	err := row.Scan(&role)
+	return role, err
 }
 
 const getTaskEmbedding = `-- name: GetTaskEmbedding :one
@@ -154,6 +181,140 @@ func (q *Queries) ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandi
 			&i.PublicID,
 			&i.Title,
 			&i.Vector,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProposalCacheTaskInputs = `-- name: ListProposalCacheTaskInputs :many
+WITH cache_scope AS (
+  SELECT
+    w.id AS workspace_id,
+    (wm.role IN ('owner', 'admin')) AS is_elevated
+  FROM workspaces w
+  JOIN workspace_members wm
+    ON wm.workspace_id = w.id
+    AND wm.enabled = TRUE
+  WHERE w.id = ?
+    AND w.enabled = TRUE
+    AND wm.user_id = CAST(? AS UNSIGNED)
+)
+SELECT
+  t.id,
+  t.public_id,
+  t.title,
+  t.description,
+  t.derived_state,
+  COALESCE(BIN_TO_UUID(u.public_id, 0), '') AS assignee_public_id,
+  u.display_name AS assignee_name
+FROM cache_scope scope
+JOIN tasks t ON t.workspace_id = scope.workspace_id
+JOIN projects p
+  ON p.id = t.project_id
+  AND p.workspace_id = t.workspace_id
+  AND p.enabled = TRUE
+LEFT JOIN task_actors pa
+  ON pa.id = (
+    SELECT ta.id
+    FROM task_actors ta
+    WHERE ta.task_id = t.id
+      AND ta.enabled = TRUE
+      AND ta.role = 'assignee'
+    ORDER BY ta.sort_weight ASC, ta.id ASC
+    LIMIT 1
+  )
+LEFT JOIN users u ON u.id = pa.user_id AND u.enabled = TRUE
+WHERE t.enabled = TRUE
+  AND t.public_id IN (/*SLICE:public_ids*/?)
+  -- The same literal task-visibility predicate is used by other task reads.
+  -- Elevated roles derive from the current membership above, never a bind
+  -- supplied by the request middleware.
+  AND (
+    t.visibility = 'public'
+    OR (t.visibility = 'project' AND EXISTS (
+      SELECT 1 FROM project_members pm_vis
+      WHERE pm_vis.project_id = t.project_id
+        AND pm_vis.user_id = CAST(? AS UNSIGNED)
+        AND pm_vis.enabled = TRUE
+    ))
+    OR (t.visibility = 'private' AND (
+      t.created_by_user_id = CAST(? AS UNSIGNED)
+      OR EXISTS (
+        SELECT 1 FROM task_actors ta_vis
+        WHERE ta_vis.task_id = t.id
+          AND ta_vis.kind = 'user'
+          AND ta_vis.user_id = CAST(? AS UNSIGNED)
+          AND ta_vis.enabled = TRUE
+      )
+    ))
+    OR scope.is_elevated = 1
+  )
+ORDER BY t.public_id
+`
+
+type ListProposalCacheTaskInputsParams struct {
+	WorkspaceID uint32           `json:"-"`
+	ActorUserID int64            `json:"actorUserId"`
+	PublicIds   []types.PublicID `json:"publicIds"`
+}
+
+type ListProposalCacheTaskInputsRow struct {
+	ID               uint32            `json:"-"`
+	PublicID         types.PublicID    `json:"publicId"`
+	Title            string            `json:"title"`
+	Description      sql.NullString    `json:"description"`
+	DerivedState     TasksDerivedState `json:"derivedState"`
+	AssigneePublicID interface{}       `json:"assigneePublicId"`
+	AssigneeName     sql.NullString    `json:"assigneeName"`
+}
+
+// Reload every task quoted by a cached proposal through the current
+// Layer-4 ACL, returning the prompt-relevant fields used to fingerprint the
+// cache snapshot. Missing, disabled, moved, or unreadable tasks are absent;
+// callers require one row for every public id before serving a cache hit.
+// The primary assignee rule of v_task_list_all: the first assignee in
+// display order, with no name when that actor is an agent or disabled.
+func (q *Queries) ListProposalCacheTaskInputs(ctx context.Context, arg ListProposalCacheTaskInputsParams) ([]ListProposalCacheTaskInputsRow, error) {
+	query := listProposalCacheTaskInputs
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.WorkspaceID)
+	queryParams = append(queryParams, arg.ActorUserID)
+	if len(arg.PublicIds) > 0 {
+		for _, v := range arg.PublicIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:public_ids*/?", strings.Repeat(",?", len(arg.PublicIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:public_ids*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.ActorUserID)
+	queryParams = append(queryParams, arg.ActorUserID)
+	queryParams = append(queryParams, arg.ActorUserID)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProposalCacheTaskInputsRow{}
+	for rows.Next() {
+		var i ListProposalCacheTaskInputsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.Title,
+			&i.Description,
+			&i.DerivedState,
+			&i.AssigneePublicID,
+			&i.AssigneeName,
 		); err != nil {
 			return nil, err
 		}

@@ -24,7 +24,7 @@ func TestGoogleProviderKeyNotInURL(t *testing.T) {
 		gotRawQuery = r.URL.RawQuery
 		gotHeader = r.Header.Get(googleAPIKeyHeader)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"hi"}]}}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1}}`)
+		_, _ = io.WriteString(w, `{"candidates":[{"content":{"parts":[{"text":"hi"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1}}`)
 	}))
 	t.Cleanup(srv.Close)
 

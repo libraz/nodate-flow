@@ -51,7 +51,7 @@ func TestCompileLens_PromptSecretNeverReachesTheInvocation(t *testing.T) {
 
 			prov := &recordingProvider{
 				kind: providers.Kind("mock"),
-				resp: &providers.Response{Text: goodLens},
+				resp: &providers.Response{Text: goodLens, Termination: providers.TerminationComplete},
 				err:  tc.providerErr,
 			}
 			var logged []InvocationRecord

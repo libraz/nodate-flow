@@ -25,9 +25,38 @@ func TestInProcessQueueDedupe(t *testing.T) {
 	if err := q.Ack(ctx, "k1"); err != nil {
 		t.Fatalf("ack: %v", err)
 	}
-	// After ack the same key can be re-enqueued at the next tick.
+	// An acked key stays known, as the finished agent_runs row does.
+	if err := q.Enqueue(ctx, r); !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("re-enqueue after ack: expected ErrDuplicate, got %v", err)
+	}
+}
+
+// Finished keys are kept for the purger's retention, not forever: the
+// in-process queue would otherwise grow by one key per run for the life of
+// the process.
+func TestInProcessQueueForgetsKeysPastRetention(t *testing.T) {
+	q := NewInProcessQueue(4)
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	q.now = func() time.Time { return now }
+	ctx := context.Background()
+	r := Run{DedupeKey: "k1", Job: Job{AgentID: 1}}
 	if err := q.Enqueue(ctx, r); err != nil {
-		t.Fatalf("re-enqueue after ack: %v", err)
+		t.Fatalf("enqueue: %v", err)
+	}
+	if _, err := q.Claim(ctx); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	if err := q.Ack(ctx, "k1"); err != nil {
+		t.Fatalf("ack: %v", err)
+	}
+
+	now = now.Add(DefaultRetention - time.Minute)
+	if err := q.Enqueue(ctx, r); !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("re-enqueue inside retention: expected ErrDuplicate, got %v", err)
+	}
+	now = now.Add(2 * inProcessPruneEvery)
+	if err := q.Enqueue(ctx, r); err != nil {
+		t.Fatalf("re-enqueue past retention: %v", err)
 	}
 }
 

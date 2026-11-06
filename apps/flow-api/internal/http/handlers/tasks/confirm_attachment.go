@@ -92,11 +92,31 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 			// candidate and the sweeper leaves it alone. The measured
 			// size replaces the declared one, which until this point
 			// was whatever the client felt like sending.
-			if err := deps.Queries.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
-				ByteSize: size,
-				ID:       row.StorageObjectID,
+			// The stamp bumps the task's work revision through a trigger, so
+			// the task row is locked first, in the order presign takes them.
+			var taskGone bool
+			if err := dbretry.InTx(ctx, deps.DB, "tasks.ConfirmUpload", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+				taskGone = false
+				qtx := generated.New(tx)
+				if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+					ID:          task.ID,
+					WorkspaceID: ws.ID,
+				}); err != nil {
+					if stderrors.Is(err, sql.ErrNoRows) {
+						taskGone = true
+						return nil
+					}
+					return err
+				}
+				return qtx.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
+					ByteSize: size,
+					ID:       row.StorageObjectID,
+				})
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			if taskGone {
+				return nil, httpErr(apierrors.WsTaskNotFound)
 			}
 			out := &ConfirmTaskAttachmentOutput{}
 			out.Body.Ok = true

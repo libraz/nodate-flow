@@ -25,6 +25,8 @@ SELECT
   p.public_id AS project_public_id,
   actor.public_id AS actor_user_public_id,
   actor.display_name AS actor_display_name,
+  actor.avatar_url AS actor_avatar_url,
+  actor.avatar_storage_object_id AS actor_avatar_storage_object_id,
   agent.public_id AS actor_agent_public_id,
   CAST(COALESCE(agent.name, '') AS CHAR(255)) AS actor_agent_name,
   e.actor_system_source,

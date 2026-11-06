@@ -11,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
@@ -124,7 +125,7 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 				CreatedAt:        r.CreatedAt.Unix(),
 			}
 			resp.Description = dbtype.PtrFromNullString(r.Description)
-			resp.OwnerAvatarURL = dbtype.PtrFromNullString(r.OwnerAvatarUrl)
+			resp.OwnerAvatarURL = handlerutil.AvatarURLPtr(r.OwnerAvatarUrl, r.OwnerPublicID)
 			out.Body.Calendars[i] = resp
 		}
 		return out, nil

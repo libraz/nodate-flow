@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -36,11 +37,18 @@ func NewMySQLQueue(db *sql.DB) *MySQLQueue {
 // treat them as no-ops across replicas.
 func (q *MySQLQueue) Enqueue(ctx context.Context, r Run) error {
 	const ins = `INSERT INTO agent_runs
-		(public_id, workspace_id, agent_id, dedupe_key, scheduled_at)
-		VALUES (?, ?, ?, ?, ?)`
+		(public_id, workspace_id, agent_id, source_event_id, dedupe_key, scheduled_at)
+		VALUES (?, ?, ?, ?, ?, ?)`
+	var sourceEventID any
+	if r.Job.SourceEventID != 0 {
+		// Pass the unsigned BIGINT as decimal text so the full uint64 range
+		// remains representable even though database/sql's signed integer
+		// conversion stops at MaxInt64.
+		sourceEventID = strconv.FormatUint(r.Job.SourceEventID, 10)
+	}
 	pub := types.New()
 	_, err := q.DB.ExecContext(ctx, ins,
-		pub, r.Job.WsID, r.Job.AgentID, r.DedupeKey, r.ScheduledAt.UTC(),
+		pub, r.Job.WsID, r.Job.AgentID, sourceEventID, r.DedupeKey, r.ScheduledAt.UTC(),
 	)
 	if err != nil {
 		if apierr.IsDuplicateEntry(err) {
@@ -81,7 +89,7 @@ func (q *MySQLQueue) tryClaim(ctx context.Context) (Run, bool, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	const sel = `SELECT id, workspace_id, agent_id, dedupe_key, scheduled_at, attempts
+	const sel = `SELECT id, workspace_id, agent_id, source_event_id, dedupe_key, scheduled_at, attempts
 		FROM agent_runs
 		WHERE status = 'pending' AND enabled = TRUE
 		ORDER BY scheduled_at ASC, id ASC
@@ -91,16 +99,25 @@ func (q *MySQLQueue) tryClaim(ctx context.Context) (Run, bool, error) {
 		id          uint32
 		wsID        uint32
 		agentID     uint32
+		sourceEvent sql.NullString
 		dedupeKey   string
 		scheduledAt time.Time
 		attempts    int
 	)
 	row := tx.QueryRowContext(ctx, sel)
-	if err := row.Scan(&id, &wsID, &agentID, &dedupeKey, &scheduledAt, &attempts); err != nil {
+	if err := row.Scan(&id, &wsID, &agentID, &sourceEvent, &dedupeKey, &scheduledAt, &attempts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Run{}, false, nil
 		}
 		return Run{}, false, err
+	}
+	var sourceEventID uint64
+	if sourceEvent.Valid {
+		parsed, err := strconv.ParseUint(sourceEvent.String, 10, 64)
+		if err != nil {
+			return Run{}, false, err
+		}
+		sourceEventID = parsed
 	}
 	const upd = `UPDATE agent_runs
 		SET status = 'claimed', claimed_at = ?, attempts = attempts + 1
@@ -113,7 +130,7 @@ func (q *MySQLQueue) tryClaim(ctx context.Context) (Run, bool, error) {
 	}
 	return Run{
 		DedupeKey:   dedupeKey,
-		Job:         Job{AgentID: agentID, WsID: wsID, DedupeKey: dedupeKey},
+		Job:         Job{AgentID: agentID, WsID: wsID, SourceEventID: sourceEventID, DedupeKey: dedupeKey},
 		ScheduledAt: scheduledAt,
 		Attempts:    attempts + 1,
 	}, true, nil

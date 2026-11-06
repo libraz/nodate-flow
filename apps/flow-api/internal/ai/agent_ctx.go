@@ -33,10 +33,10 @@ func AgentIDFromContext(ctx context.Context) uint32 {
 
 type taskCtxKey struct{}
 
-// WithTaskID returns a copy of ctx tagged with the internal id of the
-// task whose content the next orchestrator call quotes into its prompt,
-// so the ai_invocations row carries task_id and the list endpoints can
-// apply task visibility to it. Passing zero is a no-op.
+// WithTaskID returns a copy of ctx tagged with the internal subject task
+// for the next orchestrator call. The list endpoints re-check this task's
+// current ACL; this tag does not widen the invocation audience or replace
+// public input-resource provenance. Passing zero is a no-op.
 func WithTaskID(ctx context.Context, taskID uint32) context.Context {
 	if taskID == 0 {
 		return ctx

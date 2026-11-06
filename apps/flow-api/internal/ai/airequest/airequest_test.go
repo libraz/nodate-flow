@@ -167,3 +167,36 @@ func TestWithPromptKeepsEverySetting(t *testing.T) {
 		t.Fatalf("retry lost the temperature: %v", retry.Temperature)
 	}
 }
+
+func TestOutputContractFlowsThroughRequestBuilders(t *testing.T) {
+	t.Parallel()
+
+	rawSchema := []byte(`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}`)
+	spec, err := providers.NewOutputSpec("agent-result", rawSchema)
+	if err != nil {
+		t.Fatalf("NewOutputSpec: %v", err)
+	}
+	rawSchema[0] = 'x' // the spec owns its canonicalized copy.
+	exposedSchema := spec.SchemaJSON()
+	exposedSchema[0] = 'x' // readers receive an independent copy too.
+
+	first := New(stubProvider{model: "workspace-model"}, Args{Prompt: "first", Output: spec})
+	if first.Output == nil || first.Output.Contract() != "agent-result" {
+		t.Fatalf("New did not propagate output contract: %+v", first.Output)
+	}
+	if got := string(first.Output.SchemaJSON()); got != `{"additionalProperties":false,"properties":{"name":{"type":"string"}},"required":["name"],"type":"object"}` {
+		t.Fatalf("output schema was not copied/canonicalized: %s", got)
+	}
+
+	agent := ForAgent(stubProvider{model: "workspace-model"}, AgentSettings{ModelName: "agent-model", MaxOutputTokens: 256}, Args{Prompt: "first", Output: spec})
+	if agent.Output == nil || agent.Output.Contract() != "agent-result" {
+		t.Fatalf("ForAgent did not propagate output contract: %+v", agent.Output)
+	}
+	retry := WithPrompt(agent, "retry")
+	if retry.Output == nil || retry.Output.Contract() != "agent-result" || string(retry.Output.SchemaJSON()) != string(agent.Output.SchemaJSON()) {
+		t.Fatalf("WithPrompt lost output contract: first=%+v retry=%+v", agent.Output, retry.Output)
+	}
+	if retry.Model != "agent-model" || retry.MaxTokens != 256 {
+		t.Fatalf("output propagation disturbed existing settings: %+v", retry)
+	}
+}

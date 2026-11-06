@@ -5,10 +5,20 @@ INSERT INTO mentions (
   workspace_id,
   mentioned_user_id,
   actor_user_id,
+  actor_agent_id,
+  actor_agent_public_id,
+  actor_agent_name,
   task_id,
   comment_id,
   source
-) VALUES (?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, NULLIF(sqlc.arg('actor_agent_public_id'), 0x00000000000000000000000000000000), ?, ?, ?, ?);
+
+-- name: GetMentionActorAgentByline :one
+-- The agent byline a mention snapshots so it survives the agent's deletion.
+SELECT public_id, name
+FROM ai_agents
+WHERE workspace_id = ?
+  AND id = ?;
 
 -- name: ListMentionsForUser :many
 -- List mentions where a user was mentioned, within a workspace.
@@ -20,6 +30,8 @@ SELECT
   m.actor_user_id,
   au.public_id AS actor_public_id,
   au.display_name AS actor_display_name,
+  COALESCE(BIN_TO_UUID(ag.public_id, 0), BIN_TO_UUID(m.actor_agent_public_id, 0), '') AS actor_agent_public_id,
+  COALESCE(ag.name, m.actor_agent_name, '') AS actor_agent_name,
   m.task_id,
   m.comment_id,
   m.source,
@@ -28,6 +40,9 @@ SELECT
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
+-- No enabled filter: the agent is the historical actor of the mention; the
+-- snapshot answers once the agent row is gone.
+LEFT JOIN ai_agents ag ON ag.id = m.actor_agent_id
 WHERE m.workspace_id = ?
   AND m.mentioned_user_id = ?
   AND m.enabled = TRUE
@@ -45,12 +60,17 @@ SELECT
   mu.display_name AS mentioned_display_name,
   m.actor_user_id,
   au.public_id AS actor_public_id,
+  COALESCE(BIN_TO_UUID(ag.public_id, 0), BIN_TO_UUID(m.actor_agent_public_id, 0), '') AS actor_agent_public_id,
+  COALESCE(ag.name, m.actor_agent_name, '') AS actor_agent_name,
   m.source,
   m.created_at,
   COUNT(*) OVER() AS total
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
+-- No enabled filter: the agent is the historical actor of the mention; the
+-- snapshot answers once the agent row is gone.
+LEFT JOIN ai_agents ag ON ag.id = m.actor_agent_id
 WHERE m.task_id = ?
   AND m.workspace_id = ?
   AND m.enabled = TRUE

@@ -33,6 +33,9 @@ type Event struct {
 	WorkspaceID uint32
 	// ActorUserID is the acting user's internal id; nil for system.
 	ActorUserID *uint32
+	// ActorAgentID is the acting agent's internal id; nil for human or
+	// system events. It is mutually exclusive with ActorUserID.
+	ActorAgentID *uint32
 	// TaskID is the internal task id when the event targets a task.
 	TaskID *uint32
 	// Payload is any JSON-encodable value stored in payload_json.
@@ -99,6 +102,9 @@ func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.P
 	if eventbus.SubjectOf(evt.Type) != "" && evt.SubjectPublicID == (dbtype.PublicID{}) {
 		return fail(fmt.Errorf("eventlog: append %s: %w", evt.Type, eventbus.ErrSubjectRequired))
 	}
+	if evt.ActorUserID != nil && evt.ActorAgentID != nil {
+		return fail(fmt.Errorf("eventlog: append %s: actor_user_id and actor_agent_id are mutually exclusive", evt.Type))
+	}
 	// Internal ids must not reach the payload; see ValidatePayloadIDs.
 	// The check is here rather than at each builder because this is the
 	// only place every payload passes through.
@@ -121,22 +127,25 @@ func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.P
 	}
 	pubID := dbtype.New()
 
-	var actorArg, taskArg, subjectArg any
+	var actorArg, agentArg, taskArg, subjectArg any
 	if evt.SubjectPublicID != (dbtype.PublicID{}) {
 		subjectArg = evt.SubjectPublicID
 	}
 	if evt.ActorUserID != nil {
 		actorArg = *evt.ActorUserID
 	}
+	if evt.ActorAgentID != nil {
+		agentArg = *evt.ActorAgentID
+	}
 	if evt.TaskID != nil {
 		taskArg = *evt.TaskID
 	}
 
-	const q = `INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, subject_public_id, type, payload_json, occurred_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, actor_agent_id, subject_public_id, type, payload_json, occurred_at)
+	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	var lastID int64
 	insert := func(ctx context.Context) error {
-		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, subjectArg, string(evt.Type), raw, occurred)
+		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, agentArg, subjectArg, string(evt.Type), raw, occurred)
 		if err != nil {
 			return err
 		}

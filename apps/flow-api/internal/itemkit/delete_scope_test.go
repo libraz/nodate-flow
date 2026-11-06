@@ -182,7 +182,7 @@ func TestUnscheduleTaskWithdrawsOnlyThisWorkspacesTimeBlocks(t *testing.T) {
 
 // TestUnscheduleTaskDueWithdrawsOnlyThisWorkspacesEvent covers the shared
 // single-row withdrawal. UnscheduleTask's due branch reaches it through
-// unlinkEventRow, which resolves the event by task link and must then
+// unlinkEventRowForActor, which resolves the event by task link and must then
 // disable that row and no other tenant's.
 func TestUnscheduleTaskDueWithdrawsOnlyThisWorkspacesEvent(t *testing.T) {
 	db := startDB(t)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -62,6 +63,11 @@ func ListAiInvocations(deps Deps) func(context.Context, *ListTaskAiInvocationsIn
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
+		actorID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		vis := acl.ListVisibilityArgs(actorID, ws.Role)
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 20
@@ -69,6 +75,8 @@ func ListAiInvocations(deps Deps) func(context.Context, *ListTaskAiInvocationsIn
 		rows, err := deps.Queries.ListAiInvocationsForTask(ctx, generated.ListAiInvocationsForTaskParams{
 			WorkspaceID: ws.ID,
 			TaskID:      sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
+			IsElevated:  vis.IsElevated,
+			ActorUserID: vis.ActorUserID,
 			Limit:       limit,
 			Offset:      in.Offset,
 		})

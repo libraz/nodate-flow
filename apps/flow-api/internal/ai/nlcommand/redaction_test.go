@@ -53,7 +53,7 @@ func TestResolveCommand_PromptSecretNeverReachesTheInvocation(t *testing.T) {
 
 			prov := &recordingProvider{
 				kind: providers.Kind("mock"),
-				resp: &providers.Response{Text: resolvedCommand},
+				resp: &providers.Response{Text: resolvedCommand, Termination: providers.TerminationComplete},
 				err:  tc.providerErr,
 			}
 			var logged []InvocationRecord

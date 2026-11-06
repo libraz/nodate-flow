@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
@@ -44,6 +43,14 @@ type SmartCreateReader interface {
 	ListCandidateTaskEmbeddings(ctx context.Context, arg generated.ListCandidateTaskEmbeddingsParams) ([]generated.ListCandidateTaskEmbeddingsRow, error)
 	ListTasksWithAssigneesForSmartCreate(ctx context.Context, arg generated.ListTasksWithAssigneesForSmartCreateParams) ([]generated.ListTasksWithAssigneesForSmartCreateRow, error)
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]generated.ListWorkspaceMembersForSmartCreateRow, error)
+}
+
+// ProposalCacheInputReader validates current workspace access and every
+// managed task quoted by a proposal through Layer-4 ACLs. Proposal generation
+// requires this capability even when caching is disabled.
+type ProposalCacheInputReader interface {
+	GetProposalCacheWorkspaceAccess(ctx context.Context, id generated.GetProposalCacheWorkspaceAccessParams) (interface{}, error)
+	ListProposalCacheTaskInputs(ctx context.Context, arg generated.ListProposalCacheTaskInputsParams) ([]generated.ListProposalCacheTaskInputsRow, error)
 }
 
 // --------------------------------------------------------------------
@@ -83,9 +90,10 @@ type SubtaskProposal struct {
 // scoredTask pairs a task's internal ID and title with its cosine
 // similarity score against the query vector.
 type scoredTask struct {
-	id    uint32
-	title string
-	score float32
+	id       uint32
+	publicID string
+	title    string
+	score    float32
 }
 
 const (
@@ -172,14 +180,33 @@ func (o *Orchestrator) ProposeSmartCreate(
 		return nil, ErrNoProvider
 	}
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
+	cacheReader := proposalCacheInputReader(scReader, o.Queries)
+	if cacheReader == nil {
+		return nil, fmt.Errorf("ai: proposal cache input reader is unavailable")
+	}
+	vis, err = currentProposalCacheVisibility(ctx, cacheReader, workspaceID, vis.ActorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("ai: validate smart-create workspace access: %w", err)
+	}
+	cacheTitle, cacheDescription := title, description
 
 	// ---- cache check ----
-	// The proposal quotes the similar tasks the actor may read, so it is
-	// cached per visibility scope rather than per workspace.
-	cacheKey := ProposalCacheKey(workspaceID, "smart_create", VisibilityCacheScope(vis), title, description)
-	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
-		if sp, _ := cached.(*SmartProposal); sp != nil {
-			return sp, nil
+	// The proposal quotes similar task titles/assignees and the workspace
+	// roster, so the actor's current visibility scope alone is not enough
+	// to validate a cached result. Reload every saved input before a hit.
+	cacheKey := ProposalCacheKey(workspaceID, "smart_create", VisibilityCacheScope(vis), cacheTitle, cacheDescription)
+	var cached SmartProposal
+	if o.ProposalCache != nil {
+		if snapshot, ok := o.ProposalCache.getEnvelope(cacheKey, &cached); ok {
+			current, currentVis, cacheable, validateErr := currentProposalCacheSnapshot(ctx, cacheReader, scReader, workspaceID, vis, proposalCacheResources(snapshot), true)
+			if validateErr != nil {
+				return nil, fmt.Errorf("ai: validate cached smart-create inputs: %w", validateErr)
+			}
+			if cacheable && sameProposalVisibility(vis, currentVis) && sameProposalCacheSnapshot(snapshot, current) {
+				return &cached, nil
+			}
+			o.ProposalCache.Delete(cacheKey)
+			vis = currentVis
 		}
 	}
 
@@ -216,12 +243,18 @@ func (o *Orchestrator) ProposeSmartCreate(
 			continue
 		}
 		sim := embed.Cosine(queryVec, vec)
-		ranked = append(ranked, scoredTask{id: c.ID, title: c.Title, score: sim})
+		ranked = append(ranked, scoredTask{id: c.ID, publicID: c.PublicID.String(), title: c.Title, score: sim})
 	}
 	sort.Slice(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
 	if len(ranked) > smartCreateTopAssigneeN {
 		ranked = ranked[:smartCreateTopAssigneeN]
 	}
+	resourceLimit := min(len(ranked), smartCreateTopN)
+	inputResources := make([]InvocationResource, 0, resourceLimit)
+	for _, task := range ranked[:resourceLimit] {
+		inputResources = append(inputResources, TaskInputResource(task.publicID))
+	}
+	ctx = WithInputResources(ctx, inputResources...)
 
 	// ---- fetch assignees for top tasks ----
 	var taskIDs []uint32
@@ -250,32 +283,53 @@ func (o *Orchestrator) ProposeSmartCreate(
 
 	// ---- build user prompt ----
 	userPrompt := buildSmartCreatePrompt(title, description, ranked, taskRows, members)
+	rows, latestVis, _, loadErr := loadProposalCacheTaskInputs(ctx, cacheReader, workspaceID, vis.ActorUserID, InputResourcesFromContext(ctx), true)
+	if loadErr != nil {
+		return nil, fmt.Errorf("ai: validate smart-create inputs: %w", loadErr)
+	}
+	if !sameProposalVisibility(vis, latestVis) || !sameSmartCreatePromptInputs(ranked, taskRows, rows) {
+		return nil, ErrProposalInputsChanged
+	}
+	freshMembers, rosterErr := scReader.ListWorkspaceMembersForSmartCreate(ctx, workspaceID)
+	if rosterErr != nil {
+		return nil, fmt.Errorf("ai: validate smart-create workspace roster: %w", rosterErr)
+	}
+	capturedRoster := smartCreateRosterFingerprint(members)
+	if capturedRoster != smartCreateRosterFingerprint(freshMembers) {
+		return nil, ErrProposalInputsChanged
+	}
+	cacheSnapshot := proposalCacheSnapshotFromRows(rows)
+	cacheSnapshot.RosterFingerprint = capturedRoster
+	vis = latestVis
+	cacheKey = ProposalCacheKey(workspaceID, "smart_create", VisibilityCacheScope(vis), cacheTitle, cacheDescription)
+	cacheable := o.ProposalCache != nil
 
 	// ---- call LLM ----
 	req := airequest.New(prov, airequest.Args{
 		System: smartCreateSystemPrompt,
 		Prompt: userPrompt,
+		Output: smartCreateOutput,
 	})
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	var proposal SmartProposal
+	_, err = o.CompleteAndRecord(ctx, workspaceID, "propose_smart_create", prov, req, func(resp *providers.Response) error {
+		payload, err := outputPayload(resp, smartCreateOutput)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(payload, &proposal); err != nil {
+			return fmt.Errorf("%w: smart-create response could not be decoded", providers.ErrResponseSchemaMismatch)
+		}
+		if err := validateSmartProposal(&proposal, smartCreateMembers(members)); err != nil {
+			return err
+		}
+		return validateProposalCacheSnapshot(ctx, cacheReader, scReader, workspaceID, vis.ActorUserID, cacheSnapshot, true)
+	})
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		o.logFailure(ctx, workspaceID, "propose_smart_create", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	o.logSuccess(ctx, workspaceID, "propose_smart_create", req, resp)
-
-	// ---- parse response ----
-	payload := extractJSON(resp.Text)
-	if payload == "" {
-		return nil, ErrParse
+	if cacheable {
+		o.ProposalCache.putEnvelope(cacheKey, &proposal, cacheSnapshot)
 	}
-	var proposal SmartProposal
-	if err := json.Unmarshal([]byte(payload), &proposal); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrParse, err)
-	}
-	o.ProposalCache.Put(cacheKey, &proposal)
 	return &proposal, nil
 }
 

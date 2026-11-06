@@ -66,6 +66,16 @@ var (
 	// successfully but failed structural validation (missing required
 	// fields, wrong types). Maps to AI.RESPONSE.SCHEMA_MISMATCH (502).
 	ErrResponseSchemaMismatch = errors.New("ai/providers: upstream response did not match schema")
+
+	// ErrGenerationIncomplete marks a decoded response whose upstream stop
+	// signal proves generation ended before completion. It is separate from
+	// transport errors so usage and cost from the completed HTTP exchange stay
+	// available to the caller.
+	ErrGenerationIncomplete = errors.New("ai/providers: generation incomplete")
+
+	// ErrModelRefused marks an explicit provider refusal. The decoded response
+	// and its usage/cost remain available even when its text is empty.
+	ErrModelRefused = errors.New("ai/providers: model refused request")
 )
 
 // UpstreamError carries optional metadata (HTTP status, Retry-After

@@ -19,20 +19,26 @@ INSERT INTO mentions (
   workspace_id,
   mentioned_user_id,
   actor_user_id,
+  actor_agent_id,
+  actor_agent_public_id,
+  actor_agent_name,
   task_id,
   comment_id,
   source
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, NULLIF(?, 0x00000000000000000000000000000000), ?, ?, ?, ?)
 `
 
 type CreateMentionParams struct {
-	PublicID        types.PublicID `json:"publicId"`
-	WorkspaceID     uint32         `json:"-"`
-	MentionedUserID uint32         `json:"-"`
-	ActorUserID     sql.NullInt32  `json:"-"`
-	TaskID          sql.NullInt32  `json:"-"`
-	CommentID       sql.NullInt32  `json:"-"`
-	Source          MentionsSource `json:"source"`
+	PublicID           types.PublicID `json:"publicId"`
+	WorkspaceID        uint32         `json:"-"`
+	MentionedUserID    uint32         `json:"-"`
+	ActorUserID        sql.NullInt32  `json:"-"`
+	ActorAgentID       sql.NullInt32  `json:"-"`
+	ActorAgentPublicID interface{}    `json:"actorAgentPublicId"`
+	ActorAgentName     sql.NullString `json:"actorAgentName"`
+	TaskID             sql.NullInt32  `json:"-"`
+	CommentID          sql.NullInt32  `json:"-"`
+	Source             MentionsSource `json:"source"`
 }
 
 // Insert a mention record after extracting @mentions from markdown.
@@ -42,6 +48,9 @@ func (q *Queries) CreateMention(ctx context.Context, arg CreateMentionParams) (i
 		arg.WorkspaceID,
 		arg.MentionedUserID,
 		arg.ActorUserID,
+		arg.ActorAgentID,
+		arg.ActorAgentPublicID,
+		arg.ActorAgentName,
 		arg.TaskID,
 		arg.CommentID,
 		arg.Source,
@@ -103,6 +112,31 @@ type DeleteMentionsForTaskDescriptionParams struct {
 func (q *Queries) DeleteMentionsForTaskDescription(ctx context.Context, arg DeleteMentionsForTaskDescriptionParams) error {
 	_, err := q.db.ExecContext(ctx, deleteMentionsForTaskDescription, arg.TaskID, arg.WorkspaceID)
 	return err
+}
+
+const getMentionActorAgentByline = `-- name: GetMentionActorAgentByline :one
+SELECT public_id, name
+FROM ai_agents
+WHERE workspace_id = ?
+  AND id = ?
+`
+
+type GetMentionActorAgentBylineParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+type GetMentionActorAgentBylineRow struct {
+	PublicID types.PublicID `json:"publicId"`
+	Name     string         `json:"name"`
+}
+
+// The agent byline a mention snapshots so it survives the agent's deletion.
+func (q *Queries) GetMentionActorAgentByline(ctx context.Context, arg GetMentionActorAgentBylineParams) (GetMentionActorAgentBylineRow, error) {
+	row := q.db.QueryRowContext(ctx, getMentionActorAgentByline, arg.WorkspaceID, arg.ID)
+	var i GetMentionActorAgentBylineRow
+	err := row.Scan(&i.PublicID, &i.Name)
+	return i, err
 }
 
 const listMentionedUserIdsForComment = `-- name: ListMentionedUserIdsForComment :many
@@ -189,12 +223,15 @@ SELECT
   mu.display_name AS mentioned_display_name,
   m.actor_user_id,
   au.public_id AS actor_public_id,
+  COALESCE(BIN_TO_UUID(ag.public_id, 0), BIN_TO_UUID(m.actor_agent_public_id, 0), '') AS actor_agent_public_id,
+  COALESCE(ag.name, m.actor_agent_name, '') AS actor_agent_name,
   m.source,
   m.created_at,
   COUNT(*) OVER() AS total
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
+LEFT JOIN ai_agents ag ON ag.id = m.actor_agent_id
 WHERE m.task_id = ?
   AND m.workspace_id = ?
   AND m.enabled = TRUE
@@ -216,6 +253,8 @@ type ListMentionsForTaskRow struct {
 	MentionedDisplayName string         `json:"mentionedDisplayName"`
 	ActorUserID          sql.NullInt32  `json:"-"`
 	ActorPublicID        types.PublicID `json:"actorPublicId"`
+	ActorAgentPublicID   interface{}    `json:"actorAgentPublicId"`
+	ActorAgentName       string         `json:"actorAgentName"`
 	Source               MentionsSource `json:"source"`
 	CreatedAt            time.Time      `json:"createdAt"`
 	Total                interface{}    `json:"total"`
@@ -224,6 +263,8 @@ type ListMentionsForTaskRow struct {
 // List mentions within a specific task (description or comments).
 // Paginated (LIMIT/OFFSET) so the result set is always bounded; total
 // carries the pre-page count.
+// No enabled filter: the agent is the historical actor of the mention; the
+// snapshot answers once the agent row is gone.
 func (q *Queries) ListMentionsForTask(ctx context.Context, arg ListMentionsForTaskParams) ([]ListMentionsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMentionsForTask,
 		arg.TaskID,
@@ -245,6 +286,8 @@ func (q *Queries) ListMentionsForTask(ctx context.Context, arg ListMentionsForTa
 			&i.MentionedDisplayName,
 			&i.ActorUserID,
 			&i.ActorPublicID,
+			&i.ActorAgentPublicID,
+			&i.ActorAgentName,
 			&i.Source,
 			&i.CreatedAt,
 			&i.Total,
@@ -271,6 +314,8 @@ SELECT
   m.actor_user_id,
   au.public_id AS actor_public_id,
   au.display_name AS actor_display_name,
+  COALESCE(BIN_TO_UUID(ag.public_id, 0), BIN_TO_UUID(m.actor_agent_public_id, 0), '') AS actor_agent_public_id,
+  COALESCE(ag.name, m.actor_agent_name, '') AS actor_agent_name,
   m.task_id,
   m.comment_id,
   m.source,
@@ -279,6 +324,7 @@ SELECT
 FROM mentions m
 INNER JOIN users mu ON mu.id = m.mentioned_user_id
 LEFT JOIN users au ON au.id = m.actor_user_id
+LEFT JOIN ai_agents ag ON ag.id = m.actor_agent_id
 WHERE m.workspace_id = ?
   AND m.mentioned_user_id = ?
   AND m.enabled = TRUE
@@ -301,6 +347,8 @@ type ListMentionsForUserRow struct {
 	ActorUserID          sql.NullInt32  `json:"-"`
 	ActorPublicID        types.PublicID `json:"actorPublicId"`
 	ActorDisplayName     sql.NullString `json:"actorDisplayName"`
+	ActorAgentPublicID   interface{}    `json:"actorAgentPublicId"`
+	ActorAgentName       string         `json:"actorAgentName"`
 	TaskID               sql.NullInt32  `json:"-"`
 	CommentID            sql.NullInt32  `json:"-"`
 	Source               MentionsSource `json:"source"`
@@ -309,6 +357,8 @@ type ListMentionsForUserRow struct {
 }
 
 // List mentions where a user was mentioned, within a workspace.
+// No enabled filter: the agent is the historical actor of the mention; the
+// snapshot answers once the agent row is gone.
 func (q *Queries) ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMentionsForUser,
 		arg.WorkspaceID,
@@ -331,6 +381,8 @@ func (q *Queries) ListMentionsForUser(ctx context.Context, arg ListMentionsForUs
 			&i.ActorUserID,
 			&i.ActorPublicID,
 			&i.ActorDisplayName,
+			&i.ActorAgentPublicID,
+			&i.ActorAgentName,
 			&i.TaskID,
 			&i.CommentID,
 			&i.Source,

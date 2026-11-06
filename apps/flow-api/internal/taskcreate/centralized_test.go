@@ -44,6 +44,7 @@ var exemptFiles = []string{
 	"internal/http/handlers/tasks/actors.go",
 	"internal/http/handlers/tasks/agent_actors.go",
 	"internal/http/handlers/tasks/handoff.go",
+	"internal/http/handlers/taskworkflow/handoffs.go",
 }
 
 // TestCreateTaskCentralized proves that taskcreate.New is the only way a

@@ -139,18 +139,20 @@ var streamKindForFamily = map[eventbus.Family]Kind{
 	eventbus.FamilyCalendar:    KindCalendarChanged,
 	eventbus.FamilyPublicShare: KindCalendarChanged,
 
-	// Not published. Each of these is an audit-trail or back-office
+	// Workflow families reuse the established invalidation hint so already-open
+	// clients can refresh without accepting a new wire kind.
+	// Remaining unpublished families are audit-trail or back-office
 	// family with no live query to invalidate, or one whose stream kind
 	// the frontend does not yet accept.
 	eventbus.FamilyLabel:           "",
-	eventbus.FamilyAgentTask:       "",
-	eventbus.FamilyAiAgent:         "",
-	eventbus.FamilySignal:          "",
+	eventbus.FamilyAgentTask:       KindTaskChanged,
+	eventbus.FamilyAiAgent:         KindTaskChanged,
+	eventbus.FamilySignal:          KindTaskChanged,
 	eventbus.FamilyExport:          "",
 	eventbus.FamilyReaction:        "",
 	eventbus.FamilyMention:         "",
 	eventbus.FamilyFavorite:        "",
-	eventbus.FamilyIntake:          "",
+	eventbus.FamilyIntake:          KindTaskChanged,
 	eventbus.FamilyDescription:     "",
 	eventbus.FamilyImport:          "",
 	eventbus.FamilyWorkspaceMember: "",

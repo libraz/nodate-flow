@@ -302,7 +302,7 @@ func TestKindForEventType(t *testing.T) {
 		"public_share.events_attached": KindCalendarChanged,
 		"item.scheduled":               KindItemChanged,
 		"item.rescheduled":             KindItemChanged,
-		"signal.attached":              "",
+		"signal.attached":              KindTaskChanged,
 		"comment.added":                "",
 		"totally.made.up":              "",
 	}

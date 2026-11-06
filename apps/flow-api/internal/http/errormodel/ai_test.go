@@ -40,6 +40,9 @@ func TestAIFailureMapsEachFailureOnce(t *testing.T) {
 		{nlcommand.ErrUnresolvable, apierrors.AiResponseInvalidJson},
 		{providers.ErrResponseInvalidJSON, apierrors.AiResponseInvalidJson},
 		{providers.ErrResponseSchemaMismatch, apierrors.AiResponseSchemaMismatch},
+		{providers.ErrGenerationIncomplete, apierrors.AiResponseGenerationIncomplete},
+		{providers.ErrModelRefused, apierrors.AiResponseModelRefused},
+		{ai.ErrProposalInputsChanged, apierrors.AiProposalInputsChanged},
 		{providers.ErrUpstreamTimeout, apierrors.AiProviderUpstreamTimeout},
 		{providers.ErrUpstreamAuthRejected, apierrors.AiProviderUpstreamAuthRejected},
 		{providers.ErrUpstreamRequestRejected, apierrors.AiProviderUpstreamRequestRejected},
@@ -57,6 +60,7 @@ func TestAIFailureMapsEachFailureOnce(t *testing.T) {
 			t.Parallel()
 			spec, retryAfter := AIFailure(fmt.Errorf("caller: %w", tc.err))
 			require.Equal(t, tc.want.Code, spec.Code)
+			require.Equal(t, tc.want.Status, spec.Status)
 			require.Empty(t, retryAfter)
 		})
 	}

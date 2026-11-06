@@ -14,7 +14,10 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventlog"
 )
@@ -29,19 +32,21 @@ import (
 // latter links Applier-emitted events back to the originating signal
 // (D4). Both are nullable because most events have neither.
 type timelineRow struct {
-	publicID                  types.PublicID
-	taskPublicID              []byte
-	actorPublicID             []byte
-	actorDisplayName          sql.NullString
-	actorAgentPublicID        []byte
-	actorAgentName            string
-	actorSystemSource         sql.NullString
-	triggeredBySignalPublicID []byte
-	reversesEventPublicID     []byte
-	wasReversed               bool
-	eventType                 string
-	payload                   json.RawMessage
-	occurredAt                time.Time
+	publicID                   types.PublicID
+	taskPublicID               []byte
+	actorPublicID              []byte
+	actorDisplayName           sql.NullString
+	actorAvatarURL             sql.NullString
+	actorAvatarStorageObjectID sql.NullInt64
+	actorAgentPublicID         []byte
+	actorAgentName             string
+	actorSystemSource          sql.NullString
+	triggeredBySignalPublicID  []byte
+	reversesEventPublicID      []byte
+	wasReversed                bool
+	eventType                  string
+	payload                    json.RawMessage
+	occurredAt                 time.Time
 }
 
 // queryTimeline runs a dynamic SELECT against v_task_timeline and
@@ -98,6 +103,13 @@ func queryTimeline(
 	args = append(args, callerUserID)
 	args = append(args, rowArgs...)
 
+	// Proposal events have no owning task ID, so task visibility cannot
+	// protect their reasoning. The projection only includes batches whose
+	// initiating actor and every current task reference remain readable.
+	proposalPredicate, proposalArgs := suggestionprivacy.TimelinePredicate(callerUserID)
+	where = append(where, `(ev.type NOT IN ('ai.suggestion.proposed', 'ai.suggestion.edited') OR `+proposalPredicate+`)`)
+	args = append(args, proposalArgs...)
+
 	if len(kinds) > 0 {
 		placeholders := make([]string, 0, len(kinds))
 		for _, k := range kinds {
@@ -117,6 +129,8 @@ func queryTimeline(
   v.task_public_id,
   v.actor_user_public_id,
   v.actor_display_name,
+  v.actor_avatar_url,
+  v.actor_avatar_storage_object_id,
   v.actor_agent_public_id,
   v.actor_agent_name,
   v.actor_system_source,
@@ -147,6 +161,8 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 			&r.taskPublicID,
 			&r.actorPublicID,
 			&r.actorDisplayName,
+			&r.actorAvatarURL,
+			&r.actorAvatarStorageObjectID,
 			&r.actorAgentPublicID,
 			&r.actorAgentName,
 			&r.actorSystemSource,
@@ -203,6 +219,7 @@ func toDTO(r timelineRow) Event {
 		TaskID:              uuidFromBytes(r.taskPublicID),
 		ActorUserID:         uuidFromBytes(r.actorPublicID),
 		ActorDisplayName:    nullStr(r.actorDisplayName),
+		ActorAvatarURL:      resolveActorAvatarURL(r.actorPublicID, r.actorAvatarURL, r.actorAvatarStorageObjectID),
 		ActorAgentID:        uuidFromBytes(r.actorAgentPublicID),
 		ActorAgentName:      r.actorAgentName,
 		ActorSystemSource:   sysSource,
@@ -216,6 +233,26 @@ func toDTO(r timelineRow) Event {
 		Payload:    eventlog.RedactPayloadIDs(r.payload),
 		OccurredAt: r.occurredAt.Unix(),
 	}
+}
+
+// resolveActorAvatarURL returns an avatar only for a user row that
+// survived the enabled-user LEFT JOIN. Uploaded storage takes precedence
+// over avatar_url so a stale external provider value cannot mask the
+// user-owned object. The internal storage FK is converted to an opaque
+// cache tag before the browser URL is exposed.
+func resolveActorAvatarURL(actorPublicID []byte, stored sql.NullString, storageObjectID sql.NullInt64) string {
+	userPublicID := uuidFromBytes(actorPublicID)
+	if userPublicID == "" {
+		return ""
+	}
+	if storageObjectID.Valid && storageObjectID.Int64 > 0 {
+		return avatarutil.ProxyURL(userPublicID, avatarutil.OpaqueTag(uint64(storageObjectID.Int64)), "")
+	}
+	id, err := uuid.Parse(userPublicID)
+	if err != nil {
+		return ""
+	}
+	return handlerutil.AvatarURL(stored, types.FromUUID(id))
 }
 
 // resolveActorFilter parses the optional actor query parameter into the

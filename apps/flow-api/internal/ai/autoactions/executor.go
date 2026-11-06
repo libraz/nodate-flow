@@ -195,6 +195,10 @@ type taskRow struct {
 	createdAt    time.Time
 	hasAssignee  bool
 
+	// completionPolicy is tasks.completion_policy; review_required tasks
+	// complete only through an approved submission.
+	completionPolicy string
+
 	// Agent-assignee facts populated when the task has at least one
 	// enabled task_actors row with kind='agent' and role='assignee'.
 	// Used by KindHandoffToUser; otherwise unused. agentMemo is the
@@ -393,7 +397,7 @@ func (e *Executor) listWorkspaceTargets(ctx context.Context) ([]workspaceTarget,
 // pass with no reader. agent_memo is the exception and is read as
 // counters — see [decodeAgentMemo].
 const taskScanTemplate = `
-SELECT t.id, t.public_id, t.workspace_id, t.derived_state,
+SELECT t.id, t.public_id, t.workspace_id, t.derived_state, t.completion_policy,
        t.priority, t.due_on, t.updated_at, t.created_at,
        -- role, not kind. task_actors.kind is the actor type
        -- ('user' | 'agent') and role is the relationship
@@ -548,7 +552,7 @@ func (e *Executor) processWorkspaceWithThreshold(ctx context.Context, wsID uint3
 		)
 		if err := rows.Scan(
 			&r.id, &r.publicID, &r.workspaceID,
-			&r.derivedState, &r.priority, &r.dueOn, &r.updatedAt,
+			&r.derivedState, &r.completionPolicy, &r.priority, &r.dueOn, &r.updatedAt,
 			&r.createdAt, &r.hasAssignee,
 			&agentIDNull, &agentPubIDRaw, &agentMemoBytes,
 		); err != nil {
@@ -680,6 +684,7 @@ func (e *Executor) handoffToUser(ctx context.Context, r taskRow, act *Action) {
 		return
 	}
 	if emitted {
+		e.reevaluateTaskConstraints(ctx, r)
 		e.Logger.Info("auto-action applied: handoff_to_user",
 			"task", r.publicID.String(),
 			"agent", r.agentPublicID.String(),
@@ -893,12 +898,19 @@ func (e *Executor) escalate(ctx context.Context, r taskRow, act *Action) {
 	)
 }
 
-// closeStaleReview transitions a stale review task to done by going
-// through the canonical state-machine helper. The executor never
-// touches tasks.derived_state directly: writing the column is reserved
-// to taskstate.ApplyTransitionTx, which also appends the matching
-// task.transition.complete event in the same transaction.
+// closeStaleReview transitions a stale manual-policy review task to done
+// through the canonical state-machine helper, which owns the
+// derived_state write and the task.transition.complete event. A
+// review_required task is skipped: only an approved submission completes
+// it, and the review gate would refuse the attempt on every pass.
 func (e *Executor) closeStaleReview(ctx context.Context, r taskRow, act *Action) {
+	if r.completionPolicy == string(generated.TasksCompletionPolicyReviewRequired) {
+		e.Logger.Debug("auto-action executor: stale review left to its reviewer",
+			"task", r.publicID.String(),
+			"kind", string(act.Kind),
+		)
+		return
+	}
 	e.applyStateTransition(ctx, r, act, taskstate.TransitionComplete)
 }
 
@@ -1090,8 +1102,13 @@ func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Act
 		"from", string(result.FromState),
 		"to", string(result.ToState),
 	)
-	// The task's own constraints and its dependents' dependency.* facts
-	// read the state just committed.
+	e.reevaluateTaskConstraints(ctx, r)
+}
+
+// reevaluateTaskConstraints refreshes facts after a committed auto-action.
+// State transitions affect the task's own constraints and its dependents;
+// agent handbacks also affect actor.has_role facts on the task.
+func (e *Executor) reevaluateTaskConstraints(ctx context.Context, r taskRow) {
 	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: r.workspaceID, Queries: generated.New(e.DB)}}
 	if err := eng.EvaluateTaskAndDependents(ctx, r.id); err != nil {
 		e.Logger.Warn("auto-action executor: constraint re-evaluation failed", "task", r.publicID.String(), "err", err)

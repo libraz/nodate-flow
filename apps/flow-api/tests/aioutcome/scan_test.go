@@ -250,6 +250,87 @@ func (s *service) loadCached(ctx context.Context, req request) (string, error) {
 	}
 }
 
+// TestScanRecognizesFinalOutcomeRecordingAfterValidation pins the shared
+// accounting boundary's shape: validation stages enrich one error value only
+// while it is nil, then an unconditional hook call receives that final value.
+// The paired controls prove that omitting the terminal call or moving it
+// before validation remains a finding.
+func TestScanRecognizesFinalOutcomeRecordingAfterValidation(t *testing.T) {
+	t.Parallel()
+
+	const src = `package p
+
+type service struct { provider provider; hooks hooks }
+type provider interface { Complete() (string, error) }
+type hooks interface { OnInvocation(error) }
+
+func (s *service) record(err error) { s.hooks.OnInvocation(err) }
+func requireComplete(string) error { return nil }
+func validate(string) error { return nil }
+
+func recordsFinalOutcome(s *service) (string, error) {
+	response, outcomeErr := s.provider.Complete()
+	if outcomeErr == nil { outcomeErr = requireComplete(response) }
+	if outcomeErr == nil && validate != nil { outcomeErr = validate(response) }
+	s.record(outcomeErr)
+	if outcomeErr != nil { return "", outcomeErr }
+	return response, nil
+}
+
+func omitsFinalOutcome(s *service) (string, error) {
+	response, outcomeErr := s.provider.Complete() // want: omitted
+	if outcomeErr == nil { outcomeErr = requireComplete(response) }
+	if outcomeErr == nil { outcomeErr = validate(response) }
+	if outcomeErr != nil { return "", outcomeErr }
+	return response, nil
+}
+
+func recordsBeforeValidation(s *service) (string, error) {
+	response, outcomeErr := s.provider.Complete() // want: premature
+	s.record(outcomeErr)
+	if outcomeErr == nil { outcomeErr = requireComplete(response) }
+	if outcomeErr == nil { outcomeErr = validate(response) }
+	if outcomeErr != nil { return "", outcomeErr }
+	return response, nil
+}
+
+func recordsAnotherError(s *service) (string, error) {
+	response, outcomeErr := s.provider.Complete() // want: wrong error
+	var validationErr error
+	if outcomeErr == nil { outcomeErr = requireComplete(response) }
+	if outcomeErr == nil { outcomeErr = validate(response) }
+	s.record(validationErr)
+	if outcomeErr != nil { return "", outcomeErr }
+	return response, nil
+}
+`
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "final-outcome.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse sample: %v", err)
+	}
+	findings, _, callsByDir := analyze(fset, []Package{{
+		Dir:   "sample",
+		Files: []File{{Rel: "final-outcome.go", AST: file}},
+	}})
+	if got, want := callsByDir["sample"], 4; got != want {
+		t.Errorf("counted %d provider calls in the sample, want %d", got, want)
+	}
+	want := []string{
+		fmt.Sprintf("final-outcome.go:%d: %s", lineOf(t, src, "// want: omitted"), KindNeitherRecorded),
+		fmt.Sprintf("final-outcome.go:%d: %s", lineOf(t, src, "// want: premature"), KindNeitherRecorded),
+		fmt.Sprintf("final-outcome.go:%d: %s", lineOf(t, src, "// want: wrong error"), KindSuccessUnrecorded),
+	}
+	var got []string
+	for _, finding := range findings {
+		got = append(got, finding.String())
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("flagged %v, want %v", got, want)
+	}
+}
+
 // TestScanLeavesTestFilesAlone pins the scope of the rule against the
 // walk rather than against a parse, because that is where the exclusion
 // has to hold: a test file that is read and then ignored still inflates

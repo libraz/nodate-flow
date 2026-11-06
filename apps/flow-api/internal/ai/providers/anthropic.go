@@ -30,13 +30,23 @@ func (p *anthropicProvider) Model() string {
 }
 
 type anthropicReq struct {
-	Model     string             `json:"model"`
-	MaxTokens int                `json:"max_tokens"`
-	System    string             `json:"system,omitempty"`
-	Messages  []anthropicMessage `json:"messages"`
+	Model        string                 `json:"model"`
+	MaxTokens    int                    `json:"max_tokens"`
+	System       string                 `json:"system,omitempty"`
+	Messages     []anthropicMessage     `json:"messages"`
+	OutputConfig *anthropicOutputConfig `json:"output_config,omitempty"`
 	// Temperature is omitted when the caller did not choose one, leaving
 	// the model's own default in force.
 	Temperature *float64 `json:"temperature,omitempty"`
+}
+
+type anthropicOutputConfig struct {
+	Format anthropicOutputFormat `json:"format"`
+}
+
+type anthropicOutputFormat struct {
+	Type   string          `json:"type"`
+	Schema json.RawMessage `json:"schema"`
 }
 
 type anthropicMessage struct {
@@ -45,11 +55,9 @@ type anthropicMessage struct {
 }
 
 type anthropicResp struct {
-	Content []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	} `json:"content"`
-	Usage struct {
+	Content    []anthropicRespBlock `json:"content"`
+	StopReason *string              `json:"stop_reason"`
+	Usage      struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
 	} `json:"usage"`
@@ -57,6 +65,12 @@ type anthropicResp struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+type anthropicRespBlock struct {
+	Type    string `json:"type"`
+	Text    string `json:"text"`
+	Refusal string `json:"refusal"`
 }
 
 func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Response, error) {
@@ -73,12 +87,14 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 	if maxTok <= 0 {
 		maxTok = anthropicMaxTokensFb
 	}
+	outputMode, outputConfig := anthropicOutputConfigFor(model, chooseBaseURL(p.endpoint, anthropicEndpoint), req.Output)
 	body, err := json.Marshal(anthropicReq{
-		Model:       model,
-		MaxTokens:   maxTok,
-		System:      req.System,
-		Messages:    []anthropicMessage{{Role: "user", Content: req.Prompt}},
-		Temperature: req.Temperature,
+		Model:        model,
+		MaxTokens:    maxTok,
+		System:       req.System,
+		Messages:     []anthropicMessage{{Role: "user", Content: req.Prompt}},
+		Temperature:  req.Temperature,
+		OutputConfig: outputConfig,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("anthropic: marshal: %w", err)
@@ -120,7 +136,7 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 	if ar.Error != nil {
 		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
-	if len(ar.Content) == 0 {
+	if len(ar.Content) == 0 && ar.StopReason == nil && ar.Usage.InputTokens == 0 && ar.Usage.OutputTokens == 0 {
 		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
 	}
 	var text string
@@ -129,13 +145,49 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 			text += c.Text
 		}
 	}
+	termination, stopReason := classifyAnthropicCompletion(ar.StopReason, ar.Content)
 	costMicros := EstimateCostMicrosUSD(model, ar.Usage.InputTokens, ar.Usage.OutputTokens)
 	return &Response{
 		Model:        model,
 		Text:         text,
+		Termination:  termination,
+		StopReason:   stopReason,
+		OutputMode:   outputMode,
 		InputTokens:  ar.Usage.InputTokens,
 		OutputTokens: ar.Usage.OutputTokens,
 		CostMicros:   costMicros,
 		CostCents:    costMicros / 10_000,
 	}, nil
+}
+
+func anthropicOutputConfigFor(model, endpoint string, spec *OutputSpec) (OutputMode, *anthropicOutputConfig) {
+	mode, nativeSchema := nativeSchemaFor(KindAnthropic, model, endpoint, spec)
+	if mode != OutputModeNativeSchema {
+		return mode, nil
+	}
+	return mode, &anthropicOutputConfig{Format: anthropicOutputFormat{Type: "json_schema", Schema: nativeSchema}}
+}
+
+func classifyAnthropicCompletion(stopReason *string, blocks []anthropicRespBlock) (Termination, string) {
+	for _, block := range blocks {
+		if block.Type == "refusal" {
+			return TerminationRefused, "refusal"
+		}
+	}
+	if stopReason == nil {
+		return TerminationUnknown, ""
+	}
+	reason := boundedStopReason(*stopReason)
+	switch *stopReason {
+	case "end_turn":
+		return TerminationComplete, reason
+	case "max_tokens", "model_context_window_exceeded", "pause_turn", "tool_use":
+		return TerminationIncomplete, reason
+	case "refusal":
+		return TerminationRefused, reason
+	default:
+		// No stop sequences are sent by this adapter, so stop_sequence (and
+		// any future value) is not proof that a full answer was generated.
+		return TerminationUnknown, reason
+	}
 }

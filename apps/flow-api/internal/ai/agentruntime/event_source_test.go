@@ -100,6 +100,51 @@ func TestEventTriggerFanOut(t *testing.T) {
 	require.Equal(t, "signal.attached", kind)
 }
 
+// TestEventTriggerDedupesBySourceEventID pins the on_event identity to
+// the source row. A replay of the same event must remain a no-op even
+// when it happens at a later time, while a different event for the same
+// agent must create a separate run, and a replay after the first run was
+// acked is still a replay. The in-process queue exercises the same Run
+// contract as the persistent queue without a database; the MySQL side is
+// TestMySQLQueueRejectsReplayAfterAck.
+func TestEventTriggerDedupesBySourceEventID(t *testing.T) {
+	t.Parallel()
+
+	queue := NewInProcessQueue(4)
+	var clockCalls atomic.Int64
+	base := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	et := &EventTrigger{
+		Queries: &fakeOnEventQuerier{rows: []OnEventAgentMatch{{ID: 7, WorkspaceID: 9}}},
+		Queue:   queue,
+		Now: func() time.Time {
+			return base.Add(time.Duration(clockCalls.Add(1)) * time.Second)
+		},
+	}
+
+	et.dispatch(context.Background(), 9, "task.updated", 101)
+	first, err := queue.Claim(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, uint64(101), first.Job.SourceEventID)
+
+	// Replaying the same event later must be deduped by its stable ID,
+	// even though the fallback clock value has changed.
+	et.dispatch(context.Background(), 9, "task.updated", 101)
+	require.Equal(t, 0, len(queue.buffer), "replayed event must not enqueue another run")
+
+	// Completing the run does not make the event new again: the MySQL
+	// queue keeps the finished row and its key, and so must this one.
+	require.NoError(t, queue.Ack(context.Background(), first.DedupeKey))
+	et.dispatch(context.Background(), 9, "task.updated", 101)
+	require.Equal(t, 0, len(queue.buffer), "an event replayed after its run finished must not run again")
+
+	// A distinct event ID is a distinct unit of work for the same agent.
+	et.dispatch(context.Background(), 9, "task.updated", 102)
+	second, err := queue.Claim(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, uint64(102), second.Job.SourceEventID)
+	require.NotEqual(t, first.DedupeKey, second.DedupeKey)
+}
+
 // TestEventTriggerNoMatches confirms an empty row set simply no-ops
 // without touching the queue or panicking.
 func TestEventTriggerNoMatches(t *testing.T) {

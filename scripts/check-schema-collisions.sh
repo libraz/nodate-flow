@@ -67,10 +67,13 @@ fi
 # (step=complete|totp_required), so the shared schema is intentional, not a
 # silent overwrite.
 #
+# HandoffBody is the single taskworkflow/types.go resource returned by both
+# human-handoff creation and decision; both output envelopes name that type.
+#
 # IntegrationMapping is the one resource type handlers/integrationmappings
 # returns from both create and patch; PreferencesOutputBody is the one type
 # handlers/notifications returns from both the list and the update.
-ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|ImportJobBody|IntegrationMapping|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|PreferencesOutputBody|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
+ALLOWLIST_PATTERN='^(AdminDeleteOutputBody|AuthTokens|AutoActionSettingsBody|CalendarResponse|EventResponse|HandoffBody|ImportJobBody|IntegrationMapping|Label|ListTimelineOutputBody|LoginBody|MeBody|OIDCStartOutputBody|PageDTO|PreferencesOutputBody|Project|PublicShareResponse|Record|SavedLens|Task|TaskComment|TimeboxDTO|WidgetDTO|Workspace|WorkspaceMember)$'
 
 # The detector: every schema name that 2+ distinct operations reference
 # from a 200/201/202 response body or from a requestBody, as

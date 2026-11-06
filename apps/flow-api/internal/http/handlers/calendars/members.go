@@ -15,7 +15,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
-	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/memberkit"
 )
 
@@ -189,7 +188,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			Role:        input.Body.Role,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		out.Body.AvatarURL = dbtype.PtrFromNullString(user.AvatarUrl)
+		out.Body.AvatarURL = handlerutil.AvatarURLPtr(user.AvatarUrl, user.PublicID)
 
 		// The membership is named by the user it grants, the same way the
 		// two operations that change and withdraw it are, so an
@@ -235,16 +234,7 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		out := &ListMembersOutput{}
 		out.Body.Members = make([]MemberResponse, len(rows))
 		for i, r := range rows {
-			resp := MemberResponse{
-				ID:          r.PublicID.String(),
-				UserID:      r.UserPublicID.String(),
-				DisplayName: r.DisplayName,
-				MemberColor: r.MemberColor,
-				Role:        string(r.Role),
-				CreatedAt:   r.CreatedAt.Unix(),
-			}
-			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
-			out.Body.Members[i] = resp
+			out.Body.Members[i] = memberFromRow(r)
 		}
 		return out, nil
 	}
@@ -441,4 +431,18 @@ func RemoveMember(deps Deps) func(context.Context, *RemoveMemberInput) (*RemoveM
 
 		return out, nil
 	}
+}
+
+// memberFromRow maps a listed calendar member to its response.
+func memberFromRow(r calendar.ListCalendarMembersRow) MemberResponse {
+	resp := MemberResponse{
+		ID:          r.PublicID.String(),
+		UserID:      r.UserPublicID.String(),
+		DisplayName: r.DisplayName,
+		MemberColor: r.MemberColor,
+		Role:        string(r.Role),
+		CreatedAt:   r.CreatedAt.Unix(),
+	}
+	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.UserPublicID)
+	return resp
 }

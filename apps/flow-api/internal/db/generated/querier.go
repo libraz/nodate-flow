@@ -24,12 +24,17 @@ type Querier interface {
 	// Idempotent: if a soft-deleted row already exists for this (task, agent, role),
 	// re-enable it and adopt the newly supplied public_id.
 	AddAgentActor(ctx context.Context, arg AddAgentActorParams) (int64, error)
+	// Record one canonical task public ID included in the provider input. The
+	// caller inserts the invocation and all of its inputs in one transaction.
+	AddAiInvocationInput(ctx context.Context, arg AddAiInvocationInputParams) error
 	// Insert per-task attachment metadata. The blob itself (sha256, byte_size,
 	// content_type, storage_key) is owned by storage_objects and looked up via
 	// storage_object_id; caller MUST have either inserted a fresh storage_objects
 	// row or bumped ref_count on an existing one inside the same transaction.
 	AddAttachment(ctx context.Context, arg AddAttachmentParams) (int64, error)
-	// Append a comment to a task.
+	// Append a comment to a task. A human comment sets author_id; an agent
+	// comment sets author_agent_id plus the public id and name snapshot that
+	// keep the byline after the agent is deleted.
 	AddComment(ctx context.Context, arg AddCommentParams) (int64, error)
 	// Attach a new constraint to a task.
 	AddConstraint(ctx context.Context, arg AddConstraintParams) (int64, error)
@@ -214,6 +219,10 @@ type Querier interface {
 	AssignTaskNumber(ctx context.Context, arg AssignTaskNumberParams) (int32, error)
 	// Link an existing signal to a task by public_id.
 	AttachSignalToTask(ctx context.Context, arg AttachSignalToTaskParams) (int64, error)
+	// The view enforces initiating actor, current workspace membership, and the
+	// current ACL/existence of every task reference. Use this query from the
+	// caller's transaction-bound *Queries handle for command authorization.
+	AuthorizeAiSuggestionBatch(ctx context.Context, arg AuthorizeAiSuggestionBatchParams) (uint32, error)
 	// Count one failed authentication against an identity, locking the
 	// account once the count reaches the caller's threshold.
 	//
@@ -247,6 +256,12 @@ type Querier interface {
 	// (reading the deadline as it was) and the deadline second (reading the
 	// count as it now is). Swapping them silently changes both branches.
 	BumpIdentityFailedAttempts(ctx context.Context, arg BumpIdentityFailedAttemptsParams) error
+	// Manual tasks retain the old path. Review-required tasks need the latest
+	// submission for the current work revision approved, and every constraint
+	// explicitly selected by policy still enabled and currently satisfied.
+	// Every block is a current read so a caller's earlier snapshot cannot pass
+	// the gate after the task lock is taken.
+	CanCompleteTask(ctx context.Context, arg CanCompleteTaskParams) (int32, error)
 	// Cancel a pending or running import job.
 	CancelImportJob(ctx context.Context, arg CancelImportJobParams) error
 	// Verify that a user is an enabled member of a workspace. Returns 1 if
@@ -342,6 +357,9 @@ type Querier interface {
 	// DELETE /me/avatar after the object has been removed from storage.
 	// PatchMe cannot be used because NULL narg means "leave alone" there.
 	ClearMyAvatarURL(ctx context.Context, id uint32) error
+	// A successful domain effect and its exact response must complete in the
+	// same transaction as this update. Uncompleted reservations never commit.
+	CompleteOperationReceipt(ctx context.Context, arg CompleteOperationReceiptParams) (int64, error)
 	// Mark a pending TOTP enrollment as confirmed by stamping
 	// mfa_confirmed_at. The caller must have already validated a code
 	// against the stored secret.
@@ -411,6 +429,9 @@ type Querier interface {
 	CountWorkspaceActivity(ctx context.Context, arg CountWorkspaceActivityParams) (int64, error)
 	// Insert a new reusable agent configuration.
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (int64, error)
+	// Provenance is invalid until every canonical reference has been inserted.
+	CreateAiSuggestionBatch(ctx context.Context, arg CreateAiSuggestionBatchParams) (sql.Result, error)
+	CreateAiSuggestionBatchInput(ctx context.Context, arg CreateAiSuggestionBatchInputParams) error
 	// Insert a new description version snapshot.
 	CreateDescriptionVersion(ctx context.Context, arg CreateDescriptionVersionParams) (int64, error)
 	// Add an entity to the user's favorites.
@@ -421,6 +442,9 @@ type Querier interface {
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (int64, error)
 	// Insert a new intake item into the triage queue.
 	CreateIntakeItem(ctx context.Context, arg CreateIntakeItemParams) (int64, error)
+	// Capture one source signal at most once per workspace. MySQL permits
+	// multiple NULL signal ids, so manual intake rows remain independent.
+	CreateIntakeItemForSignal(ctx context.Context, arg CreateIntakeItemForSignalParams) (sql.Result, error)
 	// Claim an external source for a workspace. The (provider, external_key)
 	// UNIQUE key is instance-wide, so a second workspace claiming the same
 	// source fails with a duplicate-entry error the handler turns into
@@ -444,6 +468,10 @@ type Querier interface {
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (int64, error)
 	// Insert a short-lived CSRF state row for the personal OAuth flow.
 	CreateOauthState(ctx context.Context, arg CreateOauthStateParams) error
+	// Reserve the operation key inside the caller's transaction. A concurrent
+	// insert for the same unique key blocks until its owner commits or rolls
+	// back; the following SELECT retrieves and locks the durable receipt.
+	CreateOrLockOperationReceipt(ctx context.Context, arg CreateOrLockOperationReceiptParams) error
 	// Insert a new wiki/documentation page.
 	CreatePage(ctx context.Context, arg CreatePageParams) (int64, error)
 	// Insert a new personal access token. Plain token is shown to the user once.
@@ -469,6 +497,9 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (int64, error)
 	// Insert a stub user for invitations: no identity row, display_name defaults to email.
 	CreateStubUser(ctx context.Context, arg CreateStubUserParams) (int64, error)
+	// Create the first actor-scoped decision revision. The signal lock serializes
+	// edits to the same proposal before this unique key is written.
+	CreateSuggestionDecision(ctx context.Context, arg CreateSuggestionDecisionParams) error
 	// Insert a new task. derived_state defaults to 'open' and must NOT be set
 	// directly here; the constraint engine and event bus mutate it.
 	// Both created_by_user_id and updated_by_user_id are populated with the
@@ -478,8 +509,11 @@ type Querier interface {
 	// Insert a new link between a task and an event. Caller must validate
 	// the task and event belong to workspace_id and are enabled.
 	CreateTaskEventLink(ctx context.Context, arg CreateTaskEventLinkParams) (int64, error)
+	CreateTaskHandoff(ctx context.Context, arg CreateTaskHandoffParams) error
 	// Attach a label to a task.
 	CreateTaskLabel(ctx context.Context, arg CreateTaskLabelParams) (int64, error)
+	CreateTaskReviewDecision(ctx context.Context, arg CreateTaskReviewDecisionParams) error
+	CreateTaskSubmission(ctx context.Context, arg CreateTaskSubmissionParams) (int64, error)
 	// Insert a new timebox (sprint / iteration / cycle).
 	CreateTimebox(ctx context.Context, arg CreateTimeboxParams) (int64, error)
 	// Insert a delivery row, deduping against the (subscription_id, event_public_id)
@@ -713,6 +747,7 @@ type Querier interface {
 	// causes a second scheduler replica to get a duplicate-entry error,
 	// which callers translate to ErrDuplicate. No row is inserted on conflict.
 	EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams) (int64, error)
+	ExpireTaskHandoffDue(ctx context.Context, arg ExpireTaskHandoffDueParams) (int64, error)
 	// Fetch tasks for export scoped to a workspace + project. It applies no
 	// lens filter: the REST lens export reads lenses through the shared lens
 	// filter reader instead.
@@ -780,7 +815,9 @@ type Querier interface {
 	// id is required: returned as FK value for ai_invocations.provider_id.
 	FindDefaultProviderIDForWorkspace(ctx context.Context, workspaceID uint32) (uint32, error)
 	// Find a specific description version by public id.
+	// No enabled filter: the agent is the historical author of the version.
 	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
+	FindEnabledTaskConstraintForWorkflow(ctx context.Context, arg FindEnabledTaskConstraintForWorkflowParams) (uint32, error)
 	// Resolve a target event by public_id for the reversal handler (ADR 0008
 	// D4, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
 	// handler uses this single query to drive three eligibility checks
@@ -811,6 +848,10 @@ type Querier interface {
 	FindImportJobStatusByID(ctx context.Context, id uint32) (ImportJobsStatus, error)
 	// Find a single intake item by public id.
 	FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeItemByPublicIdParams) (FindIntakeItemByPublicIdRow, error)
+	// Resolve and lock the one intake row associated with a source signal.
+	FindIntakeItemBySignal(ctx context.Context, arg FindIntakeItemBySignalParams) (FindIntakeItemBySignalRow, error)
+	// Lock the current intake state after its source signal has been locked.
+	FindIntakeItemForConversion(ctx context.Context, arg FindIntakeItemForConversionParams) (FindIntakeItemForConversionRow, error)
 	// Resolve the workspace an inbound webhook delivery belongs to from the
 	// sender identity the provider put on the wire. Every /webhooks/*
 	// receiver calls this before it writes anything; a miss means the
@@ -825,6 +866,9 @@ type Querier interface {
 	FindLabelByPublicId(ctx context.Context, arg FindLabelByPublicIdParams) (FindLabelByPublicIdRow, error)
 	// Find a label by name within a workspace (for MCP resolve).
 	FindLabelByWorkspaceAndName(ctx context.Context, arg FindLabelByWorkspaceAndNameParams) (FindLabelByWorkspaceAndNameRow, error)
+	// Compatibility path for old clients that omitted proposalId. New clients
+	// always identify the proposal and its decision revision explicitly.
+	FindLatestSuggestionProposalForSignal(ctx context.Context, arg FindLatestSuggestionProposalForSignalParams) (FindLatestSuggestionProposalForSignalRow, error)
 	// Look up a publicly shared lens by the SHA-256 hex of its URL token.
 	// Used by unauthenticated public share endpoints; the caller hashes the
 	// token from the path before calling, so the plaintext never reaches a
@@ -865,6 +909,8 @@ type Querier interface {
 	// Find deliveries ready for (re)delivery. Used by the background worker.
 	// d.id is required: used by MarkDeliveryDelivered/Failed/Dead (WHERE id = ?).
 	FindPendingDeliveries(ctx context.Context, limit int32) ([]FindPendingDeliveriesRow, error)
+	FindPendingTaskHandoffForRole(ctx context.Context, arg FindPendingTaskHandoffForRoleParams) (uint32, error)
+	FindPendingTaskHandoffFromHolderForUpdate(ctx context.Context, arg FindPendingTaskHandoffFromHolderForUpdateParams) (FindPendingTaskHandoffFromHolderForUpdateRow, error)
 	// Resolve a project by its human-readable identifier within a workspace.
 	FindProjectByIdentifier(ctx context.Context, arg FindProjectByIdentifierParams) (FindProjectByIdentifierRow, error)
 	// Resolve a project by its UUID v7 within a workspace. Returns internal id.
@@ -879,6 +925,8 @@ type Querier interface {
 	// handlers, MCP tools, or any code outside apps/flow-api/internal/ai/providers/.
 	// id is required: used internally by the providers package for logging/tracking.
 	FindProviderForDecrypt(ctx context.Context, arg FindProviderForDecryptParams) (FindProviderForDecryptRow, error)
+	// Resolve the public task id for a converted intake's internal foreign key.
+	FindPublicIdForIntakeTask(ctx context.Context, arg FindPublicIdForIntakeTaskParams) (types.PublicID, error)
 	// Find a single reaction by public id.
 	FindReactionByPublicId(ctx context.Context, publicID types.PublicID) (FindReactionByPublicIdRow, error)
 	// The calendar.reminder event already appended for one occurrence of an
@@ -927,6 +975,8 @@ type Querier interface {
 	// replaced during a rotation of this very session, so presenting it
 	// means someone still holds a token the legitimate client gave up.
 	FindSessionByRotatedFromHash(ctx context.Context, rotatedFromHash sql.NullString) (FindSessionByRotatedFromHashRow, error)
+	// Resolve the source signal's public id while writing conversion events.
+	FindSignalPublicIdForIntakeItem(ctx context.Context, arg FindSignalPublicIdForIntakeItemParams) (types.PublicID, error)
 	// Resolve a storage object by its internal id. Used inside the same
 	// transaction as the referencing row insert/delete, where the FK id is
 	// already known and a public_id round trip is unnecessary.
@@ -939,6 +989,12 @@ type Querier interface {
 	// Used at upload time to detect a dedup hit and bump ref_count instead
 	// of inserting a new row. Matches the (workspace_id, sha256) UNIQUE key.
 	FindStorageObjectByWorkspaceSha(ctx context.Context, arg FindStorageObjectByWorkspaceShaParams) (FindStorageObjectByWorkspaceShaRow, error)
+	// Resolve an explicit proposal id only when it belongs to the locked signal.
+	FindSuggestionProposalByPublicID(ctx context.Context, arg FindSuggestionProposalByPublicIDParams) (FindSuggestionProposalByPublicIDRow, error)
+	// Read under the task lock so a removal can resolve the removed holder's
+	// pending handoff in the same transaction.
+	FindTaskActorForRemoval(ctx context.Context, arg FindTaskActorForRemovalParams) (FindTaskActorForRemovalRow, error)
+	FindTaskAttachmentDigestForSubmission(ctx context.Context, arg FindTaskAttachmentDigestForSubmissionParams) (FindTaskAttachmentDigestForSubmissionRow, error)
 	// Detail projection via v_task_detail. Workspace-scoped.
 	// task-visibility: not-applicable — every route reaching this statement
 	// resolves the task through acl.AuthorizeTaskAccess first, which applies
@@ -948,8 +1004,15 @@ type Querier interface {
 	FindTaskByPublicId(ctx context.Context, arg FindTaskByPublicIdParams) (FindTaskByPublicIdRow, error)
 	// Resolve a single link (enabled only) inside a workspace.
 	FindTaskEventLinkByPublicId(ctx context.Context, arg FindTaskEventLinkByPublicIdParams) (FindTaskEventLinkByPublicIdRow, error)
+	// The caller already holds the task lock; only the handoff row is locked here.
+	FindTaskHandoffForUpdate(ctx context.Context, arg FindTaskHandoffForUpdateParams) (FindTaskHandoffForUpdateRow, error)
+	FindTaskHumanActorForRole(ctx context.Context, arg FindTaskHumanActorForRoleParams) (FindTaskHumanActorForRoleRow, error)
 	// Check if a specific task-label junction exists.
 	FindTaskLabelByIds(ctx context.Context, arg FindTaskLabelByIdsParams) (FindTaskLabelByIdsRow, error)
+	FindTaskReviewDecisionForSubmission(ctx context.Context, arg FindTaskReviewDecisionForSubmissionParams) (uint32, error)
+	FindTaskSubmissionForDecision(ctx context.Context, arg FindTaskSubmissionForDecisionParams) (FindTaskSubmissionForDecisionRow, error)
+	// A current read under the task lock, like IsCurrentTaskWorkflowReviewer.
+	FindTaskWorkflowReviewer(ctx context.Context, arg FindTaskWorkflowReviewerParams) (FindTaskWorkflowReviewerRow, error)
 	// Resolve an unused recovery code by (user_id, hash).
 	FindUnusedRecoveryCode(ctx context.Context, arg FindUnusedRecoveryCodeParams) (uint32, error)
 	// Resolve a Discord user snowflake to (user_public_id, workspace_public_id)
@@ -1073,6 +1136,11 @@ type Querier interface {
 	// caller already cleared, so a delete cannot target an attachment on a
 	// different (or unauthorized) task; a mismatch returns no row.
 	GetAttachmentStorageObjectIDForDelete(ctx context.Context, arg GetAttachmentStorageObjectIDForDeleteParams) (GetAttachmentStorageObjectIDForDeleteRow, error)
+	// Read the enabled agent's public id and name to snapshot onto an agent
+	// comment.
+	GetCommentAgentByline(ctx context.Context, arg GetCommentAgentBylineParams) (GetCommentAgentBylineRow, error)
+	// Read back the server-assigned creation time of a just-inserted comment.
+	GetCommentCreatedAt(ctx context.Context, arg GetCommentCreatedAtParams) (time.Time, error)
 	// Resolve an event's public id and logical occurrence time given its
 	// internal id, scoped by workspace as a defence-in-depth check.
 	// Used by the webhook fanout chain: the worker needs the event's
@@ -1083,16 +1151,22 @@ type Querier interface {
 	// event time set by the eventbus producer; created_at is just the row
 	// insertion time and could drift from the event's true occurrence.
 	GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEventPublicIDAndOccurredAtParams) (GetEventPublicIDAndOccurredAtRow, error)
-	// Resolve one inbox item in a workspace and whether the reader may read
-	// the task it points at. No row means the id names no inbox item here,
-	// which is what an AI suggestion reaction has to refuse.
-	GetInboxItemTaskVisible(ctx context.Context, arg GetInboxItemTaskVisibleParams) (sql.NullBool, error)
+	// Load one active source signal inside the workspace whose membership the
+	// caller already proved. Payload remains JSON data; source-specific display
+	// fields are projected by the sourceintake package, never treated as HTML.
+	GetInboxSignalForIntake(ctx context.Context, arg GetInboxSignalForIntakeParams) (GetInboxSignalForIntakeRow, error)
 	// Return the most recent succeeded run time for a given agent.
 	// Used by the agent pre-flight check to determine if new events have
 	// occurred since the last run.
 	GetLastSuccessfulAgentRun(ctx context.Context, arg GetLastSuccessfulAgentRunParams) (time.Time, error)
+	// Every canonical state transition is appended in the same transaction
+	// while holding the task row lock. The newest event distinguishes blocked
+	// waiting work from legacy waiting work that remains submit-capable.
+	GetLatestTaskTransitionForSubmission(ctx context.Context, arg GetLatestTaskTransitionForSubmissionParams) (string, error)
 	// Fetch a single lens by its public_id.
 	GetLensByPublicID(ctx context.Context, arg GetLensByPublicIDParams) (GetLensByPublicIDRow, error)
+	// The agent byline a mention snapshots so it survives the agent's deletion.
+	GetMentionActorAgentByline(ctx context.Context, arg GetMentionActorAgentBylineParams) (GetMentionActorAgentBylineRow, error)
 	// Load, for a set of recipients in one workspace, every stored
 	// preference row for a given event_category — muted ones included.
 	//
@@ -1104,6 +1178,9 @@ type Querier interface {
 	// turned off. The caller resolves defaults against the returned rows
 	// instead; see the notification package's channel resolution.
 	GetNotificationPreferencesForRecipients(ctx context.Context, arg GetNotificationPreferencesForRecipientsParams) ([]GetNotificationPreferencesForRecipientsRow, error)
+	// Read the receipt after reserving its key. The caller re-authorizes the
+	// current principal and target before comparing the hash or replaying result.
+	GetOperationReceiptForUpdate(ctx context.Context, arg GetOperationReceiptForUpdateParams) (GetOperationReceiptForUpdateRow, error)
 	// Fetch a single page by workspace_id + public_id, including parent page info.
 	// pg.id is required: used by MCP resolvePage and page handlers for
 	// parent_page_id resolution and circular-reference checks.
@@ -1114,12 +1191,33 @@ type Querier interface {
 	// Compute nesting depth of a page by walking up to the root via recursive CTE.
 	// Returns 0 for root pages, 1 for direct children of root, etc.
 	GetPageDepth(ctx context.Context, id uint32) (interface{}, error)
+	// Current authority used by prompt snapshots and proposal-cache hits. An
+	// absent or disabled workspace membership is intentionally no row.
+	GetProposalCacheWorkspaceAccess(ctx context.Context, arg GetProposalCacheWorkspaceAccessParams) (interface{}, error)
 	// The bucket recorded by the first drainer to start against this
 	// database, read regardless of enabled so a disabled row still blocks a
 	// drainer pointed elsewhere.
 	GetStorageLocation(ctx context.Context) (string, error)
 	// Fetch a single suggestion by public_id with source/target task info.
 	GetSuggestionByPublicId(ctx context.Context, arg GetSuggestionByPublicIdParams) (GetSuggestionByPublicIdRow, error)
+	// Read and lock the actor-specific decision for an explicit proposal.
+	GetSuggestionDecisionForUpdate(ctx context.Context, arg GetSuggestionDecisionForUpdateParams) (GetSuggestionDecisionForUpdateRow, error)
+	// Lock a current project-membership grant while checking a linked task.
+	GetSuggestionProjectMemberForUpdate(ctx context.Context, arg GetSuggestionProjectMemberForUpdateParams) (uint32, error)
+	// Resolve the raw signal by workspace/public ID, including archived rows.
+	// Receipt replay authorization cannot use v_inbox because archived signals
+	// leave that view before the retry arrives.
+	GetSuggestionSignalForUpdate(ctx context.Context, arg GetSuggestionSignalForUpdateParams) (GetSuggestionSignalForUpdateRow, error)
+	// Lock a current private-task actor grant while checking a linked task.
+	GetSuggestionTaskActorForUpdate(ctx context.Context, arg GetSuggestionTaskActorForUpdateParams) (uint32, error)
+	// task-visibility: not-applicable — this internal lock projection is consumed only by lockAuthorizedTarget, which locks and verifies the current user grant in taskReadable and drops an unreadable row before exposing it; title is used only after that check to validate proposal evidence.
+	// Lock the current linked task before checking its visibility or returning
+	// a receipt. An absent/disabled task cannot be opened or used to reveal text.
+	GetSuggestionTaskForUpdate(ctx context.Context, arg GetSuggestionTaskForUpdateParams) (GetSuggestionTaskForUpdateRow, error)
+	// Share-lock only the caller's membership row before authorizing a command
+	// or returning a receipt: it blocks a concurrent demotion or removal, while
+	// leaving the workspaces row free for FK checks of inserts in the workspace.
+	GetSuggestionWorkspaceRoleForShare(ctx context.Context, arg GetSuggestionWorkspaceRoleForShareParams) (WorkspaceMembersRole, error)
 	// Read the raw agent_memo JSON for a task. The column is NOT NULL and
 	// defaults to '{}', so a matching row always answers with an object; a task
 	// that is absent or disabled answers with no row at all, which callers treat
@@ -1145,6 +1243,12 @@ type Querier interface {
 	// Fetch the embedding row for a single (task_id, model) pair. Returns
 	// sql.ErrNoRows if the task has never been embedded with the given model.
 	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
+	// Task review and completion policy queries. Every task-side lookup binds
+	// both workspace_id and task_id so a public id or submission id cannot be
+	// replayed under a sibling task's route.
+	GetTaskWorkflowSettings(ctx context.Context, arg GetTaskWorkflowSettingsParams) (GetTaskWorkflowSettingsRow, error)
+	GetTaskWorkflowSettingsForUpdate(ctx context.Context, arg GetTaskWorkflowSettingsForUpdateParams) (GetTaskWorkflowSettingsForUpdateRow, error)
+	GetTaskWorkflowUserPublicID(ctx context.Context, id uint32) (string, error)
 	// Fetch a single timebox by workspace_id + public_id.
 	GetTimeboxByPublicId(ctx context.Context, arg GetTimeboxByPublicIdParams) (GetTimeboxByPublicIdRow, error)
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
@@ -1203,6 +1307,10 @@ type Querier interface {
 	// (ai.agent.run.*) and events the agent itself authored never count, so an
 	// idle workspace lets the pre-flight skip the next tick.
 	HasNewActivityForAgent(ctx context.Context, arg HasNewActivityForAgentParams) (bool, error)
+	// An applied command changes the shared signal, so it resolves every actor's
+	// proposal for that inbox item. A dismissal is the actor's expiring decision
+	// row; its event records the outcome and is not terminal.
+	HasSuggestionProposalReaction(ctx context.Context, arg HasSuggestionProposalReactionParams) (bool, error)
 	// Atomically bump the use counter, but only while the invite still has
 	// capacity. max_uses IS NULL means unlimited. The conditional WHERE makes
 	// the check-and-increment a single statement so concurrent redemptions
@@ -1237,8 +1345,18 @@ type Querier interface {
 	// supplies a UUID v7 public_id and either workspace_id OR owner_user_id
 	// (the CHECK constraint enforces exactly one is non-null).
 	InsertStorageObject(ctx context.Context, arg InsertStorageObjectParams) (sql.Result, error)
+	// A current read: a concurrent actor removal is waited for, not read past.
+	IsCurrentTaskWorkflowReviewer(ctx context.Context, arg IsCurrentTaskWorkflowReviewerParams) (bool, error)
+	IsEnabledTaskHumanActorForHandoff(ctx context.Context, arg IsEnabledTaskHumanActorForHandoffParams) (bool, error)
 	// Quick check: is this event category muted on the in_app channel for a user?
 	IsEventMutedForUser(ctx context.Context, arg IsEventMutedForUserParams) (int64, error)
+	// Add a same-workspace task link without replacing an existing signal link.
+	// Archived signals are linked too, matching LockSignalForIntakeConversion.
+	LinkInboxSignalToTask(ctx context.Context, arg LinkInboxSignalToTaskParams) (int64, error)
+	// Claim an unconverted intake by linking it to an already-visible task. The
+	// status predicate is SetIntakeItemTask's: pending, accepted without a task,
+	// or snoozed past its deadline; a rejected or duplicate item is not reopened.
+	LinkIntakeItemToExistingTask(ctx context.Context, arg LinkIntakeItemToExistingTaskParams) (int64, error)
 	// Find all active subscriptions in a workspace. Event type filtering
 	// is done in Go since JSON_CONTAINS is not sqlc-friendly.
 	// id is required: used as subscription_id FK in CreateWebhookDelivery.
@@ -1281,19 +1399,14 @@ type Querier interface {
 	ListAgentsAssignedToTask(ctx context.Context, arg ListAgentsAssignedToTaskParams) ([]ListAgentsAssignedToTaskRow, error)
 	// List a workspace's agents joined with the underlying model.
 	ListAgentsForWorkspace(ctx context.Context, arg ListAgentsForWorkspaceParams) ([]ListAgentsForWorkspaceRow, error)
-	// Recent redacted LLM call records scoped to a single task. Used by
-	// the task detail AI reasoning panel. workspace_id is
-	// included so tenant isolation is enforced at the query level.
+	// Recent redacted LLM calls scoped to a single task. Apply the same
+	// audience and per-reference ACL policy as the workspace feed. The route
+	// already checks access to the subject task, but prompts may quote others.
 	ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error)
-	// Recent redacted LLM call records for a workspace, newest first. Used
-	// by the AI activity panel. All columns here are already redacted at
-	// write time by the orchestrator; safe to surface at the API boundary.
-	//
-	// Redaction removes secrets, not task content: a prompt carries the
-	// titles and descriptions it was built from. So a row about a task is
-	// returned only when the reader may read that task (a deleted one reads
-	// as unreadable), and a row with no task — a prompt that may embed
-	// several — only to the user who made the call. Elevated roles see all.
+	// Recent redacted LLM calls, newest first. Redaction removes secrets,
+	// not task content. Check every public resource reference and the subject
+	// task against the reader's current Layer-4 ACL. Missing, deleted,
+	// cross-workspace, malformed, or unknown resource references fail closed.
 	ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error)
 	// List archived tasks via v_task_list_archived. See ListTasksForProject
 	// for why the total is a separate query.
@@ -1456,7 +1569,17 @@ type Querier interface {
 	// derived_state, so a change to it re-opens their constraints.
 	ListDependentTaskIDsForEngine(ctx context.Context, arg ListDependentTaskIDsForEngineParams) ([]uint32, error)
 	// List all description versions for a task, newest first.
+	// No enabled filter: the agent is the historical author of the version.
 	ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error)
+	// Human task-role handoff queries.
+	// The event and resolution are committed by one RunOnce transaction. SKIP
+	// LOCKED lets multiple bounded workers claim disjoint handoffs safely; only
+	// handoff rows are locked so a held task or users row never hides a due one.
+	ListDueTaskHandoffsForUpdate(ctx context.Context, arg ListDueTaskHandoffsForUpdateParams) ([]ListDueTaskHandoffsForUpdateRow, error)
+	// Return the latest globally pending proposal per signal, overlaid with the
+	// caller's unexpired edit. Actor-scoped dismissals/deferments hide only that
+	// actor's row and never enter the global terminal-reaction predicate.
+	ListEffectivePendingAiSuggestionsForReader(ctx context.Context, arg ListEffectivePendingAiSuggestionsForReaderParams) ([]ListEffectivePendingAiSuggestionsForReaderRow, error)
 	// oauth_signin_allowlist statements.
 	//
 	// There is no workspace_id predicate anywhere in this file and none is
@@ -1602,8 +1725,12 @@ type Querier interface {
 	// List mentions within a specific task (description or comments).
 	// Paginated (LIMIT/OFFSET) so the result set is always bounded; total
 	// carries the pre-page count.
+	// No enabled filter: the agent is the historical actor of the mention; the
+	// snapshot answers once the agent row is gone.
 	ListMentionsForTask(ctx context.Context, arg ListMentionsForTaskParams) ([]ListMentionsForTaskRow, error)
 	// List mentions where a user was mentioned, within a workspace.
+	// No enabled filter: the agent is the historical actor of the mention; the
+	// snapshot answers once the agent row is gone.
 	ListMentionsForUser(ctx context.Context, arg ListMentionsForUserParams) ([]ListMentionsForUserRow, error)
 	// List models registered under a provider. Workspace-scoped.
 	ListModelsForProvider(ctx context.Context, arg ListModelsForProviderParams) ([]ListModelsForProviderRow, error)
@@ -1746,17 +1873,6 @@ type Querier interface {
 	ListPagesForWorkspace(ctx context.Context, arg ListPagesForWorkspaceParams) ([]ListPagesForWorkspaceRow, error)
 	// List a user's PATs in a workspace, masked (no token_hash).
 	ListPatsForUser(ctx context.Context, arg ListPatsForUserParams) ([]ListPatsForUserRow, error)
-	// List pending AI suggestions for a workspace. A suggestion is "pending"
-	// when an ai.suggestion.proposed event exists with no later
-	// ai.suggestion.applied / ai.suggestion.dismissed event for the same
-	// inbox_item_id (compared via JSON_EXTRACT on payload_json).
-	ListPendingAiSuggestions(ctx context.Context, workspaceID uint32) ([]ListPendingAiSuggestionsRow, error)
-	// Pending AI triage suggestions a reader may see. A suggestion is pending
-	// while no later applied / dismissed event names the same inbox item; it
-	// is the reader's only while that item is still in the inbox and the task
-	// it points at is one they may read, because the stored reasoning is the
-	// model talking about that task.
-	ListPendingAiSuggestionsForReader(ctx context.Context, arg ListPendingAiSuggestionsForReaderParams) ([]ListPendingAiSuggestionsForReaderRow, error)
 	// The worker's claim candidates, oldest first. Claiming is a separate
 	// conditional UPDATE, so this read takes no locks: a row listed here may
 	// already have been taken by another replica by the time it is claimed.
@@ -1775,6 +1891,13 @@ type Querier interface {
 	ListProjectPublicIdsForUserInWorkspace(ctx context.Context, arg ListProjectPublicIdsForUserInWorkspaceParams) ([]types.PublicID, error)
 	// List projects in a workspace via v_projects.
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
+	// Reload every task quoted by a cached proposal through the current
+	// Layer-4 ACL, returning the prompt-relevant fields used to fingerprint the
+	// cache snapshot. Missing, disabled, moved, or unreadable tasks are absent;
+	// callers require one row for every public id before serving a cache hit.
+	// The primary assignee rule of v_task_list_all: the first assignee in
+	// display order, with no name when that actor is an agent or disabled.
+	ListProposalCacheTaskInputs(ctx context.Context, arg ListProposalCacheTaskInputsParams) ([]ListProposalCacheTaskInputsRow, error)
 	// Workspace provider list. NEVER selects api_key_ciphertext.
 	ListProvidersForWorkspace(ctx context.Context, arg ListProvidersForWorkspaceParams) ([]ListProvidersForWorkspaceRow, error)
 	// Resolve a publicly shared lens's task projection.
@@ -1812,6 +1935,12 @@ type Querier interface {
 	ListReactionsForTask(ctx context.Context, arg ListReactionsForTaskParams) ([]ListReactionsForTaskRow, error)
 	// List recent audit log entries for a workspace via v_audit_recent.
 	ListRecentAudit(ctx context.Context, arg ListRecentAuditParams) ([]ListRecentAuditRow, error)
+	// A task reader gets a bounded immutable history. CurrentSubmission is
+	// derived by the handler from the row matching the task's current revision.
+	ListRecentTaskSubmissionsForWorkflow(ctx context.Context, arg ListRecentTaskSubmissionsForWorkflowParams) ([]ListRecentTaskSubmissionsForWorkflowRow, error)
+	// Bounded task-workflow state for the task detail UI. The caller has passed
+	// RequireTaskAccess, so every result remains scoped to the readable task.
+	ListRecentTaskWorkflowHandoffs(ctx context.Context, arg ListRecentTaskWorkflowHandoffsParams) ([]ListRecentTaskWorkflowHandoffsRow, error)
 	// List the most recent visits for a user in a workspace, newest first.
 	ListRecentVisitsForUser(ctx context.Context, arg ListRecentVisitsForUserParams) ([]ListRecentVisitsForUserRow, error)
 	// List draft retrospective tasks: tasks linked back to a source task
@@ -1831,7 +1960,8 @@ type Querier interface {
 	// legacy task_id fast path or subject_type = 'task'. The constraint
 	// engine's signal.received fact.
 	ListSignalKindsForTaskForEngine(ctx context.Context, arg ListSignalKindsForTaskForEngineParams) ([]string, error)
-	// List signals attached to a task via v_inbox.
+	// List signals attached to a task via v_inbox_all; a task lists its
+	// snoozed signals too, since snooze only hides them from the inbox.
 	ListSignalsForTask(ctx context.Context, arg ListSignalsForTaskParams) ([]ListSignalsForTaskRow, error)
 	// List tasks whose embedding is missing or older than tasks.updated_at for
 	// the given (workspace_id, model). Used by the background re-embed worker.
@@ -1861,6 +1991,11 @@ type Querier interface {
 	ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskActorRolesForEngineParams) ([]TaskActorsRole, error)
 	// Enabled constraint rows for a task in evaluation order.
 	ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error)
+	ListTaskHumanActorsForRole(ctx context.Context, arg ListTaskHumanActorsForRoleParams) ([]ListTaskHumanActorsForRoleRow, error)
+	// Follow a task's enabled intake backlinks to their bounded source details.
+	// Source payload JSON is deliberately not returned: its display projection
+	// was captured into the intake row after HTTP(S)-only URL validation.
+	ListTaskIntakeSources(ctx context.Context, arg ListTaskIntakeSourcesParams) ([]ListTaskIntakeSourcesRow, error)
 	// List labels attached to a task.
 	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
 	// List tasks in a project via v_task_list.
@@ -1918,7 +2053,7 @@ type Querier interface {
 	// ascending by occurred_at + id. Used by the replay tool to derive
 	// the expected derived_state from scratch.
 	ListTransitionEventsForReplay(ctx context.Context, arg ListTransitionEventsForReplayParams) ([]ListTransitionEventsForReplayRow, error)
-	// List signals in a workspace that have no task linkage yet.
+	// List signals in a workspace that have no task linkage yet, snoozed or not.
 	ListUnattachedSignals(ctx context.Context, arg ListUnattachedSignalsParams) ([]ListUnattachedSignalsRow, error)
 	// Reservations whose upload never arrived. The cutoff is supplied by
 	// the caller and must be past the lifetime of the presigned URL the row
@@ -2000,10 +2135,18 @@ type Querier interface {
 	ListWorkspaceMembersForSmartCreate(ctx context.Context, workspaceID uint32) ([]ListWorkspaceMembersForSmartCreateRow, error)
 	// List workspaces a user belongs to.
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]ListWorkspacesForUserRow, error)
+	// Read an enabled human author's byline and share-lock the row so a
+	// concurrent suspension cannot interleave with the comment insert.
+	LockCommentHumanAuthor(ctx context.Context, id uint32) (LockCommentHumanAuthorRow, error)
 	// Lock the owning project row before task-number allocation. This serializes
 	// concurrent creators for the same project while still allowing different
 	// projects to allocate independently.
 	LockProjectForTaskNumber(ctx context.Context, arg LockProjectForTaskNumberParams) (uint32, error)
+	// Lock the source association before locking its intake row and allocating
+	// the conversion task. An archived signal still matches: archiving hides it
+	// from the inbox, not from the intake it was captured into. task_id remains
+	// independent of the original signal subject_type/subject_id pair.
+	LockSignalForIntakeConversion(ctx context.Context, arg LockSignalForIntakeConversionParams) (LockSignalForIntakeConversionRow, error)
 	// Acquire a row-level lock on the task inside an open transaction so that
 	// concurrent transition requests serialize correctly. Without FOR UPDATE two
 	// requests can read the same derived_state, both validate the transition,
@@ -2017,6 +2160,9 @@ type Querier interface {
 	LogMcpInvocation(ctx context.Context, arg LogMcpInvocationParams) (int64, error)
 	// Flip the row to claimed after ClaimNextAgentRun returns it.
 	MarkAgentRunClaimed(ctx context.Context, arg MarkAgentRunClaimedParams) error
+	// Complete the one-way provenance transition only when stored references
+	// exactly match the expected count, including explicitly captured emptiness.
+	MarkAiSuggestionBatchProvenanceValid(ctx context.Context, id uint32) (int64, error)
 	// Mark all unread notifications as read for a user in a workspace.
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) error
 	// Flip the rows returned by ClaimPendingDeliveries to the in-flight
@@ -2123,6 +2269,7 @@ type Querier interface {
 	RemoveProjectMemberByUserId(ctx context.Context, arg RemoveProjectMemberByUserIdParams) error
 	// Remove a task from a timebox.
 	RemoveTaskFromTimebox(ctx context.Context, arg RemoveTaskFromTimeboxParams) (int64, error)
+	RemoveTaskHumanActorForHandoff(ctx context.Context, arg RemoveTaskHumanActorForHandoffParams) (int64, error)
 	// Soft-remove a member from a workspace.
 	RemoveWorkspaceMember(ctx context.Context, arg RemoveWorkspaceMemberParams) (int64, error)
 	// Soft-remove a member keyed by user_id.
@@ -2172,6 +2319,7 @@ type Querier interface {
 	ResolveLensForExport(ctx context.Context, arg ResolveLensForExportParams) (ResolveLensForExportRow, error)
 	// Accept or dismiss a pending suggestion. Only transitions from 'pending'.
 	ResolveSuggestion(ctx context.Context, arg ResolveSuggestionParams) (int64, error)
+	ResolveTaskHandoff(ctx context.Context, arg ResolveTaskHandoffParams) (int64, error)
 	// Resolve a human-readable task reference (e.g. NF-42) to a task public_id.
 	// task-visibility: not-applicable — the only caller re-resolves the task it
 	// finds through the shared task ACL and returns the error before the title
@@ -2211,7 +2359,8 @@ type Querier interface {
 	SetIdentityMfaSecret(ctx context.Context, arg SetIdentityMfaSecretParams) error
 	// Link an intake item to a converted task. Matches only an item not yet
 	// converted, so a losing concurrent conversion counts zero rows and rolls
-	// its task back.
+	// its task back. Beyond UpdateIntakeItemTriage's claim it also accepts an
+	// item triaged as accepted, which the triage route forwards to conversion.
 	SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error)
 	// Revoke public sharing on a lens. Clears the token hash so the URL
 	// stops resolving and re-publishing has to mint a fresh token.
@@ -2317,6 +2466,9 @@ type Querier interface {
 	// Returns rows-affected so the handler can detect a not-found / wrong-workspace
 	// target (0 rows) instead of reporting a false success.
 	UpdateProviderKey(ctx context.Context, arg UpdateProviderKeyParams) (int64, error)
+	// Advance the actor's decision revision while the signal and decision rows
+	// are locked by the caller.
+	UpdateSuggestionDecision(ctx context.Context, arg UpdateSuggestionDecisionParams) (int64, error)
 	// Update mutable task fields. derived_state is intentionally NOT writable.
 	// updated_by_user_id is appended to the SET list so callers can attribute
 	// the edit; pass the acting user's internal id (NULL for system writers).
@@ -2335,6 +2487,7 @@ type Querier interface {
 	// old value. Treating zero as success leaves the agent loop budget frozen and
 	// the same handoff eligible for retry on the next pass.
 	UpdateTaskAgentMemo(ctx context.Context, arg UpdateTaskAgentMemoParams) (int64, error)
+	UpdateTaskCompletionPolicy(ctx context.Context, arg UpdateTaskCompletionPolicyParams) (int64, error)
 	// Update only the sort_weight for a single task within a workspace.
 	// Used by the bulk reorder endpoint inside a transaction.
 	// updated_by_user_id is appended so reorder edits are attributed to the

@@ -33,7 +33,10 @@ sql:
       - "queries/relation_suggestions"
       - "queries/signals"
       - "queries/storage-objects"
+      - "queries/suggestion-commands"
+      - "queries/suggestion-privacy"
       - "queries/task-event-links"
+      - "queries/task_workflow"
       - "queries/tasks"
       - "queries/timeboxes"
       - "queries/view-preferences"
@@ -109,6 +112,39 @@ sql:
           - column: "*.id"
             go_struct_tag: 'json:"-"'
           - column: "*.workspace_id"
+            go_struct_tag: 'json:"-"'
+          - column: "task_description_versions.author_agent_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.actor_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.principal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.proposal_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invocation_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.batch_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.requested_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submission_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.decided_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submitted_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.reviewer_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.pending_role_key"
             go_struct_tag: 'json:"-"'
           - column: "*.user_id"
             go_struct_tag: 'json:"-"'
@@ -464,6 +500,39 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.workspace_id"
             go_struct_tag: 'json:"-"'
+          - column: "task_description_versions.author_agent_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.actor_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.principal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.proposal_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invocation_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.batch_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.requested_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submission_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.decided_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submitted_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.reviewer_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.pending_role_key"
+            go_struct_tag: 'json:"-"'
           - column: "*.user_id"
             go_struct_tag: 'json:"-"'
           - column: "*.calendar_id"
@@ -708,6 +777,39 @@ sql:
           - column: "*.id"
             go_struct_tag: 'json:"-"'
           - column: "*.workspace_id"
+            go_struct_tag: 'json:"-"'
+          - column: "task_description_versions.author_agent_public_id"
+            go_type:
+              import: "github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+              package: "types"
+              type: "PublicID"
+          - column: "*.actor_avatar_storage_object_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.author_agent_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.principal_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.proposal_event_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.invocation_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.batch_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.from_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.to_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.requested_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submission_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.decided_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.submitted_by_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.reviewer_user_id"
+            go_struct_tag: 'json:"-"'
+          - column: "*.pending_role_key"
             go_struct_tag: 'json:"-"'
           - column: "*.user_id"
             go_struct_tag: 'json:"-"'

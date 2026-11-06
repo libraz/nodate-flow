@@ -57,6 +57,21 @@ type RenamedTask struct {
 // than refreshed here because this function only ever runs inside a
 // transaction the caller owns.
 func RenameItem(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTask, error) {
+	return renameItem(ctx, tx, args, humanEventActor(args.ActorUserID))
+}
+
+// RenameItemAsAgent propagates an agent-authored title across the linked
+// task and calendar events while keeping both event streams attributed to
+// that agent.
+func RenameItemAsAgent(ctx context.Context, tx TX, args RenameItemArgs, agentID uint32) (RenamedTask, error) {
+	actor, err := agentEventActor(args.ActorUserID, agentID)
+	if err != nil {
+		return RenamedTask{}, err
+	}
+	return renameItem(ctx, tx, args, actor)
+}
+
+func renameItem(ctx context.Context, tx TX, args RenameItemArgs, actor eventActor) (RenamedTask, error) {
 	// The zero Title is the one value the type cannot rule out, so the
 	// invariant stays: a caller that omits the field entirely still
 	// compiles.
@@ -74,12 +89,12 @@ func RenameItem(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTask, e
 	defer disarm()
 
 	if args.TaskID != 0 {
-		return renameFromTask(ctx, tx, args)
+		return renameFromTask(ctx, tx, args, actor)
 	}
-	return renameFromEvent(ctx, tx, args)
+	return renameFromEvent(ctx, tx, args, actor)
 }
 
-func renameFromTask(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTask, error) {
+func renameFromTask(ctx context.Context, tx TX, args RenameItemArgs, actor eventActor) (RenamedTask, error) {
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -95,7 +110,7 @@ func renameFromTask(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTas
 		args.NewTitle.String(), task.id); err != nil {
 		return RenamedTask{}, fmt.Errorf("itemkit: update linked event titles: %w", err)
 	}
-	if err := appendItemEvents(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, &args.ActorUserID, &task.id,
+	if err := actor.append(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, &task.id,
 		map[string]any{
 			"taskPublicId": task.publicID.String(),
 			"newTitle":     args.NewTitle.String(),
@@ -110,7 +125,7 @@ func renameFromTask(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTas
 	}, nil
 }
 
-func renameFromEvent(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTask, error) {
+func renameFromEvent(ctx context.Context, tx TX, args RenameItemArgs, actor eventActor) (RenamedTask, error) {
 	evt, err := findEventByID(ctx, tx, args.WorkspaceID, args.EventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -156,7 +171,7 @@ func renameFromEvent(ctx context.Context, tx TX, args RenameItemArgs) (RenamedTa
 			return RenamedTask{}, fmt.Errorf("itemkit: fan-out event rename to siblings: %w", err)
 		}
 	}
-	if err := appendItemEvents(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, &args.ActorUserID, taskPtr,
+	if err := actor.append(ctx, tx, eventbus.ItemRenamed, args.WorkspaceID, taskPtr,
 		map[string]any{
 			"eventPublicId": evt.publicID.String(),
 			"newTitle":      args.NewTitle.String(),

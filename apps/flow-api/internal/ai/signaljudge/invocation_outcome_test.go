@@ -55,7 +55,7 @@ func TestExecuteJudgeMetricsCarryTheOutcome(t *testing.T) {
 		t.Parallel()
 		prov := &recordingProvider{
 			kind: providers.Kind("mock"),
-			resp: &providers.Response{Text: validVerdict, InputTokens: 311, OutputTokens: 29},
+			resp: &providers.Response{Text: validVerdict, Termination: providers.TerminationComplete, InputTokens: 311, OutputTokens: 29},
 		}
 		var samples []metricSample
 		var logged []InvocationRecord
@@ -108,7 +108,7 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 		kind: providers.Kind("mock"),
 		script: []providerAnswer{
 			// Not a valid verdict, so the runner's single retry fires.
-			{resp: &providers.Response{Text: "sorry, I cannot comply", InputTokens: 200, OutputTokens: 5}},
+			{resp: &providers.Response{Text: "sorry, I cannot comply", Termination: providers.TerminationComplete, InputTokens: 200, OutputTokens: 5}},
 			{err: retryFailure},
 		},
 	}
@@ -116,8 +116,8 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 	var logged []InvocationRecord
 	r := newOutcomeRunner(prov, &samples, &logged)
 
-	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {
-		t.Fatalf("ExecuteJudge: %v", err)
+	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); !errors.Is(err, retryFailure) {
+		t.Fatalf("ExecuteJudge error = %v, want retry failure", err)
 	}
 	if len(prov.reqs) != 2 {
 		t.Fatalf("expected the parse-retry to make a second call, got %d", len(prov.reqs))
@@ -125,8 +125,8 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 	if len(samples) != 2 {
 		t.Fatalf("expected one metrics sample per provider call, got %d: %+v", len(samples), samples)
 	}
-	if samples[0].err != nil {
-		t.Errorf("the first attempt succeeded but reported err = %v", samples[0].err)
+	if !errors.Is(samples[0].err, providers.ErrResponseInvalidJSON) {
+		t.Errorf("the complete but malformed first answer reported err = %v, want invalid JSON", samples[0].err)
 	}
 	if !errors.Is(samples[1].err, retryFailure) {
 		t.Errorf("retry sample err = %v, want %v", samples[1].err, retryFailure)
@@ -148,6 +148,9 @@ func TestExecuteJudgeCountsAFailedRetry(t *testing.T) {
 	if len(logged) != 2 {
 		t.Fatalf("expected one ai_invocations record per provider call, got %d: %+v", len(logged), logged)
 	}
+	if logged[0].Status != "error" || logged[0].ErrorCode != "AI.RESPONSE.INVALID_JSON" {
+		t.Errorf("malformed first output must be audited as invalid JSON; got %+v", logged[0])
+	}
 	if logged[1].Status != "error" || logged[1].ErrorCode == "" {
 		t.Errorf("the failed retry must be audited as an error; got %+v", logged[1])
 	}
@@ -164,7 +167,7 @@ func TestExecuteJudgeCountsARetryThatAnsweredNothing(t *testing.T) {
 	prov := &recordingProvider{
 		kind: providers.Kind("mock"),
 		script: []providerAnswer{
-			{resp: &providers.Response{Text: "sorry, I cannot comply"}},
+			{resp: &providers.Response{Text: "sorry, I cannot comply", Termination: providers.TerminationComplete}},
 			{}, // nil response, nil error
 		},
 	}
@@ -172,8 +175,8 @@ func TestExecuteJudgeCountsARetryThatAnsweredNothing(t *testing.T) {
 	var logged []InvocationRecord
 	r := newOutcomeRunner(prov, &samples, &logged)
 
-	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err != nil {
-		t.Fatalf("ExecuteJudge: %v", err)
+	if _, err := r.ExecuteJudge(context.Background(), 6, 4, 2); err == nil {
+		t.Fatal("unusable first and retry outputs reported success")
 	}
 	if len(samples) != 2 {
 		t.Fatalf("expected one metrics sample per provider call, got %d: %+v", len(samples), samples)

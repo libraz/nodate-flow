@@ -40,14 +40,24 @@ type openAIReq struct {
 	MaxTokens int             `json:"max_tokens,omitempty"`
 	// Temperature is omitted when the caller did not choose one, leaving
 	// the model's own default in force.
-	Temperature *float64 `json:"temperature,omitempty"`
+	Temperature    *float64              `json:"temperature,omitempty"`
+	ResponseFormat *openAIResponseFormat `json:"response_format,omitempty"`
+}
+
+type openAIResponseFormat struct {
+	Type       string                 `json:"type"`
+	JSONSchema openAIJSONSchemaFormat `json:"json_schema"`
+}
+
+type openAIJSONSchemaFormat struct {
+	Name   string          `json:"name"`
+	Strict bool            `json:"strict"`
+	Schema json.RawMessage `json:"schema"`
 }
 
 type openAIResp struct {
-	Choices []struct {
-		Message openAIMessage `json:"message"`
-	} `json:"choices"`
-	Usage struct {
+	Choices []openAIChoice `json:"choices"`
+	Usage   struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 	} `json:"usage"`
@@ -55,6 +65,18 @@ type openAIResp struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 	} `json:"error,omitempty"`
+}
+
+type openAIChoice struct {
+	Message      openAIResponseMessage `json:"message"`
+	FinishReason string                `json:"finish_reason"`
+}
+
+type openAIResponseMessage struct {
+	Content      string            `json:"content"`
+	Refusal      *string           `json:"refusal"`
+	ToolCalls    []json.RawMessage `json:"tool_calls"`
+	FunctionCall json.RawMessage   `json:"function_call"`
 }
 
 func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, error) {
@@ -68,11 +90,31 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	}
 	msgs = append(msgs, openAIMessage{Role: "user", Content: req.Prompt})
 
+	modeEndpoint := p.baseURL
+	// New rejects a custom endpoint for KindOpenAI, so production instances
+	// of that kind always target the official API. Keeping the configured
+	// identity here also lets this package's wire tests substitute httptest.
+	if p.cfg.Kind == KindOpenAI {
+		modeEndpoint = defaultOpenAIBaseURL
+	}
+	outputMode, nativeSchema := nativeSchemaFor(p.cfg.Kind, model, modeEndpoint, req.Output)
+	var responseFormat *openAIResponseFormat
+	if outputMode == OutputModeNativeSchema {
+		responseFormat = &openAIResponseFormat{
+			Type: "json_schema",
+			JSONSchema: openAIJSONSchemaFormat{
+				Name:   req.Output.Contract(),
+				Strict: true,
+				Schema: nativeSchema,
+			},
+		}
+	}
 	body, err := json.Marshal(openAIReq{
-		Model:       model,
-		Messages:    msgs,
-		MaxTokens:   req.MaxTokens,
-		Temperature: req.Temperature,
+		Model:          model,
+		Messages:       msgs,
+		MaxTokens:      req.MaxTokens,
+		Temperature:    req.Temperature,
+		ResponseFormat: responseFormat,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai: marshal: %w", err)
@@ -112,17 +154,48 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if or.Error != nil {
 		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
-	if len(or.Choices) == 0 {
-		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
-	}
-	text := or.Choices[0].Message.Content
 	costMicros := EstimateCostMicrosUSD(model, or.Usage.PromptTokens, or.Usage.CompletionTokens)
-	return &Response{
+	out := &Response{
 		Model:        model,
-		Text:         text,
+		OutputMode:   outputMode,
 		InputTokens:  or.Usage.PromptTokens,
 		OutputTokens: or.Usage.CompletionTokens,
 		CostMicros:   costMicros,
 		CostCents:    costMicros / 10_000,
-	}, nil
+	}
+	// The exchange was billed even without a choice, so usage goes back with the error.
+	if len(or.Choices) == 0 {
+		return out, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
+	}
+	choice := or.Choices[0]
+	out.Text = choice.Message.Content
+	out.Termination, out.StopReason = classifyOpenAICompletion(choice)
+	return out, nil
+}
+
+func classifyOpenAICompletion(choice openAIChoice) (Termination, string) {
+	if choice.Message.Refusal != nil {
+		return TerminationRefused, "refusal"
+	}
+	reason := boundedStopReason(choice.FinishReason)
+	switch strings.ToLower(choice.FinishReason) {
+	case "content_filter", "refusal":
+		return TerminationRefused, reason
+	}
+	if len(choice.Message.ToolCalls) > 0 || (len(choice.Message.FunctionCall) > 0 && string(choice.Message.FunctionCall) != "null") {
+		if reason == "" {
+			reason = "tool_calls"
+		}
+		return TerminationIncomplete, reason
+	}
+	switch strings.ToLower(choice.FinishReason) {
+	case "stop":
+		return TerminationComplete, reason
+	case "length":
+		return TerminationIncomplete, reason
+	case "tool_calls", "function_call":
+		return TerminationIncomplete, reason
+	default:
+		return TerminationUnknown, reason
+	}
 }

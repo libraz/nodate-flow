@@ -70,57 +70,81 @@ func (q *Queries) CountInboxForUser(ctx context.Context, userID uint32) (int64, 
 	return total, err
 }
 
-const getInboxItemTaskVisible = `-- name: GetInboxItemTaskVisible :one
+const getInboxSignalForIntake = `-- name: GetInboxSignalForIntake :one
 SELECT
-  (
-    CAST(? AS SIGNED) = 1
-    OR v.task_internal_id IS NULL
-    OR v.task_visibility = 'public'
-    OR (v.task_visibility = 'project' AND EXISTS (
-      SELECT 1 FROM project_members pm_vis
-      WHERE pm_vis.project_id = v.task_project_id
-        AND pm_vis.user_id = CAST(? AS UNSIGNED)
-        AND pm_vis.enabled = TRUE
-    ))
-    OR (v.task_visibility = 'private' AND (
-      v.task_created_by_user_id = CAST(? AS UNSIGNED)
-      OR EXISTS (
-        SELECT 1 FROM task_actors ta_vis
-        WHERE ta_vis.task_id = v.task_internal_id
-          AND ta_vis.kind = 'user'
-          AND ta_vis.user_id = CAST(? AS UNSIGNED)
-          AND ta_vis.enabled = TRUE
-      )
-    ))
-  ) AS task_visible
-FROM v_inbox v
-WHERE v.workspace_id = ?
-  AND v.public_id = ?
+  s.id,
+  s.public_id,
+  s.workspace_id,
+  s.task_id,
+  s.source,
+  s.kind,
+  s.payload_json,
+  s.received_at
+FROM signals s
+WHERE s.workspace_id = ?
+  AND s.public_id = ?
+  AND s.enabled = TRUE
 LIMIT 1
+FOR UPDATE
 `
 
-type GetInboxItemTaskVisibleParams struct {
-	IsElevated  int64          `json:"isElevated"`
-	ActorUserID int64          `json:"actorUserId"`
+type GetInboxSignalForIntakeParams struct {
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Resolve one inbox item in a workspace and whether the reader may read
-// the task it points at. No row means the id names no inbox item here,
-// which is what an AI suggestion reaction has to refuse.
-func (q *Queries) GetInboxItemTaskVisible(ctx context.Context, arg GetInboxItemTaskVisibleParams) (sql.NullBool, error) {
-	row := q.db.QueryRowContext(ctx, getInboxItemTaskVisible,
-		arg.IsElevated,
-		arg.ActorUserID,
-		arg.ActorUserID,
-		arg.ActorUserID,
-		arg.WorkspaceID,
-		arg.PublicID,
+type GetInboxSignalForIntakeRow struct {
+	ID          uint32          `json:"-"`
+	PublicID    types.PublicID  `json:"publicId"`
+	WorkspaceID uint32          `json:"-"`
+	TaskID      sql.NullInt32   `json:"-"`
+	Source      SignalsSource   `json:"source"`
+	Kind        string          `json:"kind"`
+	PayloadJson json.RawMessage `json:"payloadJson"`
+	ReceivedAt  time.Time       `json:"receivedAt"`
+}
+
+// Load one active source signal inside the workspace whose membership the
+// caller already proved. Payload remains JSON data; source-specific display
+// fields are projected by the sourceintake package, never treated as HTML.
+func (q *Queries) GetInboxSignalForIntake(ctx context.Context, arg GetInboxSignalForIntakeParams) (GetInboxSignalForIntakeRow, error) {
+	row := q.db.QueryRowContext(ctx, getInboxSignalForIntake, arg.WorkspaceID, arg.PublicID)
+	var i GetInboxSignalForIntakeRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.TaskID,
+		&i.Source,
+		&i.Kind,
+		&i.PayloadJson,
+		&i.ReceivedAt,
 	)
-	var task_visible sql.NullBool
-	err := row.Scan(&task_visible)
-	return task_visible, err
+	return i, err
+}
+
+const linkInboxSignalToTask = `-- name: LinkInboxSignalToTask :execrows
+UPDATE signals
+SET task_id = ?
+WHERE workspace_id = ?
+  AND id = ?
+  AND task_id IS NULL
+`
+
+type LinkInboxSignalToTaskParams struct {
+	TaskID      sql.NullInt32 `json:"-"`
+	WorkspaceID uint32        `json:"-"`
+	ID          uint32        `json:"-"`
+}
+
+// Add a same-workspace task link without replacing an existing signal link.
+// Archived signals are linked too, matching LockSignalForIntakeConversion.
+func (q *Queries) LinkInboxSignalToTask(ctx context.Context, arg LinkInboxSignalToTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, linkInboxSignalToTask, arg.TaskID, arg.WorkspaceID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listInbox = `-- name: ListInbox :many
@@ -367,96 +391,51 @@ func (q *Queries) ListInboxForUser(ctx context.Context, arg ListInboxForUserPara
 	return items, nil
 }
 
-const listPendingAiSuggestionsForReader = `-- name: ListPendingAiSuggestionsForReader :many
+const lockSignalForIntakeConversion = `-- name: LockSignalForIntakeConversion :one
 SELECT
-  e.public_id,
-  e.occurred_at,
-  e.payload_json
-FROM events e
-INNER JOIN v_inbox v
-  ON v.workspace_id = e.workspace_id
- AND v.public_id = CASE
-       WHEN IS_UUID(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')))
-       THEN UUID_TO_BIN(JSON_UNQUOTE(JSON_EXTRACT(e.payload_json, '$.inbox_item_id')), 0)
-     END
-WHERE e.workspace_id = ?
-  AND e.type = 'ai.suggestion.proposed'
-  AND NOT EXISTS (
-    SELECT 1 FROM events e2
-    WHERE e2.workspace_id = e.workspace_id
-      AND e2.type IN ('ai.suggestion.applied', 'ai.suggestion.dismissed')
-      AND e2.id > e.id
-      AND JSON_EXTRACT(e2.payload_json, '$.inbox_item_id') = JSON_EXTRACT(e.payload_json, '$.inbox_item_id')
-  )
-  AND (
-    CAST(? AS SIGNED) = 1
-    OR v.task_internal_id IS NULL
-    OR v.task_visibility = 'public'
-    OR (v.task_visibility = 'project' AND EXISTS (
-      SELECT 1 FROM project_members pm_vis
-      WHERE pm_vis.project_id = v.task_project_id
-        AND pm_vis.user_id = CAST(? AS UNSIGNED)
-        AND pm_vis.enabled = TRUE
-    ))
-    OR (v.task_visibility = 'private' AND (
-      v.task_created_by_user_id = CAST(? AS UNSIGNED)
-      OR EXISTS (
-        SELECT 1 FROM task_actors ta_vis
-        WHERE ta_vis.task_id = v.task_internal_id
-          AND ta_vis.kind = 'user'
-          AND ta_vis.user_id = CAST(? AS UNSIGNED)
-          AND ta_vis.enabled = TRUE
-      )
-    ))
-  )
-ORDER BY e.occurred_at DESC
-LIMIT 100
+  s.id,
+  s.public_id,
+  s.workspace_id,
+  s.task_id,
+  s.source,
+  s.kind
+FROM signals s
+WHERE s.workspace_id = ?
+  AND s.id = ?
+LIMIT 1
+FOR UPDATE
 `
 
-type ListPendingAiSuggestionsForReaderParams struct {
+type LockSignalForIntakeConversionParams struct {
 	WorkspaceID uint32 `json:"-"`
-	IsElevated  int64  `json:"isElevated"`
-	ActorUserID int64  `json:"actorUserId"`
+	ID          uint32 `json:"-"`
 }
 
-type ListPendingAiSuggestionsForReaderRow struct {
-	PublicID    types.PublicID  `json:"publicId"`
-	OccurredAt  time.Time       `json:"occurredAt"`
-	PayloadJson json.RawMessage `json:"payloadJson"`
+type LockSignalForIntakeConversionRow struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	TaskID      sql.NullInt32  `json:"-"`
+	Source      SignalsSource  `json:"source"`
+	Kind        string         `json:"kind"`
 }
 
-// Pending AI triage suggestions a reader may see. A suggestion is pending
-// while no later applied / dismissed event names the same inbox item; it
-// is the reader's only while that item is still in the inbox and the task
-// it points at is one they may read, because the stored reasoning is the
-// model talking about that task.
-func (q *Queries) ListPendingAiSuggestionsForReader(ctx context.Context, arg ListPendingAiSuggestionsForReaderParams) ([]ListPendingAiSuggestionsForReaderRow, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingAiSuggestionsForReader,
-		arg.WorkspaceID,
-		arg.IsElevated,
-		arg.ActorUserID,
-		arg.ActorUserID,
-		arg.ActorUserID,
+// Lock the source association before locking its intake row and allocating
+// the conversion task. An archived signal still matches: archiving hides it
+// from the inbox, not from the intake it was captured into. task_id remains
+// independent of the original signal subject_type/subject_id pair.
+func (q *Queries) LockSignalForIntakeConversion(ctx context.Context, arg LockSignalForIntakeConversionParams) (LockSignalForIntakeConversionRow, error) {
+	row := q.db.QueryRowContext(ctx, lockSignalForIntakeConversion, arg.WorkspaceID, arg.ID)
+	var i LockSignalForIntakeConversionRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.TaskID,
+		&i.Source,
+		&i.Kind,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPendingAiSuggestionsForReaderRow{}
-	for rows.Next() {
-		var i ListPendingAiSuggestionsForReaderRow
-		if err := rows.Scan(&i.PublicID, &i.OccurredAt, &i.PayloadJson); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return i, err
 }
 
 const snoozeInboxItem = `-- name: SnoozeInboxItem :execrows

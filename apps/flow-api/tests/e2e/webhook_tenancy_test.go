@@ -76,6 +76,8 @@ func TestWebhookDeliveriesRouteToTheMappedWorkspace(t *testing.T) {
 
 	aliceRepo := randomRepoID()
 	bobRepo := randomRepoID()
+	grantInstanceAdmin(t, testDB, alice.UserPublicID)
+	grantInstanceAdmin(t, testDB, bob.UserPublicID)
 	createMapping(t, alice.AccessToken, alice.WorkspacePublicID, "github", fmt.Sprint(aliceRepo), "acme/alice")
 	createMapping(t, bob.AccessToken, bob.WorkspacePublicID, "github", fmt.Sprint(bobRepo), "acme/bob")
 
@@ -180,6 +182,7 @@ func TestGithubTaskMarkerCannotCrossWorkspaces(t *testing.T) {
 	handler := signals.HandleGithubWebhook(deps)
 
 	attackerRepo := randomRepoID()
+	grantInstanceAdmin(t, testDB, attacker.UserPublicID)
 	createMapping(t, attacker.AccessToken, attacker.WorkspacePublicID, "github", fmt.Sprint(attackerRepo), "acme/attacker")
 
 	status, out := callWebhook(t, handler,
@@ -241,6 +244,7 @@ func TestIntegrationMappingCrudIsWorkspaceScoped(t *testing.T) {
 
 	owner := newTenant(t)
 	other := newTenant(t)
+	grantInstanceAdmin(t, testDB, owner.UserPublicID)
 
 	repoID := fmt.Sprint(randomRepoID())
 	created := createMapping(t, owner.AccessToken, owner.WorkspacePublicID, "github", repoID, "acme/widgets")
@@ -258,8 +262,10 @@ func TestIntegrationMappingCrudIsWorkspaceScoped(t *testing.T) {
 	require.Len(t, list.Mappings, 1, "the workspace owns exactly the mapping it just created")
 	require.Equal(t, created.ID, list.Mappings[0].ID)
 
-	// Another workspace cannot claim the same source: an inbound delivery
-	// can only belong to one tenant.
+	// Another trusted instance admin cannot claim the same source: an inbound
+	// delivery can only belong to one tenant, and the unique claim remains
+	// instance-wide.
+	grantInstanceAdmin(t, testDB, other.UserPublicID)
 	status, raw := doJSONStatus(t, http.MethodPost,
 		testServerURL+"/workspaces/"+other.WorkspacePublicID+"/integration-mappings",
 		other.AccessToken,
@@ -321,6 +327,7 @@ func TestDisabledIntegrationMappingStopsRouting(t *testing.T) {
 	t.Parallel()
 
 	tt := newTenant(t)
+	grantInstanceAdmin(t, testDB, tt.UserPublicID)
 
 	deps := webhookDeps()
 	deps.GhWebhookSecret = ghSecret

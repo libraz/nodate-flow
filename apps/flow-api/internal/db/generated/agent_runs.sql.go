@@ -38,6 +38,7 @@ SELECT
   r.public_id,
   r.workspace_id,
   r.agent_id,
+  r.source_event_id,
   r.dedupe_key,
   r.scheduled_at,
   r.attempts
@@ -50,13 +51,14 @@ FOR UPDATE SKIP LOCKED
 `
 
 type ClaimNextAgentRunRow struct {
-	ID          uint32         `json:"-"`
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	AgentID     uint32         `json:"-"`
-	DedupeKey   string         `json:"dedupeKey"`
-	ScheduledAt time.Time      `json:"scheduledAt"`
-	Attempts    uint8          `json:"attempts"`
+	ID            uint32         `json:"-"`
+	PublicID      types.PublicID `json:"publicId"`
+	WorkspaceID   uint32         `json:"-"`
+	AgentID       uint32         `json:"-"`
+	SourceEventID sql.NullInt64  `json:"-"`
+	DedupeKey     string         `json:"dedupeKey"`
+	ScheduledAt   time.Time      `json:"scheduledAt"`
+	Attempts      uint8          `json:"attempts"`
 }
 
 // Pick the oldest pending run and mark it claimed in the same tx.
@@ -70,6 +72,7 @@ func (q *Queries) ClaimNextAgentRun(ctx context.Context) (ClaimNextAgentRunRow, 
 		&i.PublicID,
 		&i.WorkspaceID,
 		&i.AgentID,
+		&i.SourceEventID,
 		&i.DedupeKey,
 		&i.ScheduledAt,
 		&i.Attempts,
@@ -82,17 +85,19 @@ INSERT INTO agent_runs (
   public_id,
   workspace_id,
   agent_id,
+  source_event_id,
   dedupe_key,
   scheduled_at
-) VALUES (?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type EnqueueAgentRunParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	AgentID     uint32         `json:"-"`
-	DedupeKey   string         `json:"dedupeKey"`
-	ScheduledAt time.Time      `json:"scheduledAt"`
+	PublicID      types.PublicID `json:"publicId"`
+	WorkspaceID   uint32         `json:"-"`
+	AgentID       uint32         `json:"-"`
+	SourceEventID sql.NullInt64  `json:"-"`
+	DedupeKey     string         `json:"dedupeKey"`
+	ScheduledAt   time.Time      `json:"scheduledAt"`
 }
 
 // Atomically enqueue a new run. The UNIQUE constraint on dedupe_key
@@ -103,6 +108,7 @@ func (q *Queries) EnqueueAgentRun(ctx context.Context, arg EnqueueAgentRunParams
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.AgentID,
+		arg.SourceEventID,
 		arg.DedupeKey,
 		arg.ScheduledAt,
 	)

@@ -69,13 +69,19 @@ type googleContent struct {
 }
 
 type googlePart struct {
-	Text string `json:"text"`
+	Text         string          `json:"text"`
+	Thought      bool            `json:"thought"`
+	FunctionCall json.RawMessage `json:"functionCall"`
 }
 
 type googleResp struct {
 	Candidates []struct {
-		Content googleContent `json:"content"`
+		Content      googleContent `json:"content"`
+		FinishReason string        `json:"finishReason"`
 	} `json:"candidates"`
+	PromptFeedback struct {
+		BlockReason string `json:"blockReason"`
+	} `json:"promptFeedback"`
 	UsageMetadata struct {
 		PromptTokenCount     int `json:"promptTokenCount"`
 		CandidatesTokenCount int `json:"candidatesTokenCount"`
@@ -95,6 +101,7 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if req.System != "" {
 		prompt = req.System + "\n\n" + prompt
 	}
+	outputMode := outputModeFor(req.Output) // Gemini keeps its established text request dialect.
 	body, err := json.Marshal(googleReq{
 		Contents:         []googleContent{{Role: "user", Parts: []googlePart{{Text: prompt}}}},
 		GenerationConfig: generationConfig(req),
@@ -146,20 +153,59 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if gr.Error != nil {
 		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
-	if len(gr.Candidates) == 0 {
-		return nil, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
-	}
-	var text string
-	for _, part := range gr.Candidates[0].Content.Parts {
-		text += part.Text
-	}
 	costMicros := EstimateCostMicrosUSD(model, gr.UsageMetadata.PromptTokenCount, gr.UsageMetadata.CandidatesTokenCount)
-	return &Response{
+	out := &Response{
 		Model:        model,
-		Text:         text,
+		OutputMode:   outputMode,
 		InputTokens:  gr.UsageMetadata.PromptTokenCount,
 		OutputTokens: gr.UsageMetadata.CandidatesTokenCount,
 		CostMicros:   costMicros,
 		CostCents:    costMicros / 10_000,
-	}, nil
+	}
+	// The exchange was billed even without a candidate, so usage goes back with the error.
+	if len(gr.Candidates) == 0 && !googlePromptBlocked(gr.PromptFeedback.BlockReason) {
+		return out, &UpstreamError{Sentinel: ErrResponseSchemaMismatch, Status: resp.StatusCode}
+	}
+	var text string
+	var finishReason string
+	var parts []googlePart
+	if len(gr.Candidates) > 0 {
+		finishReason = gr.Candidates[0].FinishReason
+		parts = gr.Candidates[0].Content.Parts
+		for _, part := range parts {
+			if !part.Thought && len(part.FunctionCall) == 0 && part.Text != "" {
+				text += part.Text
+			}
+		}
+	}
+	out.Text = text
+	out.Termination, out.StopReason = classifyGoogleCompletion(finishReason, gr.PromptFeedback.BlockReason, parts)
+	return out, nil
+}
+
+func googlePromptBlocked(reason string) bool {
+	return reason != "" && reason != "BLOCK_REASON_UNSPECIFIED" && reason != "UNSPECIFIED"
+}
+
+func classifyGoogleCompletion(finishReason, blockReason string, parts []googlePart) (Termination, string) {
+	if googlePromptBlocked(blockReason) {
+		return TerminationRefused, boundedStopReason(blockReason)
+	}
+	switch finishReason {
+	case "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY":
+		return TerminationRefused, boundedStopReason(finishReason)
+	}
+	for _, part := range parts {
+		if len(part.FunctionCall) > 0 && string(part.FunctionCall) != "null" {
+			return TerminationIncomplete, "function_call"
+		}
+	}
+	switch finishReason {
+	case "STOP":
+		return TerminationComplete, "stop"
+	case "MAX_TOKENS":
+		return TerminationIncomplete, "max_tokens"
+	default:
+		return TerminationUnknown, boundedStopReason(finishReason)
+	}
 }

@@ -43,7 +43,9 @@ func TestSchedulerDispatchesDueJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(40 * time.Millisecond)
-	s.Stop()
+	if err := s.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
 
 	if run.count.Load() < 2 {
 		t.Fatalf("expected at least 2 runs, got %d", run.count.Load())
@@ -58,7 +60,9 @@ func TestSchedulerSkipsPaused(t *testing.T) {
 	defer cancel()
 	_ = s.Start(ctx)
 	time.Sleep(20 * time.Millisecond)
-	s.Stop()
+	if err := s.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
 	if run.count.Load() != 0 {
 		t.Fatalf("paused job should not run, got %d", run.count.Load())
 	}
@@ -72,7 +76,9 @@ func TestSchedulerCountsErrors(t *testing.T) {
 	defer cancel()
 	_ = s.Start(ctx)
 	time.Sleep(20 * time.Millisecond)
-	s.Stop()
+	if err := s.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
 	_, dispatched, errs := s.Stats()
 	if dispatched != 0 || errs == 0 {
 		t.Fatalf("expected errs>0 dispatched=0, got d=%d e=%d", dispatched, errs)
@@ -146,7 +152,7 @@ func TestSchedulerStartTwice(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	_ = s.Start(ctx)
-	defer s.Stop()
+	defer func() { _ = s.Shutdown(context.Background()) }()
 	if err := s.Start(ctx); !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("expected ErrAlreadyRunning, got %v", err)
 	}

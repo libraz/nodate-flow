@@ -54,7 +54,7 @@ func nested(body map[string]any, path ...string) any {
 // TestWireCasesCoverEveryKind keeps that the only gap.
 var wireCases = map[Kind]wireCase{
 	KindAnthropic: {
-		respBody: `{"content":[{"type":"text","text":"hi"}],"usage":{"input_tokens":1000,"output_tokens":500}}`,
+		respBody: `{"content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn","usage":{"input_tokens":1000,"output_tokens":500}}`,
 		model:    func(b map[string]any) any { return nested(b, "model") },
 		maxTokens: func(b map[string]any) any {
 			return nested(b, "max_tokens")
@@ -62,13 +62,13 @@ var wireCases = map[Kind]wireCase{
 		temperature: func(b map[string]any) any { return nested(b, "temperature") },
 	},
 	KindOpenAICompat: {
-		respBody:    `{"choices":[{"message":{"role":"assistant","content":"hi"}}],"usage":{"prompt_tokens":1000,"completion_tokens":500}}`,
+		respBody:    `{"choices":[{"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":500}}`,
 		model:       func(b map[string]any) any { return nested(b, "model") },
 		maxTokens:   func(b map[string]any) any { return nested(b, "max_tokens") },
 		temperature: func(b map[string]any) any { return nested(b, "temperature") },
 	},
 	KindGoogle: {
-		respBody: `{"candidates":[{"content":{"parts":[{"text":"hi"}]}}],"usageMetadata":{"promptTokenCount":1000,"candidatesTokenCount":500}}`,
+		respBody: `{"candidates":[{"content":{"parts":[{"text":"hi"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":1000,"candidatesTokenCount":500}}`,
 		// Gemini names the model in the URL path, not the body; the
 		// response assertion below covers it.
 		model:       func(map[string]any) any { return nil },
@@ -76,7 +76,7 @@ var wireCases = map[Kind]wireCase{
 		temperature: func(b map[string]any) any { return nested(b, "generationConfig", "temperature") },
 	},
 	KindOllama: {
-		respBody:    `{"response":"hi","prompt_eval_count":1000,"eval_count":500}`,
+		respBody:    `{"response":"hi","done":true,"done_reason":"stop","prompt_eval_count":1000,"eval_count":500}`,
 		model:       func(b map[string]any) any { return nested(b, "model") },
 		maxTokens:   func(b map[string]any) any { return nested(b, "options", "num_predict") },
 		temperature: func(b map[string]any) any { return nested(b, "options", "temperature") },
@@ -196,6 +196,12 @@ func TestRequestSettingsReachTheUpstreamCall(t *testing.T) {
 			// every invocation record and cost metric is attributed by.
 			if resp.Model != wantModel {
 				t.Errorf("Response.Model = %q, want %q", resp.Model, wantModel)
+			}
+			if resp.Termination != TerminationComplete {
+				t.Errorf("explicit stop signal = %q, want complete", resp.Termination)
+			}
+			if resp.OutputMode != OutputModeNone {
+				t.Errorf("request did not ask for structured output, but OutputMode = %q", resp.OutputMode)
 			}
 		})
 	}

@@ -378,3 +378,26 @@ func TestTailerIgnoresUnknownEventTypes(t *testing.T) {
 		t.Fatalf("unknown type was published: %v", rec.kinds())
 	}
 }
+
+// Writes from another process must refresh the same business views as local appends.
+func TestTailerPublishesWorkflowChangesFromAnotherProcess(t *testing.T) {
+	db := tailDB(t)
+	wsID, wsPub := seedWorkspace(t, db, "tail-workflow")
+	rec := &recorder{}
+	tl := newTestTailer(t, db, rec, nil)
+	kinds := []string{"signal.received", "intake.created", "agent.task.started", "agent.task.completed", "agent.task.failed", "ai.agent.updated"}
+	for _, kind := range kinds {
+		appendEvent(t, db, wsID, kind)
+	}
+	if _, _, err := tl.poll(context.Background(), tl.safeID); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.events) != len(kinds) {
+		t.Fatalf("published %d workflow hints, want %d", len(rec.events), len(kinds))
+	}
+	for _, evt := range rec.events {
+		if evt.Kind != KindTaskChanged || evt.WorkspaceID != wsPub {
+			t.Fatalf("unexpected workflow hint: %+v", evt)
+		}
+	}
+}

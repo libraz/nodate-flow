@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -34,7 +35,9 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/signals"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/router"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/importer"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/lifecycle"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	calendarnotifs "github.com/libraz/nodate-flow/apps/flow-api/internal/notifications"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
@@ -43,6 +46,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storagegc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskworkflow"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/webhook"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
@@ -61,6 +65,29 @@ const eventHookConcurrency = 8
 func main() {
 	logger := nflog.New(nflog.Config{})
 	slog.SetDefault(logger)
+
+	const shutdownBudget = 20 * time.Second
+	signalCtx, stopSignal := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignal()
+	workCtx, cancelWork := context.WithCancel(signalCtx)
+	defer cancelWork()
+	var stopOnce sync.Once
+	var stopDeadline time.Time
+	var stopDeadlineWatchdog func()
+	beginStop := func() time.Time {
+		stopOnce.Do(func() {
+			stopDeadline = time.Now().Add(shutdownBudget)
+			stopDeadlineWatchdog = startShutdownDeadlineWatchdog(stopDeadline, func() {
+				logger.Error("shutdown deadline expired before startup or drain completed")
+				os.Exit(1)
+			})
+			cancelWork()
+			stopSignal()
+		})
+		return stopDeadline
+	}
+	// The first signal fixes the deadline, even mid-startup; the coordinator inherits it.
+	stopSignalWatcher := context.AfterFunc(signalCtx, func() { beginStop() })
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -84,13 +111,6 @@ func main() {
 		logger.Error("otel tracer init failed", "err", err)
 		os.Exit(1)
 	}
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := traceShutdown(ctx); err != nil {
-			logger.Error("otel tracer shutdown failed", "err", err)
-		}
-	}()
 	if cfg.OtelEndpoint != "" {
 		logger.Info("otel tracing enabled", "endpoint", cfg.OtelEndpoint)
 	}
@@ -123,12 +143,9 @@ func main() {
 		logger.Error("db session timezone check failed", "err", err)
 		os.Exit(1)
 	}
-	defer db.Close()
-
-	// Start background DB connection pool metrics collector. The channel
-	// is closed during graceful shutdown to stop the polling goroutine.
-	dbStatsDone := make(chan struct{})
-	obs.StartDBStatsCollector(db, dbStatsDone)
+	// DB connection pool metrics collector. It outlives the residents and
+	// is stopped and waited in the shutdown's metrics phase.
+	dbStatsHandle := obs.StartDBStatsCollector(context.Background(), db)
 
 	queries := generated.New(db)
 	calendarQueries := calendar.New(db)
@@ -253,11 +270,10 @@ func main() {
 	// eventbus.Append, so the tap has to be told about them separately;
 	// nothing else reaches the bell live.
 	var notificationPublisher func(context.Context, uint32)
-	// Every resident loop below hands back one stopper, called in the
-	// shutdown sequence at the bottom of main. A no-op stands in while
-	// the feature that owns the loop is disabled, so the shutdown path
-	// does not have to know which loops were started.
-	stopStreamTail := func() {}
+	// Each resident loop below keeps a *bgloop.Handle, nil while the
+	// feature that owns it is disabled; the shutdown sequence at the
+	// bottom of main registers the non-nil ones.
+	var streamTailHandle *bgloop.Handle
 	if cfg.StreamEnabled {
 		// Prefer a Redis-backed notifier when the env asks for it and
 		// the binary was compiled with -tags redis; otherwise fall
@@ -288,7 +304,7 @@ func main() {
 		if cfg.StreamTail {
 			tailer := stream.NewTailer(db, notifier, tap)
 			tailer.SetInterval(cfg.StreamTailInterval)
-			stopStreamTail = bgloop.Start(context.Background(), "stream.tailer", logger, func(ctx context.Context) {
+			streamTailHandle = bgloop.StartManaged(workCtx, "stream.tailer", logger, func(ctx context.Context) {
 				if err := tailer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					logger.Warn("event tail stopped", "err", err)
 				}
@@ -310,7 +326,7 @@ func main() {
 			budget := ai.BudgetReaderFunc(func(ctx context.Context, wsID uint32) (int64, error) {
 				return queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, queries, wsID))
 			})
-			invocationLogger := router.NewDBInvocationLogger(queries, aiInvocationPublisher)
+			invocationLogger := router.NewDBInvocationLogger(db, aiInvocationPublisher)
 			executor = &ai.AgentExecutor{
 				Queries:      queries,
 				Resolver:     resolver,
@@ -365,23 +381,8 @@ func main() {
 				Resolver:     resolver,
 				Guard:        ai.NewCostGuard(budget, cfg.AiDailyBudgetCents),
 				OnInvocation: obs.RecordAIInvocation,
-				Log: func(ctx context.Context, rec signaljudge.InvocationRecord) {
-					invocationLogger(ctx, ai.InvocationRecord{
-						WorkspaceID:      rec.WorkspaceID,
-						AgentID:          rec.AgentID,
-						Purpose:          rec.Purpose,
-						Model:            rec.Model,
-						PromptRedacted:   rec.PromptRedacted,
-						ResponseRedacted: rec.ResponseRedacted,
-						TokensInput:      rec.TokensInput,
-						TokensOutput:     rec.TokensOutput,
-						CostMicros:       rec.CostMicros,
-						CostCents:        rec.CostCents,
-						Status:           rec.Status,
-						ErrorCode:        rec.ErrorCode,
-					})
-				},
-				Applier: judgeApplier,
+				Log:          invocationLogger,
+				Applier:      judgeApplier,
 				// Wire the four PromptDeps lookups so the runner
 				// renders the full context window (recent tasks +
 				// linked tasks + judge_instructions + the workspace's
@@ -565,6 +566,10 @@ func main() {
 	// Wrap the router with the request logger so the prod binary keeps
 	// its access logs; tests build the router directly without it.
 	outer := chi.NewRouter()
+	// Closed when srv begins shutting down, so open SSE streams end
+	// instead of holding Shutdown to its deadline.
+	streamsClosing := make(chan struct{})
+	outer.Use(lifecycle.WithStreamShutdown(streamsClosing))
 	outer.Use(nflog.RequestLogger(logger))
 	outer.Use(obs.TraceMiddleware())
 	outer.Use(obs.MetricsMiddleware())
@@ -582,10 +587,11 @@ func main() {
 		Handler:           metricsMux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	listenerErrors := make(chan error, 2)
 	go func() {
 		logger.Info("metrics server listening", "addr", metricsAddr)
 		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("metrics server exited", "err", err)
+			listenerErrors <- fmt.Errorf("metrics listener: %w", err)
 		}
 	}()
 
@@ -600,7 +606,7 @@ func main() {
 	}
 	scheduler.Queue = agentQueue
 	var agentWorkers []*agentruntime.Worker
-	var stopAgentWorkers []func()
+	var agentWorkerHandles []*bgloop.Handle
 	var agentPurger *agentruntime.Purger
 	workerCount := cfg.AgentWorkerCount
 	if workerCount <= 0 {
@@ -613,8 +619,8 @@ func main() {
 		// Supervised: the loop already survives claim failures, and
 		// bgloop covers what it cannot — a panic inside an agent run
 		// would otherwise take the whole process down with it.
-		stopAgentWorkers = append(stopAgentWorkers,
-			bgloop.Start(context.Background(), name, logger, w.Loop))
+		agentWorkerHandles = append(agentWorkerHandles,
+			bgloop.StartManaged(workCtx, name, logger, w.Loop))
 	}
 	logger.Info("agent workers started", "count", workerCount, "backend", cfg.AgentQueueBackend)
 	if cfg.AgentQueueBackend == "mysql" && cfg.AgentRunsPurgeInterval > 0 {
@@ -624,7 +630,7 @@ func main() {
 			Retention: cfg.AgentRunsRetention,
 			Logger:    logger,
 		}
-		if err := agentPurger.Start(context.Background()); err != nil {
+		if err := agentPurger.Start(workCtx); err != nil {
 			logger.Warn("agent_runs purger start failed", "err", err)
 		} else {
 			logger.Info("agent_runs purger started",
@@ -633,20 +639,18 @@ func main() {
 		}
 	}
 	_ = agentWorkers
-	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
-	defer schedulerCancel()
-	if err := scheduler.Start(schedulerCtx); err != nil {
+	if err := scheduler.Start(workCtx); err != nil {
 		logger.Warn("agent scheduler start failed", "err", err)
 	}
 
-	webhookWorker.Start(context.Background())
+	webhookWorker.Start(workCtx)
 
 	// Import worker: drains the import_jobs queue that
 	// POST /workspaces/{wsId}/imports fills. Without it a created job
 	// stays pending forever, and the UI reads a pending job as one that
 	// is still working.
 	importWorker := importer.NewWorker(db, queries, logger)
-	importWorker.Start(context.Background())
+	importWorker.Start(workCtx)
 
 	// Storage sweeper: reclaims upload reservations whose bytes never
 	// arrived, and rows an interrupted delete left unreferenced. Six
@@ -657,7 +661,7 @@ func main() {
 		// A bucket other than the one recorded for this database stops
 		// only the sweeper; each refused pass logs an error.
 		storageSweeper.Location = storagegc.Location(cfg.S3Endpoint, cfg.S3Bucket)
-		storageSweeper.Start(context.Background())
+		storageSweeper.Start(workCtx)
 	} else {
 		logger.Warn("storage sweeper disabled: no object store configured")
 	}
@@ -676,7 +680,7 @@ func main() {
 		HandoffLoopLimit: cfg.AgentHandoffLoopLimit,
 		Logger:           logger,
 	}
-	stopAutoAction := func() {}
+	var autoActionHandle *bgloop.Handle
 	if cfg.AutoActionInterval > 0 {
 		// Only supervised when it is actually enabled: Start returns at
 		// once when the interval is zero, and the supervisor would read
@@ -687,15 +691,15 @@ func main() {
 		// context, which is the one signal the executor's loop observes
 		// and the one the supervisor reads as deliberate rather than as
 		// a loop that died and needs bringing back mid-shutdown.
-		stopAutoAction = bgloop.Start(context.Background(), "autoactions.executor", logger, autoActionExec.Start)
+		autoActionHandle = bgloop.StartManaged(workCtx, "autoactions.executor", logger, autoActionExec.Start)
 	} else {
-		autoActionExec.Start(context.Background())
+		autoActionExec.Start(workCtx)
 	}
 
 	// Item-consistency reconciler: scans tasks and calendar_events for
 	// drift (date mismatch, orphan role, enabled-flag mismatch) and
 	// self-heals via UPDATE. 0 disables.
-	stopReconciler := func() {}
+	var reconcilerHandle *bgloop.Handle
 	if cfg.ItemReconcilerInterval > 0 {
 		rec := &reconciler.Reconciler{
 			DB:       db,
@@ -703,95 +707,121 @@ func main() {
 			Metrics:  obs.ReconcilerMetrics{},
 			Interval: cfg.ItemReconcilerInterval,
 		}
-		stopReconciler = bgloop.Start(context.Background(), "item.reconciler", logger, rec.Start)
+		reconcilerHandle = bgloop.StartManaged(workCtx, "item.reconciler", logger, rec.Start)
 		logger.Info("item reconciler started", "interval", cfg.ItemReconcilerInterval)
 	}
 
 	addr := ":" + cfg.Port
+	handoffExpiry := taskworkflow.NewHandoffExpiryRunner(db, queries, mutationlog.New(db, queries))
+	handoffExpiryHandle := bgloop.StartManaged(workCtx, "task.handoff_expiry", logger, func(ctx context.Context) {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			if _, err := handoffExpiry.RunOnce(ctx, time.Now(), 100); err != nil && ctx.Err() == nil {
+				logger.Error("handoff expiry failed", "err", err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	})
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           outer,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	// Graceful shutdown: on SIGINT / SIGTERM stop the scheduler, drain
-	// in-flight HTTP requests, then exit. A 20s hard deadline prevents
-	// a stuck handler from blocking the pod forever.
-	stopCtx, stopCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stopCancel()
+	srv.RegisterOnShutdown(sync.OnceFunc(func() { close(streamsClosing) }))
 
 	// Calendar event reminder ticker (relocated from time-api per ADR
 	// 0007). Scans calendar_events on a 1-minute interval, dispatches
 	// reminders through the shared notification fan-out so each
 	// attendee receives an in-app notification row, and marks
-	// notified_at to prevent duplicates. Its context descends from
-	// stopCtx, so a signal ends it; the stopper covers the other way out
-	// of the select below, where the listener returned on its own and no
-	// signal ever arrived.
-	stopCalendarReminders := bgloop.Start(stopCtx, "calendar.reminder_scheduler", logger, func(ctx context.Context) {
+	// notified_at to prevent duplicates. The same root work context ends it
+	// on signal and on a fatal listener exit.
+	calendarReminderHandle := bgloop.StartManaged(workCtx, "calendar.reminder_scheduler", logger, func(ctx context.Context) {
 		calendarnotifs.StartNotificationScheduler(ctx, db, notifFanout, time.Minute)
 	})
 
-	serverErr := make(chan error, 1)
 	go func() {
 		logger.Info("listening", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			serverErr <- err
+			listenerErrors <- fmt.Errorf("api listener: %w", err)
 		}
-		close(serverErr)
 	}()
 
+	var fatalListenerErr error
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			logger.Error("server exited", "err", err)
-			os.Exit(1)
-		}
-	case <-stopCtx.Done():
+	case err := <-listenerErrors:
+		fatalListenerErr = err
+		logger.Error("listener exited", "err", err)
+		beginStop()
+	case <-signalCtx.Done():
 		logger.Info("shutdown signal received")
+		beginStop()
 	}
 
-	// Every resident loop stops here rather than on return from main: a
-	// supervised loop whose context outlives its stop is restarted by
-	// its supervisor and spends the drain window ticking against a
-	// database pool that the rest of this sequence is closing.
-	scheduler.Stop()
-	stopAutoAction()
-	webhookWorker.Stop()
-	importWorker.Stop()
-	if storageSweeper != nil {
-		storageSweeper.Stop()
+	// Every resident is signaled before any Wait; all phases share the first-signal deadline.
+	deadline := beginStop()
+	residents := []lifecycle.Resident{
+		{BeginStop: scheduler.BeginStop, Wait: scheduler.Wait},
+		{BeginStop: webhookWorker.BeginStop, Wait: webhookWorker.Wait},
+		{BeginStop: importWorker.BeginStop, Wait: importWorker.Wait},
 	}
-	schedulerCancel()
-	stopReconciler()
-	stopCalendarReminders()
-	stopStreamTail()
-	for _, stop := range stopAgentWorkers {
-		stop()
+	if storageSweeper != nil {
+		residents = append(residents, lifecycle.Resident{BeginStop: storageSweeper.BeginStop, Wait: storageSweeper.Wait})
 	}
 	if agentPurger != nil {
-		agentPurger.Stop()
+		residents = append(residents, lifecycle.Resident{BeginStop: agentPurger.BeginStop, Wait: agentPurger.Wait})
 	}
+	addManaged := func(handle *bgloop.Handle) {
+		if handle != nil {
+			residents = append(residents, lifecycle.Resident{BeginStop: handle.Stop, Wait: handle.Wait})
+		}
+	}
+	addManaged(streamTailHandle)
+	for _, handle := range agentWorkerHandles {
+		addManaged(handle)
+	}
+	addManaged(autoActionHandle)
+	addManaged(reconcilerHandle)
+	addManaged(handoffExpiryHandle)
+	addManaged(calendarReminderHandle)
 
-	close(dbStatsDone)
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer shutdownCancel()
-	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("metrics server shutdown failed", "err", err)
+	shutdown := lifecycle.NewShutdown(lifecycle.ShutdownConfig{
+		Deadline:     deadline,
+		CancelWork:   cancelWork,
+		Servers:      []*http.Server{srv, metricsSrv},
+		Residents:    residents,
+		Hooks:        hookRunner,
+		StopMetrics:  dbStatsHandle.Stop,
+		DrainMetrics: dbStatsHandle.Wait,
+		DrainTracing: traceShutdown,
+		CloseDB:      db.Close,
+	})
+	shutdownCtx := shutdown.BeginStop()
+	shutdownErr := shutdown.Shutdown(shutdownCtx)
+	if shutdownErr != nil {
+		logger.Error("graceful shutdown failed", "err", shutdownErr)
 	}
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful shutdown failed", "err", err)
-		os.Exit(1)
-	}
-	// Drain the event-hook jobs (on_event dispatches, notification
-	// fan-out, webhook delivery rows, relation suggestions), queued ones
-	// included. The shutdown context already has a 20s budget shared
-	// with the HTTP server drain above; if it expires we log and move on.
-	if err := hookRunner.Shutdown(shutdownCtx); err != nil {
-		logger.Warn("event hook shutdown timed out", "err", err)
+	stopSignalWatcher()
+	if stopDeadlineWatchdog != nil {
+		stopDeadlineWatchdog()
 	}
 	logger.Info("shutdown complete")
+	if fatalListenerErr != nil || shutdownErr != nil {
+		os.Exit(1)
+	}
+}
+
+// shutdownWatchdogGrace is how long past the coordinator deadline the
+// watchdog waits, so the coordinator can report its own deadline error first.
+const shutdownWatchdogGrace = time.Second
+
+func startShutdownDeadlineWatchdog(deadline time.Time, onExpired func()) func() {
+	timer := time.AfterFunc(time.Until(deadline.Add(shutdownWatchdogGrace)), onExpired)
+	return func() { timer.Stop() }
 }
 
 // blobURLLabel domain-separates the blob-URL signing key from the master

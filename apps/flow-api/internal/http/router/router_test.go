@@ -105,6 +105,7 @@ func stubDepsWithServiceToken(t *testing.T) Deps {
 // match the route. Adding a new {param} to a route requires adding it
 // here.
 var pathPlaceholders = map[string]string{
+	"signalId":      "01HX000000000000000000000Z",
 	"actorId":       "01HX0000000000000000000000",
 	"agentId":       "01HX0000000000000000000001",
 	"aid":           "01HX0000000000000000000002",
@@ -137,7 +138,9 @@ var pathPlaceholders = map[string]string{
 	"schema":       "HealthOutputBody",
 	"shareId":      "01HX000000000000000000000X",
 	"snowflake":    "123456789012345678",
+	"submissionId": "01HX0000000000000000000002",
 	"suggestionId": "01HX000000000000000000000H",
+	"handoffId":    "01HX0000000000000000000003",
 	"taskId":       "01HX000000000000000000000I",
 	"timeboxId":    "01HX000000000000000000000J",
 	"token":        "share-token-stub",
@@ -436,6 +439,21 @@ var roleFloorExemptOps = map[string]aclExemption{
 		via:    auth.EnforcedByHandlerCall,
 		checks: []string{"resolve.WorkspaceMemberForWrite"},
 		note:   "workspace taken from the query string; the item is workspace-shared state, so the write floor keeps guests out of it",
+	},
+	"inbox-capture-intake": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"resolve.WorkspaceMemberForWrite"},
+		note:   "workspace capture changes shared intake state, so the handler enforces the workspace member write floor",
+	},
+	"tasks-submissions-decide": {
+		via:    auth.EnforcedByGroupMiddleware,
+		checks: []string{"middleware.RequireTaskAccess"},
+		note:   "the route is task scoped; the decision transaction additionally checks the selected current reviewer",
+	},
+	"tasks-human-handoffs-decide": {
+		via:    auth.EnforcedByGroupMiddleware,
+		checks: []string{"middleware.RequireTaskAccess"},
+		note:   "the route is task scoped; the decision transaction additionally checks the pending recipient",
 	},
 
 	// The suggestion's workspace and the caller's membership of it are

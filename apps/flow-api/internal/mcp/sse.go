@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/lifecycle"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
@@ -354,10 +355,13 @@ func (h *Handler) serveSSE(w http.ResponseWriter, r *http.Request) {
 	defer heartbeat.Stop()
 	revalidate := time.NewTicker(sseRevalidateInterval)
 	defer revalidate.Stop()
+	serverClosing := lifecycle.StreamShutdown(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-serverClosing:
 			return
 		case evt := <-conn.send:
 			if err := writeSSEEvent(w, flusher, evt); err != nil {

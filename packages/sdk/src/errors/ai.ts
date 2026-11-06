@@ -31,6 +31,16 @@ export const AiErrors = {
     status: 422,
     message: "Could not turn that into a filter",
   },
+  AI_OPERATION_KEY_CONFLICT: {
+    code: "AI.OPERATION.KEY_CONFLICT",
+    status: 409,
+    message: "The operation key was used for different arguments",
+  },
+  AI_PROPOSAL_INPUTS_CHANGED: {
+    code: "AI.PROPOSAL.INPUTS_CHANGED",
+    status: 409,
+    message: "The proposal inputs changed while it was being generated",
+  },
   AI_PROVIDER_BASE_URL_NOT_ALLOWED: {
     code: "AI.PROVIDER.BASE_URL_NOT_ALLOWED",
     status: 412,
@@ -76,10 +86,20 @@ export const AiErrors = {
     status: 502,
     message: "Could not reach AI provider",
   },
+  AI_RESPONSE_GENERATION_INCOMPLETE: {
+    code: "AI.RESPONSE.GENERATION_INCOMPLETE",
+    status: 502,
+    message: "AI generation ended before the response was complete",
+  },
   AI_RESPONSE_INVALID_JSON: {
     code: "AI.RESPONSE.INVALID_JSON",
     status: 502,
     message: "AI provider response was not valid JSON",
+  },
+  AI_RESPONSE_MODEL_REFUSED: {
+    code: "AI.RESPONSE.MODEL_REFUSED",
+    status: 422,
+    message: "The AI provider declined to generate this response",
   },
   AI_RESPONSE_SCHEMA_MISMATCH: {
     code: "AI.RESPONSE.SCHEMA_MISMATCH",
@@ -100,6 +120,16 @@ export const AiErrors = {
     code: "AI.REVERSE.TARGET_NOT_FOUND",
     status: 404,
     message: "Event not found in this workspace.",
+  },
+  AI_SUGGESTION_ALREADY_RESOLVED: {
+    code: "AI.SUGGESTION.ALREADY_RESOLVED",
+    status: 409,
+    message: "The suggestion has already been resolved",
+  },
+  AI_SUGGESTION_EVIDENCE_CHANGED: {
+    code: "AI.SUGGESTION.EVIDENCE_CHANGED",
+    status: 409,
+    message: "The suggestion evidence has changed",
   },
 } as const;
 

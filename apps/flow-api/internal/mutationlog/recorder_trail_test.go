@@ -8,12 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/testhelpers"
 )
@@ -23,8 +25,9 @@ var shared = testhelpers.NewSharedMySQL(testhelpers.MySQLConfig{Database: "mutat
 // tenant is one workspace and one member, which is everything either
 // log row needs to be insertable.
 type tenant struct {
-	workspaceID uint32
-	userID      uint32
+	workspaceID       uint32
+	workspacePublicID dbtype.PublicID
+	userID            uint32
 }
 
 func seed(ctx context.Context, t *testing.T, db *sql.DB) tenant {
@@ -43,15 +46,16 @@ func seed(ctx context.Context, t *testing.T, db *sql.DB) tenant {
 		return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
 	}
 
+	workspacePublicID := dbtype.New()
 	wsID := run(`INSERT INTO workspaces (public_id, slug, name, timezone) VALUES (?, ?, ?, 'UTC')`,
-		dbtype.New(), "ws-"+slugPart, "MutationLog "+suffix)
+		workspacePublicID, "ws-"+slugPart, "MutationLog "+suffix)
 	userID := run(`INSERT INTO users (public_id, email, display_name, locale, timezone)
 		VALUES (?, ?, ?, 'en', 'UTC')`,
 		dbtype.New(), "mutationlog+"+suffix+"@example.test", "MutationLog Tester")
 	run(`INSERT INTO workspace_members (public_id, workspace_id, user_id, role) VALUES (?, ?, ?, 'owner')`,
 		dbtype.New(), wsID, userID)
 
-	return tenant{workspaceID: wsID, userID: userID}
+	return tenant{workspaceID: wsID, workspacePublicID: workspacePublicID, userID: userID}
 }
 
 // counts is the pair of numbers every assertion in this file is about.
@@ -148,6 +152,183 @@ func TestRecordDescribesTheChangeTheSameWayInBothLogs(t *testing.T) {
 		tn.workspaceID, trailAction).Scan(&actorID))
 	require.True(t, actorID.Valid, "the audit row must name who made the change")
 	require.Equal(t, int32(tn.userID), actorID.Int32) //#nosec G115 -- seeded id, fits int32
+}
+
+func TestRecordAttributesAgentWithoutHumanActor(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	tn := seed(ctx, t, db)
+	agent := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent"})
+	rec := mutationlog.New(db, generated.New(db))
+	publicAgentID := agent.AgentPublicID
+
+	rec.Record(ctx, mutationlog.Actor{AgentID: agent.AgentID, WorkspaceID: tn.workspaceID}, mutationlog.Mutation{
+		EventType:    trailKind,
+		AuditAction:  trailAction,
+		ResourceType: "intake_item",
+		ResourceID:   dbtype.New().String(),
+		Payload:      map[string]any{"authorKind": "agent", "authorAgentId": publicAgentID},
+		CallSite:     "mutationlog_test.RecordAgent",
+	})
+
+	var eventUser, eventAgent sql.NullInt32
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT actor_user_id, actor_agent_id FROM events
+WHERE workspace_id = ? AND type = ? ORDER BY id DESC LIMIT 1`, tn.workspaceID, string(trailKind)).
+		Scan(&eventUser, &eventAgent))
+	require.False(t, eventUser.Valid, "agent event attribution must not invent a human actor")
+	require.True(t, eventAgent.Valid)
+	require.Equal(t, int64(agent.AgentID), int64(eventAgent.Int32))
+
+	var auditUser sql.NullInt32
+	var metadata string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT actor_user_id, metadata_json FROM audit_logs
+WHERE workspace_id = ? AND action = ? ORDER BY id DESC LIMIT 1`, tn.workspaceID, trailAction).
+		Scan(&auditUser, &metadata))
+	require.False(t, auditUser.Valid, "agent audit attribution must not use a delegator as author")
+	require.Contains(t, metadata, publicAgentID, "audit metadata carries the public agent identity")
+}
+
+func TestRecordRejectsConflictingAgentActorsAndDeduplicatesMatch(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	tn := seed(ctx, t, db)
+	agentA := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent A"})
+	agentB := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent B"})
+	rec := mutationlog.New(db, generated.New(db))
+	mutation := func() mutationlog.Mutation {
+		return mutationlog.Mutation{
+			EventType:    trailKind,
+			AuditAction:  trailAction,
+			ResourceType: "intake_item",
+			ResourceID:   dbtype.New().String(),
+			Payload:      map[string]any{"title": "agent change"},
+			CallSite:     "mutationlog_test.RecordAgentConflict",
+		}
+	}
+	before := trail(ctx, t, db, tn, trailKind, trailAction)
+
+	conflictingHumanAndAgent := mutation()
+	rec.Record(ctx, mutationlog.Actor{UserID: tn.userID, AgentID: agentA.AgentID, WorkspaceID: tn.workspaceID}, conflictingHumanAndAgent)
+	require.Equal(t, before, trail(ctx, t, db, tn, trailKind, trailAction),
+		"one actor cannot be both a human and an agent")
+
+	differentLegacyAgent := mutation()
+	legacyAgentID := int64(agentB.AgentID)
+	differentLegacyAgent.ActorAgentID = &legacyAgentID
+	rec.Record(ctx, mutationlog.Actor{AgentID: agentA.AgentID, WorkspaceID: tn.workspaceID}, differentLegacyAgent)
+	require.Equal(t, before, trail(ctx, t, db, tn, trailKind, trailAction),
+		"new and legacy agent attribution must agree")
+
+	sameLegacyAgent := mutation()
+	sameAgentID := int64(agentA.AgentID)
+	sameLegacyAgent.ActorAgentID = &sameAgentID
+	rec.Record(ctx, mutationlog.Actor{AgentID: agentA.AgentID, WorkspaceID: tn.workspaceID}, sameLegacyAgent)
+	after := trail(ctx, t, db, tn, trailKind, trailAction)
+	require.Equal(t, before.events+1, after.events, "matching legacy attribution is deduplicated")
+	require.Equal(t, before.audits+1, after.audits)
+	var eventAgent sql.NullInt32
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT actor_agent_id FROM events
+WHERE workspace_id = ? AND type = ? ORDER BY id DESC LIMIT 1`, tn.workspaceID, string(trailKind)).Scan(&eventAgent))
+	require.True(t, eventAgent.Valid)
+	require.Equal(t, int64(agentA.AgentID), int64(eventAgent.Int32))
+}
+
+func TestRecordInTxActorConflictReturnsErrorAndRollsBack(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	tn := seed(ctx, t, db)
+	agent := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent"})
+	rec := mutationlog.New(db, generated.New(db))
+	before := trail(ctx, t, db, tn, trailKind, trailAction)
+	hookCalled := false
+	var recordErr error
+
+	txErr := dbretry.InTx(ctx, db, "mutationlog_test.actor_conflict_rollback", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET display_name = 'partial mutation' WHERE id = ?`, tn.userID); err != nil {
+			return err
+		}
+		tx.AfterCommit(func() { hookCalled = true })
+		recordErr = rec.RecordInTx(ctx, tx,
+			mutationlog.Actor{UserID: tn.userID, AgentID: agent.AgentID, WorkspaceID: tn.workspaceID},
+			mutationlog.Mutation{
+				EventType: trailKind, AuditAction: trailAction, ResourceType: "intake_item",
+				ResourceID: dbtype.New().String(), CallSite: "mutationlog_test.ActorConflictRollback",
+			},
+		)
+		return recordErr
+	})
+
+	assert.Error(t, recordErr, "RecordInTx must report ambiguous human and agent attribution")
+	assert.ErrorIs(t, recordErr, mutationlog.ErrActorConflict)
+	assert.Error(t, txErr, "the enclosing transaction must fail with the recording error")
+	assert.ErrorIs(t, txErr, mutationlog.ErrActorConflict)
+	assert.Equal(t, before, trail(ctx, t, db, tn, trailKind, trailAction), "neither event nor audit row may be written")
+	var displayName string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT display_name FROM users WHERE id = ?`, tn.userID).Scan(&displayName))
+	assert.Equal(t, "MutationLog Tester", displayName, "the preceding domain update must roll back")
+	assert.False(t, hookCalled, "after-commit hooks must not fire for the rolled-back transaction")
+}
+
+func TestRecordInTxActorConflictCannotBeSwallowed(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	tn := seed(ctx, t, db)
+	agentA := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent A"})
+	agentB := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent B"})
+	rec := mutationlog.New(db, generated.New(db))
+	before := trail(ctx, t, db, tn, trailKind, trailAction)
+	legacyAgentID := int64(agentB.AgentID)
+	var recordErr error
+	hookCalled := false
+
+	txErr := dbretry.InTx(ctx, db, "mutationlog_test.actor_conflict_swallowed", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET display_name = 'partial mutation' WHERE id = ?`, tn.userID); err != nil {
+			return err
+		}
+		tx.AfterCommit(func() { hookCalled = true })
+		recordErr = rec.RecordInTx(ctx, tx,
+			mutationlog.Actor{AgentID: agentA.AgentID, WorkspaceID: tn.workspaceID},
+			mutationlog.Mutation{
+				EventType: trailKind, AuditAction: trailAction, ResourceType: "intake_item",
+				ResourceID: dbtype.New().String(), ActorAgentID: &legacyAgentID,
+				CallSite: "mutationlog_test.ActorConflictSwallowed",
+			},
+		)
+		return nil // Deliberately ignore RecordInTx's error; tx.Fail must forbid commit.
+	})
+
+	assert.Error(t, recordErr, "the new and legacy agent identities conflict")
+	assert.ErrorIs(t, recordErr, mutationlog.ErrActorConflict)
+	assert.Error(t, txErr, "ignoring the recording error must not allow commit")
+	assert.ErrorIs(t, txErr, mutationlog.ErrActorConflict)
+	assert.Equal(t, before, trail(ctx, t, db, tn, trailKind, trailAction), "neither event nor audit row may be written")
+	var displayName string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT display_name FROM users WHERE id = ?`, tn.userID).Scan(&displayName))
+	assert.Equal(t, "MutationLog Tester", displayName, "the preceding domain update must roll back")
+	assert.False(t, hookCalled, "after-commit hooks must not fire for the rolled-back transaction")
+}
+
+func TestRecordStrictReturnsErrorForConflictingAgentAttribution(t *testing.T) {
+	db := startDB(t)
+	ctx := context.Background()
+	tn := seed(ctx, t, db)
+	agentA := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent A"})
+	agentB := helpers.SeedAgent(t, db, tn.workspacePublicID.String(), helpers.SeedAgentOptions{Name: "Mutation Agent B"})
+	rec := mutationlog.New(db, generated.New(db))
+	before := trail(ctx, t, db, tn, trailKind, trailAction)
+	legacyAgentID := int64(agentB.AgentID)
+
+	err := rec.RecordStrict(ctx,
+		mutationlog.Actor{AgentID: agentA.AgentID, WorkspaceID: tn.workspaceID},
+		mutationlog.Mutation{
+			EventType: trailKind, AuditAction: trailAction, ResourceType: "intake_item",
+			ResourceID: dbtype.New().String(), ActorAgentID: &legacyAgentID,
+			CallSite: "mutationlog_test.StrictActorConflict",
+		},
+	)
+	assert.Error(t, err, "RecordStrict must expose the identity conflict")
+	assert.ErrorIs(t, err, mutationlog.ErrActorConflict)
+	assert.Equal(t, before, trail(ctx, t, db, tn, trailKind, trailAction), "no event or audit row may be written")
 }
 
 // TestRecordInTxLeavesBothTracesOnCommit covers the transactional entry

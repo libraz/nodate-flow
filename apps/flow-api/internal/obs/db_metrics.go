@@ -70,17 +70,12 @@ func RecordDBQuery(query string, duration time.Duration, err error) {
 	dbQueriesTotal.WithLabelValues(query, status).Inc()
 }
 
-// StartDBStatsCollector launches a background goroutine that polls db.Stats()
-// every 15 seconds and updates the nf_db_connections_open and
-// nf_db_connections_idle gauges. The goroutine exits when the provided done
-// channel is closed.
-func StartDBStatsCollector(db *sql.DB, done <-chan struct{}) {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-done
-		cancel()
-	}()
-	go bgloop.Run(ctx, "obs.db_stats", nil, func(ctx context.Context) {
+// StartDBStatsCollector supervises a loop that polls db.Stats() every 15
+// seconds and updates the nf_db_connections_open and
+// nf_db_connections_idle gauges. The loop ends when ctx is cancelled or
+// the returned handle is stopped; the handle's Wait reports when it has.
+func StartDBStatsCollector(ctx context.Context, db *sql.DB) *bgloop.Handle {
+	return bgloop.StartManaged(ctx, "obs.db_stats", nil, func(ctx context.Context) {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for {

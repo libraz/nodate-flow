@@ -28,6 +28,10 @@ var errPresignRaceLost = stderrors.New("tasks.PresignUpload: storage object race
 // errPresignInternal ends an attempt on a driver result that cannot be used.
 var errPresignInternal = stderrors.New("tasks.PresignUpload: no insert id")
 
+// errPresignTaskGone ends an attempt whose task was disabled or deleted
+// after the middleware resolved it.
+var errPresignTaskGone = stderrors.New("tasks.PresignUpload: task gone")
+
 // presignMaxAttempts bounds the duplicate-entry retry loop in
 // PresignUpload. We restart the transaction (not just the SELECT)
 // when InsertStorageObject hits MySQL 1062, because the same
@@ -118,6 +122,19 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				storageKey = baseStorageKey
 				deduplicated = false
 
+				// Task row first: the attachment insert takes a shared FK lock
+				// on it and the work-revision trigger then needs it exclusively,
+				// so two presigns on one task would otherwise deadlock.
+				if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+					ID:          task.ID,
+					WorkspaceID: ws.ID,
+				}); err != nil {
+					if stderrors.Is(err, sql.ErrNoRows) {
+						return errPresignTaskGone
+					}
+					return err
+				}
+
 				existing, findErr := qtx.FindStorageObjectByWorkspaceSha(ctx, generated.FindStorageObjectByWorkspaceShaParams{
 					WorkspaceID: handlerutil.NullInt32From(ws.ID),
 					Sha256:      shaBytes,
@@ -199,6 +216,8 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 				committed = true
 			case stderrors.Is(txErr, errPresignRaceLost):
 				continue
+			case stderrors.Is(txErr, errPresignTaskGone):
+				return nil, httpErr(apierrors.WsTaskNotFound)
 			default:
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}

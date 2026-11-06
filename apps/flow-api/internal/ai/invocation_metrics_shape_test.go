@@ -36,7 +36,7 @@ func TestInvocationMetricsCarryTokensAndLatency(t *testing.T) {
 		prov := &labelProvider{
 			model: "claude-sonnet-4-6",
 			delay: providerDelay,
-			resp: &providers.Response{
+			resp: &providers.Response{Termination: providers.TerminationComplete,
 				Model:        "claude-sonnet-4-6",
 				Text:         `[{"title":"t","description":"d","priority":"low"}]`,
 				InputTokens:  wantIn,

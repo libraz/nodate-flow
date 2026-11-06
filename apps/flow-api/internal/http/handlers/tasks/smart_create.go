@@ -71,6 +71,7 @@ type ApplySmartInput struct {
 		ProjectID       string              `json:"projectId" minLength:"1"`
 		Title           string              `json:"title" minLength:"1" maxLength:"500"`
 		Description     string              `json:"description,omitempty" maxLength:"50000"`
+		DueOn           string              `json:"dueOn,omitempty" doc:"YYYY-MM-DD"`
 		Priority        int32               `json:"priority" minimum:"0" maximum:"4"`
 		AssigneeUserIDs []string            `json:"assigneeUserIds,omitempty"`
 		Subtasks        []ApplySmartSubtask `json:"subtasks,omitempty"`
@@ -186,6 +187,10 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 		if spec := handlerutil.RequireProjectRole(ctx, deps.DB, ws.ID, prj.ID, actorID, acl.ProjectRoleEditor); spec != nil {
 			return nil, httpErr(spec)
 		}
+		dueOn, err := parseDateOrNullTime(in.Body.DueOn)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
+		}
 
 		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		var (
@@ -229,6 +234,7 @@ func ApplySmart(deps SmartCreateDeps) func(context.Context, *ApplySmartInput) (*
 				Title:       parentTitle,
 				Description: sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
 				Priority:    in.Body.Priority,
+				DueOn:       dueOn,
 			})
 			if err != nil {
 				return err

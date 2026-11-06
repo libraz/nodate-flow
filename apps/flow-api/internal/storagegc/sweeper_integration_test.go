@@ -333,3 +333,40 @@ func newTestSweeperAt(db *sql.DB, store storagegc.ObjectRemover, location string
 	s.Location = location
 	return s
 }
+
+// cancellingRemover cancels the pass while the object store is removing
+// one chosen key, the moment a shutdown would land mid-reclaim.
+type cancellingRemover struct {
+	recordingRemover
+	at     string
+	cancel context.CancelFunc
+}
+
+func (r *cancellingRemover) RemoveObject(ctx context.Context, key string) error {
+	if key == r.at {
+		r.cancel()
+	}
+	return r.recordingRemover.RemoveObject(ctx, key)
+}
+
+// TestSweeperFinishesInFlightReclaimWhenStopped: a cancelled pass stops
+// between objects, but the one whose blob is already gone is committed.
+// Rolling it back would leave a row naming a key the store no longer has.
+func TestSweeperFinishesInFlightReclaimWhenStopped(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	wsID, _ := seedWorkspace(t, db)
+
+	inFlight, inFlightKey := plantObject(t, db, wsID, object{confirmed: true, age: time.Hour})
+	later, _ := plantObject(t, db, wsID, object{confirmed: true, age: time.Hour})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	store := &cancellingRemover{at: inFlightKey, cancel: cancel}
+	_, err := newTestSweeper(db, store).RunOnce(ctx)
+	require.ErrorIs(t, err, context.Canceled, "the pass must stop once cancelled")
+
+	require.True(t, store.removed(inFlightKey))
+	require.False(t, objectExists(t, db, inFlight), "the object whose blob was removed must be committed away")
+	require.True(t, objectExists(t, db, later), "no object may be reclaimed after the pass was cancelled")
+}

@@ -40,6 +40,8 @@ func mapDescriptionVersionRow(r generated.ListDescriptionVersionsRow) Descriptio
 		VersionNumber:     int(r.VersionNumber),
 		AuthorID:          handlerutil.PublicIDOrEmpty(r.AuthorPublicID),
 		AuthorDisplayName: nullStr(r.AuthorDisplayName),
+		AuthorAgentID:     handlerutil.PublicIDOrEmpty(r.AuthorAgentPublicID),
+		AuthorAgentName:   r.AuthorAgentName,
 		BodyLength:        int(r.BodyLength),
 		CreatedAt:         r.CreatedAt.Unix(),
 	}
@@ -53,6 +55,8 @@ func mapDescriptionVersionFull(r generated.FindDescriptionVersionRow) Descriptio
 			VersionNumber:     int(r.VersionNumber),
 			AuthorID:          handlerutil.PublicIDOrEmpty(r.AuthorPublicID),
 			AuthorDisplayName: nullStr(r.AuthorDisplayName),
+			AuthorAgentID:     handlerutil.PublicIDOrEmpty(r.AuthorAgentPublicID),
+			AuthorAgentName:   r.AuthorAgentName,
 			BodyLength:        int(r.BodyLength),
 			CreatedAt:         r.CreatedAt.Unix(),
 		},

@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
-	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // ErrBudgetExceeded is returned by CompileLens when the workspace has
@@ -32,31 +29,16 @@ type CostGuard interface {
 // signature matches ai.InvocationLogger so production wiring can pass the
 // same logger used by the orchestrator and ai_invocations stays a single,
 // uniform audit + cost surface.
-type InvocationLogger func(ctx context.Context, rec InvocationRecord)
+type InvocationLogger = ai.InvocationLogger
 
 // InvocationRecord is the redacted ai_invocations payload. Field shape
 // mirrors ai.InvocationRecord so callers pass a shared logger without
 // translating between two structs.
-type InvocationRecord struct {
-	WorkspaceID      uint32
-	Purpose          string
-	Model            string
-	PromptRedacted   string
-	ResponseRedacted string
-	TokensInput      int
-	TokensOutput     int
-	CostMicros       int64
-	CostCents        int64
-	Status           string
-	ErrorCode        string
-}
+type InvocationRecord = ai.InvocationRecord
 
-// InvocationMetricsHook is called after each LLM provider call. Same
-// shape as ai.InvocationMetricsHook so obs.RecordAIInvocation is reused
-// without an adapter. elapsed measures the provider call alone; the token
-// counts come from the response and are 0 on a failure. err is nil on a
-// successful call and carries the provider's error on a failed one.
-type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
+// InvocationMetricsHook aliases [ai.InvocationMetricsHook]; decoded usage is
+// reported even when the output is rejected.
+type InvocationMetricsHook = ai.InvocationMetricsHook
 
 // compileLensSystem is the system prompt sent to the LLM when compiling
 // natural-language prose into a Lens JSON object. The closed field /
@@ -143,58 +125,6 @@ func (w *WorkspaceProvider) WithMetering(guard CostGuard, log InvocationLogger, 
 	return w
 }
 
-// logSuccess records the redacted invocation + cost metric after a
-// successful provider call.
-//
-// promptRedacted is stored as it arrives. ai_invocations is served to
-// every member of the workspace, so the combined system + user prompt is
-// scrubbed by logutil.Redact where it is built, once: redacting again
-// here would nest a marker inside the replacement text of the first pass
-// ("sk-" inside "[REDACTED:sk-]" matches the scanner again).
-func (w *WorkspaceProvider) logSuccess(ctx context.Context, wsID uint32, model, promptRedacted string, resp *providers.Response, kind string, elapsed time.Duration) {
-	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), elapsed, nil)
-	}
-	if w.LogInvoke != nil {
-		loggedModel := resp.Model
-		if loggedModel == "" {
-			loggedModel = model
-		}
-		w.LogInvoke(ctx, InvocationRecord{
-			WorkspaceID:      wsID,
-			Purpose:          "compile_lens",
-			Model:            loggedModel,
-			PromptRedacted:   promptRedacted,
-			ResponseRedacted: logutil.Redact(resp.Text),
-			TokensInput:      resp.InputTokens,
-			TokensOutput:     resp.OutputTokens,
-			CostMicros:       resp.EstimatedCostMicros(),
-			CostCents:        resp.EstimatedCostCents(),
-			Status:           "ok",
-		})
-	}
-}
-
-// logFailure records the redacted invocation + zero-cost metric after a
-// failed provider call. This row has the same workspace-wide audience as
-// the successful one, so promptRedacted arrives already scrubbed here
-// too; see [WorkspaceProvider.logSuccess].
-func (w *WorkspaceProvider) logFailure(ctx context.Context, wsID uint32, model, promptRedacted string, callErr error, kind string, elapsed time.Duration) {
-	if w.OnInvocation != nil {
-		w.OnInvocation(kind, model, 0, 0, 0, elapsed, callErr)
-	}
-	if w.LogInvoke != nil {
-		w.LogInvoke(ctx, InvocationRecord{
-			WorkspaceID:    wsID,
-			Purpose:        "compile_lens",
-			Model:          model,
-			PromptRedacted: promptRedacted,
-			Status:         "error",
-			ErrorCode:      logutil.Redact(callErr.Error()),
-		})
-	}
-}
-
 // CompileLens implements Provider. It resolves the workspace's default LLM
 // provider from the request context, sends the system prompt + user prose,
 // and returns the raw response bytes.
@@ -228,23 +158,17 @@ func (w *WorkspaceProvider) CompileLens(ctx context.Context, prompt string) ([]b
 		System:    compileLensSystem,
 		Prompt:    prompt,
 		MaxTokens: 1024,
+		Output:    lensOutputSpec,
 	})
-	promptRedacted := logutil.Redact(strings.TrimSpace(req.System + "\n" + req.Prompt))
-	// time.Since is taken inside each branch rather than bound to a local
-	// here: the latency this reports must cover the provider call and
-	// nothing else, and the error check has to stay adjacent to the call
-	// it checks.
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	var output []byte
+	accounting := &ai.Orchestrator{LogInvoke: w.LogInvoke, OnInvocation: w.OnInvocation}
+	_, err = accounting.CompleteAndRecord(ctx, wsID, "compile_lens", prov, req, func(resp *providers.Response) error {
+		var err error
+		output, err = validateLensOutput(resp)
+		return err
+	})
 	if err != nil {
-		w.logFailure(ctx, wsID, req.Model, promptRedacted, err, string(prov.Kind()), time.Since(start))
 		return nil, fmt.Errorf("nlquery: provider call failed: %w", err)
 	}
-	w.logSuccess(ctx, wsID, req.Model, promptRedacted, resp, string(prov.Kind()), time.Since(start))
-
-	text := strings.TrimSpace(resp.Text)
-	if text == "" {
-		return nil, ErrUnparseable
-	}
-	return []byte(text), nil
+	return output, nil
 }

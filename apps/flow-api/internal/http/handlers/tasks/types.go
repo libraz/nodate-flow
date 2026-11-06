@@ -186,6 +186,8 @@ type TaskActor struct {
 type TaskComment struct {
 	ID                string `json:"id"`
 	AuthorID          string `json:"authorId"`
+	AuthorKind        string `json:"authorKind,omitempty"`
+	AuthorAgentID     string `json:"authorAgentId,omitempty"`
 	AuthorDisplayName string `json:"authorDisplayName"`
 	AuthorAvatarURL   string `json:"authorAvatarUrl,omitempty"`
 	Body              string `json:"body"`
@@ -1078,6 +1080,8 @@ type DescriptionVersion struct {
 	VersionNumber     int    `json:"versionNumber"`
 	AuthorID          string `json:"authorId,omitempty"`
 	AuthorDisplayName string `json:"authorDisplayName,omitempty"`
+	AuthorAgentID     string `json:"authorAgentId,omitempty"`
+	AuthorAgentName   string `json:"authorAgentName,omitempty"`
 	BodyLength        int    `json:"bodyLength"`
 	CreatedAt         int64  `json:"createdAt"`
 }

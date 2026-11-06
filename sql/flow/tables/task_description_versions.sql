@@ -9,6 +9,9 @@ CREATE TABLE task_description_versions (
   workspace_id   INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to workspaces.id',
   task_id        INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to tasks.id',
   author_user_id INT UNSIGNED NULL                       COMMENT 'User who authored this version',
+  author_agent_id INT UNSIGNED NULL                      COMMENT 'Agent who authored this version',
+  author_agent_public_id BINARY(16) NULL                  COMMENT 'Agent public byline retained after deletion',
+  author_agent_name VARCHAR(255) NULL                     COMMENT 'Agent name retained after deletion',
 
   version_number INT UNSIGNED NOT NULL                   COMMENT 'Monotonically increasing per task',
   body           MEDIUMTEXT NOT NULL                     COMMENT 'Full description snapshot',
@@ -27,5 +30,6 @@ CREATE TABLE task_description_versions (
 
   CONSTRAINT fk_task_desc_versions_workspace FOREIGN KEY (workspace_id)   REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_desc_versions_task      FOREIGN KEY (task_id)        REFERENCES tasks(id)      ON DELETE CASCADE,
-  CONSTRAINT fk_task_desc_versions_author    FOREIGN KEY (author_user_id) REFERENCES users(id)      ON DELETE SET NULL
+  CONSTRAINT fk_task_desc_versions_author    FOREIGN KEY (author_user_id) REFERENCES users(id)      ON DELETE SET NULL,
+  CONSTRAINT fk_task_desc_versions_agent     FOREIGN KEY (author_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task description version history (full snapshots)';

@@ -169,7 +169,7 @@ func TestConcurrentPatchesOfDifferentFieldsBothPersist(t *testing.T) {
 }
 
 // TestConcurrentIntakeConvertCreatesOneTask: an item converts at most
-// once; the losers create no task and record nothing.
+// once; the losers replay the winner's task and record nothing.
 func TestConcurrentIntakeConvertCreatesOneTask(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -180,8 +180,7 @@ func TestConcurrentIntakeConvertCreatesOneTask(t *testing.T) {
 	url := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/intake/" + itemID + "/convert"
 	convert := raceCall{http.MethodPost, url, tt.AccessToken, map[string]any{"projectId": tt.ProjectPublicID}}
 	statuses := raceRequests(t, []raceCall{convert, convert, convert})
-	require.Equal(t, 1, countStatus(statuses, http.StatusOK), "exactly one conversion may win: %v", statuses)
-	require.Equal(t, 2, countStatus(statuses, http.StatusConflict), "the losers must be told it was converted: %v", statuses)
+	require.Equal(t, 3, countStatus(statuses, http.StatusOK), "the losers must replay the converted task: %v", statuses)
 
 	var tasks int
 	require.NoError(t, testDB.QueryRow(`SELECT COUNT(*) FROM tasks WHERE title = ?`, title).Scan(&tasks))

@@ -53,12 +53,24 @@ type Request struct {
 	// deterministic sampling) stays distinguishable from "unset"; a plain
 	// float64 would make the zero value silently request greedy decoding.
 	Temperature *float64
+	// Output asks the provider to return one value for a static server-owned
+	// JSON output contract. Providers may use a verified native schema dialect
+	// or keep the existing text request and let the caller validate locally.
+	Output *OutputSpec
 }
 
 // Response is a minimal LLM call result.
 type Response struct {
-	Model        string
-	Text         string
+	Model string
+	Text  string
+	// Termination is explicit protocol evidence about whether generation
+	// stopped normally. Its zero value is unknown and must never be treated
+	// as a complete answer.
+	Termination Termination
+	// StopReason is a bounded protocol reason, when the provider supplied one.
+	StopReason string
+	// OutputMode records how a requested structured output was delivered.
+	OutputMode   OutputMode
 	InputTokens  int
 	OutputTokens int
 	// CostMicros is what the call cost, in millionths of a US dollar, as

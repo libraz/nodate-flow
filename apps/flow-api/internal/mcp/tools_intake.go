@@ -17,6 +17,7 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sourceintake"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
@@ -204,10 +205,9 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	// A fast answer only: the conditional link UPDATE inside the
-	// transaction is the claim.
+	// A replay returns the converted task under current visibility, as REST does.
 	if item.TaskID.Valid {
-		return nil, apierrors.New(apierrors.WsIntakeAlreadyConverted)
+		return convertedTaskResult(ctx, deps, s, item.TaskID)
 	}
 
 	// Converting writes a task into the target project, so the actor must be
@@ -216,30 +216,146 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 	if err != nil {
 		return nil, err
 	}
-
-	// The converted task takes the item's title, so it faces the rule
-	// every other task title faces. An item whose title is blank has
-	// nothing to convert into.
-	title, err := taskrules.NewTitle(item.Title)
+	prjPub, err := types.Parse(in.ProjectID)
 	if err != nil {
-		return nil, translateTaskRuleError(err)
+		return nil, apierrors.New(apierrors.WsProjectNotFound)
 	}
 
 	var (
-		taskPub  types.PublicID
-		taskID   int64
-		answered error
+		taskPub      types.PublicID
+		taskID       int64
+		answered     error
+		replayTaskID sql.NullInt32
+		adopted      sourceintake.LinkTarget
+		lockedSignal generated.LockSignalForIntakeConversionRow
+		signalLocked bool
+		taskTitle    taskrules.Title
+		taskBody     sql.NullString
 	)
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.convert_intake_to_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
+		replayTaskID = sql.NullInt32{}
+		adopted = sourceintake.LinkTarget{}
+		taskPub = types.PublicID{}
+		taskID = 0
+		taskTitle = taskrules.Title{}
+		taskBody = sql.NullString{}
+		lockedSignal = generated.LockSignalForIntakeConversionRow{}
+		signalLocked = false
+		qtx := deps.Queries.WithTx(tx.RawTx())
+
 		// An intake item is a workspace-level inbox entry with no audience of
 		// its own, so the converted task takes the workspace default, exactly
-		// as REST intake.Convert does.
+		// as REST intake.Convert does. Establish the same lock order: project
+		// allocation, optional source signal, then the current intake row.
+		if err := taskcreate.LockProject(ctx, tx, s.workspaceID, prjID); err != nil {
+			return err
+		}
+		if item.SignalID.Valid {
+			locked, lockErr := qtx.LockSignalForIntakeConversion(ctx, generated.LockSignalForIntakeConversionParams{
+				WorkspaceID: s.workspaceID,
+				ID:          uint32(item.SignalID.Int32), //#nosec G115 -- signal_id is INT UNSIGNED and fits uint32 in supported deployments
+			})
+			if lockErr != nil && !stderrors.Is(lockErr, sql.ErrNoRows) {
+				return lockErr
+			}
+			if lockErr == nil {
+				lockedSignal = locked
+				signalLocked = true
+			}
+		}
+
+		current, err := qtx.FindIntakeItemForConversion(ctx, generated.FindIntakeItemForConversionParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+		if err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				answered = apierrors.New(apierrors.WsIntakeNotFound)
+				return answered
+			}
+			return err
+		}
+		if current.SignalID.Valid {
+			if !item.SignalID.Valid || current.SignalID.Int32 != item.SignalID.Int32 || !signalLocked {
+				answered = apierrors.New(apierrors.WsInboxNotFound)
+				return answered
+			}
+		} else {
+			signalLocked = false
+		}
+		if current.TaskID.Valid {
+			replayTaskID = current.TaskID
+			return nil
+		}
+		if !sourceintake.Linkable(current.TriageStatus, current.SnoozeUntil) {
+			answered = apierrors.New(apierrors.WsIntakeAlreadyTriaged)
+			return answered
+		}
+		if signalLocked && lockedSignal.TaskID.Valid {
+			signalTaskPub, err := qtx.FindPublicIdForIntakeTask(ctx, generated.FindPublicIdForIntakeTaskParams{
+				WorkspaceID: s.workspaceID,
+				ID:          uint32(lockedSignal.TaskID.Int32), //#nosec G115 -- task_id is INT UNSIGNED and fits uint32 in supported deployments
+			})
+			if err != nil {
+				if stderrors.Is(err, sql.ErrNoRows) {
+					answered = apierrors.New(apierrors.WsTaskNotFound)
+					return answered
+				}
+				return err
+			}
+			target, err := sourceintake.LockLinkTarget(ctx, tx.RawTx(), s.workspaceID, s.userID, signalTaskPub)
+			if err != nil {
+				var apiError *apierrors.APIError
+				if stderrors.As(err, &apiError) {
+					answered = err
+				}
+				return err
+			}
+			linked, err := qtx.LinkIntakeItemToExistingTask(ctx, generated.LinkIntakeItemToExistingTaskParams{
+				TaskID:          sql.NullInt32{Int32: int32(target.Task.ID), Valid: true}, //#nosec G115 -- tasks.id is INT UNSIGNED and fits int32 in supported deployments
+				TriagedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true},       //#nosec G115 -- session user id is INT UNSIGNED and fits int32 in supported deployments
+				WorkspaceID:     s.workspaceID,
+				PublicID:        pub,
+			})
+			if err != nil {
+				return err
+			}
+			if linked == 0 {
+				answered = apierrors.New(apierrors.WsIntakeAlreadyConverted)
+				return answered
+			}
+			adoptedTaskID := int64(target.Task.ID)
+			payload := sourceintake.AcceptedPayload(pub, target.PublicID, target.ProjectID, lockedSignal.PublicID)
+			payload["via"] = "mcp"
+			if err := recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+				EventType:    eventbus.IntakeItemAccepted,
+				AuditAction:  "intake.link_existing_task",
+				ResourceType: "intake_item",
+				ResourceID:   pub.String(),
+				TaskID:       &adoptedTaskID,
+				Payload:      payload,
+				CallSite:     "mcp.convert_intake_to_task",
+			}); err != nil {
+				return err
+			}
+			adopted = target
+			return nil
+		}
+
+		// Use the locked intake row for the task content so concurrent source
+		// edits cannot make the event, task body and embedding disagree.
+		taskTitle, err = taskrules.NewTitle(current.Title)
+		if err != nil {
+			answered = translateTaskRuleError(err)
+			return answered
+		}
+		taskBody = current.Body
 		created, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(s.userID), taskcreate.Args{
 			WorkspaceID: s.workspaceID,
 			ProjectID:   prjID,
-			Title:       title,
-			Description: item.Body,
+			Title:       taskTitle,
+			Description: taskBody,
 		})
 		if err != nil {
 			return err
@@ -250,7 +366,7 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 		// The UPDATE matches only an unconverted item, so a conversion that
 		// lost the race counts zero and rolls its task back with everything
 		// else here.
-		linked, err := deps.Queries.WithTx(tx.RawTx()).SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
+		linked, err := qtx.SetIntakeItemTask(ctx, generated.SetIntakeItemTaskParams{
 			TaskID:      sql.NullInt32{Int32: int32(created.ID), Valid: true}, //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
 			WorkspaceID: s.workspaceID,
 			PublicID:    pub,
@@ -259,45 +375,123 @@ func runConvertIntakeToTask(ctx context.Context, deps Deps, s *session, raw json
 			return err
 		}
 		if linked == 0 {
-			answered = apierrors.New(apierrors.WsIntakeAlreadyConverted)
+			answered = errConvertLostRace
 			return answered
+		}
+		if signalLocked {
+			linkedSignal, err := qtx.LinkInboxSignalToTask(ctx, generated.LinkInboxSignalToTaskParams{
+				TaskID:      sql.NullInt32{Int32: int32(created.ID), Valid: true}, //#nosec G115 -- task_id is INT UNSIGNED and fits uint32 in supported deployments
+				WorkspaceID: s.workspaceID,
+				ID:          lockedSignal.ID,
+			})
+			if err != nil {
+				return err
+			}
+			if linkedSignal == 0 {
+				answered = apierrors.New(apierrors.WsIntakeAlreadyConverted)
+				return answered
+			}
 		}
 		// One call, two changes: the item is converted and a task comes into
 		// existence. Both records join this transaction.
 		rec := recorder(deps)
+		var signalPub types.PublicID
+		if signalLocked {
+			signalPub = lockedSignal.PublicID
+		}
+		acceptedPayload := sourceintake.AcceptedPayload(pub, taskPub, prjPub, signalPub)
+		acceptedPayload["via"] = "mcp"
 		if err := rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
 			EventType:    eventbus.IntakeItemAccepted,
 			AuditAction:  "intake.convert",
 			ResourceType: "intake_item",
 			ResourceID:   pub.String(),
 			TaskID:       &taskID,
-			Payload:      map[string]any{"intakeItemId": pub.String(), "taskId": taskPub.String(), "via": "mcp"},
+			Payload:      acceptedPayload,
 			CallSite:     "mcp.convert_intake_to_task",
 		}); err != nil {
 			return err
 		}
-		return rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+		if err := rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
 			EventType:    eventbus.TaskCreated,
 			AuditAction:  "task.create",
 			ResourceType: "task",
 			ResourceID:   taskPub.String(),
 			TaskID:       &taskID,
-			Payload:      map[string]any{"taskId": taskPub.String(), "title": title.String(), "source": "intake_convert_mcp"},
+			Payload:      map[string]any{"taskId": taskPub.String(), "title": taskTitle.String(), "source": "intake_convert_mcp"},
 			CallSite:     "mcp.convert_intake_to_task",
-		})
+		}); err != nil {
+			return err
+		}
+		if signalLocked {
+			return rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
+				EventType:    eventbus.SignalAttached,
+				AuditAction:  "signal.attach",
+				ResourceType: "signal",
+				ResourceID:   lockedSignal.PublicID.String(),
+				TaskID:       &taskID,
+				Payload: map[string]any{
+					"signalId": lockedSignal.PublicID.String(),
+					"taskId":   taskPub.String(),
+					"source":   string(lockedSignal.Source),
+					"kind":     lockedSignal.Kind,
+				},
+				CallSite: "mcp.convert_intake_to_task",
+			})
+		}
+		return nil
 	})
+	if stderrors.Is(answered, errConvertLostRace) {
+		current, err := deps.Queries.FindIntakeItemByPublicId(ctx, generated.FindIntakeItemByPublicIdParams{
+			WorkspaceID: s.workspaceID,
+			PublicID:    pub,
+		})
+		if err != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if current.TaskID.Valid {
+			return convertedTaskResult(ctx, deps, s, current.TaskID)
+		}
+		return nil, apierrors.New(apierrors.WsIntakeAlreadyConverted)
+	}
 	if answered != nil {
 		return nil, answered
 	}
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
+	if replayTaskID.Valid {
+		return convertedTaskResult(ctx, deps, s, replayTaskID)
+	}
+	if adopted.PublicID != (types.PublicID{}) {
+		noteInvocationTask(ctx, adopted.Task.ID)
+		return map[string]any{"ok": true, "taskId": adopted.PublicID.String()}, nil
+	}
 
 	noteInvocationTask(ctx, uint32(taskID)) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 	// The conversion is a task creation, so the task starts with an
 	// embedding like any other. The text is what the insert stored: the
 	// trimmed title and the item's body.
-	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(taskID), title.String(), item.Body.String) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+	embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, uint32(taskID), taskTitle.String(), taskBody.String) //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
 
+	return map[string]any{"ok": true, "taskId": taskPub.String()}, nil
+}
+
+// errConvertLostRace rolls back a conversion whose intake was claimed by a
+// concurrent one; the winner's task is then returned as a replay.
+var errConvertLostRace = stderrors.New("mcp.convert_intake_to_task: lost race")
+
+// convertedTaskResult answers a conversion replay with the task the intake
+// already names, under the caller's current visibility.
+func convertedTaskResult(ctx context.Context, deps Deps, s *session, taskID sql.NullInt32) (any, error) {
+	taskPub, err := sourceintake.LinkedTask(ctx, deps.DB, deps.Queries, s.workspaceID, s.userID, taskID.Int32, apierrors.WsTaskNotFound)
+	if err != nil {
+		var apiError *apierrors.APIError
+		if stderrors.As(err, &apiError) {
+			return nil, err
+		}
+		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	noteInvocationTask(ctx, uint32(taskID.Int32)) //#nosec G115 -- task_id is INT UNSIGNED and fits uint32 in supported deployments
 	return map[string]any{"ok": true, "taskId": taskPub.String()}, nil
 }

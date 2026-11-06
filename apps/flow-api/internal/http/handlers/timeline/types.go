@@ -55,6 +55,11 @@ type Event struct {
 	// ActorDisplayName is a denormalised convenience for UIs that need
 	// the user's display name without a separate fetch.
 	ActorDisplayName string `json:"actorDisplayName,omitempty"`
+	// ActorAvatarURL is the browser-ready avatar URL for an enabled user
+	// actor. Uploaded avatars use the public proxy path with a cache tag;
+	// external provider URLs are returned verbatim. The storage object FK
+	// remains internal and is never serialized.
+	ActorAvatarURL string `json:"actorAvatarUrl,omitempty"`
 	// ActorAgentID is the acting AI agent's public_id, omitted when nil.
 	ActorAgentID string `json:"actorAgentId,omitempty"`
 	// ActorAgentName is a denormalised convenience for UIs to render the

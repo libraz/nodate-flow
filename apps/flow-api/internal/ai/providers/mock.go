@@ -68,7 +68,12 @@ func (m *MockProvider) Complete(_ context.Context, req Request) (*Response, erro
 	if model == "" {
 		model = MockModel
 	}
-	return &Response{Model: model, Text: text}, nil
+	return &Response{
+		Model:       model,
+		Text:        text,
+		Termination: TerminationComplete,
+		OutputMode:  outputModeFor(req.Output),
+	}, nil
 }
 
 // LoadFixture returns the raw text of a named fixture (without the .json

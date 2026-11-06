@@ -147,6 +147,11 @@ func (e *EventTrigger) dispatch(ctx context.Context, workspaceID uint32, eventTy
 	now := e.now().UTC()
 	for _, r := range rows {
 		key := fmt.Sprintf("%d:event:%s:%d", r.ID, eventType, now.UnixNano())
+		if eventInternalID != 0 {
+			// Event IDs are the stable identity for real eventbus dispatches.
+			// The timestamp form remains for legacy callers that have no source row.
+			key = fmt.Sprintf("%d:event:%d", r.ID, eventInternalID)
+		}
 		run := Run{
 			DedupeKey:   key,
 			Job:         Job{AgentID: r.ID, WsID: r.WorkspaceID, SourceEventID: eventInternalID, DedupeKey: key},

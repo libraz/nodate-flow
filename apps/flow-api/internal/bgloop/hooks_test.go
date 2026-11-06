@@ -102,3 +102,33 @@ func TestHookRunnerDrainsAndRefusesAfterShutdown(t *testing.T) {
 		t.Errorf("ran %d jobs, want the two accepted non-panicking ones", got)
 	}
 }
+
+func TestHookRunnerAbortCancelsJobsWaitingForSemaphore(t *testing.T) {
+	t.Parallel()
+
+	r := NewHookRunner("test.abort.queued", 1, time.Minute)
+	firstStarted := make(chan struct{})
+	firstCanceled := make(chan struct{})
+	if !r.Go(context.Background(), 0, func(ctx context.Context) {
+		close(firstStarted)
+		<-ctx.Done()
+		close(firstCanceled)
+	}) {
+		t.Fatal("runner refused the first job")
+	}
+	<-firstStarted
+
+	var queuedRan atomic.Int32
+	if !r.Go(context.Background(), 0, func(context.Context) { queuedRan.Add(1) }) {
+		t.Fatal("runner refused the queued job")
+	}
+
+	r.Abort()
+	if err := r.Drain(context.Background()); err != nil {
+		t.Fatalf("Drain after Abort: %v", err)
+	}
+	<-firstCanceled
+	if got := queuedRan.Load(); got != 0 {
+		t.Fatalf("queued job ran %d times after runner cancellation, want 0", got)
+	}
+}

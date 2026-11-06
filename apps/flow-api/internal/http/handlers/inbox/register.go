@@ -9,6 +9,16 @@ import (
 // Register wires the /inbox routes. The caller must attach RequireAuth.
 func Register(api huma.API, deps Deps) {
 	huma.Register(api, huma.Operation{
+		OperationID:   "inbox-capture-intake",
+		Method:        http.MethodPost,
+		Path:          "/workspaces/{wsId}/inbox/{signalId}/intake",
+		Summary:       "Capture an inbox source as intake",
+		Description:   "Creates or returns the workspace's unique intake item for an inbox signal. The source preview is derived from the authenticated signal payload; callers never submit replacement source data.",
+		DefaultStatus: http.StatusCreated,
+		Tags:          []string{"Tasks"},
+	}, CaptureAsIntake(deps))
+
+	huma.Register(api, huma.Operation{
 		OperationID: "inbox-list",
 		Method:      http.MethodGet,
 		Path:        "/inbox",

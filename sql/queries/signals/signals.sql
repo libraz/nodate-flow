@@ -25,7 +25,8 @@ INSERT IGNORE INTO signals (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListSignalsForTask :many
--- List signals attached to a task via v_inbox.
+-- List signals attached to a task via v_inbox_all; a task lists its
+-- snoozed signals too, since snooze only hides them from the inbox.
 SELECT
   v.public_id,
   v.task_public_id,
@@ -38,7 +39,7 @@ SELECT
   v.updated_at,
   v.created_at,
   COUNT(*) OVER() AS total
-FROM v_inbox v
+FROM v_inbox_all v
 WHERE v.workspace_id = ?
   AND v.task_public_id = ?
   -- The task title rides on every row, so the signals are listable only
@@ -68,7 +69,7 @@ ORDER BY v.received_at DESC, v.public_id DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListUnattachedSignals :many
--- List signals in a workspace that have no task linkage yet.
+-- List signals in a workspace that have no task linkage yet, snoozed or not.
 SELECT
   v.public_id,
   v.source,
@@ -79,7 +80,7 @@ SELECT
   v.updated_at,
   v.created_at,
   COUNT(*) OVER() AS total
-FROM v_inbox v
+FROM v_inbox_all v
 WHERE v.workspace_id = ?
   AND v.task_public_id IS NULL
 ORDER BY v.received_at DESC, v.public_id DESC

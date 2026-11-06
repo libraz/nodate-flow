@@ -47,6 +47,11 @@ const (
 	TaskActorAdded   Kind = "task.actor.added"
 	TaskActorRemoved Kind = "task.actor.removed"
 
+	TaskSubmissionCreated Kind = "task.submission.created"
+	TaskReviewDecided     Kind = "task.review.decided"
+	TaskHandoffRequested  Kind = "task.handoff.requested"
+	TaskHandoffDecided    Kind = "task.handoff.decided"
+
 	TaskDependencyAdded   Kind = "task.dependency.added"
 	TaskDependencyRemoved Kind = "task.dependency.removed"
 

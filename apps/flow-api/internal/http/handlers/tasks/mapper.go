@@ -407,7 +407,7 @@ func rowToActor(r generated.ListActorsForTaskRow) TaskActor {
 		UserID:      r.UserPublicID.String(),
 		Email:       r.Email,
 		DisplayName: r.DisplayName,
-		AvatarURL:   nullStr(r.AvatarUrl),
+		AvatarURL:   handlerutil.AvatarURL(r.AvatarUrl, r.UserPublicID),
 		Role:        string(r.Role),
 		UpdatedAt:   nullTimeUnix(r.UpdatedAt),
 		CreatedAt:   r.CreatedAt.Unix(),
@@ -418,12 +418,28 @@ func rowToComment(r generated.ListCommentsForTaskRow) TaskComment {
 	return TaskComment{
 		ID:                r.PublicID.String(),
 		AuthorID:          publicIDOrEmpty(r.AuthorPublicID),
-		AuthorDisplayName: bylineDisplayName(r.AuthorDisplayName),
-		AuthorAvatarURL:   nullStr(r.AuthorAvatarUrl),
+		AuthorKind:        string(r.AuthorKind),
+		AuthorAgentID:     commentAuthorAgentID(r.AuthorAgentPublicID),
+		AuthorDisplayName: r.AuthorDisplayName,
+		AuthorAvatarURL:   handlerutil.AvatarURL(r.AuthorAvatarUrl, r.AuthorPublicID),
 		Body:              r.Body,
 		EditedAt:          nullTimeUnix(r.EditedAt),
 		UpdatedAt:         nullTimeUnix(r.UpdatedAt),
 		CreatedAt:         r.CreatedAt.Unix(),
+	}
+}
+
+// commentAuthorAgentID normalizes sqlc's view-expression result. The UUID
+// is textual and the MySQL driver can expose a CHAR column as either string
+// or []byte when sqlc cannot infer the view column's type.
+func commentAuthorAgentID(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	default:
+		return ""
 	}
 }
 

@@ -328,6 +328,39 @@ WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIM
 	}
 }
 
+// LookupProjectMembershipForShare is the transaction-current locking-read
+// variant of [LookupProjectMembership]. It is used after the task row has
+// been locked by a task command. FOR SHARE makes a concurrent revocation or
+// role reduction wait until the command commits, while a command that was
+// already waiting on the task observes the committed revocation when it
+// continues.
+func LookupProjectMembershipForShare(
+	ctx context.Context,
+	db DB,
+	wsID, prjID, userID uint32,
+	wsRole WorkspaceRole,
+) (role ProjectRole, isMember bool, err error) {
+	const q = `SELECT role FROM project_members
+WHERE workspace_id = ? AND project_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1 FOR SHARE`
+	var roleStr string
+	scanErr := db.QueryRowContext(ctx, q, wsID, prjID, userID).Scan(&roleStr)
+	switch {
+	case scanErr == nil:
+		pr := ProjectRole(roleStr)
+		if !pr.IsValid() || pr == ProjectRoleElevated {
+			return "", false, apierrors.New(apierrors.InternalUnexpected)
+		}
+		return pr, true, nil
+	case stderrors.Is(scanErr, sql.ErrNoRows):
+		if wsRole.AtLeast(WorkspaceRoleAdmin) {
+			return ProjectRoleElevated, false, nil
+		}
+		return ProjectRoleNone, false, nil
+	default:
+		return "", false, scanErr
+	}
+}
+
 // ----------------------------------------------------------------------------
 // Layer 4: task
 // ----------------------------------------------------------------------------
@@ -355,6 +388,27 @@ type TaskAccess struct {
 func ResolveTaskByPublicID(ctx context.Context, db DB, pub uuid.UUID) (TaskRecord, error) {
 	const q = `SELECT id, workspace_id, project_id, visibility, created_by_user_id FROM tasks
 WHERE public_id = ? AND enabled = TRUE LIMIT 1`
+	var out TaskRecord
+	var visibility string
+	if err := db.QueryRowContext(ctx, q, types.FromUUID(pub)).Scan(
+		&out.ID, &out.WorkspaceID, &out.ProjectID, &visibility, &out.CreatedByUserID,
+	); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return TaskRecord{}, apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return TaskRecord{}, err
+	}
+	out.Visibility = TaskVisibility(visibility)
+	return out, nil
+}
+
+// ResolveTaskByPublicIDForUpdate resolves and locks the current task row.
+// Task command callers must do this before locking membership, assignment,
+// or agent authority rows so revocation and the task mutation have a
+// consistent lock order.
+func ResolveTaskByPublicIDForUpdate(ctx context.Context, db DB, pub uuid.UUID) (TaskRecord, error) {
+	const q = `SELECT id, workspace_id, project_id, visibility, created_by_user_id FROM tasks
+WHERE public_id = ? AND enabled = TRUE LIMIT 1 FOR UPDATE`
 	var out TaskRecord
 	var visibility string
 	if err := db.QueryRowContext(ctx, q, types.FromUUID(pub)).Scan(
@@ -404,6 +458,63 @@ WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1`
 	return true, nil
 }
 
+// IsTaskActorForShare is the current locking-read variant used when a task
+// command's human visibility decision depends on an enabled task actor.
+func IsTaskActorForShare(ctx context.Context, db DB, taskID, userID uint32) (bool, error) {
+	const q = `SELECT 1 FROM task_actors
+WHERE task_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1 FOR SHARE`
+	var one int
+	if err := db.QueryRowContext(ctx, q, taskID, userID).Scan(&one); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// IsAgentTaskAssigneeForShare reports whether an agent currently has an
+// enabled assignee row on the task. The row is locked against reassignment
+// until the enclosing command commits.
+func IsAgentTaskAssigneeForShare(ctx context.Context, db DB, taskID, agentID uint32) (bool, error) {
+	const q = `SELECT 1 FROM task_actors
+WHERE task_id = ? AND agent_id = ? AND kind = 'agent' AND role = 'assignee' AND enabled = TRUE
+LIMIT 1 FOR SHARE`
+	var one int
+	if err := db.QueryRowContext(ctx, q, taskID, agentID).Scan(&one); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// CheckWorkspaceMemberForShare is the transaction-current locking-read
+// variant of [CheckWorkspaceMember].
+func CheckWorkspaceMemberForShare(ctx context.Context, db DB, wsID, userID uint32, deniedSpec *apierrors.Spec) (WorkspaceRole, error) {
+	if err := EnforceTokenWorkspace(ctx, wsID); err != nil {
+		return "", err
+	}
+	const q = `SELECT role FROM workspace_members
+WHERE workspace_id = ? AND user_id = ? AND enabled = TRUE LIMIT 1 FOR SHARE`
+	var role string
+	if err := db.QueryRowContext(ctx, q, wsID, userID).Scan(&role); err != nil {
+		if stderrors.Is(err, sql.ErrNoRows) {
+			if deniedSpec == nil {
+				deniedSpec = apierrors.WsWorkspaceAccessDenied
+			}
+			return "", apierrors.New(deniedSpec)
+		}
+		return "", err
+	}
+	wr := WorkspaceRole(role)
+	if !wr.IsValid() {
+		return "", apierrors.New(apierrors.InternalUnexpected)
+	}
+	return wr, nil
+}
+
 // CheckTaskVisibility enforces Layer 4 task visibility.
 //
 // Visibility rules:
@@ -451,6 +562,47 @@ func CheckTaskVisibility(
 	default:
 		// Unknown visibility values fall through to deny so adding a
 		// new visibility kind without updating this switch fails closed.
+		return apierrors.New(apierrors.WsTaskNotFound)
+	}
+}
+
+// CheckTaskVisibilityForShare applies the Layer 4 rule using the current
+// locking read for private-task actor membership. It must be called only
+// after the caller has locked the task row and current workspace/project
+// membership rows.
+func CheckTaskVisibilityForShare(
+	ctx context.Context,
+	db DB,
+	rec TaskRecord,
+	userID uint32,
+	wsRole WorkspaceRole,
+	isProjectMember bool,
+) error {
+	isElevated := wsRole.AtLeast(WorkspaceRoleAdmin)
+	switch rec.Visibility {
+	case TaskVisibilityPublic:
+		return nil
+	case TaskVisibilityProject:
+		if !isProjectMember && !isElevated {
+			return apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return nil
+	case TaskVisibilityPrivate:
+		if isElevated {
+			return nil
+		}
+		if rec.CreatedByUserID.Valid && uint32(rec.CreatedByUserID.Int32) == userID { //#nosec G115 -- created_by_user_id is users.id (INT UNSIGNED), fits uint32 within realistic deployments
+			return nil
+		}
+		ok, err := IsTaskActorForShare(ctx, db, rec.ID, userID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return apierrors.New(apierrors.WsTaskNotFound)
+		}
+		return nil
+	default:
 		return apierrors.New(apierrors.WsTaskNotFound)
 	}
 }

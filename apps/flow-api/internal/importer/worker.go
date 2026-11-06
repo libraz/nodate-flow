@@ -68,14 +68,10 @@ type Worker struct {
 	BatchSize    int32
 	StaleAfter   time.Duration
 
-	stopOnce sync.Once
-	stopCh   chan struct{}
-	// doneOnce guards the close of done. The loop runs under bgloop,
-	// which restarts it after a panic, so the teardown can execute more
-	// than once over the life of the worker; closing a closed channel
-	// would panic inside the very supervisor meant to contain panics.
-	doneOnce sync.Once
-	done     chan struct{}
+	lifecycleMu sync.Mutex
+	handle      *bgloop.Handle
+	started     bool
+	stopped     bool
 }
 
 // NewWorker builds a worker with the default cadence.
@@ -84,8 +80,6 @@ func NewWorker(db *sql.DB, q *generated.Queries, logger *slog.Logger) *Worker {
 		DB:      db,
 		Queries: q,
 		Logger:  logger,
-		stopCh:  make(chan struct{}),
-		done:    make(chan struct{}),
 	}
 }
 
@@ -97,33 +91,56 @@ func NewWorker(db *sql.DB, q *generated.Queries, logger *slog.Logger) *Worker {
 // takes the process down, and every other tenant's import is left
 // showing "still working" forever. bgloop contains the panic, records
 // it, and restarts the loop.
+//
+// A Start after [Worker.BeginStop] is a no-op: a stopped worker stays
+// stopped.
 func (w *Worker) Start(ctx context.Context) {
-	go bgloop.Run(ctx, "importer.worker", w.Logger, w.loop)
+	w.lifecycleMu.Lock()
+	defer w.lifecycleMu.Unlock()
+	if w.started || w.stopped {
+		return
+	}
+	w.started = true
+	w.handle = bgloop.StartManaged(ctx, "importer.worker", w.Logger, w.loop)
 	w.Logger.Info("import worker started",
 		slog.Duration("interval", w.pollInterval()),
 		slog.Duration("stale_after", w.staleAfter()),
 	)
 }
 
-// Stop signals the loop to exit and waits for the in-flight pass.
-func (w *Worker) Stop() {
-	w.stopOnce.Do(func() { close(w.stopCh) })
-	select {
-	case <-w.done:
-	case <-time.After(30 * time.Second):
-		w.Logger.Warn("import worker: shutdown timeout exceeded; abandoning in-flight pass")
+// BeginStop cancels the supervisor without waiting. Call it for every
+// resident before beginning any shutdown waits.
+func (w *Worker) BeginStop() {
+	w.lifecycleMu.Lock()
+	w.stopped = true
+	h := w.handle
+	w.lifecycleMu.Unlock()
+	if h != nil {
+		h.Stop()
 	}
 }
 
+// Wait waits for the whole supervisor to return, including any restarted
+// pass after a panic.
+func (w *Worker) Wait(ctx context.Context) error {
+	w.lifecycleMu.Lock()
+	h := w.handle
+	w.lifecycleMu.Unlock()
+	return h.Wait(ctx)
+}
+
+// Shutdown cancels the loop and waits for the in-flight pass within ctx.
+func (w *Worker) Shutdown(ctx context.Context) error {
+	w.BeginStop()
+	return w.Wait(ctx)
+}
+
 func (w *Worker) loop(ctx context.Context) {
-	defer w.doneOnce.Do(func() { close(w.done) })
 	ticker := time.NewTicker(w.pollInterval())
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-w.stopCh:
 			return
 		case <-ticker.C:
 			if _, err := w.RunOnce(ctx); err != nil {
@@ -168,7 +185,8 @@ func (w *Worker) RunOnce(ctx context.Context) ([]uint32, error) {
 			continue
 		}
 		claimed = append(claimed, job.ID)
-		w.run(ctx, job)
+		// Cancellation stops further claims; a claimed job still reaches a terminal state.
+		w.run(context.WithoutCancel(ctx), job)
 	}
 	return claimed, nil
 }

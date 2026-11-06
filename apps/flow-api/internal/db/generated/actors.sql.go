@@ -271,18 +271,20 @@ const removeActor = `-- name: RemoveActor :execrows
 UPDATE task_actors
 SET enabled = FALSE
 WHERE workspace_id = ?
+  AND task_id = ?
   AND public_id = ?
   AND enabled = TRUE
 `
 
 type RemoveActorParams struct {
 	WorkspaceID uint32         `json:"-"`
+	TaskID      uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
 }
 
 // Soft-remove an actor from a task.
 func (q *Queries) RemoveActor(ctx context.Context, arg RemoveActorParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, removeActor, arg.WorkspaceID, arg.PublicID)
+	result, err := q.db.ExecContext(ctx, removeActor, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	if err != nil {
 		return 0, err
 	}

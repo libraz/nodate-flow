@@ -11,7 +11,7 @@
 //     use, so the completion actually moves the task to 'done'.
 //   - `add_comment` reuses the generated AddComment INSERT (the same one
 //     the REST POST /tasks/{id}/comments handler issues), persisting a
-//     real comments row attributed to a resolved workspace member.
+//     real comments row authored by the judging agent.
 //   - `generate_retro` materialises a new retro task plus its retro_of
 //     dependency edge in one transaction.
 //
@@ -70,12 +70,9 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
-// agentCommentPrefix marks a comment row authored on behalf of the
-// signal judge. The comments table has no agent-author column
-// (author_id is a NOT NULL FK to users.id), so an auto-comment is
-// attributed to a real workspace member while this prefix keeps the
-// row honest about its machine origin. The timeline UI may render its
-// own badge; the prefix is the durable, query-able marker.
+// agentCommentPrefix marks the body of a signal-judge comment so the
+// machine origin survives wherever the body is shown without its byline
+// (search, notifications, exports).
 const agentCommentPrefix = "[signal judge] "
 
 // retroTitlePrefix is the canonical prefix every retro-drafted task
@@ -117,7 +114,7 @@ type SQLTaskMutator struct {
 	// Required.
 	Queries *generated.Queries
 	// Logger emits warn-level diagnostics on benign skips (an
-	// idempotent re-completion, an unresolvable comment author, a
+	// idempotent re-completion, a judging agent no longer enabled, a
 	// rolled-back retro transaction). nil falls back to slog.Default().
 	Logger *slog.Logger
 	// NowFn is the wall-clock used to stamp the retro description's
@@ -163,6 +160,10 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 	if taskInternalID <= 0 {
 		return errors.New("signaljudge: CompleteTask: taskInternalID is zero")
 	}
+	if agentID == 0 {
+		return errors.New("signaljudge: CompleteTask: agentID is zero")
+	}
+	actorAgentID := int64(agentID)
 
 	pub, err := m.loadTaskPublicID(ctx, workspaceID, taskInternalID)
 	if err != nil {
@@ -180,13 +181,12 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 			PublicID:    pub,
 			Transition:  taskstate.TransitionComplete,
 			ActorUserID: nil, // judged by an agent, not a real user
-			Reason:      "auto-completed by signal judge",
-			Via:         "signal_judge",
 			// The judging agent is recorded on the row itself, in
 			// events.actor_agent_id, which the timeline resolves to the
-			// agent's public id. Repeating the internal key in the
-			// payload added nothing a reader could use and published a
-			// database key to every workspace member.
+			// agent's public id; the payload carries no internal key.
+			ActorAgentID: &actorAgentID,
+			Reason:       "auto-completed by signal judge",
+			Via:          "signal_judge",
 			ExtraPayload: nil,
 		})
 		if spec != nil {
@@ -259,23 +259,18 @@ func (m *SQLTaskMutator) taskIsDone(ctx context.Context, tx *sql.Tx, workspaceID
 
 // AddComment persists a real comment row for the judged auto-comment,
 // reusing the same generated.AddComment INSERT the REST
-// POST /tasks/{id}/comments handler uses. The comments table's
-// author_id is a NOT NULL FK to users.id with no agent-author column,
-// so the row is attributed to a real workspace member — the task's
-// first enabled human assignee, falling back to the workspace owner —
-// and the body is prefixed with agentCommentPrefix so the row stays
-// honest about its machine origin.
+// POST /tasks/{id}/comments handler uses. The row is authored by the
+// judging agent (author_kind='agent', no human author) and snapshots the
+// agent's public id and name so the byline survives the agent's deletion;
+// the body is prefixed with agentCommentPrefix.
 //
 // The applier emits no follow-on event for the add_comment branch, so
-// the "no event without a state change" invariant is not at stake here;
-// this implementation eliminates the prior silent data-loss by making
-// the comment actually land. When no human author can be resolved at
-// all (no assignee and no owner — a degenerate workspace), the call
-// logs and returns nil rather than inventing an author, again without
-// emitting any event.
+// the "no event without a state change" invariant is not at stake here.
+// When the judging agent is no longer enabled the call logs and returns
+// nil rather than writing a comment no live agent authored.
 //
 // The trusted workspaceID / taskInternalID references are used as-is to
-// scope the author lookup and the INSERT.
+// scope the agent lookup and the INSERT.
 func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32, body string) error {
 	if m == nil || m.DB == nil || m.Queries == nil {
 		return errors.New("signaljudge: SQLTaskMutator missing DB or Queries")
@@ -286,6 +281,9 @@ func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, tas
 	if taskInternalID <= 0 {
 		return errors.New("signaljudge: AddComment: taskInternalID is zero")
 	}
+	if agentID == 0 {
+		return errors.New("signaljudge: AddComment: agentID is zero")
+	}
 
 	trimmed := strings.TrimSpace(body)
 	if trimmed == "" {
@@ -293,74 +291,35 @@ func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, tas
 		return nil
 	}
 
-	authorID, err := m.resolveCommentAuthor(ctx, workspaceID, taskInternalID)
+	agent, err := m.Queries.GetCommentAgentByline(ctx, generated.GetCommentAgentBylineParams{
+		WorkspaceID: workspaceID,
+		ID:          agentID,
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			m.logger().WarnContext(ctx, "signaljudge: AddComment skipped — no resolvable human author",
+			m.logger().WarnContext(ctx, "signaljudge: AddComment skipped — judging agent is not enabled",
 				slog.Uint64("workspace_internal", uint64(workspaceID)),
 				slog.Int64("task_internal", taskInternalID),
 				slog.Uint64("agent_internal", uint64(agentID)),
 			)
 			return nil
 		}
-		return fmt.Errorf("signaljudge: AddComment: resolve author: %w", err)
+		return fmt.Errorf("signaljudge: AddComment: resolve agent: %w", err)
 	}
 
 	if _, err := m.Queries.AddComment(ctx, generated.AddCommentParams{
-		PublicID:    types.New(),
-		WorkspaceID: workspaceID,
-		TaskID:      sql.NullInt32{Int32: int32(taskInternalID), Valid: true}, //#nosec G115 -- tasks.id (INT UNSIGNED), fits int32
-		AuthorID:    authorID,
-		Body:        agentCommentPrefix + trimmed,
+		PublicID:            types.New(),
+		WorkspaceID:         workspaceID,
+		TaskID:              sql.NullInt32{Int32: int32(taskInternalID), Valid: true}, //#nosec G115 -- tasks.id (INT UNSIGNED), fits int32
+		AuthorKind:          generated.CommentsAuthorKindAgent,
+		AuthorAgentID:       sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- ai_agents.id (INT UNSIGNED), fits int32
+		AuthorAgentPublicID: agent.PublicID,
+		AuthorAgentName:     sql.NullString{String: agent.Name, Valid: true},
+		Body:                agentCommentPrefix + trimmed,
 	}); err != nil {
 		return fmt.Errorf("signaljudge: AddComment: insert comment: %w", err)
 	}
 	return nil
-}
-
-// resolveCommentAuthor picks a real users.id to satisfy the comments
-// author_id FK for an agent-authored comment. Preference order:
-//  1. the task's first enabled human assignee (task_actors), so the
-//     comment surfaces under the owner most likely to act on it;
-//  2. the workspace owner (workspace_members.role='owner'), the stable
-//     fallback every workspace has.
-//
-// Returns sql.ErrNoRows when neither resolves (a degenerate workspace
-// with no owner and no human assignee); the caller treats that as a
-// skip rather than an error.
-func (m *SQLTaskMutator) resolveCommentAuthor(ctx context.Context, workspaceID uint32, taskInternalID int64) (uint32, error) {
-	const q = `
-SELECT COALESCE(
-  (
-    SELECT ta.user_id
-    FROM task_actors ta
-    WHERE ta.workspace_id = ?
-      AND ta.task_id = ?
-      AND ta.enabled = TRUE
-      AND ta.kind = 'user'
-      AND ta.role = 'assignee'
-      AND ta.user_id IS NOT NULL
-    ORDER BY ta.id ASC
-    LIMIT 1
-  ),
-  (
-    SELECT wm.user_id
-    FROM workspace_members wm
-    WHERE wm.workspace_id = ?
-      AND wm.role = 'owner'
-      AND wm.enabled = TRUE
-    ORDER BY wm.id ASC
-    LIMIT 1
-  )
-) AS author_id`
-	var authorID sql.NullInt32
-	if err := m.DB.QueryRowContext(ctx, q, workspaceID, taskInternalID, workspaceID).Scan(&authorID); err != nil {
-		return 0, err
-	}
-	if !authorID.Valid {
-		return 0, sql.ErrNoRows
-	}
-	return uint32(authorID.Int32), nil //#nosec G115 -- users.id (INT UNSIGNED), fits uint32
 }
 
 // DraftRetroTask is the production implementation of the

@@ -56,6 +56,7 @@ type Record struct {
 	ID                   string `json:"id" doc:"Intake item public id (UUID v7)"`
 	Title                string `json:"title"`
 	Body                 string `json:"body,omitempty"`
+	SourceURL            string `json:"sourceUrl,omitempty" doc:"Validated HTTP(S) URL to the originating signal, if one exists"`
 	TriageStatus         string `json:"triageStatus"`
 	SnoozeUntil          *int64 `json:"snoozeUntil,omitempty"`
 	TriagedByUserID      string `json:"triagedByUserId,omitempty"`
@@ -147,7 +148,11 @@ type TriageIntakeItemOutput struct {
 
 // ConvertIntakeItemBody is the JSON body for POST /workspaces/{wsId}/intake/{id}/convert.
 type ConvertIntakeItemBody struct {
-	ProjectID string `json:"projectId" doc:"Project public id (UUID v7) to create the task in"`
+	ProjectID       string   `json:"projectId,omitempty" doc:"Project public id (UUID v7) to create the task in; required for a new conversion and ignored when returning an existing conversion"`
+	Title           string   `json:"title,omitempty" maxLength:"500" doc:"Optional task title override; defaults to the source title"`
+	Body            *string  `json:"body,omitempty" maxLength:"50000" doc:"Optional task description override; defaults to the source body"`
+	AssigneeUserIDs []string `json:"assigneeUserIds,omitempty" maxItems:"50" doc:"Optional explicit workspace-member assignees by public user UUID"`
+	DueOn           string   `json:"dueOn,omitempty" format:"date" doc:"Optional task due date (YYYY-MM-DD)"`
 }
 
 // ConvertIntakeItemInput is the request for POST /workspaces/{wsId}/intake/{id}/convert.

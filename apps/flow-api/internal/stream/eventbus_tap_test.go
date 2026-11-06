@@ -190,3 +190,21 @@ func TestTapWorkspaceCacheIsBounded(t *testing.T) {
 		t.Fatalf("cache holds %d entries, want at most %d", size, wsCacheLimit)
 	}
 }
+
+// Workflow changes must wake another session even when no task row changes.
+func TestTapPublishesWorkflowInvalidation(t *testing.T) {
+	for _, kind := range []string{"signal.received", "intake.created", "agent.task.started", "agent.task.completed", "agent.task.failed", "ai.agent.updated"} {
+		t.Run(kind, func(t *testing.T) {
+			rec := &recorder{}
+			tap := NewEventbusTap(rec)
+			tap.RememberWorkspace(7, "workspace-public")
+			tap.Publish(context.Background(), 7, kind, 1)
+			if len(rec.events) != 1 {
+				t.Fatalf("%s published %d hints, want one", kind, len(rec.events))
+			}
+			if rec.events[0].Kind != KindTaskChanged {
+				t.Fatalf("kind = %s, want compatible task.changed", rec.events[0].Kind)
+			}
+		})
+	}
+}

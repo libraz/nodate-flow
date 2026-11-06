@@ -57,8 +57,13 @@ type Runner interface {
 // scheduler has already been started.
 var ErrAlreadyRunning = errors.New("agentruntime: scheduler already running")
 
+// ErrStopped is returned by [Scheduler.Start] and [Purger.Start] once
+// BeginStop has been called, before or after a Start. A stopped
+// resident stays stopped.
+var ErrStopped = errors.New("agentruntime: stopped")
+
 // Scheduler ticks once per [Interval] and dispatches due jobs to the
-// runner. It is safe for concurrent Stop calls; only the first
+// runner. It is safe for concurrent BeginStop calls; only the first
 // observed cancellation actually unwinds.
 type Scheduler struct {
 	Source Source
@@ -73,8 +78,9 @@ type Scheduler struct {
 	Now      func() time.Time
 
 	mu      sync.Mutex
-	cancel  context.CancelFunc
-	running bool
+	handle  *bgloop.Handle
+	started bool
+	stopped bool
 
 	// Observability counters.
 	ticks    uint64
@@ -84,11 +90,15 @@ type Scheduler struct {
 
 // Start begins the tick loop in a background goroutine. It returns
 // immediately. Calling Start while already running returns
-// [ErrAlreadyRunning].
+// [ErrAlreadyRunning]; calling it after [Scheduler.BeginStop] returns
+// [ErrStopped] and starts nothing.
 func (s *Scheduler) Start(ctx context.Context) error {
 	s.mu.Lock()
-	if s.running {
-		s.mu.Unlock()
+	defer s.mu.Unlock()
+	if s.stopped {
+		return ErrStopped
+	}
+	if s.started {
 		return ErrAlreadyRunning
 	}
 	if s.Interval <= 0 {
@@ -97,26 +107,35 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	if s.Now == nil {
 		s.Now = time.Now
 	}
-	runCtx, cancel := context.WithCancel(ctx)
-	s.cancel = cancel
-	s.running = true
-	s.mu.Unlock()
-
-	// Supervised so a panic in a tick does not take the process down
-	// and a loop that returns is restarted rather than silently gone.
-	go bgloop.Run(runCtx, "agent.scheduler", nil, s.loop)
+	s.started = true
+	s.handle = bgloop.StartManaged(ctx, "agent.scheduler", nil, s.loop)
 	return nil
 }
 
-// Stop signals the loop to exit. It is safe to call multiple times.
-func (s *Scheduler) Stop() {
+// BeginStop signals the loop to exit without waiting for the supervisor.
+// The scheduler stays stopped, including when Start has not run yet.
+func (s *Scheduler) BeginStop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
+	s.stopped = true
+	h := s.handle
+	s.mu.Unlock()
+	if h != nil {
+		h.Stop()
 	}
-	s.running = false
+}
+
+// Wait waits for the whole supervisor to return.
+func (s *Scheduler) Wait(ctx context.Context) error {
+	s.mu.Lock()
+	h := s.handle
+	s.mu.Unlock()
+	return h.Wait(ctx)
+}
+
+// Shutdown signals the loop to exit and waits within ctx.
+func (s *Scheduler) Shutdown(ctx context.Context) error {
+	s.BeginStop()
+	return s.Wait(ctx)
 }
 
 // Stats returns a snapshot of the scheduler counters.

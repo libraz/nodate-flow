@@ -12,6 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/sourceintake"
 )
 
 // List handles GET /inbox. When workspaceId is provided it scopes the
@@ -61,16 +62,17 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 					taskID, taskTitle = "", ""
 				}
 				out.Body.Items = append(out.Body.Items, Item{
-					ID:          r.PublicID.String(),
-					WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-					TaskID:      taskID,
-					TaskTitle:   taskTitle,
-					Source:      string(r.Source),
-					Kind:        r.Kind,
-					ExternalID:  nullStr(r.ExternalID),
-					Payload:     r.PayloadJson,
-					ReceivedAt:  r.ReceivedAt.Unix(),
-					CreatedAt:   r.CreatedAt.Unix(),
+					ID:           r.PublicID.String(),
+					WorkspaceID:  bytesToUUIDString(r.WorkspacePublicID),
+					TaskID:       taskID,
+					TaskTitle:    taskTitle,
+					Source:       string(r.Source),
+					Kind:         r.Kind,
+					ExternalID:   nullStr(r.ExternalID),
+					Payload:      r.PayloadJson,
+					SourceDetail: sourceintake.Project(string(r.Source), r.Kind, r.PayloadJson),
+					ReceivedAt:   r.ReceivedAt.Unix(),
+					CreatedAt:    r.CreatedAt.Unix(),
 				})
 			}
 			total, err := deps.Queries.CountInbox(ctx, wsID)
@@ -104,16 +106,17 @@ func List(deps Deps) func(context.Context, *ListInboxInput) (*ListInboxOutput, e
 				taskID, taskTitle = "", ""
 			}
 			out.Body.Items = append(out.Body.Items, Item{
-				ID:          r.PublicID.String(),
-				WorkspaceID: bytesToUUIDString(r.WorkspacePublicID),
-				TaskID:      taskID,
-				TaskTitle:   taskTitle,
-				Source:      string(r.Source),
-				Kind:        r.Kind,
-				ExternalID:  nullStr(r.ExternalID),
-				Payload:     r.PayloadJson,
-				ReceivedAt:  r.ReceivedAt.Unix(),
-				CreatedAt:   r.CreatedAt.Unix(),
+				ID:           r.PublicID.String(),
+				WorkspaceID:  bytesToUUIDString(r.WorkspacePublicID),
+				TaskID:       taskID,
+				TaskTitle:    taskTitle,
+				Source:       string(r.Source),
+				Kind:         r.Kind,
+				ExternalID:   nullStr(r.ExternalID),
+				Payload:      r.PayloadJson,
+				SourceDetail: sourceintake.Project(string(r.Source), r.Kind, r.PayloadJson),
+				ReceivedAt:   r.ReceivedAt.Unix(),
+				CreatedAt:    r.CreatedAt.Unix(),
 			})
 		}
 		total, err := deps.Queries.CountInboxForUser(ctx, actorID)

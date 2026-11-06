@@ -51,10 +51,6 @@ var reservedKinds = []ReservedKind{
 		Reason: "an agent's reasoning is persisted to tasks.agent_memo, which is a column write with no event beside it",
 	},
 	{
-		Name:   "AiSuggestionEdited",
-		Reason: "editing a triage suggestion is a local change in the dialog that is never sent to the API",
-	},
-	{
 		Name:   "CalMemoCompleted",
 		Reason: "the memo update statement sets calendar_memos.done and appends calendar.memo.updated for every field it touches",
 	},

@@ -21,6 +21,10 @@ type PurgeQuerier interface {
 	FailExhaustedAgentRuns(ctx context.Context, arg generated.FailExhaustedAgentRunsParams) (int64, error)
 }
 
+// DefaultRetention is how long finished agent_runs rows, and with them
+// their dedupe keys, are kept before the purger deletes them.
+const DefaultRetention = 7 * 24 * time.Hour
+
 // Defaults for the stranded-run reaper.
 const (
 	// DefaultStrandedAfter is how long a run may stay 'claimed' before
@@ -64,8 +68,9 @@ type Purger struct {
 	MaxAttempts   uint8
 
 	mu      sync.Mutex
-	cancel  context.CancelFunc
-	running bool
+	handle  *bgloop.Handle
+	started bool
+	stopped bool
 }
 
 // ErrPurgerAlreadyRunning is returned by [Purger.Start] when the
@@ -74,17 +79,23 @@ var ErrPurgerAlreadyRunning = errors.New("agentruntime: purger already running")
 
 // Start begins the purge loop in a background goroutine. Defaults:
 // 1h interval, 7d retention, [slog.Default] logger, [time.Now] clock.
+// Calling Start while already running returns [ErrPurgerAlreadyRunning];
+// calling it after [Purger.BeginStop] returns [ErrStopped] and starts
+// nothing.
 func (p *Purger) Start(ctx context.Context) error {
 	p.mu.Lock()
-	if p.running {
-		p.mu.Unlock()
+	defer p.mu.Unlock()
+	if p.stopped {
+		return ErrStopped
+	}
+	if p.started {
 		return ErrPurgerAlreadyRunning
 	}
 	if p.Interval <= 0 {
 		p.Interval = time.Hour
 	}
 	if p.Retention <= 0 {
-		p.Retention = 7 * 24 * time.Hour
+		p.Retention = DefaultRetention
 	}
 	if p.Logger == nil {
 		p.Logger = slog.Default()
@@ -92,24 +103,35 @@ func (p *Purger) Start(ctx context.Context) error {
 	if p.Now == nil {
 		p.Now = time.Now
 	}
-	runCtx, cancel := context.WithCancel(ctx)
-	p.cancel = cancel
-	p.running = true
-	p.mu.Unlock()
-
-	go bgloop.Run(runCtx, "agent_runs.purger", p.Logger, p.loop)
+	p.started = true
+	p.handle = bgloop.StartManaged(ctx, "agent_runs.purger", p.Logger, p.loop)
 	return nil
 }
 
-// Stop signals the loop to exit. Safe for concurrent and repeat calls.
-func (p *Purger) Stop() {
+// BeginStop signals the loop to exit without waiting for the supervisor.
+// The purger stays stopped, including when Start has not run yet.
+func (p *Purger) BeginStop() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.cancel != nil {
-		p.cancel()
-		p.cancel = nil
+	p.stopped = true
+	h := p.handle
+	p.mu.Unlock()
+	if h != nil {
+		h.Stop()
 	}
-	p.running = false
+}
+
+// Wait waits for the whole supervisor to return.
+func (p *Purger) Wait(ctx context.Context) error {
+	p.mu.Lock()
+	h := p.handle
+	p.mu.Unlock()
+	return h.Wait(ctx)
+}
+
+// Shutdown signals the loop to exit and waits within ctx.
+func (p *Purger) Shutdown(ctx context.Context) error {
+	p.BeginStop()
+	return p.Wait(ctx)
 }
 
 func (p *Purger) loop(ctx context.Context) {

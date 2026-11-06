@@ -162,8 +162,9 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		if err == nil {
 			for _, c := range childRows {
 				children = append(children, ai.ChildTaskSummary{
-					Title: c.Title,
-					State: string(c.DerivedState),
+					PublicID: c.PublicID.String(),
+					Title:    c.Title,
+					State:    string(c.DerivedState),
 				})
 			}
 		}
@@ -185,8 +186,10 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		}
 
 		// The prompt quotes this task, so its invocation row carries it.
+		invocationCtx := ai.WithInvocationAudience(ai.WithTaskID(ctx, task.ID), ai.InvocationAudienceInitiator)
+		invocationCtx = ai.WithInputResources(invocationCtx, ai.TaskInputResource(task.PublicID.String()))
 		steps, err := deps.AI.ProposeSteps(
-			ai.WithTaskID(ctx, task.ID), ws.ID,
+			invocationCtx, ws.ID,
 			row.Title, desc,
 			granularity, children,
 			embedClient, reader,

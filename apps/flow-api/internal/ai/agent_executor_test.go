@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -53,7 +54,7 @@ func (p stubProvider) Complete(_ context.Context, req providers.Request) (*provi
 	if p.failWith != nil {
 		return nil, p.failWith
 	}
-	return &providers.Response{Model: req.Model, Text: "done", InputTokens: 3, OutputTokens: 4, CostMicros: 5_000}, nil
+	return &providers.Response{Model: req.Model, Text: "done", Termination: providers.TerminationComplete, InputTokens: 3, OutputTokens: 4, CostMicros: 5_000}, nil
 }
 
 // newTestExecutor builds an executor whose invocation logger appends into
@@ -148,7 +149,7 @@ func TestExecuteAgentTaggedContextReachesProvider(t *testing.T) {
 	var recorded []InvocationRecord
 	e := newTestExecutor(&recorded, providerFunc(func(ctx context.Context, req providers.Request) (*providers.Response, error) {
 		seen = AgentIDFromContext(ctx)
-		return &providers.Response{Model: req.Model, Text: "ok"}, nil
+		return &providers.Response{Model: req.Model, Text: "ok", Termination: providers.TerminationComplete}, nil
 	}))
 
 	if _, err := e.ExecuteAgent(context.Background(), 42, 7); err != nil {
@@ -211,7 +212,7 @@ func TestExecuteAgentRefusesAnAgentAtItsMonthlyCap(t *testing.T) {
 	var recorded []InvocationRecord
 	e := newTestExecutor(&recorded, providerFunc(func(_ context.Context, req providers.Request) (*providers.Response, error) {
 		called = true
-		return &providers.Response{Model: req.Model, Text: "ok"}, nil
+		return &providers.Response{Model: req.Model, Text: "ok", Termination: providers.TerminationComplete}, nil
 	}))
 	q := e.Queries.(stubExecQueries)
 	q.capCents = &capCents
@@ -250,7 +251,7 @@ func TestExecuteAgentSendsANonEmptyUserTurn(t *testing.T) {
 		var recorded []InvocationRecord
 		e := newTestExecutor(&recorded, providerFunc(func(_ context.Context, req providers.Request) (*providers.Response, error) {
 			prompt = req.Prompt
-			return &providers.Response{Model: req.Model, Text: "ok"}, nil
+			return &providers.Response{Model: req.Model, Text: "ok", Termination: providers.TerminationComplete}, nil
 		}))
 		if _, err := e.ExecuteAgent(ctx, 42, 7); err != nil {
 			t.Fatalf("ExecuteAgent: %v", err)
@@ -269,5 +270,57 @@ func TestExecuteAgentSendsANonEmptyUserTurn(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("on_event user turn %q does not contain %q", got, want)
 		}
+	}
+}
+
+func TestExecuteAgentRejectsIncompleteOutputAndRecordsActualUsage(t *testing.T) {
+	const (
+		inputTokens  = 19
+		outputTokens = 7
+		costMicros   = int64(987654)
+	)
+	var recorded []InvocationRecord
+	var metricErr error
+	var metricCost int64
+	e := newTestExecutor(&recorded, providerFunc(func(_ context.Context, req providers.Request) (*providers.Response, error) {
+		if req.Output != nil {
+			t.Errorf("generic agent text request attached output contract %q", req.Output.Contract())
+		}
+		return &providers.Response{
+			Model:        req.Model,
+			Text:         "partial thought",
+			Termination:  providers.TerminationIncomplete,
+			InputTokens:  inputTokens,
+			OutputTokens: outputTokens,
+			CostMicros:   costMicros,
+		}, nil
+	}))
+	e.OnInvocation = func(_ string, _ string, inTok, outTok int, cost int64, _ time.Duration, err error) {
+		if inTok != inputTokens || outTok != outputTokens {
+			t.Errorf("metric token counts = (%d, %d), want (%d, %d)", inTok, outTok, inputTokens, outputTokens)
+		}
+		metricCost = cost
+		metricErr = err
+	}
+
+	result, err := e.ExecuteAgent(context.Background(), 42, 7)
+	if !errors.Is(err, providers.ErrGenerationIncomplete) {
+		t.Fatalf("ExecuteAgent error = %v, want incomplete generation", err)
+	}
+	if result.LastThought != "" {
+		t.Fatalf("returned rejected thought %q", result.LastThought)
+	}
+	if len(recorded) != 1 {
+		t.Fatalf("logged %d invocation outcomes, want exactly one", len(recorded))
+	}
+	record := recorded[0]
+	if record.AgentID != 7 || record.Status != "error" || record.TokensInput != inputTokens || record.TokensOutput != outputTokens || record.CostMicros != costMicros {
+		t.Errorf("incomplete invocation record = %+v", record)
+	}
+	if record.ResponseRedacted != "partial thought" {
+		t.Errorf("rejected thought was not retained in the record: %q", record.ResponseRedacted)
+	}
+	if metricErr == nil || metricCost != costMicros {
+		t.Errorf("metrics outcome err=%v cost=%d, want failed outcome with cost %d", metricErr, metricCost, costMicros)
 	}
 }

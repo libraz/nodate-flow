@@ -7,6 +7,7 @@ package ai
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -24,6 +25,27 @@ type ProposalCache struct {
 type proposalEntry struct {
 	value    any
 	expireAt time.Time
+}
+
+// proposalCacheTaskFingerprint records the current, actor-readable task data
+// a proposal prompt was built from. The public id is the lookup key; the
+// fingerprint includes its current text, state, and primary assignee fields.
+type proposalCacheTaskFingerprint struct {
+	PublicID    string `json:"publicId"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// proposalCacheSnapshot contains the managed inputs that must still match
+// before a cached proposal can be returned. RosterFingerprint is populated
+// for smart-create proposals, whose prompt lists workspace members.
+type proposalCacheSnapshot struct {
+	TaskInputs        []proposalCacheTaskFingerprint `json:"taskInputs"`
+	RosterFingerprint string                         `json:"rosterFingerprint,omitempty"`
+}
+
+type proposalCacheEnvelope struct {
+	Payload  json.RawMessage
+	Snapshot proposalCacheSnapshot
 }
 
 // NewProposalCache creates a cache with the given TTL. A zero or
@@ -78,4 +100,49 @@ func (c *ProposalCache) Put(key string, value any) {
 	if len(c.m) > proposalCacheMax {
 		EvictOldest(c.m, proposalCacheMax, func(e proposalEntry) time.Time { return e.expireAt })
 	}
+}
+
+// getEnvelope decodes a fresh copy of a typed proposal payload. JSON is used
+// as the copy boundary so callers cannot mutate a shared pointer or slice
+// held by the cache after a hit.
+func (c *ProposalCache) getEnvelope(key string, destination any) (proposalCacheSnapshot, bool) {
+	var snapshot proposalCacheSnapshot
+	value, ok := c.Get(key)
+	if !ok {
+		return snapshot, false
+	}
+	envelope, ok := value.(proposalCacheEnvelope)
+	if !ok || len(envelope.Payload) == 0 {
+		c.Delete(key)
+		return snapshot, false
+	}
+	if err := json.Unmarshal(envelope.Payload, destination); err != nil {
+		c.Delete(key)
+		return snapshot, false
+	}
+	snapshot.TaskInputs = append([]proposalCacheTaskFingerprint(nil), envelope.Snapshot.TaskInputs...)
+	snapshot.RosterFingerprint = envelope.Snapshot.RosterFingerprint
+	return snapshot, true
+}
+
+// putEnvelope stores a typed proposal together with its managed-input
+// snapshot. An unencodable value is simply left uncached; the proposal itself
+// remains valid for the current request.
+func (c *ProposalCache) putEnvelope(key string, value any, snapshot proposalCacheSnapshot) {
+	payload, err := json.Marshal(value)
+	if err != nil {
+		return
+	}
+	snapshot.TaskInputs = append([]proposalCacheTaskFingerprint(nil), snapshot.TaskInputs...)
+	c.Put(key, proposalCacheEnvelope{Payload: payload, Snapshot: snapshot})
+}
+
+// Delete removes a stale or unrecognized entry after validation fails.
+func (c *ProposalCache) Delete(key string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	delete(c.m, key)
+	c.mu.Unlock()
 }

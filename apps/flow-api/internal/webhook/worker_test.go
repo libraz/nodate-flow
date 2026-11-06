@@ -84,11 +84,11 @@ func TestHookRecoversPanic(t *testing.T) {
 	}
 }
 
-// TestStopIsIdempotent asserts that Stop can be reached twice — a
+// TestStopIsIdempotent asserts that BeginStop can be reached twice — a
 // signal handler and an explicit call on the same worker — without
-// panicking, and that a single Stop still ends the delivery loop.
+// panicking, and that a single BeginStop still ends the delivery loop.
 //
-// Both halves matter: a Stop that closed nothing would never panic and
+// Both halves matter: a stop that closed nothing would never panic and
 // would also never stop anything, so the loop is observed here through
 // w.done alone, with cancel left unset.
 func TestStopIsIdempotent(t *testing.T) {
@@ -102,21 +102,21 @@ func TestStopIsIdempotent(t *testing.T) {
 		w.loop(context.Background())
 	}()
 
-	w.Stop()
-	w.Stop()
+	w.BeginStop()
+	w.BeginStop()
 
 	select {
 	case <-looped:
 	case <-time.After(time.Second):
-		t.Fatal("delivery loop did not exit after Stop")
+		t.Fatal("delivery loop did not exit after BeginStop")
 	}
 }
 
-// TestShutdownWaitsForHookJobs holds the drain the hook never had: a
+// TestDrainHooksWaitsForHookJobs holds the drain the hook never had: a
 // delivery row still being written when the process exits is an event
-// whose webhook is lost, so Shutdown must wait for it, and a hook fired
-// after Shutdown began must be refused rather than started.
-func TestShutdownWaitsForHookJobs(t *testing.T) {
+// whose webhook is lost, so DrainHooks must wait for it, and a hook fired
+// after DrainHooks began must be refused rather than started.
+func TestDrainHooksWaitsForHookJobs(t *testing.T) {
 	t.Parallel()
 
 	release := make(chan struct{})
@@ -142,21 +142,21 @@ func TestShutdownWaitsForHookJobs(t *testing.T) {
 	}
 
 	done := make(chan error, 1)
-	go func() { done <- w.Shutdown(context.Background()) }()
+	go func() { done <- w.DrainHooks(context.Background()) }()
 	select {
 	case err := <-done:
-		t.Fatalf("Shutdown returned while a hook job was in flight (err=%v)", err)
+		t.Fatalf("DrainHooks returned while a hook job was in flight (err=%v)", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 
 	w.Hook()(context.Background(), 1, "task.created", 0)
 	close(release)
 	if err := <-done; err != nil {
-		t.Fatalf("Shutdown: %v", err)
+		t.Fatalf("DrainHooks: %v", err)
 	}
 	mu.Lock()
 	defer mu.Unlock()
 	if calls != 1 {
-		t.Fatalf("hook ran %d times, want 1: a hook fired after Shutdown must be refused", calls)
+		t.Fatalf("hook ran %d times, want 1: a hook fired after DrainHooks must be refused", calls)
 	}
 }

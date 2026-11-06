@@ -19,25 +19,39 @@ INSERT INTO comments (
   workspace_id,
   task_id,
   author_id,
+  author_kind,
+  author_agent_id,
+  author_agent_public_id,
+  author_agent_name,
   body
-) VALUES (?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, 0x00000000000000000000000000000000), ?, ?)
 `
 
 type AddCommentParams struct {
-	PublicID    types.PublicID `json:"publicId"`
-	WorkspaceID uint32         `json:"-"`
-	TaskID      sql.NullInt32  `json:"-"`
-	AuthorID    uint32         `json:"-"`
-	Body        string         `json:"body"`
+	PublicID            types.PublicID     `json:"publicId"`
+	WorkspaceID         uint32             `json:"-"`
+	TaskID              sql.NullInt32      `json:"-"`
+	AuthorID            sql.NullInt32      `json:"-"`
+	AuthorKind          CommentsAuthorKind `json:"authorKind"`
+	AuthorAgentID       sql.NullInt32      `json:"-"`
+	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
+	AuthorAgentName     sql.NullString     `json:"authorAgentName"`
+	Body                string             `json:"body"`
 }
 
-// Append a comment to a task.
+// Append a comment to a task. A human comment sets author_id; an agent
+// comment sets author_agent_id plus the public id and name snapshot that
+// keep the byline after the agent is deleted.
 func (q *Queries) AddComment(ctx context.Context, arg AddCommentParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, addComment,
 		arg.PublicID,
 		arg.WorkspaceID,
 		arg.TaskID,
 		arg.AuthorID,
+		arg.AuthorKind,
+		arg.AuthorAgentID,
+		arg.AuthorAgentPublicID,
+		arg.AuthorAgentName,
 		arg.Body,
 	)
 	if err != nil {
@@ -82,7 +96,7 @@ type EditCommentParams struct {
 	Body        string         `json:"body"`
 	WorkspaceID uint32         `json:"-"`
 	PublicID    types.PublicID `json:"publicId"`
-	AuthorID    uint32         `json:"-"`
+	AuthorID    sql.NullInt32  `json:"-"`
 }
 
 // Edit a comment body and stamp edited_at.
@@ -99,10 +113,61 @@ func (q *Queries) EditComment(ctx context.Context, arg EditCommentParams) (int64
 	return result.RowsAffected()
 }
 
+const getCommentAgentByline = `-- name: GetCommentAgentByline :one
+SELECT public_id, name
+FROM ai_agents
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type GetCommentAgentBylineParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+type GetCommentAgentBylineRow struct {
+	PublicID types.PublicID `json:"publicId"`
+	Name     string         `json:"name"`
+}
+
+// Read the enabled agent's public id and name to snapshot onto an agent
+// comment.
+func (q *Queries) GetCommentAgentByline(ctx context.Context, arg GetCommentAgentBylineParams) (GetCommentAgentBylineRow, error) {
+	row := q.db.QueryRowContext(ctx, getCommentAgentByline, arg.WorkspaceID, arg.ID)
+	var i GetCommentAgentBylineRow
+	err := row.Scan(&i.PublicID, &i.Name)
+	return i, err
+}
+
+const getCommentCreatedAt = `-- name: GetCommentCreatedAt :one
+SELECT created_at
+FROM comments
+WHERE workspace_id = ?
+  AND public_id = ?
+LIMIT 1
+`
+
+type GetCommentCreatedAtParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Read back the server-assigned creation time of a just-inserted comment.
+func (q *Queries) GetCommentCreatedAt(ctx context.Context, arg GetCommentCreatedAtParams) (time.Time, error) {
+	row := q.db.QueryRowContext(ctx, getCommentCreatedAt, arg.WorkspaceID, arg.PublicID)
+	var created_at time.Time
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
 const listCommentsForTask = `-- name: ListCommentsForTask :many
 SELECT
   v.public_id,
+  v.author_kind,
   v.author_public_id,
+  v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
   v.body,
@@ -125,15 +190,17 @@ type ListCommentsForTaskParams struct {
 }
 
 type ListCommentsForTaskRow struct {
-	PublicID          types.PublicID `json:"publicId"`
-	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
-	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
-	Body              string         `json:"body"`
-	EditedAt          sql.NullTime   `json:"editedAt"`
-	UpdatedAt         sql.NullTime   `json:"updatedAt"`
-	CreatedAt         time.Time      `json:"createdAt"`
-	Total             interface{}    `json:"total"`
+	PublicID            types.PublicID     `json:"publicId"`
+	AuthorKind          CommentsAuthorKind `json:"authorKind"`
+	AuthorPublicID      types.PublicID     `json:"authorPublicId"`
+	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
+	AuthorDisplayName   string             `json:"authorDisplayName"`
+	AuthorAvatarUrl     sql.NullString     `json:"authorAvatarUrl"`
+	Body                string             `json:"body"`
+	EditedAt            sql.NullTime       `json:"editedAt"`
+	UpdatedAt           sql.NullTime       `json:"updatedAt"`
+	CreatedAt           time.Time          `json:"createdAt"`
+	Total               interface{}        `json:"total"`
 }
 
 // List comments on a task joined with author display fields.
@@ -155,7 +222,9 @@ func (q *Queries) ListCommentsForTask(ctx context.Context, arg ListCommentsForTa
 		var i ListCommentsForTaskRow
 		if err := rows.Scan(
 			&i.PublicID,
+			&i.AuthorKind,
 			&i.AuthorPublicID,
+			&i.AuthorAgentPublicID,
 			&i.AuthorDisplayName,
 			&i.AuthorAvatarUrl,
 			&i.Body,
@@ -180,7 +249,9 @@ func (q *Queries) ListCommentsForTask(ctx context.Context, arg ListCommentsForTa
 const listCommentsForTaskKeyset = `-- name: ListCommentsForTaskKeyset :many
 SELECT
   v.public_id,
+  v.author_kind,
   v.author_public_id,
+  v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
   v.body,
@@ -207,14 +278,16 @@ type ListCommentsForTaskKeysetParams struct {
 }
 
 type ListCommentsForTaskKeysetRow struct {
-	PublicID          types.PublicID `json:"publicId"`
-	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
-	AuthorAvatarUrl   sql.NullString `json:"authorAvatarUrl"`
-	Body              string         `json:"body"`
-	EditedAt          sql.NullTime   `json:"editedAt"`
-	UpdatedAt         sql.NullTime   `json:"updatedAt"`
-	CreatedAt         time.Time      `json:"createdAt"`
+	PublicID            types.PublicID     `json:"publicId"`
+	AuthorKind          CommentsAuthorKind `json:"authorKind"`
+	AuthorPublicID      types.PublicID     `json:"authorPublicId"`
+	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
+	AuthorDisplayName   string             `json:"authorDisplayName"`
+	AuthorAvatarUrl     sql.NullString     `json:"authorAvatarUrl"`
+	Body                string             `json:"body"`
+	EditedAt            sql.NullTime       `json:"editedAt"`
+	UpdatedAt           sql.NullTime       `json:"updatedAt"`
+	CreatedAt           time.Time          `json:"createdAt"`
 }
 
 // Keyset-paginated variant of ListCommentsForTask.
@@ -247,7 +320,9 @@ func (q *Queries) ListCommentsForTaskKeyset(ctx context.Context, arg ListComment
 		var i ListCommentsForTaskKeysetRow
 		if err := rows.Scan(
 			&i.PublicID,
+			&i.AuthorKind,
 			&i.AuthorPublicID,
+			&i.AuthorAgentPublicID,
 			&i.AuthorDisplayName,
 			&i.AuthorAvatarUrl,
 			&i.Body,
@@ -266,4 +341,27 @@ func (q *Queries) ListCommentsForTaskKeyset(ctx context.Context, arg ListComment
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCommentHumanAuthor = `-- name: LockCommentHumanAuthor :one
+SELECT public_id, display_name
+FROM users
+WHERE id = ?
+  AND enabled = TRUE
+LIMIT 1
+FOR SHARE
+`
+
+type LockCommentHumanAuthorRow struct {
+	PublicID    types.PublicID `json:"publicId"`
+	DisplayName string         `json:"displayName"`
+}
+
+// Read an enabled human author's byline and share-lock the row so a
+// concurrent suspension cannot interleave with the comment insert.
+func (q *Queries) LockCommentHumanAuthor(ctx context.Context, id uint32) (LockCommentHumanAuthorRow, error) {
+	row := q.db.QueryRowContext(ctx, lockCommentHumanAuthor, id)
+	var i LockCommentHumanAuthorRow
+	err := row.Scan(&i.PublicID, &i.DisplayName)
+	return i, err
 }

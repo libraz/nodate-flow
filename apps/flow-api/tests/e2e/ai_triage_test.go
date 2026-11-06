@@ -38,8 +38,8 @@ func seedTriageFixtureItems(t *testing.T, tt *helpers.TestTenant) {
 
 // TestAiTriageSuggestionLifecycle exercises the AI suggestion lifecycle
 // end to end against the mock AI provider: triage proposes 3 fixture
-// suggestions, GET /ai/suggestions returns 3 pending, applying one
-// drops the pending count to 2.
+// suggestions, GET /ai/suggestions returns 3 pending, executing one
+// drops the pending count to 2, and dismissing another drops it to 1.
 //
 // Requires NF_FLOW_AI_MOCK=1 because the test server only wires the mock AI
 // orchestrator when AiMock is true at router.Build time.
@@ -69,50 +69,43 @@ func TestAiTriageSuggestionLifecycle(t *testing.T) {
 
 	// List pending suggestions.
 	var list struct {
-		Suggestions []struct {
-			EventID           string `json:"eventId"`
-			InboxItemID       string `json:"inboxItemId"`
-			RecommendedAction string `json:"recommendedAction"`
-		} `json:"suggestions"`
+		Suggestions []commandSuggestion `json:"suggestions"`
 	}
 	doJSON(t, http.MethodGet,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions",
 		tt.AccessToken, nil, &list)
 	require.Len(t, list.Suggestions, 3, "all 3 proposed suggestions should be pending")
 
-	// Apply one — pick the first.
-	target := list.Suggestions[0].InboxItemID
-	require.NotEmpty(t, target)
-	status, body := doJSONStatus(t, http.MethodPost,
-		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions/"+target+"/apply",
-		tt.AccessToken, nil)
-	require.Equalf(t, http.StatusNoContent, status, "apply body=%s", string(body))
+	// Execute the archive recommendation.
+	target := suggestionForAction(t, list.Suggestions, "archive")
+	status, body := executeSuggestion(t, tt, target, "triage-archive-"+randomHex(8), "archive")
+	require.Equalf(t, http.StatusOK, status, "execute body=%s", string(body))
 
 	// List again — pending count should now be 2.
 	var list2 struct {
-		Suggestions []struct {
-			InboxItemID string `json:"inboxItemId"`
-		} `json:"suggestions"`
+		Suggestions []commandSuggestion `json:"suggestions"`
 	}
 	doJSON(t, http.MethodGet,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions",
 		tt.AccessToken, nil, &list2)
-	require.Len(t, list2.Suggestions, 2, "applied suggestion must drop out of pending")
+	require.Len(t, list2.Suggestions, 2, "executed suggestion must drop out of pending")
 	for _, s := range list2.Suggestions {
-		require.NotEqual(t, target, s.InboxItemID, "applied suggestion must not reappear")
+		require.NotEqual(t, target.InboxItemID, s.InboxItemID, "executed suggestion must not reappear")
 	}
 
 	// Dismiss another and verify it drops to 1.
-	dismissTarget := list2.Suggestions[0].InboxItemID
-	status, body = doJSONStatus(t, http.MethodPost,
-		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions/"+dismissTarget+"/dismiss",
-		tt.AccessToken, nil)
-	require.Equalf(t, http.StatusNoContent, status, "dismiss body=%s", string(body))
+	dismissTarget := suggestionForAction(t, list2.Suggestions, "snooze")
+	status, body = doJSONStatus(t, http.MethodPatch,
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions/"+dismissTarget.InboxItemID+"/decision",
+		tt.AccessToken, map[string]any{
+			"proposalId":       dismissTarget.ProposalID,
+			"expectedRevision": dismissTarget.Revision,
+			"state":            "dismissed",
+		})
+	require.Equalf(t, http.StatusOK, status, "dismiss body=%s", string(body))
 
 	var list3 struct {
-		Suggestions []struct {
-			InboxItemID string `json:"inboxItemId"`
-		} `json:"suggestions"`
+		Suggestions []commandSuggestion `json:"suggestions"`
 	}
 	doJSON(t, http.MethodGet,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/suggestions",

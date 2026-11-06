@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -89,9 +90,12 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 			// The size is now a measurement rather than a claim, so the
 			// row stops being a reservation: it becomes a dedup
 			// candidate and the sweeper leaves it alone.
-			if err := deps.Queries.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
-				ByteSize: size,
-				ID:       att.StorageObjectID,
+			// A shared object's upload trigger also locks task rows, so a deadlock with a task confirm is retried.
+			if err := dbretry.InTx(ctx, deps.DB, "calendars.ConfirmAttachment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+				return generated.New(tx).MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
+					ByteSize: size,
+					ID:       att.StorageObjectID,
+				})
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}

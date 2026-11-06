@@ -24,10 +24,14 @@ type HookRunner struct {
 	name    string
 	timeout time.Duration
 	sem     chan struct{}
+	ctx     context.Context
+	cancel  context.CancelFunc
 
 	wg       sync.WaitGroup
-	mu       sync.RWMutex
-	stopping bool
+	mu       sync.Mutex
+	sealed   bool
+	waitOnce sync.Once
+	drained  chan struct{}
 }
 
 // defaultHookTimeout is the per-job deadline of a runner built without
@@ -43,7 +47,15 @@ func NewHookRunner(name string, concurrency int, timeout time.Duration) *HookRun
 	if timeout <= 0 {
 		timeout = defaultHookTimeout
 	}
-	return &HookRunner{name: name, timeout: timeout, sem: make(chan struct{}, concurrency)}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &HookRunner{
+		name:    name,
+		timeout: timeout,
+		sem:     make(chan struct{}, concurrency),
+		ctx:     ctx,
+		cancel:  cancel,
+		drained: make(chan struct{}),
+	}
 }
 
 // Go accepts job unless [HookRunner.Shutdown] has begun, and reports
@@ -52,13 +64,16 @@ func NewHookRunner(name string, concurrency int, timeout time.Duration) *HookRun
 // default when zero). A panic is recovered and logged so one event's bad
 // data cannot end the process.
 func (r *HookRunner) Go(ctx context.Context, timeout time.Duration, job func(ctx context.Context)) bool {
-	r.mu.RLock()
-	if r.stopping {
-		r.mu.RUnlock()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	r.mu.Lock()
+	if r.sealed {
+		r.mu.Unlock()
 		return false
 	}
 	r.wg.Add(1)
-	r.mu.RUnlock()
+	r.mu.Unlock()
 
 	if timeout <= 0 {
 		timeout = r.timeout
@@ -66,8 +81,18 @@ func (r *HookRunner) Go(ctx context.Context, timeout time.Duration, job func(ctx
 	detached := context.WithoutCancel(ctx)
 	go func() {
 		defer r.wg.Done()
-		r.sem <- struct{}{}
+		select {
+		case r.sem <- struct{}{}:
+		case <-r.ctx.Done():
+			return
+		}
 		defer func() { <-r.sem }()
+		// The semaphore and cancellation can become ready together. Check
+		// again after acquiring a slot so a queued job never starts after
+		// the runner has been force-cancelled.
+		if r.ctx.Err() != nil {
+			return
+		}
 		defer func() {
 			if v := recover(); v != nil {
 				slog.ErrorContext(detached, "event hook job panicked",
@@ -76,29 +101,61 @@ func (r *HookRunner) Go(ctx context.Context, timeout time.Duration, job func(ctx
 					"stack", string(debug.Stack()))
 			}
 		}()
-		runCtx, cancel := context.WithTimeout(detached, timeout)
+		baseCtx, cancelBase := context.WithCancel(detached)
+		stopRunnerCancel := context.AfterFunc(r.ctx, cancelBase)
+		defer func() {
+			stopRunnerCancel()
+			cancelBase()
+		}()
+		runCtx, cancel := context.WithTimeout(baseCtx, timeout)
 		defer cancel()
 		job(runCtx)
 	}()
 	return true
 }
 
+// Seal stops accepting new jobs. Accepted jobs remain detached and keep
+// running until they finish or the runner is force-cancelled.
+func (r *HookRunner) Seal() {
+	r.mu.Lock()
+	r.sealed = true
+	r.mu.Unlock()
+}
+
+// Abort seals the runner and cancels queued and running jobs. Queued jobs
+// select cancellation while waiting for a semaphore slot and do not run
+// if cancellation races with slot acquisition.
+func (r *HookRunner) Abort() {
+	r.Seal()
+	r.cancel()
+}
+
+// Drain waits for every accepted job after sealing, or until ctx is done.
+// A cancelled drain force-cancels queued and running jobs. Safe to call
+// more than once.
+func (r *HookRunner) Drain(ctx context.Context) error {
+	r.Seal()
+	r.waitOnce.Do(func() {
+		go func() {
+			r.wg.Wait()
+			close(r.drained)
+		}()
+	})
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-r.drained:
+		r.cancel()
+		return nil
+	case <-ctx.Done():
+		r.Abort()
+		return ctx.Err()
+	}
+}
+
 // Shutdown stops accepting jobs and waits for every accepted one, or
 // until ctx is done. Safe to call more than once.
 func (r *HookRunner) Shutdown(ctx context.Context) error {
-	r.mu.Lock()
-	r.stopping = true
-	r.mu.Unlock()
-
-	done := make(chan struct{})
-	go func() {
-		r.wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return r.Drain(ctx)
 }

@@ -66,7 +66,7 @@ func TestInvocationMetricsCarryAModelLabel(t *testing.T) {
 		t.Parallel()
 		prov := &labelProvider{
 			model: wantModel,
-			resp:  &providers.Response{Model: wantModel, Text: `[{"title":"t","description":"d","priority":"low"}]`},
+			resp:  &providers.Response{Termination: providers.TerminationComplete, Model: wantModel, Text: `[{"title":"t","description":"d","priority":"low"}]`},
 		}
 		var got []sample
 		o := &Orchestrator{

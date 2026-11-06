@@ -27,7 +27,7 @@ func (p *cannedProvider) Name() string         { return "canned" }
 func (p *cannedProvider) Kind() providers.Kind { return providers.Kind("openai_compat") }
 func (p *cannedProvider) Model() string        { return "canned-model" }
 func (p *cannedProvider) Complete(_ context.Context, _ providers.Request) (*providers.Response, error) {
-	return &providers.Response{Model: "canned-model", Text: p.text}, nil
+	return &providers.Response{Termination: providers.TerminationComplete, Model: "canned-model", Text: p.text}, nil
 }
 
 // TestGeneratePageClipsAnOverlongBrief proves generate_page stores a page

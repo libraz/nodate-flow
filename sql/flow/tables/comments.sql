@@ -8,7 +8,11 @@ CREATE TABLE comments (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
-  author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  author_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id when a human wrote the comment',
+  author_kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Historical author kind; remains agent if the agent is later deleted',
+  author_agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when an agent wrote the comment',
+  author_agent_public_id BINARY(16) NULL COMMENT 'Agent public byline retained after deletion',
+  author_agent_name VARCHAR(255) NULL COMMENT 'Agent name retained after deletion',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
   edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
@@ -27,6 +31,7 @@ CREATE TABLE comments (
   -- comment rows without a full table scan (the workspace-leading composite
   -- above does not satisfy author_id-only lookups).
   KEY idx_comments_author_id (author_id),
+  KEY idx_comments_author_agent_id (author_agent_id),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
@@ -34,5 +39,6 @@ CREATE TABLE comments (
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comments_author_agent FOREIGN KEY (author_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';

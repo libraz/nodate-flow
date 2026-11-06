@@ -39,6 +39,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
@@ -388,7 +389,7 @@ func (h *Handler) handleToolCall(w http.ResponseWriter, r *http.Request, s *sess
 		args = json.RawMessage("{}")
 	}
 	start := time.Now()
-	runCtx := r.Context()
+	runCtx := middleware.WithActor(r.Context(), s.userID)
 	if s.agentID != 0 {
 		runCtx = ai.WithAgentID(runCtx, s.agentID)
 	}

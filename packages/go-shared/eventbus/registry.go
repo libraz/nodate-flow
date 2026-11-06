@@ -23,6 +23,8 @@ var declaredKinds = []Kind{
 	TaskCommentAdded, TaskCommentEdited, TaskCommentRemoved,
 	TaskAttachmentAdded, TaskAttachmentRemoved,
 	TaskActorAdded, TaskActorRemoved,
+	TaskSubmissionCreated, TaskReviewDecided,
+	TaskHandoffRequested, TaskHandoffDecided,
 	TaskDependencyAdded, TaskDependencyRemoved,
 	TaskConstraintAdded, TaskConstraintRemoved,
 

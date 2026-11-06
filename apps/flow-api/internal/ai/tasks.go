@@ -16,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
 )
 
 // ErrNoProvider is returned by ProposeTasksFrom / ProposePriority when the
@@ -26,6 +27,11 @@ var ErrNoProvider = errors.New("ai: no provider configured for workspace")
 // ErrParse is returned when the LLM response could not be parsed into the
 // expected JSON shape.
 var ErrParse = errors.New("ai: failed to parse provider response")
+
+// ErrProposalInputsChanged is returned when a proposal's quoted task inputs,
+// or the caller's access to them, changed around the provider call. Map to
+// AI.PROPOSAL.INPUTS_CHANGED at the HTTP boundary.
+var ErrProposalInputsChanged = errors.New("ai: proposal inputs changed")
 
 // ProposedTask is the LLM-generated task suggestion.
 type ProposedTask struct {
@@ -50,15 +56,13 @@ func (f ProviderResolverFunc) Default(ctx context.Context, workspaceID uint32) (
 	return f(ctx, workspaceID)
 }
 
-// InvocationMetricsHook is called after every LLM provider call (success or
-// failure) with the provider name, model, the response's token counts, the
-// cost in micro-USD, and elapsed, the wall-clock duration of the provider
-// call alone. err is nil when the provider call succeeded and carries the
-// provider's error otherwise; it is the only reliable success/failure signal,
-// since a cost of 0 also means "pricing unknown" for local providers. On a
-// failure the token counts are 0, because there is no response to read them
-// from. It allows the obs package to record Prometheus metrics without
-// creating an import cycle (ai → obs → log → ai).
+// InvocationMetricsHook is called after each validated provider attempt with
+// the provider name, model, the decoded response's token counts and cost, and
+// elapsed, the wall-clock duration of the provider call alone. err describes
+// the final attempt outcome, including incomplete or rejected decoded output.
+// A decoded rejection still carries its actual usage. It allows the obs
+// package to record Prometheus metrics without creating an import cycle
+// (ai → obs → log → ai).
 type InvocationMetricsHook func(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error)
 
 // Orchestrator wires a Provider source, the cost guard, and an invocation
@@ -85,12 +89,13 @@ type Orchestrator struct {
 	// results. When set, identical requests (smart create, inbox
 	// triage) within the TTL window return the cached result instead
 	// of making a redundant LLM call. Nil disables caching.
-	ProposalCache *ProposalCache
+	ProposalCache     *ProposalCache
+	SuggestionPrivacy *suggestionprivacy.Store
 }
 
 // recordMetrics calls the OnInvocation hook if set. err is nil on a
-// successful provider call and the provider's error on a failed one;
-// elapsed measures the provider call alone.
+// successful validated attempt and describes the final attempt outcome
+// otherwise; elapsed measures the provider call alone.
 func (o *Orchestrator) recordMetrics(provider, model string, inputTokens, outputTokens int, costMicros int64, elapsed time.Duration, err error) {
 	if o.OnInvocation != nil {
 		o.OnInvocation(provider, model, inputTokens, outputTokens, costMicros, elapsed, err)
@@ -116,11 +121,13 @@ type InboxReader interface {
 type InvocationLogger func(ctx context.Context, rec InvocationRecord)
 
 // InvocationRecord is the redacted ai_invocations payload. ai_invocations
-// rows are append-only; status is one of "ok", "error".
+// rows are append-only; status is one of "ok", "error", or "blocked".
 type InvocationRecord struct {
 	WorkspaceID      uint32
 	AgentID          uint32 // non-zero when the call was made on behalf of an AI agent
 	TaskID           uint32 // non-zero when the prompt quotes one task's content
+	Audience         InvocationAudience
+	InputResources   []InvocationResource
 	Purpose          string
 	Model            string
 	PromptRedacted   string
@@ -197,24 +204,21 @@ func (o *Orchestrator) ProposeTasksFrom(ctx context.Context, workspaceID uint32,
 	req := airequest.New(prov, airequest.Args{
 		System: proposeTasksSystem,
 		Prompt: sanitizeDesc(signal),
+		Output: tasksFromOutput,
 	})
-	// time.Since is taken inside each branch rather than bound to a local
-	// here: the latency this reports must cover the provider call and
-	// nothing else, and the error check has to stay adjacent to the call
-	// it checks.
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	var tasks []ProposedTask
+	_, err = o.CompleteAndRecord(ctx, workspaceID, "propose_tasks_from", prov, req, func(resp *providers.Response) error {
+		payload, err := outputPayload(resp, tasksFromOutput)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(payload, &tasks); err != nil {
+			return fmt.Errorf("%w: task response could not be decoded", providers.ErrResponseSchemaMismatch)
+		}
+		return validateProposedTaskFields(tasks)
+	})
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		o.logFailure(ctx, workspaceID, "propose_tasks_from", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
-	}
-	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	o.logSuccess(ctx, workspaceID, "propose_tasks_from", req, resp)
-
-	tasks, parseErr := parseProposedTasks(resp.Text)
-	if parseErr != nil {
-		return nil, parseErr
 	}
 	return tasks, nil
 }
@@ -239,22 +243,26 @@ func (o *Orchestrator) ProposePriority(ctx context.Context, workspaceID uint32, 
 	req := airequest.New(prov, airequest.Args{
 		System: proposePrioritySystem,
 		Prompt: sanitizeDesc(taskSummary),
+		Output: priorityOutput,
 	})
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
-	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		o.logFailure(ctx, workspaceID, "propose_priority", req, err)
-		return "", fmt.Errorf("ai: provider call failed: %w", err)
-	}
-	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	o.logSuccess(ctx, workspaceID, "propose_priority", req, resp)
-
 	var parsed struct {
 		Priority string `json:"priority"`
 	}
-	if err := json.Unmarshal([]byte(extractJSON(resp.Text)), &parsed); err != nil {
-		return "", fmt.Errorf("%w: %v", ErrParse, err)
+	_, err = o.CompleteAndRecord(ctx, workspaceID, "propose_priority", prov, req, func(resp *providers.Response) error {
+		payload, err := outputPayload(resp, priorityOutput)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(payload, &parsed); err != nil {
+			return fmt.Errorf("%w: priority response could not be decoded", providers.ErrResponseSchemaMismatch)
+		}
+		if !validPriorityLabel(parsed.Priority) {
+			return fmt.Errorf("%w: priority is outside the supported vocabulary", providers.ErrResponseSchemaMismatch)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("ai: provider call failed: %w", err)
 	}
 	return parsed.Priority, nil
 }
@@ -278,8 +286,9 @@ const (
 // ChildTaskSummary is a lightweight representation of an existing child
 // task, passed to ProposeSteps so the LLM avoids duplicating them.
 type ChildTaskSummary struct {
-	Title string
-	State string
+	PublicID string
+	Title    string
+	State    string
 }
 
 // granularityRange returns the (min, max) step counts for a Granularity.
@@ -348,12 +357,37 @@ func (o *Orchestrator) ProposeSteps(
 		return nil, ErrNoProvider
 	}
 	ctx = providers.WithWorkspaceID(ctx, workspaceID)
+	proposalInputsReader := proposalCacheInputReader(reader, o.Queries)
+	if proposalInputsReader == nil {
+		return nil, fmt.Errorf("ai: proposal cache input reader is unavailable")
+	}
+	vis, err = currentProposalCacheVisibility(ctx, proposalInputsReader, workspaceID, vis.ActorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("ai: validate step-proposal workspace access: %w", err)
+	}
 
 	// ---- cache check ----
-	cacheKey := proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis)
-	if cached, ok := o.ProposalCache.Get(cacheKey); ok {
-		if tasks, _ := cached.([]ProposedTask); tasks != nil {
-			return tasks, nil
+	// The HTTP/MCP caller may omit a SmartCreateReader when embeddings are
+	// unavailable. The orchestrator still has the generated query handle in
+	// production, which is needed to revalidate task inputs before serving a
+	// cached response or returning a provider result.
+	cacheReader := reader
+	if cacheReader == nil {
+		cacheReader, _ = o.Queries.(SmartCreateReader)
+	}
+	cacheKey := proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, TaskIDFromContext(ctx))
+	var cached []ProposedTask
+	if o.ProposalCache != nil {
+		if snapshot, ok := o.ProposalCache.getEnvelope(cacheKey, &cached); ok {
+			current, currentVis, cacheable, validateErr := currentProposalCacheSnapshot(ctx, proposalInputsReader, cacheReader, workspaceID, vis, proposalCacheResources(snapshot), false)
+			if validateErr != nil {
+				return nil, fmt.Errorf("ai: validate cached step-proposal inputs: %w", validateErr)
+			}
+			if cacheable && sameProposalVisibility(vis, currentVis) && sameProposalCacheSnapshot(snapshot, current) {
+				return cached, nil
+			}
+			o.ProposalCache.Delete(cacheKey)
+			vis = currentVis
 		}
 	}
 
@@ -380,7 +414,7 @@ func (o *Orchestrator) ProposeSteps(
 							continue
 						}
 						sim := embed.Cosine(queryVec, vec)
-						ranked = append(ranked, scoredTask{id: c.ID, title: c.Title, score: sim})
+						ranked = append(ranked, scoredTask{id: c.ID, publicID: c.PublicID.String(), title: c.Title, score: sim})
 					}
 					sort.Slice(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
 					if len(ranked) > stepsTopN {
@@ -390,6 +424,25 @@ func (o *Orchestrator) ProposeSteps(
 			}
 		}
 	}
+	inputResources := make([]InvocationResource, 0, len(existingChildren)+len(ranked))
+	for _, child := range existingChildren {
+		inputResources = append(inputResources, TaskInputResource(child.PublicID))
+	}
+	for _, task := range ranked {
+		inputResources = append(inputResources, TaskInputResource(task.publicID))
+	}
+	ctx = WithInputResources(ctx, inputResources...)
+	rows, latestVis, _, loadErr := loadProposalCacheTaskInputs(ctx, proposalInputsReader, workspaceID, vis.ActorUserID, InputResourcesFromContext(ctx), true)
+	if loadErr != nil {
+		return nil, fmt.Errorf("ai: validate step-proposal inputs: %w", loadErr)
+	}
+	if !sameProposalVisibility(vis, latestVis) || !sameStepsPromptInputs(existingChildren, ranked, rows, TaskIDFromContext(ctx), title, description) {
+		return nil, ErrProposalInputsChanged
+	}
+	cacheSnapshot := proposalCacheSnapshotFromRows(rows)
+	vis = latestVis
+	cacheKey = proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, TaskIDFromContext(ctx))
+	cacheable := o.ProposalCache != nil
 
 	// ---- build user prompt ----
 	// Truncate user input before building the LLM prompt.
@@ -399,23 +452,29 @@ func (o *Orchestrator) ProposeSteps(
 	req := airequest.New(prov, airequest.Args{
 		System: proposeStepsSystemPrompt(granularity),
 		Prompt: userPrompt,
+		Output: stepsOutput,
 	})
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	var tasks []ProposedTask
+	_, err = o.CompleteAndRecord(ctx, workspaceID, "propose_steps", prov, req, func(resp *providers.Response) error {
+		payload, err := outputPayload(resp, stepsOutput)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(payload, &tasks); err != nil {
+			return fmt.Errorf("%w: steps response could not be decoded", providers.ErrResponseSchemaMismatch)
+		}
+		minSteps, maxSteps := granularityRange(granularity)
+		if err := validateProposedTasks(tasks, minSteps, maxSteps); err != nil {
+			return err
+		}
+		return validateProposalCacheSnapshot(ctx, proposalInputsReader, cacheReader, workspaceID, vis.ActorUserID, cacheSnapshot, false)
+	})
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		o.logFailure(ctx, workspaceID, "propose_steps", req, err)
 		return nil, fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	o.logSuccess(ctx, workspaceID, "propose_steps", req, resp)
-
-	// ---- parse response ----
-	tasks, parseErr := parseProposedTasks(resp.Text)
-	if parseErr != nil {
-		return nil, parseErr
+	if cacheable {
+		o.ProposalCache.putEnvelope(cacheKey, tasks, cacheSnapshot)
 	}
-	o.ProposalCache.Put(cacheKey, tasks)
 	return tasks, nil
 }
 
@@ -423,12 +482,13 @@ func (o *Orchestrator) ProposeSteps(
 // actor's visibility (the similar tasks quoted are that actor's readable
 // set) and the existing children (adding a subtask changes what must not
 // be duplicated). The child count leads so the key stays unambiguous.
-func proposeStepsCacheKey(workspaceID uint32, title, description string, granularity Granularity, children []ChildTaskSummary, vis acl.VisibilityArgs) string {
-	parts := make([]string, 0, 5+2*len(children))
+func proposeStepsCacheKey(workspaceID uint32, title, description string, granularity Granularity, children []ChildTaskSummary, vis acl.VisibilityArgs, subjectTaskID uint32) string {
+	parts := make([]string, 0, 6+3*len(children))
 	parts = append(parts, "propose_steps", VisibilityCacheScope(vis), title, description, string(granularity),
+		"subject:"+strconv.FormatUint(uint64(subjectTaskID), 10),
 		"children:"+strconv.Itoa(len(children)))
 	for _, c := range children {
-		parts = append(parts, c.Title, c.State)
+		parts = append(parts, c.PublicID, c.Title, c.State)
 	}
 	return ProposalCacheKey(workspaceID, parts...)
 }
@@ -472,21 +532,6 @@ func buildStepsPrompt(
 	}
 
 	return b.String()
-}
-
-// parseProposedTasks tolerates the model wrapping the JSON array in prose
-// or fenced code blocks. extractJSON pulls the first balanced "[ ... ]"
-// substring before json.Unmarshal runs.
-func parseProposedTasks(s string) ([]ProposedTask, error) {
-	payload := extractJSON(s)
-	if payload == "" {
-		return nil, ErrParse
-	}
-	var tasks []ProposedTask
-	if err := json.Unmarshal([]byte(payload), &tasks); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrParse, err)
-	}
-	return tasks, nil
 }
 
 // extractJSON returns the first JSON object or array literal it finds in s.
@@ -558,6 +603,8 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 		WorkspaceID:      workspaceID,
 		AgentID:          AgentIDFromContext(ctx),
 		TaskID:           TaskIDFromContext(ctx),
+		Audience:         InvocationAudienceFromContext(ctx),
+		InputResources:   InputResourcesFromContext(ctx),
 		Purpose:          purpose,
 		Model:            model,
 		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
@@ -570,23 +617,83 @@ func (o *Orchestrator) logSuccess(ctx context.Context, workspaceID uint32, purpo
 	})
 }
 
-func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpose string, req providers.Request, err error) {
+func (o *Orchestrator) logFailure(ctx context.Context, workspaceID uint32, purpose string, req providers.Request, err error, decodedResponse ...*providers.Response) {
 	if o.LogInvoke == nil {
 		return
 	}
+	var response *providers.Response
+	if len(decodedResponse) > 0 {
+		response = decodedResponse[0]
+	}
+	model := req.Model
+	if response != nil && response.Model != "" {
+		model = response.Model
+	}
+	responseRedacted := Redact(err.Error())
+	var tokensInput, tokensOutput int
+	var costMicros, costCents int64
+	if response != nil {
+		responseRedacted = Redact(response.Text)
+		tokensInput = response.InputTokens
+		tokensOutput = response.OutputTokens
+		costMicros = response.EstimatedCostMicros()
+		costCents = response.EstimatedCostCents()
+	}
+	status := "error"
+	if errors.Is(err, providers.ErrModelRefused) {
+		status = "blocked"
+	}
 	o.LogInvoke(ctx, InvocationRecord{
-		WorkspaceID:    workspaceID,
-		AgentID:        AgentIDFromContext(ctx),
-		TaskID:         TaskIDFromContext(ctx),
-		Purpose:        purpose,
-		Model:          req.Model,
-		PromptRedacted: Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
-		Status:         "error",
-		// Provider errors can embed a verbatim upstream response body
-		// (e.g. an echoed Authorization header or an API key in a 401
-		// detail), so scrub the message before it lands in
-		// ai_invocations.error_code — same redactor the prompt/response
-		// fields above use, mirroring signaljudge/runner.go.
-		ErrorCode: Redact(err.Error()),
+		WorkspaceID:      workspaceID,
+		AgentID:          AgentIDFromContext(ctx),
+		TaskID:           TaskIDFromContext(ctx),
+		Audience:         InvocationAudienceFromContext(ctx),
+		InputResources:   InputResourcesFromContext(ctx),
+		Purpose:          purpose,
+		Model:            model,
+		PromptRedacted:   Redact(strings.TrimSpace(req.System + "\n" + req.Prompt)),
+		ResponseRedacted: responseRedacted,
+		TokensInput:      tokensInput,
+		TokensOutput:     tokensOutput,
+		CostMicros:       costMicros,
+		CostCents:        costCents,
+		Status:           status,
+		// Persist a bounded identifier rather than provider-controlled text:
+		// ai_invocations.error_code is a small Latin-1 code column, and raw
+		// messages can also contain secrets or non-ASCII response prose.
+		ErrorCode: invocationErrorCode(err),
 	})
+}
+
+func invocationErrorCode(err error) string {
+	switch {
+	case errors.Is(err, ErrProposalInputsChanged):
+		return "AI.PROPOSAL.INPUTS_CHANGED"
+	case errors.Is(err, providers.ErrGenerationIncomplete):
+		return "AI.RESPONSE.GENERATION_INCOMPLETE"
+	case errors.Is(err, providers.ErrModelRefused):
+		return "AI.RESPONSE.MODEL_REFUSED"
+	case errors.Is(err, providers.ErrResponseInvalidJSON), errors.Is(err, ErrParse):
+		return "AI.RESPONSE.INVALID_JSON"
+	case errors.Is(err, providers.ErrResponseSchemaMismatch):
+		return "AI.RESPONSE.SCHEMA_MISMATCH"
+	case errors.Is(err, providers.ErrUpstreamRateLimited):
+		return "AI.PROVIDER.UPSTREAM_RATE_LIMITED"
+	case errors.Is(err, providers.ErrUpstreamTimeout):
+		return "AI.PROVIDER.UPSTREAM_TIMEOUT"
+	case errors.Is(err, providers.ErrUpstreamAuthRejected):
+		return "AI.PROVIDER.UPSTREAM_AUTH_REJECTED"
+	case errors.Is(err, providers.ErrUpstreamRequestRejected):
+		return "AI.PROVIDER.UPSTREAM_REQUEST_REJECTED"
+	case errors.Is(err, providers.ErrKeyDecryptFailed):
+		return "AI.PROVIDER.KEY_DECRYPT_FAILED"
+	case errors.Is(err, providers.ErrBaseURLDestinationNotAllowed), errors.Is(err, providers.ErrInvalidBaseURL):
+		return "AI.PROVIDER.BASE_URL_NOT_ALLOWED"
+	case errors.Is(err, providers.ErrBaseURLNotAllowed), errors.Is(err, providers.ErrUnknownKind), errors.Is(err, providers.ErrMissingKey), errors.Is(err, providers.ErrNoEnabledProvider):
+		return "AI.PROVIDER.NOT_CONFIGURED"
+	case errors.Is(err, providers.ErrUpstreamUnreachable):
+		return "AI.PROVIDER.UPSTREAM_UNREACHABLE"
+	default:
+		return "AI.INVOCATION.FAILED"
+	}
 }

@@ -28,18 +28,20 @@ func (r *meteringResolver) Default(_ context.Context, _ uint32) (providers.Provi
 // recordingProvider captures the request and returns a canned response or
 // error. Implements providers.Provider.
 type recordingProvider struct {
-	kind   providers.Kind
-	resp   *providers.Response
-	err    error
-	called bool
+	kind    providers.Kind
+	resp    *providers.Response
+	err     error
+	called  bool
+	request providers.Request
 }
 
 func (p *recordingProvider) Name() string         { return "recording" }
 func (p *recordingProvider) Kind() providers.Kind { return p.kind }
 func (p *recordingProvider) Model() string        { return "recording-model" }
 
-func (p *recordingProvider) Complete(_ context.Context, _ providers.Request) (*providers.Response, error) {
+func (p *recordingProvider) Complete(_ context.Context, req providers.Request) (*providers.Response, error) {
 	p.called = true
+	p.request = req
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -61,7 +63,7 @@ func extractWSFixed(id uint32) WorkspaceIDFromContext {
 // provider.
 func TestResolveCommand_BudgetExhaustedBlocks(t *testing.T) {
 	t.Parallel()
-	prov := &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: `{"tool":"create_task","args":{},"confidence":1}`}}
+	prov := &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: `{"tool":"create_task","args":{},"confidence":1}`, Termination: providers.TerminationComplete}}
 	wp := NewWorkspaceProvider(&meteringResolver{provider: prov}, extractWSFixed(7)).
 		WithMetering(fixedGuard{err: ai.ErrDailyBudgetExceeded}, nil, nil)
 
@@ -84,6 +86,7 @@ func TestResolveCommand_SuccessLogsInvocationWithCost(t *testing.T) {
 		kind: providers.Kind("mock"),
 		resp: &providers.Response{
 			Text:         `{"tool":"create_task","args":{},"confidence":1}`,
+			Termination:  providers.TerminationComplete,
 			InputTokens:  31,
 			OutputTokens: 12,
 			CostCents:    42,

@@ -297,6 +297,69 @@ func TestImportJobCancelStopsTheRun(t *testing.T) {
 		"a cancelled job must not be resurrected by a later pass")
 }
 
+// TestImportWorkerFinishesClaimedJobWhenStopped covers a shutdown landing
+// mid-import: cancelling the pass stops further claims, but the job it
+// already holds runs to a terminal state. Abandoning it would leave the
+// row running until the reaper fails it, and a retry would duplicate the
+// rows that had already landed.
+//
+// Not parallel: a sibling's pass could claim this job, and then the
+// cancellation would never reach the run under test.
+func TestImportWorkerFinishesClaimedJobWhenStopped(t *testing.T) {
+	bootstrap(t)
+
+	tenant := newTenant(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	const total = 300
+	var rows strings.Builder
+	rows.WriteString("title\n")
+	for i := 0; i < total; i++ {
+		fmt.Fprintf(&rows, "row %d\n", i)
+	}
+	jobPub, _ := createImportJob(ctx, t, tenant, "csv", map[string]any{"csv": rows.String()})
+
+	passCtx, stopPass := context.WithCancel(ctx)
+	defer stopPass()
+	cancelledAt := make(chan int, 1)
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		for passCtx.Err() == nil {
+			var n int
+			err := testDB.QueryRowContext(ctx, `
+				SELECT COUNT(*)
+				  FROM tasks t
+				  JOIN projects p ON p.id = t.project_id
+				 WHERE p.public_id = UUID_TO_BIN(?, 0)`, tenant.ProjectPublicID).Scan(&n)
+			if err == nil && n > 0 {
+				cancelledAt <- n
+				stopPass()
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	_, _ = newImportWorker(t).RunOnce(passCtx)
+	stopPass()
+	<-watcherDone
+	select {
+	case n := <-cancelledAt:
+		require.Less(t, n, total, "the pass must be cancelled while the job is still creating tasks")
+	default:
+		require.FailNow(t, "the pass was never cancelled mid-job")
+	}
+
+	job := readImportJob(t, tenant, jobPub)
+	require.Equal(t, "completed", job.Status, "a claimed job must reach a terminal state when the pass is cancelled")
+	require.Equal(t, total, job.TotalItems)
+	require.Equal(t, total, job.ProcessedItems)
+	require.Equal(t, 0, job.FailedItems, "no row may fail because the pass was cancelled")
+	require.Equal(t, total, countTasksInProject(ctx, t, tenant.ProjectPublicID))
+}
+
 // TestImportWorkerReapsAbandonedJobs covers the failure mode this queue
 // would otherwise reintroduce one step later: a worker that dies with a
 // job claimed leaves it running forever, which reads exactly like the

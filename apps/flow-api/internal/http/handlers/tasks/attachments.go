@@ -96,6 +96,19 @@ func DeleteAttachment(deps Deps) func(context.Context, *DeleteTaskAttachmentInpu
 			storageKeyToRemove = ""
 			qtx := generated.New(tx)
 
+			// The delete bumps the task's work revision through a trigger, so
+			// the task row is locked first, in the order presign takes them.
+			if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+				ID:          task.ID,
+				WorkspaceID: ws.ID,
+			}); err != nil {
+				if stderrors.Is(err, sql.ErrNoRows) {
+					answered = httpErr(apierrors.WsTaskNotFound)
+					return errAnswered
+				}
+				return err
+			}
+
 			// Resolve the storage_object_id BEFORE the soft-delete so we
 			// can decrement its ref count in the same transaction. The
 			// lookup is scoped to the task whose ACL the caller already

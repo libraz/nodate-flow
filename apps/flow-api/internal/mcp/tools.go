@@ -1623,7 +1623,8 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 			PublicID:    cpub,
 			WorkspaceID: s.workspaceID,
 			TaskID:      sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
-			AuthorID:    s.userID,
+			AuthorID:    sql.NullInt32{Int32: int32(s.userID), Valid: true},     //#nosec G115 -- verified users.id is an INT UNSIGNED key
+			AuthorKind:  generated.CommentsAuthorKindUser,
 			Body:        in.Body,
 		})
 		if e != nil {
@@ -1803,7 +1804,11 @@ func runProposePriority(ctx context.Context, deps Deps, s *session, raw json.Raw
 		summary = row.Title + "\n\n" + row.Description.String
 	}
 	// Filed under the task its prompt quotes, as propose_steps is.
-	label, err := deps.AI.ProposePriority(ai.WithTaskID(ctx, taskInternal), s.workspaceID, summary)
+	invocationCtx := ai.WithInputResources(
+		ai.WithTaskID(ctx, taskInternal),
+		ai.TaskInputResource(row.PublicID.String()),
+	)
+	label, err := deps.AI.ProposePriority(invocationCtx, s.workspaceID, summary)
 	if err != nil {
 		return nil, aiFailure(err)
 	}
@@ -1942,7 +1947,11 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	})
 	if err == nil {
 		for _, c := range childRows {
-			children = append(children, ai.ChildTaskSummary{Title: c.Title, State: string(c.DerivedState)})
+			children = append(children, ai.ChildTaskSummary{
+				PublicID: c.PublicID.String(),
+				Title:    c.Title,
+				State:    string(c.DerivedState),
+			})
 		}
 	}
 	// The interfaces stay unset when no embedder is configured: a nil
@@ -1959,7 +1968,9 @@ func runProposeSteps(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	}
 	// The invocation is filed under the task its prompt quotes, so the
 	// invocation list can apply the task's visibility to it.
-	steps, err := deps.AI.ProposeSteps(ai.WithTaskID(ctx, taskInternal), s.workspaceID, row.Title, desc, ai.GranularityStandard, children, embedClient, reader, vis)
+	invocationCtx := ai.WithInvocationAudience(ai.WithTaskID(ctx, taskInternal), ai.InvocationAudienceInitiator)
+	invocationCtx = ai.WithInputResources(invocationCtx, ai.TaskInputResource(row.PublicID.String()))
+	steps, err := deps.AI.ProposeSteps(invocationCtx, s.workspaceID, row.Title, desc, ai.GranularityStandard, children, embedClient, reader, vis)
 	if err != nil {
 		return nil, aiFailure(err)
 	}

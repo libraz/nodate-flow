@@ -8,6 +8,7 @@ package inbox
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -17,12 +18,18 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/inboxtriage"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
 )
 
 // TriageDeps is the dependency bundle for the triage endpoint. It is a
@@ -30,7 +37,8 @@ import (
 // AI orchestrator and we want to keep handler wiring narrow.
 type TriageDeps struct {
 	Deps
-	AI *ai.Orchestrator
+	AI                *ai.Orchestrator
+	SuggestionPrivacy *suggestionprivacy.Store
 }
 
 // TriageSuggestion is the per-item DTO returned to the client.
@@ -67,7 +75,7 @@ type TriageOutput struct {
 // shape as the LLM path. Used when no AI provider is configured
 // and when the daily budget is exhausted, so the triage UI is
 // never empty.
-func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vis acl.VisibilityArgs, limit int) ([]ai.InboxTriageSuggestion, error) {
+func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vis acl.VisibilityArgs, limit int) ([]ai.InboxTriageSuggestion, map[string]string, []types.PublicID, error) {
 	rows, err := deps.Queries.ListInbox(ctx, generated.ListInboxParams{
 		WorkspaceID: wsID,
 		IsElevated:  vis.IsElevated,
@@ -76,7 +84,15 @@ func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vi
 		Offset:      0,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
+	}
+	sourceVersions, err := ai.CaptureInboxTriageSourceVersions(rows)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("inbox: capture deterministic triage evidence: %w", err)
+	}
+	taskRefs, err := ai.CaptureInboxTriageTaskRefs(rows)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("inbox: capture deterministic triage task refs: %w", err)
 	}
 	now := time.Now().UTC()
 	signals := make([]inboxtriage.Signal, 0, len(rows))
@@ -86,7 +102,7 @@ func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vi
 			Source:      string(r.Source),
 			Kind:        r.Kind,
 			ReceivedAt:  r.ReceivedAt,
-			HasTask:     r.TaskPublicID.Valid && r.TaskPublicID.String != "",
+			HasTask:     r.TaskVisible.Valid && r.TaskVisible.Bool && r.TaskPublicID.Valid && r.TaskPublicID.String != "",
 			Now:         now,
 		})
 	}
@@ -100,7 +116,60 @@ func deterministicFallback(ctx context.Context, deps TriageDeps, wsID uint32, vi
 			Reasoning:         r.Reasoning,
 		})
 	}
-	return out, nil
+	return out, sourceVersions, taskRefs, nil
+}
+
+// persistDeterministicSuggestions gives fallback results a durable proposal
+// identity and exact source version just like model-backed results. Without
+// this event the new command endpoint could not safely hydrate the action
+// returned to an inbox user.
+func persistDeterministicSuggestions(ctx context.Context, deps TriageDeps, wsID, actorID uint32, suggestions []ai.InboxTriageSuggestion, sourceVersions map[string]string, taskRefs []types.PublicID) error {
+	if deps.DB == nil {
+		return nil
+	}
+	if len(suggestions) == 0 {
+		return nil
+	}
+	if deps.SuggestionPrivacy == nil || actorID == 0 {
+		return fmt.Errorf("inbox: suggestion privacy is not configured for the authenticated actor")
+	}
+	refs := make([]suggestionprivacy.Ref, 0, len(taskRefs))
+	for _, taskID := range taskRefs {
+		refs = append(refs, suggestionprivacy.Ref{Kind: suggestionprivacy.ResourceTask, PublicID: taskID})
+	}
+	batchID, err := deps.SuggestionPrivacy.Create(ctx, wsID, actorID, refs)
+	if err != nil {
+		return fmt.Errorf("inbox: persist deterministic suggestion provenance: %w", err)
+	}
+	if err := deps.SuggestionPrivacy.Authorize(ctx, generated.New(deps.DB), wsID, actorID, batchID); err != nil {
+		return fmt.Errorf("inbox: deterministic suggestion input is no longer readable: %w", err)
+	}
+	return dbretry.InTx(ctx, deps.DB, "inbox.PersistDeterministicSuggestions", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		for _, suggestion := range suggestions {
+			sourceVersion, ok := sourceVersions[suggestion.InboxItemID]
+			if !ok {
+				continue
+			}
+			if err := deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
+				EventType:    eventbus.AiSuggestionProposed,
+				AuditAction:  "inbox.ai_propose",
+				ResourceType: "signal",
+				ResourceID:   suggestion.InboxItemID,
+				Payload: map[string]any{
+					"inbox_item_id":       suggestion.InboxItemID,
+					"score":               suggestion.Score,
+					"action":              suggestion.RecommendedAction,
+					"reasoning":           suggestion.Reasoning,
+					"source_version":      sourceVersion,
+					"suggestion_batch_id": batchID.String(),
+				},
+				CallSite: "inbox.PersistDeterministicSuggestions",
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // RegisterTriage wires POST /workspaces/{wsId}/inbox/triage. The caller
@@ -140,28 +209,33 @@ func Triage(deps TriageDeps) func(context.Context, *TriageInput) (*TriageOutput,
 			limit = 50
 		}
 
-		// Try the LLM-backed path first. On ErrNoProvider or
-		// ErrDailyBudgetExceeded we fall back to the deterministic
-		// rule engine so the triage UI is never empty.
-		// Other errors (parse failures, upstream errors) bubble up
-		// as before — those indicate a misconfigured provider, not
-		// the "no LLM" case.
+		// No provider or no budget falls back to the rule engine; any other model error surfaces.
 		var suggestions []ai.InboxTriageSuggestion
+		var sourceVersions map[string]string
+		var taskRefs []types.PublicID
+		usedFallback := false
 		if deps.AI != nil {
 			suggestions, err = deps.AI.ProposeInboxTriage(ctx, wsID, vis, limit)
 			if err != nil {
 				switch {
-				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
-					suggestions, err = deterministicFallback(ctx, deps, wsID, vis, limit)
+				case errors.Is(err, ai.ErrNoProvider), errors.Is(err, providers.ErrNoEnabledProvider), errors.Is(err, ai.ErrDailyBudgetExceeded):
+					suggestions, sourceVersions, taskRefs, err = deterministicFallback(ctx, deps, wsID, vis, limit)
+					usedFallback = true
 				default:
 					return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))
 				}
 			}
 		} else {
-			suggestions, err = deterministicFallback(ctx, deps, wsID, vis, limit)
+			suggestions, sourceVersions, taskRefs, err = deterministicFallback(ctx, deps, wsID, vis, limit)
+			usedFallback = true
 		}
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if usedFallback {
+			if err := persistDeterministicSuggestions(ctx, deps, wsID, actorID, suggestions, sourceVersions, taskRefs); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 		}
 		out := &TriageOutput{}
 		out.Body.Suggestions = make([]TriageSuggestion, 0, len(suggestions))

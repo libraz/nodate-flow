@@ -25,9 +25,24 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
+
+var (
+	verdictOutputSpec, verdictOutputSpecErr = providers.NewOutputSpec("signal_verdict", []byte(verdictJSONSchema))
+)
+
+// VerdictOutputSpec returns an independent copy of the exact JSON Schema
+// embedded in the signal judge prompt. The provider receives this static
+// contract and outputcontract validates against the same full schema locally.
+func VerdictOutputSpec() (*providers.OutputSpec, error) {
+	if verdictOutputSpecErr != nil {
+		return nil, fmt.Errorf("signaljudge: invalid verdict output schema: %w", verdictOutputSpecErr)
+	}
+	return verdictOutputSpec.Clone(), nil
+}
 
 // Verdict is the structured output the signal_judge LLM returns.
 // Marshalling round-trips through [json.Marshal]; the JSON shape is

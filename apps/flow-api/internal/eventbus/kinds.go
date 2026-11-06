@@ -27,6 +27,11 @@ const (
 	TaskActorAdded   = sharedbus.TaskActorAdded
 	TaskActorRemoved = sharedbus.TaskActorRemoved
 
+	TaskSubmissionCreated = sharedbus.TaskSubmissionCreated
+	TaskReviewDecided     = sharedbus.TaskReviewDecided
+	TaskHandoffRequested  = sharedbus.TaskHandoffRequested
+	TaskHandoffDecided    = sharedbus.TaskHandoffDecided
+
 	TaskDependencyAdded   = sharedbus.TaskDependencyAdded
 	TaskDependencyRemoved = sharedbus.TaskDependencyRemoved
 

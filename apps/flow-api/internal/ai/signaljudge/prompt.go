@@ -114,11 +114,8 @@ Return exactly one JSON object that conforms to the schema below. No prose befor
 ` + "```json\n" + verdictJSONSchema + "\n```"
 
 // verdictJSONSchema is the JSON Schema describing the [Verdict] shape
-// the LLM must return. The schema is embedded in the system prompt so
-// structured-output providers (OpenAI response_format, Anthropic tool
-// use, etc.) can attach it directly; production wiring may also feed
-// it to the abstraction layer's structured-output knob when one is
-// available.
+// the LLM must return. The prompt and [VerdictOutputSpec] share these
+// exact bytes so provider constraints and local validation cannot drift.
 //
 // The schema is intentionally strict (additionalProperties: false,
 // closed enumerations) so an LLM that obeys the schema cannot smuggle

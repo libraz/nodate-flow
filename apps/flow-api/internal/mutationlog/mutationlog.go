@@ -36,6 +36,7 @@ package mutationlog
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
@@ -44,6 +45,11 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
+
+// ErrActorConflict reports that a mutation names more than one distinct
+// human or agent author. Transactional callers must treat it as a failed
+// mutation, even when they choose not to return the error from their unit.
+var ErrActorConflict = errors.New("mutationlog: conflicting actor identity")
 
 // Actor is who made the change and where. Both tables record the same
 // pair, so it is one value rather than two arguments each call site
@@ -55,6 +61,10 @@ import (
 type Actor struct {
 	// UserID is the internal users.id of the actor, or zero for none.
 	UserID uint32
+	// AgentID is the internal ai_agents.id of the actor, or zero for none.
+	// It is mutually exclusive with UserID; a delegator belongs in the
+	// mutation payload rather than being presented as the author.
+	AgentID uint32
 	// WorkspaceID is the internal workspaces.id the change belongs to.
 	// Required: a row in either table without it belongs to no tenant.
 	WorkspaceID uint32
@@ -151,6 +161,10 @@ func New(db *sql.DB, q *generated.Queries) *Recorder {
 // [Recorder.RecordStrict] where the change is idempotent and a retry is
 // what repairs the log.
 func (r *Recorder) Record(ctx context.Context, a Actor, m Mutation) {
+	a, m, err := r.normalizeActor(ctx, a, m)
+	if err != nil {
+		return
+	}
 	if !r.ready(ctx, a, m, true) {
 		return
 	}
@@ -164,6 +178,10 @@ func (r *Recorder) Record(ctx context.Context, a Actor, m Mutation) {
 // change. The audit row stays best effort either way — losing it must
 // not turn a successful mutation into a failure.
 func (r *Recorder) RecordStrict(ctx context.Context, a Actor, m Mutation) error {
+	a, m, err := r.normalizeActor(ctx, a, m)
+	if err != nil {
+		return err
+	}
 	if !r.ready(ctx, a, m, true) {
 		return nil
 	}
@@ -193,6 +211,13 @@ func (r *Recorder) RecordStrict(ctx context.Context, a Actor, m Mutation) error 
 // defer, and passing that handle here would silently degrade to
 // [Recorder.RecordStrict] while reading as if it were transactional.
 func (r *Recorder) RecordInTx(ctx context.Context, tx *dbretry.Tx, a Actor, m Mutation) error {
+	a, m, err := r.normalizeActor(ctx, a, m)
+	if err != nil {
+		if tx != nil {
+			tx.Fail(err)
+		}
+		return err
+	}
 	if !r.ready(ctx, a, m, true) {
 		return nil
 	}
@@ -259,10 +284,41 @@ func (r *Recorder) RecordHandBack(ctx context.Context, tx *dbretry.Tx, a Actor, 
 // Call it after the helper's transaction has committed. Before that, an
 // audit row can outlive a rollback.
 func (r *Recorder) RecordTxAudit(ctx context.Context, a Actor, m Mutation) {
+	a, m, err := r.normalizeActor(ctx, a, m)
+	if err != nil {
+		return
+	}
 	if !r.ready(ctx, a, m, false) {
 		return
 	}
 	r.writeAudit(ctx, a, m)
+}
+
+// normalizeActor rejects ambiguous provenance and folds the new Actor.AgentID
+// into Mutation.ActorAgentID so all existing event writers use one path. The
+// mutation field remains accepted for legacy agent calls such as hand-back.
+func (r *Recorder) normalizeActor(ctx context.Context, a Actor, m Mutation) (Actor, Mutation, error) {
+	if a.UserID != 0 && a.AgentID != 0 {
+		slog.ErrorContext(ctx, "mutationlog: ambiguous human and agent actors",
+			slog.String("audit_action", m.AuditAction),
+			slog.String("call_site", m.CallSite),
+		)
+		return a, m, ErrActorConflict
+	}
+	if a.AgentID != 0 {
+		agentID := int64(a.AgentID)
+		if m.ActorAgentID != nil && *m.ActorAgentID != agentID {
+			slog.ErrorContext(ctx, "mutationlog: conflicting agent actors",
+				slog.String("audit_action", m.AuditAction),
+				slog.String("call_site", m.CallSite),
+			)
+			return a, m, ErrActorConflict
+		}
+		if m.ActorAgentID == nil {
+			m.ActorAgentID = &agentID
+		}
+	}
+	return a, m, nil
 }
 
 // ready reports whether the recorder can write and the mutation says

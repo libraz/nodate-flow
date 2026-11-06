@@ -151,8 +151,69 @@ func Run(ctx context.Context, name string, log *slog.Logger, fn func(ctx context
 	}
 }
 
+// Handle represents one complete supervised run. Its completion signal is
+// closed only after Run has stopped, including any panic recovery and
+// restart backoff.
+type Handle struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+	once   sync.Once
+}
+
+// StartManaged supervises fn under name and returns a handle that can both
+// stop and wait for the whole supervisor. Unlike a per-iteration done
+// signal, Handle.Wait cannot report completion while Run is restarting a
+// panicked or prematurely returned loop.
+func StartManaged(ctx context.Context, name string, log *slog.Logger, fn func(ctx context.Context)) *Handle {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	loopCtx, cancel := context.WithCancel(ctx)
+	h := &Handle{cancel: cancel, done: make(chan struct{})}
+	go func() {
+		defer close(h.done)
+		defer cancel()
+		Run(loopCtx, name, log, fn)
+	}()
+	return h
+}
+
+// Stop cancels the supervised loop without waiting for it to return. It is
+// safe to call more than once.
+func (h *Handle) Stop() {
+	if h == nil {
+		return
+	}
+	h.once.Do(h.cancel)
+}
+
+// Done returns a channel closed when the complete supervised run returns.
+func (h *Handle) Done() <-chan struct{} {
+	if h == nil {
+		return nil
+	}
+	return h.done
+}
+
+// Wait waits for the complete supervised run to return, or for ctx to be
+// cancelled first.
+func (h *Handle) Wait(ctx context.Context) error {
+	if h == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-h.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // Start supervises fn under name in its own goroutine and hands back the
-// single function that ends it.
+// single nonblocking function that ends it.
 //
 // The loop runs under a context derived from ctx, and stop cancels that
 // context. Cancelling is the only clean way to end a supervised loop: a
@@ -170,9 +231,7 @@ func Run(ctx context.Context, name string, log *slog.Logger, fn func(ctx context
 // would hold the shutdown open past its deadline, and the drain budget
 // belongs to in-flight requests. Calling stop more than once is safe.
 func Start(ctx context.Context, name string, log *slog.Logger, fn func(ctx context.Context)) (stop func()) {
-	loopCtx, cancel := context.WithCancel(ctx)
-	go Run(loopCtx, name, log, fn)
-	return cancel
+	return StartManaged(ctx, name, log, fn).Stop
 }
 
 // runOnce calls fn and reports whether it panicked. The recover lives in

@@ -13,6 +13,7 @@ CREATE TABLE intake_items (
 
   title               VARCHAR(500) NOT NULL                   COMMENT 'Item title',
   body                MEDIUMTEXT NULL                         COMMENT 'Item body / details',
+  source_url          VARCHAR(2048) NULL                       COMMENT 'Validated HTTP(S) link to the originating source',
   triage_status       ENUM('pending','accepted','rejected','snoozed','duplicate') NOT NULL DEFAULT 'pending' COMMENT 'Current triage state',
   snooze_until        DATETIME(3) NULL                        COMMENT 'Snooze expiry (NULL = not snoozed)',
   ai_score            DECIMAL(3,2) NULL                       COMMENT '0.00-1.00',
@@ -27,6 +28,7 @@ CREATE TABLE intake_items (
 
   UNIQUE KEY uniq_intake_items_public_id (public_id),
   UNIQUE KEY uniq_intake_items_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_intake_items_workspace_signal (workspace_id, signal_id),
   KEY idx_intake_items_workspace_id_status (workspace_id, triage_status),
   KEY idx_intake_items_workspace_id_snooze (workspace_id, snooze_until),
   KEY idx_intake_items_signal_id (signal_id),

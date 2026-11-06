@@ -53,7 +53,7 @@ func rowToProjectMember(r generated.ListProjectMembersRow) ProjectMember {
 		UserID:      r.UserPublicID.String(),
 		Email:       r.Email,
 		DisplayName: r.DisplayName,
-		AvatarURL:   nullStr(r.AvatarUrl),
+		AvatarURL:   handlerutil.AvatarURL(r.AvatarUrl, r.UserPublicID),
 		Role:        string(r.Role),
 		AddedAt:     dbtype.UnixSecondsFromNullTime(r.AddedAt),
 		CreatedAt:   r.CreatedAt.Unix(),

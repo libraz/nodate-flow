@@ -11,6 +11,10 @@ CREATE TABLE ai_invocations (
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
   agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
+  audience ENUM('initiator','task','workspace') NOT NULL DEFAULT 'initiator' COMMENT 'Who may read the redacted prompt and response after current ACL checks',
+  input_resources_json JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Public references to task content included in the provider input; never internal IDs',
+  input_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Expected number of normalized task provenance references',
+  provenance_valid BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'False means ordinary readers must fail closed on provenance',
 
   purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
   model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Model name actually used',

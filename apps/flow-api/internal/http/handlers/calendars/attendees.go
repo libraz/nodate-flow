@@ -13,7 +13,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
-	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
 // --- Input/Output types ---
@@ -203,7 +202,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 					CanEdit:     row.CanEdit,
 					CreatedAt:   row.CreatedAt.Unix(),
 				}
-				resp.AvatarURL = dbtype.PtrFromNullString(row.AvatarUrl)
+				resp.AvatarURL = handlerutil.AvatarURLPtr(row.AvatarUrl, types.FromUUID(uid))
 				out.Body.Attendees = append(out.Body.Attendees, resp)
 				continue
 			}
@@ -234,7 +233,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				CanEdit:     false,
 				CreatedAt:   handlerutil.NowUnix(),
 			}
-			resp.AvatarURL = dbtype.PtrFromNullString(profile.AvatarUrl)
+			resp.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, types.FromUUID(uid))
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
@@ -288,16 +287,7 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 		out := &ListAttendeesOutput{}
 		out.Body.Attendees = make([]AttendeeResponse, len(rows))
 		for i, r := range rows {
-			resp := AttendeeResponse{
-				ID:          r.PublicID.String(),
-				UserID:      r.UserPublicID.String(),
-				DisplayName: r.DisplayName,
-				Rsvp:        string(r.Rsvp),
-				CanEdit:     r.CanEdit,
-				CreatedAt:   r.CreatedAt.Unix(),
-			}
-			resp.AvatarURL = dbtype.PtrFromNullString(r.AvatarUrl)
-			out.Body.Attendees[i] = resp
+			out.Body.Attendees[i] = attendeeFromRow(r)
 		}
 		return out, nil
 	}
@@ -509,4 +499,18 @@ func ToggleCanEdit(deps Deps) func(context.Context, *ToggleCanEditInput) (*Toggl
 
 		return out, nil
 	}
+}
+
+// attendeeFromRow maps a listed event attendee to its response.
+func attendeeFromRow(r calendar.ListCalendarEventAttendeesRow) AttendeeResponse {
+	resp := AttendeeResponse{
+		ID:          r.PublicID.String(),
+		UserID:      r.UserPublicID.String(),
+		DisplayName: r.DisplayName,
+		Rsvp:        string(r.Rsvp),
+		CanEdit:     r.CanEdit,
+		CreatedAt:   r.CreatedAt.Unix(),
+	}
+	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.UserPublicID)
+	return resp
 }

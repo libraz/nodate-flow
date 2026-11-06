@@ -83,6 +83,36 @@ func ResolveSnapConfig(ctx context.Context, tx TX, workspaceID, userID uint32) (
 	return cfg, nil
 }
 
+// ResolveAgentSnapConfig resolves snapping for an agent from workspace
+// defaults only. Agents have no personal calendar preferences, and a
+// delegating user's private settings must not silently affect the agent's
+// scheduling decisions. The workspace's working week and timezone apply;
+// absent a workspace row, snapping remains off as for other system writes.
+func ResolveAgentSnapConfig(ctx context.Context, tx TX, workspaceID uint32) (SnapConfig, error) {
+	cfg := SnapConfig{Mode: region.SnapOff}
+	if workspaceID == 0 {
+		return cfg, nil
+	}
+	var workingDays, timezone sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT working_days, timezone FROM workspaces WHERE id = ? AND enabled = TRUE`, workspaceID,
+	).Scan(&workingDays, &timezone)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return cfg, nil
+		}
+		return cfg, fmt.Errorf("itemkit: load workspace %d agent snap defaults: %w", workspaceID, err)
+	}
+	zone, err := region.Resolve(valueOrEmpty(timezone))
+	if err != nil {
+		return cfg, fmt.Errorf("itemkit: resolve workspace %d agent snap timezone: %w", workspaceID, err)
+	}
+	cfg.Mode = region.SnapWarn
+	cfg.WorkingDays = region.EffectiveWorkingDays("", valueOrEmpty(workingDays))
+	cfg.Zone = zone
+	return cfg, nil
+}
+
 // effectiveCountry picks the ISO 3166-1 alpha-2 code whose holidays
 // apply to the actor: their own if set, otherwise the workspace's.
 func effectiveCountry(userCountry, wsCountry sql.NullString) string {

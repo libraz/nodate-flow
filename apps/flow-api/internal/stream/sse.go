@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/lifecycle"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/problem"
 )
@@ -72,7 +73,8 @@ type ReauthorizeFunc func(r *http.Request) error
 // for a route mounted behind an auth gate.
 //
 // The handler runs until the client disconnects, the request context
-// is cancelled, or reauthorize refuses. Each published [Event] is
+// is cancelled, the server begins shutting down
+// ([lifecycle.StreamShutdown]), or reauthorize refuses. Each published [Event] is
 // written as a single SSE frame; idle periods are punctuated by
 // ": ping" comment lines at [heartbeatInterval].
 func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc, reauthorize ReauthorizeFunc) http.HandlerFunc {
@@ -132,10 +134,13 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc, reauthorize R
 		defer ticker.Stop()
 		recheck := time.NewTicker(reauthorizeInterval)
 		defer recheck.Stop()
+		serverClosing := lifecycle.StreamShutdown(ctx)
 
 		for {
 			select {
 			case <-ctx.Done():
+				return
+			case <-serverClosing:
 				return
 			case evt, ok := <-ch:
 				if !ok {

@@ -61,8 +61,8 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if !strings.Contains(got.query, "INSERT INTO events") {
 		t.Fatalf("query = %q, want an INSERT INTO events", got.query)
 	}
-	if len(got.args) != 8 {
-		t.Fatalf("arg count = %d, want 8", len(got.args))
+	if len(got.args) != 9 {
+		t.Fatalf("arg count = %d, want 9", len(got.args))
 	}
 	if got.args[0] != driver.Value(pubID) {
 		t.Errorf("public_id arg = %v, want the returned %v", got.args[0], pubID)
@@ -77,20 +77,73 @@ func TestAppendWritesTheRow(t *testing.T) {
 		t.Errorf("actor_user_id arg = %v, want %d", got.args[3], actor)
 	}
 	if got.args[4] != nil {
-		t.Errorf("subject_public_id arg = %v, want NULL for a kind with no subject", got.args[4])
+		t.Errorf("actor_agent_id arg = %v, want NULL for a human actor", got.args[4])
 	}
-	if got.args[5] != driver.Value(string(eventbus.ItemScheduled)) {
-		t.Errorf("type arg = %v, want item.scheduled", got.args[5])
+	if got.args[5] != nil {
+		t.Errorf("subject_public_id arg = %v, want NULL for a kind with no subject", got.args[5])
 	}
-	raw, ok := got.args[6].(json.RawMessage)
+	if got.args[6] != driver.Value(string(eventbus.ItemScheduled)) {
+		t.Errorf("type arg = %v, want item.scheduled", got.args[6])
+	}
+	raw, ok := got.args[7].(json.RawMessage)
 	if !ok {
-		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[6])
+		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[7])
 	}
 	if string(raw) != `{"note":"hello"}` {
 		t.Errorf("payload arg = %s, want the marshalled payload", raw)
 	}
-	if got.args[7] != driver.Value(occurred) {
-		t.Errorf("occurred_at arg = %v, want %v", got.args[7], occurred)
+	if got.args[8] != driver.Value(occurred) {
+		t.Errorf("occurred_at arg = %v, want %v", got.args[8], occurred)
+	}
+}
+
+func TestAppendRejectsAmbiguousHumanAndAgentActors(t *testing.T) {
+	db, rec := stubDB(t)
+	user, agent := uint32(7), uint32(41)
+
+	_, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:         eventbus.ItemScheduled,
+		WorkspaceID:  3,
+		ActorUserID:  &user,
+		ActorAgentID: &agent,
+	})
+	if err == nil {
+		t.Fatal("append accepted both a human and an agent actor")
+	}
+	if n := len(rec.statements()); n != 0 {
+		t.Fatalf("statement count = %d, want 0 — ambiguous actor was rejected", n)
+	}
+}
+
+func TestAppendWritesAgentActorWithoutHumanActor(t *testing.T) {
+	db, rec := stubDB(t)
+	agent := uint32(41)
+
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:         eventbus.TaskTransitionReopen,
+		WorkspaceID:  3,
+		ActorAgentID: &agent,
+		Payload:      map[string]any{"taskId": dbtype.New().String()},
+	}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	stmts := rec.statements()
+	if len(stmts) != 1 {
+		t.Fatalf("statement count = %d, want 1", len(stmts))
+	}
+	got := stmts[0]
+	if !strings.Contains(got.query, "actor_agent_id") {
+		t.Fatalf("query = %q, want actor_agent_id in the events insert", got.query)
+	}
+	if len(got.args) != 9 {
+		t.Fatalf("arg count = %d, want 9", len(got.args))
+	}
+	if got.args[3] != nil {
+		t.Errorf("actor_user_id arg = %v, want NULL for an agent actor", got.args[3])
+	}
+	if got.args[4] != driver.Value(agent) {
+		t.Errorf("actor_agent_id arg = %v, want %d", got.args[4], agent)
 	}
 }
 
@@ -107,9 +160,9 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	after := time.Now().UTC()
 
 	args := rec.statements()[0].args
-	raw, ok := args[6].(json.RawMessage)
+	raw, ok := args[7].(json.RawMessage)
 	if !ok || string(raw) != "{}" {
-		t.Errorf("payload arg = %v, want {}", args[6])
+		t.Errorf("payload arg = %v, want {}", args[7])
 	}
 	if args[2] != nil {
 		t.Errorf("task_id arg = %v, want NULL for an event with no task", args[2])
@@ -117,9 +170,12 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	if args[3] != nil {
 		t.Errorf("actor_user_id arg = %v, want NULL for a system event", args[3])
 	}
-	occurred, ok := args[7].(time.Time)
+	if args[4] != nil {
+		t.Errorf("actor_agent_id arg = %v, want NULL for a system event", args[4])
+	}
+	occurred, ok := args[8].(time.Time)
 	if !ok {
-		t.Fatalf("occurred_at arg is %T, want time.Time", args[6])
+		t.Fatalf("occurred_at arg is %T, want time.Time", args[8])
 	}
 	if occurred.Before(before) || occurred.After(after) {
 		t.Errorf("occurred_at = %v, want a timestamp taken during the call", occurred)
@@ -628,7 +684,7 @@ func TestAppendWritesTheSubject(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
-	if got := rec.statements()[0].args[4]; got != driver.Value(subject) {
+	if got := rec.statements()[0].args[5]; got != driver.Value(subject) {
 		t.Errorf("subject_public_id arg = %v, want %v", got, subject)
 	}
 

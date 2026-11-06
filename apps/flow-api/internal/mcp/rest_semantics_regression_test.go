@@ -107,7 +107,7 @@ func (p *capturingProvider) Complete(_ context.Context, req providers.Request) (
 	p.mu.Lock()
 	p.prompts = append(p.prompts, req.Prompt)
 	p.mu.Unlock()
-	return &providers.Response{Model: "capturing-model", Text: p.text}, nil
+	return &providers.Response{Termination: providers.TerminationComplete, Model: "capturing-model", Text: p.text}, nil
 }
 
 func capturingOrchestrator(p *capturingProvider) *ai.Orchestrator {

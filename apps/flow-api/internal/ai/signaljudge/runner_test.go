@@ -114,7 +114,7 @@ func TestExecuteJudgeHappyPath(t *testing.T) {
 		// runner's parse / validate retry loop fires and the test sees two
 		// invocations. The verdict shape mirrors what production prompts
 		// instruct the LLM to emit.
-		resp: &providers.Response{Text: `{"action":"noop","confidence":0.1,"reasoning_excerpt":"nothing actionable in this signal"}`, CostCents: 12},
+		resp: &providers.Response{Text: `{"action":"noop","confidence":0.1,"reasoning_excerpt":"nothing actionable in this signal"}`, Termination: providers.TerminationComplete, CostCents: 12},
 	}
 	var logged []InvocationRecord
 	r := &Runner{
@@ -169,8 +169,9 @@ func TestExecuteJudgeRedactsLastThought(t *testing.T) {
 		// the secret is embedded in reasoning_excerpt exactly as a
 		// misbehaving model might echo it back.
 		resp: &providers.Response{
-			Text:      `{"action":"noop","confidence":0.1,"reasoning_excerpt":"echoing key ` + secret + ` verbatim"}`,
-			CostCents: 3,
+			Text:        `{"action":"noop","confidence":0.1,"reasoning_excerpt":"echoing key ` + secret + ` verbatim"}`,
+			Termination: providers.TerminationComplete,
+			CostCents:   3,
 		},
 	}
 	var logged []InvocationRecord
@@ -250,7 +251,7 @@ func TestExecuteJudgeBudgetReadFailure(t *testing.T) {
 func TestExecuteJudgeUsesTheProviderOwningTheAgentsModel(t *testing.T) {
 	t.Parallel()
 	owner := types.New()
-	res := &fakeResolver{provider: &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: `{"action":"noop"}`}}}
+	res := &fakeResolver{provider: &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: validVerdict, Termination: providers.TerminationComplete}}}
 	r := &Runner{
 		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1, ProviderPublicID: owner}},
 		Signals:  &fakeSignalLookup{snap: SignalSnapshot{SignalID: 1, WorkspaceID: 1}},
@@ -311,7 +312,7 @@ func TestExecuteJudgeRefusesAnAgentAtItsMonthlyCap(t *testing.T) {
 // can customise the judge without code changes.
 func TestExecuteJudgeOverrideSystemPrompt(t *testing.T) {
 	t.Parallel()
-	prov := &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: "ok"}}
+	prov := &recordingProvider{kind: providers.Kind("mock"), resp: &providers.Response{Text: validVerdict, Termination: providers.TerminationComplete}}
 	custom := "You are the custom judge for this workspace."
 	r := &Runner{
 		Agents:   &fakeAgentLookup{snap: AgentSnapshot{AgentID: 1, WorkspaceID: 1, SystemPrompt: custom}},
@@ -347,7 +348,7 @@ func TestExecuteJudgeSendsTheAgentsConfiguredSettings(t *testing.T) {
 	prov := &recordingProvider{
 		kind:  providers.Kind("mock"),
 		model: "workspace-default-model",
-		resp:  &providers.Response{Text: `{"action":"noop","confidence":0.1,"reasoning_excerpt":"nothing actionable"}`},
+		resp:  &providers.Response{Text: `{"action":"noop","confidence":0.1,"reasoning_excerpt":"nothing actionable"}`, Termination: providers.TerminationComplete},
 	}
 	temp := uint16(15)
 	settings := airequest.AgentSettings{
@@ -402,8 +403,12 @@ func TestExecuteJudgeRetryKeepsTheAgentsSettings(t *testing.T) {
 	prov := &recordingProvider{
 		kind:  providers.Kind("mock"),
 		model: "workspace-default-model",
-		// Not a valid verdict, so the runner's single retry fires.
-		resp: &providers.Response{Text: "sorry, I cannot comply"},
+		// The first complete answer is malformed, so the runner's single
+		// repair call fires and supplies a valid verdict.
+		script: []providerAnswer{
+			{resp: &providers.Response{Text: "sorry, I cannot comply", Termination: providers.TerminationComplete}},
+			{resp: &providers.Response{Text: validVerdict, Termination: providers.TerminationComplete}},
+		},
 	}
 	temp := uint16(15)
 	r := &Runner{

@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,18 +23,10 @@ import (
 )
 
 // The memo write that records a hand-back carries `enabled = TRUE`, so it
-// can succeed and match no row: the task ACL resolved the task before the
-// request opened its transaction, and it stopped being live in between.
-// The event written after it is the visible half of the hand-back, so a
-// request that recorded the event over an unwritten memo would look, to
-// every reader afterwards, exactly like one that succeeded — an
-// announcement on the timeline above a handoff_status that never changed.
-//
-// The two cases below run the same writes with the same arguments,
-// differing only in what the driver reports as the memo write's
-// affected-row count. The pairing is the evidence: the absent event in
-// the zero-row case means something only because the one-row case shows
-// these inputs do produce it.
+// can match no task after the ACL resolved it. MySQL also reports zero
+// changed rows when the JSON patch matches the existing memo. These cases
+// distinguish the two by checking for the same workspace/task row before
+// deciding whether the hand-back event can be recorded.
 
 // TestHandoffWritesTheEventBehindAMemoThatLanded is the positive control.
 func TestHandoffWritesTheEventBehindAMemoThatLanded(t *testing.T) {
@@ -50,8 +43,26 @@ func TestHandoffWritesTheEventBehindAMemoThatLanded(t *testing.T) {
 		"a hand-back that was recorded must announce itself on the timeline")
 }
 
-// TestHandoffRefusesARequestWhoseMemoWriteMatchedNoTask is the case the
-// count answers. The request fails with the not-found this handler
+// TestHandoffAllowsAnUnchangedMemoWhenTheTaskStillExists covers the
+// zero-changed-row case where the task remains enabled and in scope.
+func TestHandoffAllowsAnUnchangedMemoWhenTheTaskStillExists(t *testing.T) {
+	t.Parallel()
+
+	stub := &handoffWriteStub{memoRows: 0, taskExists: true}
+	db := openHandoffStubDB(t, stub)
+
+	err := runHandoffWrites(t, db)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, stub.issued("SET agent_memo"), "the hand-back state must be attempted")
+	require.Equal(t, 1, stub.issued("SELECT t.agent_memo"),
+		"a zero changed-row count must be disambiguated by a scoped task lookup")
+	require.Equal(t, 1, stub.issued("INSERT INTO events"),
+		"an unchanged memo on an existing task must still record the handback event")
+}
+
+// TestHandoffRefusesARequestWhoseMemoWriteMatchedNoTask is the absent-row
+// case. The request fails with the not-found this handler
 // answers with for a task it cannot resolve at all, and the event that
 // would have announced the hand-back is never issued.
 func TestHandoffRefusesARequestWhoseMemoWriteMatchedNoTask(t *testing.T) {
@@ -91,15 +102,15 @@ func runHandoffWrites(t *testing.T, db *sql.DB) error {
 
 // --- stub driver ------------------------------------------------------
 
-// handoffWriteStub records the statements that reached it and decides
-// what the memo write reports as affected. A stub database/sql driver
-// stands in for MySQL because the count is the one thing these cases have
-// to control, and it is exactly what a driver decides.
+// handoffWriteStub records the statements that reached it and controls
+// both the memo update's changed-row count and the scoped task lookup. A
+// stub database/sql driver stands in for MySQL because those are the two
+// database outcomes the cases need to distinguish.
 type handoffWriteStub struct {
 	mu sync.Mutex
-	// memoRows is what the agent_memo UPDATE reports as affected. Zero is
-	// the task having been disabled or removed since the ACL resolved it.
+	// memoRows is what the agent_memo UPDATE reports as changed.
 	memoRows   int64
+	taskExists bool
 	statements []string
 }
 
@@ -133,6 +144,22 @@ type handoffWriteResult struct {
 
 func (r handoffWriteResult) LastInsertId() (int64, error) { return r.lastID, nil }
 func (r handoffWriteResult) RowsAffected() (int64, error) { return r.rows, nil }
+
+type handoffWriteRows struct {
+	values []driver.Value
+	done   bool
+}
+
+func (r *handoffWriteRows) Columns() []string { return []string{"agent_memo"} }
+func (r *handoffWriteRows) Close() error      { return nil }
+func (r *handoffWriteRows) Next(dest []driver.Value) error {
+	if r.done || len(r.values) == 0 {
+		return io.EOF
+	}
+	copy(dest, r.values)
+	r.done = true
+	return nil
+}
 
 type (
 	handoffWriteDriver struct{}
@@ -169,6 +196,21 @@ func (c handoffWriteConn) Begin() (driver.Tx, error) { return handoffWriteTx{}, 
 
 func (c handoffWriteConn) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
 	return c.stub.answer(query)
+}
+
+func (c handoffWriteConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	c.stub.mu.Lock()
+	c.stub.statements = append(c.stub.statements, query)
+	taskExists := c.stub.taskExists
+	c.stub.mu.Unlock()
+	if !strings.Contains(query, "SELECT t.agent_memo") {
+		return nil, fmt.Errorf("tasks: unexpected query %q", query)
+	}
+	rows := &handoffWriteRows{}
+	if taskExists {
+		rows.values = []driver.Value{[]byte(`{}`)}
+	}
+	return rows, nil
 }
 
 // CheckNamedValue accepts the argument types these writes bind (uint32

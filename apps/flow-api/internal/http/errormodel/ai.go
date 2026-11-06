@@ -37,6 +37,8 @@ func AIFailure(err error) (*apierr.Spec, string) {
 		return apierrors.AiAgentPaused, ""
 	// The lens compiler has its own code because the client answers it
 	// with a "rephrase" prompt rather than a generic failure.
+	case errors.Is(err, ai.ErrProposalInputsChanged):
+		return apierrors.AiProposalInputsChanged, ""
 	case errors.Is(err, nlquery.ErrUnparseable):
 		return apierrors.AiNlQueryUnparseable, ""
 	case errors.Is(err, ai.ErrParse),
@@ -44,6 +46,10 @@ func AIFailure(err error) (*apierr.Spec, string) {
 		errors.Is(err, nlcommand.ErrUnresolvable),
 		errors.Is(err, providers.ErrResponseInvalidJSON):
 		return apierrors.AiResponseInvalidJson, ""
+	case errors.Is(err, providers.ErrGenerationIncomplete):
+		return apierrors.AiResponseGenerationIncomplete, ""
+	case errors.Is(err, providers.ErrModelRefused):
+		return apierrors.AiResponseModelRefused, ""
 	case errors.Is(err, providers.ErrResponseSchemaMismatch):
 		return apierrors.AiResponseSchemaMismatch, ""
 	case errors.Is(err, providers.ErrUpstreamRateLimited):

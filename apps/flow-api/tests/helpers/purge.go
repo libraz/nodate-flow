@@ -31,6 +31,15 @@ var (
 	scopedTablesCache = map[*sql.DB][]string{}
 )
 
+// cascadeOnlyTables refuse a direct DELETE through a BEFORE DELETE trigger.
+// Foreign-key cascades do not fire triggers, so the task and workspace
+// deletes clear them; a new table of this kind fails the purge loudly.
+var cascadeOnlyTables = map[string]bool{
+	"task_handoffs":         true,
+	"task_review_decisions": true,
+	"task_submissions":      true,
+}
+
 // WorkspaceScopedTables returns every table in the connected schema
 // that carries a workspace_id column, sorted by name.
 //
@@ -192,7 +201,12 @@ func PurgeWorkspace(t *testing.T, db *sql.DB, workspacePublicID string) {
 	_, err = conn.ExecContext(ctx, "SET @nf_item_projection_engine = 1")
 	require.NoError(t, err, "take the projection engine role for the purge")
 
-	remaining := WorkspaceScopedTables(t, db)
+	var remaining []string
+	for _, table := range WorkspaceScopedTables(t, db) {
+		if !cascadeOnlyTables[table] {
+			remaining = append(remaining, table)
+		}
+	}
 	for len(remaining) > 0 {
 		var blocked []string
 		for _, table := range remaining {

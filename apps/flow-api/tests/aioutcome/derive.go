@@ -503,6 +503,9 @@ func (c *walkContext) omissions(body *ast.BlockStmt) []Finding {
 				out = append(out, at(KindUnchecked, nil))
 				continue
 			}
+			if c.finalOutcomeRecordedAfterValidation(list[i+1:], errIdent) {
+				continue
+			}
 			check, checkAt := findErrorCheck(list, i+1, errIdent)
 			if check == nil {
 				out = append(out, at(KindUnchecked, nil))
@@ -560,6 +563,136 @@ func (c *walkContext) omissions(body *ast.BlockStmt) []Finding {
 		}
 	}
 	return out
+}
+
+// finalOutcomeRecordedAfterValidation recognizes an unconditional recording
+// of the final provider outcome after a chain of nil-guarded error
+// validations. Each validation may replace the provider error only while no
+// earlier stage has failed; the terminal hook then receives the resulting
+// error value itself. This is the shared CompleteAndRecord shape: unlike a
+// branch-local hook, it accounts for both outcomes in one call, and the
+// validation result is already final when it is recorded.
+//
+// Keep the accepted flow narrow. An error write outside one of the guarded
+// validation assignments, a control transfer, or any intervening hook call
+// makes the result inconclusive and leaves the ordinary branch analysis in
+// charge.
+func (c *walkContext) finalOutcomeRecordedAfterValidation(stmts []ast.Stmt, errIdent string) bool {
+	validated := false
+	for _, stmt := range stmts {
+		switch node := stmt.(type) {
+		case *ast.AssignStmt:
+			if assignsTo(node, errIdent) {
+				return false
+			}
+		case *ast.IfStmt:
+			if c.firstReaching(node) != nil {
+				return false
+			}
+			if assignsToError := statementAssignsTo(node, errIdent); assignsToError {
+				if !isNilGuardedErrorValidation(node, errIdent) {
+					return false
+				}
+				validated = true
+				continue
+			}
+			if statementTransfersControl(node) {
+				return false
+			}
+		case *ast.ExprStmt:
+			call, ok := node.X.(*ast.CallExpr)
+			if !ok {
+				return false
+			}
+			chain := c.chainTo(call)
+			if chain == nil {
+				return false
+			}
+			if !validated || !callPassesIdentifier(call, errIdent) {
+				return false
+			}
+			return true
+		case *ast.DeclStmt:
+			if declarationDefines(node, errIdent) {
+				return false
+			}
+		case *ast.ReturnStmt, *ast.BranchStmt:
+			return false
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// isNilGuardedErrorValidation reports the exact non-branching validation
+// step accepted by finalOutcomeRecordedAfterValidation: the guarded body
+// assigns one call result back to the tracked error and has no alternate
+// path or additional work.
+func isNilGuardedErrorValidation(stmt *ast.IfStmt, errIdent string) bool {
+	if stmt.Else != nil || errorCheckSense(stmt.Cond, errIdent) != senseSuccessInBody {
+		return false
+	}
+	if len(stmt.Body.List) != 1 {
+		return false
+	}
+	assign, ok := stmt.Body.List[0].(*ast.AssignStmt)
+	if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 || !isIdent(assign.Lhs[0], errIdent) {
+		return false
+	}
+	_, ok = assign.Rhs[0].(*ast.CallExpr)
+	return ok
+}
+
+// statementAssignsTo reports whether an if statement writes the tracked
+// error anywhere in either branch.
+func statementAssignsTo(stmt *ast.IfStmt, name string) bool {
+	assigned := false
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		if assign, ok := n.(*ast.AssignStmt); ok && assignsTo(assign, name) {
+			assigned = true
+			return false
+		}
+		return true
+	})
+	return assigned
+}
+
+// statementTransfersControl keeps a conditional data-preparation block from
+// hiding a path that returns before the terminal outcome recording.
+func statementTransfersControl(stmt ast.Stmt) bool {
+	transfers := false
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		switch n.(type) {
+		case *ast.ReturnStmt, *ast.BranchStmt:
+			transfers = true
+			return false
+		}
+		return true
+	})
+	return transfers
+}
+
+func callPassesIdentifier(call *ast.CallExpr, name string) bool {
+	return len(call.Args) > 0 && isIdent(call.Args[len(call.Args)-1], name)
+}
+
+func declarationDefines(stmt *ast.DeclStmt, name string) bool {
+	defines := false
+	ast.Inspect(stmt, func(n ast.Node) bool {
+		value, ok := n.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+		for _, ident := range value.Names {
+			if ident.Name == name {
+				defines = true
+				return false
+			}
+		}
+		return true
+	})
+	return defines
 }
 
 // mislabels returns the hook-reaching calls in one function body that

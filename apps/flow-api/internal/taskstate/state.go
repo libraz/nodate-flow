@@ -130,6 +130,10 @@ type ApplyParams struct {
 	// transition is driven by a system component (auto-action executor,
 	// reconciler) rather than a real user.
 	ActorUserID *int64
+	// ActorAgentID is the internal ai_agents.id of the acting agent; nil
+	// when the transition is made by a human or a system component. It is
+	// mutually exclusive with ActorUserID.
+	ActorAgentID *int64
 	// Reason is an optional human-readable note recorded on the event.
 	Reason string
 	// Via is a free-form tag stored on the event payload identifying
@@ -140,6 +144,13 @@ type ApplyParams struct {
 	// keys (transition, fromState, toState, reason, via) are written.
 	// Keys collide-by-overwrite; callers should avoid clashes.
 	ExtraPayload map[string]any
+}
+
+func validateActor(p ApplyParams) error {
+	if p.ActorUserID != nil && p.ActorAgentID != nil {
+		return stderrors.New("taskstate: transition has both human and agent actors")
+	}
+	return nil
 }
 
 // ApplyResult captures the before/after derived_state so the caller
@@ -177,6 +188,9 @@ type ApplyResult struct {
 //   - [apierrors.WsTaskTransitionRejected] for verbs the state machine refuses
 //   - [apierrors.InternalUnexpected] otherwise
 func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (ApplyResult, *apierrors.Spec, error) {
+	if err := validateActor(p); err != nil {
+		return ApplyResult{}, apierrors.InternalUnexpected, err
+	}
 	if !IsKnownTransition(p.Transition) {
 		return ApplyResult{}, apierrors.WsTaskTransitionUnknown, nil
 	}
@@ -197,6 +211,31 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	next, ok := NextState(locked.DerivedState, p.Transition)
 	if !ok {
 		return ApplyResult{}, apierrors.WsTaskTransitionRejected, nil
+	}
+	if p.Transition == TransitionComplete {
+		settings, err := qtx.GetTaskWorkflowSettingsForUpdate(ctx, generated.GetTaskWorkflowSettingsForUpdateParams{
+			WorkspaceID: p.WorkspaceID,
+			ID:          p.TaskID,
+		})
+		if err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				return ApplyResult{}, apierrors.WsTaskNotFound, nil
+			}
+			return ApplyResult{}, apierrors.InternalUnexpected, err
+		}
+		completionGate, err := qtx.CanCompleteTask(ctx, generated.CanCompleteTaskParams{
+			WorkspaceID: p.WorkspaceID,
+			ID:          p.TaskID,
+		})
+		if err != nil {
+			if stderrors.Is(err, sql.ErrNoRows) {
+				return ApplyResult{}, apierrors.WsTaskNotFound, nil
+			}
+			return ApplyResult{}, apierrors.InternalUnexpected, err
+		}
+		if !completionAllowed(settings.CompletionPolicy, completionGate != 0) {
+			return ApplyResult{}, apierrors.WsTaskTransitionRejected, nil
+		}
 	}
 
 	// The trg_tasks_derived_state_guard BEFORE UPDATE trigger rejects
@@ -243,11 +282,12 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	}
 
 	if err := eventbus.Append(ctx, tx, eventbus.Event{
-		Type:        eventbus.TaskTransition(p.Transition),
-		WorkspaceID: p.WorkspaceID,
-		ActorUserID: p.ActorUserID,
-		TaskID:      &taskInternal,
-		Payload:     payload,
+		Type:         eventbus.TaskTransition(p.Transition),
+		WorkspaceID:  p.WorkspaceID,
+		ActorUserID:  p.ActorUserID,
+		ActorAgentID: p.ActorAgentID,
+		TaskID:       &taskInternal,
+		Payload:      payload,
 	}); err != nil {
 		return ApplyResult{}, apierrors.InternalUnexpected, err
 	}
@@ -261,4 +301,17 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 	obs.IncTaskTransition(string(locked.DerivedState), string(next))
 
 	return ApplyResult{FromState: locked.DerivedState, ToState: next}, nil, nil
+}
+
+// completionAllowed preserves the existing direct-completion behavior for
+// manual tasks while failing closed for unknown future policy values.
+func completionAllowed(policy generated.TasksCompletionPolicy, reviewGate bool) bool {
+	switch policy {
+	case generated.TasksCompletionPolicyManual:
+		return true
+	case generated.TasksCompletionPolicyReviewRequired:
+		return reviewGate
+	default:
+		return false
+	}
 }

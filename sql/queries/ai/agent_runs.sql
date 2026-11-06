@@ -6,9 +6,10 @@ INSERT INTO agent_runs (
   public_id,
   workspace_id,
   agent_id,
+  source_event_id,
   dedupe_key,
   scheduled_at
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?);
 
 -- name: ClaimNextAgentRun :one
 -- Pick the oldest pending run and mark it claimed in the same tx.
@@ -19,6 +20,7 @@ SELECT
   r.public_id,
   r.workspace_id,
   r.agent_id,
+  r.source_event_id,
   r.dedupe_key,
   r.scheduled_at,
   r.attempts

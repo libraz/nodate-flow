@@ -165,6 +165,7 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		completeActorMutation(ctx, deps, ws.ID, task.ID)
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -327,6 +328,7 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		completeActorMutation(ctx, deps, ws.ID, task.ID)
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -352,12 +354,10 @@ type handoffToUserWrites struct {
 // recordHandoffToUser writes the hand-back state and then the event that
 // announces it, and answers with the error the request fails on.
 //
-// The memo statement matches an enabled task only, so it can succeed and
-// change nothing. The task was resolved through the task ACL before this
-// request opened its transaction, so a zero count is that task having been
-// disabled or removed since — the same condition the handler answers with
-// WS.TASK.NOT_FOUND when it cannot resolve a task at all, seen a moment
-// later.
+// The memo statement matches an enabled task only. MySQL can report zero
+// changed rows when the patch already matches the stored memo, so a zero
+// count needs a scoped existence check before it can mean the task stopped
+// being live after the ACL resolved it.
 //
 // The order is what makes that answer worth giving. The event is the
 // visible half of a hand-back and the memo patch is the state behind it,
@@ -379,7 +379,16 @@ func recordHandoffToUser(ctx context.Context, tx *dbretry.Tx, rec *mutationlog.R
 		return httpErr(apierrors.InternalUnexpected)
 	}
 	if memoRows == 0 {
-		return httpErr(apierrors.WsTaskNotFound)
+		_, err := generated.New(tx).GetTaskAgentMemo(ctx, generated.GetTaskAgentMemoParams{
+			WorkspaceID: actor.WorkspaceID,
+			ID:          w.taskID,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
+			return httpErr(apierrors.WsTaskNotFound)
+		}
+		if err != nil {
+			return httpErr(apierrors.InternalUnexpected)
+		}
 	}
 
 	return rec.RecordHandBack(ctx, tx, actor, mutationlog.HandBack{

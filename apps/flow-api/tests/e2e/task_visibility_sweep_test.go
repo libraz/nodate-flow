@@ -42,6 +42,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -430,7 +431,9 @@ func TestNonGETEndpointsHideInvisibleTitles(t *testing.T) {
 
 	timeboxID := seedTimeboxWithTask(t, owner, task.ID)
 	suggestionID := seedRelationSuggestion(t, owner, task.ID, sentinel)
-	seedInboxSignalForTask(t, owner, task.ID)
+	signalID := seedInboxSignalForTask(t, owner, task.ID)
+	handoffID := seedSweepHandoff(t, task.ID)
+	submissionID := seedSweepSubmission(t, task.ID)
 	calendarID, eventID := seedCalendarEventLinkedToTask(t, owner, task.ID)
 	lensID := seedSweepLens(t, owner)
 	pageID := seedSweepPage(t, owner)
@@ -473,6 +476,9 @@ func TestNonGETEndpointsHideInvisibleTitles(t *testing.T) {
 		"shareId":       shareID,
 		"suggestionId":  suggestionID,
 		"userId":        guest.UserPublicID,
+		"signalId":      signalID,
+		"handoffId":     handoffID,
+		"submissionId":  submissionID,
 
 		// Rows this test does not create. The request still reaches the
 		// handler, which resolves the id and answers not-found.
@@ -862,15 +868,48 @@ func seedSweepPublicShare(t *testing.T, owner *helpers.TestTenant, eventID strin
 }
 
 // seedInboxSignalForTask attaches a signal to the task so the inbox
-// feeds have a row whose task columns could leak.
-func seedInboxSignalForTask(t *testing.T, _ *helpers.TestTenant, taskID string) {
+// feeds have a row whose task columns could leak. It returns the signal's
+// public id.
+func seedInboxSignalForTask(t *testing.T, _ *helpers.TestTenant, taskID string) string {
 	t.Helper()
+	signalID := uuid.Must(uuid.NewV7()).String()
 	_, err := testDB.Exec(
 		`INSERT INTO signals (public_id, workspace_id, task_id, source, kind, payload_json, received_at)
-		 SELECT UUID_TO_BIN(UUID(), 0), t.workspace_id, t.id, 'manual', 'sweep.probe',
+		 SELECT UUID_TO_BIN(?, 0), t.workspace_id, t.id, 'manual', 'sweep.probe',
 		        JSON_OBJECT('probe', 1), NOW(3)
 		   FROM tasks t
 		  WHERE t.public_id = UUID_TO_BIN(?, 0)`,
-		taskID)
+		signalID, taskID)
 	require.NoError(t, err)
+	return signalID
+}
+
+// seedSweepHandoff inserts a pending handoff on the task and returns its
+// public id.
+func seedSweepHandoff(t *testing.T, taskID string) string {
+	t.Helper()
+	id := uuid.Must(uuid.NewV7()).String()
+	_, err := testDB.Exec(
+		`INSERT INTO task_handoffs (public_id, workspace_id, task_id, role, status)
+		 SELECT UUID_TO_BIN(?, 0), t.workspace_id, t.id, 'reviewer', 'pending'
+		   FROM tasks t
+		  WHERE t.public_id = UUID_TO_BIN(?, 0)`,
+		id, taskID)
+	require.NoError(t, err)
+	return id
+}
+
+// seedSweepSubmission inserts a submission on the task and returns its
+// public id.
+func seedSweepSubmission(t *testing.T, taskID string) string {
+	t.Helper()
+	id := uuid.Must(uuid.NewV7()).String()
+	_, err := testDB.Exec(
+		`INSERT INTO task_submissions (public_id, workspace_id, task_id, work_revision, acceptance_criteria_json)
+		 SELECT UUID_TO_BIN(?, 0), t.workspace_id, t.id, 1, JSON_ARRAY()
+		   FROM tasks t
+		  WHERE t.public_id = UUID_TO_BIN(?, 0)`,
+		id, taskID)
+	require.NoError(t, err)
+	return id
 }

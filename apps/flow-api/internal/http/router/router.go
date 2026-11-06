@@ -86,6 +86,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/relations"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/signals"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/tasks"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/taskworkflow"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/timeboxes"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/timeline"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/webhooks"
@@ -95,6 +96,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/obs"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/stream"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 	"github.com/libraz/nodate-flow/packages/go-shared/crypto"
@@ -622,7 +624,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 	auditRec := audit.New(deps.Queries)
 	mutationRec := mutationlog.New(deps.DB, deps.Queries)
 	aclDB := passthroughDB{deps.DB}
-	invocationLogger := newDBInvocationLogger(deps.Queries, deps.AiInvocationPublisher)
+	invocationLogger := newDBInvocationLogger(deps.DB, deps.AiInvocationPublisher)
 
 	// Write-time embedding client (ADR 0003). Uses the OpenAI provider
 	// when NF_EMBED_OPENAI_KEY is set, otherwise the deterministic mock.
@@ -708,40 +710,12 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlLogger := invocationLogger
 		if nlQueryCompiler == nil {
 			prov := nlquery.NewWorkspaceProvider(wsResolver, extractWS).
-				WithMetering(nlGuard, func(ctx context.Context, rec nlquery.InvocationRecord) {
-					nlLogger(ctx, ai.InvocationRecord{
-						WorkspaceID:      rec.WorkspaceID,
-						Purpose:          rec.Purpose,
-						Model:            rec.Model,
-						PromptRedacted:   rec.PromptRedacted,
-						ResponseRedacted: rec.ResponseRedacted,
-						TokensInput:      rec.TokensInput,
-						TokensOutput:     rec.TokensOutput,
-						CostMicros:       rec.CostMicros,
-						CostCents:        rec.CostCents,
-						Status:           rec.Status,
-						ErrorCode:        rec.ErrorCode,
-					})
-				}, obs.RecordAIInvocation)
+				WithMetering(nlGuard, nlLogger, obs.RecordAIInvocation)
 			nlQueryCompiler = nlquery.New(prov)
 		}
 		if nlConstraintCompiler == nil {
 			prov := nlconstraint.NewWorkspaceProvider(wsResolver, extractWS).
-				WithMetering(nlGuard, func(ctx context.Context, rec nlconstraint.InvocationRecord) {
-					nlLogger(ctx, ai.InvocationRecord{
-						WorkspaceID:      rec.WorkspaceID,
-						Purpose:          rec.Purpose,
-						Model:            rec.Model,
-						PromptRedacted:   rec.PromptRedacted,
-						ResponseRedacted: rec.ResponseRedacted,
-						TokensInput:      rec.TokensInput,
-						TokensOutput:     rec.TokensOutput,
-						CostMicros:       rec.CostMicros,
-						CostCents:        rec.CostCents,
-						Status:           rec.Status,
-						ErrorCode:        rec.ErrorCode,
-					})
-				}, obs.RecordAIInvocation)
+				WithMetering(nlGuard, nlLogger, obs.RecordAIInvocation)
 			nlConstraintCompiler = nlconstraint.New(prov)
 		}
 		if nlCommandResolver == nil {
@@ -762,21 +736,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 				})
 			}
 			cmdProv := nlcommand.NewWorkspaceProvider(wsResolver, extractWS).
-				WithMetering(nlGuard, func(ctx context.Context, rec nlcommand.InvocationRecord) {
-					nlLogger(ctx, ai.InvocationRecord{
-						WorkspaceID:      rec.WorkspaceID,
-						Purpose:          rec.Purpose,
-						Model:            rec.Model,
-						PromptRedacted:   rec.PromptRedacted,
-						ResponseRedacted: rec.ResponseRedacted,
-						TokensInput:      rec.TokensInput,
-						TokensOutput:     rec.TokensOutput,
-						CostMicros:       rec.CostMicros,
-						CostCents:        rec.CostCents,
-						Status:           rec.Status,
-						ErrorCode:        rec.ErrorCode,
-					})
-				}, obs.RecordAIInvocation)
+				WithMetering(nlGuard, nlLogger, obs.RecordAIInvocation)
 			nlCommandResolver = nlcommand.New(cmdProv, tools)
 			nlCommandResolver.Cache = nlcommand.NewCache(5 * time.Minute)
 		}
@@ -792,12 +752,13 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		mockResolver := providers.NewMockResolver(providers.NewMockProvider(""))
 		budget := ai.BudgetReaderFunc(func(_ context.Context, _ uint32) (int64, error) { return 0, nil })
 		aiOrch = &ai.Orchestrator{
-			Resolver:      mockResolver,
-			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
-			DB:            dbretry.AutoCommit(deps.DB),
-			Queries:       deps.Queries,
-			OnInvocation:  obs.RecordAIInvocation,
-			ProposalCache: ai.NewProposalCache(10 * time.Minute),
+			Resolver:          mockResolver,
+			Guard:             ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
+			DB:                dbretry.AutoCommit(deps.DB),
+			Queries:           deps.Queries,
+			OnInvocation:      obs.RecordAIInvocation,
+			ProposalCache:     ai.NewProposalCache(10 * time.Minute),
+			SuggestionPrivacy: &suggestionprivacy.Store{DB: deps.DB},
 		}
 	case deps.Cipher != nil:
 		resolver := providers.NewWorkspaceResolver(deps.Queries, deps.Cipher)
@@ -805,13 +766,14 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 			return deps.Queries.SumAiCostTodayForWorkspace(ctx, ai.DailyCostParams(ctx, deps.Queries, wsID))
 		})
 		aiOrch = &ai.Orchestrator{
-			Resolver:      resolver,
-			Guard:         ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
-			DB:            dbretry.AutoCommit(deps.DB),
-			Queries:       deps.Queries,
-			LogInvoke:     invocationLogger,
-			OnInvocation:  obs.RecordAIInvocation,
-			ProposalCache: ai.NewProposalCache(10 * time.Minute),
+			Resolver:          resolver,
+			Guard:             ai.NewCostGuard(budget, deps.AiDailyBudgetCents),
+			DB:                dbretry.AutoCommit(deps.DB),
+			Queries:           deps.Queries,
+			LogInvoke:         invocationLogger,
+			OnInvocation:      obs.RecordAIInvocation,
+			ProposalCache:     ai.NewProposalCache(10 * time.Minute),
+			SuggestionPrivacy: &suggestionprivacy.Store{DB: deps.DB},
 		}
 	}
 
@@ -1300,6 +1262,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 	relationTaskDeps := relations.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 	reactionDeps := reactions.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 	stepsDeps := tasks.StepsDeps{DB: deps.DB, Queries: deps.Queries, AI: shared.aiOrch, Embedder: shared.embedClient, Mutations: shared.mutationRec}
+	workflowDeps := taskworkflow.Deps{DB: deps.DB, Queries: deps.Queries, Events: shared.mutationRec}
 
 	// Read group: RequireTaskAccess only.
 	r.Group(func(sub chi.Router) {
@@ -1307,6 +1270,9 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
 		subAPI := mountGroup(sub, floorNone, &apis)
 		tasks.RegisterTaskScopedReads(subAPI, shared.taskDeps)
+		taskworkflow.RegisterTaskScopedReads(subAPI, workflowDeps)
+		taskworkflow.RegisterTaskScopedDecisions(subAPI, workflowDeps)
+		intakehandlers.RegisterTaskSources(subAPI, intakehandlers.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec})
 		labels.RegisterTaskScopedReads(subAPI, labelTaskDeps)
 		timeline.RegisterTaskScoped(subAPI, shared.tlDeps)
 		relations.RegisterTaskScoped(subAPI, relationTaskDeps)
@@ -1328,6 +1294,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Use(middleware.RequireTaskAccess(shared.aclDB))
 		subAPI := mountGroup(sub, floorProjectEditor, &apis)
 		tasks.RegisterTaskScopedEditorWrites(subAPI, shared.taskDeps)
+		taskworkflow.RegisterTaskScopedEditorWrites(subAPI, workflowDeps)
 		labels.RegisterTaskScopedWrites(subAPI, labelTaskDeps)
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
@@ -1413,7 +1380,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		sub.Use(authMW)
 		sub.Use(middleware.RequireWorkspaceMember(shared.aclDB))
 		subAPI := mountGroup(sub, floorWorkspaceMember, &apis)
-		triageDeps := inbox.TriageDeps{Deps: shared.inboxDeps, AI: shared.aiOrch}
+		triageDeps := inbox.TriageDeps{Deps: shared.inboxDeps, AI: shared.aiOrch, SuggestionPrivacy: &suggestionprivacy.Store{DB: shared.inboxDeps.DB}}
 		inbox.RegisterTriage(subAPI, triageDeps)
 		inbox.RegisterAiSuggestions(subAPI, triageDeps)
 	})
@@ -2113,18 +2080,20 @@ type healthOutput struct {
 	}
 }
 
-// newDBInvocationLogger returns an ai.InvocationLogger that persists
-// redacted records into ai_invocations. When the workspace has no
-// enabled provider the record is dropped silently — LogInvoke is a
-// best-effort audit path and must never break a user-visible AI
-// response.
-func NewDBInvocationLogger(q *generated.Queries, publish func(context.Context, uint32)) ai.InvocationLogger {
-	return newDBInvocationLogger(q, publish)
+// NewDBInvocationLogger persists a redacted invocation and all normalized
+// task provenance in one transaction. Missing providers and failed audit
+// writes remain best-effort and do not change the AI response.
+func NewDBInvocationLogger(db *sql.DB, publish func(context.Context, uint32)) ai.InvocationLogger {
+	return newDBInvocationLogger(db, publish)
 }
 
-func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, uint32)) ai.InvocationLogger {
+func newDBInvocationLogger(db *sql.DB, publish func(context.Context, uint32)) ai.InvocationLogger {
+	if db == nil {
+		return func(context.Context, ai.InvocationRecord) {}
+	}
+	q := generated.New(db)
 	return func(ctx context.Context, rec ai.InvocationRecord) {
-		if q == nil || rec.WorkspaceID == 0 {
+		if rec.WorkspaceID == 0 {
 			return
 		}
 		providerID, err := q.FindDefaultProviderIDForWorkspace(ctx, rec.WorkspaceID)
@@ -2147,6 +2116,30 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		var taskID sql.NullInt32
 		if rec.TaskID != 0 {
 			taskID = sql.NullInt32{Int32: int32(rec.TaskID), Valid: true} //#nosec G115 -- task id is tasks.id (INT UNSIGNED), fits int32 within realistic deployments
+		}
+		resourcesCtx := ai.WithInputResources(ctx, rec.InputResources...)
+		inputResources := ai.InputResourcesFromContext(resourcesCtx)
+		if inputResources == nil {
+			inputResources = []ai.InvocationResource{}
+		}
+		resourcesJSON, err := json.Marshal(inputResources)
+		if err != nil {
+			return
+		}
+		inputCount := uint32(len(inputResources)) //#nosec G115 -- provider prompt size bounds the number of provenance references
+		resourceIDs := make([]types.PublicID, 0, len(inputResources))
+		provenanceValid := true
+		for _, resource := range inputResources {
+			if resource.Kind != "task" {
+				provenanceValid = false
+				continue
+			}
+			publicID, parseErr := types.Parse(resource.PublicID)
+			if parseErr != nil {
+				provenanceValid = false
+				continue
+			}
+			resourceIDs = append(resourceIDs, publicID)
 		}
 		var response sql.NullString
 		if rec.ResponseRedacted != "" {
@@ -2188,26 +2181,52 @@ func newDBInvocationLogger(q *generated.Queries, publish func(context.Context, u
 		if rec.ErrorCode != "" {
 			ec = sql.NullString{String: rec.ErrorCode, Valid: true}
 		}
-		if _, err := q.LogAiInvocation(ctx, generated.LogAiInvocationParams{
-			PublicID:         types.New(),
-			WorkspaceID:      rec.WorkspaceID,
-			ProviderID:       providerID,
-			UserID:           userID,
-			AgentID:          agentID,
-			TaskID:           taskID,
-			Purpose:          rec.Purpose,
-			Model:            model,
-			PromptRedacted:   rec.PromptRedacted,
-			ResponseRedacted: response,
-			TokensInput:      tIn,
-			TokensOutput:     tOut,
-			CostEstimate:     cost,
-			Status:           status,
-			ErrorCode:        ec,
-			InvokedAt:        time.Now().UTC(),
-		}); err == nil && publish != nil {
-			publish(ctx, rec.WorkspaceID)
+		audience := rec.Audience
+		if audience == "" {
+			audience = ai.InvocationAudienceFromContext(ctx)
+		} else {
+			audience = ai.InvocationAudienceFromContext(ai.WithInvocationAudience(ctx, audience))
 		}
+		_ = dbretry.InTx(ctx, db, "ai.invocation.write", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			qtx := q.WithTx(tx.RawTx())
+			invocationID, err := qtx.LogAiInvocation(ctx, generated.LogAiInvocationParams{
+				PublicID:           types.New(),
+				WorkspaceID:        rec.WorkspaceID,
+				ProviderID:         providerID,
+				UserID:             userID,
+				AgentID:            agentID,
+				TaskID:             taskID,
+				Audience:           generated.AiInvocationsAudience(audience),
+				InputResourcesJson: json.RawMessage(resourcesJSON),
+				InputCount:         inputCount,
+				ProvenanceValid:    provenanceValid,
+				Purpose:            rec.Purpose,
+				Model:              model,
+				PromptRedacted:     rec.PromptRedacted,
+				ResponseRedacted:   response,
+				TokensInput:        tIn,
+				TokensOutput:       tOut,
+				CostEstimate:       cost,
+				Status:             status,
+				ErrorCode:          ec,
+				InvokedAt:          time.Now().UTC(),
+			})
+			if err != nil {
+				return err
+			}
+			for _, taskPublicID := range resourceIDs {
+				if err := qtx.AddAiInvocationInput(ctx, generated.AddAiInvocationInputParams{
+					InvocationID: uint32(invocationID), //#nosec G115 -- ai_invocations.id is an INT UNSIGNED primary key
+					TaskPublicID: taskPublicID[:],
+				}); err != nil {
+					return err
+				}
+			}
+			if publish != nil {
+				tx.AfterCommit(func() { publish(ctx, rec.WorkspaceID) })
+			}
+			return nil
+		})
 	}
 }
 

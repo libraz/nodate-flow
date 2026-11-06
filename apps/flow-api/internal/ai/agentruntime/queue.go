@@ -48,11 +48,23 @@ type Queue interface {
 // InProcessQueue is an in-memory [Queue] used by the default single
 // binary deployment. It is NOT safe across processes — for
 // multi-replica k8s deployments, swap in a DB or Redis-backed queue.
+//
+// Dedupe matches the MySQL queue: a key stays known after its run is
+// acked or nacked, as the agent_runs row does, until [DefaultRetention]
+// has passed, as the purger deletes that row.
 type InProcessQueue struct {
-	mu     sync.Mutex
-	seen   map[string]struct{}
-	buffer chan Run
+	mu sync.Mutex
+	// seen holds every known key: zero while queued or running, the
+	// completion time once acked or nacked.
+	seen      map[string]time.Time
+	lastPrune time.Time
+	now       func() time.Time
+	buffer    chan Run
 }
+
+// inProcessPruneEvery bounds how often Enqueue scans seen for keys past
+// [DefaultRetention].
+const inProcessPruneEvery = time.Hour
 
 // NewInProcessQueue returns an InProcessQueue with the given buffer
 // capacity. A full buffer causes Enqueue to block until the worker
@@ -63,7 +75,8 @@ func NewInProcessQueue(capacity int) *InProcessQueue {
 		capacity = 64
 	}
 	return &InProcessQueue{
-		seen:   make(map[string]struct{}),
+		seen:   make(map[string]time.Time),
+		now:    time.Now,
 		buffer: make(chan Run, capacity),
 	}
 }
@@ -71,11 +84,12 @@ func NewInProcessQueue(capacity int) *InProcessQueue {
 // Enqueue implements [Queue].
 func (q *InProcessQueue) Enqueue(ctx context.Context, r Run) error {
 	q.mu.Lock()
+	q.prune()
 	if _, ok := q.seen[r.DedupeKey]; ok {
 		q.mu.Unlock()
 		return ErrDuplicate
 	}
-	q.seen[r.DedupeKey] = struct{}{}
+	q.seen[r.DedupeKey] = time.Time{}
 	q.mu.Unlock()
 	select {
 	case q.buffer <- r:
@@ -85,6 +99,21 @@ func (q *InProcessQueue) Enqueue(ctx context.Context, r Run) error {
 		delete(q.seen, r.DedupeKey)
 		q.mu.Unlock()
 		return ctx.Err()
+	}
+}
+
+// prune forgets keys whose run finished more than [DefaultRetention] ago.
+// The caller holds q.mu.
+func (q *InProcessQueue) prune() {
+	now := q.now()
+	if now.Sub(q.lastPrune) < inProcessPruneEvery {
+		return
+	}
+	q.lastPrune = now
+	for key, finished := range q.seen {
+		if !finished.IsZero() && now.Sub(finished) > DefaultRetention {
+			delete(q.seen, key)
+		}
 	}
 }
 
@@ -98,19 +127,19 @@ func (q *InProcessQueue) Claim(ctx context.Context) (Run, error) {
 	}
 }
 
-// Ack implements [Queue]. InProcess acks drop the dedupe entry so
-// the same agent can be rescheduled at the next tick.
+// Ack implements [Queue]. The key stays known, so a replay of the same
+// run is still rejected as [ErrDuplicate].
 func (q *InProcessQueue) Ack(_ context.Context, dedupeKey string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	delete(q.seen, dedupeKey)
+	if _, ok := q.seen[dedupeKey]; ok {
+		q.seen[dedupeKey] = q.now()
+	}
 	return nil
 }
 
-// Nack implements [Queue]. The in-process queue has no retry budget;
-// it simply drops the dedupe entry and re-enqueues with Attempts+1
-// if the caller re-submits. Persistent queues should increment an
-// attempts column and move past a max retry count.
+// Nack implements [Queue]. Like the MySQL queue it parks the run as
+// finished: there is no retry budget, and the key stays known.
 func (q *InProcessQueue) Nack(ctx context.Context, dedupeKey string, _ error) error {
 	return q.Ack(ctx, dedupeKey)
 }

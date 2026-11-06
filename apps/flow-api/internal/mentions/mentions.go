@@ -16,6 +16,7 @@ package mentions
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -23,6 +24,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 )
+
+var ErrInvalidActor = errors.New("mentions: actor must be one positive user id or agent id")
 
 // TaskDescriptionArgs describes the task description being synced.
 type TaskDescriptionArgs struct {
@@ -36,6 +39,9 @@ type TaskDescriptionArgs struct {
 	// ActorUserID is the internal id of whoever wrote the body, nil for a
 	// body a process produced.
 	ActorUserID *int64
+	// ActorAgentID is the internal ai_agents.id of the agent that wrote
+	// the body. It is mutually exclusive with ActorUserID.
+	ActorAgentID *int64
 	// Body is the description as it is being stored.
 	Body string
 }
@@ -57,6 +63,9 @@ type CommentArgs struct {
 	// ActorUserID is the internal id of the comment's author, nil for a
 	// comment a process produced.
 	ActorUserID *int64
+	// ActorAgentID is the internal ai_agents.id of the agent that wrote
+	// the comment. It is mutually exclusive with ActorUserID.
+	ActorAgentID *int64
 	// Body is the comment as it is being stored.
 	Body string
 }
@@ -73,11 +82,12 @@ func SyncTaskDescription(ctx context.Context, db dbretry.CommitBoundary, args Ta
 		return fmt.Errorf("mentions: task description sync needs a task id")
 	}
 	return syncBody(ctx, db, bodyParams{
-		workspaceID: args.WorkspaceID,
-		source:      generated.MentionsSourceTaskDescription,
-		taskID:      nullInt32(args.TaskID),
-		actorUserID: args.ActorUserID,
-		body:        args.Body,
+		workspaceID:  args.WorkspaceID,
+		source:       generated.MentionsSourceTaskDescription,
+		taskID:       nullInt32(args.TaskID),
+		actorUserID:  args.ActorUserID,
+		actorAgentID: args.ActorAgentID,
+		body:         args.Body,
 		payload: map[string]any{
 			"taskId": args.TaskPublicID.String(),
 			"source": string(generated.MentionsSourceTaskDescription),
@@ -94,12 +104,13 @@ func SyncComment(ctx context.Context, db dbretry.CommitBoundary, args CommentArg
 		return fmt.Errorf("mentions: comment sync needs a task id and a comment id")
 	}
 	return syncBody(ctx, db, bodyParams{
-		workspaceID: args.WorkspaceID,
-		source:      generated.MentionsSourceComment,
-		taskID:      nullInt32(args.TaskID),
-		commentID:   nullInt32(args.CommentID),
-		actorUserID: args.ActorUserID,
-		body:        args.Body,
+		workspaceID:  args.WorkspaceID,
+		source:       generated.MentionsSourceComment,
+		taskID:       nullInt32(args.TaskID),
+		commentID:    nullInt32(args.CommentID),
+		actorUserID:  args.ActorUserID,
+		actorAgentID: args.ActorAgentID,
+		body:         args.Body,
 		payload: map[string]any{
 			"taskId":    args.TaskPublicID.String(),
 			"commentId": args.CommentPublicID.String(),
@@ -111,12 +122,13 @@ func SyncComment(ctx context.Context, db dbretry.CommitBoundary, args CommentArg
 // bodyParams is what the two entry points differ by, reduced to what the
 // shared sequence needs.
 type bodyParams struct {
-	workspaceID uint32
-	source      generated.MentionsSource
-	taskID      sql.NullInt32
-	commentID   sql.NullInt32
-	actorUserID *int64
-	body        string
+	workspaceID  uint32
+	source       generated.MentionsSource
+	taskID       sql.NullInt32
+	commentID    sql.NullInt32
+	actorUserID  *int64
+	actorAgentID *int64
+	body         string
 	// payload names the subject of the event; syncBody adds the mentioned
 	// users to it.
 	payload map[string]any
@@ -125,6 +137,9 @@ type bodyParams struct {
 // syncBody clears the rows this body owns, re-extracts them and records
 // the event, all on the caller's commit boundary.
 func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) error {
+	if err := validateActor(p.actorUserID, p.actorAgentID); err != nil {
+		return err
+	}
 	q := generated.New(db)
 	// Read before the clear: the previous set decides who is newly named.
 	previous, err := previousUserIDs(ctx, q, p)
@@ -157,8 +172,25 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 		return nil
 	}
 	actor := sql.NullInt32{}
+	agentActor := sql.NullInt32{}
 	if p.actorUserID != nil {
 		actor = sql.NullInt32{Int32: int32(*p.actorUserID), Valid: true} //#nosec G115 -- actor user id sourced from the session, fits int32 within realistic deployments
+	}
+	// A zero id is stored as NULL by the statement.
+	agentPublicID := types.PublicID{}
+	agentName := sql.NullString{}
+	if p.actorAgentID != nil {
+		agentActor = sql.NullInt32{Int32: int32(*p.actorAgentID), Valid: true} //#nosec G115 -- actor agent id is ai_agents.id, fits int32 within realistic deployments
+		// Snapshot the byline so the mention keeps naming the agent after it is deleted.
+		byline, err := q.GetMentionActorAgentByline(ctx, generated.GetMentionActorAgentBylineParams{
+			WorkspaceID: p.workspaceID,
+			ID:          uint32(*p.actorAgentID), //#nosec G115 -- validateActor admits only positive ids, and ai_agents.id is INT UNSIGNED
+		})
+		if err != nil {
+			return fmt.Errorf("mentions: resolve actor agent: %w", err)
+		}
+		agentPublicID = byline.PublicID
+		agentName = sql.NullString{String: byline.Name, Valid: true}
 	}
 	var mentioned []string
 	for _, m := range members {
@@ -167,13 +199,16 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 		// it here would instead leave "who is named in this body" answered
 		// differently depending on who wrote it.
 		if _, err := q.CreateMention(ctx, generated.CreateMentionParams{
-			PublicID:        types.New(),
-			WorkspaceID:     p.workspaceID,
-			MentionedUserID: m.ID,
-			ActorUserID:     actor,
-			TaskID:          p.taskID,
-			CommentID:       p.commentID,
-			Source:          p.source,
+			PublicID:           types.New(),
+			WorkspaceID:        p.workspaceID,
+			MentionedUserID:    m.ID,
+			ActorUserID:        actor,
+			ActorAgentID:       agentActor,
+			ActorAgentPublicID: agentPublicID,
+			ActorAgentName:     agentName,
+			TaskID:             p.taskID,
+			CommentID:          p.commentID,
+			Source:             p.source,
 		}); err != nil {
 			return fmt.Errorf("mentions: create mention: %w", err)
 		}
@@ -197,13 +232,21 @@ func syncBody(ctx context.Context, db dbretry.CommitBoundary, p bodyParams) erro
 		taskID = &id
 	}
 	if err := eventbus.Append(ctx, db, eventbus.Event{
-		Type:        eventbus.MentionCreated,
-		WorkspaceID: p.workspaceID,
-		ActorUserID: p.actorUserID,
-		TaskID:      taskID,
-		Payload:     p.payload,
+		Type:         eventbus.MentionCreated,
+		WorkspaceID:  p.workspaceID,
+		ActorUserID:  p.actorUserID,
+		ActorAgentID: p.actorAgentID,
+		TaskID:       taskID,
+		Payload:      p.payload,
 	}); err != nil {
 		return fmt.Errorf("mentions: append event: %w", err)
+	}
+	return nil
+}
+
+func validateActor(userID, agentID *int64) error {
+	if userID != nil && *userID <= 0 || agentID != nil && *agentID <= 0 || userID != nil && agentID != nil {
+		return ErrInvalidActor
 	}
 	return nil
 }

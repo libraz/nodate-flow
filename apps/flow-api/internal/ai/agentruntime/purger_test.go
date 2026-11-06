@@ -84,8 +84,8 @@ func TestPurgerCutoff(t *testing.T) {
 	require.Equal(t, fixed.Add(-72*time.Hour), cut)
 }
 
-// TestPurgerLoopTicks verifies Start/Stop drives at least two passes
-// within a short window and that Stop unblocks.
+// TestPurgerLoopTicks verifies Start/Shutdown drives at least two passes
+// within a short window and that Shutdown unblocks.
 func TestPurgerLoopTicks(t *testing.T) {
 	t.Parallel()
 	q := &fakePurger{}
@@ -96,7 +96,7 @@ func TestPurgerLoopTicks(t *testing.T) {
 	}
 	require.NoError(t, p.Start(context.Background()))
 	time.Sleep(100 * time.Millisecond)
-	p.Stop()
+	require.NoError(t, p.Shutdown(context.Background()))
 	calls, _ := q.snapshot()
 	require.GreaterOrEqual(t, calls, 2, "expected the purger loop to fire at least twice")
 }

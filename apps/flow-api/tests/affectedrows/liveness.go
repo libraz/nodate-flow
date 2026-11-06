@@ -112,7 +112,7 @@ var livenessVocabulary = []livenessGroup{
 		Role: SingleUseClaim,
 		Reason: "the guard exists so two concurrent writers cannot both consume the row; a " +
 			"zero count reports the loser, and the row it lost on is present",
-		Columns: []string{"accepted_at", "applied_at", "claimed_at", "used_at"},
+		Columns: []string{"accepted_at", "applied_at", "claimed_at", "provenance_valid", "used_at"},
 	},
 	{
 		Role: RowContent,
@@ -145,7 +145,7 @@ var livenessVocabulary = []livenessGroup{
 		Reason: "a point on the calendar or the end of a validity window; it is compared " +
 			"against a time rather than against presence",
 		Columns: []string{
-			"access_token_expires_at", "due_on", "end_at", "ended_on", "expires_at",
+			"access_token_expires_at", "due_at", "due_on", "end_at", "ended_on", "expires_at",
 			"next_retry_at", "recurrence_end", "recurrence_original_start", "start_at",
 			"started_on",
 		},

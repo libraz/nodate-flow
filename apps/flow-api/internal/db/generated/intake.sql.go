@@ -42,13 +42,44 @@ func (q *Queries) CreateIntakeItem(ctx context.Context, arg CreateIntakeItemPara
 	return result.LastInsertId()
 }
 
+const createIntakeItemForSignal = `-- name: CreateIntakeItemForSignal :execresult
+INSERT INTO intake_items (
+  public_id, workspace_id, signal_id, title, body, source_url
+) VALUES (?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+`
+
+type CreateIntakeItemForSignalParams struct {
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	SignalID    sql.NullInt32  `json:"-"`
+	Title       string         `json:"title"`
+	Body        sql.NullString `json:"body"`
+	SourceUrl   sql.NullString `json:"sourceUrl"`
+}
+
+// Capture one source signal at most once per workspace. MySQL permits
+// multiple NULL signal ids, so manual intake rows remain independent.
+func (q *Queries) CreateIntakeItemForSignal(ctx context.Context, arg CreateIntakeItemForSignalParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createIntakeItemForSignal,
+		arg.PublicID,
+		arg.WorkspaceID,
+		arg.SignalID,
+		arg.Title,
+		arg.Body,
+		arg.SourceUrl,
+	)
+}
+
 const findIntakeItemByPublicId = `-- name: FindIntakeItemByPublicId :one
 SELECT
   ii.id,
   ii.public_id,
   ii.workspace_id,
+  ii.signal_id,
   ii.title,
   ii.body,
+  ii.source_url,
   ii.triage_status,
   ii.snooze_until,
   ii.ai_score,
@@ -72,8 +103,10 @@ type FindIntakeItemByPublicIdRow struct {
 	ID              uint32                  `json:"-"`
 	PublicID        types.PublicID          `json:"publicId"`
 	WorkspaceID     uint32                  `json:"-"`
+	SignalID        sql.NullInt32           `json:"-"`
 	Title           string                  `json:"title"`
 	Body            sql.NullString          `json:"body"`
+	SourceUrl       sql.NullString          `json:"sourceUrl"`
 	TriageStatus    IntakeItemsTriageStatus `json:"triageStatus"`
 	SnoozeUntil     sql.NullTime            `json:"snoozeUntil"`
 	AiScore         sql.NullString          `json:"aiScore"`
@@ -92,8 +125,10 @@ func (q *Queries) FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeIt
 		&i.ID,
 		&i.PublicID,
 		&i.WorkspaceID,
+		&i.SignalID,
 		&i.Title,
 		&i.Body,
+		&i.SourceUrl,
 		&i.TriageStatus,
 		&i.SnoozeUntil,
 		&i.AiScore,
@@ -106,12 +141,223 @@ func (q *Queries) FindIntakeItemByPublicId(ctx context.Context, arg FindIntakeIt
 	return i, err
 }
 
+const findIntakeItemBySignal = `-- name: FindIntakeItemBySignal :one
+SELECT
+  ii.id,
+  ii.public_id,
+  ii.workspace_id,
+  ii.signal_id,
+  ii.task_id,
+  ii.title,
+  ii.body,
+  ii.source_url,
+  ii.triage_status,
+  ii.snooze_until,
+  ii.created_at
+FROM intake_items ii
+WHERE ii.workspace_id = ?
+  AND ii.signal_id = ?
+  AND ii.enabled = TRUE
+FOR UPDATE
+`
+
+type FindIntakeItemBySignalParams struct {
+	WorkspaceID uint32        `json:"-"`
+	SignalID    sql.NullInt32 `json:"-"`
+}
+
+type FindIntakeItemBySignalRow struct {
+	ID           uint32                  `json:"-"`
+	PublicID     types.PublicID          `json:"publicId"`
+	WorkspaceID  uint32                  `json:"-"`
+	SignalID     sql.NullInt32           `json:"-"`
+	TaskID       sql.NullInt32           `json:"-"`
+	Title        string                  `json:"title"`
+	Body         sql.NullString          `json:"body"`
+	SourceUrl    sql.NullString          `json:"sourceUrl"`
+	TriageStatus IntakeItemsTriageStatus `json:"triageStatus"`
+	SnoozeUntil  sql.NullTime            `json:"snoozeUntil"`
+	CreatedAt    time.Time               `json:"createdAt"`
+}
+
+// Resolve and lock the one intake row associated with a source signal.
+func (q *Queries) FindIntakeItemBySignal(ctx context.Context, arg FindIntakeItemBySignalParams) (FindIntakeItemBySignalRow, error) {
+	row := q.db.QueryRowContext(ctx, findIntakeItemBySignal, arg.WorkspaceID, arg.SignalID)
+	var i FindIntakeItemBySignalRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.SignalID,
+		&i.TaskID,
+		&i.Title,
+		&i.Body,
+		&i.SourceUrl,
+		&i.TriageStatus,
+		&i.SnoozeUntil,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const findIntakeItemForConversion = `-- name: FindIntakeItemForConversion :one
+SELECT
+  ii.id,
+  ii.public_id,
+  ii.workspace_id,
+  ii.signal_id,
+  ii.title,
+  ii.body,
+  ii.source_url,
+  ii.triage_status,
+  ii.snooze_until,
+  ii.ai_score,
+  ii.ai_reasoning,
+  ii.scored_at,
+  ii.task_id,
+  ii.triaged_by_user_id,
+  ii.created_at
+FROM intake_items ii
+WHERE ii.workspace_id = ?
+  AND ii.public_id = ?
+  AND ii.enabled = TRUE
+LIMIT 1
+FOR UPDATE
+`
+
+type FindIntakeItemForConversionParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+type FindIntakeItemForConversionRow struct {
+	ID              uint32                  `json:"-"`
+	PublicID        types.PublicID          `json:"publicId"`
+	WorkspaceID     uint32                  `json:"-"`
+	SignalID        sql.NullInt32           `json:"-"`
+	Title           string                  `json:"title"`
+	Body            sql.NullString          `json:"body"`
+	SourceUrl       sql.NullString          `json:"sourceUrl"`
+	TriageStatus    IntakeItemsTriageStatus `json:"triageStatus"`
+	SnoozeUntil     sql.NullTime            `json:"snoozeUntil"`
+	AiScore         sql.NullString          `json:"aiScore"`
+	AiReasoning     sql.NullString          `json:"aiReasoning"`
+	ScoredAt        sql.NullTime            `json:"scoredAt"`
+	TaskID          sql.NullInt32           `json:"-"`
+	TriagedByUserID sql.NullInt32           `json:"-"`
+	CreatedAt       time.Time               `json:"createdAt"`
+}
+
+// Lock the current intake state after its source signal has been locked.
+func (q *Queries) FindIntakeItemForConversion(ctx context.Context, arg FindIntakeItemForConversionParams) (FindIntakeItemForConversionRow, error) {
+	row := q.db.QueryRowContext(ctx, findIntakeItemForConversion, arg.WorkspaceID, arg.PublicID)
+	var i FindIntakeItemForConversionRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.WorkspaceID,
+		&i.SignalID,
+		&i.Title,
+		&i.Body,
+		&i.SourceUrl,
+		&i.TriageStatus,
+		&i.SnoozeUntil,
+		&i.AiScore,
+		&i.AiReasoning,
+		&i.ScoredAt,
+		&i.TaskID,
+		&i.TriagedByUserID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const findPublicIdForIntakeTask = `-- name: FindPublicIdForIntakeTask :one
+SELECT public_id
+FROM tasks
+WHERE workspace_id = ?
+  AND id = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindPublicIdForIntakeTaskParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+// Resolve the public task id for a converted intake's internal foreign key.
+func (q *Queries) FindPublicIdForIntakeTask(ctx context.Context, arg FindPublicIdForIntakeTaskParams) (types.PublicID, error) {
+	row := q.db.QueryRowContext(ctx, findPublicIdForIntakeTask, arg.WorkspaceID, arg.ID)
+	var public_id types.PublicID
+	err := row.Scan(&public_id)
+	return public_id, err
+}
+
+const findSignalPublicIdForIntakeItem = `-- name: FindSignalPublicIdForIntakeItem :one
+SELECT public_id
+FROM signals
+WHERE workspace_id = ?
+  AND id = ?
+LIMIT 1
+`
+
+type FindSignalPublicIdForIntakeItemParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ID          uint32 `json:"-"`
+}
+
+// Resolve the source signal's public id while writing conversion events.
+func (q *Queries) FindSignalPublicIdForIntakeItem(ctx context.Context, arg FindSignalPublicIdForIntakeItemParams) (types.PublicID, error) {
+	row := q.db.QueryRowContext(ctx, findSignalPublicIdForIntakeItem, arg.WorkspaceID, arg.ID)
+	var public_id types.PublicID
+	err := row.Scan(&public_id)
+	return public_id, err
+}
+
+const linkIntakeItemToExistingTask = `-- name: LinkIntakeItemToExistingTask :execrows
+UPDATE intake_items
+SET task_id = ?,
+    triage_status = 'accepted',
+    triaged_by_user_id = ?
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND task_id IS NULL
+  AND (triage_status IN ('pending', 'accepted')
+       OR (triage_status = 'snoozed' AND snooze_until <= NOW(3)))
+`
+
+type LinkIntakeItemToExistingTaskParams struct {
+	TaskID          sql.NullInt32  `json:"-"`
+	TriagedByUserID sql.NullInt32  `json:"-"`
+	WorkspaceID     uint32         `json:"-"`
+	PublicID        types.PublicID `json:"publicId"`
+}
+
+// Claim an unconverted intake by linking it to an already-visible task. The
+// status predicate is SetIntakeItemTask's: pending, accepted without a task,
+// or snoozed past its deadline; a rejected or duplicate item is not reopened.
+func (q *Queries) LinkIntakeItemToExistingTask(ctx context.Context, arg LinkIntakeItemToExistingTaskParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, linkIntakeItemToExistingTask,
+		arg.TaskID,
+		arg.TriagedByUserID,
+		arg.WorkspaceID,
+		arg.PublicID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const listIntakeItemsForWorkspace = `-- name: ListIntakeItemsForWorkspace :many
 SELECT
   ii.public_id,
   ii.workspace_id,
   ii.title,
   ii.body,
+  ii.source_url,
   ii.triage_status,
   ii.snooze_until,
   ii.ai_score,
@@ -149,6 +395,7 @@ type ListIntakeItemsForWorkspaceRow struct {
 	WorkspaceID          uint32                  `json:"-"`
 	Title                string                  `json:"title"`
 	Body                 sql.NullString          `json:"body"`
+	SourceUrl            sql.NullString          `json:"sourceUrl"`
 	TriageStatus         IntakeItemsTriageStatus `json:"triageStatus"`
 	SnoozeUntil          sql.NullTime            `json:"snoozeUntil"`
 	AiScore              sql.NullString          `json:"aiScore"`
@@ -186,6 +433,7 @@ func (q *Queries) ListIntakeItemsForWorkspace(ctx context.Context, arg ListIntak
 			&i.WorkspaceID,
 			&i.Title,
 			&i.Body,
+			&i.SourceUrl,
 			&i.TriageStatus,
 			&i.SnoozeUntil,
 			&i.AiScore,
@@ -217,6 +465,7 @@ SELECT
   ii.workspace_id,
   ii.title,
   ii.body,
+  ii.source_url,
   ii.triage_status,
   ii.snooze_until,
   ii.ai_score,
@@ -259,6 +508,7 @@ type ListIntakeItemsForWorkspaceKeysetRow struct {
 	WorkspaceID          uint32                  `json:"-"`
 	Title                string                  `json:"title"`
 	Body                 sql.NullString          `json:"body"`
+	SourceUrl            sql.NullString          `json:"sourceUrl"`
 	TriageStatus         IntakeItemsTriageStatus `json:"triageStatus"`
 	SnoozeUntil          sql.NullTime            `json:"snoozeUntil"`
 	AiScore              sql.NullString          `json:"aiScore"`
@@ -297,6 +547,7 @@ func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg Lis
 			&i.WorkspaceID,
 			&i.Title,
 			&i.Body,
+			&i.SourceUrl,
 			&i.TriageStatus,
 			&i.SnoozeUntil,
 			&i.AiScore,
@@ -321,6 +572,78 @@ func (q *Queries) ListIntakeItemsForWorkspaceKeyset(ctx context.Context, arg Lis
 	return items, nil
 }
 
+const listTaskIntakeSources = `-- name: ListTaskIntakeSources :many
+SELECT
+  ii.public_id,
+  COALESCE(BIN_TO_UUID(s.public_id, 0), '') AS signal_public_id,
+  COALESCE(s.source, '') AS source,
+  COALESCE(s.kind, '') AS kind,
+  ii.title,
+  LEFT(COALESCE(ii.body, ''), 50000) AS body,
+  COALESCE(ii.source_url, '') AS source_url,
+  ii.created_at
+FROM intake_items ii
+LEFT JOIN signals s
+  ON s.id = ii.signal_id
+ AND s.workspace_id = ii.workspace_id
+WHERE ii.workspace_id = ?
+  AND ii.task_id = ?
+  AND ii.enabled = TRUE
+ORDER BY ii.created_at ASC, ii.id ASC
+LIMIT 50
+`
+
+type ListTaskIntakeSourcesParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+}
+
+type ListTaskIntakeSourcesRow struct {
+	PublicID       types.PublicID `json:"publicId"`
+	SignalPublicID interface{}    `json:"signalPublicId"`
+	Source         SignalsSource  `json:"source"`
+	Kind           string         `json:"kind"`
+	Title          string         `json:"title"`
+	Body           string         `json:"body"`
+	SourceUrl      string         `json:"sourceUrl"`
+	CreatedAt      time.Time      `json:"createdAt"`
+}
+
+// Follow a task's enabled intake backlinks to their bounded source details.
+// Source payload JSON is deliberately not returned: its display projection
+// was captured into the intake row after HTTP(S)-only URL validation.
+func (q *Queries) ListTaskIntakeSources(ctx context.Context, arg ListTaskIntakeSourcesParams) ([]ListTaskIntakeSourcesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskIntakeSources, arg.WorkspaceID, arg.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaskIntakeSourcesRow{}
+	for rows.Next() {
+		var i ListTaskIntakeSourcesRow
+		if err := rows.Scan(
+			&i.PublicID,
+			&i.SignalPublicID,
+			&i.Source,
+			&i.Kind,
+			&i.Title,
+			&i.Body,
+			&i.SourceUrl,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setIntakeItemTask = `-- name: SetIntakeItemTask :execrows
 UPDATE intake_items
 SET task_id        = ?,
@@ -329,6 +652,8 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
   AND task_id IS NULL
+  AND (triage_status IN ('pending', 'accepted')
+       OR (triage_status = 'snoozed' AND snooze_until <= NOW(3)))
 `
 
 type SetIntakeItemTaskParams struct {
@@ -339,7 +664,8 @@ type SetIntakeItemTaskParams struct {
 
 // Link an intake item to a converted task. Matches only an item not yet
 // converted, so a losing concurrent conversion counts zero rows and rolls
-// its task back.
+// its task back. Beyond UpdateIntakeItemTriage's claim it also accepts an
+// item triaged as accepted, which the triage route forwards to conversion.
 func (q *Queries) SetIntakeItemTask(ctx context.Context, arg SetIntakeItemTaskParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, setIntakeItemTask, arg.TaskID, arg.WorkspaceID, arg.PublicID)
 	if err != nil {

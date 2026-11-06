@@ -43,6 +43,7 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 		return fmt.Errorf("itemkit: read task: %w", err)
 	}
 
+	actor := humanEventActor(args.ActorUserID)
 	switch args.Role {
 	case RoleDue:
 		existing, err := findLinkedEvent(ctx, tx, task.id, args.Role)
@@ -52,7 +53,7 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 			}
 			return fmt.Errorf("itemkit: find linked event: %w", err)
 		}
-		if err := unlinkEventRow(ctx, tx, existing, args.ActorUserID, "unschedule"); err != nil {
+		if err := unlinkEventRowForActor(ctx, tx, existing, actor, "unschedule"); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE tasks SET due_on = NULL WHERE id = ?", task.id); err != nil {
@@ -72,44 +73,10 @@ func UnscheduleTask(ctx context.Context, tx TX, args UnscheduleTaskArgs) error {
 		}
 	}
 
-	return appendItemEvents(ctx, tx, eventbus.ItemUnscheduled, args.WorkspaceID, &args.ActorUserID, &task.id,
+	return actor.append(ctx, tx, eventbus.ItemUnscheduled, args.WorkspaceID, &task.id,
 		map[string]any{
 			"taskPublicId": task.publicID.String(),
 			"role":         string(args.Role),
-		})
-}
-
-// unlinkEventRow soft-disables one event row. Used by UnscheduleTask for
-// the due role, and by propagateEventFromTaskDate when the task date is
-// cleared. Both reach it with an event they resolved by task link.
-func unlinkEventRow(ctx context.Context, tx TX, evt eventRow, actorID uint32, reason string) error {
-	// Same named statement every other disable in this package goes
-	// through, so the column keeps one write path. Its key is (public_id,
-	// calendar_id, workspace_id); each caller resolves evt with
-	// findLinkedEvent inside this transaction, so all three are read off
-	// the row being withdrawn and identify it and nothing else.
-	//
-	// affected-rows: not-applicable — this helper is reached only after a
-	// caller has found a live link, and each of them already answers a
-	// missing one by returning nil. A zero therefore means another writer
-	// withdrew the row between that read and this statement, which leaves
-	// the state the caller asked for.
-	if _, err := calendar.New(tx.RawTx()).DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
-		PublicID:    evt.publicID,
-		CalendarID:  evt.calendarID,
-		WorkspaceID: evt.workspaceID,
-	}); err != nil {
-		return fmt.Errorf("itemkit: soft-disable event: %w", err)
-	}
-	var taskPtr *uint32
-	if evt.taskID.Valid {
-		tid := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-		taskPtr = &tid
-	}
-	return appendItemEvents(ctx, tx, eventbus.ItemUnscheduled, evt.workspaceID, &actorID, taskPtr,
-		map[string]any{
-			"eventPublicId": evt.publicID.String(),
-			"reason":        reason,
 		})
 }
 
@@ -154,7 +121,7 @@ func DeleteTask(ctx context.Context, tx TX, workspaceID, taskID, actorID uint32)
 	if n == 0 {
 		return false, nil
 	}
-	if err := appendItemEvents(ctx, tx, eventbus.ItemDeleted, workspaceID, &actorID, &task.id,
+	if err := humanEventActor(actorID).append(ctx, tx, eventbus.ItemDeleted, workspaceID, &task.id,
 		map[string]any{
 			"taskPublicId": task.publicID.String(),
 		}); err != nil {
@@ -240,7 +207,7 @@ func DeleteEvent(ctx context.Context, tx TX, workspaceID, eventID, actorID uint3
 			}
 		}
 	}
-	return appendItemEvents(ctx, tx, eventbus.ItemUnscheduled, workspaceID, &actorID, taskPtr,
+	return humanEventActor(actorID).append(ctx, tx, eventbus.ItemUnscheduled, workspaceID, taskPtr,
 		map[string]any{
 			"eventPublicId": evt.publicID.String(),
 			"reason":        "event_deleted",

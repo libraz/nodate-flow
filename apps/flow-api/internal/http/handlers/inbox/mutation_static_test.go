@@ -65,42 +65,48 @@ var writeOperationsWithoutMutationLog = map[string]string{
 // investigating a leak needs to find.
 var readOperationsRequiringMutationLog = map[string]string{}
 
+// delegatedMutationOperations are handlers that hand writes to a service
+// package. The route must still reach the named method, and its call graph
+// must continue to reach a mutationlog writer.
+var delegatedMutationOperations = map[string]string{
+	"ai-suggestion-execute":  "Execute",
+	"ai-suggestion-decision": "Decide",
+}
+
 // inboxEventKinds are the event-kind constants this package may name,
 // each with what the id filed under it identifies.
 //
-// The kind is the only thing telling a subscriber which table to resolve
-// that id against, and a lookup in the wrong one comes back empty rather
-// than failing — so the subscriber sees a change it can make nothing of,
-// on every row the operation produces. The inbox is a view over
-// `signals`: archiving disables a signal and snoozing moves its
-// received_at, so a kind naming any other table's rows is one no
-// consumer of this package's events can follow.
+// The kind tells a subscriber which row an event names. Inbox operations
+// span signals, intake items captured from signals, and their proposals;
+// the list records the rows each kind points to so a new event cannot
+// silently name an unrelated resource family.
 var inboxEventKinds = map[string]string{
-	"SignalArchived":        "a row of `signals`, taken off the queue",
-	"SignalSnoozed":         "a row of `signals`, deferred to a later moment",
-	"AiSuggestionApplied":   "the suggestion a reader accepted",
-	"AiSuggestionDismissed": "the suggestion a reader turned down",
+	"SignalArchived":       "a row of `signals`, taken off the queue",
+	"SignalSnoozed":        "a row of `signals`, deferred to a later moment",
+	"SignalAttached":       "a row of `signals`, linked to a task",
+	"IntakeItemCreated":    "a row of `intake_items`, captured from a signal",
+	"IntakeItemAccepted":   "a row of `intake_items`, converted or linked to a task",
+	"AiSuggestionProposed": "a signal row for which the actor received a triage proposal",
 }
 
 // eventKindQualifier is the package identifier the kinds are reached
-// through here. Within this package it carries kind constants and the
-// Kind type and nothing else, because [bannedRawAppends] keeps the
-// append entry points out of reach.
+// through here. The AST walk ignores the Event and Append API names; only
+// constants that identify event kinds are held to inboxEventKinds.
 const eventKindQualifier = "eventbus"
 
 // eventKindTypeName is the one name under that qualifier that is not a
 // kind.
 const eventKindTypeName = "Kind"
 
+var eventbusAPINames = map[string]bool{"Event": true, "Append": true}
+
 // TestInboxNamesOnlyKindsForItsOwnRows reads every event kind the
 // package names and holds it to that list.
 //
 // It reads the kinds the package names rather than the ones written on a
-// record, because a kind reaches a record more than one way: the queue
-// operations write the constant inline, and the suggestion reactions
-// carry it on a value declared once and shared by two handlers. A guard
-// that only read record literals would see the first pair and report the
-// second as naming nothing at all.
+// record, because a kind can reach a record through a value declared
+// apart from the record literal, which a guard reading only literals
+// would miss.
 //
 // The constant is read as written rather than by its value. The kinds
 // are declared once in the shared package and re-exported, so the name
@@ -131,7 +137,7 @@ func TestInboxNamesOnlyKindsForItsOwnRows(t *testing.T) {
 				return true
 			}
 			pkg, ok := sel.X.(*ast.Ident)
-			if !ok || pkg.Name != eventKindQualifier || sel.Sel.Name == eventKindTypeName {
+			if !ok || pkg.Name != eventKindQualifier || sel.Sel.Name == eventKindTypeName || eventbusAPINames[sel.Sel.Name] {
 				return true
 			}
 			named[sel.Sel.Name] = true
@@ -195,6 +201,7 @@ func TestInboxMutatingOperationsRecordBothHalves(t *testing.T) {
 
 	seenExempt := map[string]bool{}
 	seenRequiredRead := map[string]bool{}
+	seenDelegated := map[string]bool{}
 	for _, op := range ops {
 		if op.Handler == "" || !a.HasFunc(op.Handler) {
 			t.Errorf("%s:%d: operation %q names no handler this package declares", op.File, op.Line, op.ID)
@@ -213,9 +220,32 @@ func TestInboxMutatingOperationsRecordBothHalves(t *testing.T) {
 			continue
 		}
 		if !a.Reaches(op.Handler, mutationLogGates) {
+			if method, delegated := delegatedMutationOperations[op.ID]; delegated {
+				if !a.Reaches(op.Handler, map[string]bool{method: true}) {
+					t.Errorf("%s:%d: operation %q (%s) no longer delegates to suggestioncommand.%s",
+						op.File, op.Line, op.ID, op.Handler, method)
+				} else {
+					seenDelegated[op.ID] = true
+				}
+				continue
+			}
 			t.Errorf("%s:%d: operation %q (%s) can change the workspace but never reaches a recorder entry point; "+
 				"route it through one of %v, or add it to writeOperationsWithoutMutationLog with the reason it records nothing",
 				op.File, op.Line, op.ID, op.Handler, mutationguard.SortedKeys(mutationLogGates))
+		}
+	}
+	for id, method := range delegatedMutationOperations {
+		if !seenDelegated[id] {
+			t.Errorf("delegatedMutationOperations lists %q (%s), which is no longer a registered delegated write", id, method)
+		}
+	}
+	service, err := mutationguard.Load("../../../suggestioncommand")
+	if err != nil {
+		t.Fatalf("load suggestioncommand package: %v", err)
+	}
+	for id, method := range delegatedMutationOperations {
+		if !service.HasFunc(method) || !service.Reaches(method, mutationLogGates) {
+			t.Errorf("%s delegates to suggestioncommand.%s, but that service no longer reaches a mutationlog recorder entry point", id, method)
 		}
 	}
 

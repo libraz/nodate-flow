@@ -45,9 +45,13 @@ DROP TABLE IF EXISTS `signin_states`;
 DROP TABLE IF EXISTS `agent_runs`;
 DROP TABLE IF EXISTS `ai_agents`;
 DROP TABLE IF EXISTS `ai_invocations`;
+DROP TABLE IF EXISTS `ai_invocations_inputs`;
 DROP TABLE IF EXISTS `ai_models`;
 DROP TABLE IF EXISTS `ai_providers`;
 DROP TABLE IF EXISTS `ai_settings`;
+DROP TABLE IF EXISTS `ai_suggestion_batches`;
+DROP TABLE IF EXISTS `ai_suggestion_batches_inputs`;
+DROP TABLE IF EXISTS `ai_suggestion_decisions`;
 DROP TABLE IF EXISTS `attachments`;
 DROP TABLE IF EXISTS `auto_action_rules`;
 DROP TABLE IF EXISTS `comments`;
@@ -62,6 +66,7 @@ DROP TABLE IF EXISTS `mcp_tokens`;
 DROP TABLE IF EXISTS `mentions`;
 DROP TABLE IF EXISTS `notification_preferences`;
 DROP TABLE IF EXISTS `notifications`;
+DROP TABLE IF EXISTS `operation_receipts`;
 DROP TABLE IF EXISTS `pages`;
 DROP TABLE IF EXISTS `project_members`;
 DROP TABLE IF EXISTS `projects`;
@@ -74,7 +79,10 @@ DROP TABLE IF EXISTS `task_dependencies`;
 DROP TABLE IF EXISTS `task_description_versions`;
 DROP TABLE IF EXISTS `task_embeddings`;
 DROP TABLE IF EXISTS `task_event_links`;
+DROP TABLE IF EXISTS `task_handoffs`;
 DROP TABLE IF EXISTS `task_labels`;
+DROP TABLE IF EXISTS `task_review_decisions`;
+DROP TABLE IF EXISTS `task_submissions`;
 DROP TABLE IF EXISTS `tasks`;
 DROP TABLE IF EXISTS `timebox_tasks`;
 DROP TABLE IF EXISTS `timeboxes`;
@@ -1764,8 +1772,10 @@ CREATE TABLE agent_runs (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   agent_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_agents.id',
+  -- Match events.id's unsigned BIGINT range; zero-source jobs store NULL.
+  source_event_id BIGINT UNSIGNED NULL COMMENT 'Internal FK to the event that triggered an on_event run',
 
-  dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas',
+  dedupe_key VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Unique scheduler identity: agent/time for scheduled runs and agent/event for on_event runs',
   status ENUM('pending','claimed','succeeded','failed') NOT NULL DEFAULT 'pending' COMMENT 'Lifecycle state',
   attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of claim attempts (for retry budget)',
   scheduled_at DATETIME(3) NOT NULL COMMENT 'Tick time the scheduler enqueued the run for',
@@ -1782,11 +1792,14 @@ CREATE TABLE agent_runs (
   UNIQUE KEY uniq_agent_runs_public_id (public_id),
   UNIQUE KEY uniq_agent_runs_workspace_public_id (workspace_id, public_id),
   UNIQUE KEY uniq_agent_runs_dedupe_key (dedupe_key),
+  UNIQUE KEY uniq_agent_runs_agent_source_event (agent_id, source_event_id),
+  KEY idx_agent_runs_source_event_id (source_event_id),
   KEY idx_agent_runs_status_scheduled_at (status, scheduled_at),
   KEY idx_agent_runs_workspace_id_agent_id (workspace_id, agent_id),
 
   CONSTRAINT fk_agent_runs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE
+  CONSTRAINT fk_agent_runs_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE,
+  CONSTRAINT fk_agent_runs_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Agent execution queue + history';
 
 -- >>> ai_agents.sql
@@ -1844,6 +1857,10 @@ CREATE TABLE ai_invocations (
   user_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id (if user-initiated)',
   agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when the call was made on behalf of an AI agent',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id if applicable',
+  audience ENUM('initiator','task','workspace') NOT NULL DEFAULT 'initiator' COMMENT 'Who may read the redacted prompt and response after current ACL checks',
+  input_resources_json JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Public references to task content included in the provider input; never internal IDs',
+  input_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Expected number of normalized task provenance references',
+  provenance_valid BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'False means ordinary readers must fail closed on provenance',
 
   purpose VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Logical call purpose (e.g., propose_tasks)',
   model VARCHAR(128) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Model name actually used',
@@ -1875,6 +1892,25 @@ CREATE TABLE ai_invocations (
   CONSTRAINT fk_ai_invocations_agent FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_ai_invocations_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='LLM invocation audit';
+
+-- >>> ai_invocations_inputs.sql
+-- ====================================
+-- ai_invocations_inputs
+-- Current task ACL inputs for each logged model invocation.
+-- ====================================
+CREATE TABLE ai_invocations_inputs (
+  invocation_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_invocations.id',
+  task_public_id BINARY(16) NOT NULL COMMENT 'Public UUID of a task quoted into the provider input',
+
+  PRIMARY KEY (invocation_id, task_public_id),
+  KEY idx_ai_invocations_inputs_task_public_id (task_public_id, invocation_id),
+
+  -- Deliberately no FK to tasks: deleting a referenced task must leave
+  -- provenance behind so ordinary readers fail closed instead of silently
+  -- forgetting that the prompt once contained its content.
+  CONSTRAINT fk_ai_invocations_inputs_invocation
+    FOREIGN KEY (invocation_id) REFERENCES ai_invocations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task resources quoted into AI invocation inputs';
 
 -- >>> ai_models.sql
 -- ====================================
@@ -1985,6 +2021,86 @@ CREATE TABLE ai_settings (
   CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
 
+-- >>> ai_suggestion_batches.sql
+-- ====================================
+-- ai_suggestion_batches
+-- Immutable provenance for actor-private AI suggestion output.
+-- ====================================
+CREATE TABLE ai_suggestion_batches (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible batch id',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  user_id INT UNSIGNED NULL COMMENT 'Initiating user; NULL means the owner was deleted and access is denied',
+  input_count INT UNSIGNED NOT NULL COMMENT 'Expected number of normalized task provenance references',
+  provenance_valid BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'True only after the complete input set is stored atomically',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
+  notes TEXT NULL COMMENT 'Admin notes',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_ai_suggestion_batches_public_id (public_id),
+  UNIQUE KEY uniq_ai_suggestion_batches_workspace_public_id (workspace_id, public_id),
+  KEY idx_ai_suggestion_batches_workspace_user_created (workspace_id, user_id, created_at),
+
+  CONSTRAINT fk_ai_suggestion_batches_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_suggestion_batches_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Actor-private suggestion input provenance';
+
+-- >>> ai_suggestion_batches_inputs.sql
+-- ====================================
+-- ai_suggestion_batches_inputs
+-- Public task references quoted into one suggestion batch.
+-- ====================================
+CREATE TABLE ai_suggestion_batches_inputs (
+  batch_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_suggestion_batches.id',
+  task_public_id BINARY(16) NOT NULL COMMENT 'Public UUID of a task quoted into the provider input',
+
+  PRIMARY KEY (batch_id, task_public_id),
+  KEY idx_ai_suggestion_batches_inputs_task_public_id (task_public_id, batch_id),
+
+  -- No task FK: deletion must preserve provenance so stale output is denied.
+  CONSTRAINT fk_ai_suggestion_batches_inputs_batch FOREIGN KEY (batch_id) REFERENCES ai_suggestion_batches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task resources quoted into an AI suggestion batch';
+
+-- >>> ai_suggestion_decisions.sql
+-- ====================================
+-- ai_suggestion_decisions
+-- Actor-scoped edits, dismissals and deferrals for persisted AI suggestion
+-- proposals. Shared execution resolution remains in the event log.
+-- ====================================
+CREATE TABLE ai_suggestion_decisions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible decision id',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  proposal_event_id BIGINT UNSIGNED NOT NULL COMMENT 'Internal FK to the proposed event row',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to the user who owns this decision',
+
+  revision INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Actor-scoped decision revision',
+  state ENUM('edited','dismissed','deferred') NOT NULL COMMENT 'Actor-scoped decision state',
+  action ENUM('archive','snooze','open') NULL COMMENT 'Edited recommendation; null for dismiss or defer',
+  reasoning TEXT NULL COMMENT 'Edited recommendation explanation',
+  source_version BINARY(32) NULL COMMENT 'SHA-256 version of the source evidence reviewed by the actor',
+  expires_at DATETIME(3) NOT NULL COMMENT 'When this actor-scoped decision stops affecting the list',
+
+  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'When this decision was last changed',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When this decision was first recorded',
+
+  UNIQUE KEY uniq_ai_suggestion_decisions_public_id (public_id),
+  UNIQUE KEY uniq_ai_suggestion_decisions_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_ai_suggestion_decisions_proposal_user (workspace_id, proposal_event_id, user_id),
+  KEY idx_ai_suggestion_decisions_expiry (workspace_id, user_id, expires_at),
+
+  CONSTRAINT fk_ai_suggestion_decisions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_suggestion_decisions_proposal FOREIGN KEY (proposal_event_id) REFERENCES events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_ai_suggestion_decisions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT chk_ai_suggestion_decisions_action CHECK (
+    (state = 'edited' AND action IS NOT NULL AND reasoning IS NOT NULL AND CHAR_LENGTH(TRIM(reasoning)) > 0)
+    OR (state IN ('dismissed','deferred') AND action IS NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Actor-scoped AI suggestion decisions';
+
 -- >>> attachments.sql
 -- ====================================
 -- attachments
@@ -2077,7 +2193,11 @@ CREATE TABLE comments (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   task_id INT UNSIGNED NULL COMMENT 'Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)',
-  author_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+  author_id INT UNSIGNED NULL COMMENT 'Internal FK to users.id when a human wrote the comment',
+  author_kind ENUM('user','agent') NOT NULL DEFAULT 'user' COMMENT 'Historical author kind; remains agent if the agent is later deleted',
+  author_agent_id INT UNSIGNED NULL COMMENT 'Internal FK to ai_agents.id when an agent wrote the comment',
+  author_agent_public_id BINARY(16) NULL COMMENT 'Agent public byline retained after deletion',
+  author_agent_name VARCHAR(255) NULL COMMENT 'Agent name retained after deletion',
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
   edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
@@ -2096,6 +2216,7 @@ CREATE TABLE comments (
   -- comment rows without a full table scan (the workspace-leading composite
   -- above does not satisfy author_id-only lookups).
   KEY idx_comments_author_id (author_id),
+  KEY idx_comments_author_agent_id (author_agent_id),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
@@ -2103,7 +2224,8 @@ CREATE TABLE comments (
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_comments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
-  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_comments_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_comments_author_agent FOREIGN KEY (author_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task discussion comments';
 
 -- >>> dashboard_widgets.sql
@@ -2196,6 +2318,7 @@ CREATE TABLE intake_items (
 
   title               VARCHAR(500) NOT NULL                   COMMENT 'Item title',
   body                MEDIUMTEXT NULL                         COMMENT 'Item body / details',
+  source_url          VARCHAR(2048) NULL                       COMMENT 'Validated HTTP(S) link to the originating source',
   triage_status       ENUM('pending','accepted','rejected','snoozed','duplicate') NOT NULL DEFAULT 'pending' COMMENT 'Current triage state',
   snooze_until        DATETIME(3) NULL                        COMMENT 'Snooze expiry (NULL = not snoozed)',
   ai_score            DECIMAL(3,2) NULL                       COMMENT '0.00-1.00',
@@ -2210,6 +2333,7 @@ CREATE TABLE intake_items (
 
   UNIQUE KEY uniq_intake_items_public_id (public_id),
   UNIQUE KEY uniq_intake_items_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_intake_items_workspace_signal (workspace_id, signal_id),
   KEY idx_intake_items_workspace_id_status (workspace_id, triage_status),
   KEY idx_intake_items_workspace_id_snooze (workspace_id, snooze_until),
   KEY idx_intake_items_signal_id (signal_id),
@@ -2454,6 +2578,9 @@ CREATE TABLE mentions (
   workspace_id      INT UNSIGNED NOT NULL,
   mentioned_user_id INT UNSIGNED NOT NULL,
   actor_user_id     INT UNSIGNED NULL,
+  actor_agent_id    INT UNSIGNED NULL,
+  actor_agent_public_id BINARY(16) NULL COMMENT 'Agent public byline retained after deletion',
+  actor_agent_name  VARCHAR(255) NULL COMMENT 'Agent name retained after deletion',
 
   task_id           INT UNSIGNED NULL,
   comment_id        INT UNSIGNED NULL,
@@ -2468,12 +2595,14 @@ CREATE TABLE mentions (
   UNIQUE KEY uniq_mentions_public_id (public_id),
   UNIQUE KEY uniq_mentions_workspace_public_id (workspace_id, public_id),
   KEY idx_mentions_workspace_mentioned_user (workspace_id, mentioned_user_id),
+  KEY idx_mentions_actor_agent_id (actor_agent_id),
   KEY idx_mentions_task_id (task_id),
   KEY idx_mentions_comment_id (comment_id),
 
   CONSTRAINT fk_mentions_workspace FOREIGN KEY (workspace_id)      REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_mentions_mentioned FOREIGN KEY (mentioned_user_id) REFERENCES users(id)      ON DELETE CASCADE,
   CONSTRAINT fk_mentions_actor     FOREIGN KEY (actor_user_id)     REFERENCES users(id)      ON DELETE SET NULL,
+  CONSTRAINT fk_mentions_actor_agent FOREIGN KEY (actor_agent_id)  REFERENCES ai_agents(id) ON DELETE SET NULL,
   CONSTRAINT fk_mentions_task      FOREIGN KEY (task_id)           REFERENCES tasks(id)      ON DELETE CASCADE,
   CONSTRAINT fk_mentions_comment   FOREIGN KEY (comment_id)        REFERENCES comments(id)   ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='@mention cache (re-extractable from markdown)';
@@ -2570,6 +2699,39 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_notifications_source_event FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-user notification entries from eventbus fan-out';
+
+-- >>> operation_receipts.sql
+-- ====================================
+-- operation_receipts
+-- Durable idempotency receipts for user or agent commands. The receipt,
+-- effect and result are committed in one transaction; rows remain available
+-- so a lost response can always be retried without repeating the effect.
+-- ====================================
+CREATE TABLE operation_receipts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the externally visible operation id',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+
+  principal_kind ENUM('user','agent') NOT NULL COMMENT 'Kind of actor that owns the operation key',
+  principal_id INT UNSIGNED NOT NULL COMMENT 'Internal id of the user or agent that owns the operation key',
+  operation_kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL COMMENT 'Stable operation family name',
+  operation_key VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'Opaque client retry key; compared case-sensitively',
+  request_hash BINARY(32) NOT NULL COMMENT 'SHA-256 of the canonical operation request',
+  target_kind VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL COMMENT 'Kind of entity targeted by the operation',
+  target_public_id BINARY(16) NOT NULL COMMENT 'Public id of the target entity',
+  result_json JSON NULL COMMENT 'Exact successful result returned on matching retries',
+  completed_at DATETIME(3) NULL COMMENT 'Set only after the effect and result are ready to commit',
+
+  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT 'When the receipt last changed',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT 'When this receipt row was created',
+
+  UNIQUE KEY uniq_operation_receipts_public_id (public_id),
+  UNIQUE KEY uniq_operation_receipts_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_operation_receipts_operation_key (workspace_id, principal_kind, principal_id, operation_kind, operation_key),
+  KEY idx_operation_receipts_target (workspace_id, target_kind, target_public_id),
+
+  CONSTRAINT fk_operation_receipts_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Durable command idempotency receipts';
 
 -- >>> pages.sql
 -- ====================================
@@ -3029,6 +3191,9 @@ CREATE TABLE task_description_versions (
   workspace_id   INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to workspaces.id',
   task_id        INT UNSIGNED NOT NULL                   COMMENT 'Internal FK to tasks.id',
   author_user_id INT UNSIGNED NULL                       COMMENT 'User who authored this version',
+  author_agent_id INT UNSIGNED NULL                      COMMENT 'Agent who authored this version',
+  author_agent_public_id BINARY(16) NULL                  COMMENT 'Agent public byline retained after deletion',
+  author_agent_name VARCHAR(255) NULL                     COMMENT 'Agent name retained after deletion',
 
   version_number INT UNSIGNED NOT NULL                   COMMENT 'Monotonically increasing per task',
   body           MEDIUMTEXT NOT NULL                     COMMENT 'Full description snapshot',
@@ -3047,7 +3212,8 @@ CREATE TABLE task_description_versions (
 
   CONSTRAINT fk_task_desc_versions_workspace FOREIGN KEY (workspace_id)   REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_desc_versions_task      FOREIGN KEY (task_id)        REFERENCES tasks(id)      ON DELETE CASCADE,
-  CONSTRAINT fk_task_desc_versions_author    FOREIGN KEY (author_user_id) REFERENCES users(id)      ON DELETE SET NULL
+  CONSTRAINT fk_task_desc_versions_author    FOREIGN KEY (author_user_id) REFERENCES users(id)      ON DELETE SET NULL,
+  CONSTRAINT fk_task_desc_versions_agent     FOREIGN KEY (author_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task description version history (full snapshots)';
 
 -- >>> task_embeddings.sql
@@ -3125,6 +3291,42 @@ CREATE TABLE task_event_links (
   CONSTRAINT fk_task_event_links_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='M:N task-to-event relationships (umbrella events, milestones)';
 
+-- >>> task_handoffs.sql
+-- ====================================
+-- task_handoffs
+-- Human responsibility moves only when the recipient accepts. The
+-- generated pending_role_key scopes a unique key to live handoffs while
+-- allowing unlimited immutable history after a handoff is resolved.
+-- ====================================
+CREATE TABLE task_handoffs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  role ENUM('assignee','reviewer','approver') NOT NULL COMMENT 'Human responsibility role being handed off',
+  from_user_id INT UNSIGNED NULL COMMENT 'Current human responsibility holder until acceptance',
+  to_user_id INT UNSIGNED NULL COMMENT 'Eligible task reader who may accept or decline',
+  requested_by_user_id INT UNSIGNED NULL COMMENT 'Human who requested the handoff',
+  due_at DATETIME(3) NULL COMMENT 'Optional response deadline; stored in UTC',
+  status ENUM('pending','accepted','declined','expired','cancelled') NOT NULL DEFAULT 'pending' COMMENT 'Only acceptance changes the task actor',
+  pending_role_key VARCHAR(16) GENERATED ALWAYS AS (CASE WHEN status = 'pending' THEN role ELSE NULL END) STORED COMMENT 'Scopes the unique key to one unresolved handoff per task role',
+  resolved_at DATETIME(3) NULL COMMENT 'Time the handoff was accepted, declined, cancelled, or marked expired',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_task_handoffs_public_id (public_id),
+  UNIQUE KEY uniq_task_handoffs_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_task_handoffs_one_pending_role (task_id, pending_role_key),
+  KEY idx_task_handoffs_recipient (workspace_id, to_user_id, status, created_at),
+  KEY idx_task_handoffs_task_created (task_id, created_at),
+  KEY idx_task_handoffs_status_due_at (status, due_at, id),
+
+  CONSTRAINT fk_task_handoffs_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_handoffs_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_handoffs_from_user FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_task_handoffs_to_user FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_task_handoffs_requested_by FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Accepted human task responsibility handoffs';
+
 -- >>> task_labels.sql
 -- ====================================
 -- task_labels
@@ -3158,6 +3360,65 @@ CREATE TABLE task_labels (
   CONSTRAINT fk_task_labels_label     FOREIGN KEY (label_id)     REFERENCES labels(id)     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task-label junction';
 
+-- >>> task_review_decisions.sql
+-- ====================================
+-- task_review_decisions
+-- One immutable decision per submission. A new decision requires a new
+-- submission row, preserving the complete review history.
+-- ====================================
+CREATE TABLE task_review_decisions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  submission_id INT UNSIGNED NOT NULL COMMENT 'Submission this decision resolves',
+  decided_by_user_id INT UNSIGNED NULL COMMENT 'Human reviewer who made the decision; nullable provenance if the account is removed',
+  decision ENUM('approved','rejected') NOT NULL COMMENT 'Review outcome for the immutable submission',
+  reason TEXT NULL COMMENT 'Optional reviewer explanation',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_task_review_decisions_public_id (public_id),
+  UNIQUE KEY uniq_task_review_decisions_workspace_public_id (workspace_id, public_id),
+  UNIQUE KEY uniq_task_review_decisions_submission (submission_id),
+  KEY idx_task_review_decisions_task_created (task_id, created_at),
+
+  CONSTRAINT fk_task_review_decisions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_review_decisions_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_review_decisions_submission FOREIGN KEY (submission_id) REFERENCES task_submissions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_review_decisions_reviewer FOREIGN KEY (decided_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Immutable human decisions for task submissions';
+
+-- >>> task_submissions.sql
+-- ====================================
+-- task_submissions
+-- Immutable snapshots of submitted task work. A resubmission is a new
+-- row, even when no artifact changed, so each review decision names one
+-- precise evidence set and one work revision.
+-- ====================================
+CREATE TABLE task_submissions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  task_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to tasks.id',
+  work_revision INT UNSIGNED NOT NULL COMMENT 'Task work_revision captured by this submission',
+  submitted_by_user_id INT UNSIGNED NULL COMMENT 'Human who submitted the work; retained as nullable provenance if the account is removed',
+  reviewer_user_id INT UNSIGNED NULL COMMENT 'Selected reviewer who may decide this submission',
+  acceptance_criteria_json JSON NOT NULL COMMENT 'Immutable acceptance criteria supplied with the submission',
+  evidence_urls_json JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Bounded HTTP(S) evidence links supplied with the submission',
+  attachment_digests_json JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Attachment public IDs and SHA-256 digests snapshotted at submission time',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_task_submissions_public_id (public_id),
+  UNIQUE KEY uniq_task_submissions_workspace_public_id (workspace_id, public_id),
+  KEY idx_task_submissions_task_revision (task_id, work_revision, id),
+  KEY idx_task_submissions_reviewer (workspace_id, reviewer_user_id, created_at),
+
+  CONSTRAINT fk_task_submissions_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_submissions_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_task_submissions_submitter FOREIGN KEY (submitted_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_task_submissions_reviewer FOREIGN KEY (reviewer_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Immutable task work submissions for human review';
+
 -- >>> tasks.sql
 -- ====================================
 -- tasks
@@ -3178,6 +3439,9 @@ CREATE TABLE tasks (
   title VARCHAR(500) NOT NULL COMMENT 'Task title; length matches the API and MCP input limit',
   description MEDIUMTEXT NULL COMMENT 'Markdown body',
   derived_state ENUM('open','waiting','review','done','cancelled') NOT NULL DEFAULT 'open' COMMENT 'Computed from constraints + events; do NOT update directly',
+  completion_policy ENUM('manual','review_required') NOT NULL DEFAULT 'manual' COMMENT 'manual preserves direct completion; review_required requires approval of the current work revision',
+  work_revision INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Incremented when task title, description, or attached evidence changes; review approvals bind to this revision',
+  required_completion_constraint_ids JSON NOT NULL DEFAULT (JSON_ARRAY()) COMMENT 'Public UUID strings for the optional advisory constraints explicitly selected as completion requirements',
   agent_memo JSON NOT NULL DEFAULT (JSON_OBJECT()) COMMENT 'Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"',
   priority INT NOT NULL DEFAULT 0 COMMENT 'LLM-optimized heuristic priority',
   due_on DATE NULL COMMENT 'Deadline for task completion; drives constraint evaluation',
@@ -3642,6 +3906,8 @@ WHERE so.ref_count = 0
   );
 
 DROP VIEW IF EXISTS `v_admin_users`;
+DROP VIEW IF EXISTS `v_ai_suggestion_readable_batches`;
+DROP VIEW IF EXISTS `v_ai_suggestion_timeline_events`;
 DROP VIEW IF EXISTS `v_audit_recent`;
 DROP VIEW IF EXISTS `v_comment_for_task`;
 DROP VIEW IF EXISTS `v_inbox`;
@@ -3655,7 +3921,43 @@ DROP VIEW IF EXISTS `v_task_timeline`;
 DROP VIEW IF EXISTS `v_users`;
 DROP VIEW IF EXISTS `v_workspace_activity`;
 DROP VIEW IF EXISTS `v_workspace_members`;
+DROP VIEW IF EXISTS `_v_inbox_all`;
 DROP VIEW IF EXISTS `_v_task_list_all`;
+
+-- >>> _v_inbox_all.sql
+-- v_inbox_all
+-- Signals that belong to a workspace, with optional task linkage, whether
+-- or not they have arrived yet. A future received_at is an inbox snooze,
+-- which hides the signal from the inbox (v_inbox) but not from its task.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_inbox_all AS
+SELECT
+  s.workspace_id,
+  w.public_id AS workspace_public_id,
+  s.public_id,
+  t.public_id AS task_public_id,
+  t.title AS task_title,
+  -- The task's own ACL columns ride along so a consumer can apply the
+  -- Layer 4 visibility rule. The view cannot apply it itself: it takes
+  -- no parameters, and the answer depends on who is reading. Exposing
+  -- the inputs here is what lets every consumer reach the same verdict
+  -- instead of each inventing one.
+  t.visibility AS task_visibility,
+  t.project_id AS task_project_id,
+  t.created_by_user_id AS task_created_by_user_id,
+  t.id AS task_internal_id,
+  s.source,
+  s.kind,
+  s.external_id,
+  s.payload_json,
+  s.received_at,
+  s.updated_at,
+  s.created_at
+FROM signals s
+INNER JOIN workspaces w
+  ON w.id = s.workspace_id AND w.enabled = TRUE
+LEFT JOIN tasks t
+  ON t.id = s.task_id AND t.enabled = TRUE
+WHERE s.enabled = TRUE;
 
 -- >>> _v_task_list_all.sql
 -- v_task_list_all
@@ -3805,6 +4107,94 @@ FROM users u
 LEFT JOIN storage_objects so_avatar
   ON so_avatar.id = u.avatar_storage_object_id AND so_avatar.enabled = TRUE;
 
+-- >>> v_ai_suggestion_readable_batches.sql
+-- A batch is readable only by its initiating, currently enabled workspace
+-- member, while every captured task still exists and passes that member's
+-- current task ACL. Workspace admins bypass only task-level visibility.
+CREATE OR REPLACE VIEW v_ai_suggestion_readable_batches AS
+SELECT
+  b.id,
+  b.public_id,
+  b.workspace_id,
+  b.user_id
+FROM ai_suggestion_batches b
+INNER JOIN workspaces w
+  ON w.id = b.workspace_id AND w.enabled = TRUE
+INNER JOIN workspace_members wm
+  ON wm.workspace_id = b.workspace_id
+ AND wm.user_id = b.user_id
+ AND wm.enabled = TRUE
+INNER JOIN users u
+  ON u.id = b.user_id AND u.enabled = TRUE
+WHERE b.enabled = TRUE
+  AND b.provenance_valid = TRUE
+  AND b.user_id IS NOT NULL
+  -- Correlated, not a grouped view: a GROUP BY view cannot merge and is
+  -- materialized over every batch in the instance before b is filtered.
+  AND b.input_count = (
+    SELECT COUNT(*)
+    FROM ai_suggestion_batches_inputs i
+    WHERE i.batch_id = b.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM ai_suggestion_batches_inputs bi
+    LEFT JOIN v_task_list_all task
+      ON task.workspace_id = b.workspace_id
+     AND task.public_id = bi.task_public_id
+    WHERE bi.batch_id = b.id
+      AND (
+        task.task_internal_id IS NULL
+        OR (
+          wm.role NOT IN ('owner', 'admin')
+          AND NOT COALESCE((
+            task.visibility = 'public'
+            OR (task.visibility = 'project' AND EXISTS (
+              SELECT 1 FROM project_members pm_vis
+              WHERE pm_vis.project_id = task.project_id
+                AND pm_vis.user_id = wm.user_id
+                AND pm_vis.enabled = TRUE
+            ))
+            OR (task.visibility = 'private' AND (
+              task.created_by_user_id = wm.user_id
+              OR EXISTS (
+                SELECT 1 FROM task_actors ta_vis
+                WHERE ta_vis.task_id = task.task_internal_id
+                  AND ta_vis.kind = 'user'
+                  AND ta_vis.user_id = wm.user_id
+                  AND ta_vis.enabled = TRUE
+              )
+            ))
+          ), FALSE)
+        )
+      )
+  );
+
+-- >>> v_ai_suggestion_timeline_events.sql
+-- Safe event-to-batch projection for proposal readers. It exposes event and
+-- batch identity only; payload/reasoning remains in the protected event row.
+CREATE OR REPLACE VIEW v_ai_suggestion_timeline_events AS
+SELECT
+  e.id AS event_id,
+  b.id AS batch_id,
+  b.public_id AS batch_public_id,
+  e.workspace_id,
+  b.user_id AS owner_user_id,
+  e.actor_user_id,
+  e.type AS event_type
+FROM events e
+INNER JOIN ai_suggestion_batches b
+  ON b.workspace_id = e.workspace_id
+ AND b.public_id = CASE
+   WHEN IS_UUID(e.payload_json->>'$.suggestion_batch_id')
+   THEN UUID_TO_BIN(e.payload_json->>'$.suggestion_batch_id', 0)
+   ELSE NULL
+ END
+ AND b.user_id = e.actor_user_id
+WHERE e.enabled = TRUE
+  AND b.enabled = TRUE
+  AND e.type IN ('ai.suggestion.proposed', 'ai.suggestion.edited');
+
 -- >>> v_audit_recent.sql
 -- v_audit_recent
 -- Recent audit events projected for the admin UI. api_key values are
@@ -3844,15 +4234,18 @@ WHERE al.enabled = TRUE;
 -- unknown user. The rule this follows: `enabled = TRUE` may gate a row only
 -- when the user is what the row is about (membership, credentials, actor
 -- lists); when the user is merely the byline on someone else's content, it
--- gates the byline.
+-- gates the byline. An agent byline falls back to the name and public id
+-- snapshotted on the comment once the agent row is deleted.
 CREATE OR REPLACE ALGORITHM=MERGE VIEW v_comment_for_task AS
 SELECT
   c.workspace_id,
   c.task_id,
   t.public_id AS task_public_id,
   c.public_id,
+  c.author_kind,
   u.public_id AS author_public_id,
-  u.display_name AS author_display_name,
+  CAST(COALESCE(BIN_TO_UUID(ag.public_id, 0), BIN_TO_UUID(c.author_agent_public_id, 0), '') AS CHAR(36)) AS author_agent_public_id,
+  COALESCE(u.display_name, ag.name, c.author_agent_name, '') AS author_display_name,
   u.avatar_url AS author_avatar_url,
   u.avatar_storage_object_id AS author_avatar_storage_object_id,
   so_author_avatar.public_id AS author_avatar_storage_object_public_id,
@@ -3864,6 +4257,8 @@ FROM comments c
 INNER JOIN workspaces w ON w.id = c.workspace_id AND w.enabled = TRUE
 INNER JOIN tasks t ON t.id = c.task_id AND t.enabled = TRUE
 LEFT JOIN users u ON u.id = c.author_id AND u.enabled = TRUE
+-- No enabled filter: the agent is the historical byline, not what the row is about.
+LEFT JOIN ai_agents ag ON ag.id = c.author_agent_id
 LEFT JOIN storage_objects so_author_avatar
   ON so_author_avatar.id = u.avatar_storage_object_id AND so_author_avatar.enabled = TRUE
 WHERE c.enabled = TRUE;
@@ -3871,36 +4266,13 @@ WHERE c.enabled = TRUE;
 -- >>> v_inbox.sql
 -- v_inbox
 -- Aggregated inbox: signals that have arrived in a workspace with optional
--- task linkage. Consumers filter by workspace_id and archive/snooze state.
-CREATE OR REPLACE VIEW v_inbox AS
-SELECT
-  s.workspace_id,
-  w.public_id AS workspace_public_id,
-  s.public_id,
-  t.public_id AS task_public_id,
-  t.title AS task_title,
-  -- The task's own ACL columns ride along so a consumer can apply the
-  -- Layer 4 visibility rule. The view cannot apply it itself: it takes
-  -- no parameters, and the answer depends on who is reading. Exposing
-  -- the inputs here is what lets every consumer reach the same verdict
-  -- instead of each inventing one.
-  t.visibility AS task_visibility,
-  t.project_id AS task_project_id,
-  t.created_by_user_id AS task_created_by_user_id,
-  t.id AS task_internal_id,
-  s.source,
-  s.kind,
-  s.external_id,
-  s.payload_json,
-  s.received_at,
-  s.updated_at,
-  s.created_at
-FROM signals s
-INNER JOIN workspaces w
-  ON w.id = s.workspace_id AND w.enabled = TRUE
-LEFT JOIN tasks t
-  ON t.id = s.task_id AND t.enabled = TRUE
-WHERE s.enabled = TRUE;
+-- task linkage. Thin filter over v_inbox_all; column definitions live there.
+-- Future received_at values are snoozed until their deadline; keeping that
+-- rule here aligns workspace and cross-workspace inbox reads.
+CREATE OR REPLACE ALGORITHM=MERGE VIEW v_inbox AS
+SELECT v.*
+FROM v_inbox_all v
+WHERE v.received_at <= UTC_TIMESTAMP(3);
 
 -- >>> v_instance_audit_logs.sql
 -- v_instance_audit_logs
@@ -4112,6 +4484,8 @@ SELECT
   p.public_id AS project_public_id,
   actor.public_id AS actor_user_public_id,
   actor.display_name AS actor_display_name,
+  actor.avatar_url AS actor_avatar_url,
+  actor.avatar_storage_object_id AS actor_avatar_storage_object_id,
   agent.public_id AS actor_agent_public_id,
   CAST(COALESCE(agent.name, '') AS CHAR(255)) AS actor_agent_name,
   e.actor_system_source,
@@ -4507,7 +4881,195 @@ END$$
 
 DELIMITER ;
 
+DROP TRIGGER IF EXISTS `trg_attachments_work_revision`;
+DROP TRIGGER IF EXISTS `trg_task_handoffs_immutable`;
+DROP TRIGGER IF EXISTS `trg_task_review_decisions_immutable`;
+DROP TRIGGER IF EXISTS `trg_task_submissions_immutable`;
 DROP TRIGGER IF EXISTS `trg_tasks_derived_state_guard`;
+DROP TRIGGER IF EXISTS `trg_tasks_work_revision`;
+
+-- >>> trg_attachments_work_revision.sql
+-- ====================================
+-- trg_attachments_work_revision
+-- Attachment bytes are represented by the content-addressed storage
+-- object's digest. Attaching, replacing, moving, or removing a file
+-- changes the task work revision and invalidates prior review approval.
+-- Only uploaded files count: a presign reserves the attachment row before
+-- any bytes exist, so the revision moves when the upload is confirmed, and
+-- reclaiming a never-uploaded reservation leaves it alone. uploaded_at only
+-- ever goes from NULL to a value, so the current row answers for OLD too.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_attachments_work_revision_insert
+AFTER INSERT ON attachments
+FOR EACH ROW
+BEGIN
+  IF NEW.task_id IS NOT NULL AND NEW.enabled = TRUE
+     AND EXISTS (SELECT 1 FROM storage_objects so
+                 WHERE so.id = NEW.storage_object_id AND so.uploaded_at IS NOT NULL) THEN
+    UPDATE tasks
+    SET work_revision = work_revision + 1
+    WHERE id = NEW.task_id AND workspace_id = NEW.workspace_id;
+  END IF;
+END$$
+
+CREATE TRIGGER trg_attachments_work_revision_update
+AFTER UPDATE ON attachments
+FOR EACH ROW
+BEGIN
+  DECLARE old_counts BOOLEAN DEFAULT FALSE;
+  DECLARE new_counts BOOLEAN DEFAULT FALSE;
+  DECLARE moved BOOLEAN DEFAULT NOT (NEW.task_id <=> OLD.task_id)
+    OR NEW.storage_object_id <> OLD.storage_object_id;
+
+  SET old_counts = OLD.task_id IS NOT NULL AND OLD.enabled = TRUE
+    AND EXISTS (SELECT 1 FROM storage_objects so
+                WHERE so.id = OLD.storage_object_id AND so.uploaded_at IS NOT NULL);
+  SET new_counts = NEW.task_id IS NOT NULL AND NEW.enabled = TRUE
+    AND EXISTS (SELECT 1 FROM storage_objects so
+                WHERE so.id = NEW.storage_object_id AND so.uploaded_at IS NOT NULL);
+
+  IF old_counts AND (NOT new_counts OR moved) THEN
+    UPDATE tasks
+    SET work_revision = work_revision + 1
+    WHERE id = OLD.task_id AND workspace_id = OLD.workspace_id;
+  END IF;
+
+  IF new_counts AND (NOT old_counts OR moved) THEN
+    UPDATE tasks
+    SET work_revision = work_revision + 1
+    WHERE id = NEW.task_id AND workspace_id = NEW.workspace_id;
+  END IF;
+END$$
+
+CREATE TRIGGER trg_attachments_work_revision_delete
+AFTER DELETE ON attachments
+FOR EACH ROW
+BEGIN
+  IF OLD.task_id IS NOT NULL AND OLD.enabled = TRUE
+     AND EXISTS (SELECT 1 FROM storage_objects so
+                 WHERE so.id = OLD.storage_object_id AND so.uploaded_at IS NOT NULL) THEN
+    UPDATE tasks
+    SET work_revision = work_revision + 1
+    WHERE id = OLD.task_id AND workspace_id = OLD.workspace_id;
+  END IF;
+END$$
+
+-- The upload being confirmed is when every attachment already pointing at
+-- the reservation starts to count.
+CREATE TRIGGER trg_storage_objects_attachment_work_revision
+AFTER UPDATE ON storage_objects
+FOR EACH ROW
+BEGIN
+  IF OLD.uploaded_at IS NULL AND NEW.uploaded_at IS NOT NULL THEN
+    UPDATE tasks
+    SET work_revision = work_revision + 1
+    WHERE id IN (SELECT a.task_id FROM attachments a
+                 WHERE a.storage_object_id = NEW.id
+                   AND a.workspace_id = tasks.workspace_id
+                   AND a.enabled = TRUE);
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- >>> trg_task_handoffs_immutable.sql
+-- ====================================
+-- trg_task_handoffs_immutable
+-- Handoff identity and participants never change after request. The only
+-- legal update resolves a still-pending row exactly once.
+-- Rows are never deleted directly; FK cascades from the task and the
+-- workspace remove them and do not fire triggers.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_task_handoffs_immutable
+BEFORE UPDATE ON task_handoffs
+FOR EACH ROW
+BEGIN
+  IF NEW.public_id <> OLD.public_id
+     OR NEW.workspace_id <> OLD.workspace_id
+     OR NEW.task_id <> OLD.task_id
+     OR NEW.role <> OLD.role
+     OR NOT (NEW.from_user_id <=> OLD.from_user_id)
+     OR NOT (NEW.to_user_id <=> OLD.to_user_id)
+     OR NOT (NEW.requested_by_user_id <=> OLD.requested_by_user_id)
+     OR NOT (NEW.due_at <=> OLD.due_at)
+     OR NEW.created_at <> OLD.created_at
+     OR OLD.status <> 'pending'
+     OR NEW.status NOT IN ('accepted','declined','expired','cancelled')
+     OR NEW.resolved_at IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'task handoff may only be resolved once';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_task_handoffs_immutable_delete
+BEFORE DELETE ON task_handoffs
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'task handoffs cannot be deleted';
+END$$
+
+DELIMITER ;
+
+-- >>> trg_task_review_decisions_immutable.sql
+-- ====================================
+-- trg_task_review_decisions_immutable
+-- Review decisions are append-only. A new submission carries any later
+-- decision so prior approval / rejection cannot be rewritten.
+-- Rows are never deleted directly; FK cascades from the task and the
+-- workspace remove them and do not fire triggers.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_task_review_decisions_immutable
+BEFORE UPDATE ON task_review_decisions
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'task review decisions are immutable';
+END$$
+
+CREATE TRIGGER trg_task_review_decisions_immutable_delete
+BEFORE DELETE ON task_review_decisions
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'task review decisions cannot be deleted';
+END$$
+
+DELIMITER ;
+
+-- >>> trg_task_submissions_immutable.sql
+-- ====================================
+-- trg_task_submissions_immutable
+-- Submissions are append-only evidence snapshots. Corrections are a new
+-- submission rather than an in-place rewrite of reviewed content.
+-- Rows are never deleted directly; FK cascades from the task and the
+-- workspace remove them and do not fire triggers.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_task_submissions_immutable
+BEFORE UPDATE ON task_submissions
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'task submissions are immutable';
+END$$
+
+CREATE TRIGGER trg_task_submissions_immutable_delete
+BEFORE DELETE ON task_submissions
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'task submissions cannot be deleted';
+END$$
+
+DELIMITER ;
 
 -- >>> trg_tasks_derived_state_guard.sql
 -- ====================================
@@ -4533,6 +5095,28 @@ BEGIN
      AND @nf_derived_state_engine IS NULL THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'derived_state mutation must go through the events engine';
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- >>> trg_tasks_work_revision.sql
+-- ====================================
+-- trg_tasks_work_revision
+-- A review approval is valid only for the exact editable work that was
+-- submitted. Keep the revision increment next to task writes so REST,
+-- MCP, workers, and attachment paths cannot forget it.
+-- ====================================
+DELIMITER $$
+
+CREATE TRIGGER trg_tasks_work_revision
+BEFORE UPDATE ON tasks
+FOR EACH ROW
+BEGIN
+  IF NOT (NEW.title <=> OLD.title)
+     OR NOT (NEW.description <=> OLD.description)
+     OR NEW.work_revision <> OLD.work_revision THEN
+    SET NEW.work_revision = OLD.work_revision + 1;
   END IF;
 END$$
 

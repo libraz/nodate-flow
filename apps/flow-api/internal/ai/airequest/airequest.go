@@ -53,6 +53,10 @@ type Args struct {
 	// provider decides. For an agent run it is only the fallback: the
 	// agent's own configured cap wins.
 	MaxTokens int
+	// Output is a server-owned structured-output contract. Its schema is
+	// immutable and copied by providers.NewOutputSpec; builders carry it
+	// through alongside model and sampling settings.
+	Output *providers.OutputSpec
 }
 
 // AgentSettings is the projection of an ai_agents row that decides how
@@ -109,6 +113,7 @@ func New(p providers.Provider, a Args) providers.Request {
 		System:    a.System,
 		Prompt:    a.Prompt,
 		MaxTokens: a.MaxTokens,
+		Output:    a.Output.Clone(),
 	}
 }
 

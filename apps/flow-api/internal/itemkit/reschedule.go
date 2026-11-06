@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -37,6 +38,20 @@ type RescheduleEventArgs struct {
 // tasks.due_on. Pure time-of-day changes (same date) do NOT touch
 // the task — tasks have DATE precision, not DATETIME.
 func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error {
+	return rescheduleEvent(ctx, tx, args, humanEventActor(args.ActorUserID))
+}
+
+// RescheduleEventAsAgent moves a calendar event and records the agent as
+// the author of both the new and compatibility events.
+func RescheduleEventAsAgent(ctx context.Context, tx TX, args RescheduleEventArgs, agentID uint32) error {
+	actor, err := agentEventActor(args.ActorUserID, agentID)
+	if err != nil {
+		return err
+	}
+	return rescheduleEvent(ctx, tx, args, actor)
+}
+
+func rescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs, actor eventActor) error {
 	// The window is ordered by the rule both transports answer with, so a
 	// browser and an agent sending the same inverted pair are refused for
 	// the same reason. What each of them is told is still theirs to decide:
@@ -123,7 +138,7 @@ func RescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs) error
 		}
 		payload["taskId"] = task.publicID.String()
 	}
-	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, taskPtr, payload)
+	return actor.append(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, taskPtr, payload)
 }
 
 // RescheduleTaskArgs moves a task's due_on column and propagates to
@@ -150,6 +165,20 @@ type RescheduleTaskArgs struct {
 // change onto any linked projection event, preserving the event's
 // time-of-day portion.
 func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
+	return rescheduleTask(ctx, tx, args, humanEventActor(args.ActorUserID))
+}
+
+// RescheduleTaskAsAgent updates a task deadline and its linked due event,
+// retaining the acting agent in item.* and compatibility history.
+func RescheduleTaskAsAgent(ctx context.Context, tx TX, args RescheduleTaskArgs, agentID uint32) error {
+	actor, err := agentEventActor(args.ActorUserID, agentID)
+	if err != nil {
+		return err
+	}
+	return rescheduleTask(ctx, tx, args, actor)
+}
+
+func rescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs, actor eventActor) error {
 	if !args.SetDueOn {
 		return nil
 	}
@@ -176,7 +205,7 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 		if err := updateTaskDateColumn(ctx, tx, task.id, "due_on", snappedDueOn); err != nil {
 			return err
 		}
-		if err := propagateEventFromTaskDate(ctx, tx, task, RoleDue, snappedDueOn, args.ActorUserID, args.Snap); err != nil {
+		if err := propagateEventFromTaskDate(ctx, tx, task, RoleDue, snappedDueOn, actor, args.Snap); err != nil {
 			return err
 		}
 		args.DueOn = snappedDueOn
@@ -188,7 +217,7 @@ func RescheduleTask(ctx context.Context, tx TX, args RescheduleTaskArgs) error {
 	if args.SetDueOn {
 		payload["dueOn"] = dateOrNull(args.DueOn)
 	}
-	return appendItemEvents(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &args.ActorUserID, &task.id, payload)
+	return actor.append(ctx, tx, eventbus.ItemRescheduled, args.WorkspaceID, &task.id, payload)
 }
 
 // updateTaskDateColumn writes the due_on DATE column.
@@ -211,7 +240,7 @@ func updateTaskDateColumn(ctx context.Context, tx TX, taskID uint32, col string,
 // the task date is zero (unscheduled task). snap carries the actor's
 // snap-to-working-day preference so the mirrored event gets the same
 // badge treatment as a direct RescheduleEvent call.
-func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role DateRole, newDate time.Time, actorID uint32, snap SnapConfig) error {
+func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role DateRole, newDate time.Time, actor eventActor, snap SnapConfig) error {
 	existing, err := findLinkedEvent(ctx, tx, task.id, role)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -221,7 +250,7 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 	}
 	if newDate.IsZero() {
 		// Unschedule: disable the event, leave the task in place.
-		return unlinkEventRow(ctx, tx, existing, actorID, "task_date_cleared")
+		return unlinkEventRowForActor(ctx, tx, existing, actor, "task_date_cleared")
 	}
 	if !existing.startAt.Valid || !existing.endAt.Valid {
 		return wrapInvariant("event_undated_but_projection",
@@ -260,6 +289,33 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 		return err
 	}
 	return nil
+}
+
+// unlinkEventRowForActor soft-disables one task-linked event row resolved by
+// findLinkedEvent in this transaction. Used by UnscheduleTask for the due
+// role and by propagateEventFromTaskDate when the task date is cleared.
+func unlinkEventRowForActor(ctx context.Context, tx TX, evt eventRow, actor eventActor, reason string) error {
+	affected, err := calendar.New(tx.RawTx()).DisableCalendarEvent(ctx, calendar.DisableCalendarEventParams{
+		PublicID: evt.publicID, CalendarID: evt.calendarID, WorkspaceID: evt.workspaceID,
+	})
+	if err != nil {
+		return fmt.Errorf("itemkit: soft-disable event: %w", err)
+	}
+	// Another transaction may have withdrawn the event after findLinkedEvent
+	// read it. The requested state already holds then; avoid appending a second
+	// item.unscheduled/legacy event for the same link.
+	if affected == 0 {
+		return nil
+	}
+	var taskID *uint32
+	if evt.taskID.Valid {
+		id := uint32(evt.taskID.Int32) //#nosec G115 -- task_id is INT UNSIGNED
+		taskID = &id
+	}
+	return actor.append(ctx, tx, eventbus.ItemUnscheduled, evt.workspaceID, taskID, map[string]any{
+		"eventPublicId": evt.publicID.String(),
+		"reason":        reason,
+	})
 }
 
 // dateOrNull renders a date for event payload, using empty string for

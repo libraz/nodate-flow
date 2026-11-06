@@ -15,18 +15,21 @@ import (
 
 const createDescriptionVersion = `-- name: CreateDescriptionVersion :execlastid
 INSERT INTO task_description_versions (
-  public_id, workspace_id, task_id, author_user_id, version_number, body, body_length
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+  public_id, workspace_id, task_id, author_user_id, author_agent_id, author_agent_public_id, author_agent_name, version_number, body, body_length
+) VALUES (?, ?, ?, ?, ?, NULLIF(?, 0x00000000000000000000000000000000), ?, ?, ?, ?)
 `
 
 type CreateDescriptionVersionParams struct {
-	PublicID      types.PublicID `json:"publicId"`
-	WorkspaceID   uint32         `json:"-"`
-	TaskID        uint32         `json:"-"`
-	AuthorUserID  sql.NullInt32  `json:"-"`
-	VersionNumber uint32         `json:"versionNumber"`
-	Body          string         `json:"body"`
-	BodyLength    uint32         `json:"bodyLength"`
+	PublicID            types.PublicID `json:"publicId"`
+	WorkspaceID         uint32         `json:"-"`
+	TaskID              uint32         `json:"-"`
+	AuthorUserID        sql.NullInt32  `json:"-"`
+	AuthorAgentID       sql.NullInt32  `json:"-"`
+	AuthorAgentPublicID interface{}    `json:"authorAgentPublicId"`
+	AuthorAgentName     sql.NullString `json:"authorAgentName"`
+	VersionNumber       uint32         `json:"versionNumber"`
+	Body                string         `json:"body"`
+	BodyLength          uint32         `json:"bodyLength"`
 }
 
 // Insert a new description version snapshot.
@@ -36,6 +39,9 @@ func (q *Queries) CreateDescriptionVersion(ctx context.Context, arg CreateDescri
 		arg.WorkspaceID,
 		arg.TaskID,
 		arg.AuthorUserID,
+		arg.AuthorAgentID,
+		arg.AuthorAgentPublicID,
+		arg.AuthorAgentName,
 		arg.VersionNumber,
 		arg.Body,
 		arg.BodyLength,
@@ -51,6 +57,9 @@ SELECT
   tdv.public_id,
   tdv.version_number,
   tdv.author_user_id,
+  tdv.author_agent_id,
+  tdv.author_agent_public_id,
+  COALESCE(tdv.author_agent_name, aa.name, '') AS author_agent_name,
   au.public_id AS author_public_id,
   au.display_name AS author_display_name,
   tdv.body,
@@ -58,6 +67,7 @@ SELECT
   tdv.created_at
 FROM task_description_versions tdv
 LEFT JOIN users au ON au.id = tdv.author_user_id
+LEFT JOIN ai_agents aa ON aa.id = tdv.author_agent_id
 WHERE tdv.workspace_id = ?
   AND tdv.task_id = ?
   AND tdv.public_id = ?
@@ -71,17 +81,21 @@ type FindDescriptionVersionParams struct {
 }
 
 type FindDescriptionVersionRow struct {
-	PublicID          types.PublicID `json:"publicId"`
-	VersionNumber     uint32         `json:"versionNumber"`
-	AuthorUserID      sql.NullInt32  `json:"-"`
-	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
-	Body              string         `json:"body"`
-	BodyLength        uint32         `json:"bodyLength"`
-	CreatedAt         time.Time      `json:"createdAt"`
+	PublicID            types.PublicID `json:"publicId"`
+	VersionNumber       uint32         `json:"versionNumber"`
+	AuthorUserID        sql.NullInt32  `json:"-"`
+	AuthorAgentID       sql.NullInt32  `json:"-"`
+	AuthorAgentPublicID types.PublicID `json:"authorAgentPublicId"`
+	AuthorAgentName     string         `json:"authorAgentName"`
+	AuthorPublicID      types.PublicID `json:"authorPublicId"`
+	AuthorDisplayName   sql.NullString `json:"authorDisplayName"`
+	Body                string         `json:"body"`
+	BodyLength          uint32         `json:"bodyLength"`
+	CreatedAt           time.Time      `json:"createdAt"`
 }
 
 // Find a specific description version by public id.
+// No enabled filter: the agent is the historical author of the version.
 func (q *Queries) FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error) {
 	row := q.db.QueryRowContext(ctx, findDescriptionVersion, arg.WorkspaceID, arg.TaskID, arg.PublicID)
 	var i FindDescriptionVersionRow
@@ -89,6 +103,9 @@ func (q *Queries) FindDescriptionVersion(ctx context.Context, arg FindDescriptio
 		&i.PublicID,
 		&i.VersionNumber,
 		&i.AuthorUserID,
+		&i.AuthorAgentID,
+		&i.AuthorAgentPublicID,
+		&i.AuthorAgentName,
 		&i.AuthorPublicID,
 		&i.AuthorDisplayName,
 		&i.Body,
@@ -103,12 +120,16 @@ SELECT
   tdv.public_id,
   tdv.version_number,
   tdv.author_user_id,
+  tdv.author_agent_id,
+  tdv.author_agent_public_id,
+  COALESCE(tdv.author_agent_name, aa.name, '') AS author_agent_name,
   au.public_id AS author_public_id,
   au.display_name AS author_display_name,
   tdv.body_length,
   tdv.created_at
 FROM task_description_versions tdv
 LEFT JOIN users au ON au.id = tdv.author_user_id
+LEFT JOIN ai_agents aa ON aa.id = tdv.author_agent_id
 WHERE tdv.workspace_id = ?
   AND tdv.task_id = ?
   AND tdv.enabled = TRUE
@@ -121,16 +142,20 @@ type ListDescriptionVersionsParams struct {
 }
 
 type ListDescriptionVersionsRow struct {
-	PublicID          types.PublicID `json:"publicId"`
-	VersionNumber     uint32         `json:"versionNumber"`
-	AuthorUserID      sql.NullInt32  `json:"-"`
-	AuthorPublicID    types.PublicID `json:"authorPublicId"`
-	AuthorDisplayName sql.NullString `json:"authorDisplayName"`
-	BodyLength        uint32         `json:"bodyLength"`
-	CreatedAt         time.Time      `json:"createdAt"`
+	PublicID            types.PublicID `json:"publicId"`
+	VersionNumber       uint32         `json:"versionNumber"`
+	AuthorUserID        sql.NullInt32  `json:"-"`
+	AuthorAgentID       sql.NullInt32  `json:"-"`
+	AuthorAgentPublicID types.PublicID `json:"authorAgentPublicId"`
+	AuthorAgentName     string         `json:"authorAgentName"`
+	AuthorPublicID      types.PublicID `json:"authorPublicId"`
+	AuthorDisplayName   sql.NullString `json:"authorDisplayName"`
+	BodyLength          uint32         `json:"bodyLength"`
+	CreatedAt           time.Time      `json:"createdAt"`
 }
 
 // List all description versions for a task, newest first.
+// No enabled filter: the agent is the historical author of the version.
 func (q *Queries) ListDescriptionVersions(ctx context.Context, arg ListDescriptionVersionsParams) ([]ListDescriptionVersionsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listDescriptionVersions, arg.WorkspaceID, arg.TaskID)
 	if err != nil {
@@ -144,6 +169,9 @@ func (q *Queries) ListDescriptionVersions(ctx context.Context, arg ListDescripti
 			&i.PublicID,
 			&i.VersionNumber,
 			&i.AuthorUserID,
+			&i.AuthorAgentID,
+			&i.AuthorAgentPublicID,
+			&i.AuthorAgentName,
 			&i.AuthorPublicID,
 			&i.AuthorDisplayName,
 			&i.BodyLength,

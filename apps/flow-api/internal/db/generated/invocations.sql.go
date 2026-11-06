@@ -14,27 +14,157 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const addAiInvocationInput = `-- name: AddAiInvocationInput :exec
+INSERT INTO ai_invocations_inputs (invocation_id, task_public_id)
+VALUES (?, ?)
+`
+
+type AddAiInvocationInputParams struct {
+	InvocationID uint32 `json:"-"`
+	TaskPublicID []byte `json:"taskPublicId"`
+}
+
+// Record one canonical task public ID included in the provider input. The
+// caller inserts the invocation and all of its inputs in one transaction.
+func (q *Queries) AddAiInvocationInput(ctx context.Context, arg AddAiInvocationInputParams) error {
+	_, err := q.db.ExecContext(ctx, addAiInvocationInput, arg.InvocationID, arg.TaskPublicID)
+	return err
+}
+
 const listAiInvocationsForTask = `-- name: ListAiInvocationsForTask :many
+WITH invocation_policy AS (
+  SELECT
+    CAST(? AS SIGNED) AS is_elevated,
+    CAST(? AS UNSIGNED) AS actor_user_id
+)
 SELECT
-  public_id,
-  purpose,
-  model,
-  prompt_redacted,
-  response_redacted,
-  tokens_input,
-  tokens_output,
-  cost_estimate,
-  status,
-  error_code,
-  invoked_at
-FROM ai_invocations
-WHERE workspace_id = ?
-  AND task_id = ?
-ORDER BY invoked_at DESC, id DESC
+  ai.public_id,
+  ai.purpose,
+  ai.model,
+  ai.prompt_redacted,
+  ai.response_redacted,
+  ai.tokens_input,
+  ai.tokens_output,
+  ai.cost_estimate,
+  ai.status,
+  ai.error_code,
+  ai.invoked_at
+FROM ai_invocations ai
+CROSS JOIN invocation_policy inv_acl
+LEFT JOIN tasks t ON t.id = ai.task_id AND t.enabled = TRUE
+WHERE ai.workspace_id = ?
+  AND ai.task_id = ?
+  AND (
+    inv_acl.is_elevated = 1
+    OR (
+      ai.provenance_valid = TRUE
+      AND JSON_TYPE(ai.input_resources_json) = 'ARRAY'
+      AND ai.input_count = JSON_LENGTH(ai.input_resources_json)
+      AND ai.input_count = (
+        SELECT COUNT(*)
+        FROM ai_invocations_inputs counted_input
+        WHERE counted_input.invocation_id = ai.id
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ai_invocations_inputs input_ref
+        LEFT JOIN tasks input_task
+          ON input_task.workspace_id = ai.workspace_id
+          AND input_task.public_id = input_ref.task_public_id
+          AND input_task.enabled = TRUE
+        WHERE input_ref.invocation_id = ai.id
+          AND (
+            input_task.id IS NULL
+            OR (
+              input_task.visibility <> 'public'
+              AND NOT (
+                input_task.visibility = 'project' AND EXISTS (
+                  SELECT 1 FROM project_members pm_input
+                  WHERE pm_input.project_id = input_task.project_id
+                    AND pm_input.user_id = inv_acl.actor_user_id
+                    AND pm_input.enabled = TRUE
+                )
+              )
+              AND (
+                input_task.visibility = 'private'
+                AND (
+                  input_task.created_by_user_id = inv_acl.actor_user_id
+                  OR EXISTS (
+                    SELECT 1 FROM task_actors ta_input
+                    WHERE ta_input.task_id = input_task.id
+                      AND ta_input.kind = 'user'
+                      AND ta_input.user_id = inv_acl.actor_user_id
+                      AND ta_input.enabled = TRUE
+                  )
+                )
+              ) IS NOT TRUE
+            )
+            OR (ai.audience = 'workspace' AND input_task.visibility <> 'public')
+          )
+      )
+      AND (
+        (
+          ai.audience = 'initiator'
+          AND ai.user_id = inv_acl.actor_user_id
+          AND t.id IS NOT NULL
+          AND (
+            t.visibility = 'public'
+            OR (t.visibility = 'project' AND EXISTS (
+              SELECT 1 FROM project_members pm_subject
+              WHERE pm_subject.project_id = t.project_id
+                AND pm_subject.user_id = inv_acl.actor_user_id
+                AND pm_subject.enabled = TRUE
+            ))
+            OR (t.visibility = 'private' AND (
+              t.created_by_user_id = inv_acl.actor_user_id
+              OR EXISTS (
+                SELECT 1 FROM task_actors ta_subject
+                WHERE ta_subject.task_id = t.id
+                  AND ta_subject.kind = 'user'
+                  AND ta_subject.user_id = inv_acl.actor_user_id
+                  AND ta_subject.enabled = TRUE
+              )
+            ))
+          )
+        )
+        OR (
+          ai.audience = 'task'
+          AND t.id IS NOT NULL
+          AND (
+            t.visibility = 'public'
+            OR (t.visibility = 'project' AND EXISTS (
+              SELECT 1 FROM project_members pm_subject
+              WHERE pm_subject.project_id = t.project_id
+                AND pm_subject.user_id = inv_acl.actor_user_id
+                AND pm_subject.enabled = TRUE
+            ))
+            OR (t.visibility = 'private' AND (
+              t.created_by_user_id = inv_acl.actor_user_id
+              OR EXISTS (
+                SELECT 1 FROM task_actors ta_subject
+                WHERE ta_subject.task_id = t.id
+                  AND ta_subject.kind = 'user'
+                  AND ta_subject.user_id = inv_acl.actor_user_id
+                  AND ta_subject.enabled = TRUE
+              )
+            ))
+          )
+        )
+        OR (
+          ai.audience = 'workspace'
+          AND t.id IS NOT NULL
+          AND t.visibility = 'public'
+        )
+      )
+    )
+  )
+ORDER BY ai.invoked_at DESC, ai.id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListAiInvocationsForTaskParams struct {
+	IsElevated  int64         `json:"isElevated"`
+	ActorUserID int64         `json:"actorUserId"`
 	WorkspaceID uint32        `json:"-"`
 	TaskID      sql.NullInt32 `json:"-"`
 	Limit       int32         `json:"limit"`
@@ -55,11 +185,13 @@ type ListAiInvocationsForTaskRow struct {
 	InvokedAt        time.Time           `json:"invokedAt"`
 }
 
-// Recent redacted LLM call records scoped to a single task. Used by
-// the task detail AI reasoning panel. workspace_id is
-// included so tenant isolation is enforced at the query level.
+// Recent redacted LLM calls scoped to a single task. Apply the same
+// audience and per-reference ACL policy as the workspace feed. The route
+// already checks access to the subject task, but prompts may quote others.
 func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvocationsForTaskParams) ([]ListAiInvocationsForTaskRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAiInvocationsForTask,
+		arg.IsElevated,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.TaskID,
 		arg.Limit,
@@ -99,6 +231,11 @@ func (q *Queries) ListAiInvocationsForTask(ctx context.Context, arg ListAiInvoca
 }
 
 const listAiInvocationsForWorkspace = `-- name: ListAiInvocationsForWorkspace :many
+WITH invocation_policy AS (
+  SELECT
+    CAST(? AS SIGNED) AS is_elevated,
+    CAST(? AS UNSIGNED) AS actor_user_id
+)
 SELECT
   ai.public_id,
   ai.purpose,
@@ -112,39 +249,123 @@ SELECT
   ai.error_code,
   ai.invoked_at
 FROM ai_invocations ai
+CROSS JOIN invocation_policy inv_acl
 LEFT JOIN tasks t ON t.id = ai.task_id AND t.enabled = TRUE
 WHERE ai.workspace_id = ?
   AND (
-    CAST(? AS SIGNED) = 1
-    OR (ai.task_id IS NULL AND ai.user_id = CAST(? AS UNSIGNED))
-    OR (t.id IS NOT NULL AND (
-      t.visibility = 'public'
-      OR (t.visibility = 'project' AND EXISTS (
-        SELECT 1 FROM project_members pm_vis
-        WHERE pm_vis.project_id = t.project_id
-          AND pm_vis.user_id = CAST(? AS UNSIGNED)
-          AND pm_vis.enabled = TRUE
-      ))
-      OR (t.visibility = 'private' AND (
-        t.created_by_user_id = CAST(? AS UNSIGNED)
-        OR EXISTS (
-          SELECT 1 FROM task_actors ta_vis
-          WHERE ta_vis.task_id = t.id
-            AND ta_vis.kind = 'user'
-            AND ta_vis.user_id = CAST(? AS UNSIGNED)
-            AND ta_vis.enabled = TRUE
+    inv_acl.is_elevated = 1
+    OR (
+      ai.provenance_valid = TRUE
+      AND JSON_TYPE(ai.input_resources_json) = 'ARRAY'
+      AND ai.input_count = JSON_LENGTH(ai.input_resources_json)
+      AND ai.input_count = (
+        SELECT COUNT(*)
+        FROM ai_invocations_inputs counted_input
+        WHERE counted_input.invocation_id = ai.id
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ai_invocations_inputs input_ref
+        LEFT JOIN tasks input_task
+          ON input_task.workspace_id = ai.workspace_id
+          AND input_task.public_id = input_ref.task_public_id
+          AND input_task.enabled = TRUE
+        WHERE input_ref.invocation_id = ai.id
+          AND (
+            input_task.id IS NULL
+            OR (
+              input_task.visibility <> 'public'
+              AND NOT (
+                input_task.visibility = 'project' AND EXISTS (
+                  SELECT 1 FROM project_members pm_input
+                  WHERE pm_input.project_id = input_task.project_id
+                    AND pm_input.user_id = inv_acl.actor_user_id
+                    AND pm_input.enabled = TRUE
+                )
+              )
+              AND (
+                input_task.visibility = 'private'
+                AND (
+                  input_task.created_by_user_id = inv_acl.actor_user_id
+                  OR EXISTS (
+                    SELECT 1 FROM task_actors ta_input
+                    WHERE ta_input.task_id = input_task.id
+                      AND ta_input.kind = 'user'
+                      AND ta_input.user_id = inv_acl.actor_user_id
+                      AND ta_input.enabled = TRUE
+                  )
+                )
+              ) IS NOT TRUE
+            )
+            OR (ai.audience = 'workspace' AND input_task.visibility <> 'public')
+          )
+      )
+      AND (
+        (
+          ai.audience = 'initiator'
+          AND ai.user_id = inv_acl.actor_user_id
+          AND (
+            ai.task_id IS NULL
+            OR (t.id IS NOT NULL AND (
+              t.visibility = 'public'
+              OR (t.visibility = 'project' AND EXISTS (
+                SELECT 1 FROM project_members pm_subject
+                WHERE pm_subject.project_id = t.project_id
+                  AND pm_subject.user_id = inv_acl.actor_user_id
+                  AND pm_subject.enabled = TRUE
+              ))
+              OR (t.visibility = 'private' AND (
+                t.created_by_user_id = inv_acl.actor_user_id
+                OR EXISTS (
+                  SELECT 1 FROM task_actors ta_subject
+                  WHERE ta_subject.task_id = t.id
+                    AND ta_subject.kind = 'user'
+                    AND ta_subject.user_id = inv_acl.actor_user_id
+                    AND ta_subject.enabled = TRUE
+                )
+              ))
+            ))
+          )
         )
-      ))
-    ))
+        OR (
+          ai.audience = 'task'
+          AND ai.task_id IS NOT NULL
+          AND t.id IS NOT NULL
+          AND (
+            t.visibility = 'public'
+            OR (t.visibility = 'project' AND EXISTS (
+              SELECT 1 FROM project_members pm_subject
+              WHERE pm_subject.project_id = t.project_id
+                AND pm_subject.user_id = inv_acl.actor_user_id
+                AND pm_subject.enabled = TRUE
+            ))
+            OR (t.visibility = 'private' AND (
+              t.created_by_user_id = inv_acl.actor_user_id
+              OR EXISTS (
+                SELECT 1 FROM task_actors ta_subject
+                WHERE ta_subject.task_id = t.id
+                  AND ta_subject.kind = 'user'
+                  AND ta_subject.user_id = inv_acl.actor_user_id
+                  AND ta_subject.enabled = TRUE
+              )
+            ))
+          )
+        )
+        OR (
+          ai.audience = 'workspace'
+          AND (ai.task_id IS NULL OR (t.id IS NOT NULL AND t.visibility = 'public'))
+        )
+      )
+    )
   )
 ORDER BY ai.invoked_at DESC, ai.id DESC
 LIMIT ? OFFSET ?
 `
 
 type ListAiInvocationsForWorkspaceParams struct {
-	WorkspaceID uint32 `json:"-"`
 	IsElevated  int64  `json:"isElevated"`
 	ActorUserID int64  `json:"actorUserId"`
+	WorkspaceID uint32 `json:"-"`
 	Limit       int32  `json:"limit"`
 	Offset      int32  `json:"offset"`
 }
@@ -163,23 +384,15 @@ type ListAiInvocationsForWorkspaceRow struct {
 	InvokedAt        time.Time           `json:"invokedAt"`
 }
 
-// Recent redacted LLM call records for a workspace, newest first. Used
-// by the AI activity panel. All columns here are already redacted at
-// write time by the orchestrator; safe to surface at the API boundary.
-//
-// Redaction removes secrets, not task content: a prompt carries the
-// titles and descriptions it was built from. So a row about a task is
-// returned only when the reader may read that task (a deleted one reads
-// as unreadable), and a row with no task — a prompt that may embed
-// several — only to the user who made the call. Elevated roles see all.
+// Recent redacted LLM calls, newest first. Redaction removes secrets,
+// not task content. Check every public resource reference and the subject
+// task against the reader's current Layer-4 ACL. Missing, deleted,
+// cross-workspace, malformed, or unknown resource references fail closed.
 func (q *Queries) ListAiInvocationsForWorkspace(ctx context.Context, arg ListAiInvocationsForWorkspaceParams) ([]ListAiInvocationsForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAiInvocationsForWorkspace,
-		arg.WorkspaceID,
 		arg.IsElevated,
 		arg.ActorUserID,
-		arg.ActorUserID,
-		arg.ActorUserID,
-		arg.ActorUserID,
+		arg.WorkspaceID,
 		arg.Limit,
 		arg.Offset,
 	)
@@ -224,6 +437,10 @@ INSERT INTO ai_invocations (
   user_id,
   agent_id,
   task_id,
+  audience,
+  input_resources_json,
+  input_count,
+  provenance_valid,
   purpose,
   model,
   prompt_redacted,
@@ -234,26 +451,30 @@ INSERT INTO ai_invocations (
   status,
   error_code,
   invoked_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type LogAiInvocationParams struct {
-	PublicID         types.PublicID      `json:"publicId"`
-	WorkspaceID      uint32              `json:"-"`
-	ProviderID       uint32              `json:"-"`
-	UserID           sql.NullInt32       `json:"-"`
-	AgentID          sql.NullInt32       `json:"-"`
-	TaskID           sql.NullInt32       `json:"-"`
-	Purpose          string              `json:"purpose"`
-	Model            string              `json:"model"`
-	PromptRedacted   string              `json:"promptRedacted"`
-	ResponseRedacted sql.NullString      `json:"responseRedacted"`
-	TokensInput      sql.NullInt32       `json:"tokensInput"`
-	TokensOutput     sql.NullInt32       `json:"tokensOutput"`
-	CostEstimate     sql.NullString      `json:"costEstimate"`
-	Status           AiInvocationsStatus `json:"status"`
-	ErrorCode        sql.NullString      `json:"errorCode"`
-	InvokedAt        time.Time           `json:"invokedAt"`
+	PublicID           types.PublicID        `json:"publicId"`
+	WorkspaceID        uint32                `json:"-"`
+	ProviderID         uint32                `json:"-"`
+	UserID             sql.NullInt32         `json:"-"`
+	AgentID            sql.NullInt32         `json:"-"`
+	TaskID             sql.NullInt32         `json:"-"`
+	Audience           AiInvocationsAudience `json:"audience"`
+	InputResourcesJson json.RawMessage       `json:"inputResourcesJson"`
+	InputCount         uint32                `json:"inputCount"`
+	ProvenanceValid    bool                  `json:"provenanceValid"`
+	Purpose            string                `json:"purpose"`
+	Model              string                `json:"model"`
+	PromptRedacted     string                `json:"promptRedacted"`
+	ResponseRedacted   sql.NullString        `json:"responseRedacted"`
+	TokensInput        sql.NullInt32         `json:"tokensInput"`
+	TokensOutput       sql.NullInt32         `json:"tokensOutput"`
+	CostEstimate       sql.NullString        `json:"costEstimate"`
+	Status             AiInvocationsStatus   `json:"status"`
+	ErrorCode          sql.NullString        `json:"errorCode"`
+	InvokedAt          time.Time             `json:"invokedAt"`
 }
 
 // Append a redacted record of an LLM call. Both prompt_redacted and
@@ -266,6 +487,10 @@ func (q *Queries) LogAiInvocation(ctx context.Context, arg LogAiInvocationParams
 		arg.UserID,
 		arg.AgentID,
 		arg.TaskID,
+		arg.Audience,
+		arg.InputResourcesJson,
+		arg.InputCount,
+		arg.ProvenanceValid,
 		arg.Purpose,
 		arg.Model,
 		arg.PromptRedacted,

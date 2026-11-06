@@ -142,7 +142,8 @@ func TestExecuteJudgeRefusesToJudgeATruncatedContext(t *testing.T) {
 	prov := &recordingProvider{
 		kind: providers.Kind("mock"),
 		resp: &providers.Response{
-			Text: `{"action":"noop","confidence":0.8,"reasoning_excerpt":"no linked task matches"}`,
+			Text:        `{"action":"noop","confidence":0.8,"reasoning_excerpt":"no linked task matches"}`,
+			Termination: providers.TerminationComplete,
 		},
 	}
 	var logged []InvocationRecord

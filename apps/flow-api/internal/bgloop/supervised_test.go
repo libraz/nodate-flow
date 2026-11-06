@@ -19,7 +19,7 @@ import (
 // request is already recovered by the router middleware — so they
 // report and let the process shut down instead. The list is two entries
 // long and expected to stay that way; anything else that runs for the
-// life of the process belongs under [Run].
+// life of the process belongs under [StartManaged].
 var unsupervisedInMain = map[string]string{
 	"ListenAndServe": "http listener: a failed bind must not be retried in a loop",
 }
@@ -27,20 +27,18 @@ var unsupervisedInMain = map[string]string{
 // TestEveryResidentLoopIsSupervised checks that the loops actually go
 // through this package, not merely that this package exists.
 //
-// Writing the helper and adopting it are separate problems: six call
-// sites went through Run and three did not, and the three that did not
-// were exactly as silent as before. A reviewer cannot see the absence
-// of a call, so the check looks for goroutines that start something
-// long-lived by any route other than Run.
+// A reviewer cannot see the absence of a call, so the check looks for
+// unmanaged goroutines and ensures main uses waitable resident handles.
 //
 // Two shapes are checked, matching how a resident loop actually gets
 // started in this codebase:
 //
-//   - `go <anything>` in cmd/api/main.go, where the wiring lives. There
-//     a loop goes through [Start] rather than `go Run`, so its cancel
-//     and its stop cannot drift apart;
+//   - managed handles wired in cmd/api/main.go, where shutdown must
+//     retain both cancellation and whole-supervisor completion;
 //   - `go x.loop(...)` / `go x.Loop(...)` anywhere under internal/,
-//     which is how a component starts its own loop from Start.
+//     which is how a component starts its own loop from Start, and
+//     `go bgloop.Run(...)` there, which supervises a loop nobody can wait
+//     for.
 func TestEveryResidentLoopIsSupervised(t *testing.T) {
 	t.Parallel()
 
@@ -48,11 +46,12 @@ func TestEveryResidentLoopIsSupervised(t *testing.T) {
 	var offenders []string
 
 	offenders = append(offenders, unsupervisedGoStmtsInMain(t, root)...)
+	offenders = append(offenders, unmanagedStartsInMain(t, root)...)
 	offenders = append(offenders, unsupervisedLoopStarts(t, root)...)
 
 	if len(offenders) > 0 {
-		t.Fatalf("every goroutine that runs for the life of the process must be started through "+
-			"bgloop.Run, so a panic in it cannot end the process and a loop that stops on its own "+
+		t.Fatalf("every resident loop must be supervised and registered for completion waiting, "+
+			"so a panic cannot end the process and a loop that stops on its own "+
 			"is reported instead of simply ceasing:\n  %s", strings.Join(offenders, "\n  "))
 	}
 }
@@ -61,10 +60,8 @@ func TestEveryResidentLoopIsSupervised(t *testing.T) {
 // not appear in the allowlist.
 //
 // `go Run(...)` counts as an offender here, unlike under internal/: it
-// leaves the loop's cancel as a second thing the shutdown path has to
-// remember, and a shutdown that stops the loop without it restarts what
-// it stopped. In main, [Start] is the way in — it hands back one
-// stopper that is both.
+// leaves cancellation separate from the supervisor. Main registers each
+// managed handle with a whole-run Wait in the shutdown coordinator.
 func unsupervisedGoStmtsInMain(t *testing.T, root string) []string {
 	t.Helper()
 	path := filepath.Join(root, "cmd", "api", "main.go")
@@ -94,8 +91,54 @@ func unsupervisedGoStmtsInMain(t *testing.T, root string) []string {
 	return out
 }
 
+// unmanagedStartsInMain requires main to start residents through
+// StartManaged and rejects the legacy non-waitable Start API. The cmd/api
+// shutdown guard verifies that every handle is registered and waited.
+func unmanagedStartsInMain(t *testing.T, root string) []string {
+	t.Helper()
+	path := filepath.Join(root, "cmd", "api", "main.go")
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		t.Fatalf("parse main.go: %v", err)
+	}
+
+	managed, legacy := 0, 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		pkg, ok := sel.X.(*ast.Ident)
+		if !ok || pkg.Name != "bgloop" {
+			return true
+		}
+		switch sel.Sel.Name {
+		case "StartManaged":
+			managed++
+		case "Start":
+			legacy++
+		}
+		return true
+	})
+
+	var out []string
+	if managed == 0 {
+		out = append(out, "cmd/api/main.go starts no resident through bgloop.StartManaged")
+	}
+	if legacy > 0 {
+		out = append(out, "cmd/api/main.go uses bgloop.Start without whole-supervisor completion")
+	}
+	return out
+}
+
 // unsupervisedLoopStarts reports `go x.loop(...)` statements under
-// internal/, the shape a component uses to start its own resident loop.
+// internal/, the shape a component uses to start its own resident loop,
+// and `go bgloop.Run(...)`, whose supervisor no shutdown can wait for.
 func unsupervisedLoopStarts(t *testing.T, root string) []string {
 	t.Helper()
 	var out []string
@@ -116,7 +159,12 @@ func unsupervisedLoopStarts(t *testing.T, root string) []string {
 		rel = filepath.ToSlash(rel)
 		ast.Inspect(file, func(n ast.Node) bool {
 			goStmt, ok := n.(*ast.GoStmt)
-			if !ok || callsRun(goStmt.Call) {
+			if !ok {
+				return true
+			}
+			if callsRun(goStmt.Call) {
+				out = append(out, fmt.Sprintf("%s:%d supervises a loop with `go bgloop.Run`, which nothing can wait for; "+
+					"return a bgloop.StartManaged handle", rel, fset.Position(goStmt.Pos()).Line))
 				return true
 			}
 			sel, ok := goStmt.Call.Fun.(*ast.SelectorExpr)

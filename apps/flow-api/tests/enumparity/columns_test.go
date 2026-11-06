@@ -2,7 +2,12 @@ package enumparity
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -32,7 +37,11 @@ import (
 func TestEnumFieldsCarryTheirColumnsValues(t *testing.T) {
 	t.Parallel()
 
+	reviewMapping := reviewDecisionStorageValues(t)
 	for _, c := range Violations(Compare(readEnumTree(t).placements)) {
+		if reviewDecisionConversion(c, reviewMapping) {
+			continue
+		}
 		if c.Verdict == Open {
 			t.Errorf("%s: %s leaves %s.%s open, and it writes %s, which accepts only %s. "+
 				"Every client is told the field is any string, so anything else validates and "+
@@ -50,6 +59,117 @@ func TestEnumFieldsCarryTheirColumnsValues(t *testing.T) {
 			strings.Join(c.Declared(), ","), c.Column.Qualified(),
 			strings.Join(c.Column.Members, ","), strings.Join(c.Extra, ","))
 	}
+}
+
+// TestReviewDecisionWireEnumMapsToStorageEnum is the positive evidence for
+// the one review field whose short wire verbs are translated to persisted
+// decision states. Its OpenAPI values intentionally describe the command,
+// while the ENUM column describes the immutable result.
+func TestReviewDecisionWireEnumMapsToStorageEnum(t *testing.T) {
+	t.Parallel()
+
+	mapping := reviewDecisionStorageValues(t)
+	want := map[string]string{"approve": "approved", "reject": "rejected"}
+	if len(mapping) != len(want) {
+		t.Fatalf("review decision mapping = %v, want %v", mapping, want)
+	}
+	for wire, stored := range want {
+		if mapping[wire] != stored {
+			t.Errorf("wire decision %q maps to %q, want storage value %q", wire, mapping[wire], stored)
+		}
+	}
+}
+
+func reviewDecisionConversion(c Comparison, mapping map[string]string) bool {
+	if c.Owner != "ReviewDecisionInput" || c.Section != "body" || c.Name != "decision" || c.Column.Qualified() != "task_review_decisions.decision" {
+		return false
+	}
+	if len(c.Declared()) != len(mapping) {
+		return false
+	}
+	declared := map[string]bool{}
+	for _, value := range c.Declared() {
+		declared[value] = true
+	}
+	stored := map[string]bool{}
+	for _, value := range c.Column.Members {
+		stored[value] = true
+	}
+	if len(mapping) != len(stored) {
+		return false
+	}
+	for wire, value := range mapping {
+		if !declared[wire] || !stored[value] {
+			return false
+		}
+	}
+	return true
+}
+
+func reviewDecisionStorageValues(t *testing.T) map[string]string {
+	t.Helper()
+	path := filepath.Join("..", "..", "internal", "http", "handlers", "taskworkflow", "review.go")
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatalf("parse review handler: %v", err)
+	}
+	mapping := map[string]string{}
+	found := false
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "DecideSubmission" || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			switchStmt, ok := n.(*ast.SwitchStmt)
+			if !ok || !isReviewDecisionTag(switchStmt.Tag) {
+				return true
+			}
+			found = true
+			for _, stmt := range switchStmt.Body.List {
+				clause, ok := stmt.(*ast.CaseClause)
+				if !ok || len(clause.List) != 1 || len(clause.Body) == 0 {
+					continue
+				}
+				wireLit, ok := clause.List[0].(*ast.BasicLit)
+				if !ok || wireLit.Kind != token.STRING {
+					continue
+				}
+				assignment, ok := clause.Body[0].(*ast.AssignStmt)
+				if !ok || len(assignment.Lhs) != 1 || len(assignment.Rhs) != 1 {
+					continue
+				}
+				lhs, ok := assignment.Lhs[0].(*ast.Ident)
+				valueLit, valueOK := assignment.Rhs[0].(*ast.BasicLit)
+				if !ok || lhs.Name != "decision" || !valueOK || valueLit.Kind != token.STRING {
+					continue
+				}
+				wire, wireErr := strconv.Unquote(wireLit.Value)
+				value, valueErr := strconv.Unquote(valueLit.Value)
+				if wireErr == nil && valueErr == nil {
+					mapping[wire] = value
+				}
+			}
+			return false
+		})
+	}
+	if !found {
+		t.Fatal("DecideSubmission no longer has a switch translating its wire decision")
+	}
+	return mapping
+}
+
+func isReviewDecisionTag(expr ast.Expr) bool {
+	decision, ok := expr.(*ast.SelectorExpr)
+	if !ok || decision.Sel.Name != "Decision" {
+		return false
+	}
+	body, ok := decision.X.(*ast.SelectorExpr)
+	if !ok || body.Sel.Name != "Body" {
+		return false
+	}
+	input, ok := body.X.(*ast.Ident)
+	return ok && input.Name == "in"
 }
 
 // TestEnumColumnCoverageIsVisible prints what this check reaches and what

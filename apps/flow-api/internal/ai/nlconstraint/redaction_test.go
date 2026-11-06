@@ -51,7 +51,7 @@ func TestCompileConstraint_PromptSecretNeverReachesTheInvocation(t *testing.T) {
 
 			prov := &recordingProvider{
 				kind: providers.Kind("mock"),
-				resp: &providers.Response{Text: goodConstraint},
+				resp: &providers.Response{Text: goodConstraint, Termination: providers.TerminationComplete},
 				err:  tc.providerErr,
 			}
 			var logged []InvocationRecord

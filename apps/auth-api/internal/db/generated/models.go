@@ -186,6 +186,49 @@ func (ns NullAiAgentsScheduleScope) Value() (driver.Value, error) {
 	return string(ns.AiAgentsScheduleScope), nil
 }
 
+type AiInvocationsAudience string
+
+const (
+	AiInvocationsAudienceInitiator AiInvocationsAudience = "initiator"
+	AiInvocationsAudienceTask      AiInvocationsAudience = "task"
+	AiInvocationsAudienceWorkspace AiInvocationsAudience = "workspace"
+)
+
+func (e *AiInvocationsAudience) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiInvocationsAudience(s)
+	case string:
+		*e = AiInvocationsAudience(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiInvocationsAudience: %T", src)
+	}
+	return nil
+}
+
+type NullAiInvocationsAudience struct {
+	AiInvocationsAudience AiInvocationsAudience `json:"aiInvocationsAudience"`
+	Valid                 bool                  `json:"valid"` // Valid is true if AiInvocationsAudience is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiInvocationsAudience) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiInvocationsAudience, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiInvocationsAudience.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiInvocationsAudience) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiInvocationsAudience), nil
+}
+
 type AiInvocationsStatus string
 
 const (
@@ -272,6 +315,92 @@ func (ns NullAiProvidersKind) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.AiProvidersKind), nil
+}
+
+type AiSuggestionDecisionsAction string
+
+const (
+	AiSuggestionDecisionsActionArchive AiSuggestionDecisionsAction = "archive"
+	AiSuggestionDecisionsActionSnooze  AiSuggestionDecisionsAction = "snooze"
+	AiSuggestionDecisionsActionOpen    AiSuggestionDecisionsAction = "open"
+)
+
+func (e *AiSuggestionDecisionsAction) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiSuggestionDecisionsAction(s)
+	case string:
+		*e = AiSuggestionDecisionsAction(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiSuggestionDecisionsAction: %T", src)
+	}
+	return nil
+}
+
+type NullAiSuggestionDecisionsAction struct {
+	AiSuggestionDecisionsAction AiSuggestionDecisionsAction `json:"aiSuggestionDecisionsAction"`
+	Valid                       bool                        `json:"valid"` // Valid is true if AiSuggestionDecisionsAction is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiSuggestionDecisionsAction) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiSuggestionDecisionsAction, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiSuggestionDecisionsAction.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiSuggestionDecisionsAction) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiSuggestionDecisionsAction), nil
+}
+
+type AiSuggestionDecisionsState string
+
+const (
+	AiSuggestionDecisionsStateEdited    AiSuggestionDecisionsState = "edited"
+	AiSuggestionDecisionsStateDismissed AiSuggestionDecisionsState = "dismissed"
+	AiSuggestionDecisionsStateDeferred  AiSuggestionDecisionsState = "deferred"
+)
+
+func (e *AiSuggestionDecisionsState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AiSuggestionDecisionsState(s)
+	case string:
+		*e = AiSuggestionDecisionsState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AiSuggestionDecisionsState: %T", src)
+	}
+	return nil
+}
+
+type NullAiSuggestionDecisionsState struct {
+	AiSuggestionDecisionsState AiSuggestionDecisionsState `json:"aiSuggestionDecisionsState"`
+	Valid                      bool                       `json:"valid"` // Valid is true if AiSuggestionDecisionsState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAiSuggestionDecisionsState) Scan(value interface{}) error {
+	if value == nil {
+		ns.AiSuggestionDecisionsState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AiSuggestionDecisionsState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAiSuggestionDecisionsState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AiSuggestionDecisionsState), nil
 }
 
 type AutoActionRulesAutonomyLevel string
@@ -704,6 +833,48 @@ func (ns NullCalendarsKind) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.CalendarsKind), nil
+}
+
+type CommentsAuthorKind string
+
+const (
+	CommentsAuthorKindUser  CommentsAuthorKind = "user"
+	CommentsAuthorKindAgent CommentsAuthorKind = "agent"
+)
+
+func (e *CommentsAuthorKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CommentsAuthorKind(s)
+	case string:
+		*e = CommentsAuthorKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CommentsAuthorKind: %T", src)
+	}
+	return nil
+}
+
+type NullCommentsAuthorKind struct {
+	CommentsAuthorKind CommentsAuthorKind `json:"commentsAuthorKind"`
+	Valid              bool               `json:"valid"` // Valid is true if CommentsAuthorKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCommentsAuthorKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.CommentsAuthorKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CommentsAuthorKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCommentsAuthorKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CommentsAuthorKind), nil
 }
 
 type DashboardWidgetsWidgetType string
@@ -1276,6 +1447,48 @@ func (ns NullOauthStatesProvider) Value() (driver.Value, error) {
 	return string(ns.OauthStatesProvider), nil
 }
 
+type OperationReceiptsPrincipalKind string
+
+const (
+	OperationReceiptsPrincipalKindUser  OperationReceiptsPrincipalKind = "user"
+	OperationReceiptsPrincipalKindAgent OperationReceiptsPrincipalKind = "agent"
+)
+
+func (e *OperationReceiptsPrincipalKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OperationReceiptsPrincipalKind(s)
+	case string:
+		*e = OperationReceiptsPrincipalKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OperationReceiptsPrincipalKind: %T", src)
+	}
+	return nil
+}
+
+type NullOperationReceiptsPrincipalKind struct {
+	OperationReceiptsPrincipalKind OperationReceiptsPrincipalKind `json:"operationReceiptsPrincipalKind"`
+	Valid                          bool                           `json:"valid"` // Valid is true if OperationReceiptsPrincipalKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOperationReceiptsPrincipalKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.OperationReceiptsPrincipalKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OperationReceiptsPrincipalKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOperationReceiptsPrincipalKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OperationReceiptsPrincipalKind), nil
+}
+
 type ProjectMembersRole string
 
 const (
@@ -1716,6 +1929,178 @@ func (ns NullTaskEventLinksRelation) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.TaskEventLinksRelation), nil
+}
+
+type TaskHandoffsRole string
+
+const (
+	TaskHandoffsRoleAssignee TaskHandoffsRole = "assignee"
+	TaskHandoffsRoleReviewer TaskHandoffsRole = "reviewer"
+	TaskHandoffsRoleApprover TaskHandoffsRole = "approver"
+)
+
+func (e *TaskHandoffsRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskHandoffsRole(s)
+	case string:
+		*e = TaskHandoffsRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskHandoffsRole: %T", src)
+	}
+	return nil
+}
+
+type NullTaskHandoffsRole struct {
+	TaskHandoffsRole TaskHandoffsRole `json:"taskHandoffsRole"`
+	Valid            bool             `json:"valid"` // Valid is true if TaskHandoffsRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskHandoffsRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskHandoffsRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskHandoffsRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskHandoffsRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskHandoffsRole), nil
+}
+
+type TaskHandoffsStatus string
+
+const (
+	TaskHandoffsStatusPending   TaskHandoffsStatus = "pending"
+	TaskHandoffsStatusAccepted  TaskHandoffsStatus = "accepted"
+	TaskHandoffsStatusDeclined  TaskHandoffsStatus = "declined"
+	TaskHandoffsStatusExpired   TaskHandoffsStatus = "expired"
+	TaskHandoffsStatusCancelled TaskHandoffsStatus = "cancelled"
+)
+
+func (e *TaskHandoffsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskHandoffsStatus(s)
+	case string:
+		*e = TaskHandoffsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskHandoffsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullTaskHandoffsStatus struct {
+	TaskHandoffsStatus TaskHandoffsStatus `json:"taskHandoffsStatus"`
+	Valid              bool               `json:"valid"` // Valid is true if TaskHandoffsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskHandoffsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskHandoffsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskHandoffsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskHandoffsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskHandoffsStatus), nil
+}
+
+type TaskReviewDecisionsDecision string
+
+const (
+	TaskReviewDecisionsDecisionApproved TaskReviewDecisionsDecision = "approved"
+	TaskReviewDecisionsDecisionRejected TaskReviewDecisionsDecision = "rejected"
+)
+
+func (e *TaskReviewDecisionsDecision) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TaskReviewDecisionsDecision(s)
+	case string:
+		*e = TaskReviewDecisionsDecision(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TaskReviewDecisionsDecision: %T", src)
+	}
+	return nil
+}
+
+type NullTaskReviewDecisionsDecision struct {
+	TaskReviewDecisionsDecision TaskReviewDecisionsDecision `json:"taskReviewDecisionsDecision"`
+	Valid                       bool                        `json:"valid"` // Valid is true if TaskReviewDecisionsDecision is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTaskReviewDecisionsDecision) Scan(value interface{}) error {
+	if value == nil {
+		ns.TaskReviewDecisionsDecision, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TaskReviewDecisionsDecision.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTaskReviewDecisionsDecision) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TaskReviewDecisionsDecision), nil
+}
+
+type TasksCompletionPolicy string
+
+const (
+	TasksCompletionPolicyManual         TasksCompletionPolicy = "manual"
+	TasksCompletionPolicyReviewRequired TasksCompletionPolicy = "review_required"
+)
+
+func (e *TasksCompletionPolicy) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TasksCompletionPolicy(s)
+	case string:
+		*e = TasksCompletionPolicy(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TasksCompletionPolicy: %T", src)
+	}
+	return nil
+}
+
+type NullTasksCompletionPolicy struct {
+	TasksCompletionPolicy TasksCompletionPolicy `json:"tasksCompletionPolicy"`
+	Valid                 bool                  `json:"valid"` // Valid is true if TasksCompletionPolicy is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTasksCompletionPolicy) Scan(value interface{}) error {
+	if value == nil {
+		ns.TasksCompletionPolicy, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TasksCompletionPolicy.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTasksCompletionPolicy) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TasksCompletionPolicy), nil
 }
 
 type TasksDerivedState string
@@ -2347,7 +2732,9 @@ type AgentRun struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to ai_agents.id
 	AgentID uint32 `json:"-"`
-	// Unique key shaped as <agent_id>:<unix_minute> to prevent double enqueue across scheduler replicas
+	// Internal FK to the event that triggered an on_event run
+	SourceEventID sql.NullInt64 `json:"-"`
+	// Unique scheduler identity: agent/time for scheduled runs and agent/event for on_event runs
 	DedupeKey string `json:"dedupeKey"`
 	// Lifecycle state
 	Status AgentRunsStatus `json:"status"`
@@ -2433,6 +2820,14 @@ type AiInvocation struct {
 	AgentID sql.NullInt32 `json:"-"`
 	// Internal FK to tasks.id if applicable
 	TaskID sql.NullInt32 `json:"-"`
+	// Who may read the redacted prompt and response after current ACL checks
+	Audience AiInvocationsAudience `json:"audience"`
+	// Public references to task content included in the provider input; never internal IDs
+	InputResourcesJson json.RawMessage `json:"inputResourcesJson"`
+	// Expected number of normalized task provenance references
+	InputCount uint32 `json:"inputCount"`
+	// False means ordinary readers must fail closed on provenance
+	ProvenanceValid bool `json:"provenanceValid"`
 	// Logical call purpose (e.g., propose_tasks)
 	Purpose string `json:"purpose"`
 	// Model name actually used
@@ -2461,6 +2856,14 @@ type AiInvocation struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Task resources quoted into AI invocation inputs
+type AiInvocationsInput struct {
+	// Internal FK to ai_invocations.id
+	InvocationID uint32 `json:"-"`
+	// Public UUID of a task quoted into the provider input
+	TaskPublicID []byte `json:"taskPublicId"`
 }
 
 // Concrete LLM models per provider
@@ -2559,6 +2962,68 @@ type AiSetting struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Actor-private suggestion input provenance
+type AiSuggestionBatch struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible batch id
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Initiating user; NULL means the owner was deleted and access is denied
+	UserID sql.NullInt32 `json:"-"`
+	// Expected number of normalized task provenance references
+	InputCount uint32 `json:"inputCount"`
+	// True only after the complete input set is stored atomically
+	ProvenanceValid bool `json:"provenanceValid"`
+	// Display order
+	SortWeight int32 `json:"sortWeight"`
+	// Admin notes
+	Notes sql.NullString `json:"notes"`
+	// Enabled flag
+	Enabled   bool         `json:"enabled"`
+	UpdatedAt sql.NullTime `json:"updatedAt"`
+	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Task resources quoted into an AI suggestion batch
+type AiSuggestionBatchesInput struct {
+	// Internal FK to ai_suggestion_batches.id
+	BatchID uint32 `json:"-"`
+	// Public UUID of a task quoted into the provider input
+	TaskPublicID []byte `json:"taskPublicId"`
+}
+
+// Actor-scoped AI suggestion decisions
+type AiSuggestionDecision struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible decision id
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to the proposed event row
+	ProposalEventID uint64 `json:"-"`
+	// Internal FK to the user who owns this decision
+	UserID uint32 `json:"-"`
+	// Actor-scoped decision revision
+	Revision uint32 `json:"revision"`
+	// Actor-scoped decision state
+	State AiSuggestionDecisionsState `json:"state"`
+	// Edited recommendation; null for dismiss or defer
+	Action NullAiSuggestionDecisionsAction `json:"action"`
+	// Edited recommendation explanation
+	Reasoning sql.NullString `json:"reasoning"`
+	// SHA-256 version of the source evidence reviewed by the actor
+	SourceVersion sql.NullString `json:"sourceVersion"`
+	// When this actor-scoped decision stops affecting the list
+	ExpiresAt time.Time `json:"expiresAt"`
+	// When this decision was last changed
+	UpdatedAt time.Time `json:"updatedAt"`
+	// When this decision was first recorded
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Task file attachments metadata
@@ -3063,8 +3528,16 @@ type Comment struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to tasks.id; nullable so audit-trail comments survive task deletion (FK SET NULL)
 	TaskID sql.NullInt32 `json:"-"`
-	// Internal FK to users.id
-	AuthorID uint32 `json:"-"`
+	// Internal FK to users.id when a human wrote the comment
+	AuthorID sql.NullInt32 `json:"-"`
+	// Historical author kind; remains agent if the agent is later deleted
+	AuthorKind CommentsAuthorKind `json:"authorKind"`
+	// Internal FK to ai_agents.id when an agent wrote the comment
+	AuthorAgentID sql.NullInt32 `json:"-"`
+	// Agent public byline retained after deletion
+	AuthorAgentPublicID sql.NullString `json:"authorAgentPublicId"`
+	// Agent name retained after deletion
+	AuthorAgentName sql.NullString `json:"authorAgentName"`
 	// Markdown body
 	Body string `json:"body"`
 	// Last edit time (null = never edited)
@@ -3327,6 +3800,8 @@ type IntakeItem struct {
 	Title string `json:"title"`
 	// Item body / details
 	Body sql.NullString `json:"body"`
+	// Validated HTTP(S) link to the originating source
+	SourceUrl sql.NullString `json:"sourceUrl"`
 	// Current triage state
 	TriageStatus IntakeItemsTriageStatus `json:"triageStatus"`
 	// Snooze expiry (NULL = not snoozed)
@@ -3558,9 +4033,14 @@ type Mention struct {
 	WorkspaceID     uint32         `json:"-"`
 	MentionedUserID uint32         `json:"-"`
 	ActorUserID     sql.NullInt32  `json:"-"`
-	TaskID          sql.NullInt32  `json:"-"`
-	CommentID       sql.NullInt32  `json:"-"`
-	Source          MentionsSource `json:"source"`
+	ActorAgentID    sql.NullInt32  `json:"-"`
+	// Agent public byline retained after deletion
+	ActorAgentPublicID sql.NullString `json:"actorAgentPublicId"`
+	// Agent name retained after deletion
+	ActorAgentName sql.NullString `json:"actorAgentName"`
+	TaskID         sql.NullInt32  `json:"-"`
+	CommentID      sql.NullInt32  `json:"-"`
+	Source         MentionsSource `json:"source"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -3674,6 +4154,38 @@ type OauthState struct {
 	ExpiresAt time.Time    `json:"expiresAt"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Durable command idempotency receipts
+type OperationReceipt struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the externally visible operation id
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Kind of actor that owns the operation key
+	PrincipalKind OperationReceiptsPrincipalKind `json:"principalKind"`
+	// Internal id of the user or agent that owns the operation key
+	PrincipalID uint32 `json:"-"`
+	// Stable operation family name
+	OperationKind string `json:"operationKind"`
+	// Opaque client retry key; compared case-sensitively
+	OperationKey string `json:"operationKey"`
+	// SHA-256 of the canonical operation request
+	RequestHash []byte `json:"requestHash"`
+	// Kind of entity targeted by the operation
+	TargetKind string `json:"targetKind"`
+	// Public id of the target entity
+	TargetPublicID []byte `json:"targetPublicId"`
+	// Exact successful result returned on matching retries
+	ResultJson json.RawMessage `json:"resultJson"`
+	// Set only after the effect and result are ready to commit
+	CompletedAt sql.NullTime `json:"completedAt"`
+	// When the receipt last changed
+	UpdatedAt time.Time `json:"updatedAt"`
+	// When this receipt row was created
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Wiki/documentation pages with tree structure
@@ -4012,6 +4524,12 @@ type Task struct {
 	Description sql.NullString `json:"description"`
 	// Computed from constraints + events; do NOT update directly
 	DerivedState TasksDerivedState `json:"derivedState"`
+	// manual preserves direct completion; review_required requires approval of the current work revision
+	CompletionPolicy TasksCompletionPolicy `json:"completionPolicy"`
+	// Incremented when task title, description, or attached evidence changes; review approvals bind to this revision
+	WorkRevision uint32 `json:"workRevision"`
+	// Public UUID strings for the optional advisory constraints explicitly selected as completion requirements
+	RequiredCompletionConstraintIds json.RawMessage `json:"requiredCompletionConstraintIds"`
 	// Per-task scratchpad for the assigned AI agent: last_thought, retry_count, last_error, handoff_status, handoff_reason, last_started_at, last_cost_cents. NOT NULL with default {} so sqlc-generated json.RawMessage scans cleanly; mapper treats {} as "no memo yet"
 	AgentMemo json.RawMessage `json:"agentMemo"`
 	// LLM-optimized heuristic priority
@@ -4130,6 +4648,12 @@ type TaskDescriptionVersion struct {
 	TaskID uint32 `json:"-"`
 	// User who authored this version
 	AuthorUserID sql.NullInt32 `json:"-"`
+	// Agent who authored this version
+	AuthorAgentID sql.NullInt32 `json:"-"`
+	// Agent public byline retained after deletion
+	AuthorAgentPublicID types.PublicID `json:"authorAgentPublicId"`
+	// Agent name retained after deletion
+	AuthorAgentName sql.NullString `json:"authorAgentName"`
 	// Monotonically increasing per task
 	VersionNumber uint32 `json:"versionNumber"`
 	// Full description snapshot
@@ -4191,6 +4715,35 @@ type TaskEventLink struct {
 	CreatedAt time.Time     `json:"createdAt"`
 }
 
+// Accepted human task responsibility handoffs
+type TaskHandoff struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Human responsibility role being handed off
+	Role TaskHandoffsRole `json:"role"`
+	// Current human responsibility holder until acceptance
+	FromUserID sql.NullInt32 `json:"-"`
+	// Eligible task reader who may accept or decline
+	ToUserID sql.NullInt32 `json:"-"`
+	// Human who requested the handoff
+	RequestedByUserID sql.NullInt32 `json:"-"`
+	// Optional response deadline; stored in UTC
+	DueAt sql.NullTime `json:"dueAt"`
+	// Only acceptance changes the task actor
+	Status TaskHandoffsStatus `json:"status"`
+	// Scopes the unique key to one unresolved handoff per task role
+	PendingRoleKey sql.NullString `json:"-"`
+	// Time the handoff was accepted, declined, cancelled, or marked expired
+	ResolvedAt sql.NullTime `json:"resolvedAt"`
+	CreatedAt  time.Time    `json:"createdAt"`
+}
+
 // Task-label junction
 type TaskLabel struct {
 	// Internal PK, never exposed
@@ -4213,6 +4766,52 @@ type TaskLabel struct {
 	Active    sql.NullInt16 `json:"-"`
 	UpdatedAt sql.NullTime  `json:"updatedAt"`
 	CreatedAt time.Time     `json:"createdAt"`
+}
+
+// Immutable human decisions for task submissions
+type TaskReviewDecision struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Submission this decision resolves
+	SubmissionID uint32 `json:"-"`
+	// Human reviewer who made the decision; nullable provenance if the account is removed
+	DecidedByUserID sql.NullInt32 `json:"-"`
+	// Review outcome for the immutable submission
+	Decision TaskReviewDecisionsDecision `json:"decision"`
+	// Optional reviewer explanation
+	Reason    sql.NullString `json:"reason"`
+	CreatedAt time.Time      `json:"createdAt"`
+}
+
+// Immutable task work submissions for human review
+type TaskSubmission struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to tasks.id
+	TaskID uint32 `json:"-"`
+	// Task work_revision captured by this submission
+	WorkRevision uint32 `json:"workRevision"`
+	// Human who submitted the work; retained as nullable provenance if the account is removed
+	SubmittedByUserID sql.NullInt32 `json:"-"`
+	// Selected reviewer who may decide this submission
+	ReviewerUserID sql.NullInt32 `json:"-"`
+	// Immutable acceptance criteria supplied with the submission
+	AcceptanceCriteriaJson json.RawMessage `json:"acceptanceCriteriaJson"`
+	// Bounded HTTP(S) evidence links supplied with the submission
+	EvidenceUrlsJson json.RawMessage `json:"evidenceUrlsJson"`
+	// Attachment public IDs and SHA-256 digests snapshotted at submission time
+	AttachmentDigestsJson json.RawMessage `json:"attachmentDigestsJson"`
+	CreatedAt             time.Time       `json:"createdAt"`
 }
 
 // Time-bounded work containers
@@ -4479,6 +5078,23 @@ type VAdminUser struct {
 	IsInstanceAdmin             bool            `json:"isInstanceAdmin"`
 }
 
+type VAiSuggestionReadableBatch struct {
+	ID          uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+	WorkspaceID uint32         `json:"-"`
+	UserID      sql.NullInt32  `json:"-"`
+}
+
+type VAiSuggestionTimelineEvent struct {
+	EventID       uint64        `json:"-"`
+	BatchID       uint32        `json:"-"`
+	BatchPublicID []byte        `json:"batchPublicId"`
+	WorkspaceID   uint32        `json:"-"`
+	OwnerUserID   sql.NullInt32 `json:"-"`
+	ActorUserID   sql.NullInt32 `json:"-"`
+	EventType     string        `json:"eventType"`
+}
+
 type VAuditRecent struct {
 	WorkspaceID       uint32          `json:"-"`
 	PublicID          types.PublicID  `json:"publicId"`
@@ -4494,22 +5110,43 @@ type VAuditRecent struct {
 }
 
 type VCommentForTask struct {
-	WorkspaceID                       uint32          `json:"-"`
-	TaskID                            sql.NullInt32   `json:"-"`
-	TaskPublicID                      []byte          `json:"taskPublicId"`
-	PublicID                          types.PublicID  `json:"publicId"`
-	AuthorPublicID                    sql.NullString  `json:"authorPublicId"`
-	AuthorDisplayName                 sql.NullString  `json:"authorDisplayName"`
-	AuthorAvatarUrl                   sql.NullString  `json:"authorAvatarUrl"`
-	AuthorAvatarStorageObjectID       sql.NullInt32   `json:"-"`
-	AuthorAvatarStorageObjectPublicID *types.PublicID `json:"authorAvatarStorageObjectPublicId"`
-	Body                              string          `json:"body"`
-	EditedAt                          sql.NullTime    `json:"editedAt"`
-	UpdatedAt                         sql.NullTime    `json:"updatedAt"`
-	CreatedAt                         time.Time       `json:"createdAt"`
+	WorkspaceID                       uint32             `json:"-"`
+	TaskID                            sql.NullInt32      `json:"-"`
+	TaskPublicID                      []byte             `json:"taskPublicId"`
+	PublicID                          types.PublicID     `json:"publicId"`
+	AuthorKind                        CommentsAuthorKind `json:"authorKind"`
+	AuthorPublicID                    sql.NullString     `json:"authorPublicId"`
+	AuthorAgentPublicID               interface{}        `json:"authorAgentPublicId"`
+	AuthorDisplayName                 string             `json:"authorDisplayName"`
+	AuthorAvatarUrl                   sql.NullString     `json:"authorAvatarUrl"`
+	AuthorAvatarStorageObjectID       sql.NullInt32      `json:"-"`
+	AuthorAvatarStorageObjectPublicID *types.PublicID    `json:"authorAvatarStorageObjectPublicId"`
+	Body                              string             `json:"body"`
+	EditedAt                          sql.NullTime       `json:"editedAt"`
+	UpdatedAt                         sql.NullTime       `json:"updatedAt"`
+	CreatedAt                         time.Time          `json:"createdAt"`
 }
 
 type VInbox struct {
+	WorkspaceID         uint32              `json:"-"`
+	WorkspacePublicID   []byte              `json:"workspacePublicId"`
+	PublicID            types.PublicID      `json:"publicId"`
+	TaskPublicID        sql.NullString      `json:"taskPublicId"`
+	TaskTitle           sql.NullString      `json:"taskTitle"`
+	TaskVisibility      NullTasksVisibility `json:"taskVisibility"`
+	TaskProjectID       sql.NullInt32       `json:"-"`
+	TaskCreatedByUserID sql.NullInt32       `json:"-"`
+	TaskInternalID      sql.NullInt32       `json:"-"`
+	Source              SignalsSource       `json:"source"`
+	Kind                string              `json:"kind"`
+	ExternalID          sql.NullString      `json:"externalId"`
+	PayloadJson         json.RawMessage     `json:"payloadJson"`
+	ReceivedAt          time.Time           `json:"receivedAt"`
+	UpdatedAt           sql.NullTime        `json:"updatedAt"`
+	CreatedAt           time.Time           `json:"createdAt"`
+}
+
+type VInboxAll struct {
 	WorkspaceID         uint32              `json:"-"`
 	WorkspacePublicID   []byte              `json:"workspacePublicId"`
 	PublicID            types.PublicID      `json:"publicId"`
@@ -4693,22 +5330,24 @@ type VTaskListArchived struct {
 }
 
 type VTaskTimeline struct {
-	WorkspaceID               uint32          `json:"-"`
-	EventID                   uint64          `json:"-"`
-	PublicID                  types.PublicID  `json:"publicId"`
-	TaskPublicID              sql.NullString  `json:"taskPublicId"`
-	ProjectPublicID           sql.NullString  `json:"projectPublicId"`
-	ActorUserPublicID         types.PublicID  `json:"actorUserPublicId"`
-	ActorDisplayName          sql.NullString  `json:"actorDisplayName"`
-	ActorAgentPublicID        sql.NullString  `json:"actorAgentPublicId"`
-	ActorAgentName            interface{}     `json:"actorAgentName"`
-	ActorSystemSource         sql.NullString  `json:"actorSystemSource"`
-	TriggeredBySignalPublicID sql.NullString  `json:"triggeredBySignalPublicId"`
-	ReversesEventPublicID     sql.NullString  `json:"reversesEventPublicId"`
-	WasReversed               bool            `json:"wasReversed"`
-	Type                      string          `json:"type"`
-	PayloadJson               json.RawMessage `json:"payloadJson"`
-	OccurredAt                time.Time       `json:"occurredAt"`
+	WorkspaceID                uint32          `json:"-"`
+	EventID                    uint64          `json:"-"`
+	PublicID                   types.PublicID  `json:"publicId"`
+	TaskPublicID               sql.NullString  `json:"taskPublicId"`
+	ProjectPublicID            sql.NullString  `json:"projectPublicId"`
+	ActorUserPublicID          types.PublicID  `json:"actorUserPublicId"`
+	ActorDisplayName           sql.NullString  `json:"actorDisplayName"`
+	ActorAvatarUrl             sql.NullString  `json:"actorAvatarUrl"`
+	ActorAvatarStorageObjectID sql.NullInt32   `json:"-"`
+	ActorAgentPublicID         sql.NullString  `json:"actorAgentPublicId"`
+	ActorAgentName             interface{}     `json:"actorAgentName"`
+	ActorSystemSource          sql.NullString  `json:"actorSystemSource"`
+	TriggeredBySignalPublicID  sql.NullString  `json:"triggeredBySignalPublicId"`
+	ReversesEventPublicID      sql.NullString  `json:"reversesEventPublicId"`
+	WasReversed                bool            `json:"wasReversed"`
+	Type                       string          `json:"type"`
+	PayloadJson                json.RawMessage `json:"payloadJson"`
+	OccurredAt                 time.Time       `json:"occurredAt"`
 }
 
 type VUser struct {

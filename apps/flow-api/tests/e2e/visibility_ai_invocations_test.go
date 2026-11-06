@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -18,11 +19,33 @@ import (
 func seedInvocation(t *testing.T, wsID, providerID uint32, taskID, userID sql.NullInt32, marker string) {
 	t.Helper()
 	pub := uuid.Must(uuid.NewV7())
-	_, err := testDB.Exec(`
-		INSERT INTO ai_invocations (public_id, workspace_id, provider_id, user_id, task_id, purpose, model, prompt_redacted, status, invoked_at)
-		VALUES (?, ?, ?, ?, ?, 'propose_steps', 'test-model', ?, 'ok', ?)`,
-		pub[:], wsID, providerID, userID, taskID, marker, time.Now().UTC())
+	audience := "initiator"
+	resourcesJSON := []byte("[]")
+	inputCount := 0
+	var inputPublicID []byte
+	if taskID.Valid {
+		audience = "task"
+		inputCount = 1
+		require.NoError(t, testDB.QueryRow(`SELECT public_id FROM tasks WHERE id = ?`, uint32(taskID.Int32)).Scan(&inputPublicID)) //nolint:gosec // test-scoped task id fits uint32
+		publicID, err := uuid.FromBytes(inputPublicID)
+		require.NoError(t, err)
+		resourcesJSON, err = json.Marshal([]map[string]string{{"kind": "task", "publicId": publicID.String()}})
+		require.NoError(t, err)
+	}
+	res, err := testDB.Exec(`
+		INSERT INTO ai_invocations (
+			public_id, workspace_id, provider_id, user_id, task_id, audience,
+			input_resources_json, input_count, provenance_valid,
+			purpose, model, prompt_redacted, status, invoked_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'propose_steps', 'test-model', ?, 'ok', ?)`,
+		pub[:], wsID, providerID, userID, taskID, audience, resourcesJSON, inputCount, marker, time.Now().UTC())
 	require.NoError(t, err)
+	if taskID.Valid {
+		invocationID, err := res.LastInsertId()
+		require.NoError(t, err)
+		_, err = testDB.Exec(`INSERT INTO ai_invocations_inputs (invocation_id, task_public_id) VALUES (?, ?)`, uint32(invocationID), inputPublicID) //nolint:gosec // test-scoped invocation id fits uint32
+		require.NoError(t, err)
+	}
 }
 
 // TestAiInvocationsListHidesPromptsAboutUnreadableTasks holds the

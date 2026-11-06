@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/airequest"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
@@ -43,8 +42,8 @@ const pageGenerationMaxTokens = 2048
 // persisting directly into pages.body.
 //
 // Errors are the AI layer's own: [ErrNoProvider] with no enabled
-// provider, the cost guard's budget errors, [ErrParse] for an empty
-// draft, and the provider call's failures wrapped with %w. REST and MCP
+// provider, the cost guard's budget errors, response-protocol or empty
+// output errors, and provider failures wrapped with %w. REST and MCP
 // both map them through errormodel.PageGenerationFailure, which keeps
 // each failure's shared code and answers an unreachable provider with
 // PAGE.GENERATION.UPSTREAM_UNAVAILABLE.
@@ -78,21 +77,11 @@ func (o *Orchestrator) GeneratePageBody(
 		Prompt:    userPrompt,
 		MaxTokens: pageGenerationMaxTokens,
 	})
-	start := time.Now()
-	resp, err := prov.Complete(ctx, req)
+	resp, err := o.CompleteAndRecord(ctx, workspaceID, "generate_page", prov, req, nil)
 	if err != nil {
-		o.recordMetrics(string(prov.Kind()), req.Model, 0, 0, 0, time.Since(start), err)
-		o.logFailure(ctx, workspaceID, "generate_page", req, err)
 		return "", fmt.Errorf("ai: provider call failed: %w", err)
 	}
-	o.recordMetrics(string(prov.Kind()), req.Model, resp.InputTokens, resp.OutputTokens, resp.EstimatedCostMicros(), time.Since(start), nil)
-	o.logSuccess(ctx, workspaceID, "generate_page", req, resp)
-
-	body := strings.TrimSpace(resp.Text)
-	if body == "" {
-		return "", ErrParse
-	}
-	return body, nil
+	return strings.TrimSpace(resp.Text), nil
 }
 
 // buildPagePrompt assembles the user-side prompt for page generation.

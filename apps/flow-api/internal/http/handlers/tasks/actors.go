@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -10,6 +11,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/taskworkflow"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -76,6 +78,7 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		completeActorMutation(ctx, deps, ws.ID, task.ID)
 		return &AddTaskActorOutput{Body: TaskActor{
 			ID:     pub.String(),
 			UserID: userPub.String(),
@@ -135,17 +138,42 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		// Nothing resolves the actor row before this, so the count is the
-		// only thing that knows whether it was there: a well-formed id for
-		// an actor on another task -- or none at all -- used to answer ok
-		// and append a task.actor.removed event for a removal that never
-		// happened.
+		// The locked lookup is the existence check: a well-formed id for an
+		// actor on another task -- or none at all -- must answer not found
+		// rather than append a task.actor.removed event for a removal that
+		// never happened.
 		actorID, _ := middleware.ActorFromContext(ctx)
 		taskInternal := int64(task.ID)
 		var missing bool
 		if err := dbretry.InTx(ctx, deps.DB, "tasks.RemoveActor", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			rows, err := generated.New(tx).RemoveActor(ctx, generated.RemoveActorParams{
+			qtx := generated.New(tx)
+			// Task row first, like every other task mutation, so removal
+			// serializes with review and handoff decisions.
+			if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+				ID:          task.ID,
 				WorkspaceID: ws.ID,
+			}); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					missing = true
+					return nil
+				}
+				return err
+			}
+			holder, err := qtx.FindTaskActorForRemoval(ctx, generated.FindTaskActorForRemovalParams{
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
+				PublicID:    aid,
+			})
+			if errors.Is(err, sql.ErrNoRows) {
+				missing = true
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			rows, err := qtx.RemoveActor(ctx, generated.RemoveActorParams{
+				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
 				PublicID:    aid,
 			})
 			if err != nil {
@@ -153,6 +181,12 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 			}
 			if missing = rows == 0; missing {
 				return nil
+			}
+			if holder.Kind == generated.TaskActorsKindUser {
+				if err := taskworkflow.CancelPendingHandoffFromHolderTx(ctx, tx, deps.Mutations, actorID, ws.ID, task.ID,
+					task.PublicID.String(), holder.Role, holder.UserID); err != nil {
+					return err
+				}
 			}
 			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
 				EventType:    eventbus.TaskActorRemoved,
@@ -172,6 +206,7 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 		if missing {
 			return nil, httpErr(apierrors.WsTaskActorNotFound)
 		}
+		completeActorMutation(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskActorOutput{}
 		out.Body.Ok = true
 		return out, nil
