@@ -234,3 +234,37 @@ func TestLoadRejectsInvalidAppName(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadBrandImages(t *testing.T) {
+	t.Setenv("NF_DB_DSN", "user:pass@tcp(127.0.0.1:3306)/nodate_flow")
+
+	for _, name := range []string{"NF_APP_LOGO_URL", "NF_APP_ICON_URL"} {
+		for label, v := range map[string]string{
+			"http":      "http://cdn.example/l.svg",
+			"space":     "https://cdn.example/a b.svg",
+			"bad data":  "data:image/bmp;base64,AAAA",
+			"too long":  "data:image/png;base64," + strings.Repeat("A", 32768),
+			"no scheme": "cdn.example/l.svg",
+		} {
+			t.Run(name+" "+label, func(t *testing.T) {
+				t.Setenv(name, v)
+				_, err := Load()
+				if err == nil || !strings.Contains(err.Error(), name) {
+					t.Fatalf("Load() error = %v, want one naming %s", err, name)
+				}
+			})
+		}
+	}
+
+	t.Run("trimmed", func(t *testing.T) {
+		t.Setenv("NF_APP_LOGO_URL", " https://cdn.example/l.svg ")
+		t.Setenv("NF_APP_ICON_URL", "   ")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if cfg.AppLogoURL != "https://cdn.example/l.svg" || cfg.AppIconURL != "" {
+			t.Fatalf("got logo %q icon %q", cfg.AppLogoURL, cfg.AppIconURL)
+		}
+	})
+}

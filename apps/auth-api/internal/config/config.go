@@ -22,6 +22,11 @@ type Config struct {
 	// validated by Load.
 	AppName string `env:"NF_APP_NAME"`
 
+	// AppLogoURL and AppIconURL are the optional brand images (NF_APP_LOGO_URL,
+	// NF_APP_ICON_URL); validated by Load, empty means unset.
+	AppLogoURL string `env:"NF_APP_LOGO_URL"`
+	AppIconURL string `env:"NF_APP_ICON_URL"`
+
 	// MetricsPort is the port for the internal-only Prometheus metrics
 	// HTTP server. Metrics are served on a separate listener so they are
 	// never exposed through the public-facing API port.
@@ -244,6 +249,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.AppName = name
+	if cfg.AppLogoURL, err = brand.ResolveImageURL("NF_APP_LOGO_URL", cfg.AppLogoURL); err != nil {
+		return nil, err
+	}
+	if cfg.AppIconURL, err = brand.ResolveImageURL("NF_APP_ICON_URL", cfg.AppIconURL); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 

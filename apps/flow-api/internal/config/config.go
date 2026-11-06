@@ -20,6 +20,11 @@ type Config struct {
 	// AppName is the display name (NF_APP_NAME); resolved and validated by Load.
 	AppName string `env:"NF_APP_NAME"`
 
+	// AppLogoURL and AppIconURL are the optional brand images (NF_APP_LOGO_URL,
+	// NF_APP_ICON_URL); validated by Load, empty means unset.
+	AppLogoURL string `env:"NF_APP_LOGO_URL"`
+	AppIconURL string `env:"NF_APP_ICON_URL"`
+
 	// Env selects the runtime environment. "development"/"dev" enables
 	// developer conveniences (ephemeral JWT key fallback, permissive CORS).
 	// Any other value (e.g. "production") is treated as production by
@@ -314,6 +319,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.AppName = name
+	if cfg.AppLogoURL, err = brand.ResolveImageURL("NF_APP_LOGO_URL", cfg.AppLogoURL); err != nil {
+		return nil, err
+	}
+	if cfg.AppIconURL, err = brand.ResolveImageURL("NF_APP_ICON_URL", cfg.AppIconURL); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 

@@ -475,6 +475,7 @@ func main() {
 			Username: cfg.SMTPUsername,
 			Password: cfg.SMTPPassword,
 			From:     cfg.SMTPFrom,
+			Brand:    email.Brand{Name: cfg.AppName, LogoURL: cfg.AppLogoURL, IconURL: cfg.AppIconURL},
 		})
 		if serr != nil {
 			logger.Error("smtp sender init failed", "err", serr)

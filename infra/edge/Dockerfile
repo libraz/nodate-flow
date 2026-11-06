@@ -38,6 +38,9 @@ ARG VITE_NF_ALLOWED_REDIRECT_ORIGINS=""
 # Branding is compiled in too; changing it means rebuilding.
 ARG VITE_APP_NAME=""
 ARG VITE_APP_LOGO_URL=""
+ARG VITE_APP_LOGO_DARK_URL=""
+ARG VITE_APP_ICON_URL=""
+ARG VITE_APP_ICON_DARK_URL=""
 
 # Each app is built with only the variables it reads.
 RUN cd apps/accounts-web \
@@ -46,6 +49,9 @@ RUN cd apps/accounts-web \
     VITE_NF_ALLOWED_REDIRECT_ORIGINS="$VITE_NF_ALLOWED_REDIRECT_ORIGINS" \
     VITE_APP_NAME="$VITE_APP_NAME" \
     VITE_APP_LOGO_URL="$VITE_APP_LOGO_URL" \
+    VITE_APP_LOGO_DARK_URL="$VITE_APP_LOGO_DARK_URL" \
+    VITE_APP_ICON_URL="$VITE_APP_ICON_URL" \
+    VITE_APP_ICON_DARK_URL="$VITE_APP_ICON_DARK_URL" \
     bun run build
 RUN cd apps/flow-web \
  && VITE_API_BASE_URL="$VITE_API_BASE_URL" \
@@ -54,6 +60,9 @@ RUN cd apps/flow-web \
     VITE_PUBLIC_BASE_URL="$VITE_PUBLIC_BASE_URL" \
     VITE_APP_NAME="$VITE_APP_NAME" \
     VITE_APP_LOGO_URL="$VITE_APP_LOGO_URL" \
+    VITE_APP_LOGO_DARK_URL="$VITE_APP_LOGO_DARK_URL" \
+    VITE_APP_ICON_URL="$VITE_APP_ICON_URL" \
+    VITE_APP_ICON_DARK_URL="$VITE_APP_ICON_DARK_URL" \
     bun run build
 
 # The CSP names the hash of each index.html's inline script, so it is derived
