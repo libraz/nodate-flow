@@ -1,6 +1,6 @@
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
+-- Per-workspace AI configuration: embeddings, duplicates,
 -- auto-actions, and signal_judge prompt customization.
 -- Holds duplicate-detection thresholds, the embed-budget bucket that
 -- the CostGuard tracks separately from the LLM chat budget,
@@ -36,4 +36,4 @@ CREATE TABLE ai_settings (
 
   CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration: embeddings, duplicates, auto-actions';

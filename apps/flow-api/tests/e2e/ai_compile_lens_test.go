@@ -14,7 +14,7 @@ import (
 // TestAiCompileLensHappyAndSad exercises POST /ai/compile-lens against
 // the mock NL query fixture: a known-good prompt compiles to a
 // populated Lens, an unknown prompt returns 422
-// AI.NL_QUERY.UNPARSEABLE (ADR 0004).
+// AI.NL_QUERY.UNPARSEABLE.
 func TestAiCompileLensHappyAndSad(t *testing.T) {
 	bootstrap(t)
 	if os.Getenv("NF_FLOW_AI_MOCK") == "" {

@@ -23,7 +23,7 @@ export const autoActionsKeys = {
 
 /**
  * useAutoActionsQuery — non-suspense list of workspace-wide task
- * auto-actions. Refreshes via the realtime SSE stream (ADR 0005);
+ * auto-actions. Refreshes via the realtime SSE stream;
  * falls back to 60s polling when the stream is unhealthy.
  */
 export function useAutoActionsQuery(

@@ -4,7 +4,7 @@
 // event rows without coupling to flow-api or auth-api generated
 // types.
 //
-// Per ADR 0005 the events table is append-only. The sole deletion
+// The events table is append-only. The sole deletion
 // path is the per-tenant purge used by test fixtures.
 package eventlog
 

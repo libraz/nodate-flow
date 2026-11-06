@@ -13,7 +13,7 @@
 //
 // Time-bearing helpers normalise to UTC so the wire format is stable across
 // server timezones — both _at (unix seconds) and _on (YYYY-MM-DD) follow the
-// project's api-types convention (see docs/conventions/api-types.md).
+// project's API timestamp convention.
 package dbtype
 
 import (

@@ -148,10 +148,10 @@ func AssertSourcesCovered(candidates []string) error {
 // flow-worker, presence-discord). Field names and casing are the wire
 // contract; do not change them without regenerating the OpenAPI/SDK.
 //
-// SubjectType / SubjectID address the signal's subject (ADR 0008 D1).
+// SubjectType / SubjectID address the signal's subject.
 // TaskID is the legacy fast path equivalent to (SubjectType="task",
 // SubjectID=<task public id>). All ids are UUID v7 public ids — internal
-// numeric ids are never sent (CLAUDE.md rule 18).
+// numeric ids are never sent.
 //
 // This struct carries no validation tags itself; flow-api's Huma input
 // embeds it and supplies the `enum` / `required` / length tags so the

@@ -1,4 +1,4 @@
-// Package e2e — coverage for the ADR 0008 D4 traceability link surfaced
+// Package e2e — coverage for the traceability link surfaced
 // on event-returning endpoints.
 //
 // The test creates a signal through the public POST /signals path, then
@@ -157,7 +157,7 @@ func TestEventTriggeredBySignalIDFlowsThroughTimeline(t *testing.T) {
 }
 
 // TestEventActorSystemSourceFlowsThroughTimeline locks in that the third
-// actor source (ADR 0008 D8, worker-tick events) round-trips from
+// actor source (worker-tick events) round-trips from
 // eventbus.Append() to the GET /workspaces/{wsId}/timeline response as a
 // `actorSystemSource` string. Worker binaries are not yet wired up but the
 // contract is exercised here so the worker has a stable boundary.

@@ -10,7 +10,7 @@ import (
 // representative selection of illegal pairs, asserting the v1 state
 // machine. Adding a new transition or reshaping the diagram should
 // require touching this table — keep the table in lockstep with
-// docs/adr/0001 and the OpenAPI enum on TransitionTaskBody.
+// the state machine and the OpenAPI enum on TransitionTaskBody.
 func TestNextState(t *testing.T) {
 	t.Parallel()
 

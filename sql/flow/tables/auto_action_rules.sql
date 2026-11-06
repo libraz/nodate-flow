@@ -17,7 +17,7 @@ CREATE TABLE auto_action_rules (
   public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
   workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
-  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md',
+  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot.',
   enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
   confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
   idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',

@@ -160,7 +160,7 @@ func linkTaskToEventViaAPI(t *testing.T, tt *helpers.TestTenant, taskPublicID, e
 
 // setDerivedStateDirect overrides tasks.derived_state via raw SQL.
 // Production code never updates derived_state directly (events are the
-// sole writer per CLAUDE.md rule #10), but the prompt-render test only
+// sole writer), but the prompt-render test only
 // cares that the projected state surfaces in the prompt, not how it
 // got there. Scoping this to the test keeps it from leaking into
 // production helpers.

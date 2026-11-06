@@ -145,7 +145,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		//
 		// TODO(signal_kinds): promote `github.issue.*`, `github.pr.*`, and
 		// `github.commit.*` to signal_kinds/github.yaml once the judge
-		// prompt schema needs them (ADR 0008 D2). Until then leaving the
+		// prompt schema needs them. Until then leaving the
 		// kind values as the free-form strings NormalizeEventKind produces
 		// keeps the wire shape stable.
 		subjectType := resolveSubjectType(event, "")
@@ -205,7 +205,7 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 		})
 		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
 
-		// Best-effort signal_judge dispatch (ADR 0008 D3). The
+		// Best-effort signal_judge dispatch. The
 		// enqueuer logs and swallows errors so a flaky agent_runs
 		// insert cannot fail the webhook ACK; webhook redelivery
 		// retries the whole pipeline including the enqueue.

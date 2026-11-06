@@ -70,7 +70,7 @@ func TestResolveSubjectType(t *testing.T) {
 // workspace-scoped signals and for any subject type the caller did not
 // resolve an internal id for. Without this, an accidental zero internal
 // id would write FK 0 to signals.subject_id and break the per-subject
-// presence view (ADR 0008 D5).
+// presence view.
 func TestSubjectIDFor(t *testing.T) {
 	t.Parallel()
 

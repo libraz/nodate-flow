@@ -375,8 +375,8 @@ func RawBytesToUUIDPtr(v interface{}) *string {
 // FormatUnixISO formats a unix-seconds value as an RFC 3339 timestamp in
 // UTC, for CSV exporters.
 //
-// The API boundary keeps `*_at` as int64 unixtime (see
-// docs/conventions/api-types.md) and that does not change. A CSV is a
+// The API boundary keeps `*_at` as int64 unixtime
+// and that does not change. A CSV is a
 // different kind of artifact: someone opens it. These columns used to
 // carry the raw integer, so a spreadsheet showed ten-digit numbers under
 // "Completed At", "Created At" and "Updated At" while "Due Date" and

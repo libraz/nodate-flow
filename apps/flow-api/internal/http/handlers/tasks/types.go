@@ -22,7 +22,7 @@ type Deps struct {
 	DB      *sql.DB
 	Queries *generated.Queries
 	// Embedder upserts task embeddings on Create / Patch when title or
-	// description changes (ADR 0003). Optional: nil disables write-time
+	// description changes. Optional: nil disables write-time
 	// embedding, which is fine currently and the weekly reindex cron
 	// will catch up.
 	Embedder *embed.Client
@@ -742,10 +742,9 @@ type HandoffToUserOutput struct {
 // agents lookup per row.
 //
 // ActorSystemSource and TriggeredBySignalID mirror the same two
-// traceability fields surfaced on the workspace / task timeline (ADR
-// 0008 D4 / D8). Both are pointer-typed so the JSON shape is
+// traceability fields surfaced on the workspace / task timeline. Both are pointer-typed so the JSON shape is
 // unambiguously `null` when the underlying column was SQL NULL: agent
-// runs predating ADR 0008 carry neither attribute.
+// runs predating those fields carry neither attribute.
 type AgentRunEvent struct {
 	EventID             string   `json:"eventId"`
 	Type                string   `json:"type"`
@@ -753,11 +752,10 @@ type AgentRunEvent struct {
 	Agent               AgentRef `json:"agent"`
 	ActorSystemSource   *string  `json:"actorSystemSource,omitempty"`
 	TriggeredBySignalID *string  `json:"triggeredBySignalId,omitempty"`
-	// ReversesEventID is the public_id of the event this row compensates
-	// (ADR 0008 D4). Null for non-reversal events.
+	// ReversesEventID is the public_id of the event this row compensates. Null for non-reversal events.
 	ReversesEventID *string `json:"reversesEventId,omitempty"`
 	// WasReversed is TRUE when some other enabled event reverses this
-	// row (ADR 0008 D4). Mirrors the timeline DTO so the
+	// row. Mirrors the timeline DTO so the
 	// agent-runs view can render the same "Reversed" badge.
 	WasReversed bool   `json:"wasReversed"`
 	PayloadJSON string `json:"payloadJson,omitempty"`

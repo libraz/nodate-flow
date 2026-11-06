@@ -1,4 +1,4 @@
-// Conventional commits configuration; aligns with docs/conventions/code-style.md.
+// Conventional commits configuration.
 //
 // The shape of a message -- type prefix, no trailing period, blank line then
 // bullet body -- is enforced for every repository on this machine. What only

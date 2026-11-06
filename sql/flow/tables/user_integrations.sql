@@ -10,7 +10,7 @@ CREATE TABLE user_integrations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the presence-discord gateway — no task-mutating tokens are stored.',
   external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
   external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
   scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',

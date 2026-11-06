@@ -1,5 +1,5 @@
 /**
- * Realtime SSE invalidation test (ADR 0005).
+ * Realtime SSE invalidation test.
  *
  * Asserts that `useWorkspaceStream` — mounted once per authenticated
  * tree in `_authenticated.tsx` — actually delivers `task.changed` and

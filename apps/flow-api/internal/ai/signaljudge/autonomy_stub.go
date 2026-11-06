@@ -1,5 +1,4 @@
-// Package signaljudge — autonomy resolver interface and inert stub
-// (ADR 0008 D4 / D7).
+// Package signaljudge — autonomy resolver interface and inert stub.
 //
 // The Applier consults an [AutonomyResolver] to translate a
 // (workspace, signal_kind, confidence) triple into the

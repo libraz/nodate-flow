@@ -20,7 +20,7 @@ var ErrBudgetExceeded = errors.New("nlconstraint: daily budget exceeded")
 // CostGuard is the narrow contract WorkspaceProvider needs to participate
 // in the per-workspace daily cap. It mirrors ai.CostGuard.Check so the
 // NL-constraint path shares one budget with the orchestrator and
-// signal-judge (ADR 0008 D3). A nil guard disables enforcement.
+// signal-judge. A nil guard disables enforcement.
 type CostGuard interface {
 	Check(ctx context.Context, workspaceID uint32) error
 }

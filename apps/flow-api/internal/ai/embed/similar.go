@@ -12,7 +12,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-// Similarity thresholds (ADR 0003 §4), used when ai_settings has no row
+// Similarity thresholds, used when ai_settings has no row
 // for the workspace or a stored value does not parse.
 const (
 	DefaultDuplicateThreshold = 0.870

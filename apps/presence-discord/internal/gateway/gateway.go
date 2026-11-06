@@ -107,9 +107,8 @@ func New(cfg *config.Config, logger *slog.Logger) *Gateway {
 //  2. Construct the HTTP emitter and the debouncer (the emitter
 //     receives debounced events from the debouncer).
 //  3. Open the discordgo session with the GUILD_PRESENCES +
-//     GUILD_MEMBERS intents (both privileged; see
-//     docs/conventions/discord-bot-setup.md for the developer-portal
-//     opt-in steps).
+//     GUILD_MEMBERS intents (both privileged; opt in via the
+//     developer portal).
 //  4. Register the PresenceUpdate handler plus Connect / Disconnect /
 //     Resumed handlers that keep GatewayUp accurate.
 //  5. Block on ctx.Done().
@@ -213,8 +212,7 @@ func (g *Gateway) openSession() (sessionAdapter, error) {
 
 // defaultSessionFactory is the production wiring: discordgo.New with
 // the GUILD_PRESENCES + GUILD_MEMBERS intents. Both are privileged and
-// must be opted-in via the Discord Developer Portal; see
-// docs/conventions/discord-bot-setup.md.
+// must be opted-in via the Discord Developer Portal.
 func defaultSessionFactory(token string) (sessionAdapter, error) {
 	s, err := discordgo.New("Bot " + token)
 	if err != nil {

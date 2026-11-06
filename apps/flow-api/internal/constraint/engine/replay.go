@@ -53,13 +53,13 @@ func ParseTransitionName(eventType string) (string, bool) {
 }
 
 // ErrIllegalTransition is returned when Replay encounters a
-// transition that the v1 state machine (ADR 0001) does not allow
+// transition that the v1 state machine does not allow
 // from the current state. It indicates a bug in the write path,
 // not in replay, so surfacing it loudly is the right move.
 var ErrIllegalTransition = errors.New("engine: illegal transition")
 
 // Replay derives a task's final state by applying events in order
-// from the initial "open" state, using the ADR 0001 v1 state
+// from the initial "open" state, using the v1 state
 // machine. The result must match the task's current
 // tasks.derived_state — any drift proves a write-path bug.
 //

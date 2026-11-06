@@ -1,8 +1,7 @@
 /**
  * Date validation helpers used by the `tnk` CLI.
  *
- * The product API treats `*_on` fields as `YYYY-MM-DD` strings (see
- * `docs/conventions/api-types.md`). This module rejects malformed
+ * The product API treats `*_on` fields as `YYYY-MM-DD` strings. This module rejects malformed
  * input on the client side so the user gets a clear error message
  * instead of a confusing 400 from the server.
  *

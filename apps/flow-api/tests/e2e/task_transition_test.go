@@ -75,7 +75,7 @@ func TestTaskReopenFromDone(t *testing.T) {
 }
 
 // TestTaskBlockAndUnblock verifies the advertised block/unblock verbs
-// work in the ADR 0001 direction: block moves active work into waiting,
+// work in the documented direction: block moves active work into waiting,
 // and unblock returns waiting work to open.
 func TestTaskBlockAndUnblock(t *testing.T) {
 	bootstrap(t)

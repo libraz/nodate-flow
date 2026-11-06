@@ -2,14 +2,14 @@
 -- Timeline of events related to tasks. Merges events with the owning
 -- task's public_id so the UI can render without touching internal ids.
 --
--- Exposes the third actor source (`actor_system_source`, ADR 0008 D8) and
--- the signal traceability link (`triggered_by_signal_public_id`, ADR 0008
--- D4) so the timeline UI can render "Discord said idle -> judge ran ->
--- task completed" as a single causal chain. The signal join uses alias
+-- Exposes the third actor source (`actor_system_source`) and
+-- the signal traceability link (`triggered_by_signal_public_id`) so the timeline
+-- UI can render "Discord said idle -> judge ran -> task completed" as a
+-- single causal chain. The signal join uses alias
 -- `tsig` (triggering signal) to avoid colliding with any future signals
 -- JOIN that might use the conventional `s` alias.
 --
--- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
+-- Reversal projection: `reverses_event_public_id`
 -- surfaces the target event's public_id when this row is a compensating
 -- reverse, sourced from a self-join aliased `e_rev` (reverse target).
 -- `was_reversed` is TRUE when some other enabled event points back to this

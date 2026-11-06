@@ -132,11 +132,11 @@ type Querier interface {
 	// orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 	// calls dispatched from an agent context.
 	//
-	// `triggered_by_signal_id` (ADR 0008 D4) is set when the Applier emits this
+	// `triggered_by_signal_id` is set when the Applier emits this
 	// event in response to a judged signal so the timeline UI can render the
 	// causal chain "signal -> judge verdict -> task event".
 	//
-	// `reverses_event_id` (ADR 0008 D4) mirrors the same field on
+	// `reverses_event_id` mirrors the same field on
 	// AppendEvent. The reversal handler uses this INSERT path when the target
 	// event being reversed was originally produced by an agent so the
 	// compensating event preserves the same actor kind. NULL for normal
@@ -152,24 +152,24 @@ type Querier interface {
 	// Append a single user-actor event to the append-only event log. The events
 	// table has no UPDATE/DELETE path; only purgeWorkspace removes rows.
 	//
-	// `actor_system_source` is bound here so the third actor source (ADR 0008
-	// D8) can be expressed without a separate INSERT path; callers pass an
-	// empty string when the row is genuinely user-attributed. The three-way
+	// `actor_system_source` is bound here so the third actor source can be expressed
+	// without a separate INSERT path; callers pass an empty string when the row is
+	// genuinely user-attributed. The three-way
 	// actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
 	// is enforced by handler-side validation (eventbus.validateActors) rather
 	// than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
 	// columns used in FK ON DELETE SET NULL actions; see sql/core/tables/events.sql.
 	//
-	// `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
+	// `triggered_by_signal_id` is the internal signal id when the
 	// event was emitted by the Applier in response to a judged signal. NULL for
 	// events with no signal lineage. ON DELETE SET NULL on the FK so signal
 	// purge does not cascade to the event log.
 	//
-	// `reverses_event_id` (ADR 0008 D4) is the internal event id this row
+	// `reverses_event_id` is the internal event id this row
 	// compensates. NULL for non-reversal events. The reversal handler binds
 	// this when appending a same-type compensating event so the derived_state
 	// projection can cancel the original out without ever UPDATEing the event
-	// log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
+	// log (events stay immutable). ON DELETE SET NULL
 	// so purging a reversed event detaches the backlink instead of cascading.
 	//
 	// `calendar_id` is the symmetric counterpart of `task_id`: the internal
@@ -818,9 +818,9 @@ type Querier interface {
 	// No enabled filter: the agent is the historical author of the version.
 	FindDescriptionVersion(ctx context.Context, arg FindDescriptionVersionParams) (FindDescriptionVersionRow, error)
 	FindEnabledTaskConstraintForWorkflow(ctx context.Context, arg FindEnabledTaskConstraintForWorkflowParams) (uint32, error)
-	// Resolve a target event by public_id for the reversal handler (ADR 0008
-	// D4, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
-	// handler uses this single query to drive three eligibility checks
+	// Resolve a target event by public_id for the reversal handler
+	// (POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The handler uses this
+	// single query to drive three eligibility checks
 	// before appending the compensating event:
 	//   - target exists in the caller's workspace (LIMIT 1 + workspace_id =
 	//     ? gives 404 vs. 403 separation when combined with the standard
@@ -1112,7 +1112,7 @@ type Querier interface {
 	// restriction, and it has to reach the guard as a scannable JSON value.
 	GetAgentGuardSnapshot(ctx context.Context, id uint32) (GetAgentGuardSnapshotRow, error)
 	// ============================================================================
-	// ai_settings queries (ADR 0003)
+	// ai_settings queries
 	// Per-workspace AI knobs: embed model, daily embed budget, the
 	// duplicate-detection similarity thresholds, auto-action executor settings,
 	// and free-form judge_instructions spliced into the signal_judge prompt.
@@ -1328,7 +1328,7 @@ type Querier interface {
 	// Dedup is workspace-scoped via UNIQUE (workspace_id, source, external_id)
 	// when external_id is non-NULL. Duplicate deliveries are silently ignored
 	// via INSERT IGNORE; LastInsertId() returns 0 when the row was a duplicate.
-	// subject_type is NOT NULL per sql/flow/tables/signals.sql (ADR 0008 D1) so every
+	// subject_type is NOT NULL per sql/flow/tables/signals.sql so every
 	// caller must resolve a kind-appropriate subject; subject_id stays NULL for
 	// workspace-scoped signals (workspace_id already identifies the owner).
 	// judge_run_id / judge_output_json / confidence / applied_at stay NULL at
@@ -1377,14 +1377,14 @@ type Querier interface {
 	// events; the type LIKE narrows to the run lifecycle family. ORDER BY
 	// occurred_at DESC, id DESC produces a stable newest-first timeline.
 	//
-	// Projects `actor_system_source` (ADR 0008 D8) and the LEFT JOINed
-	// `triggered_by_signal_public_id` (ADR 0008 D4) so the agent-runs handler
+	// Projects `actor_system_source` and the LEFT JOINed
+	// `triggered_by_signal_public_id` so the agent-runs handler
 	// can surface the third actor source and the signal causal link without
-	// exposing internal ids on the API boundary (CLAUDE.md rule 18). The
+	// exposing internal ids on the API boundary. The
 	// signal join uses alias `tsig` (triggering signal) to mirror the
 	// v_task_timeline view.
 	//
-	// Reversal projection (ADR 0008 D4): `reverses_event_public_id`
+	// Reversal projection: `reverses_event_public_id`
 	// comes from the LEFT self-join aliased `e_rev` (reverse target);
 	// `was_reversed` is computed by a correlated EXISTS subquery using
 	// alias `e_chk` (reverse check), backed by idx_events_reverses
@@ -1445,7 +1445,7 @@ type Querier interface {
 	// Per-workspace auto-action rule configuration. Each row defines a single
 	// rule kind (e.g. auto-close, auto-archive) with its own enabled flag,
 	// confidence threshold, and idle-hours delay. Rules can now be scoped per
-	// signal_kind; see docs/conventions/autonomy.md for resolution layer order.
+	// signal_kind.
 	// Rows may also carry an explicit autonomy_level ('suggest' | 'draft' |
 	// 'auto'); when non-NULL the resolver returns it verbatim and skips the
 	// confidence-vs-threshold gate. NULL preserves the legacy confidence-based
@@ -1625,7 +1625,7 @@ type Querier interface {
 	// predicates. Events without a task_id (workspace-level signals) are
 	// intentionally excluded — scoped agents only react to task-bound events.
 	//
-	// Reversal projection (ADR 0008 D4): `reverses_event_id` is exposed
+	// Reversal projection: `reverses_event_id` is exposed
 	// so the orchestrator can recognise compensating events and skip
 	// triggering downstream agents on them when desired. `was_reversed` is
 	// computed by a correlated EXISTS subquery aliased `e_chk` (reverse
@@ -2556,7 +2556,7 @@ type Querier interface {
 	// update the timestamp and title snapshot.
 	UpsertRecentVisit(ctx context.Context, arg UpsertRecentVisitParams) error
 	// ============================================================================
-	// task_embeddings queries (ADR 0003)
+	// task_embeddings queries
 	//
 	// Internal plumbing: task_embeddings has no public_id of its own; workspace
 	// scoping is reached via the denormalized workspace_id column (FK-guarded

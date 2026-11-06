@@ -6,7 +6,7 @@
 -- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
 -- SKIP LOCKED, run the agent, then update status to succeeded / failed.
 -- Completed rows are retained as the audit trail for
--- `ai.agent.run.*` events (ADR 0002 — events in MySQL).
+-- `ai.agent.run.*` events.
 -- ====================================
 CREATE TABLE agent_runs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',

@@ -254,7 +254,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "propose_duplicates",
-		description:   "Return likely-duplicate tasks for a given task by embedding similarity (ADR 0003).",
+		description:   "Return likely-duplicate tasks for a given task by embedding similarity.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"taskId": stringSchema("Task public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
@@ -3245,8 +3245,7 @@ func runListCalendars(ctx context.Context, deps Deps, s *session, _ json.RawMess
 
 // parseDayBoundary parses a YYYY-MM-DD string and returns the time at
 // 00:00:00 UTC on that calendar day. Used for all-day events at the MCP
-// boundary, mirroring the API/MCP convention from
-// docs/conventions/api-types.md.
+// boundary, mirroring the API/MCP convention.
 func parseDayBoundary(s string) (time.Time, error) {
 	return time.Parse("2006-01-02", s)
 }

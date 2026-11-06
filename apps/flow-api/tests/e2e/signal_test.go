@@ -11,7 +11,7 @@ import (
 // attached to a task. Webhook HMAC paths are covered by unit tests in
 // internal/integrations/ and are intentionally skipped here.
 //
-// Asserts the ADR 0008 D1 contract that every signals row carries a
+// Asserts the contract that every signals row carries a
 // non-empty subject_type: the legacy `taskId` parameter implicitly
 // promotes the row to subject_type=task and surfaces the subjectId in
 // the response so SDK consumers can render the new addressing shape

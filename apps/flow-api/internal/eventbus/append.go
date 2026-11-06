@@ -107,7 +107,7 @@ func nextSeq(workspaceInternalID uint32) int64 {
 // passing nil. Payload is JSON-marshalled before insertion; pass nil for
 // an empty payload.
 //
-// Actor exclusion (ADR 0008 D8). The events row supports three mutually
+// Actor exclusion. The events row supports three mutually
 // exclusive actor sources — [Event.ActorUserID], [Event.ActorAgentID],
 // and [Event.ActorSystemSource]. MySQL 8.4 cannot enforce this via
 // CHECK because all three FK referential actions use ON DELETE SET NULL
@@ -133,7 +133,7 @@ type Event struct {
 	ActorAgentID *int64
 	// ActorSystemSource names the worker-tick origin (`worker.calendar`,
 	// `worker.retention`, ...) when the event was emitted by the worker
-	// binary (ADR 0008 D8). Not an FK because the worker is not
+	// binary. Not an FK because the worker is not
 	// represented in the database. Mutually exclusive with the other
 	// two actor fields. The worker binary is the first writer; this
 	// field exists today so the eventbus contract is stable when that
@@ -151,14 +151,12 @@ type Event struct {
 	// part of the schema, so this field is currently ignored by [Append].
 	ProjectID *int64
 	// TriggeredBySignalID is the internal signals.id when the event was
-	// emitted by the Applier in response to a judged signal (ADR 0008
-	// D4). Nil for events with no signal lineage. Provides the
+	// emitted by the Applier in response to a judged signal. Nil for events with no signal lineage. Provides the
 	// traceability link surfaced as `triggeredBySignalId` on the
 	// timeline DTO so the UI can render the causal chain "signal -> judge
 	// verdict -> task event".
 	TriggeredBySignalID *int64
-	// ReversesEventID is the internal events.id this row compensates
-	// (ADR 0008 D4). Set by the reversal handler when appending a
+	// ReversesEventID is the internal events.id this row compensates. Set by the reversal handler when appending a
 	// compensating event so the derived_state projection can cancel the
 	// original out without ever UPDATEing the immutable event log. Nil
 	// for normal (non-reversal) callers — every other writer leaves
@@ -303,7 +301,7 @@ func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType 
 }
 
 // IsJudgeEventKind reports whether t is one of the event kinds reserved
-// for the signaljudge Applier (ADR 0008 D4). [Append] rejects any other
+// for the signaljudge Applier. [Append] rejects any other
 // caller that tries to use them so the Applier remains the sole writer
 // of judge-driven task state; the Applier itself uses [AppendJudgeEvent]
 // to bypass this gate while still going through the shared INSERT path.
@@ -332,7 +330,7 @@ func IsJudgeEventKind(t Kind) bool { return sharedbus.IsJudgeOnly(t) }
 // transaction a deadlock has already invalidated everything and only the
 // caller's [dbretry.InTx] can retry the unit that matters.
 //
-// Judge-kind guard (ADR 0008 D4). Event kinds listed in
+// Judge-kind guard. Event kinds listed in
 // [IsJudgeEventKind] are reserved for the signaljudge Applier. Any
 // other caller using [Append] with one of those kinds short-circuits
 // with INTERNAL.EVENTBUS.JUDGE_KIND_OUTSIDE_APPLIER so the invariant
@@ -402,8 +400,7 @@ func AppendBestEffort(ctx context.Context, db dbretry.CommitBoundary, evt Event,
 
 // AppendJudgeEvent is the signaljudge Applier's entry point into the
 // shared INSERT path. Behaves identically to [Append] for non-judge
-// kinds but additionally permits the kinds listed in [judgeEventKinds]
-// (ADR 0008 D4).
+// kinds but additionally permits the kinds listed in [judgeEventKinds].
 //
 // Restricted contract: this function MUST only be called from
 // apps/flow-api/internal/ai/signaljudge/. The runtime guard in
@@ -427,7 +424,7 @@ type ReverseAppendResult struct {
 }
 
 // AppendReverseEvent is the dedicated entry point for the reversal
-// flow (ADR 0008 D4 / `POST /workspaces/{wsId}/events/{eventPublicId}/reverse`).
+// flow (`POST /workspaces/{wsId}/events/{eventPublicId}/reverse`).
 // It bypasses the judge-kind guard because reversing a judge-only
 // event (e.g. `task.auto_completed`) is, by construction, a
 // user-driven exception to the "Applier is the sole writer" rule —
@@ -480,7 +477,7 @@ func appendInternal(ctx context.Context, db dbretry.CommitBoundary, evt Event, m
 //
 // Every failure is reported to db through [dbretry.CommitBoundary.Fail]
 // unless the caller asked for best effort. Task state is derived from
-// the event log (CLAUDE.md rule 8), so a transaction that mutated a task
+// the event log, so a transaction that mutated a task
 // and then failed to record why must not commit the mutation on its own
 // — and whether it does is not the call site's to decide.
 func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt Event, mode appendMode) (ReverseAppendResult, error) {
@@ -495,7 +492,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 		}
 		return ReverseAppendResult{}, err
 	}
-	// Judge-kind guard (ADR 0008 D4). See IsJudgeEventKind for the set.
+	// Judge-kind guard. See IsJudgeEventKind for the set.
 	// Reject early so we do not log noise or wake notify hooks for an
 	// event the Applier-only invariant says should never reach the
 	// INSERT path from this caller.
@@ -510,7 +507,7 @@ func appendInternalWithMeta(ctx context.Context, db dbretry.CommitBoundary, evt 
 		)
 		return fail(err)
 	}
-	// Three-way actor exclusion (ADR 0008 D8). MySQL cannot enforce this
+	// Three-way actor exclusion. MySQL cannot enforce this
 	// via CHECK constraint because all three actor FKs are declared with
 	// ON DELETE SET NULL — MySQL 8.4 forbids CHECK constraints that
 	// reference columns used in FK referential actions. The guard lives

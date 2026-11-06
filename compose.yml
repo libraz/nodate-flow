@@ -329,8 +329,7 @@ services:
   # into signals POSTed to flow-api. Not started by default — bring it up
   # explicitly with `docker compose --profile presence-discord up -d`.
   # The Discord bot also requires GUILD_PRESENCES + GUILD_MEMBERS
-  # privileged intents to be opted in via the Discord Developer Portal
-  # (see docs/conventions/discord-bot-setup.md).
+  # privileged intents to be opted in via the Discord Developer Portal.
   #
   # No healthcheck: the gateway exposes no HTTP endpoint, and the
   # metrics listener only comes up after the WS session opens, so a

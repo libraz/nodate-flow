@@ -1,7 +1,7 @@
 // Package events contains Huma operation handlers for the
 // /workspaces/{wsId}/events/* endpoints. Today the only operation is
-// the reversal flow (POST .../events/{eventPublicId}/reverse) per
-// ADR 0008 D4 — listing events lives in the timeline package and is
+// the reversal flow (POST .../events/{eventPublicId}/reverse) —
+// listing events lives in the timeline package and is
 // scoped per task / project / workspace there.
 package events
 
@@ -50,8 +50,8 @@ type ReverseOutputBody struct {
 // ReverseOutput is the response for POST .../events/{eventPublicId}/reverse.
 // Status is set to 201 to mirror create-shaped POSTs: the operation
 // produces a brand-new compensating event row in the immutable log,
-// not a state mutation on the target row (which stays untouched per
-// CLAUDE.md rule 10 + ADR 0008 D4 — events are immutable, reversals
+// not a state mutation on the target row (which stays untouched:
+// events are immutable, reversals
 // are new rows that the projection cancels out).
 type ReverseOutput struct {
 	Status int `header:"Status,omitempty"`

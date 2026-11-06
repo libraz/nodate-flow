@@ -1765,7 +1765,7 @@ CREATE TABLE signin_states (
 -- double-fire a job. Workers claim rows with SELECT ... FOR UPDATE
 -- SKIP LOCKED, run the agent, then update status to succeeded / failed.
 -- Completed rows are retained as the audit trail for
--- `ai.agent.run.*` events (ADR 0002 — events in MySQL).
+-- `ai.agent.run.*` events.
 -- ====================================
 CREATE TABLE agent_runs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
@@ -1814,7 +1814,7 @@ CREATE TABLE ai_agents (
   workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   model_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to ai_models.id',
 
-  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).',
+  kind ENUM('task_agent','signal_judge') NOT NULL DEFAULT 'task_agent' COMMENT 'Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals.',
   name VARCHAR(255) NOT NULL COMMENT 'Human-readable agent name',
   description TEXT NULL COMMENT 'Free-form description',
   system_prompt MEDIUMTEXT NOT NULL COMMENT 'System prompt text',
@@ -1983,7 +1983,7 @@ CREATE TABLE ai_providers (
 -- >>> ai_settings.sql
 -- ====================================
 -- ai_settings
--- Per-workspace AI configuration (ADR 0003): embeddings, duplicates,
+-- Per-workspace AI configuration: embeddings, duplicates,
 -- auto-actions, and signal_judge prompt customization.
 -- Holds duplicate-detection thresholds, the embed-budget bucket that
 -- the CostGuard tracks separately from the LLM chat budget,
@@ -2019,7 +2019,7 @@ CREATE TABLE ai_settings (
 
   CONSTRAINT fk_ai_settings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_ai_settings_modifier FOREIGN KEY (modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-workspace AI configuration: embeddings, duplicates, auto-actions';
 
 -- >>> ai_suggestion_batches.sql
 -- ====================================
@@ -2160,7 +2160,7 @@ CREATE TABLE auto_action_rules (
   public_id     BINARY(16)   NOT NULL COMMENT 'UUID v7, used in API responses',
   workspace_id  INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
   kind          VARCHAR(64)  NOT NULL COMMENT 'Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review',
-  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md',
+  signal_kind   VARCHAR(64)  NULL COMMENT 'Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. ''discord.presence''), or wildcard prefix where the stored value matches kinds with that suffix-after-dot.',
   enabled       BOOLEAN      NOT NULL DEFAULT TRUE COMMENT 'Whether this rule fires during evaluation',
   confidence    DECIMAL(3,2) NOT NULL COMMENT 'Confidence score emitted when this rule fires (0.00-1.00)',
   idle_hours    INT UNSIGNED NOT NULL COMMENT 'Idle threshold in hours. 0 for rules that use due_on (escalate_overdue)',
@@ -2963,8 +2963,7 @@ CREATE TABLE relation_suggestions (
 -- verdict. Optionally linked to a task via `task_id` (legacy fast path) and/or
 -- to an arbitrary subject via `(subject_type, subject_id)`.
 --
--- See ADR 0008 (docs/adr/0008-signals-and-judge-loop.md) D1 for the rationale
--- for extending this table in place rather than introducing `signals_v2`.
+-- The table is extended in place rather than replaced by a `signals_v2`.
 -- Presence signals (subject_type = 'user') are stored here directly; a
 -- "who's online" projection is intentionally not materialised until a
 -- presence read endpoint exists that exposes only public ids (the prior
@@ -3051,7 +3050,7 @@ CREATE TABLE signals (
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_signals_judge_run FOREIGN KEY (judge_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier';
 
 -- >>> task_actors.sql
 -- ====================================
@@ -3219,7 +3218,7 @@ CREATE TABLE task_description_versions (
 -- >>> task_embeddings.sql
 -- ====================================
 -- task_embeddings
--- Per ADR 0003: native MySQL 9.x VECTOR storage for duplicate detection.
+-- Native MySQL 9.x VECTOR storage for duplicate detection.
 -- Vectors are L2-normalized before insert so cosine similarity reduces
 -- to a dot product. (task_id, model) composite PK lets two models
 -- coexist during a rolling re-embed; the duplicate-detection query
@@ -3249,7 +3248,7 @@ CREATE TABLE task_embeddings (
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_embeddings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection';
 
 -- >>> task_event_links.sql
 -- ====================================
@@ -3613,7 +3612,7 @@ CREATE TABLE user_integrations (
   public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
   user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
 
-  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.',
+  provider ENUM('github','slack','google_calendar','discord') NOT NULL COMMENT 'OAuth provider kind. ''discord'' is reserved for personal presence binding read by the presence-discord gateway — no task-mutating tokens are stored.',
   external_account_id VARCHAR(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Provider subject (GH login, Slack user id, Google sub)',
   external_account_label VARCHAR(255) NOT NULL COMMENT 'Display-only label (email or @handle)',
   scopes TEXT NOT NULL COMMENT 'Space-separated list of granted OAuth scopes',
@@ -4461,14 +4460,14 @@ WHERE v.archived_at IS NOT NULL;
 -- Timeline of events related to tasks. Merges events with the owning
 -- task's public_id so the UI can render without touching internal ids.
 --
--- Exposes the third actor source (`actor_system_source`, ADR 0008 D8) and
--- the signal traceability link (`triggered_by_signal_public_id`, ADR 0008
--- D4) so the timeline UI can render "Discord said idle -> judge ran ->
--- task completed" as a single causal chain. The signal join uses alias
+-- Exposes the third actor source (`actor_system_source`) and
+-- the signal traceability link (`triggered_by_signal_public_id`) so the timeline
+-- UI can render "Discord said idle -> judge ran -> task completed" as a
+-- single causal chain. The signal join uses alias
 -- `tsig` (triggering signal) to avoid colliding with any future signals
 -- JOIN that might use the conventional `s` alias.
 --
--- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
+-- Reversal projection: `reverses_event_public_id`
 -- surfaces the target event's public_id when this row is a compensating
 -- reverse, sourced from a self-join aliased `e_rev` (reverse target).
 -- `was_reversed` is TRUE when some other enabled event points back to this

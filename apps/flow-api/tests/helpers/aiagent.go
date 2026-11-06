@@ -172,7 +172,7 @@ type SeedAgentOptions struct {
 	MonthlyCostCapCents int
 	// Kind overrides the ai_agents.kind column. Empty defaults to
 	// 'task_agent' to preserve every existing call site. Set to
-	// 'signal_judge' to seed a judge agent (ADR 0008 D3).
+	// 'signal_judge' to seed a judge agent.
 	Kind string
 	// EventTriggerTypes overrides ai_agents.event_trigger_types. Empty
 	// leaves the column as the default JSON_ARRAY() (wildcard). Pass a

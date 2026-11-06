@@ -150,7 +150,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 			CallSite: "signals.HandleGoogleWebhook",
 		})
 
-		// Best-effort signal_judge dispatch (ADR 0008 D3).
+		// Best-effort signal_judge dispatch.
 		if deps.JudgeEnqueuer != nil {
 			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
 				slog.WarnContext(ctx, "signaljudge enqueue failed",

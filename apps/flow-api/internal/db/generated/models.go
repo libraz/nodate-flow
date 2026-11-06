@@ -2768,7 +2768,7 @@ type AiAgent struct {
 	WorkspaceID uint32 `json:"-"`
 	// Internal FK to ai_models.id
 	ModelID uint32 `json:"-"`
-	// Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals (see ADR 0008 D3).
+	// Agent dispatch kind. task_agent: operates on tasks (default, all current agents). signal_judge: LLM judge for external signals.
 	Kind AiAgentsKind `json:"kind"`
 	// Human-readable agent name
 	Name string `json:"name"`
@@ -2934,7 +2934,7 @@ type AiProvider struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Per-workspace AI configuration (ADR 0003): embeddings, duplicates, auto-actions
+// Per-workspace AI configuration: embeddings, duplicates, auto-actions
 type AiSetting struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -3096,7 +3096,7 @@ type AutoActionRule struct {
 	WorkspaceID uint32 `json:"-"`
 	// Rule kind: escalate_overdue | assign_owner | nudge_assignee | close_stale_review
 	Kind string `json:"kind"`
-	// Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. 'discord.presence'), or wildcard prefix where the stored value matches kinds with that suffix-after-dot. Resolution layer details live in docs/conventions/autonomy.md
+	// Signal scope: NULL = wildcard (matches every kind), exact dotted string match (e.g. 'discord.presence'), or wildcard prefix where the stored value matches kinds with that suffix-after-dot.
 	SignalKind sql.NullString `json:"signalKind"`
 	// Whether this rule fires during evaluation
 	Enabled bool `json:"enabled"`
@@ -4414,7 +4414,7 @@ type Session struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)
+// Inbound signals; judged by the signal_judge agent and reified into task events by the Applier
 type Signal struct {
 	// Internal PK, never exposed
 	ID uint32 `json:"-"`
@@ -4670,7 +4670,7 @@ type TaskDescriptionVersion struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
-// Task embedding vectors for duplicate detection (ADR 0003)
+// Task embedding vectors for duplicate detection
 type TaskEmbedding struct {
 	// Internal FK to tasks.id
 	TaskID uint32 `json:"-"`
@@ -4967,7 +4967,7 @@ type UserIntegration struct {
 	PublicID types.PublicID `json:"publicId"`
 	// Internal FK to users.id
 	UserID uint32 `json:"-"`
-	// OAuth provider kind. 'discord' is reserved for personal presence binding read by the presence-discord gateway (see ADR 0008 D6) — no task-mutating tokens are stored.
+	// OAuth provider kind. 'discord' is reserved for personal presence binding read by the presence-discord gateway — no task-mutating tokens are stored.
 	Provider UserIntegrationsProvider `json:"provider"`
 	// Provider subject (GH login, Slack user id, Google sub)
 	ExternalAccountID string `json:"externalAccountId"`

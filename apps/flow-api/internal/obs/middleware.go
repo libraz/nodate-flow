@@ -71,8 +71,7 @@ func TraceMiddleware() func(http.Handler) http.Handler {
 				attrs = append(attrs, attribute.String("request_id", reqID))
 			}
 			// user_id intentionally omitted: the actor context only carries
-			// the internal sequential id, which must never be exposed (see
-			// requirements §11.9). The public actor UUID is not available in
+			// the internal sequential id, which must never be exposed. The public actor UUID is not available in
 			// the request context without a DB lookup, so the attribute is
 			// dropped rather than leaking the internal id.
 			if ws, ok := middleware.WorkspaceFromContext(ctx); ok {

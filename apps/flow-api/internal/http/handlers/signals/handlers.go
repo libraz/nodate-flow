@@ -177,7 +177,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		}
 
 		// Step 2 — closed-enum kind validation against signal_kinds/*.yaml.
-		// The registry is the single source of truth (ADR 0008 D2) and is
+		// The registry is the single source of truth and is
 		// regenerated from YAML by `make gen-signal-kinds`.
 		if _, known := signalkinds.Lookup(signalkinds.Kind(in.Body.Kind)); !known {
 			return nil, httpErr(apierrors.WsSignalKindUnknown)
@@ -363,7 +363,7 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		})
 		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
 
-		// Wake any matching signal_judge agents (ADR 0008 D3). The
+		// Wake any matching signal_judge agents. The
 		// enqueuer is best-effort: a non-nil error is logged but does
 		// not fail the HTTP response — the signal row is the
 		// canonical write. signalInternalID = 0 (duplicate INSERT

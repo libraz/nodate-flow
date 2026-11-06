@@ -11,14 +11,14 @@
 -- events; the type LIKE narrows to the run lifecycle family. ORDER BY
 -- occurred_at DESC, id DESC produces a stable newest-first timeline.
 --
--- Projects `actor_system_source` (ADR 0008 D8) and the LEFT JOINed
--- `triggered_by_signal_public_id` (ADR 0008 D4) so the agent-runs handler
+-- Projects `actor_system_source` and the LEFT JOINed
+-- `triggered_by_signal_public_id` so the agent-runs handler
 -- can surface the third actor source and the signal causal link without
--- exposing internal ids on the API boundary (CLAUDE.md rule 18). The
+-- exposing internal ids on the API boundary. The
 -- signal join uses alias `tsig` (triggering signal) to mirror the
 -- v_task_timeline view.
 --
--- Reversal projection (ADR 0008 D4): `reverses_event_public_id`
+-- Reversal projection: `reverses_event_public_id`
 -- comes from the LEFT self-join aliased `e_rev` (reverse target);
 -- `was_reversed` is computed by a correlated EXISTS subquery using
 -- alias `e_chk` (reverse check), backed by idx_events_reverses

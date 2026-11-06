@@ -1,5 +1,4 @@
-// Package eventbus — unit tests for the three-way actor exclusion guard
-// added in ADR 0008 D8.
+// Package eventbus — unit tests for the three-way actor exclusion guard.
 package eventbus
 
 import (

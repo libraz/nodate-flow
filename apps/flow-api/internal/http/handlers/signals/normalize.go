@@ -1,8 +1,7 @@
 // Package signals — subject normalisation helpers shared by the manual
 // ingestion handler (POST /signals) and the provider webhook adapters
 // (GitHub / Slack / Google). Centralised here so every write path lands
-// the same `(source, kind, subject_type, subject_id)` shape per ADR 0008
-// D1.
+// the same `(source, kind, subject_type, subject_id)` shape.
 package signals
 
 import (

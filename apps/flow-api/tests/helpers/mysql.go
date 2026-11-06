@@ -36,9 +36,7 @@ type MySQLInstance struct {
 }
 
 const (
-	// MySQL 9 Community is used in tests to match the production target
-	// (see docs/requirements.md §3.5). Embeddings are stored via the
-	// schema defined in ADR 0003.
+	// MySQL 9 Community is used in tests to match the production target.
 	mysqlImage    = "mysql:9.7"
 	mysqlDatabase = "nodate_flow_test"
 	mysqlUser     = "nodate"

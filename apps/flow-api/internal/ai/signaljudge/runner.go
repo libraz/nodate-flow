@@ -31,7 +31,7 @@ type ProviderResolver interface {
 // CostGuard is the narrow contract the runner needs to participate in
 // the per-workspace daily cap. It mirrors [ai.CostGuard.Check] so the
 // task-agent and signal-judge paths share one budget — there is one
-// budget per workspace, not one per agent kind (ADR 0008 D3).
+// budget per workspace, not one per agent kind.
 type CostGuard interface {
 	Check(ctx context.Context, workspaceID uint32) error
 }

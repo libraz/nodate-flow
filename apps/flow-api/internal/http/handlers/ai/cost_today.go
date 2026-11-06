@@ -22,7 +22,7 @@ type CostTodayInput struct {
 // `monthlyCapUsd` is never populated: there is no workspace monthly cap,
 // only the daily budget the window below is measured against.
 // `windowStartsAt` is when the window the figure covers began, as a unixtime
-// in seconds per docs/conventions/api-types.md. It is the same instant the
+// in seconds. It is the same instant the
 // cost guard measures from, so a workspace that has been cut off can be
 // reconciled against this response instead of guessed at.
 // `date` is that window's day in the workspace timezone as YYYY-MM-DD.

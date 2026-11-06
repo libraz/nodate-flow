@@ -42,7 +42,7 @@ type Querier interface {
 	// disables a row in it, and a workspace that emitted a disabled event
 	// still emitted one.
 	CountWorkspacesWithRecentActivity(ctx context.Context, since time.Time) (int64, error)
-	// Retention sweep (ADR 0008 D1/D8): delete one batch of signals whose
+	// Retention sweep: delete one batch of signals whose
 	// expires_at has passed and which the Applier never applied. Applied rows
 	// and rows with no expiry (expires_at NULL) are never touched. A row an
 	// event or an intake item still cites is kept: both FKs are ON DELETE SET

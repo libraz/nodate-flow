@@ -1439,7 +1439,7 @@ export interface paths {
          * List tasks for a project or workspace
          * @description Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).
          *
-         *     Layer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial); see `docs/conventions/acl.md` for the rationale.
+         *     Layer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).
          */
         get: operations["tasks-list"];
         put?: never;
@@ -2744,7 +2744,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Compile natural-language prose into a validated Lens JSON (ADR 0004)
+         * Compile natural-language prose into a validated Lens JSON
          * @description Asks the workspace LLM to translate a natural-language description into a validated Lens JSON. Returns the JSON plus the model's confidence so the client can confirm before saving.
          */
         post: operations["ai-compile-lens"];
@@ -10062,7 +10062,7 @@ export interface components {
             /** @description Subject row public id (UUID v7). Omitted when subject_type=workspace because workspace_id already identifies the owner. */
             subjectId?: string;
             /**
-             * @description What the signal is about (ADR 0008 D1).
+             * @description What the signal is about.
              * @enum {string}
              */
             subjectType: "user" | "task" | "workspace" | "calendar_event";

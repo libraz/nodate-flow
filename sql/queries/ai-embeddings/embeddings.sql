@@ -1,5 +1,5 @@
 -- ============================================================================
--- task_embeddings queries (ADR 0003)
+-- task_embeddings queries
 --
 -- Internal plumbing: task_embeddings has no public_id of its own; workspace
 -- scoping is reached via the denormalized workspace_id column (FK-guarded

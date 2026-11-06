@@ -2,8 +2,7 @@
  * Agent panel for the task detail page.
  *
  * Mirrors the visual language of the AI activity section. All colors,
- * spacing, radii and shadows come from design tokens (see
- * /docs/conventions/design-tokens.md). Translucent surfaces use
+ * spacing, radii and shadows come from design tokens. Translucent surfaces use
  * color-mix() so the four themes pick up the right accent.
  *
  * The container has a fixed minimum block-size so the kind/mode-style

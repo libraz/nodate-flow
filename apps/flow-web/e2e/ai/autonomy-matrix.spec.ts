@@ -21,8 +21,8 @@
  *
  *   (Test 4 — Save-error rollback — is intentionally omitted; forcing a
  *   500 mid-test would require either an API mock or backend fault
- *   injection. The harness has neither, and CLAUDE.md rule #7 forbids
- *   the former.
+ *   injection. The harness has neither, and API mocks are forbidden
+ *   in this harness.
  *   TODO: error-path coverage requires harness extension for backend
  *   fault injection.)
  *

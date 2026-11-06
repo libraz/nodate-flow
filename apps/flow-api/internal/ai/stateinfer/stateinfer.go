@@ -67,7 +67,7 @@ type Proposal struct {
 }
 
 // Idle thresholds per source state. Tuned to match the "no progress
-// in a week" rule of thumb surfaced in ADR 0004 and phase-2 plan.
+// in a week" rule of thumb.
 const (
 	openIdleThreshold    = 3 * 24 * time.Hour
 	waitingIdleThreshold = 5 * 24 * time.Hour

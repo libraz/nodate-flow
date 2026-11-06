@@ -95,8 +95,7 @@ const HEX = '0123456789abcdefABCDEF';
 /**
  * True when the value has the shape of a public id (UUID v7 in canonical
  * 8-4-4-4-12 hex form). Checked character by character rather than with a
- * pattern: matching in resolution paths avoids regex project-wide
- * (docs/conventions/autonomy.md).
+ * pattern: matching in resolution paths avoids regex project-wide.
  */
 export function looksLikePublicId(value: string): boolean {
   if (value.length !== 36) return false;

@@ -8,7 +8,7 @@
  *
  * All colors / radii / spacing / durations resolve to design tokens — no
  * hardcoded values. Hairline borders use `--nf-space-px` (the hairline
- * exception documented in docs/conventions/design-tokens.md).
+ * exception).
  */
 
 .group {

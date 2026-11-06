@@ -305,8 +305,8 @@ func TestFanOutImmediateOnAutoCommit(t *testing.T) {
 //
 // The closure here does what the swallow always looked like: it takes the
 // error, ignores it, and reports success. The transaction still must not
-// commit, because task state is derived from the event log (CLAUDE.md
-// rule 8) and a mutation that lands without the row describing it is a
+// commit, because task state is derived from the event log
+// and a mutation that lands without the row describing it is a
 // wrong state nothing later corrects. Whether that holds is not up to
 // the call site, which is why the call site is written the wrong way
 // round on purpose.

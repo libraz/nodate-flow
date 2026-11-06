@@ -39,8 +39,7 @@ type SignalsClient struct {
 	UserAgent string
 	// HTTPClient is the underlying transport. When nil the constructor
 	// installs a client with a 10s overall timeout — never use
-	// http.DefaultClient because it has no timeout (CLAUDE.md test
-	// conventions).
+	// http.DefaultClient because it has no timeout.
 	HTTPClient *http.Client
 	// Logger receives structured warn/debug records on per-signal HTTP
 	// outcomes. Required.
@@ -83,8 +82,7 @@ func NewSignalsClient(baseURL, token, userAgent string, logger *slog.Logger) (*S
 // drift into a compile error.
 //
 // SubjectID is the calendar_events.public_id as a canonical UUID v7
-// string; the worker never sends the internal numeric id (CLAUDE.md
-// rule 18). Payload is a raw JSON document so the worker can include
+// string; the worker never sends the internal numeric id. Payload is a raw JSON document so the worker can include
 // the all-day flag and start instant. The worker leaves the TaskID and
 // other unused fields zero-valued (omitempty drops them from the wire).
 type PostSignalBody = signalwire.CreateRequest

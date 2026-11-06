@@ -11,7 +11,7 @@
  *   3. Timeline event cards use only an avatar URL returned by the API,
  *      and an uploaded image successfully decodes with its cache tag.
  *
- * All preconditions are seeded via REST (CLAUDE.md rule 7) and each
+ * All preconditions are seeded via REST and each
  * spec uses an isolated tenant created in this file so the parallel
  * harness cannot collide on actor-specific assertions. Console errors
  * surfaced during page navigation fail the spec.

@@ -1,7 +1,7 @@
 // Package signaljudge — production AutonomyResolver.
 //
 // [RuleBackedResolver] implements [AutonomyResolver] by consulting the
-// five-layer resolution order documented in docs/conventions/autonomy.md:
+// five-layer resolution order:
 //
 //  1. exact auto_action_rules.signal_kind match for (workspace, *, kind).
 //  2. wildcard-prefix rule (e.g. stored `*.presence` matches caller

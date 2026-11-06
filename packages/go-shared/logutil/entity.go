@@ -1,6 +1,6 @@
 // Package logutil entity helpers.
 //
-// These helpers exist to enforce CLAUDE.md convention 18: internal
+// These helpers exist to enforce one rule: internal
 // `id INT UNSIGNED` is for FK / JOIN only. Only `public_id BINARY(16)`
 // (UUID v7) may be exposed externally — including in structured logs.
 //

@@ -1,5 +1,5 @@
 // Package signaljudge — Applier translates a judge verdict into
-// task-domain events (ADR 0008 D4).
+// task-domain events.
 //
 // The Applier is the sole writer of judge-driven task events. The
 // invariant is enforced at runtime by [eventbus.Append], which

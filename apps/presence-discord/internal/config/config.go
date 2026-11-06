@@ -6,7 +6,7 @@
 // presence-discord is the second long-running worker after flow-worker:
 // flow-worker hosts cron-style jobs, presence-discord holds a single
 // Discord gateway WebSocket connection and translates presence updates
-// into signals POSTed back to flow-api. This split follows ADR 0008 D8.
+// into signals POSTed back to flow-api.
 package config
 
 import (

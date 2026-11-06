@@ -1,6 +1,6 @@
 /**
  * use-workspace-stream — realtime SSE subscription for a single
- * workspace (ADR 0005).
+ * workspace.
  *
  * Mounts once per active workspace near the authenticated tree root.
  * Opens a long-lived fetch-based SSE connection to

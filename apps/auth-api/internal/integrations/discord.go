@@ -159,7 +159,7 @@ func (p *DiscordProvider) Exchange(ctx context.Context, code, redirectURI string
 	// via JSON_EXTRACT(metadata_json, '$.external_user_id') without
 	// branching on the provider column. The snowflake is duplicated
 	// into external_account_id for the standard reverse lookup; the
-	// duplication is intentional (ADR 0008 D6) so the gateway query
+	// duplication is intentional so the gateway query
 	// stays uniform across present and future presence providers.
 	meta, err := json.Marshal(map[string]string{
 		"external_user_id": u.ID,

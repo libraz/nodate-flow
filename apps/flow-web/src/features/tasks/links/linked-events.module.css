@@ -2,7 +2,7 @@
  * Quiet Chronograph — discreet sub-section for task↔event links.
  *
  * Every colour, spacing, radius, shadow, and duration comes from a
- * design token (see /docs/conventions/design-tokens.md). No hex
+ * design token. No hex
  * literals, no Tailwind grays. Translucent layers are produced via
  * `color-mix()` so the four themes (aurora / dotline / glass-light /
  * glass-dark) inherit the right accent without per-theme overrides.

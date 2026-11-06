@@ -26,7 +26,7 @@ import (
 )
 
 // Transition names accepted by [NextState] / [ApplyTransitionTx]. The
-// set mirrors the v1 state machine described in ADR 0001 and the public
+// set mirrors the v1 state machine and the public
 // /tasks/{id}/transitions enum.
 const (
 	TransitionStart    = "start"
@@ -59,7 +59,7 @@ func IsKnownTransition(name string) bool {
 	return ok
 }
 
-// NextState applies the v1 state machine described in ADR 0001 to a
+// NextState applies the v1 state machine to a
 // (current, transition) pair. It returns the next derived_state and
 // true on success, or an empty string and false when the pair is
 // illegal.

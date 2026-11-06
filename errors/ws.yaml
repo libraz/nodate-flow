@@ -584,7 +584,7 @@ resources:
         message: "Unknown signal kind"
         message_ja: "未知のシグナル種別です"
         message_zh: "未知的信号类型"
-        description: "Returned when the request supplies a `kind` value that is not present in the signal_kinds/*.yaml registry. The registry is the closed enumeration of signal kinds the system observes (ADR 0008 D2)."
+        description: "Returned when the request supplies a `kind` value that is not present in the signal_kinds/*.yaml registry. The registry is the closed enumeration of signal kinds the system observes."
         userAction: "Use one of the documented signal kinds (e.g. discord.presence, slack.presence, calendar.event_day_arrived, manual). Adding a new kind requires a YAML entry plus a codegen run."
 
       subject_mismatch:

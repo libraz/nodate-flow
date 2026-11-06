@@ -257,7 +257,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Realtime SSE fan-out (ADR 0005). The notifier is in-process
+	// Realtime SSE fan-out. The notifier is in-process
 	// for v1; swap for a Redis/NATS implementation when moving to
 	// multi-replica. eventbus.Append calls the tap after every
 	// successful insert so SSE subscribers see task.* and
@@ -338,7 +338,7 @@ func main() {
 			// The signal_judge runner shares the same provider
 			// resolver, cost guard, and metrics hook as the task-agent
 			// path so cost accounting and ai_invocations stay uniform
-			// across both kinds (ADR 0008 D3).
+			// across both kinds.
 			//
 			// Wire the Applier so the runner's verdict
 			// turns into events through the deterministic, non-LLM
@@ -511,7 +511,7 @@ func main() {
 	eventbus.BridgeEventlog()
 
 	// JudgeEnqueuer wakes any matching signal_judge agents the moment
-	// a fresh signal lands (ADR 0008 D3). The orchestrator dispatch
+	// a fresh signal lands. The orchestrator dispatch
 	// branch in OrchestratorRunner.Run picks the queued row up via
 	// the judge-shaped dedupe_key.
 	//

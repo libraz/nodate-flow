@@ -51,7 +51,7 @@ type ListAutoActionRulesForWorkspaceRow struct {
 // Per-workspace auto-action rule configuration. Each row defines a single
 // rule kind (e.g. auto-close, auto-archive) with its own enabled flag,
 // confidence threshold, and idle-hours delay. Rules can now be scoped per
-// signal_kind; see docs/conventions/autonomy.md for resolution layer order.
+// signal_kind.
 // Rows may also carry an explicit autonomy_level ('suggest' | 'draft' |
 // 'auto'); when non-NULL the resolver returns it verbatim and skips the
 // confidence-vs-threshold gate. NULL preserves the legacy confidence-based

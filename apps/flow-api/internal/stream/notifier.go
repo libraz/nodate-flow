@@ -28,7 +28,7 @@ type Notifier interface {
 // NopNotifier is the zero value of an unset [Notifier]. Publish is a
 // no-op and Subscribe returns a closed channel, so code paths that
 // never set a real notifier (tests, CLI tools) see exactly the same
-// behavior they did before ADR 0005.
+// behavior they did before the notifier existed.
 type NopNotifier struct{}
 
 // Publish is a no-op.

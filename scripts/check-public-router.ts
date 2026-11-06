@@ -13,7 +13,7 @@
  * The check has three halves, and they fail for different reasons:
  *
  *   1. Every allowlisted public path is present in the merged spec.
- *      Losing one is a regression against ADR 0007 — a share link that
+ *      Losing one is a regression — a share link that
  *      silently stops resolving.
  *
  *   2. Every route the public builder registers is on the allowlist.

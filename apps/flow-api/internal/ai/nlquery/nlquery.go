@@ -1,10 +1,9 @@
-// Package nlquery implements the NL query → Lens JSON compiler from
-// ADR 0004. A Compiler turns user prose into a strictly-typed Lens
+// Package nlquery implements the NL query → Lens JSON compiler. A Compiler turns user prose into a strictly-typed Lens
 // object using a closed field/operator whitelist. The LLM is expected
 // to return JSON that matches the Lens grammar; anything else is a
 // validation error and surfaces as AI.NL_QUERY.UNPARSEABLE.
 //
-// The closed grammar is the security boundary (ADR 0004 §5). No raw
+// The closed grammar is the security boundary. No raw
 // SQL, no wildcard fields, no OR combinator. The caller is responsible
 // for scoping the compiled Lens to the authenticated workspace before
 // execution.
@@ -24,7 +23,7 @@ import (
 var ErrUnparseable = errors.New("nlquery: unparseable")
 
 // Field is a whitelisted Lens filter field. No other field name may
-// appear in the compiled Lens (ADR 0004 §2).
+// appear in the compiled Lens.
 type Field string
 
 const (
@@ -44,7 +43,7 @@ const (
 )
 
 // allowedFields is the whitelist enforced server-side after the LLM
-// responds. Order matches ADR 0004 appendix A.
+// responds.
 var allowedFields = map[Field]struct{}{
 	FieldTitle: {}, FieldStatus: {}, FieldAssignee: {}, FieldProject: {},
 	FieldWorkspace: {}, FieldPriority: {}, FieldEstimate: {},
@@ -60,7 +59,7 @@ var allowedOperators = map[string]struct{}{
 	"is_null": {}, "is_not_null": {},
 }
 
-// allowedSortFields matches the sort.field enum from ADR 0004.
+// allowedSortFields matches the sort.field enum of the Lens grammar.
 var allowedSortFields = map[string]struct{}{
 	"title": {}, "status": {}, "assignee": {}, "project": {},
 	"priority": {}, "estimate": {}, "created_at": {},

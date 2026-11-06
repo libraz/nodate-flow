@@ -1,7 +1,7 @@
 # Web E2E (Playwright)
 
 Smoke + regression harness for `apps/flow-web`. Real backend, real DB, no
-mocks (per `CLAUDE.md` rule 7).
+mocks.
 
 ## Layout
 

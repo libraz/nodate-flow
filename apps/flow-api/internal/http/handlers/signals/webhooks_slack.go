@@ -128,7 +128,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 
 		// Slack does not (yet) resolve the per-user subject from this
 		// webhook entrypoint — the mention/user normalisation is a follow-up
-		// when slack OAuth lands per ADR 0008 D6. Until then the row is
+		// when slack OAuth lands. Until then the row is
 		// workspace-scoped, which keeps signals.subject_type NOT NULL
 		// satisfied without claiming a user we have not actually resolved.
 		subjectType := resolveSubjectType(kind, "")
@@ -176,7 +176,7 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 			CallSite: "signals.HandleSlackWebhook",
 		})
 
-		// Best-effort signal_judge dispatch (ADR 0008 D3).
+		// Best-effort signal_judge dispatch.
 		if deps.JudgeEnqueuer != nil {
 			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
 				slog.WarnContext(ctx, "signaljudge enqueue failed",

@@ -21,7 +21,7 @@ func writeJSONError(w http.ResponseWriter, status int, code, message string) {
 
 // heartbeatInterval is the idle cadence at which the SSE writer emits
 // a comment line (": ping") so intermediaries don't close the
-// connection. ADR 0005 fixes this at 20 seconds.
+// connection. It is fixed at 20 seconds.
 //
 // reauthorizeInterval is how often an open stream is re-checked
 // against the gate it passed on connect. It matches the cadence the
@@ -103,7 +103,7 @@ func SSEHandler(notifier Notifier, remember RememberWorkspaceFunc, reauthorize R
 		// Opt out of any reverse-proxy buffering that would turn SSE
 		// into a batch response. Nginx and some Caddy configs honour
 		// this header directly; others need proxy_buffering off at
-		// the proxy config level (see ADR 0005 §Consequences).
+		// the proxy config level.
 		h.Set("X-Accel-Buffering", "no")
 		w.WriteHeader(http.StatusOK)
 

@@ -19,8 +19,7 @@ import (
 // AutoActionRuleBody is the public representation of a single
 // auto-action rule. Kind identifies the rule family; SignalKind narrows
 // it to a specific signal scope (nil = wildcard, matches every signal
-// kind for that family). See docs/conventions/autonomy.md for the
-// five-layer resolution order.
+// kind for that family).
 //
 // AutonomyLevel, when non-nil, is the operator-picked override for the
 // resolver: the autonomy level is returned verbatim and the

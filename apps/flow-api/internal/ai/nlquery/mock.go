@@ -12,7 +12,7 @@ import (
 
 // MockProvider is the deterministic fixture-backed Provider used under
 // NF_AI_MOCK=1. It looks up the normalized prompt in
-// testdata/ai/nl_query.json (ADR 0004 §6) and returns the stored Lens
+// testdata/ai/nl_query.json and returns the stored Lens
 // bytes. Missing keys return nlquery.ErrUnparseable so tests can cover
 // both happy and sad paths without a network call.
 type MockProvider struct {

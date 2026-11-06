@@ -1,4 +1,4 @@
-// Package router static-check tests (ADR 0007). The
+// Package router static-check tests. The
 // router has been split into three builders (buildAuthenticatedAPI /
 // buildPublicShareAPI / buildAuthAPI) and the tests in this file are
 // the safety net that prevents auth-bypass regressions when later
@@ -180,7 +180,7 @@ func resolvePath(t *testing.T, p string) string {
 // TestPublicSubRouterIsAuthFree asserts that no operation registered
 // through buildPublicShareAPI returns 401 when called without
 // credentials. A 401 here would mean the auth middleware leaked into
-// the public surface, defeating the sub-router split that ADR 0007
+// the public surface, defeating the sub-router split
 // relies on for blast-radius isolation.
 func TestPublicSubRouterIsAuthFree(t *testing.T) {
 	t.Parallel()

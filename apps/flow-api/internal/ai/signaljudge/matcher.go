@@ -1,5 +1,4 @@
-// Package signaljudge — deterministic pre-judge eligibility filter
-// (ADR 0008 D4).
+// Package signaljudge — deterministic pre-judge eligibility filter.
 //
 // The Matcher runs synchronously inside the signal-ingestion path
 // (apps/flow-api/internal/http/handlers/signals/handlers.go) before

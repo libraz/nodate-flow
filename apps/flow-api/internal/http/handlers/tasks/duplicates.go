@@ -39,7 +39,7 @@ type ListDuplicatesOutput struct {
 
 // ListDuplicates handles GET /tasks/{id}/duplicates. It finds
 // similar-text tasks in the same workspace by cosine similarity on the
-// stored L2-normalized embeddings (ADR 0003). Scoring is done in Go.
+// stored L2-normalized embeddings. Scoring is done in Go.
 func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*ListDuplicatesOutput, error) {
 	return func(ctx context.Context, _ *ListDuplicatesInput) (*ListDuplicatesOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)

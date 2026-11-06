@@ -49,7 +49,7 @@ type GetAiSettingsRow struct {
 }
 
 // ============================================================================
-// ai_settings queries (ADR 0003)
+// ai_settings queries
 // Per-workspace AI knobs: embed model, daily embed budget, the
 // duplicate-detection similarity thresholds, auto-action executor settings,
 // and free-form judge_instructions spliced into the signal_judge prompt.

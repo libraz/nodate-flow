@@ -67,7 +67,7 @@ type AgentExecutor interface {
 }
 
 // JudgeExecutor is the narrow dependency the runner needs to dispatch
-// a signal_judge agent (ADR 0008 D3). Production wiring passes an
+// a signal_judge agent. Production wiring passes an
 // adapter around the signaljudge.Runner so this package stays free of
 // an import cycle with the ai stack.
 //
@@ -136,8 +136,7 @@ type RunnerQuerier interface {
 type OrchestratorRunner struct {
 	DB       *sql.DB
 	Executor AgentExecutor
-	// Judge is the dispatch hook for signal_judge agents (ADR 0008
-	// D3). When non-nil, claimed rows whose dedupe_key carries the
+	// Judge is the dispatch hook for signal_judge agents. When non-nil, claimed rows whose dedupe_key carries the
 	// `judge:<agent>:<signal>` shape route through ExecuteJudge
 	// instead of ExecuteAgent. A nil Judge falls back to the
 	// AgentExecutor with a warning, so deployments that have not

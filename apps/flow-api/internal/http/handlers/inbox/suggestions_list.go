@@ -1,6 +1,5 @@
 // Package inbox - suggestions_list.go exposes the persisted AI
-// suggestion lifecycle so the Glass Dock can resume across devices. Per
-// ADR 0002 the lifecycle lives in the events table; this handler reads it
+// suggestion lifecycle so the Glass Dock can resume across devices. The lifecycle lives in the events table; this handler reads it
 // back, and suggestion_commands.go records the reactions.
 package inbox
 

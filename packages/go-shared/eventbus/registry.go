@@ -231,8 +231,7 @@ func FamilyForEventType(eventType string) (Family, bool) {
 	return familyByPrefix(eventType)
 }
 
-// judgeOnlyKinds are the kinds only the signaljudge Applier may append
-// (ADR 0008 D4). The set lives beside the constants rather than in the
+// judgeOnlyKinds are the kinds only the signaljudge Applier may append. The set lives beside the constants rather than in the
 // package that enforces it, because the enforcement is a runtime guard:
 // a kind added to the judge loop and forgotten here is appendable by
 // anyone, and nothing about the guard's own file would have said so.

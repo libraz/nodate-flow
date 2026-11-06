@@ -2,7 +2,7 @@
  * NL query feature — POST /workspaces/{wsId}/ai/compile-lens.
  *
  * Returns a validated {@link Lens} compiled from a natural language
- * prompt (ADR 0004). Failures surface as AI.NL_QUERY.UNPARSEABLE so the
+ * prompt. Failures surface as AI.NL_QUERY.UNPARSEABLE so the
  * glass dock can render a "rephrase" toast.
  */
 
@@ -32,7 +32,7 @@ export interface CompileLensArgs {
 /**
  * useCompileLens — mutation that calls POST /workspaces/{wsId}/ai/compile-lens.
  *
- * The backend validates against the closed NL→Lens grammar (ADR 0004) and
+ * The backend validates against the closed NL→Lens grammar and
  * returns AI.NL_QUERY.UNPARSEABLE on failure; callers should render a
  * "rephrase" hint when {@link ApiError.code} contains that code.
  */

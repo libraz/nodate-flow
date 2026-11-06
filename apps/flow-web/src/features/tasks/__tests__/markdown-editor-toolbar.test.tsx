@@ -1,8 +1,8 @@
 /**
  * Smoke test for the MarkdownEditor toolbar glyphs.
  *
- * Guards against regression of CLAUDE.md rule #21 (no HTML character
- * references / unicode escapes — UTF-8 only). The list and link
+ * Guards against regression of the no-HTML-character-reference / no-unicode-escape
+ * rule (UTF-8 only). The list and link
  * buttons must render the literal "•" and "🔗" characters, not
  * &#8226;/&#128279; or &bull;/escape sequences.
  */

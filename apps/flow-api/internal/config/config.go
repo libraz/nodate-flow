@@ -97,7 +97,7 @@ type Config struct {
 	// settings.
 	AiDailyBudgetCents int64 `env:"NF_FLOW_AI_DAILY_BUDGET_CENTS" envDefault:"0"`
 
-	// StreamEnabled toggles the realtime SSE fan-out (ADR 0005). When
+	// StreamEnabled toggles the realtime SSE fan-out. When
 	// false the /workspaces/{wsId}/stream route still mounts but uses
 	// a [stream.NopNotifier] so eventbus.Append becomes a no-op for
 	// subscribers. Defaults to true so dev + prod get realtime out of

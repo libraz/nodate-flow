@@ -155,7 +155,7 @@ type DeleteProviderOutput struct {
 // McpTokenSummary is the masked DTO for an mcp_tokens row. It NEVER
 // carries the plaintext token nor its hash.
 //
-// Per docs/conventions/api-types.md §17 all `*_at` fields are emitted
+// All `*_at` fields are emitted
 // as int64 unix seconds. Nullable timestamps use *int64 (nil → null).
 type McpTokenSummary struct {
 	ID          string   `json:"id" doc:"McpToken public id (UUID v7)"`

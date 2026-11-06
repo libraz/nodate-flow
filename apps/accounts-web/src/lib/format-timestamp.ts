@@ -3,8 +3,7 @@
  *
  * Centralizes the formatter that was duplicated across five admin routes
  * (admins, audit-logs, users, users/$userId, workspaces, workspaces/$wsId).
- * The API-level convention is `*_at` = unixtime seconds (see
- * docs/conventions/api-types.md), so the helper multiplies by 1000 before
+ * The API-level convention is `*_at` = unixtime seconds, so the helper multiplies by 1000 before
  * handing off to the platform `Intl` formatter.
  *
  * This used to call `toLocaleString()` with no arguments, which formats

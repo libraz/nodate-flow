@@ -1,5 +1,5 @@
 // Package signaljudge — verdict schema and validator for the LLM
-// signal_judge agent's structured output (ADR 0008 D4).
+// signal_judge agent's structured output.
 //
 // The verdict is the contract between the Runner (LLM-facing) and the
 // Applier (event-emitting). The Runner is responsible for parsing the
@@ -8,7 +8,7 @@
 // always reflects what the judge attempted, even when its output was
 // malformed.
 //
-// Schema discipline (ADR 0008 D4):
+// Schema discipline:
 //   - Action is a closed enumeration; new action kinds are a code
 //     change, not a prompt change.
 //   - Confidence is bounded to [0.0, 1.0] so the autonomy resolver can

@@ -5,7 +5,7 @@
 // to the LLM.
 //
 // The judge is intentionally a thin layer over the agentruntime
-// invocation path (ADR 0008 D3). All cost-guard, provider resolution,
+// invocation path. All cost-guard, provider resolution,
 // invocation logging, redaction, and runaway-loop detection live in
 // the existing AI stack; this package only adds the dispatch logic
 // the runner needs to tell a signal_judge agent apart from a regular

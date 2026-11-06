@@ -54,7 +54,7 @@ func (s swallow) String() string {
 // call site: the same lost error turns up independently wherever an
 // append is written, alongside neighbours that check it, which is what a
 // review-time rule fails to hold. Dropping a row is not cosmetic — task
-// state is derived from the event log (CLAUDE.md rule 8), so a missing
+// state is derived from the event log, so a missing
 // row is a wrong state that nothing later corrects.
 //
 // Three shapes count as losing the failure, and the middle one is the

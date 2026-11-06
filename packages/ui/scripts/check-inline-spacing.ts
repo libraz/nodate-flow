@@ -6,7 +6,7 @@
  * instead of the `--nf-space-*` / `--nf-radius-*` / `--nf-text-*` design
  * tokens.
  *
- * The intent is to enforce rule #19 of CLAUDE.md / docs/conventions/design-tokens.md:
+ * The intent is to enforce the design-token rule:
  * spacing, sizing, radii, and font-size must flow through CSS custom
  * properties rather than literal `0.75rem` / `12px` values.
  *

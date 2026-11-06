@@ -290,7 +290,7 @@ sql:
               type: "PublicID"
               pointer: true
           # triggered_by_signal_public_id is the public_id of the signal that
-          # caused this event (ADR 0008 D4). Sourced from a LEFT JOIN to
+          # caused this event. Sourced from a LEFT JOIN to
           # signals so it is genuinely nullable: only events written by the
           # Applier carry a backlink.
           - column: "*.triggered_by_signal_public_id"
@@ -306,7 +306,7 @@ sql:
           - column: "*.triggered_by_signal_id"
             go_struct_tag: 'json:"-"'
           # reverses_event_public_id is the public_id of the event this row
-          # compensates (ADR 0008 D4 / J5). Sourced from a LEFT self-join
+          # compensates. Sourced from a LEFT self-join
           # on events (alias `e_rev`) so it is genuinely nullable: only the
           # compensating events written by the reversal handler carry a
           # backlink.

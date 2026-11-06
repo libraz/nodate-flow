@@ -11,8 +11,7 @@
  *
  * NOTE: this fixture talks directly to the REST API rather than going
  * through the UI for setup. The UI is only exercised by the assertions
- * inside the spec itself, per CLAUDE.md rule 7 (real API integration,
- * no mocks).
+ * inside the spec itself, (real API integration, no mocks).
  */
 
 import { randomUUID } from 'node:crypto';

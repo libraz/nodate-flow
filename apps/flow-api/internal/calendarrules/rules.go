@@ -20,7 +20,7 @@
 // one answer on both surfaces rather than two that happen to agree.
 //
 // The times are unix seconds because that is the shape of the API
-// boundary (see docs/conventions/api-types.md): *_at fields cross as
+// boundary: *_at fields cross as
 // int64 unixtime, and checking them in that form means the check runs on
 // what the caller actually sent. [UnixSeconds] converts for a caller that
 // has already resolved an instant.

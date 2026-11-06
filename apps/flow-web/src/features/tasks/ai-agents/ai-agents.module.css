@@ -3,8 +3,8 @@
  *
  * Mirrors the visual language of the linked-events section so both
  * collapsibles read as siblings on the task detail page. All colours,
- * spacing, radii, shadows and durations come from design tokens
- * (see /docs/conventions/design-tokens.md). No hex literals, no
+ * spacing, radii, shadows and durations come from design tokens.
+ * No hex literals, no
  * Tailwind grays. Translucent layers are produced via `color-mix()`
  * so the four themes (aurora / dotline / glass-light / glass-dark)
  * inherit the right accent without per-theme overrides.

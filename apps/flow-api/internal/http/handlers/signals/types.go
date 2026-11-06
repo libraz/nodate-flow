@@ -79,7 +79,7 @@ type Deps struct {
 	DefaultWorkspaceID string
 
 	// JudgeEnqueuer is the optional hook called after a signal row is
-	// inserted to wake any matching signal_judge agents (ADR 0008 D3).
+	// inserted to wake any matching signal_judge agents.
 	// Nil disables judge dispatch — the signal still lands and the
 	// rest of the system continues to work, which is the single-binary
 	// default before LLM provider config is in place.
@@ -90,7 +90,7 @@ type Deps struct {
 var httpErr = handlerutil.HTTPErr
 
 // Signal is the public DTO for a signals row. The subject pair
-// (`subjectType` + `subjectId`) and `expiresAt` were added in ADR 0008 D1;
+// (`subjectType` + `subjectId`) and `expiresAt` were added;
 // every new write path populates them, legacy writes that predate the
 // registry leave `subjectType` set to "workspace" with NULL `subjectId`.
 type Signal struct {
@@ -100,7 +100,7 @@ type Signal struct {
 	Kind        string          `json:"kind"`
 	ExternalID  string          `json:"externalId,omitempty"`
 	Payload     json.RawMessage `json:"payload,omitempty"`
-	SubjectType string          `json:"subjectType" enum:"user,task,workspace,calendar_event" doc:"What the signal is about (ADR 0008 D1)."`
+	SubjectType string          `json:"subjectType" enum:"user,task,workspace,calendar_event" doc:"What the signal is about."`
 	SubjectID   string          `json:"subjectId,omitempty" doc:"Subject row public id (UUID v7). Omitted when subject_type=workspace because workspace_id already identifies the owner."`
 	ReceivedAt  int64           `json:"receivedAt"`
 	ExpiresAt   *int64          `json:"expiresAt,omitempty" doc:"Provider-derived TTL in unix seconds; null for signals that never expire (e.g. manual)."`
@@ -108,7 +108,7 @@ type Signal struct {
 }
 
 // SignalCreateInputBody is the JSON body of POST /signals. SubjectType and
-// SubjectID were added in ADR 0008 D1; when omitted, the handler resolves
+// SubjectID were added; when omitted, the handler resolves
 // SubjectType from the kind's signal_kinds/*.yaml SubjectTypeDefault.
 //
 // TaskID is the legacy fast path equivalent to (SubjectType="task",

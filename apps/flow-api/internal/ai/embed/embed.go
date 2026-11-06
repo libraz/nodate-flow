@@ -1,5 +1,5 @@
 // Package embed provides the task embedding client used by the
-// duplicate-detection pipeline (ADR 0003). It normalizes vectors from a
+// duplicate-detection pipeline. It normalizes vectors from a
 // pluggable Provider, hashes the source text to skip redundant work,
 // and upserts rows into task_embeddings via the sqlc-generated query
 // layer.
@@ -26,7 +26,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
-// Dim is the default embedding dimensionality (see ADR 0003).
+// Dim is the default embedding dimensionality.
 const Dim = 768
 
 // Purposes written to ai_invocations.purpose. Every embedding purpose

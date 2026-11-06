@@ -50,7 +50,7 @@ type limitTagSpec struct {
 //
 // The allow-list is the single point that documents *why* an endpoint
 // is allowed to deviate. New entries require a reviewer to confirm
-// the policy in CLAUDE.md / requirements §13.
+// the policy.
 func TestPaginationDoesNotDriftAboveCanonicalCap(t *testing.T) {
 	t.Parallel()
 

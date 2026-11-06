@@ -1,5 +1,5 @@
-// Package eventbus — unit tests for the judge-kind runtime guard
-// added in ADR 0008 D4. The guard rejects [Append] calls that try to
+// Package eventbus — unit tests for the judge-kind runtime guard.
+// The guard rejects [Append] calls that try to
 // emit event kinds reserved for the signaljudge Applier and forces
 // callers to go through [AppendJudgeEvent] instead.
 package eventbus

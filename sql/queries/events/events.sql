@@ -2,24 +2,24 @@
 -- Append a single user-actor event to the append-only event log. The events
 -- table has no UPDATE/DELETE path; only purgeWorkspace removes rows.
 --
--- `actor_system_source` is bound here so the third actor source (ADR 0008
--- D8) can be expressed without a separate INSERT path; callers pass an
--- empty string when the row is genuinely user-attributed. The three-way
+-- `actor_system_source` is bound here so the third actor source can be expressed
+-- without a separate INSERT path; callers pass an empty string when the row is
+-- genuinely user-attributed. The three-way
 -- actor exclusion (actor_user_id / actor_agent_id / actor_system_source)
 -- is enforced by handler-side validation (eventbus.validateActors) rather
 -- than a CHECK constraint because MySQL 8.4 forbids CHECK constraints on
 -- columns used in FK ON DELETE SET NULL actions; see sql/core/tables/events.sql.
 --
--- `triggered_by_signal_id` (ADR 0008 D4) is the internal signal id when the
+-- `triggered_by_signal_id` is the internal signal id when the
 -- event was emitted by the Applier in response to a judged signal. NULL for
 -- events with no signal lineage. ON DELETE SET NULL on the FK so signal
 -- purge does not cascade to the event log.
 --
--- `reverses_event_id` (ADR 0008 D4) is the internal event id this row
+-- `reverses_event_id` is the internal event id this row
 -- compensates. NULL for non-reversal events. The reversal handler binds
 -- this when appending a same-type compensating event so the derived_state
 -- projection can cancel the original out without ever UPDATEing the event
--- log (events stay immutable; see CLAUDE.md rule 10). ON DELETE SET NULL
+-- log (events stay immutable). ON DELETE SET NULL
 -- so purging a reversed event detaches the backlink instead of cascading.
 --
 -- `calendar_id` is the symmetric counterpart of `task_id`: the internal
@@ -56,11 +56,11 @@ INSERT INTO events (
 -- orchestrator runner when emitting ai.agent.run.* events and by MCP tool
 -- calls dispatched from an agent context.
 --
--- `triggered_by_signal_id` (ADR 0008 D4) is set when the Applier emits this
+-- `triggered_by_signal_id` is set when the Applier emits this
 -- event in response to a judged signal so the timeline UI can render the
 -- causal chain "signal -> judge verdict -> task event".
 --
--- `reverses_event_id` (ADR 0008 D4) mirrors the same field on
+-- `reverses_event_id` mirrors the same field on
 -- AppendEvent. The reversal handler uses this INSERT path when the target
 -- event being reversed was originally produced by an agent so the
 -- compensating event preserves the same actor kind. NULL for normal
@@ -125,9 +125,9 @@ WHERE workspace_id = ?
 LIMIT 1;
 
 -- name: FindEventForReverse :one
--- Resolve a target event by public_id for the reversal handler (ADR 0008
--- D4, POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The
--- handler uses this single query to drive three eligibility checks
+-- Resolve a target event by public_id for the reversal handler
+-- (POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The handler uses this
+-- single query to drive three eligibility checks
 -- before appending the compensating event:
 --   - target exists in the caller's workspace (LIMIT 1 + workspace_id =
 --     ? gives 404 vs. 403 separation when combined with the standard

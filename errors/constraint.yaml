@@ -20,7 +20,7 @@ resources:
         message: "Constraint expression uses an operator that is not supported"
         message_ja: "制約式にサポートされていない演算子 {operator} が含まれています"
         message_zh: "约束表达式使用了不受支持的运算符 {operator}"
-        description: "Returned when a constraint node references an op {operator} that is not in the closed DSL whitelist (ADR 0006). The offending operator is included in the error details."
+        description: "Returned when a constraint node references an op {operator} that is not in the closed DSL whitelist. The offending operator is included in the error details."
         userAction: "Replace {operator} with one of the documented ops (and, or, not, time.*, dependency.*, actor.*, signal.*, approval.*, ci.*)."
 
       missing_arg:

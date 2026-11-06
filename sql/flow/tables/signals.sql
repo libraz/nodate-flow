@@ -5,8 +5,7 @@
 -- verdict. Optionally linked to a task via `task_id` (legacy fast path) and/or
 -- to an arbitrary subject via `(subject_type, subject_id)`.
 --
--- See ADR 0008 (docs/adr/0008-signals-and-judge-loop.md) D1 for the rationale
--- for extending this table in place rather than introducing `signals_v2`.
+-- The table is extended in place rather than replaced by a `signals_v2`.
 -- Presence signals (subject_type = 'user') are stored here directly; a
 -- "who's online" projection is intentionally not materialised until a
 -- presence read endpoint exists that exposes only public ids (the prior
@@ -93,4 +92,4 @@ CREATE TABLE signals (
   CONSTRAINT fk_signals_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_signals_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
   CONSTRAINT fk_signals_judge_run FOREIGN KEY (judge_run_id) REFERENCES agent_runs(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier (ADR 0008)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Inbound signals; judged by the signal_judge agent and reified into task events by the Applier';

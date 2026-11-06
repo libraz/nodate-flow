@@ -185,8 +185,8 @@ import { resolveContentType } from '../../lib/file-mime';
 export { ApiError as TaskApiError };
 
 /**
- * Legal transitions from a given derived state, per ADR 0001 (v1 state
- * machine) as specialized for the board drop / transitions panel UX.
+ * Legal transitions from a given derived state, per the v1 state
+ * machine as specialized for the board drop / transitions panel UX.
  *
  * Keep this in sync with `transitionForDrop` below — the transitions panel
  * simply enumerates these, while the board infers the right transition from

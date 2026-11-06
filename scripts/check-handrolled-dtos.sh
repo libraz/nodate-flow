@@ -55,9 +55,6 @@
 #
 # Usage:
 #   ./scripts/check-handrolled-dtos.sh        # exit 1 on any hit
-#
-# Companion to: docs/conventions/frontend.md (SDK type usage),
-#               docs/conventions/api-types.md (API contract).
 
 set -euo pipefail
 
@@ -212,8 +209,6 @@ if [[ $count -gt 0 ]]; then
   echo "If the type is a deliberate view-model (not a 1:1 API mirror),"
   echo "rename it so it does not end in Body / OutputBody /"
   echo "ResponseBody / Response."
-  echo ""
-  echo "See docs/conventions/frontend.md for the canonical pattern."
   exit 1
 fi
 

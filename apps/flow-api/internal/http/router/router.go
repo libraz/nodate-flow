@@ -8,7 +8,7 @@
 // construct it with a fixed test cipher and an empty default workspace
 // id.
 //
-// Sub-router split (ADR 0007). The router composes three
+// Sub-router split. The router composes three
 // builder functions:
 //
 //   - buildAuthenticatedAPI: every route that requires a valid bearer
@@ -184,7 +184,7 @@ type Deps struct {
 	AgentRunner agentruntime.Runner
 	// JudgeEnqueuer is the optional signal_judge dispatch hook
 	// invoked from /signals and the /webhooks/* handlers after a
-	// signal row lands (ADR 0008 D3). Nil disables judge dispatch
+	// signal row lands. Nil disables judge dispatch
 	// for single-binary deployments that have not opted in.
 	JudgeEnqueuer signals.JudgeEnqueuer
 
@@ -626,7 +626,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 	aclDB := passthroughDB{deps.DB}
 	invocationLogger := newDBInvocationLogger(deps.DB, deps.AiInvocationPublisher)
 
-	// Write-time embedding client (ADR 0003). Uses the OpenAI provider
+	// Write-time embedding client. Uses the OpenAI provider
 	// when NF_EMBED_OPENAI_KEY is set, otherwise the deterministic mock.
 	var embedClient *embed.Client
 	var nlQueryCompiler *nlquery.Compiler
@@ -1069,7 +1069,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			OperationID: "ai-compile-lens",
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/ai/compile-lens",
-			Summary:     "Compile natural-language prose into a validated Lens JSON (ADR 0004)",
+			Summary:     "Compile natural-language prose into a validated Lens JSON",
 			Description: "Asks the workspace LLM to translate a natural-language description into a validated Lens JSON. Returns the JSON plus the model's confidence so the client can confirm before saving.",
 			Tags:        []string{"Public"},
 		}, aihandlers.CompileLens(shared.aiDeps))
@@ -1132,7 +1132,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		// Realtime SSE stream for this workspace. Not a Huma
 		// operation because the response is a long-lived
 		// text/event-stream that never fits the request/response DTO
-		// model. See ADR 0005.
+		// model.
 		notifier := deps.StreamNotifier
 		if notifier == nil {
 			notifier = stream.NopNotifier{}
@@ -1299,7 +1299,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		tasks.RegisterSteps(subAPI, stepsDeps)
 	})
 
-	// Workspace timeline + event reversal (ADR 0008 D4). Both share
+	// Workspace timeline + event reversal. Both share
 	// the same RequireWorkspaceMember middleware because reversal is a
 	// workspace-scoped mutation of an audit-log row that is otherwise
 	// only visible through the timeline.
@@ -1385,7 +1385,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		inbox.RegisterAiSuggestions(subAPI, triageDeps)
 	})
 
-	// Calendar surface (relocated from time-api per ADR 0007). The
+	// Calendar surface (relocated from time-api). The
 	// authenticated calendar routes split into two membership tiers:
 	// workspace-member level (calendar list/create, public-share admin,
 	// /me/* inbox endpoints) and calendar-member level (single calendar
@@ -1896,7 +1896,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 //
 // The public calendar share and event-invite endpoints
 // (/share/cal/{token}, /invites/{token}/info, /invites/{token}/accept)
-// were relocated here from the retired time-api binary per ADR 0007
+// were relocated here from the retired time-api binary
 // and are registered inside this builder.
 // Budgets for the unauthenticated surface. Both windows are 15 minutes;
 // what differs is how many requests fit in one and what a bucket counts.
@@ -2010,8 +2010,8 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 		publicLensDeps := lenses.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		lenses.RegisterPublic(subAPI, publicLensDeps)
 
-		// Calendar public share render (relocated from time-api per
-		// ADR 0007). Unauthenticated; the opaque token is the capability.
+		// Calendar public share render (relocated from time-api).
+		// Unauthenticated; the opaque token is the capability.
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "public-shares-render",
 			Method:      http.MethodGet,
@@ -2062,7 +2062,7 @@ func buildPublicShareAPI(r chi.Router, deps Deps, shared *sharedDeps) []huma.API
 // of flow-api. flow-api does not own login, refresh, or session
 // endpoints today (those live in apps/auth-api/). The builder exists so
 // future migrations — for example, folding auth-api into flow-api or
-// adding /me/invites flows from the time-api retirement (ADR 0007) —
+// adding /me/invites flows from the time-api retirement —
 // have a stable insertion point that the static check tests already
 // exempt from the public-router assertion.
 //

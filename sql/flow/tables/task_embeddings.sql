@@ -1,6 +1,6 @@
 -- ====================================
 -- task_embeddings
--- Per ADR 0003: native MySQL 9.x VECTOR storage for duplicate detection.
+-- Native MySQL 9.x VECTOR storage for duplicate detection.
 -- Vectors are L2-normalized before insert so cosine similarity reduces
 -- to a dot product. (task_id, model) composite PK lets two models
 -- coexist during a rolling re-embed; the duplicate-detection query
@@ -30,4 +30,4 @@ CREATE TABLE task_embeddings (
 
   CONSTRAINT fk_task_embeddings_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_task_embeddings_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection (ADR 0003)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Task embedding vectors for duplicate detection';

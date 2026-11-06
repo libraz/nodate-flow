@@ -1,5 +1,4 @@
-// Package stream implements the realtime SSE fan-out described in
-// ADR 0005. It turns append-only `events` writes into
+// Package stream implements the realtime SSE fan-out described here. It turns append-only `events` writes into
 // invalidation-only Server-Sent Events that the web frontend uses to
 // refresh its workspace-scoped queries without polling.
 //
@@ -12,7 +11,7 @@
 //   - [SSEHandler], a Huma-free http.Handler that upgrades the
 //     request to an SSE stream for a single authenticated workspace.
 //
-// Per ADR 0005 the wire format carries *no payloads*. The server only
+// The wire format carries *no payloads*. The server only
 // says "something in this workspace changed, refetch whatever you
 // cared about", and the frontend maps each [Kind] to a set of
 // TanStack Query invalidation calls.
@@ -21,7 +20,7 @@ package stream
 import "github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 
 // Kind is the closed set of event families the stream emits. Adding
-// a new kind requires an ADR amendment (ADR 0005 §Wire format).
+// a new kind requires an ADR amendment.
 type Kind string
 
 // Known kinds. Keep this list in sync with
@@ -104,7 +103,7 @@ type Event struct {
 
 // streamKindForFamily maps every event family onto the stream [Kind]
 // subscribers see for it. A family mapped to "" is deliberately not
-// published: the wire format is a closed set (ADR 0005 §Wire format), so
+// published: the wire format is a closed set, so
 // carrying a family onto the stream is an ADR amendment and a frontend
 // change, not a silent addition here.
 //

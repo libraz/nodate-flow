@@ -83,7 +83,7 @@ func (l *streamFrameLog) String() string {
 	return "frames observed: " + strings.Join(parts, ", ")
 }
 
-// TestWorkspaceStream exercises the realtime SSE endpoint (ADR 0005).
+// TestWorkspaceStream exercises the realtime SSE endpoint.
 // It opens a subscription for a fresh tenant, creates a task in a
 // separate goroutine, and asserts that a `task.changed` frame shows
 // up on the stream.

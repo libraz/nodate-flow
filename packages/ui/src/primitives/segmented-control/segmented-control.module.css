@@ -17,7 +17,7 @@
  *
  * Sizing: md meets the 40×40 min tap target (`--nf-space-10`), sm meets 32×32
  * (`--nf-space-8`). Hairline borders use `--nf-space-px` (the hairline
- * exception documented in docs/conventions/design-tokens.md).
+ * exception).
  */
 
 /*

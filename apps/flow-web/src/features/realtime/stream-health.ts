@@ -5,7 +5,7 @@
  * Feature hooks read `useStreamHealthy()` to decide whether they
  * should run their fallback `refetchInterval`. When the stream is
  * healthy, polling is disabled and invalidation is the only trigger
- * for refetches (ADR 0005).
+ * for refetches.
  */
 
 import { useSyncExternalStore } from 'react';

@@ -30,7 +30,7 @@ import (
 // of `done` via the canonical `reopen` transition; using
 // taskstate.ApplyTransitionTx keeps the row-lock, the trigger guard,
 // and the audit event aligned with the engine's invariants
-// (CLAUDE.md rule 10: derived_state is only mutated through the
+// (derived_state is only mutated through the
 // engine path).
 //
 // Empty value means "no state rollback for this event type" — the
@@ -120,12 +120,12 @@ var errReverseAnswered = stderrors.New("events: reverse answered")
 //     additionally drives the task back through the canonical state
 //     transition (e.g. TaskAutoCompleted → reopen). This is the
 //     state-cancellation half of the reversal: rather than mutate
-//     derived_state directly (forbidden by CLAUDE.md rule 10) we
+//     derived_state directly (forbidden) we
 //     funnel through taskstate.ApplyTransitionTx so the engine's
 //     row-lock + trigger guard + transition event all run together.
 //
 // On success the response is 201 with the new compensating event's
-// public_id + occurred_at (unix seconds per CLAUDE.md rule 17).
+// public_id + occurred_at (unix seconds).
 func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, error) {
 	return func(ctx context.Context, in *ReverseInput) (*ReverseOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)

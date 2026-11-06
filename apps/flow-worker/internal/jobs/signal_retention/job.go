@@ -1,5 +1,5 @@
 // Package signal_retention implements the worker job that deletes signals
-// past their expires_at which the Applier never applied (ADR 0008 D1/D8).
+// past their expires_at which the Applier never applied.
 // Without it the signals table, and every inbox read windowed over it,
 // grows without bound.
 //

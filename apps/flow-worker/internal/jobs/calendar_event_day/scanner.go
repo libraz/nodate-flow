@@ -34,8 +34,7 @@
 // (event, occurrence-day) idempotent across ticks and catch-up.
 //
 // All public_id values are surfaced as canonical UUID v7 strings so that
-// internal numeric ids never leak past the worker → API boundary
-// (CLAUDE.md rule 18).
+// internal numeric ids never leak past the worker → API boundary.
 package calendar_event_day
 
 import (
