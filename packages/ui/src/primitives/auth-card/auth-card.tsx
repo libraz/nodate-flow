@@ -1,6 +1,6 @@
 /**
  * AuthCard -- centered card layout for authentication and account management
- * pages. Renders the brand wordmark (gradient) above a single bordered panel,
+ * pages. Renders the brand logo (optional) and wordmark (gradient) above a single bordered panel,
  * keeping the public auth surface visually consistent.
  */
 
@@ -9,6 +9,10 @@ import styles from './auth-card.module.css';
 
 export interface AuthCardProps {
   children: ReactNode;
+  /** Deployment product name shown as the wordmark. */
+  appName: string;
+  /** Optional logo shown before the wordmark; decorative (empty alt). */
+  logoUrl?: string | undefined;
   /**
    * Controls the card width. 'narrow' (default) uses ~28rem and fits auth
    * flows; 'wide' uses ~36rem for settings pages with longer form fields
@@ -17,7 +21,12 @@ export interface AuthCardProps {
   width?: 'narrow' | 'wide';
 }
 
-export default function AuthCard({ children, width = 'narrow' }: AuthCardProps): ReactElement {
+export default function AuthCard({
+  children,
+  appName,
+  logoUrl,
+  width = 'narrow',
+}: AuthCardProps): ReactElement {
   const maxWidth = width === 'wide' ? '36rem' : '28rem';
   return (
     <main
@@ -32,27 +41,30 @@ export default function AuthCard({ children, width = 'narrow' }: AuthCardProps):
         background: 'var(--nf-color-bg, var(--color-bg))',
       }}
     >
-      <div
-        aria-hidden
-        className={styles.wordmark}
-        style={{
-          margin: 0,
-          fontFamily: 'var(--nf-font-display)',
-          fontWeight: 400,
-          // nf-token-override: the product wordmark on the auth surfaces; the only text on the page, sized to the card rather than to a heading level
-          fontSize: 'clamp(2rem, 5vw, 3rem)',
-          lineHeight: 1,
-          letterSpacing: '-0.02em',
-          backgroundImage: 'var(--nf-gradient-wordmark)',
-          backgroundClip: 'text',
-          // biome-ignore lint/style/useNamingConvention: vendor prefix
-          WebkitBackgroundClip: 'text',
-          color: 'transparent',
-          // biome-ignore lint/style/useNamingConvention: vendor prefix
-          WebkitTextFillColor: 'transparent',
-        }}
-      >
-        nodate-flow
+      <div className={styles.brand}>
+        {logoUrl ? <img src={logoUrl} alt="" className={styles.logo} /> : null}
+        <div
+          aria-hidden
+          className={styles.wordmark}
+          style={{
+            margin: 0,
+            fontFamily: 'var(--nf-font-display)',
+            fontWeight: 400,
+            // nf-token-override: the product wordmark on the auth surfaces; the only text on the page, sized to the card rather than to a heading level
+            fontSize: 'clamp(2rem, 5vw, 3rem)',
+            lineHeight: 1,
+            letterSpacing: '-0.02em',
+            backgroundImage: 'var(--nf-gradient-wordmark)',
+            backgroundClip: 'text',
+            // biome-ignore lint/style/useNamingConvention: vendor prefix
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            // biome-ignore lint/style/useNamingConvention: vendor prefix
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          {appName}
+        </div>
       </div>
       <section
         className={styles.panel}

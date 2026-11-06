@@ -7,3 +7,20 @@
   --nf-motion-shift: var(--nf-motion-shift-sm);
   animation: global(nf-slide-in-from-block-end) var(--nf-duration-slow) var(--nf-ease-out) both;
 }
+
+.brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nf-space-3);
+  max-inline-size: 100%;
+}
+
+.logo {
+  block-size: var(--nf-space-12);
+  inline-size: auto;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: min(16rem, 100%);
+  object-fit: contain;
+}

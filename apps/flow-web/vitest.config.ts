@@ -5,6 +5,13 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // Tests must not depend on a developer's local .env branding.
+    env: {
+      // biome-ignore lint/style/useNamingConvention: env variable name
+      VITE_APP_NAME: '',
+      // biome-ignore lint/style/useNamingConvention: env variable name
+      VITE_APP_LOGO_URL: '',
+    },
     setupFiles: ['./tests/setup.ts'],
     include: [
       'src/**/*.test.{ts,tsx}',
