@@ -304,6 +304,6 @@ func (d Deps) seedOIDCAvatar(ctx context.Context, userID uint32, raw string) {
 		AvatarUrl: sql.NullString{String: raw, Valid: true},
 		ID:        userID,
 	}); err != nil {
-		slog.WarnContext(ctx, "oidc: avatar seeding failed", slog.Uint64("user_id", uint64(userID)))
+		slog.WarnContext(ctx, "oidc: avatar seeding failed", slog.Any("err", err))
 	}
 }
