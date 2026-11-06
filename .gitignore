@@ -8,6 +8,9 @@
 # Go package nested under apps/*/internal/ (an unanchored rule would silently
 # un-commit such source and break `go build ./...`).
 /secrets/
+# Deployment playbooks for one installation, with its vault. Kept out of the
+# public tree on purpose.
+/ansible/
 
 # ---- Node / TypeScript ----
 node_modules/
