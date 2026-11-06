@@ -57,6 +57,11 @@ export function OIDCCompletePage(): ReactElement {
   const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const location = useLocation();
+  // Read once, on the first render. The scrub below rewrites the address
+  // bar, and the router sees that as a navigation: anything keyed on the
+  // live location would run again against an empty fragment and report a
+  // failure over the sign-in this page has just completed.
+  const [fragment] = useState(() => readOIDCFragment(location.hash || window.location.hash));
   const [status, setStatus] = useState<'verifying' | 'totp' | 'error'>('verifying');
   const [error, setError] = useState<AuthErrorI18nKey | null>(null);
   const [challengeToken, setChallengeToken] = useState('');
@@ -90,8 +95,6 @@ export function OIDCCompletePage(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    const hash = location.hash || window.location.hash;
-    const fragment = readOIDCFragment(hash);
     // Take the fragment out of the address bar as soon as it has been
     // read. It carries the step-up challenge, and a fragment survives in
     // history, in a restored session, and in anything the user copies
@@ -138,7 +141,7 @@ export function OIDCCompletePage(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [location.hash, completeSignIn]);
+  }, [fragment, completeSignIn]);
 
   const handleTotpSubmit = async (credential: TotpCredential): Promise<void> => {
     if (totpGuard.guard()) return;

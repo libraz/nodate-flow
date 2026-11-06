@@ -1,6 +1,7 @@
 import { authStore } from '@nodate-flow/sdk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  createBrowserHistory,
   createMemoryHistory,
   createRootRoute,
   createRoute,
@@ -14,7 +15,7 @@ import i18n from 'i18next';
 import ICU from 'i18next-icu';
 import type { ReactElement, ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import enAuth from '../../../locales/en/auth.json';
 
@@ -86,7 +87,14 @@ function buildI18n(): ReturnType<typeof i18n.createInstance> {
   return instance;
 }
 
-function mountOIDCComplete(initialPath: string) {
+let destroyBrowserHistory: (() => void) | null = null;
+
+/**
+ * `memory` keeps the address bar out of the test. `browser` is what the
+ * deployed app runs on: its history wraps window.history.replaceState, so
+ * the page's own fragment scrub is seen by the router as a navigation.
+ */
+function mountOIDCComplete(initialPath: string, historyKind: 'memory' | 'browser' = 'memory') {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, throwOnError: false },
@@ -109,7 +117,7 @@ function mountOIDCComplete(initialPath: string) {
   });
   const router = createRouter({
     routeTree: rootRoute.addChildren([oidcRoute, profileRoute]),
-    history: createMemoryHistory({ initialEntries: [initialPath] }),
+    history: historyFor(initialPath, historyKind),
   });
 
   function Wrapper({ children }: { children: ReactNode }): ReactElement {
@@ -121,6 +129,14 @@ function mountOIDCComplete(initialPath: string) {
   }
   render(<RouterProvider router={router} />, { wrapper: Wrapper });
   return router;
+}
+
+function historyFor(initialPath: string, historyKind: 'memory' | 'browser') {
+  if (historyKind === 'memory') return createMemoryHistory({ initialEntries: [initialPath] });
+  window.history.replaceState(null, '', initialPath);
+  const history = createBrowserHistory();
+  destroyBrowserHistory = () => history.destroy();
+  return history;
 }
 
 function mockMe(email: string) {
@@ -154,6 +170,12 @@ beforeEach(() => {
   window.sessionStorage.clear();
 });
 
+afterEach(() => {
+  destroyBrowserHistory?.();
+  destroyBrowserHistory = null;
+  window.history.replaceState(null, '', '/');
+});
+
 describe('oidc complete route', () => {
   it('refreshes from the OIDC callback cookie and redirects to profile', async () => {
     sdkMocks.refresh.mockResolvedValueOnce('access-oidc-1');
@@ -166,6 +188,29 @@ describe('oidc complete route', () => {
     expect(sdkMocks.refresh).toHaveBeenCalledTimes(1);
     expect(authStore.getState().accessToken).toBe('access-oidc-1');
     expect(authStore.getState().user?.email).toBe('oidc@example.test');
+  });
+
+  // Scrubbing the fragment changes the router's location. The page must
+  // finish the sign-in it read rather than re-read an empty fragment and
+  // report a generic failure over a session that was just opened.
+  it('completes under browser history, where the scrub is a navigation', async () => {
+    sdkMocks.refresh.mockResolvedValueOnce('access-oidc-5');
+    mockMe('oidc-browser@example.test');
+
+    const router = mountOIDCComplete('/oidc/complete#step=complete', 'browser');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile'));
+    expect(sdkMocks.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(enAuth.errors.generic)).toBeNull();
+    expect(authStore.getState().user?.email).toBe('oidc-browser@example.test');
+  });
+
+  it('keeps the TOTP challenge under browser history after the scrub', async () => {
+    mountOIDCComplete('/oidc/complete#step=totp_required&challengeToken=challenge-b', 'browser');
+
+    expect(await screen.findByLabelText(new RegExp(`^${enAuth.login.totp_code}`))).toBeDefined();
+    expect(screen.queryByText(enAuth.errors.generic)).toBeNull();
+    expect(window.location.hash).toBe('');
   });
 
   it('lands on the page the sign-in started from', async () => {
