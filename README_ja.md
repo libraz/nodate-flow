@@ -1,254 +1,85 @@
 # nodate-flow
 
-> **タスクを「管理する」ためのツールではなく、仕事の流れが勝手に前へ進んでいくシステム。**
+[![CI](https://img.shields.io/github/actions/workflow/status/libraz/nodate-flow/ci.yml?branch=main&label=CI)](https://github.com/libraz/nodate-flow/actions)
+[![codecov](https://codecov.io/gh/libraz/nodate-flow/branch/main/graph/badge.svg)](https://codecov.io/gh/libraz/nodate-flow)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-green)](https://github.com/libraz/nodate-flow/blob/main/LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-LLM と MCP を後付けではなく実行層そのものとして組み込んだ、OSS のタスク基盤。タスクの状態はボタンで変えるのではなく、制約とイベントから導出されます。
+**nodate-flow は、仕事の流れが勝手に前へ進むようにします。タスクは制約とイベントから状態が導出されるプロセスで、LLM と MCP がその実行層を担います。**
 
-ひとつのモノレポから 2 つのプロダクトを提供しています:
+Go、MySQL、React で作られた自前ホスト型のタスク基盤です。タスクの状態は手で書き換えるものではなく、依存関係、制約、追記専用のイベントログから導出されます。そのため、LLM が行った変更を含むすべての変更が、行為者つきで記録されます。
 
-- **nodate-flow** — 制約・イベント・AI エージェント駆動のタスク管理。
-- **nodate-time** — TimeTree の共有カレンダーの手軽さと Google カレンダーの権限管理を両立させたカレンダーアプリ。
+📖 **[ドキュメント](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)** &nbsp;·&nbsp; **[はじめに](#はじめに)** &nbsp;·&nbsp; **[デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)**
 
-> **名前について:** _"no date"_（締切に振り回されない働き方）と **野点（のだて）**（野外で気軽に茶を点てる所作）の掛け言葉です。
+> **アルファ版（1.0 より前）です。** v1.0 までは後方互換性を保たず、タスク関連のスキーマは移行ではなく再構築で更新します。第三者によるセキュリティ監査は受けていません。脆弱性は [SECURITY.md](https://github.com/libraz/nodate-flow/blob/main/SECURITY.md) の手順で報告してください。
 
-**ステータス:** alpha | **ライセンス:** [AGPL-3.0](./LICENSE) | **スタック:** Go · MySQL 9.7 · React 19 · OpenAPI 3.1
+![依存関係とクリティカルパスを表示したガントチャート](docs/images/gantt.png)
 
----
+| ボード                                                 | カレンダー                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------- |
+| ![状態ごとに並んだタスクボード](docs/images/board.png) | ![予定とタスクの期日を並べた月表示のカレンダー](docs/images/calendar.png) |
 
-## nodate-flow
+## できること
 
-| 機能               | 詳細                                                                 |
-| ------------------ | -------------------------------------------------------------------- |
-| **ビュー**         | ボード、タイムライン、ガントチャート、ダッシュボード、カスタムレンズ |
-| **制約エンジン**   | 依存関係、自動評価、状態の導出 — 手動でのステータス切り替え不要      |
-| **AI**             | 優先度・状態の提案、スマート作成、埋め込みベースの重複検出           |
-| **MCP**            | ビルトインサーバー — GitHub、Slack、外部ツールが同一ワークスペースに |
-| **ページ**         | 軽量 Wiki / ドキュメント                                             |
-| **通知**           | 受信トレイ + 週次ダイジェスト                                        |
-| **Webhook**        | アウトバウンドのイベント配信                                         |
-| **認証**           | パスワード (Argon2id) · OIDC · TOTP 2FA · リカバリーコード           |
-| **マルチテナント** | ワークスペース + ロールベースのアクセス制御                          |
+- **導出されるタスク状態** — 依存関係と制約、イベントログがタスクの状態を決めます。直接の更新はデータベースのトリガーが拒否します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **ビューとレンズ** — プロジェクトごとのボード、リスト、依存関係グラフ、スプレッドシートに加え、タイムライン、ガント、ダッシュボードのウィジェット、読み取り専用で共有できるレンズ。
+- **レビューゲート** — 完了ポリシーで、レビュアーが承認した提出を完了の条件にできます。ハンドオフもタスクに記録されます。
+- **シグナルと判定ループ** — GitHub、Slack、Google の Webhook、Discord のプレゼンス、カレンダーの当日、手動メモがシグナルになり、LLM の判定器がタスクのイベントを提案します。提案にとどめるか、下書きにするか、自動で適用するかは、ワークスペースごとの自律度が決めます。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
+- **AI アシスト** — スマートなタスク作成、状態の推定、優先度のインサイト、関連の検出、自然言語のコマンド。OpenAI、Anthropic、Google、Ollama、OpenAI 互換のプロバイダーに対応します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **MCP サーバー** — エージェントや外部ツールが、スコープ付きのトークンでワークスペースを読み書きします。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **カレンダー** — 共有・個人カレンダー、繰り返しイベント、参加者、招待、リマインダー、タスクとのリンク、公開共有と埋め込みページ。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **ページ** — Markdown ページのツリーと、AI による下書き生成。
+- **受信トレイと取り込み** — スヌーズ付きの通知、取り込んだソースをタスクにするトリアージ、週次ダイジェスト、Server-Sent Events によるリアルタイム更新。
+- **Webhook とデータ** — HMAC 署名つきの送信 Webhook、CSV と JSON のエクスポート、CSV のインポート。
+- **アカウントとアクセス** — Argon2id のパスワード、Google・GitHub・Microsoft の OIDC サインイン、リカバリーコード付きの TOTP、OIDC 専用モード、ロールベースのアクセス制御を持つワークスペース。[デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)
+- **nodate-time との共有データベース** — nodate-flow と、別プロダクトのカレンダー nodate-time は、1 つの MySQL に向けると、公開されたスキーマ契約を通してユーザー、グループ、カレンダーのデータを共有できます。コードの依存はありません。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
 
-## nodate-time
+## はじめに
 
-| 機能           | 詳細                                                 |
-| -------------- | ---------------------------------------------------- |
-| **カレンダー** | 共有 & 個人、メンバーごとの表示権限制御              |
-| **イベント**   | 参加者、招待、チェックリスト、コメント、添付ファイル |
-| **同期**       | nodate-flow とのタスク双方向同期                     |
-| **祝日**       | ロケール対応の祝日スケジューリング                   |
-
-## Asana / Plane / Linear と何が違うのか
-
-多くのツールはタスクを「クリックで状態を変える DB の行」として扱います。nodate-flow はタスクを**プロセス**として扱い、状態は制約とイベントログから導出します。LLM はビルトインの実行アクターとして動き、外部サービスは個別の連携コードではなく MCP 経由でワークスペースに統合されます。
-
-一番近いのは [Plane](https://plane.so)（OSS、AGPL、自前ホスト前提）ですが、Plane は行+ステータスの枠組みに留まっています。
-
-## クイックスタート
+Go、Bun、Docker が必要です。バージョンは `go.mod` と `package.json` で固定しています。
 
 ```sh
-git clone <repo> && cd nodate-flow
-make dev          # MySQL (Docker) + auth-api + flow-api + flow-web
-make seed-flow    # デモ管理ユーザー + ワークスペース
+git clone https://github.com/libraz/nodate-flow.git && cd nodate-flow
+make dev          # MySQL (Docker) + auth-api + flow-api + accounts-web + flow-web
+make seed-flow    # 別のターミナルで実行: デモ管理ユーザーとワークスペース
 ```
 
-```
-make test-unit    # コンテナ不要の Go + TS テスト
-make test         # Go + TS テスト
-make gen          # codegen (sqlc + errors + SDK)
+<http://localhost:5173> を開き、`admin@example.com`、パスワード `password123` でサインインします。
+
+| サービス     | アドレス                                                       |
+| ------------ | -------------------------------------------------------------- |
+| flow-web     | <http://localhost:5173>                                        |
+| accounts-web | <http://localhost:5175/accounts>                               |
+| flow-api     | <http://localhost:8080>（API リファレンスは `/api-reference`） |
+| auth-api     | <http://localhost:8082>                                        |
+
+`make dev` は、バックグラウンドワーカーと Discord ゲートウェイを起動しません。定期ジョブとシグナルの保持期間管理には `make dev-worker`、Discord プレゼンスのゲートウェイには `make dev-presence` を実行します。`make dev-reset` は、スキーマからデータベースを作り直し、デモデータを入れ直します。
+
+サーバーで動かす場合は [デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md) を参照してください。
+
+## ソースからビルド
+
+```sh
+make reload       # 開発サーバーを止めて `make dev` をやり直す
+make test-unit    # コンテナ不要のテスト (Go -short と、すべての TS ワークスペース)
+make test         # Go と TS のテスト。Go の統合テストには Docker が必要
+make gen          # codegen: sqlc、エラー、シグナル種別、祝日、SDK
+make check        # 静的チェック: lint、フォーマット、型検査、生成物とリポジトリの整合性
+make build        # すべてのアプリをビルド
 make help         # 全ターゲット一覧
 ```
 
-開発用のオブジェクトストレージは以前のチェックアウトとは別のサービスに変わったため、古い `minio_data` ボリュームは引き継がれません。`make dev-reset` で初期データを入れ直せます。
+リポジトリ構成と、各ターゲットがビルドするサービスは [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md) にまとめています。
 
-## リポジトリ構成
+## ドキュメント
 
-```
-apps/
-  flow-api/       # Go バックエンド — タスク、カレンダー、AI、MCP、公開共有 (Huma + chi + sqlc)
-  flow-web/       # React 19 フロントエンド — タスク、カレンダー、/share/cal、/invites/accept、/setup
-  auth-api/       # Go — 認証・セッション (JWT, OIDC, TOTP)
-  accounts-web/   # React 19 — ログイン / サインアップ / アカウント UI
-  cli/            # CLI (バイナリ名: tnk)
-packages/
-  sdk/            # flow-api 用 TS SDK (OpenAPI から生成)
-  ui/             # デザインシステム (4 テーマ)
-  go-shared/      # 共有 Go パッケージ
-  holidays/       # 祝日データ
-  fixtures/       # テスト用フィクスチャ
-errors/           # エラーコード (YAML → Go + TS codegen)
-sql/              # テーブル / ビュー / sqlc クエリ
-infra/            # Docker, Prometheus, Grafana, OTel, edge (nginx)
-```
+ガイドは [`docs/`](https://github.com/libraz/nodate-flow/tree/main/docs) にあります。
 
-## デプロイ
-
-`compose.prod.yml` は、MySQL、オブジェクトストレージ、auth-api、flow-api、flow-worker、そして 2 つの SPA を配信して 2 つの API へプロキシする nginx の edge コンテナを、1 台のホストでまとめて動かします。SPA は API のオリジンをバンドルに埋め込むため、イメージは pull せずこのリポジトリからビルドします。
-
-ホスト名は 1 つ、証明書も 1 つで、公開するものは他にありません。入口は edge コンテナだけで、公開するポートも edge（80 と 443）だけです。edge は TLS を終端し、パスで振り分けます。`/` は flow-web、`/accounts/` は accounts-web、`/api/` は flow-api、`/auth-api/` は auth-api です。2 つの API のプレフィックスは、プロキシの前に取り除かれます。データベース、オブジェクトストレージ、API のポート、メトリクスは compose ネットワークの内側にとどまります。
-
-### 前提
-
-Compose プラグイン付きの Docker と、ホストにインストールした certbot が必要です。
-
-ホストを指す DNS 名が 1 つ必要です。例えば `flow.example.com` です。すべてを同じオリジンから配信するので、リフレッシュ用 cookie はファーストパーティになります。
-
-### 設定
-
-設定は `compose.prod.yml` と同じ場所の `.env` に書きます。次の値には既定値がなく、欠けていると Compose が名前を挙げて停止します。
-
-- `NF_PUBLIC_HOST`
-- `NF_DB_ROOT_PASSWORD`、`NF_DB_PASSWORD`
-- `NF_SECRET_KEY`
-- `NF_S3_ACCESS_KEY`、`NF_S3_SECRET_KEY`
-- `NF_FLOW_API_SIGNAL_TOKEN`
-- `NF_FLOW_GH_WEBHOOK_SECRET`、`NF_FLOW_SLACK_SIGNING_SECRET`、`NF_FLOW_GOOGLE_CHANNEL_TOKEN`
-
-秘密の値はすべて `openssl rand -hex 32` で生成してください。flow-api は 3 つの Webhook 秘密がそろっていないと起動しないため、使わない連携の分にも乱数を入れます。誰も知らない乱数であれば、その連携に対するリクエストを偽造できる人はいません。
-
-SMTP は任意です（`NF_SMTP_HOST`、`NF_SMTP_FROM` と、それに付随する認証情報）。ホストを設定しない場合、マジックリンクでのサインインは提供されず、招待や通知のメールも送られません。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
-
-### OIDC のみのサインイン
-
-パスワードアカウントも SMTP も使わず、IdP 経由のサインインだけを許可するには、`.env` に次を書きます。
-
-```sh
-NF_PASSWORD_LOGIN_ENABLED=false
-NF_AUTH_GOOGLE_CLIENT_ID=...
-NF_AUTH_GOOGLE_CLIENT_SECRET=...
-NF_OAUTH_ALLOWED_DOMAINS=example.com        # または NF_OAUTH_ALLOWED_EMAILS=ceo@example.com
-NF_REGISTRATION_OPEN=true
-```
-
-`NF_PASSWORD_LOGIN_ENABLED=false` にすると、auth-api は `POST /auth/register`、`POST /auth/login`、`POST /me/password` と `/me/totp` 配下の TOTP 管理ルートを登録せず、Web アプリにはプロバイダーのボタンだけが表示されます。二要素目は IdP 側のものを使います。切り替え前に TOTP を登録していたアカウントは、チャレンジ（`POST /auth/login/totp`）とリカバリーコードをそのまま使えますが、パスワードログインを再び有効にするまで TOTP を管理できません。このとき `NF_REGISTRATION_OPEN=true` が開くのは OIDC の自動プロビジョニングだけで、許可リストに載ったドメインとアドレスに限られます。許可リストがないと、プロバイダー上で検証済みのアドレスなら誰でもアカウントを作れるため、必ず設定してください。`NF_SMTP_HOST` を未設定のままにすれば、マジックリンクでのサインインも無効のままです。
-
-### 証明書
-
-nginx は証明書のない server ブロックを読み込めないため、スタックを起動する前に証明書を取得しておく必要があります。80 番ポートを空けた状態で取得します。
-
-```sh
-mkdir -p acme
-certbot certonly --standalone -d flow.example.com
-```
-
-edge は `/etc/letsencrypt/live/<NF_TLS_CERT_NAME>/` から証明書を読みます。既定は `NF_PUBLIC_HOST` で、certbot が `-d` の名前で作るディレクトリと一致します。証明書ディレクトリは `NF_TLS_DIR`（既定 `/etc/letsencrypt`）、チャレンジ用ディレクトリは `NF_ACME_WEBROOT`（既定 `./acme`）で変えられます。
-
-更新は、動作中の edge が webroot から応答するので、何も止める必要はありません。nginx は再読み込みを指示されるまで古い証明書を使い続けます。
-
-```sh
-certbot renew --webroot -w /path/to/acme \
-  --deploy-hook 'docker compose -f /path/to/compose.prod.yml exec edge nginx -s reload'
-```
-
-### 初回起動と初期管理者
-
-管理者がいない間は外から到達できないよう、edge 以外を先に起動します。
-
-```sh
-docker compose -f compose.prod.yml up -d --build mysql storage auth-api api flow-worker
-```
-
-次に、最初のユーザーを登録して管理者にします。コマンドは compose ネットワーク上のコンテナから実行します。ネットワーク名はプロジェクト名 `nodate-flow-prod` に `_default` を付けたものです。`POST /auth/register` が返すアクセストークンを、`POST /admin/setup` に Bearer トークンとして渡します。`/admin/setup` は 1 回目だけ `{"ok":true}` を返し、以後は 409 になります。
-
-```sh
-NET=nodate-flow-prod_default
-resp=$(docker run --rm --network $NET curlimages/curl -fsS \
-  -X POST http://auth-api:8082/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"choose-a-long-one","displayName":"Admin"}')
-token=$(printf '%s' "$resp" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
-docker run --rm --network $NET curlimages/curl -fsS \
-  -X POST http://auth-api:8082/admin/setup \
-  -H "Authorization: Bearer $token"
-```
-
-OIDC のみのインスタンスには、登録に使うパスワードがありません。許可リストに自分のアドレスだけを設定したうえで、スタック全体を起動します。プロバイダー経由で一度サインインしてアカウントを作り、そのアカウントに管理者権限を付与します。このコマンドは繰り返し実行しても安全です。
-
-```sh
-docker compose -f compose.prod.yml up -d --build
-docker compose -f compose.prod.yml exec auth-api /grant-admin -email admin@example.com
-```
-
-そのアドレスのユーザーがまだいない場合、`grant-admin` は 0 以外の終了コードで失敗します。
-
-パスワード方式のインスタンスでは、続けて edge を起動します。公開しないインスタンスなら、先に `.env` で `NF_REGISTRATION_OPEN=false` にしておいてください。
-
-```sh
-docker compose -f compose.prod.yml up -d --build
-```
-
-### IdP に登録するリダイレクト URI
-
-各プロバイダーに次を登録します。`<auth>` は `https://` に `NF_PUBLIC_HOST`、`/auth-api` を続けたものです。
-
-サインイン用:
-
-- `<auth>/auth/oidc/google/callback`
-- `<auth>/auth/oidc/github/callback`
-- `<auth>/auth/oidc/microsoft/callback`
-
-ワークスペース連携用:
-
-- `<auth>/oauth/callback/github`
-- `<auth>/oauth/callback/slack`
-- `<auth>/oauth/callback/google`
-- `<auth>/oauth/callback/discord`
-
-### ホスト側のプロキシを使う場合
-
-TLS を別の場所で終端するときは、`edge` サービスから `tls.conf.template` のマウントと 2 つの証明書マウントを外し、`80:80` と `443:443` の代わりに `127.0.0.1:8081:80` を publish します。ブラウザから見れば HTTPS のままなので `NF_PUBLIC_SCHEME=https` は変えず、`NF_TRUSTED_PROXY_HOPS=2` にして 2 段のプロキシを越えたクライアントアドレスを読ませます。ホスト側のプロキシは `X-Forwarded-For` を上書きせず追記し、レスポンスをバッファせず（ワークスペースのストリームは SSE です）、128 MB までのリクエストボディを通す必要があります。
-
-### ホスト名やスキームを変える場合
-
-ホスト名とスキームは SPA のバンドルに埋め込まれます。`.env` で変えたら edge を再ビルドしてください。
-
-```sh
-docker compose -f compose.prod.yml up -d --build edge
-```
-
-### スキーマ
-
-`sql/schema.sql` が自動で適用されるのは、`mysql_data` ボリュームが空のときだけです。もう一度適用するには、アプリケーション側のサービスを止めて手で流します。このファイルは `DROP TABLE` から始まるので、データはすべて消えます。
-
-```sh
-docker compose -f compose.prod.yml stop edge auth-api api flow-worker
-docker compose -f compose.prod.yml exec -T mysql \
-  sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < sql/schema.sql
-docker compose -f compose.prod.yml up -d
-```
-
-`sql/schema.sql` には 3 つの層がすべて入っています。core、nodate-time と共有する time 層、flow 層です。同じデータベースで nodate-time も動いている場合、このファイルを流し直すと nodate-time のデータも消えます。データを残すには、その場で upgrade します。両方のアプリケーションを止め、`sql/core/upgrades/*.sql` を番号順に流し、続けて `sql/time/upgrades/` の time 層の upgrade を流します。最後に `bash sql/core/conformance/run.sh --dsn 'user:pass@host:port/db' --mode schema` で結果を確かめます。手順は `sql/core/PROTOCOL.md` にあります。
-
-### バックアップ
-
-永続データは `mysql_data` と `storage_data` の 2 つのボリュームにあります。添付ファイルは片方の行がもう片方のオブジェクトを指す関係なので、必ず揃えて取得してください。
-
-```sh
-docker compose -f compose.prod.yml exec -T mysql \
-  sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction "$MYSQL_DATABASE"' \
-  > mysql.sql
-docker run --rm -v nodate-flow-prod_storage_data:/data:ro -v "$PWD/storage-backup":/backup \
-  alpine sh -c 'apk add --no-cache rsync >/dev/null && rsync -aX /data/ /backup/'
-```
-
-ストレージゲートウェイはオブジェクトをファイルとして保存し、メタデータを拡張属性に持つため、コピーでも拡張属性を保つ必要があります（`rsync -aX`）。
-
-### オブジェクトストレージ
-
-同梱の S3 互換ゲートウェイは compose ネットワークの内側でだけ応答します。ブラウザが直接アクセスすることはなく、添付ファイルやアバターは flow-api の `/blobs` 中継を通ります。外部の S3 互換サービスを使うときは、`storage` サービスとその `depends_on` を削除し、`compose.prod.yml` の `auth-api` と `api` にある `NF_S3_ENDPOINT` と `NF_S3_USE_SSL` を書き換えてください（同梱ゲートウェイ向けの固定値になっています）。`NF_S3_ACCESS_KEY`、`NF_S3_SECRET_KEY`、`NF_S3_BUCKET` は `.env` から渡されます。
-
-### Discord presence
-
-Discord presence ボットは既定では起動しません。`.env` に `NF_DISCORD_BOT_TOKEN` を設定し、profile を指定して起動します。
-
-```sh
-docker compose -f compose.prod.yml --profile presence-discord up -d
-```
+- **学ぶ** — [概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
+- **ガイド** — [デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)
+- **リファレンス** — flow-api が `/api-reference` で配信する HTTP API リファレンス · [コントリビュート](https://github.com/libraz/nodate-flow/blob/main/CONTRIBUTING.md)（英語） · [セキュリティポリシー](https://github.com/libraz/nodate-flow/blob/main/SECURITY.md)
 
 ## ライセンス
 
-[AGPL-3.0](./LICENSE) — 自前ホスト、改変、再配布は自由です。ネットワーク越しに提供する場合はソースの公開が必要です（Plane や Vikunja と同じモデル）。
-
----
-
-English version: [`README.md`](./README.md)
+[AGPL-3.0](LICENSE)

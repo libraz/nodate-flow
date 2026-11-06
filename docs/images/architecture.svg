@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 730" width="1280" height="730" role="img" aria-labelledby="t d">
+  <title id="t">nodate-flow production topology</title>
+  <desc id="d">A browser reaches a single nginx edge container over TLS. The edge serves two SPAs and proxies /api/ to flow-api and /auth-api/ to auth-api. flow-api, auth-api and flow-worker use MySQL; flow-api and auth-api use object storage that is internal only.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; font-size: 14px; }
+      .h { font-size: 16px; font-weight: 600; }
+      .m { fill: #59636e; font-size: 12px; }
+      .s { fill: #59636e; font-size: 11px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+      .acc { fill: #0550ae; }
+      .box { fill: #ffffff; stroke: #8c959f; stroke-width: 1.25; }
+      .opt { fill: #ffffff; stroke: #8c959f; stroke-width: 1.25; stroke-dasharray: 5 4; }
+      .chip { fill: #f3f5f7; stroke: #c4cbd2; stroke-width: 1; }
+      .in { fill: none; stroke: #0969da; stroke-width: 1.75; }
+      .int { fill: none; stroke: #6e7781; stroke-width: 1.5; }
+    </style>
+    <marker id="ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#0969da"/></marker>
+    <marker id="an" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9 z" fill="#6e7781"/></marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="1279" height="729" rx="16" fill="#fafbfc" stroke="#d0d7de"/>
+
+  <!-- compose network -->
+  <rect x="215" y="50" width="1035" height="650" rx="14" fill="none" stroke="#8c959f" stroke-width="1.25" stroke-dasharray="7 5"/>
+  <text class="m" x="237" y="76">compose network (nodate-flow-prod)</text>
+
+  <!-- external, left -->
+  <rect class="box" x="12" y="110" width="128" height="50" rx="8"/>
+  <text class="h" x="76" y="140" text-anchor="middle">Browser</text>
+  <rect class="box" x="12" y="190" width="128" height="50" rx="8"/>
+  <text class="h" x="76" y="212" text-anchor="middle">MCP clients</text>
+  <text class="s" x="76" y="229" text-anchor="middle">external agents</text>
+  <rect class="box" x="12" y="370" width="128" height="60" rx="8"/>
+  <text class="h" x="76" y="396" text-anchor="middle">LLM providers</text>
+  <text class="s" x="76" y="413" text-anchor="middle">external APIs</text>
+
+  <!-- edge -->
+  <rect x="230" y="100" width="830" height="160" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.75"/>
+  <text class="h" x="252" y="132">edge</text>
+  <text class="m" x="252" y="152">nginx, TLS terminated</text>
+  <rect x="252" y="168" width="226" height="24" rx="12" fill="#ddf4ff" stroke="#54aeff" stroke-width="1"/>
+  <text class="s" x="365" y="184" text-anchor="middle" style="fill:#0550ae">only published service: 80 and 443</text>
+
+  <rect class="chip" x="560" y="118" width="230" height="52" rx="8"/>
+  <text class="mono acc" x="576" y="140">/</text>
+  <text x="576" y="158">flow-web SPA</text>
+  <rect class="chip" x="810" y="118" width="230" height="52" rx="8"/>
+  <text class="mono acc" x="826" y="140">/accounts/</text>
+  <text x="826" y="158">accounts-web SPA</text>
+  <text class="s" x="560" y="192">static bundles built into the edge image</text>
+  <text class="s" x="560" y="238">/api/ and /auth-api/ are proxied to the services with the prefix stripped</text>
+
+  <!-- flow-api to storage: drawn first so the ingress arrow can break it -->
+  <path class="int" d="M480 330 V300 H1160 V330" marker-end="url(#an)"/>
+
+  <!-- ingress arrows -->
+  <path class="in" d="M140 135 H230" marker-end="url(#ai)"/>
+  <text class="s" x="185" y="127" text-anchor="middle">HTTPS</text>
+  <path class="in" d="M140 215 H230" marker-end="url(#ai)"/>
+  <text class="mono acc" x="185" y="207" text-anchor="middle" style="font-size:11px">/api/mcp</text>
+
+  <path d="M410 260 V330" stroke="#fafbfc" stroke-width="7" fill="none"/>
+  <path class="in" d="M410 260 V330" marker-end="url(#ai)"/>
+  <text class="mono acc" x="422" y="284">/api/</text>
+  <path d="M930 260 V330" stroke="#ffffff" stroke-width="7" fill="none"/>
+  <path class="in" d="M930 260 V330" marker-end="url(#ai)"/>
+  <text class="mono acc" x="942" y="284">/auth-api/</text>
+
+  <!-- services -->
+  <rect class="box" x="300" y="330" width="240" height="140" rx="10"/>
+  <text class="h" x="320" y="360">flow-api</text>
+  <text class="m" x="320" y="382">tasks, calendar, AI, public shares</text>
+  <text class="m" x="320" y="400">MCP server at /mcp</text>
+  <text class="m" x="320" y="418">blob relay at /blobs</text>
+
+  <rect class="opt" x="590" y="330" width="170" height="56" rx="10"/>
+  <text class="h" x="606" y="355">presence-discord</text>
+  <text class="s" x="606" y="373">optional, compose profile</text>
+  <rect class="box" x="590" y="420" width="170" height="56" rx="10"/>
+  <text class="h" x="606" y="446">flow-worker</text>
+  <text class="s" x="606" y="464">background worker</text>
+
+  <rect class="box" x="830" y="330" width="200" height="70" rx="10"/>
+  <text class="h" x="850" y="360">auth-api</text>
+  <text class="m" x="850" y="380">identity and sign-in</text>
+
+  <!-- worker and presence into flow-api -->
+  <path class="int" d="M590 358 H540" marker-end="url(#an)"/>
+  <path class="int" d="M590 448 H540" marker-end="url(#an)"/>
+
+  <!-- flow-api outbound to LLM -->
+  <path class="int" d="M300 400 H140" marker-end="url(#an)"/>
+  <text class="s" x="262" y="392" text-anchor="middle">outbound</text>
+
+  <!-- object storage -->
+  <rect class="box" x="1090" y="330" width="140" height="140" rx="10"/>
+  <text class="h" x="1110" y="360">Object storage</text>
+  <text class="m" x="1110" y="380">S3-compatible</text>
+  <text class="s" x="1110" y="410">Compose network</text>
+  <text class="s" x="1110" y="426">only. Browsers get</text>
+  <text class="s" x="1110" y="442">blobs via flow-api.</text>
+  <path class="int" d="M1030 365 H1090" marker-end="url(#an)"/>
+
+  <!-- MySQL -->
+  <rect class="box" x="300" y="590" width="730" height="60" rx="10"/>
+  <text class="h" x="665" y="626" text-anchor="middle">MySQL 9.7</text>
+  <path class="int" d="M410 470 V590" marker-end="url(#an)"/>
+  <path class="int" d="M675 476 V590" marker-end="url(#an)"/>
+  <path class="int" d="M930 400 V590" marker-end="url(#an)"/>
+
+  <text class="s" x="237" y="684">Database, object storage, API ports and metrics are not published.</text>
+</svg>
