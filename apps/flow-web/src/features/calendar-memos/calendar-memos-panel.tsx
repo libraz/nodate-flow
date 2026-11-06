@@ -433,6 +433,7 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
       <div className={styles.bodyText}>
         <div className={styles.titleLine}>
           <input
+            data-1p-ignore
             type="text"
             className={`${styles.titleInput}${memo.done ? ` ${styles.titleInputDone}` : ''}`}
             aria-label={t('calendar.memos.title_label')}

@@ -5,7 +5,8 @@
  * role="combobox">` paired with a portal-rendered `role="listbox"`. Keyboard
  * navigation: ArrowUp/ArrowDown to move active option, Home/End to jump,
  * Enter to select, Escape to dismiss. Active option is communicated via
- * `aria-activedescendant`.
+ * `aria-activedescendant`. The input carries `data-1p-ignore` (1Password
+ * ignores `autocomplete="off"`).
  *
  * Two modes:
  * 1. Static (default): pass `options` and the input filters them client-side
@@ -373,6 +374,7 @@ function ComboboxImpl(
         }
         aria-busy={isLoading || undefined}
         autoComplete="off"
+        data-1p-ignore
         disabled={disabled}
         className={styles.input}
         placeholder={placeholder}

@@ -1,6 +1,7 @@
 /**
  * Input — primitive text input. Wraps a native `<input>` and adds
  * design-system styling plus an `invalid` style hook driven by `aria-invalid`.
+ * Emits `data-1p-ignore` unless `autoComplete` is a credential/identity token (1Password ignores `autocomplete="off"`).
  */
 
 import { forwardRef, type InputHTMLAttributes, type ReactElement } from 'react';
@@ -23,7 +24,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 /** Input renders a styled native `<input>` element. */
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
-    { className, invalid, type, dir = 'auto', 'aria-invalid': ariaInvalid, ...rest },
+    { className, invalid, type, dir = 'auto', 'aria-invalid': ariaInvalid, autoComplete, ...rest },
     ref,
   ): ReactElement => (
     <input
@@ -31,6 +32,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       type={type ?? 'text'}
       dir={dir}
       aria-invalid={ariaInvalid ?? (invalid ? true : undefined)}
+      autoComplete={autoComplete}
+      data-1p-ignore={autoComplete === undefined || autoComplete === 'off' ? true : undefined}
       className={cx(styles.root, invalid && styles.invalid, className)}
       {...rest}
     />

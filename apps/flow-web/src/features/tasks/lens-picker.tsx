@@ -306,6 +306,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
 
       <div className={styles.saveRow}>
         <input
+          data-1p-ignore
           type="text"
           value={nameInput}
           onChange={(e) => {
@@ -331,6 +332,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
       </div>
 
       <textarea
+        data-1p-ignore
         value={descriptionInput}
         onChange={(e) => {
           setDescriptionInput(e.target.value);

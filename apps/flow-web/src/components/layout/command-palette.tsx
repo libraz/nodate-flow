@@ -510,6 +510,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
   return (
     <div className={css.body}>
       <input
+        data-1p-ignore
         ref={inputRef}
         type="text"
         value={query}

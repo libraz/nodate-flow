@@ -140,6 +140,7 @@ export default function ShareLensDialog({
                 <span className={styles.linkLabel}>{t('public_link')}</span>
                 <div className={styles.linkRow}>
                   <input
+                    data-1p-ignore
                     ref={linkRef}
                     type="text"
                     className={`${styles.linkInput} nf-focus-ring`}

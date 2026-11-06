@@ -1,5 +1,6 @@
 /**
  * Textarea — primitive multi-line text input.
+ * Emits `data-1p-ignore` unless `autoComplete` is a credential/identity token (1Password ignores `autocomplete="off"`).
  */
 
 import { forwardRef, type ReactElement, type TextareaHTMLAttributes } from 'react';
@@ -20,13 +21,15 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 /** Textarea renders a styled native `<textarea>` element. */
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   (
-    { className, invalid, dir = 'auto', 'aria-invalid': ariaInvalid, ...rest },
+    { className, invalid, dir = 'auto', 'aria-invalid': ariaInvalid, autoComplete, ...rest },
     ref,
   ): ReactElement => (
     <textarea
       ref={ref}
       dir={dir}
       aria-invalid={ariaInvalid ?? (invalid ? true : undefined)}
+      autoComplete={autoComplete}
+      data-1p-ignore={autoComplete === undefined || autoComplete === 'off' ? true : undefined}
       className={cx(styles.root, invalid && styles.invalid, className)}
       {...rest}
     />

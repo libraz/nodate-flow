@@ -242,6 +242,7 @@ function PickerPanel({
           <path d="M10.5 10.5L13 13" />
         </svg>
         <input
+          data-1p-ignore
           ref={inputRef}
           type="text"
           role="combobox"

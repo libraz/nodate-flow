@@ -111,6 +111,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
         <div className={styles.sidebarColumn}>
           <div className={styles.searchBar}>
             <input
+              data-1p-ignore
               type="search"
               className={styles.searchInput}
               placeholder={t('search_placeholder')}

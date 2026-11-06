@@ -46,6 +46,7 @@ export default function LabelPicker({
         // nf-token-override: component dimension, not a spacing step
         <div className="flex flex-col gap-2 p-2" style={{ minWidth: '14rem' }}>
           <input
+            data-1p-ignore
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

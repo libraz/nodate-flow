@@ -235,6 +235,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         {t('nl_query.label')}
       </label>
       <input
+        data-1p-ignore
         id="nl-query-input"
         type="text"
         autoComplete="off"

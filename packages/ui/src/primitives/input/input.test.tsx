@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 import Input from './input';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 function Controlled(): ReactElement {
   const [v, setV] = useState('');
@@ -68,5 +79,21 @@ describe.each(THEMES)('Input [%s]', (theme) => {
   it('forwards explicit dir="rtl"', () => {
     render(<Input aria-label="rtl-input" dir="rtl" />);
     expect(screen.getByLabelText('rtl-input').getAttribute('dir')).toBe('rtl');
+  });
+
+  it('sets data-1p-ignore by default and with autoComplete="off"', () => {
+    render(
+      <>
+        <Input aria-label="a" />
+        <Input aria-label="b" autoComplete="off" />
+      </>,
+    );
+    expect(screen.getByLabelText('a').hasAttribute('data-1p-ignore')).toBe(true);
+    expect(screen.getByLabelText('b').hasAttribute('data-1p-ignore')).toBe(true);
+  });
+
+  it('omits data-1p-ignore for credential autoComplete tokens', () => {
+    render(<Input aria-label="c" autoComplete="current-password" />);
+    expect(screen.getByLabelText('c').hasAttribute('data-1p-ignore')).toBe(false);
   });
 });

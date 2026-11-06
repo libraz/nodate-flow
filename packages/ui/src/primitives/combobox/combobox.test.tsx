@@ -4,7 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import Combobox, { type ComboboxOption } from './combobox';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 const OPTIONS: ComboboxOption[] = [
   { value: 'apple', label: 'Apple' },
@@ -315,5 +326,10 @@ describe.each(THEMES)('Combobox [%s]', (theme) => {
     } finally {
       Element.prototype.scrollIntoView = original;
     }
+  });
+
+  it('sets data-1p-ignore on the input', () => {
+    render(<Combobox options={OPTIONS} aria-label="fruit" />);
+    expect(screen.getByRole('combobox').hasAttribute('data-1p-ignore')).toBe(true);
   });
 });

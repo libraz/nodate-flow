@@ -408,6 +408,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
     if (isEditing(rowIdx, 'title')) {
       return (
         <input
+          data-1p-ignore
           type="text"
           className={css.cellInput}
           value={editDraft}

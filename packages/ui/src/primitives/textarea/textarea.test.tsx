@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { axe } from 'vitest-axe';
 import Textarea from './textarea';
 
-const THEMES = ['aurora-light', 'aurora-dark', 'dotline-light', 'dotline-dark'] as const;
+const THEMES = [
+  'glass-light',
+  'glass-dark',
+  'modern-light',
+  'modern-dark',
+  'washi-light',
+  'washi-dark',
+  'classic-light',
+  'classic-dark',
+  'nothing-light',
+  'nothing-dark',
+] as const;
 
 function Controlled(): ReactElement {
   const [v, setV] = useState('');
@@ -68,5 +79,21 @@ describe.each(THEMES)('Textarea [%s]', (theme) => {
   it('forwards explicit dir="rtl"', () => {
     render(<Textarea aria-label="rtl-ta" dir="rtl" />);
     expect(screen.getByLabelText('rtl-ta').getAttribute('dir')).toBe('rtl');
+  });
+
+  it('sets data-1p-ignore by default and with autoComplete="off"', () => {
+    render(
+      <>
+        <Textarea aria-label="a" />
+        <Textarea aria-label="b" autoComplete="off" />
+      </>,
+    );
+    expect(screen.getByLabelText('a').hasAttribute('data-1p-ignore')).toBe(true);
+    expect(screen.getByLabelText('b').hasAttribute('data-1p-ignore')).toBe(true);
+  });
+
+  it('omits data-1p-ignore for credential autoComplete tokens', () => {
+    render(<Textarea aria-label="c" autoComplete="current-password" />);
+    expect(screen.getByLabelText('c').hasAttribute('data-1p-ignore')).toBe(false);
   });
 });
