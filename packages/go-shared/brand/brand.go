@@ -1,10 +1,14 @@
-// Package brand resolves the deployment's display name (NF_APP_NAME).
+// Package brand resolves the deployment's display name (NF_APP_NAME) and
+// logo/icon image URLs.
 // The name is a display label only; identifiers such as JWT issuers and
 // key-derivation labels never use it.
 package brand
 
 import (
 	"errors"
+	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -56,4 +60,46 @@ func isForbiddenControl(r rune) bool {
 		return true
 	}
 	return false
+}
+
+// MaxDataURILength is the longest accepted data: image URI, in characters.
+const MaxDataURILength = 32768
+
+const imageSpaceChars = " \t\n\r\f\v"
+
+var dataImagePrefix = regexp.MustCompile(`(?i)^data:image/(png|svg\+xml|webp|jpeg|gif)[;,]`)
+
+// ResolveImageURL trims raw and validates it as an https URL or a bounded
+// data:image URI, returning "" when the trimmed value is empty. Errors name
+// envName and the broken rule, never the value.
+func ResolveImageURL(envName, raw string) (string, error) {
+	v := strings.Trim(raw, imageSpaceChars)
+	if v == "" {
+		return "", nil
+	}
+	for i := 0; i < len(v); i++ {
+		if v[i] < 0x21 || v[i] > 0x7e {
+			return "", fmt.Errorf("%s must contain only printable ASCII characters", envName)
+		}
+	}
+	badKind := fmt.Errorf("%s must be an https URL or a data:image/(png|svg+xml|webp|jpeg|gif) URI", envName)
+	if IsDataURI(v) {
+		if !dataImagePrefix.MatchString(v) {
+			return "", badKind
+		}
+		if len(v) > MaxDataURILength {
+			return "", fmt.Errorf("%s data URI must be at most %d characters", envName, MaxDataURILength)
+		}
+		return v, nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
+		return "", badKind
+	}
+	return v, nil
+}
+
+// IsDataURI reports whether s starts with "data:", ignoring case.
+func IsDataURI(s string) bool {
+	return len(s) >= 5 && strings.EqualFold(s[:5], "data:")
 }

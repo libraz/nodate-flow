@@ -8,8 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
+	"net/mail"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,11 +103,72 @@ func TestSMTPSenderDeliversRFC5322MessageToServer(t *testing.T) {
 		"Reply-To: reply@example.test\r\n",
 		"Subject: =?utf-8?q?",
 		"MIME-Version: 1.0\r\n",
-		"Content-Type: text/plain; charset=utf-8\r\n",
-		"\r\nPlain text body\r\nsecond line",
+		"Content-Type: multipart/alternative; boundary=",
 	} {
 		if !strings.Contains(got.data, want) {
 			t.Fatalf("SMTP DATA missing %q in:\n%s", want, got.data)
+		}
+	}
+}
+
+func TestSMTPSenderSendsMultipartAlternative(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestSMTPServer(t)
+	sender, err := NewSMTPSender(SMTPConfig{
+		Host:  "127.0.0.1",
+		Port:  srv.port,
+		From:  "from@example.test",
+		Brand: Brand{Name: "Acme", LogoURL: "https://cdn.example/l.svg"},
+	})
+	if err != nil {
+		t.Fatalf("NewSMTPSender: %v", err)
+	}
+	body := "Open https://x.example/a?b=1&c=2.\n\n日本語 <tag>"
+	if err := sender.Send(context.Background(), Message{To: []string{"a@example.test"}, Subject: "s", Body: body}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	msg, err := mail.ReadMessage(strings.NewReader(srv.message(t).data))
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	mt, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if err != nil || mt != "multipart/alternative" {
+		t.Fatalf("Content-Type = %q, %v", msg.Header.Get("Content-Type"), err)
+	}
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+	var types, bodies []string
+	for {
+		p, err := mr.NextRawPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("NextRawPart: %v", err)
+		}
+		if got := p.Header.Get("Content-Transfer-Encoding"); got != "quoted-printable" {
+			t.Fatalf("CTE = %q", got)
+		}
+		raw, err := io.ReadAll(quotedprintable.NewReader(p))
+		if err != nil {
+			t.Fatalf("decode part: %v", err)
+		}
+		types = append(types, p.Header.Get("Content-Type"))
+		bodies = append(bodies, string(raw))
+	}
+	if len(types) != 2 || types[0] != "text/plain; charset=utf-8" || types[1] != "text/html; charset=utf-8" {
+		t.Fatalf("part types = %#v", types)
+	}
+	if strings.ReplaceAll(bodies[0], "\r\n", "\n") != body {
+		t.Fatalf("text part = %q", bodies[0])
+	}
+	for _, want := range []string{
+		`<img src="https://cdn.example/l.svg" alt="Acme"`,
+		`<a href="https://x.example/a?b=1&amp;c=2">`,
+		"日本語 &lt;tag&gt;",
+	} {
+		if !strings.Contains(bodies[1], want) {
+			t.Fatalf("html part missing %q in:\n%s", want, bodies[1])
 		}
 	}
 }

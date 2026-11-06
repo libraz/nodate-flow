@@ -57,3 +57,55 @@ func TestNameOrDefault(t *testing.T) {
 	assert.Equal(t, DefaultAppName, NameOrDefault(""))
 	assert.Equal(t, "Acme", NameOrDefault("Acme"))
 }
+
+func TestResolveImageURL(t *testing.T) {
+	const kindErr = "must be an https URL or a data:image/(png|svg+xml|webp|jpeg|gif) URI"
+	const asciiErr = "must contain only printable ASCII characters"
+	dataOf := func(n int) string {
+		p := "data:image/png;base64,"
+		return p + strings.Repeat("A", n-len(p))
+	}
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		wantErr string
+	}{
+		{"empty", "", "", ""},
+		{"spaces", "   ", "", ""},
+		{"tab newline", "\t\n", "", ""},
+		{"trimmed", " https://cdn.example/l.svg ", "https://cdn.example/l.svg", ""},
+		{"upper scheme", "HTTPS://cdn.example/l.svg", "HTTPS://cdn.example/l.svg", ""},
+		{"upper data", "DATA:image/png;base64,AAAA", "DATA:image/png;base64,AAAA", ""},
+		{"svg data", "data:image/svg+xml,%3Csvg%3E", "data:image/svg+xml,%3Csvg%3E", ""},
+		{"bmp", "data:image/bmp;base64,AAAA", "", kindErr},
+		{"http", "http://cdn.example/l.svg", "", kindErr},
+		{"no host", "https://", "", kindErr},
+		{"no scheme", "cdn.example/l.svg", "", kindErr},
+		{"inner space", "https://cdn.example/a b.svg", "", asciiErr},
+		{"inner newline", "https://a.example/x\ny", "", asciiErr},
+		{"non-ascii", "https://例え.jp/l.svg", "", asciiErr},
+		{"data 32768", dataOf(32768), dataOf(32768), ""},
+		{"data 32769", dataOf(32769), "", "data URI must be at most 32768 characters"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveImageURL("NF_APP_LOGO_URL", tt.raw)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "NF_APP_LOGO_URL")
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestIsDataURI(t *testing.T) {
+	assert.True(t, IsDataURI("data:image/png,"))
+	assert.True(t, IsDataURI("DATA:x"))
+	assert.False(t, IsDataURI("https://x"))
+	assert.False(t, IsDataURI("dat"))
+}

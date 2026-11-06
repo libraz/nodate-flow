@@ -12,8 +12,8 @@ import (
 )
 
 // Message is the minimal structured representation of an outbound
-// email. Body is plain text; HTML is intentionally not supported in
-// the v1 surface to keep the deliverability story simple.
+// email. Body is plain text; [SMTPSender] derives the HTML alternative
+// from it, so callers never supply HTML.
 type Message struct {
 	From    string
 	To      []string

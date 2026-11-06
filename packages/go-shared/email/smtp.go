@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 )
 
@@ -25,6 +28,16 @@ type SMTPConfig struct {
 	// From is the default envelope sender used when a [Message] does
 	// not specify one.
 	From string
+	// Brand is shown in the header of the HTML alternative.
+	Brand Brand
+}
+
+// Brand is the deployment identity rendered in the HTML header. Only
+// https image URLs are shown; data: URIs are ignored.
+type Brand struct {
+	Name    string
+	LogoURL string
+	IconURL string
 }
 
 // SMTPSender is a [Sender] backed by net/smtp. It uses PLAIN auth
@@ -87,11 +100,36 @@ func (s *SMTPSender) Send(_ context.Context, m Message) error {
 	}
 	fmt.Fprintf(&b, "Subject: %s\r\n", encodeHeader(m.Subject))
 	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
-	b.WriteString("\r\n")
-	b.WriteString(m.Body)
+	mw := multipart.NewWriter(&b)
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", mw.Boundary())
+	for _, part := range []struct{ ctype, body string }{
+		{"text/plain", m.Body},
+		{"text/html", renderHTML(s.cfg.Brand, m.Body)},
+	} {
+		if err := writeQPPart(mw, part.ctype, part.body); err != nil {
+			return err
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
 
 	return smtp.SendMail(addr, auth, envelopeFrom, envelopeTo, []byte(b.String()))
+}
+
+func writeQPPart(mw *multipart.Writer, ctype, body string) error {
+	h := textproto.MIMEHeader{}
+	h.Set("Content-Type", ctype+"; charset=utf-8")
+	h.Set("Content-Transfer-Encoding", "quoted-printable")
+	w, err := mw.CreatePart(h)
+	if err != nil {
+		return err
+	}
+	qw := quotedprintable.NewWriter(w)
+	if _, err := qw.Write([]byte(body)); err != nil {
+		return err
+	}
+	return qw.Close()
 }
 
 func validateHeaderValues(values ...string) error {
