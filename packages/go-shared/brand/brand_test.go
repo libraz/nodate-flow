@@ -27,10 +27,10 @@ func TestResolveAppName(t *testing.T) {
 		{"nul", "a\x00b", "", true},
 		{"del", "a\x7fb", "", true},
 		{"C1 NEL", "a\u0085b", "", true},
-		{"line separator", "a b", "", true},
-		{"paragraph separator", "a b", "", true},
-		{"bidi override", "a‮b", "", true},
-		{"bidi isolate", "a⁦b", "", true},
+		{"line separator", "a\u2028b", "", true},
+		{"paragraph separator", "a\u2029b", "", true},
+		{"bidi override", "a\u202eb", "", true},
+		{"bidi isolate", "a\u2066b", "", true},
 		{"colon", "a:b", "", true},
 	}
 	for _, tt := range tests {
