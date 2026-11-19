@@ -231,6 +231,14 @@ func OutboundSnapshot() map[string]outbound.LimiterStats {
 // maxRetries is the number of additional attempts after the first 429.
 const maxRetries = 3
 
+type singleAttemptContextKey struct{}
+
+// WithSingleAttempt disables application retries and redirects for a
+// generation whose caller is limiting upstream requests.
+func WithSingleAttempt(ctx context.Context) context.Context {
+	return context.WithValue(ctx, singleAttemptContextKey{}, true)
+}
+
 // waitEgress consumes one token from every cap that applies to this
 // call: the per-workspace bucket when the context carries a workspace
 // ID, then the global per-destination bucket. The workspace bucket is
@@ -266,10 +274,14 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 		return nil, err
 	}
 
-	client := clientForDestination(destination)
+	singleAttempt, _ := ctx.Value(singleAttemptContextKey{}).(bool)
+	client := clientForDestination(destination, singleAttempt)
 	resp, err := client.Do(req) //#nosec G107 G704 -- request URL is configured by workspace admin via the AI provider settings, not derived from end-user input.
 	if err != nil {
 		return nil, err
+	}
+	if singleAttempt {
+		return resp, nil
 	}
 
 	for attempt := 0; attempt < maxRetries && resp.StatusCode == http.StatusTooManyRequests; attempt++ {
@@ -309,8 +321,8 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 	return resp, nil
 }
 
-func clientForDestination(destination string) *http.Client {
-	if destination != DestOpenAIEmbed {
+func clientForDestination(destination string, singleAttempt bool) *http.Client {
+	if destination != DestOpenAIEmbed && !singleAttempt {
 		return sharedClient
 	}
 	client := *sharedClient

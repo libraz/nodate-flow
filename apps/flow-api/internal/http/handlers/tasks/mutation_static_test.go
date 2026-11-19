@@ -56,6 +56,7 @@ var writeOperationsWithoutMutationLog = map[string]string{
 	"tasks-constraints-compile":     "compiles a prompt into a DSL expression and returns it; nothing is stored",
 	"tasks-constraints-explain":     "explains a DSL expression; nothing is stored",
 	"tasks-propose-steps":           "returns an LLM breakdown for the caller to apply; tasks-apply-steps records the change",
+	"tasks-propose-reply":           "returns a reply proposal for the caller to review and apply through existing task mutations",
 	"tasks-propose-smart":           "returns an LLM draft for the caller to apply; tasks-apply-smart records the change",
 	"calendar-events-shift-propose": "computes a shift proposal in a read-only transaction",
 }

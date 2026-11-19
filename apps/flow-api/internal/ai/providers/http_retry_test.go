@@ -101,3 +101,41 @@ func TestEmbeddingClientDoesNotFollowRedirects(t *testing.T) {
 		t.Fatalf("redirect destination calls = %d, want 0", got)
 	}
 }
+
+func TestSingleAttemptDoesNotRetryOrRedirect(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		status int
+	}{
+		{"rate limited", http.StatusTooManyRequests},
+		{"redirect", http.StatusTemporaryRedirect},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var attempts atomic.Uint64
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if attempts.Add(1) == 1 {
+					w.Header().Set("Location", "/second")
+					w.Header().Set("Retry-After", "1")
+					w.WriteHeader(tc.status)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			t.Cleanup(srv.Close)
+			ctx := WithSingleAttempt(t.Context())
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := doLimited(ctx, "llm.test", req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != tc.status || attempts.Load() != 1 {
+				t.Fatalf("status = %d, attempts = %d; want %d and 1", resp.StatusCode, attempts.Load(), tc.status)
+			}
+		})
+	}
+}

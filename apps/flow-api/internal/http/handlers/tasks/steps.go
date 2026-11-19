@@ -6,6 +6,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -48,6 +50,7 @@ type ProposeStepsInput struct {
 	ID   string `path:"id"`
 	Body struct {
 		Granularity string `json:"granularity,omitempty" enum:"coarse,standard,fine" default:"standard" doc:"Decomposition granularity: coarse (3-5), standard (5-8), fine (8-15)"`
+		Instruction string `json:"instruction,omitempty" maxLength:"1000" doc:"Optional task-scoped guidance for the decomposition; treated as untrusted input"`
 	}
 }
 
@@ -131,6 +134,10 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 		if deps.AI == nil {
 			return nil, httpErr(apierrors.AiProviderNotConfigured)
 		}
+		if utf8.RuneCountInString(in.Body.Instruction) > ai.MaxStepsInstructionRunes {
+			return nil, httpErr(apierrors.ValidationBodyFieldInvalid)
+		}
+		instruction := strings.TrimSpace(in.Body.Instruction)
 
 		// Load full task row to get title + description.
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
@@ -198,6 +205,7 @@ func ProposeSteps(deps StepsDeps) func(context.Context, *ProposeStepsInput) (*Pr
 			granularity, children,
 			embedClient, reader,
 			vis,
+			instruction,
 		)
 		if err != nil {
 			return nil, handlerutil.HTTPErrWithRetryAfter(errormodel.AIFailure(err))

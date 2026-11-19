@@ -2222,6 +2222,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{id}/propose-reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose task updates from a reply
+         * @description Interprets a reply and returns task update suggestions for the caller to review and apply through existing task mutation endpoints. No task is changed and no comment is posted automatically.
+         */
+        post: operations["tasks-propose-reply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{id}/propose-steps": {
         parameters: {
             query?: never;
@@ -3016,6 +3036,26 @@ export interface paths {
          * @description Atomically applies archive or snooze with its events and idempotency receipt. Open returns a currently authorized navigation target without resolving the suggestion.
          */
         post: operations["ai-suggestion-execute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/task-digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Summarize selected tasks with AI
+         * @description Creates a short on-demand summary from up to 25 selected tasks. The request is read-only and does not run automatically.
+         */
+        post: operations["ai-task-digest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9354,6 +9394,8 @@ export interface components {
              * @enum {string}
              */
             granularity: "coarse" | "standard" | "fine";
+            /** @description Optional task-scoped guidance for the decomposition; treated as untrusted input */
+            instruction?: string;
         };
         ProposeStepsOutputBody: {
             /**
@@ -9737,6 +9779,37 @@ export interface components {
             derivedState: string;
             equivalent: boolean;
             stored: string;
+        };
+        ReplyProposal: {
+            clarification?: string;
+            /** @description Suggested comment text; it is not posted automatically */
+            comment?: string;
+            /** @description Proposed due date, YYYY-MM-DD */
+            dueOn?: string;
+            /** @enum {string} */
+            transition?: "start" | "block" | "unblock" | "submit" | "complete" | "reopen" | "cancel";
+        };
+        ReplyProposalInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReplyProposalInputBody.json
+             */
+            readonly $schema?: string;
+            reply: string;
+        };
+        ReplyProposalOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReplyProposalOutputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Current YYYY-MM-DD due date; empty when unset */
+            expectedDueOn: string;
+            expectedState: string;
+            proposal: components["schemas"]["ReplyProposal"];
+            taskId: string;
         };
         ResolveBody: {
             /**
@@ -10449,6 +10522,27 @@ export interface components {
             otherTaskDerivedState: string;
             otherTaskId: string;
             otherTaskTitle: string;
+        };
+        TaskDigestInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskDigestInputBody.json
+             */
+            readonly $schema?: string;
+            /** @description Task public IDs to summarize (up to 25) */
+            taskIds: string[] | null;
+        };
+        TaskDigestOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/TaskDigestOutputBody.json
+             */
+            readonly $schema?: string;
+            summary: string;
+            /** Format: int64 */
+            taskCount: number;
         };
         TaskEventLink: {
             /**
@@ -15794,6 +15888,41 @@ export interface operations {
             };
         };
     };
+    "tasks-propose-reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyProposalInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyProposalOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "tasks-propose-steps": {
         parameters: {
             query?: never;
@@ -17407,6 +17536,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExecuteResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-task-digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskDigestInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskDigestOutputBody"];
                 };
             };
             /** @description Error */

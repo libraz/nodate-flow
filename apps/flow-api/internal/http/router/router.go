@@ -987,6 +987,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		dashDeps := dashboard.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: shared.mutationRec}
 		dashboard.RegisterWorkspaceScoped(subAPI, dashDeps)
 		pages.RegisterWorkspaceScoped(subAPI, newPageDeps(deps, shared))
+		aihandlers.RegisterTaskDigest(subAPI, shared.aiDeps, shared.aiOrch)
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "ai-cost-today",
 			Method:      http.MethodGet,
@@ -1300,6 +1301,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 		taskworkflow.RegisterTaskScopedEditorWrites(subAPI, workflowDeps)
 		labels.RegisterTaskScopedWrites(subAPI, labelTaskDeps)
 		tasks.RegisterSteps(subAPI, stepsDeps)
+		tasks.RegisterReplyProposal(subAPI, stepsDeps)
 	})
 
 	// Workspace timeline + event reversal. Both share

@@ -9218,6 +9218,11 @@
             "description": "Decomposition granularity: coarse (3-5), standard (5-8), fine (8-15)",
             "enum": ["coarse", "standard", "fine"],
             "type": "string"
+          },
+          "instruction": {
+            "description": "Optional task-scoped guidance for the decomposition; treated as untrusted input",
+            "maxLength": 1000,
+            "type": "string"
           }
         },
         "type": "object"
@@ -10065,6 +10070,75 @@
           }
         },
         "required": ["derivedState", "equivalent", "stored"],
+        "type": "object"
+      },
+      "ReplyProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "clarification": {
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "comment": {
+            "description": "Suggested comment text; it is not posted automatically",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "dueOn": {
+            "description": "Proposed due date, YYYY-MM-DD",
+            "type": "string"
+          },
+          "transition": {
+            "enum": ["start", "block", "unblock", "submit", "complete", "reopen", "cancel"],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReplyProposalInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReplyProposalInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "reply": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["reply"],
+        "type": "object"
+      },
+      "ReplyProposalOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ReplyProposalOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedDueOn": {
+            "description": "Current YYYY-MM-DD due date; empty when unset",
+            "type": "string"
+          },
+          "expectedState": {
+            "type": "string"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/ReplyProposal"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": ["taskId", "expectedState", "expectedDueOn", "proposal"],
         "type": "object"
       },
       "ResolveBody": {
@@ -11653,6 +11727,49 @@
           "otherTaskDerivedState",
           "createdAt"
         ],
+        "type": "object"
+      },
+      "TaskDigestInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskDigestInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "taskIds": {
+            "description": "Task public IDs to summarize (up to 25)",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 25,
+            "type": ["array", "null"]
+          }
+        },
+        "required": ["taskIds"],
+        "type": "object"
+      },
+      "TaskDigestOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/TaskDigestOutputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "taskCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": ["summary", "taskCount"],
         "type": "object"
       },
       "TaskEventLink": {
@@ -20932,6 +21049,61 @@
         "tags": ["Tasks"]
       }
     },
+    "/tasks/{id}/propose-reply": {
+      "post": {
+        "description": "Interprets a reply and returns task update suggestions for the caller to review and apply through existing task mutation endpoints. No task is changed and no comment is posted automatically.",
+        "operationId": "tasks-propose-reply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyProposalInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplyProposalOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Propose task updates from a reply",
+        "tags": ["Tasks"]
+      }
+    },
     "/tasks/{id}/propose-steps": {
       "post": {
         "description": "Asks the workspace's LLM to decompose this task into ordered execution steps. Nothing is written until the returned steps are submitted to /apply-steps.",
@@ -23617,6 +23789,61 @@
         ],
         "summary": "Execute a persisted AI inbox suggestion",
         "tags": ["Tasks"]
+      }
+    },
+    "/workspaces/{wsId}/ai/task-digest": {
+      "post": {
+        "description": "Creates a short on-demand summary from up to 25 selected tasks. The request is read-only and does not run automatically.",
+        "operationId": "ai-task-digest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDigestInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDigestOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Summarize selected tasks with AI",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/weekly-digest": {
