@@ -375,7 +375,12 @@ func (o *Orchestrator) ProposeSteps(
 	if cacheReader == nil {
 		cacheReader, _ = o.Queries.(SmartCreateReader)
 	}
-	cacheKey := proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, TaskIDFromContext(ctx))
+	includeSimilar := embedClient != nil && reader != nil
+	if checker, ok := embedClient.(workspaceEmbedChecker); includeSimilar && ok {
+		includeSimilar = checker.CheckWorkspace(ctx, workspaceID) == nil
+	}
+	subjectTaskID := TaskIDFromContext(ctx)
+	cacheKey := proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, subjectTaskID, includeSimilar)
 	var cached []ProposedTask
 	if o.ProposalCache != nil {
 		if snapshot, ok := o.ProposalCache.getEnvelope(cacheKey, &cached); ok {
@@ -393,7 +398,7 @@ func (o *Orchestrator) ProposeSteps(
 
 	// ---- find similar past tasks (optional) ----
 	var ranked []scoredTask
-	if embedClient != nil && reader != nil {
+	if includeSimilar {
 		taskText := composeText(title, description)
 		if taskText != "" {
 			queryVec, embedErr := embedClient.EmbedQuery(ctx, workspaceID, taskText)
@@ -436,12 +441,12 @@ func (o *Orchestrator) ProposeSteps(
 	if loadErr != nil {
 		return nil, fmt.Errorf("ai: validate step-proposal inputs: %w", loadErr)
 	}
-	if !sameProposalVisibility(vis, latestVis) || !sameStepsPromptInputs(existingChildren, ranked, rows, TaskIDFromContext(ctx), title, description) {
+	if !sameProposalVisibility(vis, latestVis) || !sameStepsPromptInputs(existingChildren, ranked, rows, subjectTaskID, title, description) {
 		return nil, ErrProposalInputsChanged
 	}
 	cacheSnapshot := proposalCacheSnapshotFromRows(rows)
 	vis = latestVis
-	cacheKey = proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, TaskIDFromContext(ctx))
+	cacheKey = proposeStepsCacheKey(workspaceID, title, description, granularity, existingChildren, vis, subjectTaskID, includeSimilar)
 	cacheable := o.ProposalCache != nil
 
 	// ---- build user prompt ----
@@ -480,12 +485,13 @@ func (o *Orchestrator) ProposeSteps(
 
 // proposeStepsCacheKey keys a decomposition on every prompt input: the
 // actor's visibility (the similar tasks quoted are that actor's readable
-// set) and the existing children (adding a subtask changes what must not
-// be duplicated). The child count leads so the key stays unambiguous.
-func proposeStepsCacheKey(workspaceID uint32, title, description string, granularity Granularity, children []ChildTaskSummary, vis acl.VisibilityArgs, subjectTaskID uint32) string {
-	parts := make([]string, 0, 6+3*len(children))
+// set), embedding availability, and the existing children (adding a subtask
+// changes what must not be duplicated).
+func proposeStepsCacheKey(workspaceID uint32, title, description string, granularity Granularity, children []ChildTaskSummary, vis acl.VisibilityArgs, subjectTaskID uint32, includeSimilar bool) string {
+	parts := make([]string, 0, 8+3*len(children))
 	parts = append(parts, "propose_steps", VisibilityCacheScope(vis), title, description, string(granularity),
 		"subject:"+strconv.FormatUint(uint64(subjectTaskID), 10),
+		"similar:"+strconv.FormatBool(includeSimilar),
 		"children:"+strconv.Itoa(len(children)))
 	for _, c := range children {
 		parts = append(parts, c.PublicID, c.Title, c.State)

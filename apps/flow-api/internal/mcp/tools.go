@@ -1854,6 +1854,12 @@ func rankSimilarTasks(ctx context.Context, deps Deps, s *session, wsRole acl.Wor
 	if stderrors.Is(err, embed.ErrNoSourceVector) {
 		return deps.Embedder.Model(), nil, nil
 	}
+	if stderrors.Is(err, embed.ErrWorkspaceDisabled) {
+		return deps.Embedder.Model(), nil, apierrors.New(apierrors.AiEmbeddingDisabled)
+	}
+	if stderrors.Is(err, embed.ErrWorkspaceNotConfigured) {
+		return deps.Embedder.Model(), nil, apierrors.New(apierrors.AiEmbeddingNotConfigured)
+	}
 	if err != nil {
 		return deps.Embedder.Model(), nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
@@ -3021,7 +3027,14 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
 	}
 	if deps.Embedder == nil {
-		return nil, apierrors.New(apierrors.AiProviderNotConfigured)
+		policyErr := embed.CheckWorkspacePolicy(ctx, deps.Queries, s.workspaceID)
+		if stderrors.Is(policyErr, embed.ErrWorkspaceDisabled) {
+			return nil, apierrors.New(apierrors.AiEmbeddingDisabled)
+		}
+		if policyErr != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, policyErr)
+		}
+		return nil, apierrors.New(apierrors.AiEmbeddingNotConfigured)
 	}
 
 	// Call the smart create orchestrator. The embed client satisfies

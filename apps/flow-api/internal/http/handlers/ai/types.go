@@ -36,7 +36,10 @@ type Deps struct {
 	// Audit records audit log entries. Nil-safe.
 	Audit *audit.Recorder
 	// Mutations records a change on both the timeline and the audit log.
-	Mutations *mutationlog.Recorder
+	Mutations       *mutationlog.Recorder
+	EmbedConfigured bool
+	EmbedModel      string
+	EmbedEndpoint   string
 }
 
 // httpErr delegates to handlerutil.HTTPErr.

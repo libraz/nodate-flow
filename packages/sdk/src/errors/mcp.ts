@@ -31,6 +31,11 @@ export const McpErrors = {
     status: 401,
     message: "MCP token has been revoked",
   },
+  MCP_TOKEN_SESSION_REQUIRED: {
+    code: "MCP.TOKEN.SESSION_REQUIRED",
+    status: 403,
+    message: "An active user session is required to manage MCP tokens",
+  },
   MCP_TOKEN_UNKNOWN: {
     code: "MCP.TOKEN.UNKNOWN",
     status: 401,

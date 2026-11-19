@@ -261,8 +261,10 @@ type CreateTaskOutput struct {
 // (ListTasksForProjectKeyset / ListTasksForWorkspaceKeyset) and emits
 // `nextCursor` in the response; otherwise the historical OFFSET path
 // is used and `nextCursor` is empty. Mixing `cursor` with filters
-// (`q`, `state`, `assignee`) keeps the OFFSET path because the keyset
-// queries do not express those predicates.
+// (`q`, `state`, `assignee`, priority, or due dates) keeps the OFFSET
+// path because the keyset queries do not express those predicates. Due
+// date filters reject a cursor so callers cannot mistake an offset page
+// for a cursor page.
 type ListTasksInput struct {
 	ProjectID   string   `query:"projectId" doc:"Optional project public id (UUID v7) to scope the list"`
 	WorkspaceID string   `query:"workspaceId" doc:"Workspace public id (UUID v7); required when projectId is not given"`
@@ -270,7 +272,9 @@ type ListTasksInput struct {
 	State       []string `query:"state" doc:"Filter by derived_state; repeat to OR multiple values"`
 	Assignee    string   `query:"assignee" doc:"Filter to tasks with this user as an assignee (user public id UUID v7)"`
 	Priority    []int32  `query:"priority" minimum:"0" maximum:"4" doc:"Filter by priority level; comma-separate to OR multiple values (priority=4,2)"`
-	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
+	DueFrom     string   `query:"dueFrom" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
+	DueThrough  string   `query:"dueThrough" pattern:"^\\d{4}-\\d{2}-\\d{2}$" doc:"Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination."`
+	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough."`
 	Limit       int32    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 	Offset      int32    `query:"offset" minimum:"0" default:"0"`
 }
@@ -368,17 +372,19 @@ type GetTaskOutput struct {
 
 // PatchTaskBody is the JSON body for PATCH /tasks/{id}.
 type PatchTaskBody struct {
-	Title       *string `json:"title,omitempty" minLength:"1" maxLength:"500"`
-	Description *string `json:"description,omitempty" maxLength:"50000"`
-	Priority    *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
-	DueOn       *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
-	StartOn     *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
-	SortWeight  *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
-	Visibility  *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
+	Title         *string `json:"title,omitempty" minLength:"1" maxLength:"500"`
+	Description   *string `json:"description,omitempty" maxLength:"50000"`
+	Priority      *int32  `json:"priority,omitempty" minimum:"0" maximum:"4"`
+	DueOn         *string `json:"dueOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+	StartOn       *string `json:"startOn,omitempty" doc:"YYYY-MM-DD or empty string to clear"`
+	SortWeight    *int32  `json:"sortWeight,omitempty" doc:"Display order weight. Lower values sort first."`
+	Visibility    *string `json:"visibility,omitempty" enum:"public,project,private" doc:"Task visibility: public (workspace), project (project members), or private (task actors only)"`
+	ExpectedDueOn *string `json:"expectedDueOn,omitempty" doc:"Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date."`
 }
 
 // PatchTaskInput is the request for PATCH /tasks/{id}.
 type PatchTaskInput struct {
+	handlerutil.IdempotencyKeyInput
 	ID   string `path:"id"`
 	Body PatchTaskBody
 }
@@ -437,13 +443,15 @@ type ReorderTasksOutput struct {
 
 // TransitionTaskBody is the JSON body for POST /tasks/{id}/transitions.
 type TransitionTaskBody struct {
-	Transition string `json:"transition" enum:"start,block,unblock,submit,complete,reopen,cancel" doc:"State machine transition name"`
-	Reason     string `json:"reason,omitempty" maxLength:"2000" doc:"Optional human-readable reason recorded on the event"`
-	OccurredAt int64  `json:"occurredAt,omitempty" doc:"Optional client-provided unix seconds timestamp; ignored for storage"`
+	Transition    string `json:"transition" enum:"start,block,unblock,submit,complete,reopen,cancel" doc:"State machine transition name"`
+	Reason        string `json:"reason,omitempty" maxLength:"2000" doc:"Optional human-readable reason recorded on the event"`
+	OccurredAt    int64  `json:"occurredAt,omitempty" doc:"Optional client-provided unix seconds timestamp; ignored for storage"`
+	ExpectedState string `json:"expectedState,omitempty" enum:"open,waiting,review,done,cancelled" doc:"Apply only if the task is still in this state"`
 }
 
 // TransitionTaskInput is the request for POST /tasks/{id}/transitions.
 type TransitionTaskInput struct {
+	handlerutil.IdempotencyKeyInput
 	ID   string `path:"id"`
 	Body TransitionTaskBody
 }
@@ -787,6 +795,7 @@ type AddTaskCommentBody struct {
 
 // AddTaskCommentInput is the request for POST /tasks/{id}/comments.
 type AddTaskCommentInput struct {
+	handlerutil.IdempotencyKeyInput
 	ID   string `path:"id"`
 	Body AddTaskCommentBody
 }

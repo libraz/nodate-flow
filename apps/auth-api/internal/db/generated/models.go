@@ -2638,6 +2638,48 @@ func (ns NullWebhookDeliveriesStatus) Value() (driver.Value, error) {
 	return string(ns.WebhookDeliveriesStatus), nil
 }
 
+type WorkspaceEmbeddingSettingsMode string
+
+const (
+	WorkspaceEmbeddingSettingsModeInherit  WorkspaceEmbeddingSettingsMode = "inherit"
+	WorkspaceEmbeddingSettingsModeDisabled WorkspaceEmbeddingSettingsMode = "disabled"
+)
+
+func (e *WorkspaceEmbeddingSettingsMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = WorkspaceEmbeddingSettingsMode(s)
+	case string:
+		*e = WorkspaceEmbeddingSettingsMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for WorkspaceEmbeddingSettingsMode: %T", src)
+	}
+	return nil
+}
+
+type NullWorkspaceEmbeddingSettingsMode struct {
+	WorkspaceEmbeddingSettingsMode WorkspaceEmbeddingSettingsMode `json:"workspaceEmbeddingSettingsMode"`
+	Valid                          bool                           `json:"valid"` // Valid is true if WorkspaceEmbeddingSettingsMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullWorkspaceEmbeddingSettingsMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.WorkspaceEmbeddingSettingsMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.WorkspaceEmbeddingSettingsMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullWorkspaceEmbeddingSettingsMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.WorkspaceEmbeddingSettingsMode), nil
+}
+
 type WorkspaceInvitesRole string
 
 const (
@@ -5508,6 +5550,20 @@ type Workspace struct {
 	Enabled   bool         `json:"enabled"`
 	UpdatedAt sql.NullTime `json:"updatedAt"`
 	CreatedAt time.Time    `json:"createdAt"`
+}
+
+// Per-workspace embedding provider policy
+type WorkspaceEmbeddingSetting struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// Workspace this embedding policy applies to
+	WorkspaceID uint32 `json:"-"`
+	// Last modifying user.id; NULL when the user is removed
+	ModifiedByUserID sql.NullInt32 `json:"-"`
+	// Whether to use the instance embedding provider or disable it for this workspace
+	Mode      WorkspaceEmbeddingSettingsMode `json:"mode"`
+	UpdatedAt sql.NullTime                   `json:"updatedAt"`
+	CreatedAt time.Time                      `json:"createdAt"`
 }
 
 // Token-based workspace invite links

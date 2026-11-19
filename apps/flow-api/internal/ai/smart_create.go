@@ -36,6 +36,10 @@ type EmbedClient interface {
 	Model() string
 }
 
+type workspaceEmbedChecker interface {
+	CheckWorkspace(ctx context.Context, workspaceID uint32) error
+}
+
 // SmartCreateReader is the narrow contract ProposeSmartCreate uses to
 // fetch task assignee and workspace member information for the LLM
 // prompt. The methods are satisfied by *generated.Queries.
@@ -168,6 +172,14 @@ func (o *Orchestrator) ProposeSmartCreate(
 	// ---- guard ----
 	if o == nil || o.Resolver == nil {
 		return nil, ErrNoProvider
+	}
+	if embedClient == nil {
+		return nil, embed.ErrWorkspaceNotConfigured
+	}
+	if checker, ok := embedClient.(workspaceEmbedChecker); ok {
+		if err := checker.CheckWorkspace(ctx, workspaceID); err != nil {
+			return nil, fmt.Errorf("ai: smart create embedding is unavailable: %w", err)
+		}
 	}
 	if _, err := CheckBudget(ctx, o.Guard, workspaceID); err != nil {
 		return nil, err

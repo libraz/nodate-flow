@@ -20,6 +20,8 @@ nodate-flow is a set of Go services and two React apps over one MySQL database. 
 
 flow-worker connects to MySQL itself and to flow-api with a shared service token. presence-discord does not touch the database: it looks up the flow user for a Discord account and posts signals, both over HTTP to flow-api, so a compromised gateway is bounded by what that token allows.
 
+Task embeddings are stored as 768-dimensional vectors in MySQL. For similarity suggestions, the database selects up to 200 recent tasks that match the workspace and embedding model and that the caller can read. flow-api ranks that candidate set by cosine similarity. Older tasks outside the candidate set are excluded. MySQL Community provides vector storage. The native vector distance function is available in HeatWave and MySQL AI. [MySQL vector functions](https://dev.mysql.com/doc/refman/26.10/en/vector-functions.html)
+
 By default flow-api keeps its event stream and its outbound rate limiter in process, which assumes one replica. Setting `NF_FLOW_STREAM_BACKEND` and `NF_FLOW_OUTBOUND_BACKEND` to `redis` moves both to a Redis-compatible store shared by replicas. The stream also tails the `events` table (`NF_FLOW_STREAM_TAIL`, on by default), so changes written by another process reach connected clients.
 
 The development compose file adds a Redis-compatible store, a mail catcher, an OpenTelemetry collector, Prometheus and Grafana. Their configuration is under `infra/`.

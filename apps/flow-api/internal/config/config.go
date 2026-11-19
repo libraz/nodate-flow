@@ -3,10 +3,13 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/libraz/nodate-flow/packages/go-shared/brand"
@@ -265,11 +268,13 @@ type Config struct {
 	// When false, the POST /auth/register endpoint returns 403.
 	RegistrationOpen bool `env:"NF_REGISTRATION_OPEN" envDefault:"true"`
 
-	// EmbedOpenAIKey is the plaintext OpenAI API key used by the
+	// EmbedOpenAIKey is the optional OpenAI API key used by the
 	// task-embedding pipeline (text-embedding-3-small, 768 dims). When
-	// empty the embedding system falls back to the deterministic mock
-	// provider.
+	// empty, embedding is unavailable unless NF_FLOW_AI_MOCK is enabled.
 	EmbedOpenAIKey string `env:"NF_FLOW_EMBED_OPENAI_KEY" envDefault:""`
+	// EmbedOpenAIKeyFile is an optional path to the OpenAI embedding key.
+	// Prefer this to passing the key through the container environment.
+	EmbedOpenAIKeyFile string `env:"NF_FLOW_EMBED_OPENAI_KEY_FILE" envDefault:""`
 	// EmbedModel overrides the default OpenAI embedding model
 	// (text-embedding-3-small). Use text-embedding-3-large for higher
 	// fidelity or an Azure/compatible endpoint's model name.
@@ -311,6 +316,11 @@ func Load() (*Config, error) {
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
 	}
+	embedKey, err := loadEmbedOpenAIKey(cfg.EmbedOpenAIKey, cfg.EmbedOpenAIKeyFile)
+	if err != nil {
+		return nil, err
+	}
+	cfg.EmbedOpenAIKey = embedKey
 	if err := validateEnums(cfg); err != nil {
 		return nil, err
 	}
@@ -326,6 +336,80 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// loadEmbedOpenAIKey resolves the environment and file sources for the
+// optional server-wide embedding key. The error messages deliberately omit
+// both the key and file contents.
+func loadEmbedOpenAIKey(envKey, keyFile string) (string, error) {
+	if envKey != "" && keyFile != "" {
+		return "", fmt.Errorf("config: set only one of NF_FLOW_EMBED_OPENAI_KEY or NF_FLOW_EMBED_OPENAI_KEY_FILE")
+	}
+
+	key := envKey
+	if keyFile != "" {
+		contents, err := readEmbedOpenAIKeyFile(keyFile)
+		if err != nil {
+			return "", fmt.Errorf("config: NF_FLOW_EMBED_OPENAI_KEY_FILE could not be read")
+		}
+		key = string(contents)
+		clear(contents)
+		if strings.HasSuffix(key, "\r\n") {
+			key = strings.TrimSuffix(key, "\r\n")
+		} else if strings.HasSuffix(key, "\n") {
+			key = strings.TrimSuffix(key, "\n")
+		}
+		if key == "" {
+			return "", fmt.Errorf("config: NF_FLOW_EMBED_OPENAI_KEY_FILE must contain an API key")
+		}
+	}
+
+	if key == "" {
+		return "", nil
+	}
+	for _, character := range key {
+		if unicode.IsControl(character) || unicode.IsSpace(character) {
+			return "", fmt.Errorf("config: the embedding API key must not contain whitespace or control characters")
+		}
+	}
+	return key, nil
+}
+
+const maxEmbedOpenAIKeyFileBytes = 4 << 10
+
+func readEmbedOpenAIKeyFile(path string) ([]byte, error) {
+	// Check before opening so a misconfigured FIFO does not block startup.
+	source, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !source.Mode().IsRegular() {
+		return nil, fmt.Errorf("embedding API key file is not a regular file")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxEmbedOpenAIKeyFileBytes {
+		return nil, fmt.Errorf("embedding API key file is not a small regular file")
+	}
+
+	contents, err := io.ReadAll(io.LimitReader(file, maxEmbedOpenAIKeyFileBytes+1))
+	if err != nil {
+		clear(contents)
+		return nil, err
+	}
+	if len(contents) > maxEmbedOpenAIKeyFileBytes {
+		clear(contents)
+		return nil, fmt.Errorf("embedding API key file is too large")
+	}
+	return contents, nil
 }
 
 // IsDev reports whether the api is running in a development environment.

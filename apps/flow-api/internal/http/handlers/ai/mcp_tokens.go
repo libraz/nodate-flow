@@ -14,6 +14,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mcp"
+	"github.com/libraz/nodate-flow/packages/go-shared/authn"
 )
 
 // mcpTokenDisplayPrefixLen is the number of leading plaintext characters
@@ -22,12 +23,27 @@ import (
 // begin with "mcp_") so users can identify their tokens at a glance.
 const mcpTokenDisplayPrefixLen = 8
 
+// requireMcpTokenManagementSession keeps long-lived bearer tokens from
+// minting or revoking other credentials. A JWT kind alone is insufficient
+// because legacy JWTs without a session claim are accepted by the resolver.
+func requireMcpTokenManagementSession(ctx context.Context) error {
+	kind, hasKind := authn.TokenKindFromContext(ctx)
+	_, hasSession := authn.SessionPublicIDFromContext(ctx)
+	if !hasKind || kind != authn.TokenKindJWT || !hasSession {
+		return httpErr(apierrors.McpTokenSessionRequired)
+	}
+	return nil
+}
+
 // CreateMcpToken handles POST /workspaces/{wsId}/me/mcp-tokens.
 //
 // The plaintext token is returned exactly once in the response and never
 // stored or logged. Only the SHA-256 hash is persisted.
 func CreateMcpToken(deps Deps) func(context.Context, *CreateMcpTokenInput) (*CreateMcpTokenOutput, error) {
 	return func(ctx context.Context, in *CreateMcpTokenInput) (*CreateMcpTokenOutput, error) {
+		if err := requireMcpTokenManagementSession(ctx); err != nil {
+			return nil, err
+		}
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
@@ -195,6 +211,9 @@ func ListMcpTokens(deps Deps) func(context.Context, *ListMcpTokensInput) (*ListM
 // DeleteMcpToken handles DELETE /workspaces/{wsId}/me/mcp-tokens/{tokenId}.
 func DeleteMcpToken(deps Deps) func(context.Context, *DeleteMcpTokenInput) (*DeleteMcpTokenOutput, error) {
 	return func(ctx context.Context, in *DeleteMcpTokenInput) (*DeleteMcpTokenOutput, error) {
+		if err := requireMcpTokenManagementSession(ctx); err != nil {
+			return nil, err
+		}
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)

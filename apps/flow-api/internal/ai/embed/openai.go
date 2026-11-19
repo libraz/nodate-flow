@@ -23,17 +23,6 @@ type Decryptor interface {
 	Decrypt(blob []byte) ([]byte, error)
 }
 
-// identityDecryptor is a fallback Decryptor that returns a copy of the
-// input bytes. Used when no real cipher is available at startup so the
-// provider still follows the decrypt-use-zero lifecycle.
-type identityDecryptor struct{}
-
-func (identityDecryptor) Decrypt(blob []byte) ([]byte, error) {
-	out := make([]byte, len(blob))
-	copy(out, blob)
-	return out, nil
-}
-
 const (
 	defaultOpenAIEmbedURL   = "https://api.openai.com/v1/embeddings"
 	defaultOpenAIEmbedModel = "text-embedding-3-small"
@@ -83,12 +72,11 @@ func WithOpenAIBaseURL(u string) OpenAIOption {
 // NewOpenAIProvider creates an embedding provider backed by the OpenAI
 // Embeddings API. keyCiphertext is the encrypted API key blob; dec is
 // used to decrypt it on every call. The plaintext is zeroed immediately
-// after each use. When dec is nil an identity decryptor is used (the
-// blob is treated as plaintext — useful when no cipher is available at
-// startup, but the decrypt-use-zero lifecycle still applies).
-func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption) *OpenAIProvider {
+// after each use. A real decryptor is required so plaintext keys are never
+// stored in the provider.
+func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption) (*OpenAIProvider, error) {
 	if dec == nil {
-		dec = identityDecryptor{}
+		return nil, errors.New("embed: decryptor is required")
 	}
 	p := &OpenAIProvider{
 		keyCiphertext: keyCiphertext,
@@ -100,11 +88,51 @@ func NewOpenAIProvider(keyCiphertext []byte, dec Decryptor, opts ...OpenAIOption
 	for _, o := range opts {
 		o(p)
 	}
-	return p
+	if !validEmbeddingEndpoint(p.url) {
+		return nil, errors.New("embed: endpoint must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	return p, nil
+}
+
+// ValidateOpenAIBaseURL validates the configured embeddings API base URL.
+// HTTP is accepted only when allowHTTP is true, which is intended for local
+// development endpoints.
+func ValidateOpenAIBaseURL(raw string, allowHTTP bool) error {
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.Opaque != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return errors.New("embed: endpoint must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	if u.Hostname() == "" {
+		return errors.New("embed: endpoint host is required")
+	}
+	if u.Scheme == "https" || allowHTTP && u.Scheme == "http" {
+		return nil
+	}
+	return errors.New("embed: endpoint must use HTTPS")
+}
+
+func validEmbeddingEndpoint(raw string) bool {
+	return ValidateOpenAIBaseURL(raw, true) == nil
 }
 
 // Model implements Provider.
 func (p *OpenAIProvider) Model() string { return p.model }
+
+// PublicEndpoint returns the endpoint origin without a path that could carry
+// provider credentials or other private routing data.
+func (p *OpenAIProvider) PublicEndpoint() string {
+	if p == nil {
+		return ""
+	}
+	u, err := url.Parse(p.url)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
 
 // ProviderName returns the metrics/audit provider label for embedding calls.
 func (p *OpenAIProvider) ProviderName() string { return "openai" }
@@ -176,7 +204,7 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 		return nil, fmt.Errorf("openai embed: parse: %w", providers.ErrResponseInvalidJSON)
 	}
 	if or.Error != nil {
-		return nil, fmt.Errorf("openai embed: upstream error type %q: %w", or.Error.Type, providers.ErrUpstreamRequestRejected)
+		return nil, fmt.Errorf("openai embed: upstream request rejected: %w", providers.ErrUpstreamRequestRejected)
 	}
 	if len(or.Data) == 0 || len(or.Data[0].Embedding) == 0 {
 		return nil, fmt.Errorf("openai embed: empty embedding in response: %w", providers.ErrResponseSchemaMismatch)

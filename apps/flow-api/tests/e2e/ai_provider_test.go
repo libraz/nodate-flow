@@ -39,11 +39,25 @@ func TestAIProviderCRUD(t *testing.T) {
 		ID           string `json:"id"`
 		Kind         string `json:"kind"`
 		APIKeyMasked string `json:"apiKeyMasked"`
+		DefaultModel string `json:"defaultModel"`
 	}
 	require.NoError(t, json.Unmarshal(body, &created))
 	require.NotEmpty(t, created.ID)
 	require.Equal(t, "anthropic", created.Kind)
 	require.NotEmpty(t, created.APIKeyMasked)
+	require.Equal(t, "claude-sonnet-5-5", created.DefaultModel)
+
+	var modelName string
+	var inputPrice, outputPrice uint32
+	require.NoError(t, testDB.QueryRow(
+		`SELECT m.name, m.input_price_micro_usd_per_mtok, m.output_price_micro_usd_per_mtok
+		   FROM ai_models m
+		   JOIN ai_providers p ON m.provider_id = p.id
+		  WHERE p.public_id = UUID_TO_BIN(?, 0)`, created.ID,
+	).Scan(&modelName, &inputPrice, &outputPrice))
+	require.Equal(t, created.DefaultModel, modelName)
+	require.Equal(t, uint32(2_000_000), inputPrice)
+	require.Equal(t, uint32(10_000_000), outputPrice)
 
 	// List — no ciphertext, no plaintext.
 	status, body = doJSONStatus(t, http.MethodGet,

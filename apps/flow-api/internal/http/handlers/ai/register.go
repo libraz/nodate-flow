@@ -55,7 +55,7 @@ func RegisterMcpTokens(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/workspaces/{wsId}/me/mcp-tokens",
 		Summary:     "Mint a new MCP bearer token (plaintext returned once)",
-		Description: "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.",
+		Description: "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. Requires an active user session. The plaintext token is returned exactly once; only the hash is stored.",
 		Tags:        []string{"AI"},
 	}, CreateMcpToken(deps))
 
@@ -73,7 +73,7 @@ func RegisterMcpTokens(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/workspaces/{wsId}/me/mcp-tokens/{tokenId}",
 		Summary:     "Revoke an MCP bearer token",
-		Description: "Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
+		Description: "Marks the token as revoked so future /mcp requests carrying it are rejected. Requires an active user session. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
 		Tags:        []string{"AI"},
 	}, DeleteMcpToken(deps))
 }

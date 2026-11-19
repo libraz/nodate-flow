@@ -44,6 +44,15 @@ resources:
   token_admin:
     breadcrumb: "MCP > Token"
     errors:
+      session_required:
+        code: MCP.TOKEN.SESSION_REQUIRED
+        status: 403
+        message: "An active user session is required to manage MCP tokens"
+        message_ja: "MCP トークンの管理にはログイン中のセッションが必要です"
+        message_zh: "管理 MCP 令牌需要有效的用户会话"
+        description: "Returned when a request to issue or revoke an MCP token is authenticated without an active user session."
+        userAction: "Sign in and manage MCP tokens from your account settings."
+
       not_found:
         code: MCP.TOKEN.NOT_FOUND
         status: 404

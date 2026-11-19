@@ -1,0 +1,73 @@
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+}
+
+.settingCopy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.settingLabel {
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.settingDescription,
+.privacyNote {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  margin: 0;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.3fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--nf-space-3);
+  font-size: var(--nf-text-sm);
+}
+
+.detailRow dt {
+  color: var(--nf-color-fg-muted);
+}
+
+.detailRow dd {
+  min-inline-size: 0;
+  margin: 0;
+  color: var(--nf-color-fg);
+}
+
+.endpoint {
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-micro);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-danger-fg);
+}
+
+.skeletonRow {
+  block-size: 2.75rem;
+  inline-size: 100%;
+}
+
+@media (max-width: 40rem) {
+  .detailRow {
+    grid-template-columns: 1fr;
+    gap: var(--nf-space-1);
+  }
+}

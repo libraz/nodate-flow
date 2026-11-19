@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlcommand"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlconstraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/nlquery"
@@ -23,6 +24,12 @@ import (
 // provider.
 func AIFailure(err error) (*apierr.Spec, string) {
 	switch {
+	case errors.Is(err, embed.ErrWorkspaceDisabled):
+		return apierrors.AiEmbeddingDisabled, ""
+	case errors.Is(err, embed.ErrWorkspaceNotConfigured):
+		return apierrors.AiEmbeddingNotConfigured, ""
+	case errors.Is(err, embed.ErrWorkspaceSettingsUnavailable):
+		return apierrors.InternalUnexpected, ""
 	case errors.Is(err, ai.ErrNoProvider),
 		errors.Is(err, providers.ErrNoEnabledProvider):
 		return apierrors.AiProviderNotConfigured, ""

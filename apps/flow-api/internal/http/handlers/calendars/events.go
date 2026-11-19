@@ -14,7 +14,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -98,9 +97,10 @@ type ListEventsOutput struct {
 // of prose, and the number stated is the one the tools writing the same
 // column state.
 type CreateEventInput struct {
-	WsID  string `path:"wsId" doc:"Workspace public ID"`
-	CalID string `path:"calId" doc:"Calendar public ID"`
-	Body  struct {
+	WsID           string `path:"wsId" doc:"Workspace public ID"`
+	CalID          string `path:"calId" doc:"Calendar public ID"`
+	IdempotencyKey string `header:"Idempotency-Key" maxLength:"128" pattern:"^[A-Za-z0-9._~-]{1,128}$" doc:"Optional key for safely retrying event creation"`
+	Body           struct {
 		Kind               string           `json:"kind" enum:"event,block,free,milestone" doc:"Event kind"`
 		Visibility         string           `json:"visibility,omitempty" required:"false" enum:"default,public,private,confidential" doc:"Visibility"`
 		ShowAs             string           `json:"showAs,omitempty" required:"false" enum:"busy,free,tentative,oof" doc:"Show-as status"`
@@ -417,30 +417,14 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		}
 
 		ownerUserID := actorID
-		if input.Body.OwnerUserID != nil {
-			ownerUID, parseErr := uuid.Parse(*input.Body.OwnerUserID)
-			if parseErr != nil {
-				return nil, httpErr(apierrors.CalendarEventOwnerUserIdMalformed)
-			}
-			// The owner FK references the global users table, so the
-			// lookup itself is what keeps the event inside this workspace:
-			// a user who is not an enabled member answers exactly as an
-			// unknown id does, and says nothing about other tenants.
-			ownerInternal, lookupErr := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx,
-				generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
-					WorkspaceID: wsID,
-					PublicID:    types.FromUUID(ownerUID),
-				})
-			if lookupErr != nil {
-				if errors.Is(lookupErr, sql.ErrNoRows) {
-					return nil, httpErr(apierrors.CalendarEventOwnerUserNotFound)
+		if input.IdempotencyKey == "" {
+			ownerUserID, err = resolveEventCreateOwner(ctx, deps.Queries, wsID, actorID, sub, input.Body.OwnerUserID)
+			if err != nil {
+				if !isHTTPStatusError(err) {
+					return nil, httpErr(apierrors.CalendarEventOwnerUserResolveInterrupted)
 				}
-				return nil, httpErr(apierrors.CalendarEventOwnerUserResolveInterrupted)
+				return nil, err
 			}
-			if !canSetOwner(actorID, ownerInternal, sub) {
-				return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
-			}
-			ownerUserID = ownerInternal
 		}
 
 		eventPublicID := types.New()
@@ -533,6 +517,9 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		}
 		if input.Body.NotificationOffset != nil {
 			params.NotificationOffset = sql.NullInt32{Int32: *input.Body.NotificationOffset, Valid: true}
+		}
+		if input.IdempotencyKey != "" {
+			return createEventWithIdempotency(ctx, deps, input, wsID, actorID, cal, params)
 		}
 
 		_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, params)

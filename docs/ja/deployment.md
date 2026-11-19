@@ -8,6 +8,8 @@
 
 Compose プラグイン付きの Docker と、ホストにインストールした certbot が必要です。
 
+同梱のデータベースは MySQL Community 26.10.0 です。
+
 ホストを指す DNS 名が 1 つ必要です。例えば `flow.example.com` です。すべてを同じオリジンから配信するので、リフレッシュ用 cookie はファーストパーティになります。
 
 ## 設定
@@ -26,6 +28,37 @@ Compose プラグイン付きの Docker と、ホストにインストールし�
 SMTP は任意です（`NF_SMTP_HOST`、`NF_SMTP_FROM` と、それに付随する認証情報）。ホストを設定しない場合、マジックリンクでのサインインは提供されず、招待や通知のメールも送られません。`NF_PUBLIC_SCHEME` の既定は `https` です。公開 URL はこの 2 つから導出されます。`NF_AUTH_PUBLIC_URL` は `https://<host>/auth-api`、`NF_FLOW_PUBLIC_URL` は `https://<host>/api`、accounts-web は `https://<host>/accounts` です。IdP の認証情報（`NF_AUTH_GOOGLE_CLIENT_ID` など）、`NF_REGISTRATION_OPEN`、その他の調整用変数は任意で、`.env` の値がそれを読むサービスへそのまま渡されます。
 
 `NF_APP_NAME` は、2 つの Web アプリに表示される製品名、タブのタイトル、マジックリンクのメールの件名、認証アプリに表示される発行者名、製品 API リファレンスのタイトルを設定します。既定は `nodate-flow` で、64 文字までです。`:` と制御文字は使えません。`NF_APP_LOGO_URL` は、名前を含んだロゴ画像です。サインイン画面、サイドバー、公開共有ページで名前の文字の代わりに表示されます。`NF_APP_ICON_URL` は正方形のシンボル画像です。組み込みのマークの代わりに名前の横に表示され、favicon にも使われます。アイコンだけを設定した場合は名前も表示されます。ロゴだけを設定した場合、畳んだサイドバーでは組み込みのマークが表示されます。以前 `NF_APP_LOGO_URL` に正方形の画像を設定していた場合は、`NF_APP_ICON_URL` に移してください。`NF_APP_LOGO_DARK_URL` と `NF_APP_ICON_DARK_URL` はダークテーマ用の画像で、対応する基本の変数が必要です。値は `https://` の URL か、32 KiB までの `data:image/png`、`svg+xml`、`webp`、`jpeg`、`gif` の URI で、内部に空白を含まない印字可能な ASCII で書きます。国際化ドメイン名は punycode で指定してください。送信メールのヘッダーに表示されるのは `https://` の画像だけなので、メールにロゴやアイコンを出したい場合は URL を指定してください。名前と 4 つの画像変数は SPA のバンドルに組み込まれるため、変更したら [ホスト名やスキームを変える場合](#ホスト名やスキームを変える場合) の手順で edge を再ビルドしてください。送信メールの差出人アドレスは、別に `NF_SMTP_FROM` で設定します。名前を変えたあとに 2 要素認証を再登録した人は、認証アプリに項目が 2 つ並ぶことがあります。既存の項目のコードはそのまま使えます。
+
+`NF_FLOW_EMBED_OPENAI_KEY` は、サーバー全体でタスクの埋め込みを有効にします。本番では、キーの実値がコンテナの環境変数に入らないファイル方式を使います。
+
+```sh
+# .env
+NF_FLOW_EMBED_OPENAI_KEY_FILE=/run/secrets/embedding-openai-key
+```
+
+`compose.embedding-secret.yml` などの Compose オーバーライドを作り、ホスト上のキーのファイルを API コンテナ内へ読み取り専用でマウントします。
+
+```yaml
+services:
+  api:
+    volumes:
+      - type: bind
+        source: /etc/nodate-flow/secrets/embedding-openai-key
+        target: /run/secrets/embedding-openai-key
+        read_only: true
+        bind:
+          create_host_path: false
+```
+
+キーのファイルはシークレット管理ツールを使って作成します。所有者を API コンテナのユーザーである数値の UID と GID `65532` にし、権限を `0400` にします。親ディレクトリは root だけがアクセスできるようにしてください。2 つの Compose ファイルを指定して API を起動します。
+
+```sh
+docker compose -f compose.prod.yml -f compose.embedding-secret.yml up -d --build --force-recreate api
+```
+
+サービスを起動または再作成する Compose コマンドには毎回 `-f compose.embedding-secret.yml` を追加します。後に続く初回起動のコマンドでも同じです。キーの設定元はどちらか一方にしてください。ファイルには空でないキーが必要で、末尾の改行は 1 つまで許容します。キーは起動時に読み込むため、ファイルを更新したら `api` コンテナを再作成します。ワークスペースは既定でサーバー共通の埋め込み設定を引き継ぎ、AI プロバイダー設定から無効にできます。このキーは各ワークスペースに登録する LLM のキーとは別です。`NF_FLOW_EMBED_OPENAI_KEY` で直接渡すと、Docker のコンテナ環境情報からキーの実値を読めます。
+
+既定のモデルは `text-embedding-3-small` です。`NF_FLOW_EMBED_MODEL` と `NF_FLOW_EMBED_BASE_URL` で、モデルと OpenAI 互換の接続先を指定できます。本番では接続先に HTTPS を使ってください。
 
 ## OIDC のみのサインイン
 
@@ -136,7 +169,7 @@ docker compose -f compose.prod.yml exec -T mysql \
 docker compose -f compose.prod.yml up -d
 ```
 
-`sql/schema.sql` には 3 つの層がすべて入っています。core、nodate-time と共有する time 層、flow 層です。同じデータベースで nodate-time も動いている場合、このファイルを流し直すと nodate-time のデータも消えます。データを残すには、その場で upgrade します。両方のアプリケーションを止め、`sql/core/upgrades/*.sql` を番号順に流し、続けて `sql/time/upgrades/` の time 層の upgrade を流します。最後に `bash sql/core/conformance/run.sh --dsn 'user:pass@host:port/db' --mode schema` で結果を確かめます。手順は `sql/core/PROTOCOL.md` にあります。
+`sql/schema.sql` には 3 つの層がすべて入っています。core、nodate-time と共有する time 層、flow 層です。同じデータベースで nodate-time も動いている場合、このファイルを流し直すと nodate-time のデータも消えます。
 
 ## バックアップ
 

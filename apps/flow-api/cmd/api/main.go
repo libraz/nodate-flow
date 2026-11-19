@@ -23,6 +23,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/agentruntime"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/autoactions"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/providers"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/signaljudge"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
@@ -171,6 +172,38 @@ func main() {
 		cipher = c
 	} else {
 		logger.Warn("ai cipher disabled", "err", cerr)
+	}
+
+	var embedProvider embed.Provider
+	if cfg.EmbedOpenAIKey != "" {
+		key := []byte(cfg.EmbedOpenAIKey)
+		cfg.EmbedOpenAIKey = ""
+		if cipher == nil {
+			clear(key)
+			logger.Warn("embedding provider disabled because the AI cipher is unavailable")
+		} else if err := embed.ValidateOpenAIBaseURL(cfg.EmbedBaseURL, cfg.IsDev()); err != nil {
+			clear(key)
+			logger.Warn("embedding provider disabled because its endpoint configuration is invalid")
+		} else {
+			sealed, err := cipher.Encrypt(key)
+			clear(key)
+			if err != nil {
+				logger.Warn("embedding provider disabled because its key could not be sealed")
+			} else {
+				opts := make([]embed.OpenAIOption, 0, 2)
+				if cfg.EmbedModel != "" {
+					opts = append(opts, embed.WithOpenAIModel(cfg.EmbedModel))
+				}
+				if cfg.EmbedBaseURL != "" {
+					opts = append(opts, embed.WithOpenAIBaseURL(cfg.EmbedBaseURL))
+				}
+				embedProvider, err = embed.NewOpenAIProvider(sealed, cipher, opts...)
+				if err != nil {
+					embedProvider = nil
+					logger.Warn("embedding provider disabled because its endpoint configuration is invalid")
+				}
+			}
+		}
 	}
 
 	// S3-compatible object storage for file uploads. When NF_S3_ENDPOINT
@@ -557,9 +590,7 @@ func main() {
 		EmailSender:           emailSender,
 		EmailFrom:             cfg.SMTPFrom,
 		FlowWebURL:            cfg.FlowWebURL,
-		EmbedOpenAIKey:        cfg.EmbedOpenAIKey,
-		EmbedModel:            cfg.EmbedModel,
-		EmbedBaseURL:          cfg.EmbedBaseURL,
+		EmbedProvider:         embedProvider,
 		DisableRateLimit:      cfg.DisableRateLimit,
 		TrustedProxyHops:      cfg.TrustedProxyHops,
 		HookRunner:            hookRunner,

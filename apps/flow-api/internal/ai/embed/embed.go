@@ -7,13 +7,14 @@
 // Vectors are stored as MySQL 9.x VECTOR columns; the write/read path
 // uses STRING_TO_VECTOR / VECTOR_TO_STRING so the wire format is the
 // textual "[0.1,0.2,...]" form. Cosine similarity is a dot product on
-// the unit-length vectors, computed in Go (MySQL 9.7 Community does not
-// ship VEC_DISTANCE_COSINE).
+// the unit-length vectors, computed in Go because MySQL Community lacks
+// the vector DISTANCE function.
 package embed
 
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -51,6 +52,48 @@ type Provider interface {
 type Store interface {
 	GetTaskEmbedding(ctx context.Context, arg generated.GetTaskEmbeddingParams) (generated.GetTaskEmbeddingRow, error)
 	UpsertTaskEmbedding(ctx context.Context, arg generated.UpsertTaskEmbeddingParams) error
+	DeleteTaskEmbeddingsForTask(ctx context.Context, taskID uint32) error
+	GetWorkspaceEmbeddingSettings(ctx context.Context, workspaceID uint32) (generated.WorkspaceEmbeddingSettingsMode, error)
+}
+
+// ErrWorkspaceDisabled means a workspace has opted out of the instance's
+// embedding provider.
+var ErrWorkspaceDisabled = errors.New("workspace embedding is disabled")
+
+// ErrWorkspaceNotConfigured means no usable embedding provider is configured
+// for the workspace and instance.
+var ErrWorkspaceNotConfigured = errors.New("workspace embedding is not configured")
+
+// ErrWorkspaceSettingsUnavailable means the embedding policy could not be
+// read. The client fails closed so task text is never sent without permission.
+var ErrWorkspaceSettingsUnavailable = errors.New("workspace embedding settings are unavailable")
+
+// WorkspaceSettingsReader reads the workspace-level embedding opt-out.
+type WorkspaceSettingsReader interface {
+	GetWorkspaceEmbeddingSettings(ctx context.Context, workspaceID uint32) (generated.WorkspaceEmbeddingSettingsMode, error)
+}
+
+// CheckWorkspacePolicy reads the workspace's embedding permission without
+// requiring an instance provider to be configured.
+func CheckWorkspacePolicy(ctx context.Context, q WorkspaceSettingsReader, workspaceID uint32) error {
+	if q == nil {
+		return ErrWorkspaceSettingsUnavailable
+	}
+	mode, err := q.GetWorkspaceEmbeddingSettings(ctx, workspaceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrWorkspaceSettingsUnavailable, err)
+	}
+	switch mode {
+	case generated.WorkspaceEmbeddingSettingsModeInherit:
+		return nil
+	case generated.WorkspaceEmbeddingSettingsModeDisabled:
+		return ErrWorkspaceDisabled
+	default:
+		return ErrWorkspaceSettingsUnavailable
+	}
 }
 
 // CostGuard is the narrow budget-gate contract used by Client.
@@ -118,6 +161,25 @@ func (c *Client) Model() string {
 	return c.Provider.Model()
 }
 
+// CheckWorkspace reports whether this workspace may use the configured
+// embedding provider. A missing row inherits the instance configuration.
+func (c *Client) CheckWorkspace(ctx context.Context, workspaceID uint32) error {
+	if c == nil || c.Queries == nil {
+		return ErrWorkspaceNotConfigured
+	}
+	if err := checkWorkspace(ctx, c.Queries, workspaceID); err != nil {
+		return err
+	}
+	if c.Provider == nil {
+		return ErrWorkspaceNotConfigured
+	}
+	return nil
+}
+
+func checkWorkspace(ctx context.Context, q WorkspaceSettingsReader, workspaceID uint32) error {
+	return CheckWorkspacePolicy(ctx, q, workspaceID)
+}
+
 // New constructs a Client. Panics if provider or queries is nil so
 // wiring mistakes fail loudly at boot.
 func New(provider Provider, q Store) *Client {
@@ -178,6 +240,12 @@ const QueryTextOmitted = "query text omitted"
 // The provider sees the task text; the invocation row does not. See
 // [TaskTextOmitted].
 func (c *Client) EmbedTask(ctx context.Context, workspaceID, taskID uint32, title, description string) error {
+	if err := c.CheckWorkspace(ctx, workspaceID); err != nil {
+		if errors.Is(err, ErrWorkspaceDisabled) {
+			return c.Queries.DeleteTaskEmbeddingsForTask(ctx, taskID)
+		}
+		return err
+	}
 	text := composeTaskText(title, description)
 	if text == "" {
 		return nil
@@ -240,6 +308,9 @@ func (c *Client) EmbedQuery(ctx context.Context, workspaceID uint32, text string
 // always derived from text, so splitting the two cannot make the audit
 // row understate spend.
 func (c *Client) meteredEmbed(ctx context.Context, workspaceID uint32, purpose, text, audit string) ([]float32, error) {
+	if err := c.CheckWorkspace(ctx, workspaceID); err != nil {
+		return nil, err
+	}
 	if c.Guard != nil {
 		if err := c.Guard.Check(ctx, workspaceID); err != nil {
 			return nil, err

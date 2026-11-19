@@ -216,6 +216,11 @@ export const WsErrors = {
     status: 422,
     message: "Adding this dependency would create a cycle",
   },
+  WS_TASK_IDEMPOTENCY_KEY_CONFLICT: {
+    code: "WS.TASK.IDEMPOTENCY_KEY_CONFLICT",
+    status: 409,
+    message: "This idempotency key has already been used for a different task request",
+  },
   WS_TASK_NOT_FOUND: {
     code: "WS.TASK.NOT_FOUND",
     status: 404,

@@ -44,7 +44,7 @@ func TestProposeStepsCacheKeyFollowsVisibilityAndChildren(t *testing.T) {
 	one := []ChildTaskSummary{{Title: "Draft", State: "open"}}
 	two := append([]ChildTaskSummary{}, one[0], ChildTaskSummary{Title: "Review", State: "open"})
 	key := func(vis acl.VisibilityArgs, children []ChildTaskSummary) string {
-		return proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, children, vis, 42)
+		return proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, children, vis, 42, true)
 	}
 
 	if key(owner, one) == key(member, one) {
@@ -59,12 +59,13 @@ func TestProposeStepsCacheKeyFollowsVisibilityAndChildren(t *testing.T) {
 	if key(member, one) != key(member, []ChildTaskSummary{{Title: "Draft", State: "open"}}) {
 		t.Error("identical inputs must share an entry")
 	}
-	if proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, one, member, 42) ==
-		proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, one, member, 43) {
+	if key(member, one) == proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, one, member, 43, true) {
 		t.Error("different managed parent tasks must not share a proposal")
 	}
-	if proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, one, member, 42) ==
-		proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, []ChildTaskSummary{{PublicID: "other-child", Title: "Draft", State: "open"}}, member, 42) {
+	if key(member, one) == proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, []ChildTaskSummary{{PublicID: "other-child", Title: "Draft", State: "open"}}, member, 42, true) {
 		t.Error("different child identities must not share a proposal")
+	}
+	if key(member, one) == proposeStepsCacheKey(1, "Ship it", "", GranularityStandard, one, member, 42, false) {
+		t.Error("a workspace that opted out of embeddings must not reuse steps based on similar tasks")
 	}
 }

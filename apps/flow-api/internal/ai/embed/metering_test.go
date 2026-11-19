@@ -12,13 +12,18 @@ import (
 )
 
 type fakeStore struct {
-	existing generated.GetTaskEmbeddingRow
-	getErr   error
-	upsert   generated.UpsertTaskEmbeddingParams
-	upserts  int
+	existing      generated.GetTaskEmbeddingRow
+	getErr        error
+	upsert        generated.UpsertTaskEmbeddingParams
+	upserts       int
+	deletes       int
+	reads         int
+	workspaceMode generated.WorkspaceEmbeddingSettingsMode
+	workspaceErr  error
 }
 
 func (s *fakeStore) GetTaskEmbedding(context.Context, generated.GetTaskEmbeddingParams) (generated.GetTaskEmbeddingRow, error) {
+	s.reads++
 	return s.existing, s.getErr
 }
 
@@ -26,6 +31,21 @@ func (s *fakeStore) UpsertTaskEmbedding(_ context.Context, arg generated.UpsertT
 	s.upsert = arg
 	s.upserts++
 	return nil
+}
+
+func (s *fakeStore) DeleteTaskEmbeddingsForTask(context.Context, uint32) error {
+	s.deletes++
+	return nil
+}
+
+func (s *fakeStore) GetWorkspaceEmbeddingSettings(context.Context, uint32) (generated.WorkspaceEmbeddingSettingsMode, error) {
+	if s.workspaceErr != nil {
+		return "", s.workspaceErr
+	}
+	if s.workspaceMode == "" {
+		return "", sql.ErrNoRows
+	}
+	return s.workspaceMode, nil
 }
 
 type fakeProvider struct {
@@ -165,6 +185,67 @@ func TestEmbedTask_BudgetBlockSkipsProvider(t *testing.T) {
 	}
 	if store.upserts != 0 {
 		t.Fatalf("upserts = %d, want 0", store.upserts)
+	}
+}
+
+func TestEmbedTask_DisabledDeletesStaleVectorBeforeAnyEmbeddingWork(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeStore{workspaceMode: generated.WorkspaceEmbeddingSettingsModeDisabled}
+	provider := &fakeProvider{}
+	guard := &fakeGuard{}
+	client := New(provider, store).WithMetering(guard, nil, nil, nil)
+
+	if err := client.EmbedTask(context.Background(), 7, 42, "Title", "Description"); err != nil {
+		t.Fatalf("EmbedTask returned error: %v", err)
+	}
+	if store.deletes != 1 {
+		t.Errorf("stale vector deletes = %d, want 1", store.deletes)
+	}
+	if store.reads != 0 || store.upserts != 0 {
+		t.Errorf("embedding store reads/upserts = %d/%d, want 0/0", store.reads, store.upserts)
+	}
+	if guard.calls != 0 || provider.calls != 0 {
+		t.Errorf("guard/provider calls = %d/%d, want 0/0", guard.calls, provider.calls)
+	}
+}
+
+func TestEmbedQuery_DisabledAndSettingsFailureFailClosedBeforeMetering(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		mode        generated.WorkspaceEmbeddingSettingsMode
+		settingsErr error
+		wantErr     error
+	}{
+		{
+			name:    "disabled",
+			mode:    generated.WorkspaceEmbeddingSettingsModeDisabled,
+			wantErr: ErrWorkspaceDisabled,
+		},
+		{
+			name:        "settings read failure",
+			settingsErr: errors.New("database unavailable"),
+			wantErr:     ErrWorkspaceSettingsUnavailable,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &fakeStore{workspaceMode: tc.mode, workspaceErr: tc.settingsErr}
+			provider := &fakeProvider{}
+			guard := &fakeGuard{}
+			client := New(provider, store).WithMetering(guard, nil, nil, nil)
+
+			if _, err := client.EmbedQuery(context.Background(), 7, "private query"); !errors.Is(err, tc.wantErr) {
+				t.Fatalf("EmbedQuery error = %v, want %v", err, tc.wantErr)
+			}
+			if guard.calls != 0 || provider.calls != 0 {
+				t.Errorf("guard/provider calls = %d/%d, want 0/0", guard.calls, provider.calls)
+			}
+		})
 	}
 }
 

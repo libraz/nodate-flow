@@ -63,3 +63,41 @@ func TestRetryChargesTheWorkspacePerAttempt(t *testing.T) {
 		t.Fatalf("workspace charged %d tokens for %d upstream attempts; the retry was free", charged, sent)
 	}
 }
+
+func TestEmbeddingClientDoesNotFollowRedirects(t *testing.T) {
+	var destinationCalls atomic.Uint64
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		destinationCalls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+
+	var sourceCalls atomic.Uint64
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		sourceCalls.Add(1)
+		w.Header().Set("Location", target.URL)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer source.Close()
+
+	req, err := http.NewRequest(http.MethodPost, source.URL, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer embedding-secret")
+
+	resp, err := doLimited(context.Background(), DestOpenAIEmbed, req)
+	if err != nil {
+		t.Fatalf("doLimited: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusFound)
+	}
+	if got := sourceCalls.Load(); got != 1 {
+		t.Fatalf("source calls = %d, want 1", got)
+	}
+	if got := destinationCalls.Load(); got != 0 {
+		t.Fatalf("redirect destination calls = %d, want 0", got)
+	}
+}

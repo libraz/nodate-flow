@@ -29,6 +29,14 @@ func (s *keyRecordingStore) UpsertTaskEmbedding(_ context.Context, arg generated
 	return nil
 }
 
+func (*keyRecordingStore) DeleteTaskEmbeddingsForTask(context.Context, uint32) error {
+	return nil
+}
+
+func (*keyRecordingStore) GetWorkspaceEmbeddingSettings(context.Context, uint32) (generated.WorkspaceEmbeddingSettingsMode, error) {
+	return generated.WorkspaceEmbeddingSettingsModeInherit, nil
+}
+
 // TestEmbeddingsAreStoredUnderTheClientsModelKey pins that the key rows
 // are written under is the same key [Client.Model] reports, whatever the
 // provider happens to be called.

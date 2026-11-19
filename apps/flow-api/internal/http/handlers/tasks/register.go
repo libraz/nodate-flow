@@ -26,7 +26,7 @@ func RegisterCollection(api huma.API, deps Deps) {
 		Method:      http.MethodGet,
 		Path:        "/tasks",
 		Summary:     "List tasks for a project or workspace",
-		Description: "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).",
+		Description: "Returns a page of tasks filtered by project or workspace plus optional title, status, assignee, priority, or due-date filters. dueFrom and dueThrough are inclusive YYYY-MM-DD bounds on dueOn and use limit/offset pagination. They cannot be combined with cursor. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).",
 		Tags:        []string{"Tasks"},
 	}, List(deps))
 
@@ -222,7 +222,7 @@ func RegisterTaskScopedCommenterWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/comments",
 		Summary:     "Add a comment to a task",
-		Description: "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
+		Description: "Appends a comment from the caller and notifies users mentioned in the body. Send an Idempotency-Key to safely retry the request.",
 		Tags:        []string{"Tasks"},
 	}, AddComment(deps))
 
@@ -261,7 +261,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPatch,
 		Path:        "/tasks/{id}",
 		Summary:     "Patch a task",
-		Description: "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
+		Description: "Updates editable task fields, including the due date. Set expectedDueOn to the due date you read before making the change. A mismatch returns 409. Send an Idempotency-Key to safely retry the request. Description edits append a version to the task history.",
 		Tags:        []string{"Tasks"},
 	}, Patch(deps))
 
@@ -279,7 +279,7 @@ func RegisterTaskScopedEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/transitions",
 		Summary:     "Apply a state machine transition to a task",
-		Description: "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.",
+		Description: "Applies a state-machine transition and records it in the task history. Set expectedState to the state you read before requesting the transition. A mismatch returns 409. Send an Idempotency-Key to safely retry the request.",
 		Tags:        []string{"Tasks"},
 	}, Transition(deps))
 

@@ -30,6 +30,7 @@ var ErrNoSourceVector = errors.New("embed: source task has no usable embedding")
 // SimilarStore is the sqlc query subset [Client.RankSimilarTasks] reads.
 type SimilarStore interface {
 	GetAiSettings(ctx context.Context, workspaceID uint32) (generated.GetAiSettingsRow, error)
+	GetWorkspaceEmbeddingSettings(ctx context.Context, workspaceID uint32) (generated.WorkspaceEmbeddingSettingsMode, error)
 	GetTaskEmbedding(ctx context.Context, arg generated.GetTaskEmbeddingParams) (generated.GetTaskEmbeddingRow, error)
 	ListCandidateTaskEmbeddings(ctx context.Context, arg generated.ListCandidateTaskEmbeddingsParams) ([]generated.ListCandidateTaskEmbeddingsRow, error)
 }
@@ -63,12 +64,18 @@ type SimilarTask struct {
 
 // RankSimilarTasks is the one similarity search over stored task
 // embeddings: thresholds from ai_settings, a write-time embedding when
-// the source has none, Go-side cosine over the candidate pool (MySQL 9.7
-// Community lacks VEC_DISTANCE_COSINE), score-descending and capped.
+// the source has none, and Go-side cosine over the candidate pool. The
+// results are sorted by descending score and capped.
 //
 // A nil client has no embeddings and yields [ErrNoSourceVector].
 func (c *Client) RankSimilarTasks(ctx context.Context, q SimilarStore, in SimilarQuery) ([]SimilarTask, error) {
 	if c == nil {
+		return nil, ErrNoSourceVector
+	}
+	if err := checkWorkspace(ctx, q, in.WorkspaceID); err != nil {
+		return nil, err
+	}
+	if c.Provider == nil {
 		return nil, ErrNoSourceVector
 	}
 	model := c.Model()

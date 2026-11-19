@@ -34,7 +34,7 @@ func BuildCORS(allowed []string, devLocalhost bool) func(http.Handler) http.Hand
 	opts := cors.Options{
 		AllowedOrigins:   allowed,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Requested-With"},
 		ExposedHeaders:   []string{"X-Request-Id"},
 		AllowCredentials: allowCreds,
 		MaxAge:           3600,

@@ -16,6 +16,7 @@ import { renderWithProviders } from '@tests/helpers/render';
 import { describe, expect, it } from 'vitest';
 
 import { type AiProvider, aiProvidersKeys } from '../api';
+import { type EmbeddingSettings, embeddingSettingsKeys } from '../embedding-settings-api';
 import ProviderList from '../provider-list';
 
 const WS = 'ws-1';
@@ -41,6 +42,10 @@ function renderList(providers: AiProvider[]) {
     },
   });
   queryClient.setQueryData(aiProvidersKeys.list(WS), providers);
+  queryClient.setQueryData<EmbeddingSettings>(embeddingSettingsKeys.settings(WS), {
+    mode: 'inherit',
+    status: 'unconfigured',
+  });
   return renderWithProviders(<ProviderList workspaceId={WS} />, { queryClient });
 }
 

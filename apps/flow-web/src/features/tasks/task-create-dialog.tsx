@@ -96,7 +96,7 @@ export default function TaskCreateDialog({
   const [proposal, setProposal] = useState<SmartProposal | null>(null);
   const [selectedAssignees, setSelectedAssignees] = useState<Set<string>>(new Set());
   const [selectedSubtasks, setSelectedSubtasks] = useState<Set<number>>(new Set());
-  const [proposalError, setProposalError] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
 
   const reset = (): void => {
     resetCore();
@@ -106,7 +106,7 @@ export default function TaskCreateDialog({
     setProposal(null);
     setSelectedAssignees(new Set());
     setSelectedSubtasks(new Set());
-    setProposalError(false);
+    setProposalError(null);
   };
 
   const handleClose = (): void => {
@@ -117,7 +117,7 @@ export default function TaskCreateDialog({
 
   const handlePropose = (): void => {
     if (!workspaceId || title.trim().length === 0) return;
-    setProposalError(false);
+    setProposalError(null);
     propose.mutate(
       {
         workspaceId,
@@ -132,8 +132,8 @@ export default function TaskCreateDialog({
           setSelectedAssignees(new Set(data.suggestedAssignees.map((a) => a.userPublicId)));
           setSelectedSubtasks(new Set(data.subtasks.map((_, i) => i)));
         },
-        onError: () => {
-          setProposalError(true);
+        onError: (error) => {
+          setProposalError(error.code ?? '');
         },
       },
     );
@@ -387,7 +387,7 @@ export default function TaskCreateDialog({
 
 interface SmartCreateSectionProps {
   proposing: boolean;
-  proposalError: boolean;
+  proposalError: string | null;
   proposal: SmartProposal | null;
   selectedAssignees: Set<string>;
   selectedSubtasks: Set<number>;
@@ -413,6 +413,23 @@ function SmartCreateSection({
   onApply,
 }: SmartCreateSectionProps): ReactElement {
   const { t } = useTranslation('common');
+  const proposalErrorText =
+    proposalError === 'AI.EMBEDDING.DISABLED'
+      ? t('AI.EMBEDDING.DISABLED', {
+          ns: 'errors',
+          defaultValue: t('tasks.smart_create.error'),
+        })
+      : proposalError === 'AI.EMBEDDING.NOT_CONFIGURED'
+        ? t('AI.EMBEDDING.NOT_CONFIGURED', {
+            ns: 'errors',
+            defaultValue: t('tasks.smart_create.error'),
+          })
+        : proposalError === 'AI.PROVIDER.NOT_CONFIGURED'
+          ? t('AI.PROVIDER.NOT_CONFIGURED', {
+              ns: 'errors',
+              defaultValue: t('tasks.smart_create.error'),
+            })
+          : t('tasks.smart_create.error');
 
   return (
     <section aria-label={t('tasks.smart_create.assist_button')} className={styles.smartSection}>
@@ -433,9 +450,9 @@ function SmartCreateSection({
         )}
 
         {/* Error state */}
-        {proposalError && !proposing && (
+        {proposalError !== null && !proposing && (
           <p role="alert" className={styles.smartError}>
-            {t('tasks.smart_create.error')}
+            {proposalErrorText}
           </p>
         )}
 

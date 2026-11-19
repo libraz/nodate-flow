@@ -230,15 +230,9 @@ type Deps struct {
 	// in tests.
 	FlowWebURL string
 
-	// EmbedOpenAIKey is the plaintext OpenAI API key for the embedding
-	// pipeline. When non-empty, the router uses embed.OpenAIProvider
-	// instead of the mock. Empty in tests (mock is used).
-	EmbedOpenAIKey string
-	// EmbedModel overrides the default embedding model. Empty means
-	// text-embedding-3-small.
-	EmbedModel string
-	// EmbedBaseURL overrides the embeddings API base URL.
-	EmbedBaseURL string
+	// EmbedProvider is constructed by cmd/api after sealing the instance key.
+	// The router receives only the provider, never the plaintext key.
+	EmbedProvider embed.Provider
 }
 
 // Result is what BuildResult returns: the composed chi router plus the
@@ -650,31 +644,8 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		nlConstraintCompiler = nlconstraint.New(nlconstraint.NewMockProvider())
 		nlCommandResolver = nlcommand.New(nlcommand.NewMockProvider(), nil)
 		nlCommandResolver.Cache = nlcommand.NewCache(5 * time.Minute)
-	case deps.EmbedOpenAIKey != "":
-		var opts []embed.OpenAIOption
-		if deps.EmbedModel != "" {
-			opts = append(opts, embed.WithOpenAIModel(deps.EmbedModel))
-		}
-		if deps.EmbedBaseURL != "" {
-			opts = append(opts, embed.WithOpenAIBaseURL(deps.EmbedBaseURL))
-		}
-		// Encrypt the plaintext key at boot so the provider stores only
-		// ciphertext and decrypts per-call (decrypt-use-zero pattern).
-		// When no cipher is available, pass the raw bytes with a nil
-		// decryptor which triggers the identity fallback.
-		var keyCipher []byte
-		var dec embed.Decryptor
-		if deps.Cipher != nil {
-			ct, encErr := deps.Cipher.Encrypt([]byte(deps.EmbedOpenAIKey))
-			if encErr == nil {
-				keyCipher = ct
-				dec = deps.Cipher
-			}
-		}
-		if keyCipher == nil {
-			keyCipher = []byte(deps.EmbedOpenAIKey)
-		}
-		embedClient = embed.New(embed.NewOpenAIProvider(keyCipher, dec, opts...), deps.Queries)
+	case deps.EmbedProvider != nil:
+		embedClient = embed.New(deps.EmbedProvider, deps.Queries)
 	}
 	if embedClient != nil {
 		embedClient.WithMetering(
@@ -788,6 +759,15 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		}
 	}
 
+	embedModel := ""
+	embedEndpoint := ""
+	if embedClient != nil {
+		embedModel = embedClient.Model()
+		if endpointProvider, ok := embedClient.Provider.(interface{ PublicEndpoint() string }); ok {
+			embedEndpoint = endpointProvider.PublicEndpoint()
+		}
+	}
+
 	return &sharedDeps{
 		aclDB:                aclDB,
 		auditRec:             auditRec,
@@ -802,7 +782,7 @@ func buildSharedDeps(deps Deps) *sharedDeps {
 		tlDeps:               timeline.Deps{DB: deps.DB, Queries: deps.Queries},
 		inboxDeps:            inbox.Deps{DB: deps.DB, Queries: deps.Queries, Mutations: mutationRec},
 		notifDeps:            notifications.Deps{DB: deps.DB, Queries: deps.Queries, Audit: auditRec},
-		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec, Mutations: mutationRec},
+		aiDeps:               aihandlers.Deps{DB: deps.DB, Queries: deps.Queries, Cipher: deps.Cipher, NlQuery: nlQueryCompiler, NlCommand: nlCommandResolver, Audit: auditRec, Mutations: mutationRec, EmbedConfigured: embedClient != nil, EmbedModel: embedModel, EmbedEndpoint: embedEndpoint},
 		signalDeps: signals.Deps{
 			DB:                 deps.DB,
 			Queries:            deps.Queries,
@@ -870,6 +850,17 @@ func newSubAPI(sub chi.Router) huma.API {
 // requirement, because a bearer changes nothing about what they return.
 func newPublicSubAPI(sub chi.Router) huma.API {
 	return &recordingAPI{API: humachi.New(sub, newAPIConfig(brand.DefaultAppName, false))}
+}
+
+func rejectRepeatedIdempotencyKeyHeader(ctx huma.Context, next func(huma.Context)) {
+	req, _ := humachi.Unwrap(ctx)
+	values := req.Header.Values("Idempotency-Key")
+	if len(values) > 1 {
+		req.Header.Set("Idempotency-Key", strings.Join(values, ","))
+	} else if len(values) == 1 && values[0] == "" {
+		req.Header.Set("Idempotency-Key", " ")
+	}
+	next(ctx)
 }
 
 // bearerSchemeName is the OpenAPI key under which the API's JWT bearer
@@ -1191,6 +1182,7 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Tags:        []string{"Workspace"},
 		}, projects.Create(shared.prjDeps))
 		aihandlers.RegisterProviders(subAPI, shared.aiDeps)
+		aihandlers.RegisterEmbeddingSettings(subAPI, shared.aiDeps)
 		aihandlers.RegisterAutoActionSettings(subAPI, shared.aiDeps)
 		aihandlers.RegisterAutoActionRules(subAPI, shared.aiDeps)
 		webhookDeps := webhooks.Deps{DB: deps.DB, Queries: deps.Queries, Audit: shared.auditRec}
@@ -1591,8 +1583,9 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Method:      http.MethodPost,
 			Path:        "/workspaces/{wsId}/calendars/{calId}/events",
 			Summary:     "Create an event",
-			Description: "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.",
+			Description: "Creates an event in the calendar. Supply an optional Idempotency-Key to safely retry the same request after an uncertain response. Reusing a key with a different calendar or request body returns 409. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.",
 			Tags:        []string{"Calendar"},
+			Middlewares: huma.Middlewares{rejectRepeatedIdempotencyKeyHeader},
 		}, calendars.CreateEvent(shared.calDeps))
 		huma.Register(subAPI, huma.Operation{
 			OperationID: "events-get",

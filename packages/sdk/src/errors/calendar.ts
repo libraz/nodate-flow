@@ -186,6 +186,11 @@ export const CalendarErrors = {
     status: 422,
     message: "endAt must be at or after startAt",
   },
+  CALENDAR_EVENT_IDEMPOTENCY_KEY_CONFLICT: {
+    code: "CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT",
+    status: 409,
+    message: "This idempotency key has already been used for a different event request",
+  },
   CALENDAR_EVENT_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED",
     status: 500,

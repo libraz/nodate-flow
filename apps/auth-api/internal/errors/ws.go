@@ -90,6 +90,8 @@ var (
 	WsTaskDependencyAlreadyExists = &Spec{Code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS", Status: 409, Message: "This dependency already exists", Description: "Returned when a new task dependency edge has the same source, target and kind as an edge that already exists.", UserAction: "The dependency is already in place; no change is needed."}
 	// WS.TASK.DEPENDENCY_CYCLE — Adding this dependency would create a cycle
 	WsTaskDependencyCycle = &Spec{Code: "WS.TASK.DEPENDENCY_CYCLE", Status: 422, Message: "Adding this dependency would create a cycle", Description: "Returned when a new task dependency edge would close a cycle in the workspace dependency graph (directly or transitively). The dependency graph must remain a DAG so blocked-by computation and topological scheduling terminate.", UserAction: "Remove the conflicting dependency on the other task before adding this edge."}
+	// WS.TASK.IDEMPOTENCY_KEY_CONFLICT — This idempotency key has already been used for a different task request
+	WsTaskIdempotencyKeyConflict = &Spec{Code: "WS.TASK.IDEMPOTENCY_KEY_CONFLICT", Status: 409, Message: "This idempotency key has already been used for a different task request", Description: "Returned when a task mutation reuses an idempotency key with a different task or request body.", UserAction: "Retry with the original request, or use a new key for a different operation."}
 	// WS.TASK.NOT_FOUND — Task not found
 	WsTaskNotFound = &Spec{Code: "WS.TASK.NOT_FOUND", Status: 404, Message: "Task not found", Description: "Returned when a task with the given public_id does not exist or has been deleted in the current workspace.", UserAction: "Verify the task ID, or refresh the list to see current tasks."}
 	// WS.TASK.TRANSITION_REJECTED — Task transition not allowed in current state
@@ -97,7 +99,7 @@ var (
 	// WS.TASK.TRANSITION_UNKNOWN — Unknown task transition
 	WsTaskTransitionUnknown = &Spec{Code: "WS.TASK.TRANSITION_UNKNOWN", Status: 400, Message: "Unknown task transition", Description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs.", UserAction: "Use one of the supported transition names defined by the API."}
 	// WS.TASK.UPDATE_CONFLICT — Task was modified by someone else
-	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else", Description: "Returned when an optimistic concurrency check (version or updated_at) fails during update.", UserAction: "Reload the task to see the latest version, then re-apply your changes."}
+	WsTaskUpdateConflict = &Spec{Code: "WS.TASK.UPDATE_CONFLICT", Status: 409, Message: "Task was modified by someone else", Description: "Returned when an optimistic concurrency check or a supplied task state or due date precondition fails.", UserAction: "Reload the task to see the latest version, then re-apply your changes."}
 	// WS.TASK_ACTOR.NOT_FOUND — Task actor not found
 	WsTaskActorNotFound = &Spec{Code: "WS.TASK_ACTOR.NOT_FOUND", Status: 404, Message: "Task actor not found", Description: "Returned when removing an actor that is not assigned to this task, or was already removed.", UserAction: "Refresh the task and try again."}
 	// WS.TASK_AGENT.ALREADY_ASSIGNED — Agent is already the assignee for this task

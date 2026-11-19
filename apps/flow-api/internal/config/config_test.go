@@ -298,6 +298,105 @@ func TestLoadReadsAiDailyBudgetOverride(t *testing.T) {
 	})
 }
 
+func TestLoadReadsEmbeddingKeyFile(t *testing.T) {
+	keyFile := filepath.Join(t.TempDir(), "embedding-key")
+	if err := os.WriteFile(keyFile, []byte("test-embedding-key\r\n"), 0o600); err != nil {
+		t.Fatalf("write test key file: %v", err)
+	}
+
+	t.Setenv("NF_DB_DSN", "user:pass@tcp(127.0.0.1:3306)/nodate_flow")
+	t.Setenv("NF_FLOW_WEBHOOKS_INSECURE", "true")
+	t.Setenv("NF_FLOW_EMBED_OPENAI_KEY", "")
+	t.Setenv("NF_FLOW_EMBED_OPENAI_KEY_FILE", keyFile)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.EmbedOpenAIKey != "test-embedding-key" {
+		t.Fatalf("EmbedOpenAIKey = %q, want file contents without the final line ending", cfg.EmbedOpenAIKey)
+	}
+}
+
+func TestLoadEmbedOpenAIKeyRejectsUnsafeSources(t *testing.T) {
+	keyFile := filepath.Join(t.TempDir(), "embedding-key")
+	if err := os.WriteFile(keyFile, []byte("file-test-key\n"), 0o600); err != nil {
+		t.Fatalf("write test key file: %v", err)
+	}
+
+	t.Run("both sources", func(t *testing.T) {
+		_, err := loadEmbedOpenAIKey("env-test-key", keyFile)
+		if err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted both key sources")
+		}
+		for _, secret := range []string{"env-test-key", "file-test-key"} {
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("error exposes a key value: %v", err)
+			}
+		}
+	})
+
+	t.Run("unreadable file", func(t *testing.T) {
+		_, err := loadEmbedOpenAIKey("", filepath.Join(t.TempDir(), "missing"))
+		if err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted a missing key file")
+		}
+		if strings.Contains(err.Error(), "missing") {
+			t.Errorf("error exposes file details: %v", err)
+		}
+	})
+
+	t.Run("empty file", func(t *testing.T) {
+		emptyFile := filepath.Join(t.TempDir(), "empty")
+		if err := os.WriteFile(emptyFile, nil, 0o600); err != nil {
+			t.Fatalf("write empty key file: %v", err)
+		}
+		if _, err := loadEmbedOpenAIKey("", emptyFile); err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted an empty key file")
+		}
+	})
+
+	t.Run("whitespace in file", func(t *testing.T) {
+		unsafeFile := filepath.Join(t.TempDir(), "unsafe")
+		if err := os.WriteFile(unsafeFile, []byte("first-line\nsecond-line\n"), 0o600); err != nil {
+			t.Fatalf("write unsafe key file: %v", err)
+		}
+		_, err := loadEmbedOpenAIKey("", unsafeFile)
+		if err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted a multiline key")
+		}
+		if strings.Contains(err.Error(), "first-line") || strings.Contains(err.Error(), "second-line") {
+			t.Errorf("error exposes file contents: %v", err)
+		}
+	})
+
+	t.Run("non-regular file", func(t *testing.T) {
+		if _, err := loadEmbedOpenAIKey("", t.TempDir()); err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted a directory as a key file")
+		}
+	})
+
+	t.Run("oversized file", func(t *testing.T) {
+		largeFile := filepath.Join(t.TempDir(), "large")
+		if err := os.WriteFile(largeFile, []byte(strings.Repeat("k", maxEmbedOpenAIKeyFileBytes+1)), 0o600); err != nil {
+			t.Fatalf("write oversized test key file: %v", err)
+		}
+		if _, err := loadEmbedOpenAIKey("", largeFile); err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted an oversized key file")
+		}
+	})
+
+	t.Run("whitespace in environment key", func(t *testing.T) {
+		_, err := loadEmbedOpenAIKey("first-part second-part", "")
+		if err == nil {
+			t.Fatal("loadEmbedOpenAIKey accepted whitespace in an environment key")
+		}
+		if strings.Contains(err.Error(), "first-part") || strings.Contains(err.Error(), "second-part") {
+			t.Errorf("error exposes the environment key: %v", err)
+		}
+	})
+}
+
 func TestValidateDevModeSkipsGuards(t *testing.T) {
 	t.Parallel()
 	// In development the same insecure settings are tolerated.

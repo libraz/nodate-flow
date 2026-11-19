@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"math"
 	"net/http"
 
@@ -101,8 +102,16 @@ func ProposeSmart(deps SmartCreateDeps) func(context.Context, *ProposeSmartInput
 		if !ok {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
-		if deps.AI == nil || deps.Embedder == nil {
+		if deps.AI == nil {
 			return nil, httpErr(apierrors.AiProviderNotConfigured)
+		}
+		if deps.Embedder == nil {
+			if err := embed.CheckWorkspacePolicy(ctx, deps.Queries, ws.ID); stderrors.Is(err, embed.ErrWorkspaceDisabled) {
+				return nil, httpErr(apierrors.AiEmbeddingDisabled)
+			} else if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			return nil, httpErr(apierrors.AiEmbeddingNotConfigured)
 		}
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {

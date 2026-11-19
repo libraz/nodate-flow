@@ -8,6 +8,8 @@ One hostname, one certificate, and nothing else published. The edge container is
 
 Docker with the Compose plugin, and certbot on the host.
 
+The bundled database uses MySQL Community 26.10.0.
+
 One DNS name that points at the host, for example `flow.example.com`. Everything is served from that origin, so the refresh cookie is first-party.
 
 ## Configuration
@@ -26,6 +28,37 @@ Generate every secret with `openssl rand -hex 32`. flow-api refuses to start unl
 SMTP is optional (`NF_SMTP_HOST`, `NF_SMTP_FROM`, and the credentials beside them). Without a host, magic-link sign-in is not offered and no mail is sent: no invitation or notification emails. `NF_PUBLIC_SCHEME` defaults to `https`. The public URLs are derived from the two: `NF_AUTH_PUBLIC_URL` is `https://<host>/auth-api`, `NF_FLOW_PUBLIC_URL` is `https://<host>/api`, and accounts-web is at `https://<host>/accounts`. Identity provider credentials (`NF_AUTH_GOOGLE_CLIENT_ID` and the like), `NF_REGISTRATION_OPEN` and the remaining tuning variables are optional; each is passed through from `.env` to the service that reads it.
 
 `NF_APP_NAME` sets the product name shown in both web apps, the tab title, the subject of the magic-link mail, the issuer in authenticator apps and the title of the product API reference. It defaults to `nodate-flow` and may be up to 64 characters, with no `:` and no control characters. `NF_APP_LOGO_URL` is a logo that already contains the name; it replaces the name text on the sign-in pages, the sidebar and the public share pages. `NF_APP_ICON_URL` is a square symbol; it replaces the built-in mark, is shown next to the name, and is the favicon. If you set only the icon, the name is still shown; if you set a logo and no icon, the collapsed sidebar falls back to the built-in mark. A square image that was previously set as `NF_APP_LOGO_URL` belongs in `NF_APP_ICON_URL`. `NF_APP_LOGO_DARK_URL` and `NF_APP_ICON_DARK_URL` replace the images in dark themes and require their base variable. Each value is an `https://` URL or a `data:image/png`, `svg+xml`, `webp`, `jpeg` or `gif` URI of up to 32 KiB, written in printable ASCII with no inner spaces; use punycode for an internationalized hostname. Outgoing mail shows only `https://` images, so use a URL if you want the logo or icon in the mail header. The name and the four image variables are compiled into the SPA bundles, so after changing any of them, rebuild the edge as described in [Changing the hostname or the scheme](#changing-the-hostname-or-the-scheme). The sender address of outgoing mail is set separately with `NF_SMTP_FROM`. After a rename, people who re-enrol two-factor authentication may see a second entry in their authenticator app; codes from the existing entry keep working.
+
+`NF_FLOW_EMBED_OPENAI_KEY` enables server-wide task embeddings. Use the file source in production to keep the key value out of the container environment:
+
+```sh
+# .env
+NF_FLOW_EMBED_OPENAI_KEY_FILE=/run/secrets/embedding-openai-key
+```
+
+Create a separate Compose override such as `compose.embedding-secret.yml` and mount the host file read-only into the API container:
+
+```yaml
+services:
+  api:
+    volumes:
+      - type: bind
+        source: /etc/nodate-flow/secrets/embedding-openai-key
+        target: /run/secrets/embedding-openai-key
+        read_only: true
+        bind:
+          create_host_path: false
+```
+
+Create the host file through your secret manager. Set its owner to numeric UID and GID `65532`, the API container user, and its mode to `0400`. Keep the containing directory accessible only to root. Start the API with both Compose files:
+
+```sh
+docker compose -f compose.prod.yml -f compose.embedding-secret.yml up -d --build --force-recreate api
+```
+
+Include `-f compose.embedding-secret.yml` in every Compose command that starts or recreates services, including the first-start commands below. Configure exactly one key source. The file must contain a non-empty key. A single final line ending is accepted. The process reads the key at startup, so recreate `api` after rotating the file. Workspaces inherit this server-wide embedding provider by default and can disable it in AI provider settings. This key is separate from the LLM keys registered for each workspace. When the key is set directly through `NF_FLOW_EMBED_OPENAI_KEY`, Docker exposes its value in container environment metadata.
+
+The default model is `text-embedding-3-small`. Use `NF_FLOW_EMBED_MODEL` and `NF_FLOW_EMBED_BASE_URL` to select a model and an OpenAI-compatible endpoint. The base URL must use HTTPS in production.
 
 ## OIDC-only sign-in
 
@@ -136,7 +169,7 @@ docker compose -f compose.prod.yml exec -T mysql \
 docker compose -f compose.prod.yml up -d
 ```
 
-`sql/schema.sql` holds all three schema layers: core, the time layer shared with nodate-time, and flow. When nodate-time runs on the same database, re-applying the file erases its data too. To keep the data, upgrade in place instead: stop both applications, apply `sql/core/upgrades/*.sql` in number order, then the time layer's upgrade in `sql/time/upgrades/`, and check the result with `bash sql/core/conformance/run.sh --dsn 'user:pass@host:port/db' --mode schema`. `sql/core/PROTOCOL.md` describes the order.
+`sql/schema.sql` holds all three schema layers: core, the time layer shared with nodate-time, and flow. When nodate-time runs on the same database, re-applying the file erases its data too.
 
 ## Backups
 

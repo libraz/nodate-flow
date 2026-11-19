@@ -38,6 +38,14 @@ func (stubEmbedStore) UpsertTaskEmbedding(context.Context, generated.UpsertTaskE
 	return nil
 }
 
+func (stubEmbedStore) DeleteTaskEmbeddingsForTask(context.Context, uint32) error {
+	return nil
+}
+
+func (stubEmbedStore) GetWorkspaceEmbeddingSettings(context.Context, uint32) (generated.WorkspaceEmbeddingSettingsMode, error) {
+	return generated.WorkspaceEmbeddingSettingsModeInherit, nil
+}
+
 // emptySmartCreateReader has no history to offer, which is enough: what
 // is asserted here is the embedding call, not the ranking built from it.
 type emptySmartCreateReader struct{}

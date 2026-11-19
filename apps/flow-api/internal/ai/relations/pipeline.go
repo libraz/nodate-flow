@@ -153,6 +153,10 @@ func (p *Pipeline) processTask(ctx context.Context, workspaceID uint32, taskID u
 		ActorUserID: 0,
 		ResultLimit: MaxSuggestions,
 	})
+	if stderrors.Is(err, embed.ErrWorkspaceDisabled) ||
+		stderrors.Is(err, embed.ErrWorkspaceNotConfigured) {
+		return
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "relations pipeline: rank similar tasks", "taskId", taskID, "err", err)
 		return

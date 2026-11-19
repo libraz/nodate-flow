@@ -4,6 +4,7 @@
 .env.*
 !.env.example
 backup/
+/secrets/
 **/dist
 .claude/
 .serena/

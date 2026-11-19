@@ -13,20 +13,37 @@ import (
 // similarStore serves one source vector, a fixed candidate pool and an
 // optional ai_settings row.
 type similarStore struct {
-	settings   *generated.GetAiSettingsRow
-	source     string
-	candidates []generated.ListCandidateTaskEmbeddingsRow
-	listArgs   generated.ListCandidateTaskEmbeddingsParams
+	settings              *generated.GetAiSettingsRow
+	workspaceMode         generated.WorkspaceEmbeddingSettingsMode
+	workspaceErr          error
+	source                string
+	candidates            []generated.ListCandidateTaskEmbeddingsRow
+	listArgs              generated.ListCandidateTaskEmbeddingsParams
+	aiSettingsReads       int
+	embeddingReads        int
+	candidateListRequests int
 }
 
 func (s *similarStore) GetAiSettings(context.Context, uint32) (generated.GetAiSettingsRow, error) {
+	s.aiSettingsReads++
 	if s.settings == nil {
 		return generated.GetAiSettingsRow{}, sql.ErrNoRows
 	}
 	return *s.settings, nil
 }
 
+func (s *similarStore) GetWorkspaceEmbeddingSettings(context.Context, uint32) (generated.WorkspaceEmbeddingSettingsMode, error) {
+	if s.workspaceErr != nil {
+		return "", s.workspaceErr
+	}
+	if s.workspaceMode == "" {
+		return "", sql.ErrNoRows
+	}
+	return s.workspaceMode, nil
+}
+
 func (s *similarStore) GetTaskEmbedding(context.Context, generated.GetTaskEmbeddingParams) (generated.GetTaskEmbeddingRow, error) {
+	s.embeddingReads++
 	if s.source == "" {
 		return generated.GetTaskEmbeddingRow{}, sql.ErrNoRows
 	}
@@ -34,6 +51,7 @@ func (s *similarStore) GetTaskEmbedding(context.Context, generated.GetTaskEmbedd
 }
 
 func (s *similarStore) ListCandidateTaskEmbeddings(_ context.Context, arg generated.ListCandidateTaskEmbeddingsParams) ([]generated.ListCandidateTaskEmbeddingsRow, error) {
+	s.candidateListRequests++
 	s.listArgs = arg
 	return s.candidates, nil
 }
@@ -116,5 +134,54 @@ func TestRankSimilarTasksWithoutSourceVector(t *testing.T) {
 	var nilClient *Client
 	if _, err := nilClient.RankSimilarTasks(context.Background(), store, SimilarQuery{WorkspaceID: 7, TaskID: 9}); !errors.Is(err, ErrNoSourceVector) {
 		t.Fatalf("nil client err = %v, want ErrNoSourceVector", err)
+	}
+}
+
+func TestRankSimilarTasksChecksWorkspacePolicyBeforeReadingStoredVectors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		mode        generated.WorkspaceEmbeddingSettingsMode
+		settingsErr error
+		wantErr     error
+	}{
+		{
+			name:    "disabled",
+			mode:    generated.WorkspaceEmbeddingSettingsModeDisabled,
+			wantErr: ErrWorkspaceDisabled,
+		},
+		{
+			name:        "settings read failure",
+			settingsErr: errors.New("database unavailable"),
+			wantErr:     ErrWorkspaceSettingsUnavailable,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := newSimilarStore()
+			store.workspaceMode = tc.mode
+			store.workspaceErr = tc.settingsErr
+			client := &Client{Provider: &fakeProvider{}}
+			sourceTextCalls := 0
+
+			_, err := client.RankSimilarTasks(context.Background(), store, SimilarQuery{
+				WorkspaceID: 7,
+				TaskID:      9,
+				SourceText: func(context.Context) (string, string, error) {
+					sourceTextCalls++
+					return "private task", "description", nil
+				},
+			})
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("RankSimilarTasks error = %v, want %v", err, tc.wantErr)
+			}
+			if store.aiSettingsReads != 0 || store.embeddingReads != 0 || store.candidateListRequests != 0 || sourceTextCalls != 0 {
+				t.Errorf("reads before policy gate: settings=%d vectors=%d candidates=%d source text=%d; want all zero",
+					store.aiSettingsReads, store.embeddingReads, store.candidateListRequests, sourceTextCalls)
+			}
+		})
 	}
 }

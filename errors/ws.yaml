@@ -200,8 +200,17 @@ resources:
         message: "Task was modified by someone else"
         message_ja: "このタスクは他のユーザーに更新されました"
         message_zh: "该任务已被其他用户更新"
-        description: "Returned when an optimistic concurrency check (version or updated_at) fails during update."
+        description: "Returned when an optimistic concurrency check or a supplied task state or due date precondition fails."
         userAction: "Reload the task to see the latest version, then re-apply your changes."
+
+      idempotency_key_conflict:
+        code: WS.TASK.IDEMPOTENCY_KEY_CONFLICT
+        status: 409
+        message: "This idempotency key has already been used for a different task request"
+        message_ja: "この冪等性キーは別のタスクリクエストで使用済みです"
+        message_zh: "此幂等键已用于其他任务请求"
+        description: "Returned when a task mutation reuses an idempotency key with a different task or request body."
+        userAction: "Retry with the original request, or use a new key for a different operation."
 
       transition_unknown:
         code: WS.TASK.TRANSITION_UNKNOWN

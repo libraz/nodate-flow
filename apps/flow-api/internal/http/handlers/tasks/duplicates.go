@@ -73,6 +73,9 @@ func ListDuplicates(deps Deps) func(context.Context, *ListDuplicatesInput) (*Lis
 			ActorUserID: vis.ActorUserID,
 			ResultLimit: duplicateResultLimit,
 		})
+		if errors.Is(err, embed.ErrWorkspaceDisabled) || errors.Is(err, embed.ErrWorkspaceNotConfigured) {
+			return emptyDuplicates(""), nil
+		}
 		if errors.Is(err, embed.ErrNoSourceVector) {
 			return emptyDuplicates(model), nil
 		}

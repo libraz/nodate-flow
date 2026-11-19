@@ -77,6 +77,31 @@
       "forbidden": "仅工作区管理员可管理 AI 提供商。",
       "retry": "重试"
     },
-    "invalid_base_url": "此类型始终连接官方端点，因此下方的 Base URL 会被忽略，经由此服务提供商的所有请求都会失败。请删除后以 OpenAI 兼容重新添加。"
+    "invalid_base_url": "此类型始终连接官方端点，因此下方的 Base URL 会被忽略，经由此服务提供商的所有请求都会失败。请删除后以 OpenAI 兼容重新添加。",
+    "embedding": {
+      "title": "任务嵌入",
+      "description": "选择此工作区是否可以使用服务器共享的嵌入提供商搜索相似任务。",
+      "mode_label": "使用共享嵌入提供商",
+      "mode": {
+        "inherit": "使用服务器运营者配置的提供商。",
+        "disabled": "此工作区已关闭嵌入调用。"
+      },
+      "effective_status": "当前状态",
+      "status": {
+        "enabled": "可用",
+        "disabled": "已关闭",
+        "unconfigured": "尚未配置服务器提供商"
+      },
+      "model": "模型",
+      "endpoint": "端点",
+      "data_use": "启用后，系统会将任务标题和描述发送到此端点，以生成相似度搜索所需的向量。",
+      "save": "保存更改",
+      "error": {
+        "load_failed": "无法加载嵌入设置，请重试。",
+        "forbidden": "仅工作区管理员可管理嵌入设置。",
+        "retry": "重试",
+        "update_failed": "无法更新嵌入设置，请重试。"
+      }
+    }
   }
 }

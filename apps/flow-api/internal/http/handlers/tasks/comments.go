@@ -3,15 +3,18 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/operation"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -32,6 +35,8 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		}
 		pub := types.New()
 		taskInternal := int64(task.ID)
+		var result TaskComment
+		idempotent := in.IdempotencyKey != ""
 		// One commit boundary for the body, the mentions it names and the
 		// event describing it: a
 		// mention row that lands without its comment, or a comment that
@@ -41,8 +46,41 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 		// Retry on transient FK deadlocks: comments inherits FK locks
 		// on tasks/workspaces/users via its FKs and races with the
 		// task transition / fan-out paths under heavy parallel load.
-		if err := dbretry.InTx(ctx, deps.DB, "tasks.AddComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		err := dbretry.InTx(ctx, deps.DB, "tasks.AddComment", taskMutationTxOptions(in.IdempotencyKey), func(ctx context.Context, tx *dbretry.Tx) error {
+			result = TaskComment{}
 			qtx := deps.Queries.WithTx(tx.RawTx())
+			var receipt operation.Receipt
+			if idempotent {
+				cached := TaskComment{}
+				var replayed bool
+				var err error
+				receipt, replayed, err = lockTaskMutation(ctx, tx, ws, task, actorID,
+					execution.CapabilityAddComment, "task.comment.add", in.IdempotencyKey, in.Body, &cached)
+				if err != nil {
+					return err
+				}
+				if replayed {
+					commentID, err := types.Parse(cached.ID)
+					if err != nil {
+						return apierrors.New(apierrors.InternalUnexpected)
+					}
+					var enabled int
+					err = tx.RawTx().QueryRowContext(ctx,
+						`SELECT 1 FROM comments
+WHERE workspace_id = ? AND task_id = ? AND public_id = ? AND enabled = TRUE
+LIMIT 1`,
+						ws.ID, task.ID, commentID,
+					).Scan(&enabled)
+					if errors.Is(err, sql.ErrNoRows) {
+						return apierrors.New(apierrors.WsCommentNotFound)
+					}
+					if err != nil {
+						return err
+					}
+					result = cached
+					return nil
+				}
+			}
 			id, e := qtx.AddComment(ctx, generated.AddCommentParams{
 				PublicID:    pub,
 				WorkspaceID: ws.ID,
@@ -54,10 +92,20 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 			if e != nil {
 				return e
 			}
+			if idempotent {
+				createdAt, err := qtx.GetCommentCreatedAt(ctx, generated.GetCommentCreatedAtParams{
+					WorkspaceID: ws.ID,
+					PublicID:    pub,
+				})
+				if err != nil {
+					return err
+				}
+				result = TaskComment{ID: pub.String(), Body: in.Body.Body, CreatedAt: createdAt.Unix()}
+			}
 			if e := syncCommentMentions(ctx, tx, ws.ID, task, uint32(id), pub, actorPtr(ctx), in.Body.Body); e != nil { //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
 				return e
 			}
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			if err := deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
 				EventType:    eventbus.TaskCommentAdded,
 				AuditAction:  "comment.create",
 				ResourceType: "comment",
@@ -65,15 +113,28 @@ func AddComment(deps Deps) func(context.Context, *AddTaskCommentInput) (*AddTask
 				TaskID:       &taskInternal,
 				Payload:      map[string]any{"taskId": task.PublicID.String(), "commentId": pub.String()},
 				CallSite:     "tasks.AddComment",
-			})
-		}); err != nil {
+			}); err != nil {
+				return err
+			}
+			if idempotent {
+				return completeTaskMutation(ctx, tx, receipt, result)
+			}
+			return nil
+		})
+		if err != nil {
+			if idempotent {
+				return nil, taskMutationHTTPError(err)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		return &AddTaskCommentOutput{Body: TaskComment{
-			ID:        pub.String(),
-			Body:      in.Body.Body,
-			CreatedAt: handlerutil.NowUnix(),
-		}}, nil
+		if !idempotent {
+			result = TaskComment{
+				ID:        pub.String(),
+				Body:      in.Body.Body,
+				CreatedAt: handlerutil.NowUnix(),
+			}
+		}
+		return &AddTaskCommentOutput{Body: result}, nil
 	}
 }
 

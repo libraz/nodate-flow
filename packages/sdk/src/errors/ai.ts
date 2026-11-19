@@ -21,6 +21,16 @@ export const AiErrors = {
     status: 402,
     message: "Daily AI spend limit reached",
   },
+  AI_EMBEDDING_DISABLED: {
+    code: "AI.EMBEDDING.DISABLED",
+    status: 412,
+    message: "Embeddings are disabled for this workspace",
+  },
+  AI_EMBEDDING_NOT_CONFIGURED: {
+    code: "AI.EMBEDDING.NOT_CONFIGURED",
+    status: 412,
+    message: "The instance embedding provider is not configured",
+  },
   AI_MODEL_NOT_FOUND: {
     code: "AI.MODEL.NOT_FOUND",
     status: 404,

@@ -7,6 +7,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
@@ -43,19 +44,46 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 		}
 
 		var (
-			result  taskstate.ApplyResult
-			specErr *apierrors.Spec
+			result        taskstate.ApplyResult
+			specErr       *apierrors.Spec
+			replayed      bool
+			actorID       uint32
+			auditMutation mutationlog.Mutation
+			output        TransitionTaskOutput
 		)
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Transition", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		actorID, ok = middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthTokenMissingOrMalformed)
+		}
+		var expectedState *generated.TasksDerivedState
+		if in.Body.ExpectedState != "" {
+			value := generated.TasksDerivedState(in.Body.ExpectedState)
+			expectedState = &value
+		}
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Transition", taskMutationTxOptions(in.IdempotencyKey), func(ctx context.Context, tx *dbretry.Tx) error {
+			result = taskstate.ApplyResult{}
+			specErr = nil
+			replayed = false
+			receipt, isReplay, err := lockTaskMutation(ctx, tx, ws, task, actorID,
+				execution.CapabilityEditTask, "task.transition", in.IdempotencyKey, in.Body, &output.Body)
+			if err != nil {
+				return err
+			}
+			if isReplay {
+				replayed = true
+				return nil
+			}
+
 			r, spec, applyErr := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
-				WorkspaceID:  ws.ID,
-				TaskID:       task.ID,
-				PublicID:     types.FromUUID(task.PublicID),
-				Transition:   in.Body.Transition,
-				ActorUserID:  actorPtr(ctx),
-				Reason:       in.Body.Reason,
-				Via:          "api",
-				ExtraPayload: extra,
+				WorkspaceID:   ws.ID,
+				TaskID:        task.ID,
+				PublicID:      types.FromUUID(task.PublicID),
+				Transition:    in.Body.Transition,
+				ExpectedState: expectedState,
+				ActorUserID:   actorPtr(ctx),
+				Reason:        in.Body.Reason,
+				Via:           "api",
+				ExtraPayload:  extra,
 			})
 			// taskstate returns an apierrors.Spec for validation
 			// failures (with applyErr == nil) and for SQL-level errors
@@ -71,38 +99,52 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 				return errSpec
 			}
 			result = r
-			return nil
+			auditMutation = mutationlog.Mutation{
+				AuditAction:  "task.transition",
+				ResourceType: "task",
+				ResourceID:   task.PublicID.String(),
+				Payload: map[string]any{
+					"transition": in.Body.Transition,
+					"fromState":  string(result.FromState),
+					"toState":    string(result.ToState),
+				},
+				CallSite: "tasks.Transition",
+			}
+			if in.IdempotencyKey == "" {
+				return nil
+			}
+			row, err := deps.Queries.WithTx(tx.RawTx()).FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
+			})
+			if err != nil {
+				return err
+			}
+			output.Body = rowToTaskFromFind(row)
+			return completeTaskMutation(ctx, tx, receipt, output.Body)
 		})
 		if specErr != nil {
 			return nil, httpErr(specErr)
 		}
 		if txErr != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, taskMutationHTTPError(txErr)
 		}
-
-		// taskstate appended the transition event in the transaction.
-		aID, _ := middleware.ActorFromContext(ctx)
-		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: aID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-			AuditAction:  "task.transition",
-			ResourceType: "task",
-			ResourceID:   task.PublicID.String(),
-			Payload: map[string]any{
-				"transition": in.Body.Transition,
-				"fromState":  string(result.FromState),
-				"toState":    string(result.ToState),
-			},
-			CallSite: "tasks.Transition",
-		})
-
+		if replayed {
+			return &output, nil
+		}
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, auditMutation)
 		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
-		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if in.IdempotencyKey == "" {
+			row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			output.Body = rowToTaskFromFind(row)
 		}
-		return &TransitionTaskOutput{Body: rowToTaskFromFind(row)}, nil
+		return &output, nil
 	}
 }
 

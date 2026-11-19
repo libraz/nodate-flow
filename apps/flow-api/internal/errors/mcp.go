@@ -16,6 +16,8 @@ var (
 	McpTokenNotFound = &Spec{Code: "MCP.TOKEN.NOT_FOUND", Status: 404, Message: "MCP token not found", Description: "Returned when revoking an MCP token that does not exist for this user in this workspace, or was already revoked.", UserAction: "Refresh the token list and try again."}
 	// MCP.TOKEN.REVOKED — MCP token has been revoked
 	McpTokenRevoked = &Spec{Code: "MCP.TOKEN.REVOKED", Status: 401, Message: "MCP token has been revoked", Description: "Returned when the MCP token has been explicitly revoked by the user or an admin.", UserAction: "Re-issue a new MCP token."}
+	// MCP.TOKEN.SESSION_REQUIRED — An active user session is required to manage MCP tokens
+	McpTokenSessionRequired = &Spec{Code: "MCP.TOKEN.SESSION_REQUIRED", Status: 403, Message: "An active user session is required to manage MCP tokens", Description: "Returned when a request to issue or revoke an MCP token is authenticated without an active user session.", UserAction: "Sign in and manage MCP tokens from your account settings."}
 	// MCP.TOKEN.UNKNOWN — MCP token is invalid
 	McpTokenUnknown = &Spec{Code: "MCP.TOKEN.UNKNOWN", Status: 401, Message: "MCP token is invalid", Description: "Returned when the bearer token presented to the MCP endpoint is unknown or malformed.", UserAction: "Re-issue an MCP token from your account settings."}
 	// MCP.TOKEN.WORKSPACE_MISMATCH — MCP token is bound to a different workspace

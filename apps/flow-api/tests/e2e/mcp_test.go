@@ -69,6 +69,63 @@ func TestMCPTokenAndJSONRPC(t *testing.T) {
 	require.Greater(t, invocations, 0, "tools/call must record mcp_invocations row")
 }
 
+func TestMCPTokenCannotManageMCPBearerTokens(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	baseURL := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/me/mcp-tokens"
+
+	var tokenResp struct {
+		ID    string `json:"id"`
+		Token string `json:"token"`
+	}
+	doJSON(t, http.MethodPost, baseURL, tt.AccessToken, map[string]any{
+		"name":   "management-boundary-test",
+		"scopes": []string{"read:workspace", "write:workspace"},
+	}, &tokenResp)
+	require.NotEmpty(t, tokenResp.ID)
+	require.NotEmpty(t, tokenResp.Token)
+
+	status, body := doJSONStatus(t, http.MethodPost, baseURL, tokenResp.Token, map[string]any{
+		"name":   "second-token",
+		"scopes": []string{"read:workspace", "write:workspace"},
+	})
+	requireDenied(t, status, body, http.StatusForbidden, "MCP.TOKEN.SESSION_REQUIRED",
+		"MCP bearer attempting to mint a token")
+
+	// Listing remains available to the token owner and exposes only masked
+	// metadata, so the management restriction does not break current clients.
+	var listed struct {
+		Tokens []struct {
+			ID string `json:"id"`
+		} `json:"tokens"`
+	}
+	doJSON(t, http.MethodGet, baseURL, tokenResp.Token, nil, &listed)
+	require.Len(t, listed.Tokens, 1, "the denied create must not mint a second token")
+	require.Equal(t, tokenResp.ID, listed.Tokens[0].ID)
+
+	status, body = doJSONStatus(t, http.MethodDelete, baseURL+"/"+tokenResp.ID, tokenResp.Token, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "MCP.TOKEN.SESSION_REQUIRED",
+		"MCP bearer attempting to revoke a token")
+
+	// The original credential remains valid after the denied revoke.
+	doJSON(t, http.MethodGet, baseURL, tokenResp.Token, nil, &listed)
+	require.Len(t, listed.Tokens, 1)
+
+	pat := mintPatForWorkspace(t, tt.AccessToken, tt.UserPublicID, tt.WorkspacePublicID)
+	status, body = doJSONStatus(t, http.MethodPost, baseURL, pat, map[string]any{
+		"name":   "pat-created-token",
+		"scopes": []string{"read:workspace", "write:workspace"},
+	})
+	requireDenied(t, status, body, http.StatusForbidden, "MCP.TOKEN.SESSION_REQUIRED",
+		"PAT attempting to mint an MCP token")
+
+	status, body = doJSONStatus(t, http.MethodDelete, baseURL+"/"+tokenResp.ID, pat, nil)
+	requireDenied(t, status, body, http.StatusForbidden, "MCP.TOKEN.SESSION_REQUIRED",
+		"PAT attempting to revoke an MCP token")
+}
+
 // TestMCPTransitionTaskUsesCanonicalStateEngine verifies that MCP task
 // transitions go through the same trigger-aware state engine as REST. With
 // trg_tasks_derived_state_guard loaded, a direct TransitionTaskState update

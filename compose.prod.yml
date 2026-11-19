@@ -54,7 +54,7 @@ services:
       - "443:443"
 
   mysql:
-    image: mysql:9.7
+    image: mysql:26.10.0
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${NF_DB_ROOT_PASSWORD:?database root password}
@@ -84,7 +84,7 @@ services:
   # blobs through flow-api's /blobs relay. NF_S3_* may point at an external
   # S3 instead (drop this service and its depends_on entries).
   storage:
-    image: versity/versitygw:v1.10.0
+    image: versity/versitygw:v1.11.0
     restart: unless-stopped
     command: ["posix", "/data"]
     environment:
@@ -235,6 +235,7 @@ services:
       NF_FLOW_OUTBOUND_LLM_RPS: ${NF_FLOW_OUTBOUND_LLM_RPS:-0}
       NF_FLOW_OUTBOUND_LLM_BURST: ${NF_FLOW_OUTBOUND_LLM_BURST:-0}
       NF_FLOW_EMBED_OPENAI_KEY: ${NF_FLOW_EMBED_OPENAI_KEY:-}
+      NF_FLOW_EMBED_OPENAI_KEY_FILE: ${NF_FLOW_EMBED_OPENAI_KEY_FILE:-}
       NF_FLOW_EMBED_MODEL: ${NF_FLOW_EMBED_MODEL:-}
       NF_FLOW_EMBED_BASE_URL: ${NF_FLOW_EMBED_BASE_URL:-}
       NF_FLOW_AGENT_TICK_INTERVAL: ${NF_FLOW_AGENT_TICK_INTERVAL:-1m}

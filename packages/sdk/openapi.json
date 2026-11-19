@@ -4005,6 +4005,34 @@
         "required": ["body"],
         "type": "object"
       },
+      "EmbeddingSettingsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/EmbeddingSettingsBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "mode": {
+            "enum": ["inherit", "disabled"],
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "status": {
+            "enum": ["enabled", "disabled", "unconfigured"],
+            "type": "string"
+          }
+        },
+        "required": ["mode", "status"],
+        "type": "object"
+      },
       "Entry": {
         "additionalProperties": false,
         "properties": {
@@ -8203,6 +8231,24 @@
         },
         "type": "object"
       },
+      "PatchEmbeddingSettingsInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/PatchEmbeddingSettingsInputBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "mode": {
+            "enum": ["inherit", "disabled"],
+            "type": "string"
+          }
+        },
+        "required": ["mode"],
+        "type": "object"
+      },
       "PatchEventInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -8633,6 +8679,10 @@
           },
           "dueOn": {
             "description": "YYYY-MM-DD or empty string to clear",
+            "type": "string"
+          },
+          "expectedDueOn": {
+            "description": "Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date.",
             "type": "string"
           },
           "priority": {
@@ -12328,6 +12378,11 @@
             "examples": ["https://example.com/schemas/TransitionTaskBody.json"],
             "format": "uri",
             "readOnly": true,
+            "type": "string"
+          },
+          "expectedState": {
+            "description": "Apply only if the task is still in this state",
+            "enum": ["open", "waiting", "review", "done", "cancelled"],
             "type": "string"
           },
           "occurredAt": {
@@ -18129,7 +18184,7 @@
     },
     "/tasks": {
       "get": {
-        "description": "Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).",
+        "description": "Returns a page of tasks filtered by project or workspace plus optional title, status, assignee, priority, or due-date filters. dueFrom and dueThrough are inclusive YYYY-MM-DD bounds on dueOn and use limit/offset pagination. They cannot be combined with cursor. Backs every task list view (board, list, etc.).\n\nLayer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).",
         "operationId": "tasks-list",
         "parameters": [
           {
@@ -18202,12 +18257,34 @@
             }
           },
           {
-            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "description": "Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination.",
+            "explode": false,
+            "in": "query",
+            "name": "dueFrom",
+            "schema": {
+              "description": "Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination.",
+            "explode": false,
+            "in": "query",
+            "name": "dueThrough",
+            "schema": {
+              "description": "Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination.",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough.",
             "explode": false,
             "in": "query",
             "name": "cursor",
             "schema": {
-              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough.",
               "type": "string"
             }
           },
@@ -18442,9 +18519,20 @@
         "tags": ["Tasks"]
       },
       "patch": {
-        "description": "Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.",
+        "description": "Updates editable task fields, including the due date. Set expectedDueOn to the due date you read before making the change. A mismatch returns 409. Send an Idempotency-Key to safely retry the request. Description edits append a version to the task history.",
         "operationId": "tasks-patch",
         "parameters": [
+          {
+            "description": "Optional key for safely retrying the same request",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "description": "Optional key for safely retrying the same request",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "id",
@@ -18917,9 +19005,20 @@
     },
     "/tasks/{id}/apply-steps": {
       "post": {
-        "description": "Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.",
+        "description": "Creates the submitted steps as ordered child tasks under this parent. The client may send an Idempotency-Key to safely retry after an uncertain response, and may trim or reorder the steps before applying.",
         "operationId": "tasks-apply-steps",
         "parameters": [
+          {
+            "description": "Optional key for safely retrying the same request",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "description": "Optional key for safely retrying the same request",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "id",
@@ -19375,9 +19474,20 @@
         "tags": ["Tasks"]
       },
       "post": {
-        "description": "Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.",
+        "description": "Appends a comment from the caller and notifies users mentioned in the body. Send an Idempotency-Key to safely retry the request.",
         "operationId": "tasks-comments-add",
         "parameters": [
+          {
+            "description": "Optional key for safely retrying the same request",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "description": "Optional key for safely retrying the same request",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "id",
@@ -20824,7 +20934,7 @@
     },
     "/tasks/{id}/propose-steps": {
       "post": {
-        "description": "Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.",
+        "description": "Asks the workspace's LLM to decompose this task into ordered execution steps. Nothing is written until the returned steps are submitted to /apply-steps.",
         "operationId": "tasks-propose-steps",
         "parameters": [
           {
@@ -21422,9 +21532,20 @@
     },
     "/tasks/{id}/transitions": {
       "post": {
-        "description": "Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.",
+        "description": "Applies a state-machine transition and records it in the task history. Set expectedState to the state you read before requesting the transition. A mismatch returns 409. Send an Idempotency-Key to safely retry the request.",
         "operationId": "tasks-transitions-apply",
         "parameters": [
+          {
+            "description": "Optional key for safely retrying the same request",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "description": "Optional key for safely retrying the same request",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._~-]{1,128}$",
+              "type": "string"
+            }
+          },
           {
             "in": "path",
             "name": "id",
@@ -22607,6 +22728,104 @@
         ],
         "summary": "Today's accumulated LLM spend (USD) for a workspace",
         "tags": ["Public"]
+      }
+    },
+    "/workspaces/{wsId}/ai/embedding-settings": {
+      "get": {
+        "description": "Returns the workspace opt-out mode and the effective instance embedding provider status without exposing credentials.",
+        "operationId": "ai-embedding-settings-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingSettingsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get embedding provider settings for a workspace",
+        "tags": ["AI"]
+      },
+      "patch": {
+        "description": "Sets the workspace embedding mode to inherit the instance provider or disable embeddings for this workspace.",
+        "operationId": "ai-embedding-settings-update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "wsId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchEmbeddingSettingsInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingSettingsBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update embedding provider settings for a workspace",
+        "tags": ["AI"]
       }
     },
     "/workspaces/{wsId}/ai/invocations": {
@@ -24207,7 +24426,7 @@
         "tags": ["Calendar"]
       },
       "post": {
-        "description": "Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.",
+        "description": "Creates an event in the calendar. Supply an optional Idempotency-Key to safely retry the same request after an uncertain response. Reusing a key with a different calendar or request body returns 409. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.",
         "operationId": "events-create",
         "parameters": [
           {
@@ -24227,6 +24446,17 @@
             "required": true,
             "schema": {
               "description": "Calendar public ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional key for safely retrying event creation",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "description": "Optional key for safely retrying event creation",
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._~-]{1,128}$",
               "type": "string"
             }
           }
@@ -29381,7 +29611,7 @@
         "tags": ["AI"]
       },
       "post": {
-        "description": "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.",
+        "description": "Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. Requires an active user session. The plaintext token is returned exactly once; only the hash is stored.",
         "operationId": "mcp-tokens-create",
         "parameters": [
           {
@@ -29436,7 +29666,7 @@
     },
     "/workspaces/{wsId}/me/mcp-tokens/{tokenId}": {
       "delete": {
-        "description": "Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
+        "description": "Marks the token as revoked so future /mcp requests carrying it are rejected. Requires an active user session. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.",
         "operationId": "mcp-tokens-delete",
         "parameters": [
           {

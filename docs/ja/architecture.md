@@ -20,6 +20,8 @@ nodate-flow は、1 つの MySQL データベースの上で動く Go のサー�
 
 flow-worker は MySQL に直接接続し、flow-api へは共有のサービストークンで接続します。presence-discord はデータベースに触れません。Discord アカウントに対応する flow ユーザーの照会とシグナルの送信を、どちらも flow-api への HTTP で行います。そのため、ゲートウェイが侵害されても影響はこのトークンで許可された範囲に限られます。
 
+タスクの埋め込みは MySQL に 768 次元のベクトルとして保存します。類似候補を出すときは、ワークスペースと埋め込みモデルが一致し、利用者に閲覧権限がある新しいタスクを最大 200 件取得します。flow-api がその候補をコサイン類似度で順位付けします。対象範囲より古いタスクは候補に入りません。MySQL Community はベクトル型を備えています。ベクトル間の距離を SQL で計算する関数は HeatWave と MySQL AI 向けです。 [MySQL のベクトル関数](https://dev.mysql.com/doc/refman/26.10/en/vector-functions.html)
+
 flow-api は既定でイベントストリームと送信レートリミッターをプロセス内に持つため、レプリカは 1 つを前提にしています。`NF_FLOW_STREAM_BACKEND` と `NF_FLOW_OUTBOUND_BACKEND` を `redis` にすると、両方がレプリカ間で共有される Redis 互換ストアに移ります。ストリームは `events` テーブルの追跡も行い（`NF_FLOW_STREAM_TAIL`、既定で有効）、別のプロセスが書き込んだ変更も接続中のクライアントに届きます。
 
 開発用の compose ファイルには、Redis 互換ストア、メールキャッチャー、OpenTelemetry コレクター、Prometheus、Grafana が加わります。設定は `infra/` にあります。

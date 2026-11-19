@@ -1248,6 +1248,10 @@ type Querier interface {
 	GetWebhookSubscription(ctx context.Context, arg GetWebhookSubscriptionParams) (GetWebhookSubscriptionRow, error)
 	// Fetch a single widget by workspace_id + public_id.
 	GetWidgetByPublicID(ctx context.Context, arg GetWidgetByPublicIDParams) (GetWidgetByPublicIDRow, error)
+	// ============================================================================
+	// workspace_embedding_settings queries
+	// ============================================================================
+	GetWorkspaceEmbeddingSettings(ctx context.Context, workspaceID uint32) (WorkspaceEmbeddingSettingsMode, error)
 	// Resolve internal workspace id from public_id; ignored if workspace is disabled.
 	// Direct table lookup (no view) because this is a single-column id resolution
 	// used on hot paths in task handlers; v_workspaces would project unused columns.
@@ -1458,10 +1462,8 @@ type Querier interface {
 	// Return the newest task_embeddings for (workspace_id, model), up to the
 	// caller's LIMIT by descending task id, excluding a given task_id (so
 	// self-similarity is filtered out). Tasks older than that window are not
-	// candidates. Cosine similarity is
-	// computed in Go because MySQL 9.7 Community does not expose
-	// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
-	// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
+	// candidates. The Go caller computes cosine similarity from the
+	// L2-normalized vectors and applies the cutoffs from ai_settings.
 	ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error)
 	// List enabled child pages for a given parent page with creator info.
 	// The recursive CTE enforces that every ancestor on the chain up to the
@@ -2560,8 +2562,8 @@ type Querier interface {
 	// VECTOR columns are read/written as []byte. The Go embedding client
 	// L2-normalizes vectors before INSERT and serializes them with
 	// STRING_TO_VECTOR / the native binary protocol. Cosine similarity is
-	// computed in Go (dot product on normalized vectors), because MySQL 9.7
-	// Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only).
+	// computed in Go as a dot product on normalized vectors. MySQL Community
+	// Edition does not include the vector DISTANCE function.
 	// The query layer
 	// therefore returns candidate rows and the application does the ranking.
 	// ============================================================================
@@ -2587,6 +2589,7 @@ type Querier interface {
 	// save against a soft-deleted row updates that row in place, reports success,
 	// and leaves the preference still invisible.
 	UpsertViewPreference(ctx context.Context, arg UpsertViewPreferenceParams) error
+	UpsertWorkspaceEmbeddingSettings(ctx context.Context, arg UpsertWorkspaceEmbeddingSettingsParams) error
 	// Withdraw an entry by clearing its enabled flag. The row stays: it is what
 	// holds the (entry_kind, entry_value) claim that lets the same entry be added
 	// back later, and deleting it would strand that path.

@@ -101,6 +101,15 @@ resources:
   event:
     breadcrumb: "Calendar > Event"
     errors:
+      idempotency_key_conflict:
+        code: CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT
+        status: 409
+        message: "This idempotency key has already been used for a different event request"
+        message_ja: "この冪等性キーは別の予定作成リクエストで使用済みです"
+        message_zh: "此幂等键已用于其他日历事件请求"
+        description: "Returned when an event creation request reuses an idempotency key with a different calendar or request body."
+        userAction: "Retry with the original request, or use a new key for a different event."
+
       not_found:
         code: CALENDAR.EVENT.NOT_FOUND
         status: 404

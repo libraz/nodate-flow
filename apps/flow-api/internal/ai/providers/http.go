@@ -266,7 +266,8 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 		return nil, err
 	}
 
-	resp, err := sharedClient.Do(req) //#nosec G107 G704 -- request URL is configured by workspace admin via the AI provider settings, not derived from end-user input.
+	client := clientForDestination(destination)
+	resp, err := client.Do(req) //#nosec G107 G704 -- request URL is configured by workspace admin via the AI provider settings, not derived from end-user input.
 	if err != nil {
 		return nil, err
 	}
@@ -299,13 +300,24 @@ func doLimited(ctx context.Context, destination string, req *http.Request) (*htt
 			req.Body = body
 		}
 
-		resp, err = sharedClient.Do(req) //#nosec G107 G704 -- retry of the same admin-configured provider URL.
+		resp, err = client.Do(req) //#nosec G107 G704 -- retry of the same admin-configured provider URL.
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return resp, nil
+}
+
+func clientForDestination(destination string) *http.Client {
+	if destination != DestOpenAIEmbed {
+		return sharedClient
+	}
+	client := *sharedClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &client
 }
 
 // DestOpenAIEmbed is the limiter key for the embeddings endpoint. It is

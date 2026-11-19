@@ -40,6 +40,33 @@ afterEach(() => {
 });
 
 describe('<TaskCreateDialog> AI due date', () => {
+  it.each(['AI.EMBEDDING.DISABLED', 'AI.EMBEDDING.NOT_CONFIGURED', 'AI.PROVIDER.NOT_CONFIGURED'])(
+    'shows the embedding setup reason when smart-create fails with %s',
+    async (code) => {
+      const user = userEvent.setup();
+      server.use(
+        http.post(
+          `${API_URL}/workspaces/ws-1/tasks/propose-smart`,
+          () =>
+            new Response(JSON.stringify({ type: code, detail: code, status: 503 }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/problem+json' },
+            }),
+        ),
+      );
+      renderWithProviders(
+        <TaskCreateDialog projectId="project-1" workspaceId="ws-1" open={true} onClose={vi.fn()} />,
+      );
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'tasks.form.title' }), {
+        target: { value: 'Prepare release handoff' },
+      });
+      await user.click(screen.getByRole('button', { name: 'tasks.smart_create.assist_button' }));
+
+      expect((await screen.findByRole('alert')).textContent).toContain(code);
+    },
+  );
+
   it('preserves the selected due date and assignee when applying AI-assisted creation', async () => {
     const user = userEvent.setup();
     let applyBody: Record<string, unknown> | undefined;

@@ -126,6 +126,9 @@ type ApplyParams struct {
 	PublicID types.PublicID
 	// Transition is the verb to apply (see Transition* constants).
 	Transition string
+	// ExpectedState makes the transition conditional on the state read
+	// under the task row lock. A mismatch returns WS.TASK.UPDATE_CONFLICT.
+	ExpectedState *generated.TasksDerivedState
 	// ActorUserID is the internal user id of the actor; nil when the
 	// transition is driven by a system component (auto-action executor,
 	// reconciler) rather than a real user.
@@ -206,6 +209,9 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 			return ApplyResult{}, apierrors.WsTaskNotFound, nil
 		}
 		return ApplyResult{}, apierrors.InternalUnexpected, err
+	}
+	if p.ExpectedState != nil && locked.DerivedState != *p.ExpectedState {
+		return ApplyResult{}, apierrors.WsTaskUpdateConflict, nil
 	}
 
 	next, ok := NextState(locked.DerivedState, p.Transition)

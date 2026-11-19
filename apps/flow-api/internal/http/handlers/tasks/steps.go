@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -16,10 +17,12 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/errormodel"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/operation"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
@@ -93,6 +96,7 @@ type ApplyStep struct {
 
 // ApplyStepsInput is the request for POST /tasks/{id}/apply-steps.
 type ApplyStepsInput struct {
+	handlerutil.IdempotencyKeyInput
 	ID   string `path:"id"`
 	Body struct {
 		Steps []ApplyStep `json:"steps" minItems:"1"`
@@ -248,6 +252,7 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
+		idempotent := in.IdempotencyKey != ""
 
 		// Every step title is checked before the transaction opens, so a
 		// blank one in the middle of the list is refused as a validation
@@ -269,11 +274,13 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		// the whole workspace.
 		var parentProjectID uint32
 		var parentVisibility generated.TasksVisibility
-		if err := deps.DB.QueryRowContext(ctx,
-			`SELECT project_id, visibility FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
-			task.ID, ws.ID,
-		).Scan(&parentProjectID, &parentVisibility); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if !idempotent {
+			if err := deps.DB.QueryRowContext(ctx,
+				`SELECT project_id, visibility FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`,
+				task.ID, ws.ID,
+			).Scan(&parentProjectID, &parentVisibility); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 		}
 
 		// Every step is created in one transaction so a failure halfway
@@ -289,9 +296,42 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		created := make([]string, 0, len(in.Body.Steps))
 		childIDs := make([]int64, 0, len(in.Body.Steps))
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		var replayed bool
+		var result ApplyStepsOutputBody
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.ApplySteps", taskMutationTxOptions(in.IdempotencyKey), func(ctx context.Context, tx *dbretry.Tx) error {
+			replayed = false
+			result = ApplyStepsOutputBody{}
 			created = created[:0]
 			childIDs = childIDs[:0]
+			var receipt operation.Receipt
+			if idempotent {
+				cached := ApplyStepsOutputBody{}
+				var wasReplayed bool
+				var err error
+				receipt, wasReplayed, err = lockTaskMutation(ctx, tx, ws, task, actorID,
+					execution.CapabilityEditTask, "task.steps.apply", in.IdempotencyKey, in.Body, &cached)
+				if err != nil {
+					return err
+				}
+				if wasReplayed {
+					result = cached
+					replayed = true
+					return nil
+				}
+				if err := tx.RawTx().QueryRowContext(ctx,
+					`SELECT project_id, visibility
+FROM tasks
+WHERE id = ? AND workspace_id = ? AND enabled = TRUE
+LIMIT 1
+FOR UPDATE`,
+					task.ID, ws.ID,
+				).Scan(&parentProjectID, &parentVisibility); err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return apierrors.New(apierrors.WsTaskNotFound)
+					}
+					return err
+				}
+			}
 			for i, st := range in.Body.Steps {
 				child, err := taskcreate.New(ctx, tx, taskcreate.AuthoredBy(actorID), taskcreate.Args{
 					WorkspaceID:  ws.ID,
@@ -325,9 +365,16 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 				created = append(created, child.PublicID.String())
 				childIDs = append(childIDs, child.ID)
 			}
+			result.Created = append([]string(nil), created...)
+			if idempotent {
+				return completeTaskMutation(ctx, tx, receipt, result)
+			}
 			return nil
 		})
 		if txErr != nil {
+			if idempotent {
+				return nil, taskMutationHTTPError(txErr)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
@@ -336,12 +383,14 @@ func ApplySteps(deps StepsDeps) func(context.Context, *ApplyStepsInput) (*ApplyS
 		// title is trimmed on the way in, so embedding the submitted
 		// one would index a padded string against a row holding the
 		// trimmed one.
-		for i, st := range in.Body.Steps {
-			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(childIDs[i]), stepTitles[i].String(), st.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+		if !replayed {
+			for i, st := range in.Body.Steps {
+				embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, uint32(childIDs[i]), stepTitles[i].String(), st.Description) //#nosec G115 -- LastInsertId for tasks.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
+			}
 		}
 
 		out := &ApplyStepsOutput{}
-		out.Body.Created = created
+		out.Body = result
 		return out, nil
 	}
 }
@@ -357,7 +406,7 @@ func RegisterSteps(api huma.API, deps StepsDeps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/propose-steps",
 		Summary:     "AI-powered step decomposition for a task",
-		Description: "Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.",
+		Description: "Asks the workspace's LLM to decompose this task into ordered execution steps. Nothing is written until the returned steps are submitted to /apply-steps.",
 		Tags:        []string{"Tasks"},
 	}, ProposeSteps(deps))
 
@@ -366,7 +415,7 @@ func RegisterSteps(api huma.API, deps StepsDeps) {
 		Method:      http.MethodPost,
 		Path:        "/tasks/{id}/apply-steps",
 		Summary:     "Apply proposed steps as child tasks under a parent task",
-		Description: "Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.",
+		Description: "Creates the submitted steps as ordered child tasks under this parent. The client may send an Idempotency-Key to safely retry after an uncertain response, and may trim or reorder the steps before applying.",
 		Tags:        []string{"Tasks"},
 	}, ApplySteps(deps))
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/execution"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
@@ -96,27 +97,13 @@ func parseActorRole(s string) (generated.TaskActorsRole, error) {
 // query input; it is used to choose between the sqlc fast path and the
 // dynamic SQL path.
 func hasListFilters(in *ListTasksInput) bool {
-	return in.Q != "" || len(in.State) > 0 || in.Assignee != "" || len(in.Priority) > 0
+	return in.Q != "" || len(in.State) > 0 || in.Assignee != "" || len(in.Priority) > 0 ||
+		in.DueFrom != "" || in.DueThrough != ""
 }
 
-// needsDynamicQuery reports whether GET /tasks must go through the
-// dynamic SQL path instead of the sqlc-generated fast path.
-//
-// The dynamic path is required for two non-overlapping reasons:
-//   - the caller passed at least one of the user-facing filters
-//     (q / state / assignee), which sqlc cannot express;
-//   - the caller is not a workspace admin or owner, so the list is
-//     routed through the runtime-spliced form of the Layer-4 filter.
-//
-// The static sqlc queries carry the same predicate, so the second
-// condition is a routing choice rather than the thing that keeps a
-// task the caller may not see off the wire.
-//
-// The helper is kept (and not inlined into both call sites) because
-// the combined predicate covers two filter sources and four boolean
-// sub-clauses; inlining at both call sites would duplicate the
-// rationale comment and invite drift between the project-scope and
-// workspace-scope branches.
+// needsDynamicQuery reports whether GET /tasks must use dynamic SQL.
+// User-facing filters need dynamic predicates, while non-admin users
+// need the runtime-spliced form of the Layer-4 visibility filter.
 func needsDynamicQuery(in *ListTasksInput, wsRole middleware.WorkspaceRole) bool {
 	if hasListFilters(in) {
 		return true
@@ -137,18 +124,20 @@ func listTotal(offset, limit int32, pageLen int, count func() (int64, error)) (i
 }
 
 // listTasksFiltered runs a dynamic SELECT against v_task_list applying the
-// optional q / state / assignee / priority filters. It bypasses sqlc
+// optional q / state / assignee / priority / due date filters. It bypasses sqlc
 // because sqlc cannot express dynamic WHERE fragments. The shape of the
 // returned rows matches the sqlc ListTasksForWorkspace projection so the
 // existing mapper can reuse them.
 //
 // The total comes from a second statement rather than COUNT(*) OVER(),
-// and only when the page came back full. The window function had to
+// when the page came back full or an empty page has a nonzero offset.
+// The window function had to
 // consume every matching row, and each of those rows pulls
 // v_task_list's per-row label and assignee subqueries along with it, so
 // a 50-row page of a large project paid for them thousands of times
-// over. A short page needs no statement at all: it is the last one, so
-// the offset plus what came back is the exact total.
+// over. A nonempty short page is the last one, so the offset plus what
+// came back is the exact total. An empty first page also has an exact
+// total of zero.
 func listTasksFiltered(
 	ctx context.Context,
 	db *sql.DB,
@@ -157,6 +146,7 @@ func listTasksFiltered(
 	actorID uint32,
 	wsRole middleware.WorkspaceRole,
 	in *ListTasksInput,
+	dueFrom, dueThrough sql.NullTime,
 ) ([]generated.ListTasksForWorkspaceRow, int64, error) {
 	var (
 		where []string
@@ -174,6 +164,14 @@ func listTasksFiltered(
 	if len(projectPublicID) > 0 {
 		where = append(where, "v.project_public_id = ?")
 		args = append(args, projectPublicID)
+	}
+	if dueFrom.Valid {
+		where = append(where, "v.due_on >= ?")
+		args = append(args, dueFrom.Time.Format("2006-01-02"))
+	}
+	if dueThrough.Valid {
+		where = append(where, "v.due_on <= ?")
+		args = append(args, dueThrough.Time.Format("2006-01-02"))
 	}
 	// Substring match, deliberately, and not the FULLTEXT index the
 	// tasks table declares. MySQL's default parser leaves Japanese
@@ -318,7 +316,7 @@ LIMIT ? OFFSET ?`, strings.Join(where, " AND "))
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	if int32(len(out)) < in.Limit { //#nosec G115 -- page length is capped by the LIMIT bind, which the schema caps at 200
+	if int32(len(out)) < in.Limit && (len(out) > 0 || in.Offset == 0) { //#nosec G115 -- page length is capped by the LIMIT bind, which the schema caps at 200
 		return out, int64(in.Offset) + int64(len(out)), nil
 	}
 	//#nosec G201 -- same WHERE fragments as the page query above; user values stay bound.
@@ -345,6 +343,21 @@ func parseDateOrNullTime(s string) (sql.NullTime, error) {
 		return sql.NullTime{}, err
 	}
 	return sql.NullTime{Time: t, Valid: true}, nil
+}
+
+func parseTaskDueRange(from, through string) (sql.NullTime, sql.NullTime, error) {
+	dueFrom, err := parseDateOrNullTime(from)
+	if err != nil {
+		return sql.NullTime{}, sql.NullTime{}, err
+	}
+	dueThrough, err := parseDateOrNullTime(through)
+	if err != nil {
+		return sql.NullTime{}, sql.NullTime{}, err
+	}
+	if dueFrom.Valid && dueThrough.Valid && dueFrom.Time.After(dueThrough.Time) {
+		return sql.NullTime{}, sql.NullTime{}, errors.New("dueFrom must be on or before dueThrough")
+	}
+	return dueFrom, dueThrough, nil
 }
 
 // actorPtr delegates to handlerutil.ActorPtr.
@@ -535,6 +548,13 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
+		dueFrom, dueThrough, err := parseTaskDueRange(in.DueFrom, in.DueThrough)
+		if err != nil {
+			return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+		}
+		if in.Cursor != "" && (in.DueFrom != "" || in.DueThrough != "") {
+			return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+		}
 		limit := in.Limit
 		if limit <= 0 {
 			limit = 50
@@ -560,7 +580,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			pubBytes := prjPub.UUID()
 			if needsDynamicQuery(in, wsRole) {
 				in.Limit = limit
-				frows, total, ferr := listTasksFiltered(ctx, deps.DB, prj.WorkspaceID, pubBytes[:], actorID, wsRole, in)
+				frows, total, ferr := listTasksFiltered(ctx, deps.DB, prj.WorkspaceID, pubBytes[:], actorID, wsRole, in, dueFrom, dueThrough)
 				if ferr != nil {
 					if errors.Is(ferr, errInvalidAssignee) {
 						return out, nil
@@ -669,7 +689,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
 		if needsDynamicQuery(in, wsRole2) {
 			in.Limit = limit
-			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, actorID, wsRole2, in)
+			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, actorID, wsRole2, in, dueFrom, dueThrough)
 			if ferr != nil {
 				if errors.Is(ferr, errInvalidAssignee) {
 					return out, nil
@@ -806,7 +826,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 		// Dates in the body are parsed before the transaction; everything
 		// merged against the stored row happens inside it.
-		var bodyDue, bodyStart sql.NullTime
+		var bodyDue, bodyStart, expectedDueOn sql.NullTime
 		if in.Body.DueOn != nil {
 			parsed, err := parseDateOrNullTime(*in.Body.DueOn)
 			if err != nil {
@@ -821,6 +841,13 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			bodyStart = parsed
 		}
+		if in.Body.ExpectedDueOn != nil {
+			parsed, err := parseDateOrNullTime(*in.Body.ExpectedDueOn)
+			if err != nil {
+				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
+			}
+			expectedDueOn = parsed
+		}
 
 		taskInternal := int64(task.ID)
 		var (
@@ -829,13 +856,27 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			titleChanged bool
 			descChanged  bool
 			answered     error
+			replayed     bool
+			output       PatchTaskOutput
 		)
 		// One transaction for the merge and the write. The row is locked
 		// before it is read, so the merge starts from what the previous
 		// writer committed and a concurrent PATCH of another field is kept
 		// rather than overwritten with a value read before it landed.
-		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", taskMutationTxOptions(in.IdempotencyKey), func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
+			titleChanged = false
+			descChanged = false
+			replayed = false
+			receipt, isReplay, err := lockTaskMutation(ctx, tx, ws, task, actorID,
+				execution.CapabilityEditTask, "task.patch", in.IdempotencyKey, in.Body, &output.Body)
+			if err != nil {
+				return err
+			}
+			if isReplay {
+				replayed = true
+				return nil
+			}
 			qtx := deps.Queries.WithTx(tx.RawTx())
 			if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
 				ID:          task.ID,
@@ -857,6 +898,12 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 					return errAnswered
 				}
 				return err
+			}
+			if in.Body.ExpectedDueOn != nil &&
+				(current.DueOn.Valid != expectedDueOn.Valid ||
+					(current.DueOn.Valid && current.DueOn.Time.Format("2006-01-02") != expectedDueOn.Time.Format("2006-01-02"))) {
+				answered = httpErr(apierrors.WsTaskUpdateConflict)
+				return errAnswered
 			}
 
 			newTitle, err = taskrules.PatchTitle(current.Title, in.Body.Title)
@@ -987,7 +1034,7 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			}
 			// The lifecycle event commits with the change; the audit row
 			// waits for the commit.
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			if err := deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
 				EventType:    eventbus.TaskUpdated,
 				AuditAction:  "task.update",
 				ResourceType: "task",
@@ -995,13 +1042,30 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				TaskID:       &taskInternal,
 				Payload:      map[string]any{"taskId": task.PublicID.String()},
 				CallSite:     "tasks.Patch",
+			}); err != nil {
+				return err
+			}
+			if in.IdempotencyKey == "" {
+				return nil
+			}
+			row, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
 			})
+			if err != nil {
+				return err
+			}
+			output.Body = rowToTaskFromFind(row)
+			return completeTaskMutation(ctx, tx, receipt, output.Body)
 		})
 		if answered != nil {
 			return nil, answered
 		}
 		if txErr != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, taskMutationHTTPError(txErr)
+		}
+		if replayed {
+			return &output, nil
 		}
 		// Only text that actually moved invalidates the vector: a refresh
 		// costs a provider call the workspace pays for.
@@ -1010,14 +1074,17 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, newTitle.String(), nullStr(newDesc))
 		}
 
-		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(task.PublicID),
-		})
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+		if in.IdempotencyKey == "" {
+			row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(task.PublicID),
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			output.Body = rowToTaskFromFind(row)
 		}
-		return &PatchTaskOutput{Body: rowToTaskFromFind(row)}, nil
+		return &output, nil
 	}
 }
 

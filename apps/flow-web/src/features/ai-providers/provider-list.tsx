@@ -22,6 +22,7 @@ import {
   useAiProvidersQuery,
   useDeleteAiProvider,
 } from './api';
+import EmbeddingSettingsPanel from './embedding-settings';
 import MaskedKey from './masked-key';
 import ProviderAddDialog from './provider-add-dialog';
 import styles from './provider-list.module.css';
@@ -206,6 +207,8 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
           ))}
         </ul>
       )}
+
+      {error?.status === 403 ? null : <EmbeddingSettingsPanel workspaceId={workspaceId} />}
 
       <ProviderAddDialog
         workspaceId={workspaceId}

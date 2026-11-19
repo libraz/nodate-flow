@@ -26,6 +26,7 @@ const (
 	CapabilityReadTask    Capability = "read_task"
 	CapabilitySetPriority Capability = "set_priority"
 	CapabilityAddComment  Capability = "add_comment"
+	CapabilityEditTask    Capability = "edit_task"
 )
 
 // AgentIdentity contains the current public agent identity needed for
@@ -63,6 +64,8 @@ func requirementFor(capability Capability) (requirement, error) {
 		return requirement{tool: ToolSetPriority, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleEditor}, nil
 	case CapabilityAddComment:
 		return requirement{tool: ToolAddComment, scope: ScopeWriteWorkspace, floor: acl.ProjectRoleCommenter}, nil
+	case CapabilityEditTask:
+		return requirement{floor: acl.ProjectRoleEditor}, nil
 	default:
 		return requirement{}, fmt.Errorf("%w: unsupported capability %q", ErrInvalidPrincipal, capability)
 	}
@@ -91,6 +94,9 @@ func AuthorizeTaskTx(
 	}
 	if principal.IsAgent() && !principal.CapturedTarget(target) {
 		return TaskAuthorization{}, apierrors.New(apierrors.WsTaskNotFound)
+	}
+	if principal.IsAgent() && capability == CapabilityEditTask {
+		return TaskAuthorization{}, apierrors.New(apierrors.WsTaskAccessDenied)
 	}
 	db := tx.RawTx()
 	rec, err := acl.ResolveTaskByPublicIDForUpdate(ctx, db, uuid.UUID(target.UUID()))

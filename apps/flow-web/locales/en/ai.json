@@ -77,6 +77,31 @@
       "forbidden": "Only workspace admins can manage AI providers.",
       "retry": "Try again"
     },
-    "invalid_base_url": "This kind always uses the official endpoint, so the base URL below is ignored and every request through this provider fails. Delete it and add it again as OpenAI-compatible."
+    "invalid_base_url": "This kind always uses the official endpoint, so the base URL below is ignored and every request through this provider fails. Delete it and add it again as OpenAI-compatible.",
+    "embedding": {
+      "title": "Task embeddings",
+      "description": "Choose whether this workspace can use the server's shared embedding provider for similar-task search.",
+      "mode_label": "Use shared embedding provider",
+      "mode": {
+        "inherit": "Uses the provider configured by the server operator.",
+        "disabled": "Embedding calls are turned off for this workspace."
+      },
+      "effective_status": "Effective status",
+      "status": {
+        "enabled": "Available",
+        "disabled": "Disabled",
+        "unconfigured": "Server provider is not configured"
+      },
+      "model": "Model",
+      "endpoint": "Endpoint",
+      "data_use": "When enabled, task titles and descriptions are sent to this endpoint to create vectors for similarity search.",
+      "save": "Save changes",
+      "error": {
+        "load_failed": "Could not load embedding settings. Try again.",
+        "forbidden": "Only workspace admins can manage embedding settings.",
+        "retry": "Try again",
+        "update_failed": "Could not update embedding settings. Try again."
+      }
+    }
   }
 }

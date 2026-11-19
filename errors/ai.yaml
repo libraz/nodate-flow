@@ -127,6 +127,27 @@ resources:
         description: "Returned when the upstream LLM provider responded with a non-success status that is not auth-related or rate-limited (e.g. 400 invalid request, 5xx provider error)."
         userAction: "Retry in a moment; if the problem persists, check the provider's status page or the model configuration."
 
+  embedding:
+    breadcrumb: "AI > Embedding"
+    errors:
+      disabled:
+        code: AI.EMBEDDING.DISABLED
+        status: 412
+        message: "Embeddings are disabled for this workspace"
+        message_ja: "このワークスペースでは埋め込みが無効です"
+        message_zh: "此工作区已停用嵌入"
+        description: "Returned when an embedding feature is used in a workspace that opted out of the instance embedding provider."
+        userAction: "Enable embeddings in the workspace AI settings, or use an AI feature that does not require embeddings."
+
+      not_configured:
+        code: AI.EMBEDDING.NOT_CONFIGURED
+        status: 412
+        message: "The instance embedding provider is not configured"
+        message_ja: "インスタンスの埋め込みプロバイダが設定されていません"
+        message_zh: "实例嵌入提供商尚未配置"
+        description: "Returned when a workspace inherits embedding settings but the instance has no usable embedding provider configured."
+        userAction: "Ask the server administrator to configure the instance embedding provider."
+
   cost:
     breadcrumb: "AI > Cost"
     errors:

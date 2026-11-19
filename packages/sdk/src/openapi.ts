@@ -1413,7 +1413,7 @@ export interface paths {
         };
         /**
          * List tasks for a project or workspace
-         * @description Returns a cursor-paginated page of tasks filtered by project or workspace plus optional status / assignee / label filters. Backs every task list view (board, list, etc.).
+         * @description Returns a page of tasks filtered by project or workspace plus optional title, status, assignee, priority, or due-date filters. dueFrom and dueThrough are inclusive YYYY-MM-DD bounds on dueOn and use limit/offset pagination. They cannot be combined with cursor. Backs every task list view (board, list, etc.).
          *
          *     Layer 4 task visibility (public / project / private) is enforced as a SQL filter rather than a per-row 403, so tasks the actor cannot see are silently excluded from both the rows and the `total` count. This is asymmetric with the single-task endpoint (which returns 404 on visibility denial).
          */
@@ -1473,7 +1473,7 @@ export interface paths {
         head?: never;
         /**
          * Patch a task
-         * @description Updates editable task fields (title, description, due_on, priority, assignee). Description edits append a description-version row so history is queryable.
+         * @description Updates editable task fields, including the due date. Set expectedDueOn to the due date you read before making the change. A mismatch returns 409. Send an Idempotency-Key to safely retry the request. Description edits append a version to the task history.
          */
         patch: operations["tasks-patch"];
         trace?: never;
@@ -1597,7 +1597,7 @@ export interface paths {
         put?: never;
         /**
          * Apply proposed steps as child tasks under a parent task
-         * @description Persists a proposal returned by /propose-steps as ordered child tasks under this parent. The client may trim or reorder the steps before applying.
+         * @description Creates the submitted steps as ordered child tasks under this parent. The client may send an Idempotency-Key to safely retry after an uncertain response, and may trim or reorder the steps before applying.
          */
         post: operations["tasks-apply-steps"];
         delete?: never;
@@ -1741,7 +1741,7 @@ export interface paths {
         put?: never;
         /**
          * Add a comment to a task
-         * @description Appends a comment from the caller. Mentions inside the body are parsed and routed through the notifications pipeline.
+         * @description Appends a comment from the caller and notifies users mentioned in the body. Send an Idempotency-Key to safely retry the request.
          */
         post: operations["tasks-comments-add"];
         delete?: never;
@@ -2233,7 +2233,7 @@ export interface paths {
         put?: never;
         /**
          * AI-powered step decomposition for a task
-         * @description Asks the workspace's LLM to decompose this task into ordered execution steps. Returns the proposal and a cache key so /apply-steps can persist it; nothing is written until apply.
+         * @description Asks the workspace's LLM to decompose this task into ordered execution steps. Nothing is written until the returned steps are submitted to /apply-steps.
          */
         post: operations["tasks-propose-steps"];
         delete?: never;
@@ -2417,7 +2417,7 @@ export interface paths {
         put?: never;
         /**
          * Apply a state machine transition to a task
-         * @description Applies the named transition to the task. Validates against the state machine and emits a task.transitioned event. Attached constraints are advisory markers evaluated by the constraint engine; they do not reject transitions.
+         * @description Applies a state-machine transition and records it in the task history. Set expectedState to the state you read before requesting the transition. A mismatch returns 409. Send an Idempotency-Key to safely retry the request.
          */
         post: operations["tasks-transitions-apply"];
         delete?: never;
@@ -2748,6 +2748,30 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{wsId}/ai/embedding-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get embedding provider settings for a workspace
+         * @description Returns the workspace opt-out mode and the effective instance embedding provider status without exposing credentials.
+         */
+        get: operations["ai-embedding-settings-get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update embedding provider settings for a workspace
+         * @description Sets the workspace embedding mode to inherit the instance provider or disable embeddings for this workspace.
+         */
+        patch: operations["ai-embedding-settings-update"];
         trace?: never;
     };
     "/workspaces/{wsId}/ai/invocations": {
@@ -3185,7 +3209,7 @@ export interface paths {
         put?: never;
         /**
          * Create an event
-         * @description Creates an event in the calendar. Optionally accepts an attendee list which triggers RSVP requests. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.
+         * @description Creates an event in the calendar. Supply an optional Idempotency-Key to safely retry the same request after an uncertain response. Reusing a key with a different calendar or request body returns 409. A recurrenceRule is validated for well-formedness (freq / interval / byDay / until / count bounds) and stored as-is; it is not expanded server-side — clients expand concrete instances from the stored rule.
          */
         post: operations["events-create"];
         delete?: never;
@@ -4313,7 +4337,7 @@ export interface paths {
         put?: never;
         /**
          * Mint a new MCP bearer token (plaintext returned once)
-         * @description Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. The plaintext token is returned exactly once; only the hash is stored.
+         * @description Generates a new MCP bearer token (mcp_…) the caller can pass to a local MCP client to authenticate against /mcp. Requires an active user session. The plaintext token is returned exactly once; only the hash is stored.
          */
         post: operations["mcp-tokens-create"];
         delete?: never;
@@ -4334,7 +4358,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke an MCP bearer token
-         * @description Marks the token as revoked so future /mcp requests carrying it are rejected. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.
+         * @description Marks the token as revoked so future /mcp requests carrying it are rejected. Requires an active user session. Returns 404 MCP.TOKEN.NOT_FOUND when the token is already revoked.
          */
         delete: operations["mcp-tokens-delete"];
         options?: never;
@@ -6969,6 +6993,20 @@ export interface components {
             readonly $schema?: string;
             body: string;
         };
+        EmbeddingSettingsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/EmbeddingSettingsBody.json
+             */
+            readonly $schema?: string;
+            endpoint?: string;
+            /** @enum {string} */
+            mode: "inherit" | "disabled";
+            model?: string;
+            /** @enum {string} */
+            status: "enabled" | "disabled" | "unconfigured";
+        };
         Entry: {
             action: string;
             /** @description Actor classification ('user' | 'agent' | 'system') */
@@ -8838,6 +8876,16 @@ export interface components {
             /** @description Calendar name */
             name?: string;
         };
+        PatchEmbeddingSettingsInputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchEmbeddingSettingsInputBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            mode: "inherit" | "disabled";
+        };
         PatchEventInputBody: {
             /**
              * Format: uri
@@ -9053,6 +9101,8 @@ export interface components {
             description?: string;
             /** @description YYYY-MM-DD or empty string to clear */
             dueOn?: string;
+            /** @description Apply only if the current due date matches this YYYY-MM-DD value. Use an empty string to require no due date. */
+            expectedDueOn?: string;
             /** Format: int32 */
             priority?: number;
             /**
@@ -10715,6 +10765,11 @@ export interface components {
              * @example https://example.com/schemas/TransitionTaskBody.json
              */
             readonly $schema?: string;
+            /**
+             * @description Apply only if the task is still in this state
+             * @enum {string}
+             */
+            expectedState?: "open" | "waiting" | "review" | "done" | "cancelled";
             /**
              * Format: int64
              * @description Optional client-provided unix seconds timestamp; ignored for storage
@@ -14125,7 +14180,11 @@ export interface operations {
                 assignee?: string;
                 /** @description Filter by priority level; comma-separate to OR multiple values (priority=4,2) */
                 priority?: number[] | null;
-                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                /** @description Inclusive lower bound for dueOn (YYYY-MM-DD). Uses offset pagination. */
+                dueFrom?: string;
+                /** @description Inclusive upper bound for dueOn (YYYY-MM-DD). Uses offset pagination. */
+                dueThrough?: string;
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with dueFrom or dueThrough. */
                 cursor?: string;
                 limit?: number;
                 offset?: number;
@@ -14287,7 +14346,10 @@ export interface operations {
     "tasks-patch": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional key for safely retrying the same request */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: string;
             };
@@ -14559,7 +14621,10 @@ export interface operations {
     "tasks-apply-steps": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional key for safely retrying the same request */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: string;
             };
@@ -14826,7 +14891,10 @@ export interface operations {
     "tasks-comments-add": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional key for safely retrying the same request */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: string;
             };
@@ -16074,7 +16142,10 @@ export interface operations {
     "tasks-transitions-apply": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional key for safely retrying the same request */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: string;
             };
@@ -16800,6 +16871,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostTodayOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-embedding-settings-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingSettingsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "ai-embedding-settings-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wsId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchEmbeddingSettingsInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingSettingsBody"];
                 };
             };
             /** @description Error */
@@ -17720,7 +17857,10 @@ export interface operations {
     "events-create": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional key for safely retrying event creation */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 /** @description Workspace public ID */
                 wsId: string;
