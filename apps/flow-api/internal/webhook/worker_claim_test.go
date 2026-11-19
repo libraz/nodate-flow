@@ -109,7 +109,7 @@ func startClaimTestDB(t *testing.T) *sql.DB {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	container, err := tcmysql.Run(ctx, "mysql:9.7",
+	container, err := tcmysql.Run(ctx, "mysql:26.10.0",
 		tcmysql.WithDatabase("webhook_claim_test"),
 		tcmysql.WithUsername("nodate"),
 		tcmysql.WithPassword("nodate"),

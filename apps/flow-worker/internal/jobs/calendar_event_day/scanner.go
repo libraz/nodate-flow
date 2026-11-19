@@ -191,9 +191,8 @@ type EventOnDay struct {
 //
 // The local-day boundary is converted to its UTC range Go-side and the
 // query uses a plain half-open interval `[utcStart, utcEnd)` per day.
-// This avoids depending on the MySQL timezone tables (CONVERT_TZ), which
-// are not loaded by default in the mysql:9.7 compose image; the workspace
-// timezone is the single source of truth for the local date. A recurring
+// This avoids depending on the server's MySQL timezone tables. The
+// workspace timezone determines the local date. A recurring
 // row is selected as a candidate whenever its base start_at is before the
 // day's upper bound (occurrences only move forward), then filtered down to
 // the day's range by the expansion.

@@ -18,10 +18,30 @@
  * only owns the lifecycle.
  */
 
+import type { Window as HappyDOMWindow } from 'happy-dom';
+import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 
-export const server = setupServer();
+function localApiPreflight(request: Request): HttpResponse<null> {
+  const headers = new Headers({
+    'access-control-allow-origin': window.location.origin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'access-control-allow-headers':
+      request.headers.get('access-control-request-headers') ??
+      'accept, authorization, content-type, x-requested-with',
+  });
+
+  return new HttpResponse(null, { status: 204, headers });
+}
+
+// happy-dom 21 models fetch's browser CORS preflight. Consume only OPTIONS
+// requests to the local API mocks; actual API requests still require a test
+// handler under the strict unhandled-request strategy below.
+export const server = setupServer(
+  http.options(/^http:\/\/localhost:(?:8080|8082)\//, ({ request }) => localApiPreflight(request)),
+);
 
 /**
  * Base URLs the app's two SDK clients point at under test. They mirror
@@ -31,11 +51,44 @@ export const server = setupServer();
 export const API_URL = 'http://localhost:8080';
 export const AUTH_API_URL = 'http://localhost:8082';
 
+function enableLocalMockApiCors(): () => void {
+  const fetchSettings = (window as unknown as HappyDOMWindow).happyDOM.settings.fetch;
+  const previousInterceptor = fetchSettings.interceptor;
+
+  fetchSettings.interceptor = {
+    ...previousInterceptor,
+    afterAsyncResponse: async (context) => {
+      const response =
+        (await previousInterceptor?.afterAsyncResponse?.(context)) ?? context.response;
+      const requestUrl = new URL(context.request.url);
+      const origin = context.request.headers.get('origin');
+
+      if (
+        origin &&
+        new URL(origin).hostname === 'localhost' &&
+        (requestUrl.origin === API_URL || requestUrl.origin === AUTH_API_URL)
+      ) {
+        response.headers.set('access-control-allow-origin', origin);
+        response.headers.set('access-control-allow-credentials', 'true');
+      }
+
+      return response;
+    },
+  };
+
+  return () => {
+    fetchSettings.interceptor = previousInterceptor;
+  };
+}
+
 /**
  * Starts MSW for the current test file. Call once at module scope.
  */
 export function useMockApi(): void {
+  let restoreFetchInterceptor = (): void => {};
+
   beforeAll(() => {
+    restoreFetchInterceptor = enableLocalMockApiCors();
     server.listen({ onUnhandledFrame: 'error' });
   });
   afterEach(() => {
@@ -43,5 +96,6 @@ export function useMockApi(): void {
   });
   afterAll(() => {
     server.close();
+    restoreFetchInterceptor();
   });
 }

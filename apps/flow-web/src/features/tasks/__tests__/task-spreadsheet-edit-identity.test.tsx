@@ -16,7 +16,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
 import type { ReactElement, ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { TaskListItem } from '../api';
 
@@ -55,6 +55,23 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: vi.fn() },
 }));
 
+vi.mock('@tanstack/react-virtual', async () => {
+  const virtual =
+    await vi.importActual<typeof import('@tanstack/react-virtual')>('@tanstack/react-virtual');
+  return {
+    ...virtual,
+    useVirtualizer: (options: Parameters<typeof virtual.useVirtualizer>[0]) =>
+      virtual.useVirtualizer({
+        ...options,
+        initialRect: { width: 600, height: 600 },
+        observeElementRect: (_virtualizer, observe) => {
+          observe({ width: 600, height: 600 });
+          return () => {};
+        },
+      }),
+  };
+});
+
 import TaskSpreadsheetView from '../task-spreadsheet-view';
 
 function testI18n(): ReturnType<typeof i18n.createInstance> {
@@ -84,19 +101,83 @@ function Wrapper({ children }: { children: ReactNode }): ReactElement {
 }
 
 describe('task-spreadsheet-view inline edit identity', () => {
+  let originalOffsetHeight: PropertyDescriptor | undefined;
+  let originalOffsetWidth: PropertyDescriptor | undefined;
+  let originalResizeObserver: PropertyDescriptor | undefined;
+
   beforeAll(() => {
-    // @tanstack/react-virtual sizes its viewport from offsetHeight/Width,
-    // which jsdom/happy-dom report as 0. Without a nonzero viewport the
-    // virtualizer computes an empty visible range and no rows render at
-    // all, which would make this test pass vacuously.
+    // Browser layout supplies a nonzero viewport through offset sizes and
+    // ResizeObserver. happy-dom has no layout engine, so provide those
+    // measurements for the scroll grid and its rows.
+    originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+    originalResizeObserver = Object.getOwnPropertyDescriptor(window, 'ResizeObserver');
+
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
       configurable: true,
-      value: 600,
+      get() {
+        return this.getAttribute('role') === 'grid' ? 600 : 36;
+      },
     });
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
       configurable: true,
       value: 600,
     });
+
+    class LayoutResizeObserver implements ResizeObserver {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+
+      observe(target: Element): void {
+        const blockSize = target.getAttribute('role') === 'grid' ? 600 : 36;
+        const boxSize = { inlineSize: 600, blockSize };
+        const entry = {
+          target,
+          contentRect: {
+            x: 0,
+            y: 0,
+            width: 600,
+            height: blockSize,
+            top: 0,
+            right: 600,
+            bottom: blockSize,
+            left: 0,
+            toJSON: () => ({}),
+          },
+          borderBoxSize: [boxSize],
+          contentBoxSize: [boxSize],
+          devicePixelContentBoxSize: [boxSize],
+        } as unknown as ResizeObserverEntry;
+
+        queueMicrotask(() => this.callback([entry], this));
+      }
+
+      unobserve(): void {}
+
+      disconnect(): void {}
+    }
+
+    Object.defineProperty(window, 'ResizeObserver', {
+      configurable: true,
+      value: LayoutResizeObserver,
+    });
+  });
+
+  afterAll(() => {
+    if (originalOffsetHeight) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight);
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
+    }
+    if (originalOffsetWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', originalOffsetWidth);
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'offsetWidth');
+    }
+    if (originalResizeObserver) {
+      Object.defineProperty(window, 'ResizeObserver', originalResizeObserver);
+    } else {
+      Reflect.deleteProperty(window, 'ResizeObserver');
+    }
   });
 
   afterEach(() => {
@@ -105,7 +186,7 @@ describe('task-spreadsheet-view inline edit identity', () => {
     vi.clearAllMocks();
   });
 
-  it('commits to the task captured at edit start even after the row order changes underneath it', () => {
+  it('commits to the task captured at edit start even after the row order changes underneath it', async () => {
     state.tasks = [makeTask('task-A', 'Original A'), makeTask('task-B', 'Original B')];
 
     const { rerender } = render(
@@ -118,7 +199,7 @@ describe('task-spreadsheet-view inline edit identity', () => {
     // text itself (not role=gridcell — the checkbox cell in the same
     // row also computes an accessible name from its aria-labelled
     // checkbox, "Original A", which collides with a role-based query).
-    const rowATitleText = screen.getByText('Original A');
+    const rowATitleText = await screen.findByText('Original A');
     fireEvent.click(rowATitleText);
 
     // Row order flips underneath the open edit: task B now occupies row 0.
@@ -136,7 +217,7 @@ describe('task-spreadsheet-view inline edit identity', () => {
       </Wrapper>,
     );
 
-    const input = screen.getByRole('textbox', { name: 'tasks.inline.edit_title' });
+    const input = await screen.findByRole('textbox', { name: 'tasks.inline.edit_title' });
     fireEvent.change(input, { target: { value: 'Renamed while editing' } });
     fireEvent.blur(input);
 

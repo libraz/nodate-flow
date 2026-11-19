@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.29.0
 # Multi-stage build for the nodate-flow auth API.
 # Build context is the repo root so go.work is visible.
 
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.4-alpine3.24 AS build
 WORKDIR /src
 
 # Copy workspace + module manifests first for layer caching.
@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     cd apps/auth-api && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/grant-admin ./cmd/grant-admin
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /
 COPY --from=build /out/api /api
 COPY --from=build /out/healthcheck /healthcheck

@@ -28,7 +28,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { Suspense } from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { API_URL, server, useMockApi } from '../../../../tests/msw/server';
+import { API_URL, AUTH_API_URL, server, useMockApi } from '../../../../tests/msw/server';
 import { type TaskListItem, tasksKeys, useTasksInfiniteQuery } from '../api';
 
 useMockApi();
@@ -74,6 +74,9 @@ function captureTaskRequests(respond: (call: number) => FakePage): URL[] {
   const seen: URL[] = [];
   let call = 0;
   server.use(
+    http.post(`${AUTH_API_URL}/auth/refresh`, () =>
+      HttpResponse.json({ accessToken: 'test-access-token' }),
+    ),
     http.get(`${API_URL}/tasks`, ({ request }) => {
       seen.push(new URL(request.url));
       const page = respond(call);

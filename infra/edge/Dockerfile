@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.29.0
 # Edge image: serves both SPAs and fronts the two APIs on one host with nginx.
 # The build context is the repository root: the lockfile, the shared
 # TypeScript configuration and the workspace packages live there.
 
-ARG BUN_VERSION=1.4.4
+ARG BUN_VERSION=1.4.5
 
 FROM oven/bun:${BUN_VERSION}-alpine AS build
 WORKDIR /src
@@ -72,7 +72,7 @@ RUN mkdir /csp \
  && bun /tmp/csp-script-hash.mjs apps/accounts-web/dist/index.html spa_script_hash_accounts > /csp/csp-accounts.conf \
  && bun /tmp/csp-script-hash.mjs apps/flow-web/dist/index.html spa_script_hash_flow > /csp/csp-flow.conf
 
-FROM nginx:1.30-alpine
+FROM nginx:1.31.9-alpine3.24
 
 # The nginx image runs envsubst over /etc/nginx/templates/**/*.template at
 # startup and writes the results under /etc/nginx/conf.d/. Only NF_-prefixed

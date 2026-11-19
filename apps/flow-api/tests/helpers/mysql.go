@@ -27,7 +27,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 )
 
-// MySQLInstance is a running MySQL 9.7 container plus an opened *sql.DB
+// MySQLInstance is a running MySQL test container plus an opened *sql.DB
 // handle and the DSN used to connect.
 type MySQLInstance struct {
 	Container *mysql.MySQLContainer
@@ -36,8 +36,8 @@ type MySQLInstance struct {
 }
 
 const (
-	// MySQL 9 Community is used in tests to match the production target.
-	mysqlImage    = "mysql:9.7"
+	// MySQL Community Server is used in tests to match the production target.
+	mysqlImage    = "mysql:26.10.0"
 	mysqlDatabase = "nodate_flow_test"
 	mysqlUser     = "nodate"
 	mysqlPassword = "nodate"
@@ -89,7 +89,7 @@ func StartIsolated(t *testing.T) *MySQLInstance {
 	return inst
 }
 
-// startMySQL boots a MySQL 9.7 testcontainer, opens a *sql.DB handle,
+// startMySQL boots a MySQL testcontainer, opens a *sql.DB handle,
 // and applies the full layered schema (sql/core + sql/flow).
 func startMySQL(ctx context.Context) (*MySQLInstance, error) {
 	startCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)

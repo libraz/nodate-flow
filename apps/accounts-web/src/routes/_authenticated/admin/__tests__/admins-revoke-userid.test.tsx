@@ -73,6 +73,9 @@ describe('admins revoke targets the user public_id', () => {
   it('sends userId (not the grant-row id) to DELETE /admin/instance-admins/{userId}', async () => {
     const deleted: string[] = [];
     server.use(
+      http.post(`${AUTH_API_URL}/auth/refresh`, () =>
+        HttpResponse.json({ accessToken: 'test-access-token' }),
+      ),
       http.get(`${AUTH_API_URL}/admin/instance-admins`, () =>
         HttpResponse.json({
           items: [

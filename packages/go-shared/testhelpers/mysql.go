@@ -1,5 +1,5 @@
 // Package testhelpers provides service-agnostic integration-test
-// primitives: a shared MySQL 9 testcontainer with the full repo
+// primitives: a shared MySQL testcontainer with the full repo
 // schema loaded, a repo-root finder, and a per-file SQL executor.
 //
 // Apps (flow-api, auth-api) and shared kits (itemkit) wrap this
@@ -34,7 +34,7 @@ import (
 // MySQLImage is the testcontainers image tag used across all
 // services. Kept as a package variable so a single CI override can
 // re-pin every service's integration tests in one place.
-var MySQLImage = "mysql:9.7"
+var MySQLImage = "mysql:26.10.0"
 
 // MySQLConfig controls MySQL container startup. Zero value is valid:
 // the defaults match the flow-api helper's historical behavior.

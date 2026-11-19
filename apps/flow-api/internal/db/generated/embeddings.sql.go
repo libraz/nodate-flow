@@ -154,10 +154,8 @@ type ListCandidateTaskEmbeddingsRow struct {
 // Return the newest task_embeddings for (workspace_id, model), up to the
 // caller's LIMIT by descending task id, excluding a given task_id (so
 // self-similarity is filtered out). Tasks older than that window are not
-// candidates. Cosine similarity is
-// computed in Go because MySQL 9.7 Community does not expose
-// VEC_DISTANCE_COSINE; the caller dot-products the L2-normalized vectors
-// and applies the duplicate_threshold_high / low cutoffs from ai_settings.
+// candidates. The Go caller computes cosine similarity from the
+// L2-normalized vectors and applies the cutoffs from ai_settings.
 func (q *Queries) ListCandidateTaskEmbeddings(ctx context.Context, arg ListCandidateTaskEmbeddingsParams) ([]ListCandidateTaskEmbeddingsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCandidateTaskEmbeddings,
 		arg.WorkspaceID,
@@ -456,8 +454,8 @@ type UpsertTaskEmbeddingParams struct {
 // VECTOR columns are read/written as []byte. The Go embedding client
 // L2-normalizes vectors before INSERT and serializes them with
 // STRING_TO_VECTOR / the native binary protocol. Cosine similarity is
-// computed in Go (dot product on normalized vectors), because MySQL 9.7
-// Community Edition does not expose VEC_DISTANCE_COSINE (HeatWave-only).
+// computed in Go as a dot product on normalized vectors. MySQL Community
+// Edition does not include the vector DISTANCE function.
 // The query layer
 // therefore returns candidate rows and the application does the ranking.
 // ============================================================================
