@@ -12,7 +12,7 @@ import (
 
 const (
 	googleBaseURL      = "https://generativelanguage.googleapis.com/v1beta/models"
-	googleDefaultModel = "gemini-1.5-flash-latest"
+	googleDefaultModel = "gemini-4-hydrogen"
 	// googleAPIKeyHeader is Gemini's supported alternative to the ?key=
 	// query parameter. Passing the key in a header keeps it out of the
 	// request URL, so it can never leak through a url.Error message,
@@ -33,7 +33,7 @@ type googleProvider struct {
 func (p *googleProvider) Name() string { return p.cfg.Name }
 func (p *googleProvider) Kind() Kind   { return KindGoogle }
 func (p *googleProvider) Model() string {
-	return chooseBaseURL(p.cfg.DefaultModel, googleDefaultModel)
+	return chooseBaseURL(p.cfg.DefaultModel, OfficialDefaultModel(KindGoogle))
 }
 
 type googleReq struct {
@@ -46,19 +46,37 @@ type googleReq struct {
 }
 
 type googleGenerationConfig struct {
-	MaxOutputTokens int      `json:"maxOutputTokens,omitempty"`
-	Temperature     *float64 `json:"temperature,omitempty"`
+	MaxOutputTokens    int                   `json:"maxOutputTokens,omitempty"`
+	Temperature        *float64              `json:"temperature,omitempty"`
+	ThinkingConfig     *googleThinkingConfig `json:"thinkingConfig,omitempty"`
+	ResponseMIMEType   string                `json:"responseMimeType,omitempty"`
+	ResponseJSONSchema json.RawMessage       `json:"responseJsonSchema,omitempty"`
 }
 
-// generationConfig returns the sampling block for req, or nil when the
-// caller chose neither knob so the field can be omitted entirely.
-func generationConfig(req Request) *googleGenerationConfig {
-	if req.MaxTokens <= 0 && req.Temperature == nil {
+type googleThinkingConfig struct {
+	ThinkingLevel string `json:"thinkingLevel,omitempty"`
+}
+
+// generationConfig returns the model's supported generation controls. The
+// current Hydrogen API rejects sampling controls, so its path sends only a
+// bounded output cap, low thinking, and an optional verified response schema.
+func generationConfig(model string, req Request, nativeSchema json.RawMessage) *googleGenerationConfig {
+	modernModel := model == googleDefaultModel
+	if req.MaxTokens <= 0 && req.Temperature == nil && !modernModel && len(nativeSchema) == 0 {
 		return nil
 	}
-	cfg := &googleGenerationConfig{Temperature: req.Temperature}
+	cfg := &googleGenerationConfig{}
+	if modernModel {
+		cfg.ThinkingConfig = &googleThinkingConfig{ThinkingLevel: "LOW"}
+	} else {
+		cfg.Temperature = req.Temperature
+	}
 	if req.MaxTokens > 0 {
 		cfg.MaxOutputTokens = req.MaxTokens
+	}
+	if len(nativeSchema) > 0 {
+		cfg.ResponseMIMEType = "application/json"
+		cfg.ResponseJSONSchema = append(json.RawMessage(nil), nativeSchema...)
 	}
 	return cfg
 }
@@ -85,6 +103,7 @@ type googleResp struct {
 	UsageMetadata struct {
 		PromptTokenCount     int `json:"promptTokenCount"`
 		CandidatesTokenCount int `json:"candidatesTokenCount"`
+		ThoughtsTokenCount   int `json:"thoughtsTokenCount"`
 	} `json:"usageMetadata"`
 	Error *struct {
 		Code    int    `json:"code"`
@@ -101,16 +120,16 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if req.System != "" {
 		prompt = req.System + "\n\n" + prompt
 	}
-	outputMode := outputModeFor(req.Output) // Gemini keeps its established text request dialect.
+	base := chooseBaseURL(p.baseURL, googleBaseURL)
+	outputMode, nativeSchema := nativeSchemaFor(KindGoogle, model, base, req.Output)
 	body, err := json.Marshal(googleReq{
 		Contents:         []googleContent{{Role: "user", Parts: []googlePart{{Text: prompt}}}},
-		GenerationConfig: generationConfig(req),
+		GenerationConfig: generationConfig(model, req, nativeSchema),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("google: marshal: %w", err)
 	}
 
-	base := chooseBaseURL(p.baseURL, googleBaseURL)
 	endpoint := fmt.Sprintf("%s/%s:generateContent", base, url.PathEscape(model))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -153,12 +172,13 @@ func (p *googleProvider) Complete(ctx context.Context, req Request) (*Response, 
 	if gr.Error != nil {
 		return nil, &UpstreamError{Sentinel: ErrUpstreamRequestRejected, Status: resp.StatusCode}
 	}
-	costMicros := EstimateCostMicrosUSD(model, gr.UsageMetadata.PromptTokenCount, gr.UsageMetadata.CandidatesTokenCount)
+	outputTokens := gr.UsageMetadata.CandidatesTokenCount + gr.UsageMetadata.ThoughtsTokenCount
+	costMicros := EstimateCostMicrosUSD(model, gr.UsageMetadata.PromptTokenCount, outputTokens)
 	out := &Response{
 		Model:        model,
 		OutputMode:   outputMode,
 		InputTokens:  gr.UsageMetadata.PromptTokenCount,
-		OutputTokens: gr.UsageMetadata.CandidatesTokenCount,
+		OutputTokens: outputTokens,
 		CostMicros:   costMicros,
 		CostCents:    costMicros / 10_000,
 	}

@@ -396,14 +396,18 @@ func TestNativeOutputCapabilitiesAreExactAndConservative(t *testing.T) {
 		verified bool
 		dialect  OutputDialect
 	}{
+		{KindOpenAI, "gpt-6-luna", defaultOpenAIBaseURL, true, DialectOpenAIChatCompletions},
 		{KindOpenAI, "gpt-4o-mini", defaultOpenAIBaseURL, true, DialectOpenAIChatCompletions},
 		{KindOpenAI, "gpt-4o-mini-2024-07-18", defaultOpenAIBaseURL, true, DialectOpenAIChatCompletions},
 		{KindOpenAI, "gpt-4o-2024-08-06", defaultOpenAIBaseURL, true, DialectOpenAIChatCompletions},
 		{KindOpenAI, "gpt-4o-mini-preview", defaultOpenAIBaseURL, false, ""},
 		{KindOpenAICompat, "gpt-4o-mini", "http://127.0.0.1:9000/v1", false, ""},
+		{KindAnthropic, "claude-sonnet-5-5", anthropicEndpoint, true, DialectAnthropicMessages},
 		{KindAnthropic, "claude-opus-5-5", anthropicEndpoint, true, DialectAnthropicMessages},
 		{KindAnthropic, "claude-3-5-sonnet-latest", anthropicEndpoint, false, ""},
 		{KindGoogle, "gemini-2.5-flash", googleBaseURL, false, ""},
+		{KindGoogle, "gemini-4-hydrogen", googleBaseURL, true, DialectGoogleGenerate},
+		{KindGoogle, "gemini-4-hydrogen", "http://127.0.0.1:9000/v1", false, ""},
 		{KindOllama, "llama3.2", "http://localhost:11434", true, DialectOllamaGenerate},
 		{KindOllama, "llama3.2", "http://ollama.example:11434", false, ""},
 	}

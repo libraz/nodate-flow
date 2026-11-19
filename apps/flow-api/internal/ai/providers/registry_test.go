@@ -75,6 +75,91 @@ func TestOpenAICompatAcceptsBaseURL(t *testing.T) {
 	}
 }
 
+func TestLatestProviderDefaultModels(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		kind Kind
+		want string
+	}{
+		{KindAnthropic, "claude-sonnet-5-5"},
+		{KindOpenAI, "gpt-6-luna"},
+		{KindGoogle, "gemini-4-hydrogen"},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			cfg := Config{Kind: tc.kind, Name: "test", EncryptedKey: []byte("sealed-key")}
+			p, err := New(cfg, fakeDecryptor{})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if got := p.Model(); got != tc.want {
+				t.Fatalf("Model() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOfficialDefaultModelIsSingleSourceForOfficialKinds(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		kind Kind
+		want string
+	}{
+		{KindAnthropic, "claude-sonnet-5-5"},
+		{KindOpenAI, "gpt-6-luna"},
+		{KindGoogle, "gemini-4-hydrogen"},
+		{KindOpenAICompat, ""},
+		{KindOllama, ""},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			if got := OfficialDefaultModel(tc.kind); got != tc.want {
+				t.Fatalf("OfficialDefaultModel(%q) = %q, want %q", tc.kind, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOpenAICompatBlankModelKeepsGatewayFallback(t *testing.T) {
+	t.Parallel()
+
+	p, err := New(Config{Kind: KindOpenAICompat, Name: "gateway", EncryptedKey: []byte("k")}, fakeDecryptor{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if got := p.Model(); got != openAICompatDefaultModel {
+		t.Fatalf("blank OpenAI-compatible model = %q, want legacy gateway default %q", got, openAICompatDefaultModel)
+	}
+}
+
+func TestConfiguredProviderModelRemainsExplicit(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		kind  Kind
+		model string
+	}{
+		{KindAnthropic, "claude-3-5-sonnet-latest"},
+		{KindOpenAI, "gpt-4o-mini"},
+		{KindGoogle, "gemini-2.5-flash"},
+		{KindOpenAICompat, "custom-gateway-model"},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			p, err := New(Config{
+				Kind: tc.kind, Name: "test", EncryptedKey: []byte("sealed-key"), DefaultModel: tc.model,
+			}, fakeDecryptor{})
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			if got := p.Model(); got != tc.model {
+				t.Fatalf("Model() = %q, want the explicit configured model %q", got, tc.model)
+			}
+		})
+	}
+}
+
 // TestValidateAgreesWithNew pins the contract the create handler relies
 // on: anything Validate accepts, New accepts, and anything Validate
 // rejects, New rejects with the same sentinel. The handler cannot call

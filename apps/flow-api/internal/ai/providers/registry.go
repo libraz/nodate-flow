@@ -32,6 +32,23 @@ func AllKinds() []Kind {
 	return []Kind{KindAnthropic, KindOpenAI, KindGoogle, KindOllama, KindOpenAICompat}
 }
 
+// OfficialDefaultModel returns the current model used when a newly created
+// official provider has no explicit model configured. Custom and local
+// provider kinds intentionally return an empty string so their own model
+// selection remains explicit.
+func OfficialDefaultModel(kind Kind) string {
+	switch kind {
+	case KindAnthropic:
+		return anthropicDefaultMdl
+	case KindOpenAI:
+		return openAIDefaultModel
+	case KindGoogle:
+		return googleDefaultModel
+	default:
+		return ""
+	}
+}
+
 // New constructs a Provider for cfg, decrypting nothing yet. The actual
 // decryption happens inside Complete, scoped to a single upstream HTTP
 // call. dec is the only object that holds the master key; it MUST be the

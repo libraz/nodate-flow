@@ -1036,7 +1036,7 @@ func mintShareToken() (string, error) {
 const (
 	seedAIProviderKind = "anthropic"
 	seedAIProviderName = "Anthropic (seed placeholder)"
-	seedAIModelName    = "claude-sonnet-4-6"
+	seedAIModelName    = "claude-sonnet-5-5"
 )
 
 // ensureAIProviderAndModel inserts an ai_providers row and a matching
@@ -1109,7 +1109,7 @@ func ensureAIProviderAndModel(ctx context.Context, db *sql.DB, wsID uint32, logg
 				context_window, max_output_tokens,
 				input_price_micro_usd_per_mtok, output_price_micro_usd_per_mtok,
 				supports_tools, supports_vision, enabled
-			) VALUES (?, ?, ?, ?, ?, 200000, 8192, 0, 0, TRUE, TRUE, TRUE)`,
+			) VALUES (?, ?, ?, ?, ?, 1000000, 128000, 2000000, 10000000, TRUE, TRUE, TRUE)`,
 			pub, wsID, providerID, seedAIModelName, seedAIModelName,
 		)
 		if err != nil {

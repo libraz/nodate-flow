@@ -23,16 +23,17 @@ import (
 // an ai_models row alongside a newly created provider. Operators can edit
 // these values later once a standalone model admin surface lands.
 type modelDefaults struct {
-	contextWindow   uint32
-	maxOutputTokens uint32
-	supportsTools   bool
-	supportsVision  bool
+	contextWindow              uint32
+	maxOutputTokens            uint32
+	inputPriceMicroUSDPerMTok  int64
+	outputPriceMicroUSDPerMTok int64
+	supportsTools              bool
+	supportsVision             bool
 }
 
-// defaultsForKind returns sensible defaults for the flagship model of
-// each provider kind. Numbers are rounded public values and not meant to
-// be exact; they only exist to avoid a zero context window that would
-// confuse downstream components until the operator edits the row.
+// defaultsForKind returns generic metadata for an explicit model whose
+// capabilities are not in the current official-default catalog. Keep these
+// values stable for custom and previously supported model IDs.
 func defaultsForKind(kind string) modelDefaults {
 	switch kind {
 	case "anthropic":
@@ -46,6 +47,44 @@ func defaultsForKind(kind string) modelDefaults {
 		// assumed tool/vision support since the deployed model is unknown.
 		return modelDefaults{contextWindow: 8192, maxOutputTokens: 2048, supportsTools: false, supportsVision: false}
 	}
+}
+
+// defaultsForModel returns current public metadata and prices only when the
+// exact official default is known. Other explicit model IDs keep the prior
+// conservative per-kind metadata and unpriced status.
+func defaultsForModel(kind, model string) modelDefaults {
+	if model == "" || model != providers.OfficialDefaultModel(providers.Kind(kind)) {
+		return defaultsForKind(kind)
+	}
+	switch kind {
+	case "anthropic":
+		return modelDefaults{
+			contextWindow: 1_000_000, maxOutputTokens: 128_000,
+			inputPriceMicroUSDPerMTok: 2_000_000, outputPriceMicroUSDPerMTok: 10_000_000,
+			supportsTools: true, supportsVision: true,
+		}
+	case "openai":
+		return modelDefaults{
+			contextWindow: 1_050_000, maxOutputTokens: 128_000,
+			inputPriceMicroUSDPerMTok: 100_000, outputPriceMicroUSDPerMTok: 500_000,
+			supportsTools: true, supportsVision: true,
+		}
+	case "google":
+		return modelDefaults{
+			contextWindow: 1_048_576, maxOutputTokens: 65_536,
+			inputPriceMicroUSDPerMTok: 1_500_000, outputPriceMicroUSDPerMTok: 7_500_000,
+			supportsTools: true, supportsVision: true,
+		}
+	default:
+		return defaultsForKind(kind)
+	}
+}
+
+func resolveDefaultModel(kind, requested string) string {
+	if requested != "" {
+		return requested
+	}
+	return providers.OfficialDefaultModel(providers.Kind(kind))
 }
 
 // CreateProvider handles POST /workspaces/{wsId}/ai/providers.
@@ -74,11 +113,12 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		// EncryptedKey is a stand-in: the real sealed blob does not exist
 		// yet at this point and Validate only checks that a key is present
 		// for the kinds that require one.
+		defaultModel := resolveDefaultModel(in.Body.Kind, in.Body.DefaultModel)
 		if err := providers.Validate(providers.Config{
 			Kind:         providers.Kind(in.Body.Kind),
 			Name:         in.Body.Name,
 			BaseURL:      in.Body.BaseURL,
-			DefaultModel: in.Body.DefaultModel,
+			DefaultModel: defaultModel,
 			EncryptedKey: []byte(in.Body.APIKey),
 		}); err != nil {
 			slog.InfoContext(ctx, "ai provider create rejected",
@@ -128,7 +168,8 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		in.Body.APIKey = ""
 
 		pub := types.New()
-		var baseURL, defaultModel = nullableString(in.Body.BaseURL), nullableString(in.Body.DefaultModel)
+		var baseURL = nullableString(in.Body.BaseURL)
+		defaultModelValue := nullableString(defaultModel)
 		providerInternalID, err := deps.Queries.CreateProvider(ctx, generated.CreateProviderParams{
 			PublicID:         pub,
 			WorkspaceID:      ws.ID,
@@ -138,7 +179,7 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 			ApiKeyCiphertext: sealed,
 			ApiKeyPrefix:     prefix,
 			ApiKeySuffix:     suffix,
-			DefaultModel:     defaultModel,
+			DefaultModel:     defaultModelValue,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "ai provider create failed",
@@ -154,19 +195,20 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		// create dialog is stuck at the empty state because there is no
 		// standalone model-registration UI yet. See
 		// docs/bugs/2026-04-23-web-ai-agents-cannot-be-created-no-model-registration-path.md
-		if in.Body.DefaultModel != "" && providerInternalID > 0 {
-			d := defaultsForKind(in.Body.Kind)
+		if defaultModel != "" && providerInternalID > 0 {
+			d := defaultsForModel(in.Body.Kind, defaultModel)
 			modelPub := types.New()
 			const insertModel = `INSERT INTO ai_models (
 				public_id, workspace_id, provider_id, name, display_name,
 				context_window, max_output_tokens,
 				input_price_micro_usd_per_mtok, output_price_micro_usd_per_mtok,
 				supports_tools, supports_vision, enabled
-			) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, TRUE)`
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`
 			if _, err := deps.DB.ExecContext(ctx, insertModel,
 				modelPub, ws.ID, uint32(providerInternalID), //#nosec G115 -- LastInsertId for ai_providers.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				in.Body.DefaultModel, in.Body.DefaultModel,
+				defaultModel, defaultModel,
 				d.contextWindow, d.maxOutputTokens,
+				d.inputPriceMicroUSDPerMTok, d.outputPriceMicroUSDPerMTok,
 				d.supportsTools, d.supportsVision,
 			); err != nil {
 				// Log but do not fail the provider create; operators can
@@ -176,7 +218,7 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 				slog.ErrorContext(ctx, "ai model auto-register failed",
 					slog.String("workspaceId", ws.PublicID.String()),
 					slog.String("providerId", pub.String()),
-					slog.String("modelName", in.Body.DefaultModel),
+					slog.String("modelName", defaultModel),
 					slog.Any("error", err),
 				)
 			}
@@ -198,7 +240,7 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 			Kind:         in.Body.Kind,
 			Name:         in.Body.Name,
 			BaseURL:      in.Body.BaseURL,
-			DefaultModel: in.Body.DefaultModel,
+			DefaultModel: defaultModel,
 			APIKeyMasked: maskKey(prefix, suffix),
 		}}
 		return out, nil

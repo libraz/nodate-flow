@@ -21,6 +21,7 @@ var knownPrices = []struct {
 	price  modelPrice
 }{
 	// Anthropic (platform.claude.com/docs/en/about-claude/pricing)
+	{"claude-sonnet-5-5", modelPrice{2_000_000, 10_000_000}}, // $2 / $10
 	{"claude-opus-4", modelPrice{5_000_000, 25_000_000}},     // $5 / $25
 	{"claude-sonnet-4", modelPrice{3_000_000, 15_000_000}},   // $3 / $15
 	{"claude-haiku-4", modelPrice{1_000_000, 5_000_000}},     // $1 / $5
@@ -31,6 +32,7 @@ var knownPrices = []struct {
 	{"claude-3-haiku", modelPrice{250_000, 1_250_000}},       // $0.25 / $1.25 (legacy)
 
 	// OpenAI (openai.com/api/pricing)
+	{"gpt-6-luna", modelPrice{100_000, 500_000}},        // $0.10 / $0.50
 	{"o4-mini", modelPrice{1_100_000, 4_400_000}},       // $1.10 / $4.40
 	{"o3-mini", modelPrice{1_100_000, 4_400_000}},       // $1.10 / $4.40
 	{"o3", modelPrice{2_000_000, 8_000_000}},            // $2 / $8
@@ -47,6 +49,7 @@ var knownPrices = []struct {
 	{"text-embedding-3-large", modelPrice{130_000, 0}},  // $0.13 / 1M input tokens
 
 	// Google (ai.google.dev/gemini-api/docs/pricing)
+	{"gemini-4-hydrogen", modelPrice{1_500_000, 7_500_000}}, // $1.50 / $7.50
 	{"gemini-3.1-pro", modelPrice{2_000_000, 12_000_000}},   // $2 / $12 (≤200k ctx)
 	{"gemini-2.5-pro", modelPrice{1_250_000, 10_000_000}},   // $1.25 / $10 (≤200k ctx)
 	{"gemini-2.5-flash-lite", modelPrice{100_000, 400_000}}, // $0.10 / $0.40

@@ -89,3 +89,26 @@ func TestEstimateCostMicrosUSDCoversRuntimeDefaultModels(t *testing.T) {
 		}
 	}
 }
+
+func TestEstimateCostMicrosUSDMatchesCurrentDefaultModelPricing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		model         string
+		input, output int64
+	}{
+		{"claude-sonnet-5-5", 2_000_000, 10_000_000},
+		{"gpt-6-luna", 100_000, 500_000},
+		{"gemini-4-hydrogen", 1_500_000, 7_500_000},
+	}
+	for _, tc := range tests {
+		t.Run(tc.model, func(t *testing.T) {
+			if got := EstimateCostMicrosUSD(tc.model, 1_000_000, 0); got != tc.input {
+				t.Errorf("input price = %d micros per MTok, want %d", got, tc.input)
+			}
+			if got := EstimateCostMicrosUSD(tc.model, 0, 1_000_000); got != tc.output {
+				t.Errorf("output price = %d micros per MTok, want %d", got, tc.output)
+			}
+		})
+	}
+}

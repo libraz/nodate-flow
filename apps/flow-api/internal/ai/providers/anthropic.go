@@ -12,7 +12,7 @@ import (
 const (
 	anthropicEndpoint    = "https://api.anthropic.com/v1/messages"
 	anthropicAPIVersion  = "2023-06-01"
-	anthropicDefaultMdl  = "claude-3-5-sonnet-latest"
+	anthropicDefaultMdl  = "claude-sonnet-5-5"
 	anthropicMaxTokensFb = 1024
 )
 
@@ -26,7 +26,7 @@ type anthropicProvider struct {
 func (p *anthropicProvider) Name() string { return p.cfg.Name }
 func (p *anthropicProvider) Kind() Kind   { return KindAnthropic }
 func (p *anthropicProvider) Model() string {
-	return chooseBaseURL(p.cfg.DefaultModel, anthropicDefaultMdl)
+	return chooseBaseURL(p.cfg.DefaultModel, OfficialDefaultModel(KindAnthropic))
 }
 
 type anthropicReq struct {
@@ -37,7 +37,12 @@ type anthropicReq struct {
 	OutputConfig *anthropicOutputConfig `json:"output_config,omitempty"`
 	// Temperature is omitted when the caller did not choose one, leaving
 	// the model's own default in force.
-	Temperature *float64 `json:"temperature,omitempty"`
+	Temperature *float64           `json:"temperature,omitempty"`
+	Thinking    *anthropicThinking `json:"thinking,omitempty"`
+}
+
+type anthropicThinking struct {
+	Type string `json:"type"`
 }
 
 type anthropicOutputConfig struct {
@@ -88,12 +93,22 @@ func (p *anthropicProvider) Complete(ctx context.Context, req Request) (*Respons
 		maxTok = anthropicMaxTokensFb
 	}
 	outputMode, outputConfig := anthropicOutputConfigFor(model, chooseBaseURL(p.endpoint, anthropicEndpoint), req.Output)
+	temperature := req.Temperature
+	var thinking *anthropicThinking
+	if model == "claude-sonnet-5-5" {
+		// Sonnet 5.5 rejects the legacy temperature field. Its migration
+		// contract also requires the between-tools thinking mode so reasoning
+		// does not consume the caller's bounded output budget.
+		temperature = nil
+		thinking = &anthropicThinking{Type: "between_tools"}
+	}
 	body, err := json.Marshal(anthropicReq{
 		Model:        model,
 		MaxTokens:    maxTok,
 		System:       req.System,
 		Messages:     []anthropicMessage{{Role: "user", Content: req.Prompt}},
-		Temperature:  req.Temperature,
+		Temperature:  temperature,
+		Thinking:     thinking,
 		OutputConfig: outputConfig,
 	})
 	if err != nil {

@@ -13,6 +13,7 @@ type OutputDialect string
 const (
 	DialectOpenAIChatCompletions OutputDialect = "openai_chat_completions_json_schema"
 	DialectAnthropicMessages     OutputDialect = "anthropic_messages_output_config_format"
+	DialectGoogleGenerate        OutputDialect = "google_generate_content_json_schema"
 	DialectOllamaGenerate        OutputDialect = "ollama_generate_schema_format"
 )
 
@@ -35,7 +36,7 @@ func NativeOutputCapability(kind Kind, model, endpoint string) OutputCapability 
 			return OutputCapability{Reason: "non_official_endpoint"}
 		}
 		switch model {
-		case "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gpt-4o-2024-08-06":
+		case "gpt-6-luna", "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gpt-4o-2024-08-06":
 			return OutputCapability{Verified: true, Dialect: DialectOpenAIChatCompletions, Reason: "verified_model_snapshot"}
 		default:
 			return OutputCapability{Reason: "model_not_verified"}
@@ -44,7 +45,7 @@ func NativeOutputCapability(kind Kind, model, endpoint string) OutputCapability 
 		if endpoint != anthropicEndpoint {
 			return OutputCapability{Reason: "non_official_endpoint"}
 		}
-		if model == "claude-opus-5-5" {
+		if model == "claude-sonnet-5-5" || model == "claude-opus-5-5" {
 			return OutputCapability{Verified: true, Dialect: DialectAnthropicMessages, Reason: "verified_model"}
 		}
 		return OutputCapability{Reason: "model_not_verified"}
@@ -54,7 +55,13 @@ func NativeOutputCapability(kind Kind, model, endpoint string) OutputCapability 
 		}
 		return OutputCapability{Reason: "endpoint_not_loopback"}
 	case KindGoogle:
-		return OutputCapability{Reason: "legacy_gemini_contract_uses_validated_text"}
+		if endpoint != googleBaseURL {
+			return OutputCapability{Reason: "non_official_endpoint"}
+		}
+		if model == "gemini-4-hydrogen" {
+			return OutputCapability{Verified: true, Dialect: DialectGoogleGenerate, Reason: "verified_model"}
+		}
+		return OutputCapability{Reason: "model_not_verified"}
 	case KindOpenAICompat:
 		return OutputCapability{Reason: "compatible_endpoint_not_verified"}
 	default:

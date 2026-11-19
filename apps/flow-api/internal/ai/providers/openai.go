@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	defaultOpenAIBaseURL = "https://api.openai.com/v1"
-	openAIDefaultModel   = "gpt-4o-mini"
+	defaultOpenAIBaseURL     = "https://api.openai.com/v1"
+	openAIDefaultModel       = "gpt-6-luna"
+	openAICompatDefaultModel = "gpt-4o-mini"
 )
 
 // openAIProvider also serves the openai_compat kind: any endpoint that
@@ -26,7 +27,13 @@ type openAIProvider struct {
 func (p *openAIProvider) Name() string { return p.cfg.Name }
 func (p *openAIProvider) Kind() Kind   { return p.cfg.Kind }
 func (p *openAIProvider) Model() string {
-	return chooseBaseURL(p.cfg.DefaultModel, openAIDefaultModel)
+	if p.cfg.DefaultModel != "" {
+		return p.cfg.DefaultModel
+	}
+	if p.cfg.Kind == KindOpenAICompat {
+		return openAICompatDefaultModel
+	}
+	return OfficialDefaultModel(KindOpenAI)
 }
 
 type openAIMessage struct {
@@ -35,9 +42,11 @@ type openAIMessage struct {
 }
 
 type openAIReq struct {
-	Model     string          `json:"model"`
-	Messages  []openAIMessage `json:"messages"`
-	MaxTokens int             `json:"max_tokens,omitempty"`
+	Model               string          `json:"model"`
+	Messages            []openAIMessage `json:"messages"`
+	MaxTokens           int             `json:"max_tokens,omitempty"`
+	MaxCompletionTokens int             `json:"max_completion_tokens,omitempty"`
+	ReasoningEffort     string          `json:"reasoning_effort,omitempty"`
 	// Temperature is omitted when the caller did not choose one, leaving
 	// the model's own default in force.
 	Temperature    *float64              `json:"temperature,omitempty"`
@@ -109,12 +118,25 @@ func (p *openAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 			},
 		}
 	}
+	maxTokens := req.MaxTokens
+	maxCompletionTokens := 0
+	reasoningEffort := ""
+	if p.cfg.Kind == KindOpenAI && model == openAIDefaultModel {
+		// GPT-6 Luna uses the modern completion cap and supports disabling
+		// reasoning explicitly. Keep the legacy fields for other official
+		// model IDs and all OpenAI-compatible gateways.
+		maxTokens = 0
+		maxCompletionTokens = req.MaxTokens
+		reasoningEffort = "none"
+	}
 	body, err := json.Marshal(openAIReq{
-		Model:          model,
-		Messages:       msgs,
-		MaxTokens:      req.MaxTokens,
-		Temperature:    req.Temperature,
-		ResponseFormat: responseFormat,
+		Model:               model,
+		Messages:            msgs,
+		MaxTokens:           maxTokens,
+		MaxCompletionTokens: maxCompletionTokens,
+		ReasoningEffort:     reasoningEffort,
+		Temperature:         req.Temperature,
+		ResponseFormat:      responseFormat,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai: marshal: %w", err)
