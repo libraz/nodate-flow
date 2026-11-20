@@ -2732,10 +2732,9 @@
             "type": "string"
           },
           "apiKey": {
-            "description": "Plaintext provider API key (write-only). Printable ASCII, no spaces.",
+            "description": "Plaintext provider API key (write-only). Required for every kind except ollama (enforced by the handler). Printable ASCII, no spaces, at least 8 characters.",
             "maxLength": 484,
-            "minLength": 8,
-            "pattern": "^[\\x21-\\x7E]+$",
+            "pattern": "^$|^[\\x21-\\x7E]{8,}$",
             "type": "string",
             "writeOnly": true
           },
@@ -2758,7 +2757,7 @@
             "type": "string"
           }
         },
-        "required": ["kind", "name", "apiKey"],
+        "required": ["kind", "name"],
         "type": "object"
       },
       "CreatePublicShareInputBody": {
@@ -4168,7 +4167,14 @@
       "EvaluateConstraintsOutcome": {
         "additionalProperties": false,
         "properties": {
+          "expression": {
+            "type": "string"
+          },
           "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["deadline", "dependency", "approval", "signal", "custom"],
             "type": "string"
           },
           "parseError": {
@@ -4178,7 +4184,7 @@
             "type": "boolean"
           }
         },
-        "required": ["id", "satisfied"],
+        "required": ["id", "kind", "expression", "satisfied"],
         "type": "object"
       },
       "EvaluateConstraintsOutputBody": {
@@ -4577,6 +4583,10 @@
             "type": "string"
           },
           "targetType": {
+            "type": "string"
+          },
+          "title": {
+            "description": "Target display title; present on list responses",
             "type": "string"
           }
         },
@@ -7808,6 +7818,10 @@
           "resourceId": {
             "type": "string"
           },
+          "resourceTitle": {
+            "description": "Title of the referenced task while the recipient can read it",
+            "type": "string"
+          },
           "resourceType": {
             "type": "string"
           },
@@ -9281,6 +9295,7 @@
             "type": "string"
           },
           "apiKeyMasked": {
+            "description": "Masked key; absent when no key is stored",
             "type": "string"
           },
           "baseUrl": {
@@ -9308,7 +9323,7 @@
             "type": "integer"
           }
         },
-        "required": ["id", "kind", "name", "apiKeyMasked", "createdAt"],
+        "required": ["id", "kind", "name", "createdAt"],
         "type": "object"
       },
       "ProviderStatus": {
@@ -11479,6 +11494,20 @@
         "required": ["id", "purpose", "model", "promptRedacted", "status", "invokedAt"],
         "type": "object"
       },
+      "TaskAssigneeRef": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Assignee user public id (UUID v7)",
+            "type": "string"
+          }
+        },
+        "required": ["id", "displayName"],
+        "type": "object"
+      },
       "TaskAttachment": {
         "additionalProperties": false,
         "properties": {
@@ -11888,6 +11917,13 @@
             "format": "int64",
             "type": "integer"
           },
+          "assignees": {
+            "description": "Human assignees in display order",
+            "items": {
+              "$ref": "#/components/schemas/TaskAssigneeRef"
+            },
+            "type": ["array", "null"]
+          },
           "completedAt": {
             "format": "int64",
             "type": "integer"
@@ -11964,6 +12000,7 @@
           "sortWeight",
           "primaryAssigneeId",
           "assigneeCount",
+          "assignees",
           "createdAt"
         ],
         "type": "object"
@@ -11979,8 +12016,24 @@
             "format": "int32",
             "type": "integer"
           },
-          "reason": {
-            "type": "string"
+          "dependentCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "enum": [
+                "overdue",
+                "due_by_tomorrow",
+                "due_this_week",
+                "due_this_fortnight",
+                "in_review",
+                "many_dependents",
+                "unassigned"
+              ],
+              "type": "string"
+            },
+            "type": ["array", "null"]
           },
           "suggestedPriority": {
             "format": "int32",
@@ -11999,7 +12052,8 @@
           "currentPriority",
           "suggestedPriority",
           "confidence",
-          "reason"
+          "reasons",
+          "dependentCount"
         ],
         "type": "object"
       },
@@ -12014,9 +12068,7 @@
             "type": "string"
           },
           "kind": {
-            "type": "string"
-          },
-          "message": {
+            "enum": ["overdue", "due_today", "due_soon"],
             "type": "string"
           },
           "state": {
@@ -12029,7 +12081,7 @@
             "type": "string"
           }
         },
-        "required": ["taskId", "title", "state", "dueOn", "kind", "daysUntilDue", "message"],
+        "required": ["taskId", "title", "state", "dueOn", "kind", "daysUntilDue"],
         "type": "object"
       },
       "TaskSource": {

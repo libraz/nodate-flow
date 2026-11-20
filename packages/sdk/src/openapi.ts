@@ -6432,8 +6432,8 @@ export interface components {
              * @example https://example.com/schemas/CreateProviderInputBody.json
              */
             readonly $schema?: string;
-            /** @description Plaintext provider API key (write-only). Printable ASCII, no spaces. */
-            apiKey: string;
+            /** @description Plaintext provider API key (write-only). Required for every kind except ollama (enforced by the handler). Printable ASCII, no spaces, at least 8 characters. */
+            apiKey?: string;
             baseUrl?: string;
             defaultModel?: string;
             /** @enum {string} */
@@ -7120,7 +7120,10 @@ export interface components {
             userAction?: string;
         };
         EvaluateConstraintsOutcome: {
+            expression: string;
             id: string;
+            /** @enum {string} */
+            kind: "deadline" | "dependency" | "approval" | "signal" | "custom";
             parseError?: string;
             satisfied: boolean;
         };
@@ -7301,6 +7304,8 @@ export interface components {
             sortWeight: number;
             targetId: string;
             targetType: string;
+            /** @description Target display title; present on list responses */
+            title?: string;
         };
         GeneratePageBody: {
             /**
@@ -8732,6 +8737,8 @@ export interface components {
             /** Format: int64 */
             readAt: number | null;
             resourceId?: string;
+            /** @description Title of the referenced task while the recipient can read it */
+            resourceTitle?: string;
             resourceType: string;
             severity: string;
             title: string;
@@ -9423,7 +9430,8 @@ export interface components {
              * @example https://example.com/schemas/Provider.json
              */
             readonly $schema?: string;
-            apiKeyMasked: string;
+            /** @description Masked key; absent when no key is stored */
+            apiKeyMasked?: string;
             baseUrl?: string;
             /** Format: int64 */
             createdAt: number;
@@ -10429,6 +10437,11 @@ export interface components {
             /** Format: int32 */
             tokensOutput?: number;
         };
+        TaskAssigneeRef: {
+            displayName: string;
+            /** @description Assignee user public id (UUID v7) */
+            id: string;
+        };
         TaskAttachment: {
             /** Format: int64 */
             byteSize: number;
@@ -10596,6 +10609,8 @@ export interface components {
             archivedAt?: number;
             /** Format: int64 */
             assigneeCount: number;
+            /** @description Human assignees in display order */
+            assignees: components["schemas"]["TaskAssigneeRef"][] | null;
             /** Format: int64 */
             completedAt?: number;
             /** Format: int64 */
@@ -10627,7 +10642,9 @@ export interface components {
             confidence: number;
             /** Format: int32 */
             currentPriority: number;
-            reason: string;
+            /** Format: int64 */
+            dependentCount: number;
+            reasons: ("overdue" | "due_by_tomorrow" | "due_this_week" | "due_this_fortnight" | "in_review" | "many_dependents" | "unassigned")[] | null;
             /** Format: int32 */
             suggestedPriority: number;
             taskId: string;
@@ -10637,8 +10654,8 @@ export interface components {
             /** Format: int64 */
             daysUntilDue: number;
             dueOn: string;
-            kind: string;
-            message: string;
+            /** @enum {string} */
+            kind: "overdue" | "due_today" | "due_soon";
             state: string;
             taskId: string;
             title: string;
