@@ -138,11 +138,12 @@ type SQLTaskMutator struct {
 // desired end state already holds, so the Applier proceeds to emit its
 // TaskAutoCompleted audit event.
 //
-// Any other rejection (the task sits in a state from which 'complete'
-// is genuinely illegal, e.g. 'waiting', or the row vanished) returns a
-// non-nil error. The Applier surfaces that error and short-circuits
-// before appending TaskAutoCompleted, so no completion event is ever
-// emitted without the matching state change.
+// A task in 'waiting' is refused even though the state machine allows
+// 'complete' there: the judge must not close started work without a
+// human. Any other rejection (a state with no 'complete' edge, or the row
+// vanished) also returns a non-nil error. The Applier surfaces that error
+// and short-circuits before appending TaskAutoCompleted, so no completion
+// event is ever emitted without the matching state change.
 //
 // The trusted workspaceID / taskInternalID references are used as-is:
 // the workspace id scopes both the lock and the persisted UPDATE, and
@@ -174,6 +175,16 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 
 	var rejected bool
 	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.CompleteTask", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		locked, lockErr := generated.New(tx).LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
+			ID:          uint32(taskInternalID), //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32
+			WorkspaceID: workspaceID,
+		})
+		if lockErr == nil && locked.DerivedState == generated.TasksDerivedStateWaiting {
+			rejected = true
+			return errors.New("transition rejected: task is in progress and needs a human to complete")
+		}
+		// A missing row or read error falls through; ApplyTransitionTx
+		// reports it with its own spec.
 		_, spec, cause := taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
 			WorkspaceID: workspaceID,
 			TaskID:      uint32(taskInternalID), //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32

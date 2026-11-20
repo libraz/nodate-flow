@@ -170,6 +170,36 @@ func TestApplierCompleteTaskIsIdempotent(t *testing.T) {
 		"only the first completion appends a task.transition.complete event")
 }
 
+// TestApplierCompleteTaskRefusesWaiting pins that the judge never closes
+// started work: a waiting task is rejected and stays 'waiting', and no
+// transition event is appended.
+func TestApplierCompleteTaskRefusesWaiting(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := helpers.CreateTestTenant(t, testSrv.BaseURL)
+	wsID := lookupWorkspaceIDForRetro(t, testDB, tt.WorkspacePublicID)
+
+	srcPub, srcInternalID := createSourceTask(t, tt, "Work in progress")
+	doRetroJSON(t, "POST", tt.BaseURL+"/tasks/"+srcPub+"/transitions", tt.AccessToken,
+		map[string]any{"transition": "start"}, nil)
+	require.Equal(t, "waiting", loadDerivedState(t, testDB, wsID, srcInternalID))
+
+	agent := helpers.SeedAgent(t, testDB, tt.WorkspacePublicID, helpers.SeedAgentOptions{Kind: "signal_judge"})
+	mutator := &signaljudge.SQLTaskMutator{
+		DB:      testDB,
+		Queries: generated.New(testDB),
+		Logger:  slog.New(slog.DiscardHandler),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := mutator.CompleteTask(ctx, wsID, srcInternalID, agent.AgentID)
+	require.Error(t, err, "a waiting task must not be auto-completed")
+	require.Equal(t, "waiting", loadDerivedState(t, testDB, wsID, srcInternalID))
+	require.Equal(t, 0, countTransitionCompleteEvents(t, testDB, wsID, srcInternalID))
+}
+
 // TestApplierAddCommentPersistsRealCommentRow pins that an
 // add_comment verdict under autonomy=auto writes a real comments row
 // (not a silent no-op). The row is authored by the judging agent, the REST

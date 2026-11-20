@@ -113,6 +113,8 @@ func nextState(current DerivedState, transition string) (DerivedState, bool) {
 			return StateReview, true
 		case "unblock":
 			return StateOpen, true
+		case "complete":
+			return StateDone, true
 		case "cancel":
 			return StateCancelled, true
 		}

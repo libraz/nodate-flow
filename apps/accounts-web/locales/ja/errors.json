@@ -286,6 +286,7 @@
   "WS.SIGNAL.SUBJECT_NOT_FOUND": "シグナルの subject はこのワークスペースに存在しません",
   "WS.TASK.ACCESS_DENIED": "このタスクへのアクセス権がありません",
   "WS.TASK.ACTOR_ROLE_INVALID": "タスク参加者の役割は assignee / reviewer / watcher / approver のいずれかを指定してください",
+  "WS.TASK.COMPLETION_NEEDS_APPROVAL": "このタスクは承認が必要です。レビューに出し、承認されてから完了にしてください。",
   "WS.TASK.DEPENDENCY_ALREADY_EXISTS": "この依存関係は既に存在します",
   "WS.TASK.DEPENDENCY_CYCLE": "この依存関係を追加すると循環が発生します",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "この冪等性キーは別のタスクリクエストで使用済みです",

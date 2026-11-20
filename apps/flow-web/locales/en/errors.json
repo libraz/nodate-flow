@@ -286,6 +286,7 @@
   "WS.SIGNAL.SUBJECT_NOT_FOUND": "Signal subject does not exist in this workspace",
   "WS.TASK.ACCESS_DENIED": "You do not have access to this task",
   "WS.TASK.ACTOR_ROLE_INVALID": "Task actor role must be one of: assignee, reviewer, watcher, approver",
+  "WS.TASK.COMPLETION_NEEDS_APPROVAL": "This task needs approval. Submit it for review and complete it once it is approved.",
   "WS.TASK.DEPENDENCY_ALREADY_EXISTS": "This dependency already exists",
   "WS.TASK.DEPENDENCY_CYCLE": "Adding this dependency would create a cycle",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "This idempotency key has already been used for a different task request",

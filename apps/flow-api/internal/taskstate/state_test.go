@@ -33,6 +33,7 @@ func TestNextState(t *testing.T) {
 		// waiting -> ...
 		{generated.TasksDerivedStateWaiting, TransitionSubmit, generated.TasksDerivedStateReview, true},
 		{generated.TasksDerivedStateWaiting, TransitionUnblock, generated.TasksDerivedStateOpen, true},
+		{generated.TasksDerivedStateWaiting, TransitionComplete, generated.TasksDerivedStateDone, true},
 		{generated.TasksDerivedStateWaiting, TransitionCancel, generated.TasksDerivedStateCancelled, true},
 		{generated.TasksDerivedStateWaiting, TransitionBlock, "", false},
 		{generated.TasksDerivedStateWaiting, TransitionStart, "", false},

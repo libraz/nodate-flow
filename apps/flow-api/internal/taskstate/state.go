@@ -87,6 +87,8 @@ func NextState(current generated.TasksDerivedState, transition string) (generate
 			return generated.TasksDerivedStateReview, true
 		case TransitionUnblock:
 			return generated.TasksDerivedStateOpen, true
+		case TransitionComplete:
+			return generated.TasksDerivedStateDone, true
 		case TransitionCancel:
 			return generated.TasksDerivedStateCancelled, true
 		}
@@ -192,6 +194,7 @@ type ApplyResult struct {
 //   - [apierrors.WsTaskNotFound] when the row does not exist or is disabled
 //   - [apierrors.WsTaskTransitionUnknown] for unknown verbs
 //   - [apierrors.WsTaskTransitionRejected] for verbs the state machine refuses
+//   - [apierrors.WsTaskCompletionNeedsApproval] when the completion gate is closed
 //   - [apierrors.InternalUnexpected] otherwise
 func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (ApplyResult, *apierrors.Spec, error) {
 	if err := validateActor(p); err != nil {
@@ -250,7 +253,7 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 			return ApplyResult{}, apierrors.InternalUnexpected, err
 		}
 		if !completionAllowed(settings.CompletionPolicy, completionGate != 0) {
-			return ApplyResult{}, apierrors.WsTaskTransitionRejected, nil
+			return ApplyResult{}, apierrors.WsTaskCompletionNeedsApproval, nil
 		}
 	}
 

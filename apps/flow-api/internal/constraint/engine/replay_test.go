@@ -60,6 +60,13 @@ func TestReplay_BlockUnblockDirections(t *testing.T) {
 	}
 }
 
+func TestReplay_WaitingComplete(t *testing.T) {
+	st, err := Replay([]TransitionEvent{{Name: "start"}, {Name: "complete"}})
+	if err != nil || st != StateDone {
+		t.Fatalf("expected done, got %v %v", st, err)
+	}
+}
+
 func TestReplay_WaitingBlockIsIllegal(t *testing.T) {
 	_, err := Replay([]TransitionEvent{{Name: "start"}, {Name: "block"}})
 	if err != ErrIllegalTransition {

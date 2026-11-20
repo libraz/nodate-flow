@@ -230,6 +230,15 @@ resources:
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
 
+      completion_needs_approval:
+        code: WS.TASK.COMPLETION_NEEDS_APPROVAL
+        status: 422
+        message: "This task needs approval. Submit it for review and complete it once it is approved."
+        message_ja: "このタスクは承認が必要です。レビューに出し、承認されてから完了にしてください。"
+        message_zh: "此任务需要审批。请提交审核，获批后再完成。"
+        description: "Returned when completing a task whose completion policy requires review and the current work revision has no approved submission."
+        userAction: "Submit the task for review and complete it after it is approved."
+
       actor_role_invalid:
         code: WS.TASK.ACTOR_ROLE_INVALID
         status: 422

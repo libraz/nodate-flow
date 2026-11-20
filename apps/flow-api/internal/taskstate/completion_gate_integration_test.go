@@ -57,7 +57,7 @@ func TestCompletionGateReadsCurrentPolicyAfterEarlierSnapshot(t *testing.T) {
 			Via:         "integration_test",
 		})
 		require.NoError(t, err)
-		require.Equal(t, apierrors.WsTaskTransitionRejected, spec,
+		require.Equal(t, apierrors.WsTaskCompletionNeedsApproval, spec,
 			"the gate must see the committed review_required policy, not the transaction's earlier snapshot")
 		return errRollbackProbe
 	})
@@ -90,7 +90,7 @@ func TestGateEvaluatesWithFreshFactsAfterEarlierSnapshot(t *testing.T) {
 	}
 
 	err := dbretry.InTx(ctx, db, "taskstate_test.complete_before_blocker", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		require.Equal(t, apierrors.WsTaskTransitionRejected, completeTarget(ctx, tx),
+		require.Equal(t, apierrors.WsTaskCompletionNeedsApproval, completeTarget(ctx, tx),
 			"an open blocker must fail the required constraint and reject the completion")
 		return errRollbackProbe
 	})
@@ -120,6 +120,60 @@ func TestGateEvaluatesWithFreshFactsAfterEarlierSnapshot(t *testing.T) {
 		return errRollbackProbe
 	})
 	require.ErrorIs(t, err, errRollbackProbe)
+}
+
+// TestCompletionFromWaiting covers the gate for work that is in progress:
+// review_required without a current approval is refused with the
+// approval-specific code, and a manual-policy task lands in done.
+func TestCompletionFromWaiting(t *testing.T) {
+	ctx := context.Background()
+	complete := func(db *sql.DB, f reviewedWorkFixture) (*apierrors.Spec, error) {
+		var spec *apierrors.Spec
+		err := dbretry.InTx(ctx, db, "taskstate_test.complete_from_waiting", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			var err error
+			_, spec, err = taskstate.ApplyTransitionTx(ctx, tx, taskstate.ApplyParams{
+				WorkspaceID: f.workspaceID,
+				TaskID:      f.taskID,
+				PublicID:    f.taskPublicID,
+				Transition:  taskstate.TransitionComplete,
+				Via:         "integration_test",
+			})
+			return err
+		})
+		return spec, err
+	}
+	stateOf := func(db *sql.DB, f reviewedWorkFixture) string {
+		var state string
+		require.NoError(t, db.QueryRowContext(ctx, `SELECT derived_state FROM tasks WHERE id = ?`, f.taskID).Scan(&state))
+		return state
+	}
+
+	t.Run("review_required without approval is refused", func(t *testing.T) {
+		db := workChangeDB(t)
+		f := seedReviewedWork(t, db, "review_required")
+		require.NoError(t, applyInOwnTx(ctx, db, f.workspaceID, f.taskID, f.taskPublicID, taskstate.TransitionReopen))
+		// Revising the work after the approval leaves no current approval.
+		_, err := db.ExecContext(ctx, `UPDATE tasks SET title = 'Revised after approval' WHERE id = ?`, f.taskID)
+		require.NoError(t, err)
+		require.Equal(t, "waiting", stateOf(db, f))
+
+		spec, err := complete(db, f)
+		require.NoError(t, err)
+		require.Equal(t, apierrors.WsTaskCompletionNeedsApproval, spec)
+		require.Equal(t, "waiting", stateOf(db, f))
+	})
+
+	t.Run("manual policy completes to done", func(t *testing.T) {
+		db := workChangeDB(t)
+		f := seedReviewedWork(t, db, "manual")
+		require.NoError(t, applyInOwnTx(ctx, db, f.workspaceID, f.taskID, f.taskPublicID, taskstate.TransitionReopen))
+		require.Equal(t, "waiting", stateOf(db, f))
+
+		spec, err := complete(db, f)
+		require.NoError(t, err)
+		require.Nil(t, spec)
+		require.Equal(t, "done", stateOf(db, f))
+	})
 }
 
 func applyInOwnTx(ctx context.Context, db *sql.DB, workspaceID, taskID uint32, publicID types.PublicID, transition string) error {

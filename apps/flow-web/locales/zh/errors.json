@@ -286,6 +286,7 @@
   "WS.SIGNAL.SUBJECT_NOT_FOUND": "信号 subject 在该工作区中不存在",
   "WS.TASK.ACCESS_DENIED": "您没有访问此任务的权限",
   "WS.TASK.ACTOR_ROLE_INVALID": "任务参与者角色必须为 assignee、reviewer、watcher 或 approver 之一",
+  "WS.TASK.COMPLETION_NEEDS_APPROVAL": "此任务需要审批。请提交审核，获批后再完成。",
   "WS.TASK.DEPENDENCY_ALREADY_EXISTS": "该依赖关系已存在",
   "WS.TASK.DEPENDENCY_CYCLE": "添加此依赖关系会产生循环依赖",
   "WS.TASK.IDEMPOTENCY_KEY_CONFLICT": "此幂等键已用于其他任务请求",

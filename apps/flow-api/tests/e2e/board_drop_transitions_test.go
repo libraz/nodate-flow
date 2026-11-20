@@ -33,6 +33,7 @@ func TestBoardDropTransitionsMatchBackend(t *testing.T) {
 		{name: "open→cancelled (cancel)", setup: nil, transition: "cancel", expect: "cancelled"},
 		{name: "waiting→review (submit)", setup: []string{"start"}, transition: "submit", expect: "review"},
 		{name: "waiting→open (unblock)", setup: []string{"start"}, transition: "unblock", expect: "open"},
+		{name: "waiting→done (complete)", setup: []string{"start"}, transition: "complete", expect: "done"},
 		{name: "waiting→cancelled (cancel)", setup: []string{"start"}, transition: "cancel", expect: "cancelled"},
 		{name: "review→waiting (block)", setup: []string{"start", "submit"}, transition: "block", expect: "waiting"},
 		{name: "review→done (complete)", setup: []string{"start", "submit"}, transition: "complete", expect: "done"},

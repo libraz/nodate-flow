@@ -206,6 +206,11 @@ export const WsErrors = {
     status: 422,
     message: "Task actor role must be one of: assignee, reviewer, watcher, approver",
   },
+  WS_TASK_COMPLETION_NEEDS_APPROVAL: {
+    code: "WS.TASK.COMPLETION_NEEDS_APPROVAL",
+    status: 422,
+    message: "This task needs approval. Submit it for review and complete it once it is approved.",
+  },
   WS_TASK_DEPENDENCY_ALREADY_EXISTS: {
     code: "WS.TASK.DEPENDENCY_ALREADY_EXISTS",
     status: 409,
