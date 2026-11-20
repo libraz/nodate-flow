@@ -278,7 +278,7 @@
   "WS.PROJECT.ACCESS_DENIED": "You do not have access to this project",
   "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN": "Project identifier is already taken",
   "WS.PROJECT.NOT_FOUND": "Project not found",
-  "WS.PROJECT.SLUG_ALREADY_TAKEN": "Project slug is already taken",
+  "WS.PROJECT.SLUG_ALREADY_TAKEN": "This project URL name is already taken",
   "WS.REACTION.ALREADY_EXISTS": "You already reacted with this emoji",
   "WS.REACTION.NOT_FOUND": "Reaction not found",
   "WS.SIGNAL.KIND_UNKNOWN": "Unknown signal kind",
@@ -302,7 +302,7 @@
   "WS.TASK_EVENT_LINK.NOT_FOUND": "Linked event not found",
   "WS.WORKSPACE.ACCESS_DENIED": "You do not have access to this workspace",
   "WS.WORKSPACE.NOT_FOUND": "Workspace not found",
-  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "Workspace slug is already taken",
+  "WS.WORKSPACE.SLUG_ALREADY_TAKEN": "This workspace URL name is already taken",
   "WS.WORKSPACE_INVITE.EXHAUSTED": "Invite has reached its use limit.",
   "WS.WORKSPACE_INVITE.EXPIRED": "Invite has expired.",
   "WS.WORKSPACE_INVITE.NOT_FOUND": "Invite not found"

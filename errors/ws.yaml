@@ -26,9 +26,9 @@ resources:
       slug_already_taken:
         code: WS.WORKSPACE.SLUG_ALREADY_TAKEN
         status: 409
-        message: "Workspace slug is already taken"
-        message_ja: "このワークスペース slug は既に使用されています"
-        message_zh: "该工作区 slug 已被使用"
+        message: "This workspace URL name is already taken"
+        message_ja: "このワークスペースの URL 用の名前は既に使われています"
+        message_zh: "该工作区的 URL 名称已被使用"
         description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
         userAction: "Choose a different slug."
 
@@ -158,9 +158,9 @@ resources:
       slug_already_taken:
         code: WS.PROJECT.SLUG_ALREADY_TAKEN
         status: 409
-        message: "Project slug is already taken"
-        message_ja: "このプロジェクト slug は既に使用されています"
-        message_zh: "该项目 slug 已被使用"
+        message: "This project URL name is already taken"
+        message_ja: "このプロジェクトの URL 用の名前は既に使われています"
+        message_zh: "该项目的 URL 名称已被使用"
         description: "Returned when the requested project slug already exists within the workspace."
         userAction: "Choose a different slug."
 
@@ -216,8 +216,8 @@ resources:
         code: WS.TASK.TRANSITION_UNKNOWN
         status: 400
         message: "Unknown task transition"
-        message_ja: "未知のタスク遷移です"
-        message_zh: "未知的任务状态转换"
+        message_ja: "不明な状態の変更です"
+        message_zh: "未知的任务状态变更"
         description: "Returned when the client submits a transition name that is not one of {start|block|unblock|submit|complete|reopen|cancel}. Rejected at the HTTP layer before the constraint engine runs."
         userAction: "Use one of the supported transition names defined by the API."
 
@@ -225,8 +225,8 @@ resources:
         code: WS.TASK.TRANSITION_REJECTED
         status: 422
         message: "Task transition not allowed in current state"
-        message_ja: "現在の状態ではこのタスク遷移は許可されていません"
-        message_zh: "当前状态不允许该任务状态转换"
+        message_ja: "現在の状態からは、この状態の変更はできません"
+        message_zh: "当前状态不允许进行该状态变更"
         description: "Returned by the constraint engine when the requested transition is illegal for the task's current lifecycle state."
         userAction: "Refresh the task to see its current state and choose a valid transition."
 
@@ -492,8 +492,8 @@ resources:
         code: WS.INTAKE.NOT_FOUND
         status: 404
         message: "Intake item not found"
-        message_ja: "インテークアイテムが見つかりません"
-        message_zh: "未找到收件项"
+        message_ja: "受付項目が見つかりません"
+        message_zh: "未找到受理项"
         description: "Returned when an intake item with the given public_id does not exist or has been removed."
         userAction: "Verify the intake item ID, or refresh the list to see current items."
 
@@ -501,8 +501,8 @@ resources:
         code: WS.INTAKE.ALREADY_TRIAGED
         status: 409
         message: "This intake item has already been triaged"
-        message_ja: "このインテークアイテムは既に振り分け済みです"
-        message_zh: "该收件项已分流"
+        message_ja: "この受付項目は既に振り分け済みです"
+        message_zh: "该受理项已分流"
         description: "Returned when attempting to triage an intake item that has already been triaged."
         userAction: "The item has already been triaged. No further action is needed."
 
@@ -510,8 +510,8 @@ resources:
         code: WS.INTAKE.ALREADY_CONVERTED
         status: 409
         message: "This intake item has already been converted to a task"
-        message_ja: "このインテークアイテムは既にタスクに変換済みです"
-        message_zh: "该收件项已转换为任务"
+        message_ja: "この受付項目は既にタスクに変換済みです"
+        message_zh: "该受理项已转换为任务"
         description: "Returned when attempting to convert an intake item that has already been converted to a task."
         userAction: "The item has already been converted. Open the linked task instead."
 
@@ -519,8 +519,8 @@ resources:
         code: WS.INTAKE.SNOOZE_DEADLINE_REQUIRED
         status: 422
         message: "Snoozing an intake item requires a deadline"
-        message_ja: "インテークアイテムをスヌーズするには期限が必要です"
-        message_zh: "延后收件项需要设置截止时间"
+        message_ja: "受付項目をスヌーズするには期限が必要です"
+        message_zh: "延后受理项需要设置截止时间"
         description: "Returned when a triage request sets the status to snoozed without a snoozeUntil deadline. The pending queue is filtered on triage status alone, so an item parked as snoozed with no deadline leaves the pending list with no date at which anything brings it back."
         userAction: "Supply a snoozeUntil timestamp in the future, or choose a different triage status."
 

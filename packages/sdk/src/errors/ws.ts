@@ -169,7 +169,7 @@ export const WsErrors = {
   WS_PROJECT_SLUG_ALREADY_TAKEN: {
     code: "WS.PROJECT.SLUG_ALREADY_TAKEN",
     status: 409,
-    message: "Project slug is already taken",
+    message: "This project URL name is already taken",
   },
   WS_REACTION_ALREADY_EXISTS: {
     code: "WS.REACTION.ALREADY_EXISTS",
@@ -289,7 +289,7 @@ export const WsErrors = {
   WS_WORKSPACE_SLUG_ALREADY_TAKEN: {
     code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN",
     status: 409,
-    message: "Workspace slug is already taken",
+    message: "This workspace URL name is already taken",
   },
   WS_WORKSPACE_INVITE_EXHAUSTED: {
     code: "WS.WORKSPACE_INVITE.EXHAUSTED",

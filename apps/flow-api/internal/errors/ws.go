@@ -70,8 +70,8 @@ var (
 	WsProjectIdentifierAlreadyTaken = &Spec{Code: "WS.PROJECT.IDENTIFIER_ALREADY_TAKEN", Status: 409, Message: "Project identifier is already taken", Description: "Returned when the requested project identifier already exists within the workspace.", UserAction: "Choose a different identifier."}
 	// WS.PROJECT.NOT_FOUND — Project not found
 	WsProjectNotFound = &Spec{Code: "WS.PROJECT.NOT_FOUND", Status: 404, Message: "Project not found", Description: "Returned when a project does not exist or when the actor cannot access it (404 to avoid leaking existence).", UserAction: "Verify the project ID, or contact a workspace admin if you should have access."}
-	// WS.PROJECT.SLUG_ALREADY_TAKEN — Project slug is already taken
-	WsProjectSlugAlreadyTaken = &Spec{Code: "WS.PROJECT.SLUG_ALREADY_TAKEN", Status: 409, Message: "Project slug is already taken", Description: "Returned when the requested project slug already exists within the workspace.", UserAction: "Choose a different slug."}
+	// WS.PROJECT.SLUG_ALREADY_TAKEN — This project URL name is already taken
+	WsProjectSlugAlreadyTaken = &Spec{Code: "WS.PROJECT.SLUG_ALREADY_TAKEN", Status: 409, Message: "This project URL name is already taken", Description: "Returned when the requested project slug already exists within the workspace.", UserAction: "Choose a different slug."}
 	// WS.REACTION.ALREADY_EXISTS — You already reacted with this emoji
 	WsReactionAlreadyExists = &Spec{Code: "WS.REACTION.ALREADY_EXISTS", Status: 409, Message: "You already reacted with this emoji", Description: "Returned when the actor attempts to add a duplicate reaction with the same emoji to the same target.", UserAction: "Remove the existing reaction first if you want to change it."}
 	// WS.REACTION.NOT_FOUND — Reaction not found
@@ -118,8 +118,8 @@ var (
 	WsWorkspaceAccessDenied = &Spec{Code: "WS.WORKSPACE.ACCESS_DENIED", Status: 403, Message: "You do not have access to this workspace", Description: "Returned when the actor is authenticated but is not a member of the target workspace.", UserAction: "Ask a workspace admin to invite you."}
 	// WS.WORKSPACE.NOT_FOUND — Workspace not found
 	WsWorkspaceNotFound = &Spec{Code: "WS.WORKSPACE.NOT_FOUND", Status: 404, Message: "Workspace not found", Description: "Returned when a workspace with the given public_id does not exist or the actor has no visibility into it.", UserAction: "Verify the workspace ID, or ask an admin to add you as a member."}
-	// WS.WORKSPACE.SLUG_ALREADY_TAKEN — Workspace slug is already taken
-	WsWorkspaceSlugAlreadyTaken = &Spec{Code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN", Status: 409, Message: "Workspace slug is already taken", Description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance.", UserAction: "Choose a different slug."}
+	// WS.WORKSPACE.SLUG_ALREADY_TAKEN — This workspace URL name is already taken
+	WsWorkspaceSlugAlreadyTaken = &Spec{Code: "WS.WORKSPACE.SLUG_ALREADY_TAKEN", Status: 409, Message: "This workspace URL name is already taken", Description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance.", UserAction: "Choose a different slug."}
 	// WS.WORKSPACE_INVITE.EXHAUSTED — Invite has reached its use limit.
 	WsWorkspaceInviteExhausted = &Spec{Code: "WS.WORKSPACE_INVITE.EXHAUSTED", Status: 410, Message: "Invite has reached its use limit.", Description: "Returned when the workspace invite has been redeemed the maximum allowed number of times.", UserAction: "Ask a workspace admin to send a new invite."}
 	// WS.WORKSPACE_INVITE.EXPIRED — Invite has expired.
