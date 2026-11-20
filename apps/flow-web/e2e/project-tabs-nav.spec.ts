@@ -51,4 +51,35 @@ test.describe('project tab strip', () => {
     await expect(page).toHaveURL(new RegExp(`${projectBase}$`), { timeout: 10_000 });
     await expect(page.getByRole('main')).toBeVisible();
   });
+
+  test('lists the tabs as tasks, gantt, timeline, overview', async ({ page }) => {
+    const { user2: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    await page.goto(`/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}/tasks`);
+    const tabStrip = page.getByRole('navigation', { name: enCommon.projects.nav.label });
+    await expect(tabStrip).toBeVisible({ timeout: 15_000 });
+
+    const { tasks, gantt, timeline, overview } = enCommon.projects.nav;
+    await expect(tabStrip.getByRole('link')).toHaveText([tasks, gantt, timeline, overview]);
+  });
+
+  test('opening a project from the workspace project list lands on its tasks', async ({ page }) => {
+    const { user2: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    await page.goto(`/workspaces/${tenant.workspaceId}/projects`);
+    const link = page
+      .getByRole('main')
+      .getByRole('link', { name: /E2E Project/ })
+      .first();
+    await expect(link).toBeVisible({ timeout: 15_000 });
+    await link.click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/workspaces/${tenant.workspaceId}/projects/[^/]+/tasks(/.*)?$`),
+      { timeout: 10_000 },
+    );
+    await expect(page.getByRole('main')).toBeVisible();
+  });
 });
