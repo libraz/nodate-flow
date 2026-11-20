@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "归档",
-    "subtitle": "你存放的任务都在这里。它们没有消失。",
+    "subtitle": "你存放的任务和项目都在这里。它们没有消失。",
     "countWithLast": "{count, plural, other {# 个任务}} · 最近归档于 {ago}"
   },
   "filters": {
@@ -40,7 +40,8 @@
   },
   "empty": {
     "noneTitle": "还没有任何归档",
-    "noneBody": "已归档的任务保存在这里，并不会被删除。可通过看板卡片上的“移动任务”菜单归档，并随时在此页面恢复。",
+    "noTasks": "没有已归档的任务。",
+    "noneBody": "已归档的任务和项目保存在这里，并不会被删除。可通过看板卡片上的“移动任务”菜单归档任务，在项目设置中归档项目，并随时在此页面恢复。",
     "noneCta": "浏览进行中的任务",
     "filteredTitle": "未找到匹配的归档",
     "filteredBody": "尝试扩大时间范围，或清除项目筛选。",
@@ -54,5 +55,9 @@
   "toast": {
     "unarchivedOne": "已恢复「{title}」。",
     "unarchivedMany": "已恢复 {count} 个任务。"
+  },
+  "projects": {
+    "title": "已归档的项目",
+    "description": "取消归档后，项目会重新显示在侧边栏和选择列表中。"
   }
 }

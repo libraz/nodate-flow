@@ -90,6 +90,8 @@
     "page_delete": "deleted a page",
     "page_update": "updated a page",
     "project_create": "created a project",
+    "project_archive": "Archived a project",
+    "project_unarchive": "Restored a project",
     "project_delete": "deleted a project",
     "project_update": "updated a project",
     "reaction_create": "added a reaction",

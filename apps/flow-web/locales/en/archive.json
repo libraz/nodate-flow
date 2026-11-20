@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Archive",
-    "subtitle": "Tasks you've stored away. Nothing is gone.",
+    "subtitle": "Tasks and projects you've stored away. Nothing is gone.",
     "countWithLast": "{count, plural, one {# task} other {# tasks}} · last archived {ago}"
   },
   "filters": {
@@ -40,7 +40,8 @@
   },
   "empty": {
     "noneTitle": "Nothing stored yet",
-    "noneBody": "Archived tasks are kept here, not deleted. Archive a task from the Move task menu on a board card, and restore it from this page any time.",
+    "noTasks": "No archived tasks.",
+    "noneBody": "Archived tasks and projects are kept here, not deleted. Archive a task from the Move task menu on a board card, or a project from its settings, and restore it from this page any time.",
     "noneCta": "Browse open tasks",
     "filteredTitle": "Couldn't find any matching archive",
     "filteredBody": "Try widening your time range or clearing project filter.",
@@ -54,5 +55,9 @@
   "toast": {
     "unarchivedOne": "Restored \"{title}\".",
     "unarchivedMany": "Restored {count} tasks."
+  },
+  "projects": {
+    "title": "Archived projects",
+    "description": "Restoring a project shows it in the sidebar and pickers again."
   }
 }

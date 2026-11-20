@@ -53,6 +53,7 @@
     "insightsPriority": "AI priority suggestions",
     "retroDrafts": "Retrospective drafts",
     "archive": "Archive",
+    "history": "History",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "insightsPriorityHint": "Proposed priority changes for open tasks. Nothing changes until you apply one.",
@@ -74,7 +75,8 @@
     },
     "hint": {
       "reminders": "Tasks that are overdue or due within 3 days.",
-      "archive": "Tasks you archived. You can restore them.",
+      "archive": "Tasks and projects you archived. You can restore them.",
+      "history": "Task changes (Timeline) and the record of what people, AI and integrations did (Activity log), in one place.",
       "timeboxes": "Group tasks into a fixed period such as a sprint.",
       "insightsPriority": "Proposed priority changes for open tasks. Nothing changes until you apply one.",
       "retroDrafts": "Retrospective tasks drafted by AI from recent work. Approve or discard them.",
@@ -220,7 +222,6 @@
     "in_workspace": "{workspace}",
     "no_due_label": "No due date",
     "complete_task": "Mark “{title}” done",
-    "complete_unavailable": "In-progress tasks are completed from the task page: submit for review, or move it back to open first.",
     "completed_toast": "Marked “{title}” done",
     "complete_error": "Could not complete the task",
     "undo_error": "Could not undo the change"
@@ -685,8 +686,8 @@
     },
     "settings": {
       "rename": "Rename",
-      "disable": "Disable project",
-      "disable_confirm": "Are you sure you want to disable this project? This cannot be undone from the UI."
+      "disable": "Delete project",
+      "disable_confirm": "Delete this project? All of its tasks are deleted too, and this cannot be undone. To keep them, archive the project instead."
     },
     "validation": {
       "name_required": "Name is required.",
@@ -698,10 +699,23 @@
     "errors": {
       "create_failed": "Could not create the project. Please try again.",
       "update_failed": "Could not update the project. Please try again.",
-      "disable_failed": "Could not disable the project. Please try again.",
+      "disable_failed": "Could not delete the project. Please try again.",
       "add_member_failed": "Could not add the member. Please try again."
     },
-    "description": "A project groups the related tasks of this workspace. Open one to see its tasks, Gantt chart, timeline and members."
+    "description": "A project groups the related tasks of this workspace. Open one to see its tasks, Gantt chart, timeline and members.",
+    "archive": {
+      "section_title": "Tidy up",
+      "description": "Archiving hides the project from the sidebar and pickers. Its tasks stay, and you can restore it at any time.",
+      "action": "Archive",
+      "restore": "Restore",
+      "done": "Archived “{name}”",
+      "restored": "Restored “{name}”",
+      "failed": "Could not archive the project. Please try again.",
+      "restore_failed": "Could not restore the project. Please try again."
+    },
+    "archived_banner": {
+      "text": "This project is archived. It is hidden from the sidebar."
+    }
   },
   "tasks": {
     "title": "Tasks",

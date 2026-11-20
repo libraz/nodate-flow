@@ -53,6 +53,7 @@
     "insightsPriority": "AI 优先级建议",
     "retroDrafts": "回顾草稿",
     "archive": "归档",
+    "history": "历史记录",
     "collapse": "收起侧边栏",
     "expand": "展开侧边栏",
     "insightsPriorityHint": "未完成任务的优先级变更建议。应用之前任务不会改变。",
@@ -74,7 +75,8 @@
     },
     "hint": {
       "reminders": "已逾期或 3 天内到期的任务。",
-      "archive": "已归档的任务，可以恢复。",
+      "archive": "已归档的任务和项目，可以恢复。",
+      "history": "在一处查看任务的变化（时间线）以及人员、AI 和集成的操作记录（操作历史）。",
       "timeboxes": "按冲刺等固定周期归集任务。",
       "insightsPriority": "针对未完成任务的优先级调整建议。应用前任务不会改变。",
       "retroDrafts": "AI 根据近期工作起草的回顾任务。可采纳或放弃。",
@@ -220,7 +222,6 @@
     "in_workspace": "{workspace}",
     "no_due_label": "无截止日期",
     "complete_task": "将“{title}”标记为完成",
-    "complete_unavailable": "进行中的任务需在任务页面中提交审核，或先改回未开始后再完成。",
     "completed_toast": "已将“{title}”标记为完成",
     "complete_error": "无法完成该任务",
     "undo_error": "无法撤销"
@@ -685,8 +686,8 @@
     },
     "settings": {
       "rename": "重命名",
-      "disable": "停用项目",
-      "disable_confirm": "确定要停用此项目吗？此操作无法在界面中撤销。"
+      "disable": "删除项目",
+      "disable_confirm": "要删除此项目吗？其中的所有任务也会被删除，且无法恢复。如需保留，请改为归档项目。"
     },
     "validation": {
       "name_required": "请填写名称。",
@@ -698,10 +699,23 @@
     "errors": {
       "create_failed": "创建项目失败，请重试。",
       "update_failed": "更新项目失败，请重试。",
-      "disable_failed": "停用项目失败，请重试。",
+      "disable_failed": "无法删除项目，请重试。",
       "add_member_failed": "添加成员失败，请重试。"
     },
-    "description": "项目用来归集该工作区内相关的任务。打开后可查看它的任务、甘特图、时间线和成员。"
+    "description": "项目用来归集该工作区内相关的任务。打开后可查看它的任务、甘特图、时间线和成员。",
+    "archive": {
+      "section_title": "整理",
+      "description": "归档后项目不再显示在侧边栏和选择列表中。任务会保留，随时可以恢复。",
+      "action": "归档",
+      "restore": "取消归档",
+      "done": "已归档“{name}”",
+      "restored": "已恢复“{name}”",
+      "failed": "无法归档项目，请重试。",
+      "restore_failed": "无法取消归档，请重试。"
+    },
+    "archived_banner": {
+      "text": "此项目已归档，不会显示在侧边栏中。"
+    }
   },
   "tasks": {
     "title": "任务",

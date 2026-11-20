@@ -56,7 +56,7 @@
     "summary": "Check your assigned work and move to the selected workspace's dashboard and projects.",
     "tips": {
       "t1": "The four counts cover tasks where you hold a role (assignee, reviewer or approver) in any workspace. Overdue and Due today follow your time zone.",
-      "t2": "My tasks lists up to five open tasks. The round button at the start of a row completes a task you are assigned to; for an in-progress task, open it first. View all tasks opens the full list, grouped by due date.",
+      "t2": "My tasks lists up to five open tasks. The round button at the start of a row completes a task you are assigned to. View all tasks opens the full list, grouped by due date.",
       "t3": "Press ⌘K (Ctrl+K on Windows) anywhere to search or run an AI command, and C to start a new task.",
       "t4": "Click the workspace name at the top left to switch to another workspace.",
       "t5": "The dashboard at the bottom belongs to the selected workspace. Use Edit layout to add, reorder or remove widgets."
@@ -80,7 +80,7 @@
     "tips": {
       "t1": "Sections run Overdue, Today, Tomorrow, This week, Later and No due date. Done and cancelled tasks are hidden.",
       "t2": "Tasks show up when you are added as assignee, reviewer or approver. Rows are sorted by due date, then priority.",
-      "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task. The round button at the start of a row completes a task you are assigned to; for an in-progress task, open it first.",
+      "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task. The round button at the start of a row completes a task you are assigned to, and the toast that follows offers Undo.",
       "t4": "Up to 200 tasks are loaded. Press G then T from anywhere to come back to this page."
     }
   },
@@ -119,7 +119,7 @@
     "tips": {
       "t1": "Overview shows how many tasks are active and a bar split by state. Progress is the share of tasks that are done.",
       "t2": "Members and Settings are tabs inside Overview. Members sets each person's role: Viewer, Commenter, Editor or Lead.",
-      "t3": "Settings lets you rename the project or disable it. Disabling cannot be undone from the app.",
+      "t3": "Settings lets you rename, archive or delete the project. Archiving only hides it from the sidebar; its tasks stay and you can restore it any time. Deleting removes its tasks too and cannot be undone.",
       "t4": "Tasks has board, list, graph and spreadsheet views. Gantt and Timeline are read-only views of the same project."
     }
   },
@@ -245,7 +245,7 @@
   },
   "task-archive": {
     "title": "Archive",
-    "summary": "Archived tasks are stored here, not deleted. Restore them any time.",
+    "summary": "Archived tasks and projects are stored here, not deleted. Restore them any time.",
     "tips": {
       "t1": "Search by title, narrow by 7, 30 or 90 days, or pick a project or the person who archived the task.",
       "t2": "Tasks are grouped by when they were archived, from this week back to older.",

@@ -90,6 +90,8 @@
     "page_delete": "ページを削除しました",
     "page_update": "ページを更新しました",
     "project_create": "プロジェクトを作成しました",
+    "project_archive": "プロジェクトをアーカイブしました",
+    "project_unarchive": "プロジェクトのアーカイブを解除しました",
     "project_delete": "プロジェクトを削除しました",
     "project_update": "プロジェクトを更新しました",
     "reaction_create": "リアクションを追加しました",
