@@ -1420,6 +1420,20 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           initial={task.description ?? ''}
           workspaceId={task.workspaceId}
         />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
+          <ReactionsSection taskId={id} />
+        </Suspense>
+        <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
+          <TaskAttachments taskId={id} />
+        </Suspense>
+        <Separator />
+        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
+        <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
+          <CommentsFeed taskId={id} workspaceId={task.workspaceId} />
+        </Suspense>
         <Suspense fallback={<SectionSkeleton />}>
           <TaskSourceLinks taskId={id} />
         </Suspense>
@@ -1429,11 +1443,6 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           workspaceId={task.workspaceId}
           projectId={task.projectId}
         />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '2rem', inlineSize: '12rem' }} />}>
-          <ReactionsSection taskId={id} />
-        </Suspense>
-        <Separator />
         {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
         <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
           <DependenciesSection taskId={id} workspaceId={task.workspaceId} />
@@ -1446,16 +1455,6 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
         <Separator />
         <Suspense fallback={<AIAgentsSkeleton />}>
           <AIAgentsSection taskId={id} locale={locale} />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '4rem', inlineSize: '100%' }} />}>
-          <TaskAttachments taskId={id} />
-        </Suspense>
-        <Separator />
-        {/* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */}
-        <Suspense fallback={<Skeleton style={{ blockSize: '8rem', inlineSize: '100%' }} />}>
-          <CommentsFeed taskId={id} workspaceId={task.workspaceId} />
         </Suspense>
       </div>
       <Sidebar
