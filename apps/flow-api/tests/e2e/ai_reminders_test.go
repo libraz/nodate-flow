@@ -11,7 +11,8 @@ import (
 // TestAiReminders creates two tasks — one with a past due date and one
 // without — and hits the workspace reminder endpoint. The
 // overdue task must appear in the reminder list with kind "overdue"
-// and a negative daysUntilDue, while the other must be absent.
+// and a negative daysUntilDue, while the other must be absent. The
+// payload carries no free-text message: clients render from kind.
 func TestAiReminders(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
@@ -47,7 +48,6 @@ func TestAiReminders(t *testing.T) {
 			TaskID       string `json:"taskId"`
 			Kind         string `json:"kind"`
 			DaysUntilDue int    `json:"daysUntilDue"`
-			Message      string `json:"message"`
 		} `json:"reminders"`
 	}
 	doJSON(t, http.MethodGet,
@@ -60,5 +60,10 @@ func TestAiReminders(t *testing.T) {
 	require.Equal(t, overdue.ID, top.TaskID)
 	require.Equal(t, "overdue", top.Kind)
 	require.Less(t, top.DaysUntilDue, 0)
-	require.NotEmpty(t, top.Message)
+
+	status, raw := doJSONStatus(t, http.MethodGet,
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/ai/reminders",
+		tt.AccessToken, nil)
+	require.Equal(t, http.StatusOK, status, string(raw))
+	require.NotContains(t, string(raw), `"message"`, "reminders must not carry a message field")
 }

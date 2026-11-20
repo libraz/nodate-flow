@@ -7,7 +7,6 @@
 package reminders
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
@@ -54,9 +53,8 @@ type Signals struct {
 // reminder applies (terminal state, no due date, or due date still far
 // out).
 type Reminder struct {
-	Kind         Kind   `json:"kind"`
-	DaysUntilDue int    `json:"daysUntilDue"`
-	Message      string `json:"message"`
+	Kind         Kind `json:"kind"`
+	DaysUntilDue int  `json:"daysUntilDue"`
 }
 
 // Window thresholds for Evaluate, in days.
@@ -81,23 +79,11 @@ func Evaluate(s Signals) *Reminder {
 
 	switch {
 	case diffDays < 0:
-		return &Reminder{
-			Kind:         KindOverdue,
-			DaysUntilDue: diffDays,
-			Message:      fmt.Sprintf("overdue by %d day(s)", -diffDays),
-		}
+		return &Reminder{Kind: KindOverdue, DaysUntilDue: diffDays}
 	case diffDays == 0:
-		return &Reminder{
-			Kind:         KindDueToday,
-			DaysUntilDue: 0,
-			Message:      "due today",
-		}
+		return &Reminder{Kind: KindDueToday, DaysUntilDue: 0}
 	case diffDays <= dueSoonDays:
-		return &Reminder{
-			Kind:         KindDueSoon,
-			DaysUntilDue: diffDays,
-			Message:      fmt.Sprintf("due in %d day(s)", diffDays),
-		}
+		return &Reminder{Kind: KindDueSoon, DaysUntilDue: diffDays}
 	}
 	return nil
 }

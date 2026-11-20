@@ -30,9 +30,8 @@ type TaskReminder struct {
 	Title        string `json:"title"`
 	State        string `json:"state"`
 	DueOn        string `json:"dueOn"`
-	Kind         string `json:"kind"`
+	Kind         string `json:"kind" enum:"overdue,due_today,due_soon"`
 	DaysUntilDue int    `json:"daysUntilDue"`
-	Message      string `json:"message"`
 }
 
 // ListRemindersOutput wraps the reminder list.
@@ -109,7 +108,6 @@ func ListReminders(deps Deps) func(context.Context, *ListRemindersInput) (*ListR
 				DueOn:        handlerutil.NullTimeDateStr(r.DueOn),
 				Kind:         string(rm.Kind),
 				DaysUntilDue: rm.DaysUntilDue,
-				Message:      rm.Message,
 			})
 		}
 		sort.SliceStable(out.Body.Reminders, func(i, j int) bool {

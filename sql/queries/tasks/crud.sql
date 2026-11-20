@@ -235,7 +235,16 @@ SELECT
   v.updated_at,
   v.created_at,
   v.primary_assignee_public_id,
-  v.assignee_count
+  v.assignee_count,
+  -- Dependents: enabled edges pointing AT this task (to_task_id) from
+  -- enabled tasks, i.e. the work blocked on it. This is the direction the
+  -- priority optimizer's bottleneck rule reads; v_task_detail.dependency_count
+  -- counts the opposite (outgoing) direction.
+  (SELECT COUNT(*) FROM task_dependencies d_dep
+     INNER JOIN tasks dft ON dft.id = d_dep.from_task_id AND dft.enabled = TRUE
+     WHERE d_dep.workspace_id = v.workspace_id
+       AND d_dep.to_task_id = v.task_internal_id
+       AND d_dep.enabled = TRUE) AS dependent_count
 FROM v_task_list v
 WHERE v.workspace_id = sqlc.arg('workspace_id')
   AND (

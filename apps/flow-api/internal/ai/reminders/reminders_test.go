@@ -72,9 +72,6 @@ func TestEvaluate(t *testing.T) {
 			if got.DaysUntilDue != tc.want.DaysUntilDue {
 				t.Errorf("daysUntilDue: want %d got %d", tc.want.DaysUntilDue, got.DaysUntilDue)
 			}
-			if got.Message == "" {
-				t.Errorf("message should not be empty")
-			}
 		})
 	}
 }

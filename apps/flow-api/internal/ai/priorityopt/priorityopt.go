@@ -8,11 +8,10 @@
 // intentionally simple: a handful of signal weights + due-date
 // urgency, tuned against the judgement calls a human makes when
 // skimming a cluttered backlog. The API shape already accommodates a
-// future LLM-backed path via Suggestion.Confidence + Suggestion.Reason.
+// future LLM-backed path via Suggestion.Confidence + Suggestion.Reasons.
 package priorityopt
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -42,23 +41,41 @@ type Signals struct {
 	UpdatedAt       time.Time
 	DueOn           time.Time
 	HasDueOn        bool
-	DependencyCount int64
-	HasAssignee     bool
-	Now             time.Time
+	// DependentCount is the number of tasks blocked on this task.
+	DependentCount int64
+	HasAssignee    bool
+	Now            time.Time
 	// Zone is the zone whose calendar day "today" is; the zero value
 	// reads the day in UTC.
 	Zone region.Zone
 }
 
+// ReasonCode identifies a rule that contributed to a suggestion; clients
+// render the wording.
+type ReasonCode string
+
+// Reason codes emitted in Suggestion.Reasons.
+const (
+	ReasonOverdue          ReasonCode = "overdue"
+	ReasonDueByTomorrow    ReasonCode = "due_by_tomorrow"
+	ReasonDueThisWeek      ReasonCode = "due_this_week"
+	ReasonDueThisFortnight ReasonCode = "due_this_fortnight"
+	ReasonInReview         ReasonCode = "in_review"
+	ReasonManyDependents   ReasonCode = "many_dependents"
+	ReasonUnassigned       ReasonCode = "unassigned"
+)
+
 // Suggestion is the output row. SuggestedPriority is clamped to
-// [0, 4]; Confidence is in [0, 1].
+// [0, 4]; Confidence is in [0, 1]. Reasons is never nil; empty means
+// no rule fired (steady). DependentCount is copied from the signals.
 type Suggestion struct {
 	TaskID            string
 	Title             string
 	CurrentPriority   int32
 	SuggestedPriority int32
 	Confidence        float32
-	Reason            string
+	Reasons           []ReasonCode
+	DependentCount    int64
 }
 
 // Evaluate runs the rules over signals and returns one [Suggestion]
@@ -91,7 +108,7 @@ func evaluateOne(s Signals) Suggestion {
 	// Start from a neutral score of 1.5 (~medium low) and nudge from
 	// there. Score is later clamped and rounded into [0, 4].
 	score := float32(1.5)
-	reasons := make([]string, 0, 4)
+	reasons := make([]ReasonCode, 0, 4)
 
 	// Due date urgency: overdue > soon > far > none, counted in calendar
 	// days so a task due today is due soon, not overdue.
@@ -100,23 +117,23 @@ func evaluateOne(s Signals) Suggestion {
 		switch {
 		case daysUntilDue < 0:
 			score += 2.5
-			reasons = append(reasons, "overdue")
+			reasons = append(reasons, ReasonOverdue)
 		case daysUntilDue <= 1:
 			score += 1.8
-			reasons = append(reasons, "due within 48h")
+			reasons = append(reasons, ReasonDueByTomorrow)
 		case daysUntilDue <= 7:
 			score += 0.9
-			reasons = append(reasons, "due this week")
+			reasons = append(reasons, ReasonDueThisWeek)
 		case daysUntilDue <= 14:
 			score += 0.3
-			reasons = append(reasons, "due this fortnight")
+			reasons = append(reasons, ReasonDueThisFortnight)
 		}
 	}
 
 	// State: review is usually blocking a teammate, bump it.
 	if s.State == StateReview {
 		score += 0.4
-		reasons = append(reasons, "in review")
+		reasons = append(reasons, ReasonInReview)
 	}
 	// Waiting means someone else owes us something; slightly lower
 	// urgency on our side.
@@ -125,17 +142,17 @@ func evaluateOne(s Signals) Suggestion {
 	}
 
 	// A task with many dependents on it is a bottleneck.
-	if s.DependencyCount >= 3 {
+	if s.DependentCount >= 3 {
 		score += 0.5
-		reasons = append(reasons, fmt.Sprintf("%d dependencies", s.DependencyCount))
-	} else if s.DependencyCount >= 1 {
+		reasons = append(reasons, ReasonManyDependents)
+	} else if s.DependentCount >= 1 {
 		score += 0.2
 	}
 
 	// Unassigned in-flight work is a process smell: keep it visible.
 	if !s.HasAssignee && s.State != StateWaiting {
 		score += 0.2
-		reasons = append(reasons, "unassigned")
+		reasons = append(reasons, ReasonUnassigned)
 	}
 
 	// Staleness: tasks that have not moved in a long time are usually
@@ -149,18 +166,14 @@ func evaluateOne(s Signals) Suggestion {
 	suggested := clampPriority(int32(round(score)))
 	conf := confidenceFor(s, suggested)
 
-	reason := "steady"
-	if len(reasons) > 0 {
-		reason = joinReasons(reasons)
-	}
-
 	return Suggestion{
 		TaskID:            s.TaskID,
 		Title:             s.Title,
 		CurrentPriority:   s.CurrentPriority,
 		SuggestedPriority: suggested,
 		Confidence:        conf,
-		Reason:            reason,
+		Reasons:           reasons,
+		DependentCount:    s.DependentCount,
 	}
 }
 
@@ -200,12 +213,4 @@ func round(f float32) float32 {
 		return float32(int32(f + 0.5))
 	}
 	return float32(int32(f - 0.5))
-}
-
-func joinReasons(r []string) string {
-	out := r[0]
-	for _, s := range r[1:] {
-		out += ", " + s
-	}
-	return out
 }

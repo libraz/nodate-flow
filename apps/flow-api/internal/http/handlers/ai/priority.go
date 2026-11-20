@@ -28,12 +28,14 @@ type ListPrioritySuggestionsInput struct {
 // TaskPrioritySuggestion is a single (task, suggested priority) pair
 // surfaced to the UI.
 type TaskPrioritySuggestion struct {
-	TaskID            string  `json:"taskId"`
-	Title             string  `json:"title"`
-	CurrentPriority   int32   `json:"currentPriority"`
-	SuggestedPriority int32   `json:"suggestedPriority"`
-	Confidence        float32 `json:"confidence"`
-	Reason            string  `json:"reason"`
+	TaskID            string   `json:"taskId"`
+	Title             string   `json:"title"`
+	CurrentPriority   int32    `json:"currentPriority"`
+	SuggestedPriority int32    `json:"suggestedPriority"`
+	Confidence        float32  `json:"confidence"`
+	Reasons           []string `json:"reasons" enum:"overdue,due_by_tomorrow,due_this_week,due_this_fortnight,in_review,many_dependents,unassigned"`
+	// DependentCount is the number of enabled tasks blocked on this task.
+	DependentCount int64 `json:"dependentCount"`
 }
 
 // ListPrioritySuggestionsOutput wraps the suggestion list. Total is
@@ -95,9 +97,10 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 				// an untyped aggregate whose Go representation is the
 				// driver's choice. A false here suppresses the
 				// deprioritise rule for tasks that do have an owner.
-				HasAssignee: r.AssigneeCount > 0,
-				Now:         now,
-				Zone:        zone,
+				HasAssignee:    r.AssigneeCount > 0,
+				DependentCount: r.DependentCount,
+				Now:            now,
+				Zone:           zone,
 			}
 			if r.UpdatedAt.Valid {
 				sig.UpdatedAt = r.UpdatedAt.Time
@@ -116,13 +119,18 @@ func ListPrioritySuggestions(deps Deps) func(context.Context, *ListPrioritySugge
 		out.Body.Total = len(signals)
 		out.Body.Suggestions = make([]TaskPrioritySuggestion, 0, len(results))
 		for _, s := range results {
+			reasons := make([]string, 0, len(s.Reasons))
+			for _, c := range s.Reasons {
+				reasons = append(reasons, string(c))
+			}
 			out.Body.Suggestions = append(out.Body.Suggestions, TaskPrioritySuggestion{
 				TaskID:            s.TaskID,
 				Title:             s.Title,
 				CurrentPriority:   s.CurrentPriority,
 				SuggestedPriority: s.SuggestedPriority,
 				Confidence:        s.Confidence,
-				Reason:            s.Reason,
+				Reasons:           reasons,
+				DependentCount:    s.DependentCount,
 			})
 		}
 		return out, nil

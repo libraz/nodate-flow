@@ -1,7 +1,7 @@
 package priorityopt
 
 import (
-	"strings"
+	"slices"
 	"testing"
 	"time"
 )
@@ -42,7 +42,7 @@ func TestEvaluate_SkipsUnchanged(t *testing.T) {
 		HasAssignee:     true,
 		Now:             now,
 	}})
-	// No due date, no dependencies, assigned → score ≈ 1.5, round=2,
+	// No due date, no dependents, assigned → score ≈ 1.5, round=2,
 	// delta=0 → filtered out.
 	if len(out) != 0 {
 		t.Fatalf("expected no suggestion for steady task, got %+v", out)
@@ -62,7 +62,7 @@ func TestEvaluate_SortsByPriorityThenConfidence(t *testing.T) {
 			TaskID: "high", State: StateReview, CurrentPriority: 0,
 			HasDueOn: true, DueOn: now.Add(-1 * time.Hour),
 			UpdatedAt: now, HasAssignee: true, Now: now,
-			DependencyCount: 4,
+			DependentCount: 4,
 		},
 	})
 	if len(out) < 2 {
@@ -79,7 +79,7 @@ func TestEvaluate_ClampsToRange(t *testing.T) {
 	out := Evaluate([]Signals{{
 		TaskID: "x", State: StateReview, CurrentPriority: 0,
 		HasDueOn: true, DueOn: now.Add(-100 * time.Hour),
-		DependencyCount: 10, HasAssignee: false, Now: now, UpdatedAt: now,
+		DependentCount: 10, HasAssignee: false, Now: now, UpdatedAt: now,
 	}})
 	if len(out) == 0 {
 		t.Fatal("expected a suggestion")
@@ -112,12 +112,12 @@ func TestEvaluate_DueTodayIsNotOverdue(t *testing.T) {
 	sig.Now = time.Date(2026, 10, 23, 15, 0, 0, 0, time.UTC)
 	sig.UpdatedAt = sig.Now
 	out := Evaluate([]Signals{sig})
-	if len(out) != 1 || strings.Contains(out[0].Reason, "overdue") || !strings.Contains(out[0].Reason, "due within 48h") {
-		t.Fatalf("due today at 15:00Z: got %+v, want due within 48h and not overdue", out)
+	if len(out) != 1 || slices.Contains(out[0].Reasons, ReasonOverdue) || !slices.Contains(out[0].Reasons, ReasonDueByTomorrow) {
+		t.Fatalf("due today at 15:00Z: got %+v, want due_by_tomorrow and not overdue", out)
 	}
 	sig.Now = time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
 	out = Evaluate([]Signals{sig})
-	if len(out) != 1 || !strings.Contains(out[0].Reason, "overdue") {
+	if len(out) != 1 || !slices.Contains(out[0].Reasons, ReasonOverdue) {
 		t.Fatalf("the next day at 00:00Z: got %+v, want overdue", out)
 	}
 }
