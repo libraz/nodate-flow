@@ -204,6 +204,17 @@ describe('new project button', () => {
   });
 });
 
+describe('favorites placement', () => {
+  it('renders the favorites section after the More toggle', async () => {
+    renderSidebar();
+    const toggle = await screen.findByRole('button', { name: 'nav.more' });
+    const favorites = await screen.findByText('favorites.sidebar_title');
+    expect(
+      toggle.compareDocumentPosition(favorites) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
 describe('More disclosure', () => {
   it('starts closed and records the user toggling it', async () => {
     const user = userEvent.setup();

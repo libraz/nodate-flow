@@ -369,9 +369,6 @@ function WorkspaceArea({
       })}
       {railCollapsed ? null : (
         <>
-          <Suspense fallback={null}>
-            <FavoritesSection workspaceId={workspaceId} />
-          </Suspense>
           <button
             type="button"
             className={cx(styles.item, styles.moreToggle, 'nf-focus-ring')}
@@ -397,6 +394,9 @@ function WorkspaceArea({
               ))}
             </div>
           </Collapse>
+          <Suspense fallback={null}>
+            <FavoritesSection workspaceId={workspaceId} />
+          </Suspense>
         </>
       )}
       {canCreateProject ? (

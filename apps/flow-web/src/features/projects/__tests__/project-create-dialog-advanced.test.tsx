@@ -35,7 +35,7 @@ describe('ProjectCreateDialog advanced fields', () => {
       target: { value: '営業 Q4' },
     });
     expect(container.ownerDocument.querySelector('details')?.open).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'projects.form.submit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'projects.form.create' }));
 
     await waitFor(() => {
       expect(h.mutateAsync).toHaveBeenCalled();
@@ -53,7 +53,7 @@ describe('ProjectCreateDialog advanced fields', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /projects\.form\.name/ }), {
       target: { value: '営業' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'projects.form.submit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'projects.form.create' }));
     await waitFor(() => {
       expect(h.mutateAsync).toHaveBeenCalled();
     });
@@ -69,7 +69,7 @@ describe('ProjectCreateDialog advanced fields', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /projects\.form\.name/ }), {
       target: { value: '営業' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'projects.form.submit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'projects.form.create' }));
     await waitFor(() => {
       expect(container.ownerDocument.querySelector('details')?.open).toBe(true);
     });

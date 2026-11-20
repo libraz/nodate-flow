@@ -250,7 +250,7 @@ export default function ProjectCreateDialog({
             disabled={submitting}
             aria-busy={submitting || undefined}
           >
-            {t('projects.form.submit')}
+            {t('projects.form.create')}
           </Button>
         </div>
       </form>
