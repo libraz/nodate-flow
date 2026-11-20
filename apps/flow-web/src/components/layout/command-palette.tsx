@@ -446,7 +446,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       id: `project:${p.id}`,
       label: p.name,
       group: projectGroup,
-      href: `/workspaces/${p.workspaceId}/projects/${p.id}`,
+      href: `/workspaces/${p.workspaceId}/projects/${p.id}/tasks`,
       icon: FolderKanban,
     }));
     return [...actions, ...tasks, ...projects, ...nav, ...ws];

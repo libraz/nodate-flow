@@ -429,6 +429,12 @@
   color: var(--nf-color-accent-fg);
 }
 
+.railMoreList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
 .itemDisabled {
   opacity: 0.5;
   pointer-events: none;

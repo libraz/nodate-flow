@@ -5,6 +5,7 @@ import { cx } from '@nodate-flow/ui/lib/cx';
 import { BrandImage } from '@nodate-flow/ui/primitives';
 import BrandMark from '@nodate-flow/ui/primitives/brand-mark';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
+import Popover from '@nodate-flow/ui/primitives/popover';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
@@ -18,6 +19,7 @@ import {
   Keyboard,
   type LucideIcon,
   Menu,
+  MoreHorizontal,
   Plus,
   X,
 } from 'lucide-react';
@@ -79,6 +81,7 @@ function NavLinkItem({
   exact = false,
   forcedActive,
   sub = false,
+  onClick,
 }: {
   entry: NavEntry;
   workspaceId: string | null;
@@ -86,6 +89,7 @@ function NavLinkItem({
   exact?: boolean;
   forcedActive?: boolean;
   sub?: boolean;
+  onClick?: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
   const label = t(entry.labelKey);
@@ -98,6 +102,7 @@ function NavLinkItem({
       {...(entry.needsWorkspace && workspaceId ? { params: { id: workspaceId } } : {})}
       aria-label={label}
       title={tooltip === null ? label : undefined}
+      {...(onClick ? { onClick } : {})}
       className={cx(baseClass, forcedActive && styles.itemActive, 'nf-focus-ring')}
       activeOptions={{ exact }}
       activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring') }}
@@ -114,6 +119,12 @@ function NavLinkItem({
   );
 }
 
+/** True for the project's own routes and every tab beneath it. */
+function isUnderProject(pathname: string, workspaceId: string, projectId: string): boolean {
+  const base = `/workspaces/${workspaceId}/projects/${projectId}`;
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
 /** Non-workspace-scoped entries are looked up once; the model is static. */
 const PERSONAL_ENTRIES = navEntriesIn('personal');
 const WORKSPACE_ENTRIES = navEntriesIn('workspace');
@@ -127,7 +138,13 @@ const SETTINGS_ENTRY = navEntry('settings');
  * entry. Suspends on first load; the caller wraps it in a null-fallback
  * Suspense so the rest of the nav renders immediately.
  */
-function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): ReactElement | null {
+function WorkspaceProjectsSection({
+  workspaceId,
+  pathname,
+}: {
+  workspaceId: string;
+  pathname: string;
+}): ReactElement | null {
   const { data: projects } = useProjectsQuery(workspaceId);
   const visible = projects.filter((p) => !p.isArchived);
   if (visible.length === 0) return null;
@@ -136,9 +153,14 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
       {visible.map((p) => (
         <Link
           key={p.id}
-          to="/workspaces/$id/projects/$projectId"
+          to="/workspaces/$id/projects/$projectId/tasks"
           params={{ id: workspaceId, projectId: p.id }}
-          className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+          className={cx(
+            styles.item,
+            styles.subItem,
+            isUnderProject(pathname, workspaceId, p.id) && styles.itemActive,
+            'nf-focus-ring',
+          )}
           activeProps={{
             className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
           }}
@@ -179,9 +201,11 @@ function favoriteIconFor(targetType: string): LucideIcon {
 function FavoriteRow({
   favorite,
   workspaceId,
+  pathname,
 }: {
   favorite: Favorite;
   workspaceId: string;
+  pathname: string;
 }): ReactElement | null {
   const { t } = useTranslation('labels');
   const icon = favoriteIconFor(favorite.targetType);
@@ -204,9 +228,11 @@ function FavoriteRow({
   if (favorite.targetType === 'project') {
     return (
       <Link
-        to="/workspaces/$id/projects/$projectId"
+        to="/workspaces/$id/projects/$projectId/tasks"
         params={{ id: workspaceId, projectId: favorite.targetId }}
-        className={className}
+        className={
+          isUnderProject(pathname, workspaceId, favorite.targetId) ? activeClassName : className
+        }
         activeProps={{ className: activeClassName }}
       >
         <Icon icon={icon} decorative />
@@ -224,7 +250,13 @@ function FavoriteRow({
  * fallback so the rest of the nav renders immediately. With no
  * favorites it says where the star is, so the section is discoverable.
  */
-function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement {
+function FavoritesSection({
+  workspaceId,
+  pathname,
+}: {
+  workspaceId: string;
+  pathname: string;
+}): ReactElement {
   const { t } = useTranslation('labels');
   const { data: favorites } = useFavoritesQuery(workspaceId);
   return (
@@ -235,10 +267,19 @@ function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElemen
       {favorites.length === 0 ? (
         <p className={styles.sectionEmpty}>{t('favorites.empty')}</p>
       ) : (
-        favorites.map((f) => <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} />)
+        favorites.map((f) => (
+          <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} pathname={pathname} />
+        ))
       )}
     </div>
   );
+}
+
+function isUnderMore(pathname: string, workspaceId: string | null): boolean {
+  return MORE_ENTRIES.some((e) => {
+    const href = navHref(e, workspaceId);
+    return href !== null && pathname.startsWith(href);
+  });
 }
 
 function readMoreOpen(pathname: string, workspaceId: string | null): boolean {
@@ -247,10 +288,7 @@ function readMoreOpen(pathname: string, workspaceId: string | null): boolean {
   } catch {
     /* ignore */
   }
-  return MORE_ENTRIES.some((e) => {
-    const href = navHref(e, workspaceId);
-    return href !== null && pathname.startsWith(href);
-  });
+  return isUnderMore(pathname, workspaceId);
 }
 
 /**
@@ -271,6 +309,7 @@ function WorkspaceArea({
   const { data: workspaces } = useWorkspacesQuery();
   const role = useCurrentWorkspaceRole();
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [railMoreOpen, setRailMoreOpen] = useState(false);
   // Initial state only: after mount the user alone opens and closes it.
   const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname, workspaceId));
   const headingId = useId();
@@ -382,13 +421,48 @@ function WorkspaceArea({
             </div>
             {railCollapsed ? null : (
               <Suspense fallback={null}>
-                <WorkspaceProjectsSection workspaceId={workspaceId} />
+                <WorkspaceProjectsSection workspaceId={workspaceId} pathname={pathname} />
               </Suspense>
             )}
           </div>
         );
       })}
-      {railCollapsed ? null : (
+      {railCollapsed ? (
+        <Popover
+          open={railMoreOpen}
+          onOpenChange={setRailMoreOpen}
+          placement="right"
+          ariaLabel={t('nav.more')}
+          content={
+            <div className={styles.railMoreList}>
+              {MORE_ENTRIES.map((entry) => (
+                <NavLinkItem
+                  key={entry.key}
+                  entry={entry}
+                  workspaceId={workspaceId}
+                  railCollapsed={false}
+                  sub
+                  onClick={() => {
+                    setRailMoreOpen(false);
+                  }}
+                />
+              ))}
+            </div>
+          }
+        >
+          <button
+            type="button"
+            className={cx(
+              styles.item,
+              isUnderMore(pathname, workspaceId) && styles.itemActive,
+              'nf-focus-ring',
+            )}
+            aria-label={t('nav.more')}
+          >
+            <Icon icon={MoreHorizontal} decorative />
+          </button>
+        </Popover>
+      ) : (
         <>
           <button
             ref={moreToggleRef}
@@ -417,7 +491,7 @@ function WorkspaceArea({
             </div>
           </Collapse>
           <Suspense fallback={null}>
-            <FavoritesSection workspaceId={workspaceId} />
+            <FavoritesSection workspaceId={workspaceId} pathname={pathname} />
           </Suspense>
         </>
       )}

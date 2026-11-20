@@ -16,6 +16,13 @@ const mocks = vi.hoisted(() => ({
   pathname: '/today',
   workspaces: [] as Array<{ id: string; name: string }>,
   role: null as string | null,
+  projects: [] as Array<{ id: string; name: string; isArchived: boolean }>,
+  favorites: [] as Array<{
+    id: string;
+    targetType: string;
+    targetId: string;
+    title: string | null;
+  }>,
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -70,11 +77,14 @@ vi.mock('../../../lib/api', async (importOriginal) => ({
 
 vi.mock('../../../features/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../features/projects/api')>()),
-  useProjectsQuery: () => ({ data: [], response: new Response(null, { status: 200 }) }),
+  useProjectsQuery: () => ({ data: mocks.projects, response: new Response(null, { status: 200 }) }),
 }));
 
 vi.mock('../../../features/favorites/api', () => ({
-  useFavoritesQuery: () => ({ data: [], response: new Response(null, { status: 200 }) }),
+  useFavoritesQuery: () => ({
+    data: mocks.favorites,
+    response: new Response(null, { status: 200 }),
+  }),
 }));
 
 vi.mock('../../../lib/use-current-workspace-role', () => ({
@@ -106,6 +116,8 @@ beforeEach(() => {
   mocks.pathname = '/today';
   mocks.workspaces = ACME;
   mocks.role = null;
+  mocks.projects = [];
+  mocks.favorites = [];
   window.localStorage.clear();
   clearActiveWorkspaceId();
   setActiveWorkspaceId('ws-1');
@@ -298,5 +310,36 @@ describe('More disclosure', () => {
 
       expect(scrollIntoView).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('project entries', () => {
+  beforeEach(() => {
+    mocks.projects = [{ id: 'p1', name: 'Platform', isArchived: false }];
+    mocks.favorites = [{ id: 'f1', targetType: 'project', targetId: 'p2', title: 'Roadmap' }];
+  });
+
+  it('links the project row and the favorite to the task list', async () => {
+    renderSidebar();
+    const row = await screen.findByRole('link', { name: 'Platform' });
+    const favorite = await screen.findByRole('link', { name: 'Roadmap' });
+
+    expect(row.getAttribute('href')).toBe('/workspaces/ws-1/projects/p1/tasks');
+    expect(favorite.getAttribute('href')).toBe('/workspaces/ws-1/projects/p2/tasks');
+  });
+
+  it('keeps the project row active on the other project tabs', async () => {
+    mocks.pathname = '/workspaces/ws-1/projects/p1/gantt';
+    renderSidebar();
+    const row = await screen.findByRole('link', { name: 'Platform' });
+
+    expect(row.className).toContain('itemActive');
+  });
+
+  it('leaves the project row inactive elsewhere', async () => {
+    renderSidebar();
+    const row = await screen.findByRole('link', { name: 'Platform' });
+
+    expect(row.className).not.toContain('itemActive');
   });
 });

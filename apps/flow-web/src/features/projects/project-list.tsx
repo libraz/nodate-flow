@@ -42,7 +42,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
       header: () => t('projects.columns.name'),
       cell: ({ row }) => (
         <Link
-          to="/workspaces/$id/projects/$projectId"
+          to="/workspaces/$id/projects/$projectId/tasks"
           params={{ id: workspaceId, projectId: row.original.id }}
           className={styles.nameLink}
           title={row.original.name}

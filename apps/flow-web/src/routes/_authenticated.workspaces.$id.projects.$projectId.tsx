@@ -49,10 +49,10 @@ interface ProjectSubNavItem {
 }
 
 const PROJECT_SUB_NAV: readonly ProjectSubNavItem[] = [
-  { key: 'overview', to: '/workspaces/$id/projects/$projectId' },
   { key: 'tasks', to: '/workspaces/$id/projects/$projectId/tasks' },
   { key: 'gantt', to: '/workspaces/$id/projects/$projectId/gantt' },
   { key: 'timeline', to: '/workspaces/$id/projects/$projectId/timeline' },
+  { key: 'overview', to: '/workspaces/$id/projects/$projectId' },
 ];
 
 function labelKeyFor(
