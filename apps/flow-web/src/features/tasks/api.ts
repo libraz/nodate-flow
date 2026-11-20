@@ -57,6 +57,7 @@ import {
 } from '@tanstack/react-query';
 
 import { apiRequest } from '../../lib/api';
+import { calendarEventKeys } from '../events/api';
 import { timelineKeys } from '../timeline/api';
 import { replayKeys } from '../timeline/replay-api';
 
@@ -463,6 +464,43 @@ export function useMyTasksInfiniteQuery(): UseSuspenseInfiniteQueryResult<
   });
 }
 
+/**
+ * `GET /me/tasks` returns one row per role, so a task the caller both
+ * assigns and reviews arrives twice. Keep one row per id, preferring the
+ * assignee row because that is the role the row's actions depend on.
+ */
+function dedupeMyTasks(rows: MyTaskListItem[]): MyTaskListItem[] {
+  const byId = new Map<string, MyTaskListItem>();
+  for (const row of rows) {
+    const seen = byId.get(row.id);
+    if (!seen || (seen.actorRole !== 'assignee' && row.actorRole === 'assignee')) {
+      byId.set(row.id, row);
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * GET /me/tasks as one deduplicated flat list (Today, home summary).
+ *
+ * Shares `calendarEventKeys.myTasks` with the calendar aggregates, so the
+ * cache holds the raw rows and `select` collapses them on read.
+ */
+export function useMyTasksQuery(): UseSuspenseQueryResult<MyTaskListItem[]> {
+  return useSuspenseQuery({
+    queryKey: calendarEventKeys.myTasks,
+    staleTime: 30_000,
+    queryFn: async (): Promise<MyTaskListItem[]> => {
+      const data = await apiRequest(
+        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
+        'Failed to load assigned tasks',
+      );
+      return data.tasks ?? [];
+    },
+    select: dedupeMyTasks,
+  });
+}
+
 export function useTaskQuery(taskId: string): UseSuspenseQueryResult<Task> {
   return useSuspenseQuery({
     queryKey: tasksKeys.detail(taskId),
@@ -695,6 +733,8 @@ export function useCreateTask(): UseMutationResult<Task, ApiError, CreateTaskInp
       // cross-workspace "my tasks" lists. Broadcast the shared list prefix so
       // all task-list surfaces refresh together.
       void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.myTasks });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.meTasks });
     },
   });
 }
@@ -845,6 +885,8 @@ export interface TransitionTaskArgs {
   optimisticState?: TaskDerivedState;
 }
 
+const TRANSITION_MUTATION_KEY = ['tasks', 'transition'] as const;
+
 /**
  * useTransitionTask — POST /tasks/{id}/transitions.
  *
@@ -855,6 +897,7 @@ export interface TransitionTaskArgs {
 export function useTransitionTask(): UseMutationResult<Task, ApiError, TransitionTaskArgs> {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: TRANSITION_MUTATION_KEY,
     mutationFn: async ({ id, transition }: TransitionTaskArgs): Promise<Task> => {
       const data = await apiRequest(
         (client) =>
@@ -878,6 +921,17 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
         await qc.cancelQueries({ queryKey: [...tasksKeys.all, 'list'] });
       }
       await qc.cancelQueries({ queryKey: tasksKeys.detail(vars.id) });
+      await qc.cancelQueries({ queryKey: calendarEventKeys.myTasks });
+      const myTasksSnapshot = qc.getQueryData<MyTaskListItem[]>(calendarEventKeys.myTasks);
+      if (vars.optimisticState && myTasksSnapshot) {
+        const nextState = vars.optimisticState;
+        qc.setQueryData<MyTaskListItem[]>(
+          calendarEventKeys.myTasks,
+          myTasksSnapshot.map((row) =>
+            row.id === vars.id ? { ...row, derivedState: nextState } : row,
+          ),
+        );
+      }
       // The list prefix mixes two cache shapes: the flat `TaskListItem[]`
       // produced by `useTasksQuery` and the `InfiniteData<TasksPage>`
       // produced by `useTasksInfiniteQuery` / `useMyTasksInfiniteQuery`.
@@ -916,7 +970,7 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
           });
         }
       }
-      return { listSnapshots, detailSnapshot };
+      return { listSnapshots, detailSnapshot, myTasksSnapshot };
     },
     onError: (_err, vars, ctx) => {
       // `listSnapshots` holds either flat `TaskListItem[]` or
@@ -927,9 +981,13 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
         | {
             listSnapshots: [readonly unknown[], unknown][];
             detailSnapshot: Task | undefined;
+            myTasksSnapshot: MyTaskListItem[] | undefined;
           }
         | undefined;
       if (!snap) return;
+      if (snap.myTasksSnapshot) {
+        qc.setQueryData(calendarEventKeys.myTasks, snap.myTasksSnapshot);
+      }
       for (const [key, value] of snap.listSnapshots) {
         qc.setQueryData(key, value);
       }
@@ -953,6 +1011,13 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
         });
       } else {
         void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      }
+      // A burst of completions refetches once, after the last one settles,
+      // so an early response cannot flash a row back that a later click
+      // already removed. This mutation still counts itself here.
+      if (qc.isMutating({ mutationKey: TRANSITION_MUTATION_KEY }) === 1) {
+        void qc.invalidateQueries({ queryKey: calendarEventKeys.myTasks });
+        void qc.invalidateQueries({ queryKey: calendarEventKeys.meTasks });
       }
     },
   });

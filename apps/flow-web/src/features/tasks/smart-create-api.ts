@@ -6,6 +6,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
+import { calendarEventKeys } from '../events/api';
 import { tasksKeys } from './api';
 
 export { ApiError as TaskApiError };
@@ -119,6 +120,8 @@ export function useApplySmartTask() {
       // and cross-workspace "my tasks" lists, depending on assignees and
       // current filters. Refresh the shared task-list prefix.
       void qc.invalidateQueries({ queryKey: [...tasksKeys.all, 'list'] });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.myTasks });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.meTasks });
     },
   });
 }
