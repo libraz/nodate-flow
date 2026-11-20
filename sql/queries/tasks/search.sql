@@ -1,4 +1,4 @@
 -- Task full-text search is implemented in the MCP tool layer
--- (apps/flow-api/internal/mcp/tools.go, searchMCPTasks) where the
+-- (apps/flow-api/internal/mcp/tools_tasks.go, searchMCPTasks) where the
 -- workspace scope and task-visibility filter are applied dynamically.
 -- No sqlc-generated search query is defined here.

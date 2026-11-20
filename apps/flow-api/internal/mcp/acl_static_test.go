@@ -26,7 +26,7 @@ func TestMCPResolveTaskUsesSharedVisibilityACL(t *testing.T) {
 func TestMCPListTasksUsesVisibilityFilter(t *testing.T) {
 	t.Parallel()
 
-	src := readMCPSource(t, "tools.go")
+	src := readMCPSource(t, "tools_tasks.go")
 	for _, want := range []string{
 		"listMCPTasks",
 		"acl.TaskVisibilityFilter",
@@ -438,4 +438,19 @@ func readMCPSource(t *testing.T, name string) string {
 		t.Fatalf("read %s: %v", name, err)
 	}
 	return string(b)
+}
+
+func readMCPToolSources(t *testing.T) string {
+	t.Helper()
+
+	var source strings.Builder
+	for _, name := range mcpPackageSourceFiles(t) {
+		if strings.HasPrefix(name, "tools") {
+			source.WriteString(readMCPSource(t, name))
+		}
+	}
+	if source.Len() == 0 {
+		t.Fatal("no MCP tool source files found")
+	}
+	return source.String()
 }

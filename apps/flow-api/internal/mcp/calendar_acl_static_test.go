@@ -130,7 +130,7 @@ func TestMCPCalendarOwnerRuleIsShared(t *testing.T) {
 		t.Error("create_calendar_event must reach canSetCalendarEventOwner; deciding delegation in the tool body is how the two transports drifted apart")
 	}
 
-	if strings.Contains(readMCPSource(t, "tools.go"), "owner_user_id FROM calendars") {
+	if strings.Contains(readMCPToolSources(t), "owner_user_id FROM calendars") {
 		t.Error("the calendar-owner lookup is back in the delegation decision; it is NULL on every calendar a group shares")
 	}
 }
@@ -152,7 +152,7 @@ func TestMCPFreeSlotsResolvesTimezone(t *testing.T) {
 		t.Error("list_free_slots must reach resolveUserTimezone; a working day built in UTC is a working day only at offset zero")
 	}
 
-	src := readMCPSource(t, "tools.go")
+	src := readMCPToolSources(t)
 	if strings.Contains(src, "9, 0, 0, 0, time.UTC)") {
 		t.Error("the working-day window is being constructed in UTC again")
 	}

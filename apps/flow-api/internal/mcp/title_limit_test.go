@@ -13,9 +13,9 @@ import (
 func TestTitleLimitsComeFromOneDeclaration(t *testing.T) {
 	t.Parallel()
 
-	src := readMCPSource(t, "tools.go")
+	src := readMCPToolSources(t)
 	if m := regexp.MustCompile(`(?m)^\s*\w*TitleMaxLen\s*=`).FindString(src); m != "" {
-		t.Errorf("a local title width is back in tools.go (%q); use the shared title limit constants", strings.TrimSpace(m))
+		t.Errorf("a local title width is back in the MCP tool sources (%q); use the shared title limit constants", strings.TrimSpace(m))
 	}
 	if !strings.Contains(src, "stringutil.TruncateRunes(proposal.Subtasks[i].Title, taskTitleLimit)") {
 		t.Error("model-produced subtask titles must be cut by character at taskTitleLimit, so a title the schema accepts is never shortened")

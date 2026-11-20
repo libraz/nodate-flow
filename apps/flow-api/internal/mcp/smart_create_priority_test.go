@@ -65,16 +65,21 @@ func TestSmartCreatePriorityMappingIsTheSharedOne(t *testing.T) {
 func TestSmartCreateKeepsNoPriorityMappingOfItsOwn(t *testing.T) {
 	t.Parallel()
 
-	src := readMCPSource(t, "tools.go")
-	if !strings.Contains(src, "handlerutil.PriorityFromLabel") {
+	proposalSource := readMCPSource(t, "tools_task_proposals.go")
+	if !strings.Contains(proposalSource, "handlerutil.PriorityFromLabel") {
 		t.Error("the smart-create path has to resolve a proposed priority through handlerutil.PriorityFromLabel, so a model's word means the same number on both transports")
 	}
-	if !strings.Contains(src, "priority outside the vocabulary") {
+	if !strings.Contains(proposalSource, "priority outside the vocabulary") {
 		t.Error("a model answering outside the vocabulary it was handed has to be reported; absorbing it makes a malformed answer indistinguishable from a deliberate one")
 	}
+	toolSources := readMCPToolSources(t)
 	for _, gone := range []string{`case "low":`, `case "medium":`, `case "high":`} {
-		if strings.Contains(src, gone) {
-			t.Errorf("a priority mapping local to this package is back in tools.go (%s); one copy per transport is how the two came to disagree", gone)
+		if strings.Contains(toolSources, gone) {
+			t.Errorf("a priority mapping local to this package is back in the MCP tool sources (%s); one copy per transport is how the two came to disagree", gone)
 		}
+	}
+	entry := mcpRunFuncName(t, mcpRegisteredTools(t), "smart_create_task")
+	if !reachesAny(mcpPackageCallGraph(t), entry, map[string]bool{"proposedPriority": true}) {
+		t.Error("smart_create_task must resolve proposed priorities through proposedPriority")
 	}
 }
