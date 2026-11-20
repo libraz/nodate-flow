@@ -73,8 +73,8 @@ type EmissionSurface struct {
 
 // emissionSurfaces are the files that name kinds without appending them.
 //
-// Every one of them names kinds in bulk — that is what they are for — so
-// a rule that counted them would report nothing whatever the tree did.
+// The declaration and policy tables name kinds in bulk, so counting
+// them would hide missing producers.
 // The list is closed and each entry is checked to still exist, because a
 // surface that quietly stops being excluded is the failure mode that has
 // no symptom: it turns the rule green on every kind at once.
@@ -92,8 +92,12 @@ var emissionSurfaces = []EmissionSurface{
 		Reason: "re-exports every shared constant under the flow-api package name",
 	},
 	{
-		Path:   "apps/flow-api/internal/notification/fanout.go",
+		Path:   "apps/flow-api/internal/notification/classification.go",
 		Reason: "gives every kind a delivery policy: a notification title and severity, or silence",
+	},
+	{
+		Path:   "apps/flow-api/internal/notification/fanout.go",
+		Reason: "uses the kind of an existing calendar reminder when writing delivery rows",
 	},
 }
 

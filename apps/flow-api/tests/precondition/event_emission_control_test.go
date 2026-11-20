@@ -30,8 +30,8 @@ import (
 //   - a kind built by the declaring package's run-time minter is
 //     appended, for every kind under the prefix the minter builds;
 //   - a kind named only by the declaration, the family table, the
-//     re-export or the delivery-policy table is not appended, however
-//     many of the four name it;
+//     re-export, delivery-policy table or delivery writer is not appended,
+//     however many of those surfaces name it;
 //   - a kind named only by a test is not, because a fixture is not a
 //     feature;
 //   - a kind named only by the web app is not, because the API owns the
@@ -68,17 +68,15 @@ func TestEmissionRuleCountsAnAppendAndNothingElse(t *testing.T) {
 			"  Emitted in the fixture: a constant named by a handler, a wire string written as a Go literal, "+
 			"a wire string in an INSERT, and two kinds built by the run-time minter.\n"+
 			"  Not emitted: one named only in a WHERE clause, one only by a test, two only by the web app, "+
-			"one only in Go and SQL comments, and one named by all four declaration surfaces at once.",
+			"one only in Go and SQL comments, and one named by all declaration and consumption surfaces at once.",
 			got, want)
 	}
 
 	// The kind every surface names is the one that says the exclusions
-	// hold. Without them it would be emitted four times over, and so would
-	// every other kind in the tree.
+	// hold. Counting any of those references would give it a producer.
 	if sites := scope.Emitters("FixtureDeclaredOnly"); len(sites) > 0 {
 		t.Errorf("FixtureDeclaredOnly is counted as appended at %s, but it is named only by the declaration, "+
-			"the family table, the re-export and the delivery-policy table; counting any of those makes the "+
-			"rule pass on every kind",
+			"the family table, the re-export, the delivery-policy table and the delivery writer",
 			describeSites(sites))
 	}
 	for _, surface := range emissionSurfaces {
@@ -204,7 +202,7 @@ const (
 )
 `)
 
-	write("apps/flow-api/internal/notification/fanout.go", `package notification
+	write("apps/flow-api/internal/notification/classification.go", `package notification
 
 import "`+sharedEventbusPath+`"
 
@@ -224,6 +222,14 @@ func categoryFor(eventType string) string {
 		return "other"
 	}
 }
+`)
+
+	write("apps/flow-api/internal/notification/fanout.go", `package notification
+
+import "`+sharedEventbusPath+`"
+
+// deliveryKind labels a delivery row for an existing event.
+func deliveryKind() string { return string(eventbus.FixtureDeclaredOnly) }
 `)
 
 	write("apps/flow-api/internal/http/handlers/thing/handlers.go", `package thing
