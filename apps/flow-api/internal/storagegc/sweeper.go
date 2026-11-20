@@ -383,8 +383,8 @@ func (s *Sweeper) sweep(ctx context.Context, kind reclaimKind, reason string, li
 // drainQueuedRemovals removes one batch of blobs a teardown queued in
 // storage_blob_removals. Each record is dropped only after its blob is
 // gone, so a failed removal is retried on the next pass; removing a key
-// that is already absent is not an error. A key some storage_objects
-// row still holds, confirmed or reserved, is not removed: its record is
+// that is already absent is not an error. A key a confirmed or
+// still-referenced storage object holds is not removed: its record is
 // dropped and the blob stays with that row's lifecycle. Without an object
 // store nothing can be removed, so the records stay.
 func (s *Sweeper) drainQueuedRemovals(ctx context.Context) (int, error) {
@@ -402,7 +402,7 @@ func (s *Sweeper) drainQueuedRemovals(ctx context.Context) (int, error) {
 		}
 		// Cancellation stops between records; the one in hand is finished.
 		unit := context.WithoutCancel(ctx)
-		held, err := s.Queries.CountStorageObjectsByKey(unit, row.StorageKey)
+		held, err := s.Queries.CountStorageObjectsHoldingKey(unit, row.StorageKey)
 		if err != nil {
 			s.Logger.Error("storage sweeper: check queued key", slog.String("err", err.Error()))
 			continue

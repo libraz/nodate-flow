@@ -386,10 +386,10 @@ func queuedRemovalCount(t *testing.T, db *sql.DB, key string) int {
 	return n
 }
 
-// TestSweeperQueuedRemovalSkipsHeldKeys: a queued key that a
-// storage_objects row still holds, confirmed or reserved, is a live claim.
-// The drainer drops the queue record and leaves the blob to that row; a
-// key nothing holds is removed as before.
+// TestSweeperQueuedRemovalSkipsHeldKeys: a queued key that a confirmed or
+// still-referenced storage_objects row holds is a live claim. The drainer
+// drops the queue record and leaves the blob to that row; a key nothing
+// holds, or only an unreferenced reservation, is removed.
 func TestSweeperQueuedRemovalSkipsHeldKeys(t *testing.T) {
 	testhelpers.SkipUnlessIntegration(t)
 	db := helpers.StartShared(t).DB
@@ -399,8 +399,9 @@ func TestSweeperQueuedRemovalSkipsHeldKeys(t *testing.T) {
 	// Fresh and referenced, so the object sweeps leave both rows alone.
 	_, confirmedKey := plantObject(t, db, wsID, object{confirmed: true, refCount: 1})
 	_, reservedKey := plantObject(t, db, wsID, object{refCount: 1})
+	_, discardedKey := plantObject(t, db, wsID, object{})
 	freeKey := "sweep-test/" + uuid.NewString()
-	for _, key := range []string{confirmedKey, reservedKey, freeKey} {
+	for _, key := range []string{confirmedKey, reservedKey, discardedKey, freeKey} {
 		plantQueuedRemoval(t, db, key)
 	}
 
@@ -414,6 +415,8 @@ func TestSweeperQueuedRemovalSkipsHeldKeys(t *testing.T) {
 	require.Zero(t, queuedRemovalCount(t, db, confirmedKey), "the queue record of a held key is dropped")
 	require.Zero(t, queuedRemovalCount(t, db, reservedKey), "the queue record of a held key is dropped")
 
+	require.True(t, store.removed(discardedKey), "an unreferenced reservation holds nothing")
+	require.Zero(t, queuedRemovalCount(t, db, discardedKey))
 	require.True(t, store.removed(freeKey), "an unheld key is removed")
 	require.Zero(t, queuedRemovalCount(t, db, freeKey))
 }

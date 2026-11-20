@@ -27,10 +27,12 @@ WHERE id = ?;
 DELETE FROM storage_blob_removals
 WHERE storage_key IN (sqlc.slice('storage_keys'));
 
--- name: CountStorageObjectsByKey :one
--- How many storage_objects rows hold a key, confirmed or reserved. A
--- reservation is a live claim on the key, so a drainer that finds any row
--- leaves the blob to that row's lifecycle.
+-- name: CountStorageObjectsHoldingKey :one
+-- How many storage_objects rows hold a key: confirmed ones vouch for the
+-- bytes there, and a referenced reservation is an upload in flight. A
+-- reservation nothing references -- one whose bytes failed their digest --
+-- holds nothing. A drainer that finds a holder leaves the blob to it.
 SELECT COUNT(*) AS held
 FROM storage_objects
-WHERE storage_key = ?;
+WHERE storage_key = ?
+  AND (uploaded_at IS NOT NULL OR ref_count > 0);

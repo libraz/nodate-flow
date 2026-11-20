@@ -399,10 +399,11 @@ type Querier interface {
 	// Count of the actor's cross-workspace inbox, the total ListInboxForUser
 	// pages through.
 	CountInboxForUser(ctx context.Context, userID uint32) (int64, error)
-	// How many storage_objects rows hold a key, confirmed or reserved. A
-	// reservation is a live claim on the key, so a drainer that finds any row
-	// leaves the blob to that row's lifecycle.
-	CountStorageObjectsByKey(ctx context.Context, storageKey string) (int64, error)
+	// How many storage_objects rows hold a key: confirmed ones vouch for the
+	// bytes there, and a referenced reservation is an upload in flight. A
+	// reservation nothing references -- one whose bytes failed their digest --
+	// holds nothing. A drainer that finds a holder leaves the blob to it.
+	CountStorageObjectsHoldingKey(ctx context.Context, storageKey string) (int64, error)
 	// Row count behind ListTasksForProject. Filters must stay identical to
 	// that query's WHERE clause or the pager reports a total the list can
 	// never reach -- including the Layer-4 visibility predicate, whose

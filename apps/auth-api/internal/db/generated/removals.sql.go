@@ -10,17 +10,19 @@ import (
 	"strings"
 )
 
-const countStorageObjectsByKey = `-- name: CountStorageObjectsByKey :one
+const countStorageObjectsHoldingKey = `-- name: CountStorageObjectsHoldingKey :one
 SELECT COUNT(*) AS held
 FROM storage_objects
 WHERE storage_key = ?
+  AND (uploaded_at IS NOT NULL OR ref_count > 0)
 `
 
-// How many storage_objects rows hold a key, confirmed or reserved. A
-// reservation is a live claim on the key, so a drainer that finds any row
-// leaves the blob to that row's lifecycle.
-func (q *Queries) CountStorageObjectsByKey(ctx context.Context, storageKey string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countStorageObjectsByKey, storageKey)
+// How many storage_objects rows hold a key: confirmed ones vouch for the
+// bytes there, and a referenced reservation is an upload in flight. A
+// reservation nothing references -- one whose bytes failed their digest --
+// holds nothing. A drainer that finds a holder leaves the blob to it.
+func (q *Queries) CountStorageObjectsHoldingKey(ctx context.Context, storageKey string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countStorageObjectsHoldingKey, storageKey)
 	var held int64
 	err := row.Scan(&held)
 	return held, err
