@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -89,11 +88,6 @@ func recordWorkflowEvent(
 			CallSite:     callSite,
 		},
 	)
-}
-
-func refreshTaskConstraints(ctx context.Context, q *generated.Queries, workspaceID, taskID uint32) error {
-	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: workspaceID, Queries: q}}
-	return eng.EvaluateTaskAndDependents(ctx, taskID)
 }
 
 func isElevatedWorkspaceRole(role middleware.WorkspaceRole) bool {

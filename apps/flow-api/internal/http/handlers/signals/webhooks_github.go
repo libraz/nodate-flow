@@ -1,49 +1,18 @@
 package signals
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	gh "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/github"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
-
-// taskMarker is the inline body marker convention that lets a GitHub
-// PR / issue body announce which task it relates to. Example:
-//
-//	tnk:01931c2c-7e3a-7c66-9b85-3a0c9b3a8eaa
-const taskMarker = "tnk:"
-
-// extractTaskMarker scans body for the first occurrence of "tnk:<uuid>"
-// and returns the parsed UUID if found. It deliberately avoids regular
-// expressions; the marker is fixed-shape (4 chars + 36 chars).
-func extractTaskMarker(body []byte) (string, bool) {
-	s := string(body)
-	idx := strings.Index(s, taskMarker)
-	if idx < 0 {
-		return "", false
-	}
-	rest := s[idx+len(taskMarker):]
-	if len(rest) < 36 {
-		return "", false
-	}
-	candidate := rest[:36]
-	if _, err := types.Parse(candidate); err != nil {
-		return "", false
-	}
-	return candidate, true
-}
 
 // HandleGithubWebhook is a chi-level handler for POST /webhooks/github.
 // It verifies the X-Hub-Signature-256 header, routes the delivery to the
@@ -104,24 +73,6 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			return
 		}
 
-		// Best-effort task linkage from a body marker. The lookup is
-		// scoped to wsID — the workspace the repository is mapped to —
-		// so a `tnk:<uuid>` written into an issue body can only ever
-		// name a task in that repository's own workspace. A marker
-		// pointing at another tenant's task simply does not resolve and
-		// the signal stays workspace-scoped.
-		var taskFK sql.NullInt32
-		var taskInternal int64
-		var taskLinked bool
-		if marker, ok := extractTaskMarker(body); ok {
-			id, found, terr := resolveTaskInWorkspace(ctx, deps.DB, wsID, marker)
-			if terr == nil && found {
-				taskFK = sql.NullInt32{Int32: int32(id), Valid: true} //#nosec G115 -- task_id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				taskInternal = id
-				taskLinked = true
-			}
-		}
-
 		// Validate body is JSON; otherwise store as opaque object so the
 		// signals row stays well-formed.
 		payload := body
@@ -129,100 +80,38 @@ func HandleGithubWebhook(deps Deps) http.HandlerFunc {
 			payload = json.RawMessage(`{}`)
 		}
 
-		pub := types.New()
-		now := time.Now().UTC()
-		// X-GitHub-Delivery is the delivery's own id and is repeated
-		// verbatim on every redelivery of it, which is what the
-		// (workspace_id, source, external_id) dedupe key needs.
-		ext := dedupeKey(r.Header.Get("X-GitHub-Delivery"))
-		// GitHub webhook kinds (issue / pull_request / commit events) are
-		// NOT yet members of the signal_kinds/*.yaml registry, so the
-		// registry lookup misses and resolveSubjectType falls back to
-		// SignalsSubjectTypeWorkspace. The task linkage (extracted from the
-		// `tnk:<uuid>` body marker) is recorded on the legacy `task_id`
-		// column; subject_type is upgraded to `task` so the new addressing
-		// shape stays consistent with the legacy fast path.
-		//
-		// TODO(signal_kinds): promote `github.issue.*`, `github.pr.*`, and
-		// `github.commit.*` to signal_kinds/github.yaml once the judge
-		// prompt schema needs them. Until then leaving the
-		// kind values as the free-form strings NormalizeEventKind produces
-		// keeps the wire shape stable.
+		// GitHub kinds are not in the signal_kinds registry yet, so the
+		// subject falls back to the workspace unless a body marker binds a task.
 		subjectType := resolveSubjectType(event, "")
-		if taskLinked {
-			subjectType = generated.SignalsSubjectTypeTask
-		}
-		subjectID := subjectIDFor(subjectType, taskInternal)
-		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
-			PublicID:    pub,
+		params := generated.InsertSignalParams{
 			WorkspaceID: wsID,
-			TaskID:      taskFK,
 			Source:      generated.SignalsSourceGithub,
 			Kind:        event,
-			ExternalID:  ext,
+			// X-GitHub-Delivery repeats verbatim on every redelivery.
+			ExternalID:  dedupeKey(r.Header.Get("X-GitHub-Delivery")),
 			PayloadJson: payload,
-			ReceivedAt:  now,
+			ReceivedAt:  time.Now().UTC(),
 			SubjectType: subjectType,
-			SubjectID:   subjectID,
-		})
-		if err != nil {
-			writeError(w, apierrors.InternalUnexpected)
-			return
+			SubjectID:   subjectIDFor(subjectType, 0),
 		}
-		// A redelivery of the same X-GitHub-Delivery collides on the
-		// dedupe key and writes nothing, so it must not mint a public id,
-		// append a second signal.attached event, or re-wake the judge for
-		// a signal the first delivery already filed.
-		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceGithub, ext, signalInternalID, "signals.HandleGithubWebhook") {
-			return
-		}
-
-		// A delivery from outside still changes the workspace, so it is
-		// recorded in both logs like any other ingestion. There is no
-		// authenticated user behind it: Actor.UserID zero is what says so,
-		// and both rows carry no actor rather than a fabricated one.
-		//
-		// Unconditional for the same reason as the manual path —
-		// signal.attached names the ingestion, not the task link — with
-		// task_id set only when the body marker resolved to a task in this
-		// workspace.
-		var taskPtr *int64
-		if taskLinked {
-			taskPtr = &taskInternal
-		}
-		deps.Mutations.Record(ctx, mutationlog.Actor{WorkspaceID: wsID}, mutationlog.Mutation{
-			EventType:    eventbus.SignalAttached,
-			AuditAction:  "signal.create",
-			ResourceType: "signal",
-			ResourceID:   pub.String(),
-			TaskID:       taskPtr,
-			Payload: map[string]any{
-				"signalId": pub.String(),
-				"source":   "github",
-				"kind":     event,
-			},
+		bindTaskMarker(ctx, deps, wsID, body, &params)
+		res, ispec := ingestSignal(ctx, deps, ingestInput{
+			Params:   params,
+			Actor:    mutationlog.Actor{WorkspaceID: wsID},
 			CallSite: "signals.HandleGithubWebhook",
 		})
-		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
-
-		// Best-effort signal_judge dispatch. The
-		// enqueuer logs and swallows errors so a flaky agent_runs
-		// insert cannot fail the webhook ACK; webhook redelivery
-		// retries the whole pipeline including the enqueue.
-		if deps.JudgeEnqueuer != nil {
-			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(event)); jerr != nil {
-				slog.WarnContext(ctx, "signaljudge enqueue failed",
-					slog.Any("err", jerr),
-					slog.String("handler", "signals.HandleGithubWebhook"),
-					slog.String("signal_public_id", pub.String()),
-					slog.String("kind", event),
-				)
-			}
+		if ispec != nil {
+			writeError(w, ispec)
+			return
+		}
+		if res.Duplicate {
+			writeIngestDuplicate(w, res)
+			return
 		}
 
 		writeJSON(w, http.StatusAccepted, map[string]any{
-			"id":     pub.String(),
-			"linked": taskLinked,
+			"id":     res.PublicID.String(),
+			"linked": params.TaskID.Valid,
 		})
 	}
 }

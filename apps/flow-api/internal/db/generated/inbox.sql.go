@@ -123,6 +123,31 @@ func (q *Queries) GetInboxSignalForIntake(ctx context.Context, arg GetInboxSigna
 	return i, err
 }
 
+const getSignalTaskForArchive = `-- name: GetSignalTaskForArchive :one
+SELECT t.id
+FROM signals s
+INNER JOIN tasks t
+  ON t.workspace_id = s.workspace_id
+ AND t.id = COALESCE(s.task_id, IF(s.subject_type = 'task', s.subject_id, NULL))
+WHERE s.workspace_id = ?
+  AND s.public_id = ?
+`
+
+type GetSignalTaskForArchiveParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Internal id of the task a signal is attached to, through task_id or a
+// task subject. subject_id counts only when it joins a task in the same
+// workspace. ErrNoRows means the signal is not attached to a task.
+func (q *Queries) GetSignalTaskForArchive(ctx context.Context, arg GetSignalTaskForArchiveParams) (uint32, error) {
+	row := q.db.QueryRowContext(ctx, getSignalTaskForArchive, arg.WorkspaceID, arg.PublicID)
+	var id uint32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const linkInboxSignalToTask = `-- name: LinkInboxSignalToTask :execrows
 UPDATE signals
 SET task_id = ?

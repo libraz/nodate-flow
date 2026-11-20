@@ -59,7 +59,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -216,15 +215,6 @@ func (m *SQLTaskMutator) CompleteTask(ctx context.Context, workspaceID uint32, t
 			)
 		}
 		return fmt.Errorf("signaljudge: complete task: %w", txErr)
-	}
-	// The task's own constraints and its dependents' dependency.* facts
-	// read the state just committed.
-	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: workspaceID, Queries: generated.New(m.DB)}}
-	if err := eng.EvaluateTaskAndDependents(ctx, uint32(taskInternalID)); err != nil { //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32
-		m.logger().WarnContext(ctx, "signaljudge: CompleteTask constraint re-evaluation failed",
-			slog.Any("err", err),
-			slog.Int64("task_internal", taskInternalID),
-		)
 	}
 	return nil
 }

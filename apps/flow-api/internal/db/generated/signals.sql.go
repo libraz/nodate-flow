@@ -107,6 +107,87 @@ func (q *Queries) InsertSignal(ctx context.Context, arg InsertSignalParams) (int
 	return result.LastInsertId()
 }
 
+const listSignalKindsBySubjectForEngineLocked = `-- name: ListSignalKindsBySubjectForEngineLocked :many
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = ?
+  AND subject_type = 'task'
+  AND subject_id = ?
+  AND enabled = TRUE
+FOR SHARE
+`
+
+type ListSignalKindsBySubjectForEngineLockedParams struct {
+	WorkspaceID uint32        `json:"-"`
+	SubjectID   sql.NullInt32 `json:"-"`
+}
+
+// Subject arm of the signal.received fact, with FOR SHARE; see
+// ListSignalKindsByTaskForEngineLocked. Follows idx_signals_subject.
+func (q *Queries) ListSignalKindsBySubjectForEngineLocked(ctx context.Context, arg ListSignalKindsBySubjectForEngineLockedParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listSignalKindsBySubjectForEngineLocked, arg.WorkspaceID, arg.SubjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var kind string
+		if err := rows.Scan(&kind); err != nil {
+			return nil, err
+		}
+		items = append(items, kind)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSignalKindsByTaskForEngineLocked = `-- name: ListSignalKindsByTaskForEngineLocked :many
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND enabled = TRUE
+FOR SHARE
+`
+
+type ListSignalKindsByTaskForEngineLockedParams struct {
+	WorkspaceID uint32        `json:"-"`
+	TaskID      sql.NullInt32 `json:"-"`
+}
+
+// Task_id arm of the signal.received fact, with FOR SHARE for the completion
+// gate (caller transaction, possibly stale snapshot). Split from the subject
+// arm so each follows one index (idx_signals_workspace_id_task_id) and the
+// lock covers only this task's signals, not the workspace.
+func (q *Queries) ListSignalKindsByTaskForEngineLocked(ctx context.Context, arg ListSignalKindsByTaskForEngineLockedParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listSignalKindsByTaskForEngineLocked, arg.WorkspaceID, arg.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var kind string
+		if err := rows.Scan(&kind); err != nil {
+			return nil, err
+		}
+		items = append(items, kind)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSignalKindsForTaskForEngine = `-- name: ListSignalKindsForTaskForEngine :many
 SELECT DISTINCT kind
 FROM signals

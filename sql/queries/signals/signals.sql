@@ -109,3 +109,26 @@ WHERE workspace_id = sqlc.arg(workspace_id)
     task_id = sqlc.arg(task_id)
     OR (subject_type = 'task' AND subject_id = sqlc.arg(task_id))
   );
+
+-- name: ListSignalKindsByTaskForEngineLocked :many
+-- Task_id arm of the signal.received fact, with FOR SHARE for the completion
+-- gate (caller transaction, possibly stale snapshot). Split from the subject
+-- arm so each follows one index (idx_signals_workspace_id_task_id) and the
+-- lock covers only this task's signals, not the workspace.
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND enabled = TRUE
+FOR SHARE;
+
+-- name: ListSignalKindsBySubjectForEngineLocked :many
+-- Subject arm of the signal.received fact, with FOR SHARE; see
+-- ListSignalKindsByTaskForEngineLocked. Follows idx_signals_subject.
+SELECT DISTINCT kind
+FROM signals
+WHERE workspace_id = ?
+  AND subject_type = 'task'
+  AND subject_id = ?
+  AND enabled = TRUE
+FOR SHARE;

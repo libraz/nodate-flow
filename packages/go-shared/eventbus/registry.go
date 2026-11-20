@@ -27,6 +27,7 @@ var declaredKinds = []Kind{
 	TaskHandoffRequested, TaskHandoffDecided,
 	TaskDependencyAdded, TaskDependencyRemoved,
 	TaskConstraintAdded, TaskConstraintRemoved,
+	TaskConstraintSatisfied, TaskConstraintFailed,
 
 	LabelCreated, LabelUpdated, LabelDisabled,
 	TaskLabelAdded, TaskLabelRemoved,

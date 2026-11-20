@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -349,11 +348,6 @@ func Reverse(deps Deps) func(context.Context, *ReverseInput) (*ReverseOutput, er
 				},
 				CallSite: "events.Reverse (taskstate.ApplyTransitionTx appended the event)",
 			})
-			// Dependents read this task's state in their dependency facts,
-			// so their markers move with it. Best effort: the reversal has
-			// committed and the next evaluation recovers a failure.
-			eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: ws.ID, Queries: deps.Queries}}
-			_ = eng.EvaluateTaskAndDependents(ctx, rollback.taskID)
 		}
 
 		return &ReverseOutput{

@@ -124,6 +124,13 @@ WHERE workspace_id = ?
   AND id = ?
 LIMIT 1;
 
+-- name: GetEventTaskForReevaluation :one
+-- Task an event is attached to, for constraint re-evaluation. A NULL task_id
+-- means the event is not task-scoped; ErrNoRows means no such event here.
+SELECT task_id
+FROM events
+WHERE id = ? AND workspace_id = ?;
+
 -- name: FindEventForReverse :one
 -- Resolve a target event by public_id for the reversal handler
 -- (POST /workspaces/{wsId}/events/{eventPublicId}/reverse). The handler uses this

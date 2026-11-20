@@ -14,8 +14,8 @@ import (
 // engine. These verify structural invariants that must hold regardless
 // of which constraints or facts are supplied.
 //
-//  1. EvaluateTask is idempotent: calling it twice produces the same outcomes.
-//  2. EvaluateTask with empty facts never panics.
+//  1. evaluate is idempotent: calling it twice produces the same outcomes.
+//  2. evaluate with empty facts never panics.
 //  3. Outcome count always equals the number of constraint rows.
 //  4. Parse errors never trigger MarkSatisfied / MarkFailed.
 
@@ -36,18 +36,18 @@ func newTracking(facts constraint.Facts, rows []Row) *trackingStore {
 	}
 }
 
-func (s *trackingStore) LoadTask(_ context.Context, _ uint32) (constraint.Facts, []Row, error) {
-	return s.facts, s.rows, nil
+func (s *trackingStore) LoadTask(_ context.Context, _ uint32) (Task, error) {
+	return Task{PublicID: "t", Facts: s.facts, Rows: s.rows, Found: true}, nil
 }
 
-func (s *trackingStore) MarkSatisfied(_ context.Context, id string, _ time.Time) error {
+func (s *trackingStore) MarkSatisfied(_ context.Context, id string, _ time.Time) (bool, error) {
 	s.satisfiedCalls = append(s.satisfiedCalls, id)
-	return nil
+	return true, nil
 }
 
-func (s *trackingStore) MarkFailed(_ context.Context, id string, _ time.Time) error {
+func (s *trackingStore) MarkFailed(_ context.Context, id string, _ time.Time) (bool, error) {
 	s.failedCalls = append(s.failedCalls, id)
-	return nil
+	return true, nil
 }
 
 func (s *trackingStore) reset() {
@@ -118,16 +118,16 @@ func TestProperty_Engine_Idempotent(t *testing.T) {
 
 		// First evaluation.
 		store1 := newTracking(facts, rows)
-		eng1 := &Engine{Store: store1, Now: func() time.Time { return frozenNow }}
-		out1, err1 := eng1.EvaluateTask(context.Background(), 1)
+		eng1 := &Engine{Store: store1, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+		out1, err1 := eng1.evaluate(context.Background(), 1)
 		if err1 != nil {
 			t.Fatalf("iter %d: first eval error: %v", iter, err1)
 		}
 
 		// Second evaluation with a fresh store (same data).
 		store2 := newTracking(facts, rows)
-		eng2 := &Engine{Store: store2, Now: func() time.Time { return frozenNow }}
-		out2, err2 := eng2.EvaluateTask(context.Background(), 1)
+		eng2 := &Engine{Store: store2, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+		out2, err2 := eng2.evaluate(context.Background(), 1)
 		if err2 != nil {
 			t.Fatalf("iter %d: second eval error: %v", iter, err2)
 		}
@@ -159,8 +159,8 @@ func TestProperty_Engine_EmptyFacts(t *testing.T) {
 	}
 
 	store := newTracking(constraint.Facts{}, rows)
-	eng := &Engine{Store: store, Now: func() time.Time { return frozenNow }}
-	out, err := eng.EvaluateTask(context.Background(), 1)
+	eng := &Engine{Store: store, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+	out, err := eng.evaluate(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("empty facts should not error: %v", err)
 	}
@@ -195,8 +195,8 @@ func TestProperty_Engine_OutcomeCountEqualsRowCount(t *testing.T) {
 		}
 		facts := randomFacts(rng)
 		store := newTracking(facts, rows)
-		eng := &Engine{Store: store, Now: func() time.Time { return frozenNow }}
-		out, err := eng.EvaluateTask(context.Background(), 1)
+		eng := &Engine{Store: store, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+		out, err := eng.evaluate(context.Background(), 1)
 		if err != nil {
 			t.Fatalf("iter %d: unexpected error: %v", iter, err)
 		}
@@ -224,8 +224,8 @@ func TestProperty_Engine_ParseErrorNeverMarked(t *testing.T) {
 		store := newTracking(constraint.Facts{}, []Row{
 			{PublicID: "bad1", Expression: []byte(expr)},
 		})
-		eng := &Engine{Store: store, Now: func() time.Time { return frozenNow }}
-		out, err := eng.EvaluateTask(context.Background(), 1)
+		eng := &Engine{Store: store, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+		out, err := eng.evaluate(context.Background(), 1)
 		if err != nil {
 			t.Fatalf("unexpected error for %q: %v", expr, err)
 		}
@@ -265,8 +265,8 @@ func TestProperty_Engine_ValidRowAlwaysMarked(t *testing.T) {
 		}
 		facts := randomFacts(rng)
 		store := newTracking(facts, rows)
-		eng := &Engine{Store: store, Now: func() time.Time { return frozenNow }}
-		_, err := eng.EvaluateTask(context.Background(), 1)
+		eng := &Engine{Store: store, Emit: discardEmit, Now: func() time.Time { return frozenNow }}
+		_, err := eng.evaluate(context.Background(), 1)
 		if err != nil {
 			t.Fatalf("iter %d: unexpected error: %v", iter, err)
 		}

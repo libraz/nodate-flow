@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
 func addAllDoneConstraint(t *testing.T, token, taskID string, blockers ...string) string {
@@ -37,7 +40,7 @@ func TestCompletingBlockerReevaluatesDependent(t *testing.T) {
 		map[string]any{"toTaskId": blocker, "kind": "blocks"}, nil)
 	con := addAllDoneConstraint(t, tt.AccessToken, dependent, blocker)
 
-	satisfiedAt, failedAt := readConstraintMarkers(t, con)
+	satisfiedAt, failedAt := waitConstraintMarkers(t, con, func(_, f sql.NullTime) bool { return f.Valid })
 	require.False(t, satisfiedAt.Valid, "fixture: an open blocker leaves the constraint unmet")
 	require.True(t, failedAt.Valid)
 
@@ -45,13 +48,13 @@ func TestCompletingBlockerReevaluatesDependent(t *testing.T) {
 		doJSON(t, http.MethodPost, testServerURL+"/tasks/"+blocker+"/transitions",
 			tt.AccessToken, map[string]any{"transition": tr}, nil)
 	}
-	satisfiedAt, failedAt = readConstraintMarkers(t, con)
+	satisfiedAt, failedAt = waitConstraintMarkers(t, con, func(s, _ sql.NullTime) bool { return s.Valid })
 	require.True(t, satisfiedAt.Valid, "completing the blocker must satisfy the dependent's constraint")
 	require.False(t, failedAt.Valid)
 
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+blocker+"/transitions",
 		tt.AccessToken, map[string]any{"transition": "reopen"}, nil)
-	satisfiedAt, failedAt = readConstraintMarkers(t, con)
+	satisfiedAt, failedAt = waitConstraintMarkers(t, con, func(_, f sql.NullTime) bool { return f.Valid })
 	require.False(t, satisfiedAt.Valid, "reopening the blocker must clear the stale satisfied marker")
 	require.True(t, failedAt.Valid)
 }
@@ -74,12 +77,14 @@ func TestReevaluationKeepsSatisfiedAt(t *testing.T) {
 		map[string]any{"dueOn": "2100-01-01"}, nil)
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task+"/constraints/evaluate", tt.AccessToken, nil, nil)
 
-	first, _ := readConstraintMarkers(t, con.ID)
+	helpers.WaitReevalIdle(t, internalWorkspaceID(t, testDB, tt.WorkspacePublicID))
+	first, _ := waitConstraintMarkers(t, con.ID, func(s, _ sql.NullTime) bool { return s.Valid })
 	require.True(t, first.Valid, "fixture: the constraint must be satisfied")
 
 	time.Sleep(1100 * time.Millisecond)
 	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task+"/constraints/evaluate", tt.AccessToken, nil, nil)
 
+	helpers.WaitReevalIdle(t, internalWorkspaceID(t, testDB, tt.WorkspacePublicID))
 	second, _ := readConstraintMarkers(t, con.ID)
 	require.True(t, first.Time.Equal(second.Time),
 		"re-evaluating a satisfied constraint moved satisfied_at from %s to %s", first.Time, second.Time)

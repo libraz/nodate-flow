@@ -74,11 +74,12 @@ func (q *Queries) DeleteConstraint(ctx context.Context, arg DeleteConstraintPara
 
 const failConstraint = `-- name: FailConstraint :execrows
 UPDATE task_constraints
-SET failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP),
+SET failed_at = CURRENT_TIMESTAMP,
     satisfied_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND failed_at IS NULL
 `
 
 type FailConstraintParams struct {
@@ -86,9 +87,10 @@ type FailConstraintParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Mark a constraint as currently failing. Clears satisfied_at so a
-// constraint that stops holding no longer reads as satisfied; failed_at keeps
-// the time the failure began across re-evaluations.
+// Mark a constraint as currently failing; clears satisfied_at so a constraint
+// that stops holding no longer reads as satisfied. The row matches only when
+// the outcome changes, so :execrows = 1 means "changed". An already failing
+// row does not match, which keeps the time the failure began.
 func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)
 	if err != nil {
@@ -177,11 +179,12 @@ func (q *Queries) ListConstraintsForTask(ctx context.Context, arg ListConstraint
 
 const satisfyConstraint = `-- name: SatisfyConstraint :execrows
 UPDATE task_constraints
-SET satisfied_at = COALESCE(satisfied_at, CURRENT_TIMESTAMP),
+SET satisfied_at = CURRENT_TIMESTAMP,
     failed_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE
+  AND satisfied_at IS NULL
 `
 
 type SatisfyConstraintParams struct {
@@ -189,8 +192,9 @@ type SatisfyConstraintParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Mark a constraint as satisfied. satisfied_at records when it first became
-// satisfied, so re-evaluating an already satisfied constraint keeps it.
+// Mark a constraint as satisfied. The row matches only when the outcome
+// changes, so :execrows = 1 means "changed". An already satisfied row does not
+// match, which keeps the time it first became satisfied.
 func (q *Queries) SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, satisfyConstraint, arg.WorkspaceID, arg.PublicID)
 	if err != nil {

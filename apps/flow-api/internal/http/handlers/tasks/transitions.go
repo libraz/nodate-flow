@@ -133,7 +133,6 @@ func Transition(deps Deps) func(context.Context, *TransitionTaskInput) (*Transit
 			return &output, nil
 		}
 		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, auditMutation)
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		if in.IdempotencyKey == "" {
 			row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 				WorkspaceID: ws.ID,

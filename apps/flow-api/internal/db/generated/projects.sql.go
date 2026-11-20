@@ -72,49 +72,16 @@ type DisableProjectParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Soft-disable a project. The handler must call DisableProjectChildTasks
-// inside the same transaction to cascade enabled = FALSE down to tasks;
-// this query alone leaves child tasks live on the underlying table.
+// Soft-disable a project. The handler must delete the child tasks
+// (ListEnabledProjectTaskIDsForUpdate + itemkit) inside the same
+// transaction; this query alone leaves child tasks live on the underlying
+// table.
 func (q *Queries) DisableProject(ctx context.Context, arg DisableProjectParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, disableProject, arg.WorkspaceID, arg.PublicID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const disableProjectChildTasks = `-- name: DisableProjectChildTasks :exec
-UPDATE tasks
-SET enabled = FALSE,
-    updated_at = CURRENT_TIMESTAMP(3)
-WHERE workspace_id = ?
-  AND project_id = ?
-  AND enabled = TRUE
-`
-
-type DisableProjectChildTasksParams struct {
-	WorkspaceID uint32 `json:"-"`
-	ProjectID   uint32 `json:"-"`
-}
-
-// Cascade-disable every currently-enabled task that lives under a project.
-// Must be called inside the same transaction as DisableProject so callers
-// observe a consistent snapshot. The views (v_task_list, v_task_detail)
-// already AND-filter projects.enabled, but bypassing the view (raw SELECT
-// on tasks, MCP tooling, replay jobs) would otherwise still see live rows
-// under a disabled project. updated_at is bumped explicitly so audit
-// consumers can see the cascade event even though the column has an
-// ON UPDATE clause already.
-// workspace_id is included as the first WHERE clause for defense-in-depth
-// per project DB conventions, even though project_id is globally unique.
-//
-// affected-rows: not-applicable — a cascade over however many live tasks
-// the project holds, and a project with none cascades onto nothing.
-// DisableProject runs in the same transaction and is what reports whether
-// the project the caller named was there.
-func (q *Queries) DisableProjectChildTasks(ctx context.Context, arg DisableProjectChildTasksParams) error {
-	_, err := q.db.ExecContext(ctx, disableProjectChildTasks, arg.WorkspaceID, arg.ProjectID)
-	return err
 }
 
 const findProjectByIdentifier = `-- name: FindProjectByIdentifier :one
@@ -315,6 +282,47 @@ func (q *Queries) FindProjectByPublicIdGlobal(ctx context.Context, publicID type
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listEnabledProjectTaskIDsForUpdate = `-- name: ListEnabledProjectTaskIDsForUpdate :many
+SELECT id
+FROM tasks
+WHERE workspace_id = ?
+  AND project_id = ?
+  AND enabled = TRUE
+ORDER BY id
+FOR UPDATE
+`
+
+type ListEnabledProjectTaskIDsForUpdateParams struct {
+	WorkspaceID uint32 `json:"-"`
+	ProjectID   uint32 `json:"-"`
+}
+
+// Lock and list the enabled tasks under a project, in id order. The project
+// disable handler deletes each one through itemkit inside the same
+// transaction as DisableProject.
+func (q *Queries) ListEnabledProjectTaskIDsForUpdate(ctx context.Context, arg ListEnabledProjectTaskIDsForUpdateParams) ([]uint32, error) {
+	rows, err := q.db.QueryContext(ctx, listEnabledProjectTaskIDsForUpdate, arg.WorkspaceID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uint32{}
+	for rows.Next() {
+		var id uint32
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listProjectsForWorkspace = `-- name: ListProjectsForWorkspace :many

@@ -44,10 +44,7 @@ func EvaluateConstraints(deps Deps) func(context.Context, *EvaluateConstraintsIn
 		if !ok {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
-		eng := &engine.Engine{
-			Store: &engine.SqlcStore{WorkspaceID: ws.ID, Queries: deps.Queries},
-		}
-		outs, err := eng.EvaluateTask(ctx, task.ID)
+		outs, err := engine.Evaluate(ctx, deps.DB, ws.ID, task.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}

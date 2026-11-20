@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -684,7 +683,6 @@ func (e *Executor) handoffToUser(ctx context.Context, r taskRow, act *Action) {
 		return
 	}
 	if emitted {
-		e.reevaluateTaskConstraints(ctx, r)
 		e.Logger.Info("auto-action applied: handoff_to_user",
 			"task", r.publicID.String(),
 			"agent", r.agentPublicID.String(),
@@ -1102,15 +1100,4 @@ func (e *Executor) applyStateTransition(ctx context.Context, r taskRow, act *Act
 		"from", string(result.FromState),
 		"to", string(result.ToState),
 	)
-	e.reevaluateTaskConstraints(ctx, r)
-}
-
-// reevaluateTaskConstraints refreshes facts after a committed auto-action.
-// State transitions affect the task's own constraints and its dependents;
-// agent handbacks also affect actor.has_role facts on the task.
-func (e *Executor) reevaluateTaskConstraints(ctx context.Context, r taskRow) {
-	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: r.workspaceID, Queries: generated.New(e.DB)}}
-	if err := eng.EvaluateTaskAndDependents(ctx, r.id); err != nil {
-		e.Logger.Warn("auto-action executor: constraint re-evaluation failed", "task", r.publicID.String(), "err", err)
-	}
 }

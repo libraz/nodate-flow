@@ -165,7 +165,6 @@ func HandoffToAgent(deps Deps) func(context.Context, *HandoffToAgentInput) (*Han
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		completeActorMutation(ctx, deps, ws.ID, task.ID)
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -328,7 +327,6 @@ func HandoffToUser(deps Deps) func(context.Context, *HandoffToUserInput) (*Hando
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		completeActorMutation(ctx, deps, ws.ID, task.ID)
 
 		row, err := deps.Queries.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 			WorkspaceID: ws.ID,

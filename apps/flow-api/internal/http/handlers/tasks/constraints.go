@@ -47,7 +47,7 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 		}
 		// Validate the DSL expression up front so an unparseable constraint
 		// is rejected at add time instead of saving with HTTP 200 and being
-		// silently inert (autoEvaluateConstraints swallows parse errors).
+		// silently inert (evaluation swallows parse errors).
 		// Mirrors the NL constraint compile/explain handlers.
 		if _, err := constraint.Parse([]byte(in.Body.Expression)); err != nil {
 			return nil, httpErr(constraintParseErr(err))
@@ -84,7 +84,6 @@ func AddConstraint(deps Deps) func(context.Context, *AddTaskConstraintInput) (*A
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskConstraintOutput{Body: TaskConstraint{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
@@ -148,7 +147,6 @@ func RemoveConstraint(deps Deps) func(context.Context, *RemoveTaskConstraintInpu
 		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskConstraintOutput{}
 		out.Body.Ok = true
 		return out, nil

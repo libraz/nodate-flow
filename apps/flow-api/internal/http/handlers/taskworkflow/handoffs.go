@@ -416,14 +416,6 @@ func DecideHandoff(deps Deps) func(context.Context, *HandoffDecisionInput) (*Han
 				}); err != nil {
 				return err
 			}
-			if decision == "accept" {
-				// Actor transfer, domain events, and dependent constraint state
-				// commit together. A failed refresh rolls the whole acceptance
-				// back instead of leaving derived constraint state stale.
-				if err := refreshTaskConstraints(ctx, qtx, ws.ID, task.ID); err != nil {
-					return err
-				}
-			}
 			var dueAtValue *int64
 			if handoff.DueAt.Valid {
 				value := handoff.DueAt.Time.UTC().Unix()

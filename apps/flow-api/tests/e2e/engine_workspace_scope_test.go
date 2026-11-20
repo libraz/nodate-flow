@@ -99,16 +99,18 @@ func TestEngineReadsRejectForeignWorkspace(t *testing.T) {
 
 	// Foreign workspace (B): every read must be empty / not-found.
 	storeForeign := &engine.SqlcStore{WorkspaceID: wsB, Queries: q}
-	factsForeign, constraintsForeign, err := storeForeign.LoadTask(ctx, taskID)
+	foreign, err := storeForeign.LoadTask(ctx, taskID)
 	require.NoError(t, err, "LoadTask must not error on an empty result")
-	require.Nil(t, factsForeign.DueOn, "due_on must not leak across workspaces")
-	require.Empty(t, factsForeign.DependencyStates, "dependency states must not leak across workspaces")
-	require.Empty(t, factsForeign.ActorRoles, "actor roles must not leak across workspaces")
-	require.Empty(t, constraintsForeign, "constraints must not leak across workspaces")
+	require.False(t, foreign.Found, "a task of another workspace must not be found")
+	require.Empty(t, foreign.PublicID, "the public id must not leak across workspaces")
+	require.Nil(t, foreign.Facts.DueOn, "due_on must not leak across workspaces")
+	require.Empty(t, foreign.Facts.DependencyStates, "dependency states must not leak across workspaces")
+	require.Empty(t, foreign.Facts.ActorRoles, "actor roles must not leak across workspaces")
+	require.Empty(t, foreign.Rows, "constraints must not leak across workspaces")
 
 	// Each underlying query individually scoped to B must also be empty.
-	_, err = q.GetTaskDueOnForEngine(ctx, generated.GetTaskDueOnForEngineParams{ID: taskID, WorkspaceID: wsB})
-	require.ErrorIs(t, err, sql.ErrNoRows, "GetTaskDueOnForEngine must miss for foreign workspace")
+	_, err = q.GetTaskForEngine(ctx, generated.GetTaskForEngineParams{ID: taskID, WorkspaceID: wsB})
+	require.ErrorIs(t, err, sql.ErrNoRows, "GetTaskForEngine must miss for foreign workspace")
 	depsB, err := q.ListDependencyStatesForEngine(ctx, generated.ListDependencyStatesForEngineParams{FromTaskID: taskID, WorkspaceID: wsB})
 	require.NoError(t, err)
 	require.Empty(t, depsB)
@@ -122,11 +124,13 @@ func TestEngineReadsRejectForeignWorkspace(t *testing.T) {
 	// Sanity: the correct workspace (A) still returns the facts, so the
 	// new scoping did not break the legitimate read path.
 	storeOwn := &engine.SqlcStore{WorkspaceID: wsA, Queries: q}
-	factsOwn, constraintsOwn, err := storeOwn.LoadTask(ctx, taskID)
+	own, err := storeOwn.LoadTask(ctx, taskID)
 	require.NoError(t, err)
-	require.NotNil(t, factsOwn.DueOn, "owning workspace must see due_on")
-	require.NotEmpty(t, factsOwn.DependencyStates, "owning workspace must see dependency states")
-	require.NotEmpty(t, constraintsOwn, "owning workspace must see constraints")
+	require.True(t, own.Found, "owning workspace must find the task")
+	require.Equal(t, triggerPub, own.PublicID, "owning workspace must see the task's public id")
+	require.NotNil(t, own.Facts.DueOn, "owning workspace must see due_on")
+	require.NotEmpty(t, own.Facts.DependencyStates, "owning workspace must see dependency states")
+	require.NotEmpty(t, own.Rows, "owning workspace must see constraints")
 }
 
 // TestListPendingSuggestionsRejectForeignWorkspace proves the workspace scoping

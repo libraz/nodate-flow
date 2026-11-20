@@ -196,11 +196,11 @@
     "not": { "file": "apps/flow-api/internal/constraint/eval.go", "symbol": "case OpNot" },
     "time.due_before": {
       "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
-      "symbol": "GetTaskDueOnForEngine"
+      "symbol": "f.DueOn"
     },
     "time.due_after": {
       "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",
-      "symbol": "GetTaskDueOnForEngine"
+      "symbol": "f.DueOn"
     },
     "dependency.all_done": {
       "file": "apps/flow-api/internal/constraint/engine/sqlc_store.go",

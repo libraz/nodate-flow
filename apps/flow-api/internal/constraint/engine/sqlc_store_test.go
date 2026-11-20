@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 )
 
@@ -44,18 +43,21 @@ func TestSqlcStoreLoadTaskReportsUnreadableDueDate(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	store := &SqlcStore{WorkspaceID: 1, Queries: generated.New(db)}
-	facts, rows, err := store.LoadTask(context.Background(), 42)
+	task, err := store.LoadTask(context.Background(), 42)
 	if err == nil {
 		t.Fatal("LoadTask must fail when the due_on read fails; got nil error")
 	}
 	if !errors.Is(err, errStoreUnreachable) {
 		t.Fatalf("LoadTask must surface the underlying failure; got %v", err)
 	}
-	if facts.DueOn != nil {
-		t.Fatalf("a failed read must not fabricate a due date; got %v", *facts.DueOn)
+	if task.Found {
+		t.Fatal("a failed load must not report the task as found")
 	}
-	if len(rows) != 0 {
-		t.Fatalf("a failed load must not return constraint rows; got %d", len(rows))
+	if task.Facts.DueOn != nil {
+		t.Fatalf("a failed read must not fabricate a due date; got %v", *task.Facts.DueOn)
+	}
+	if len(task.Rows) != 0 {
+		t.Fatalf("a failed load must not return constraint rows; got %d", len(task.Rows))
 	}
 }
 
@@ -64,18 +66,18 @@ type unloadableStore struct {
 	marks int
 }
 
-func (s *unloadableStore) LoadTask(context.Context, uint32) (constraint.Facts, []Row, error) {
-	return constraint.Facts{}, nil, errStoreUnreachable
+func (s *unloadableStore) LoadTask(context.Context, uint32) (Task, error) {
+	return Task{}, errStoreUnreachable
 }
 
-func (s *unloadableStore) MarkSatisfied(_ context.Context, _ string, _ time.Time) error {
+func (s *unloadableStore) MarkSatisfied(_ context.Context, _ string, _ time.Time) (bool, error) {
 	s.marks++
-	return nil
+	return true, nil
 }
 
-func (s *unloadableStore) MarkFailed(_ context.Context, _ string, _ time.Time) error {
+func (s *unloadableStore) MarkFailed(_ context.Context, _ string, _ time.Time) (bool, error) {
 	s.marks++
-	return nil
+	return true, nil
 }
 
 // TestEngineWritesNoMarkersWhenFactsAreUnavailable is the other half of
@@ -85,16 +87,23 @@ func (s *unloadableStore) MarkFailed(_ context.Context, _ string, _ time.Time) e
 // verdict.
 func TestEngineWritesNoMarkersWhenFactsAreUnavailable(t *testing.T) {
 	store := &unloadableStore{}
-	eng := &Engine{Store: store}
+	emits := 0
+	eng := &Engine{Store: store, Emit: func(context.Context, uint32, string, Row, bool) error {
+		emits++
+		return nil
+	}}
 
-	outcomes, err := eng.EvaluateTask(context.Background(), 1)
+	outcomes, err := eng.evaluate(context.Background(), 1)
 	if !errors.Is(err, errStoreUnreachable) {
-		t.Fatalf("EvaluateTask must surface the load failure; got %v", err)
+		t.Fatalf("evaluate must surface the load failure; got %v", err)
 	}
 	if len(outcomes) != 0 {
 		t.Fatalf("no outcome may be reported for an unevaluated task; got %d", len(outcomes))
 	}
 	if store.marks != 0 {
 		t.Fatalf("no marker may be written for an unevaluated task; got %d", store.marks)
+	}
+	if emits != 0 {
+		t.Fatalf("no verdict may be emitted for an unevaluated task; got %d", emits)
 	}
 }

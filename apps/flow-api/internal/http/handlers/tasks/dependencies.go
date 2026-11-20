@@ -154,7 +154,6 @@ func AddDependency(deps Deps) func(context.Context, *AddTaskDependencyInput) (*A
 			ResourceID:   pub.String(),
 			CallSite:     "tasks.AddDependency (taskdeps.Add appended the event)",
 		})
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		return &AddTaskDependencyOutput{Body: TaskDependency{
 			ID:         pub.String(),
 			Kind:       in.Body.Kind,
@@ -226,7 +225,6 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 		if affected == 0 {
 			return nil, httpErr(apierrors.WsTaskNotFound)
 		}
-		autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskDependencyOutput{}
 		out.Body.Ok = true
 		return out, nil

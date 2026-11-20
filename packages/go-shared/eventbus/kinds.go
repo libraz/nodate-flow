@@ -55,8 +55,10 @@ const (
 	TaskDependencyAdded   Kind = "task.dependency.added"
 	TaskDependencyRemoved Kind = "task.dependency.removed"
 
-	TaskConstraintAdded   Kind = "task.constraint.added"
-	TaskConstraintRemoved Kind = "task.constraint.removed"
+	TaskConstraintAdded     Kind = "task.constraint.added"
+	TaskConstraintRemoved   Kind = "task.constraint.removed"
+	TaskConstraintSatisfied Kind = "task.constraint.satisfied"
+	TaskConstraintFailed    Kind = "task.constraint.failed"
 )
 
 // Label events.

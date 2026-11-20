@@ -29,6 +29,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/auth"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/bgloop"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/config"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/reeval"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -536,6 +537,16 @@ func main() {
 	webhookWorker := webhook.NewWorker(db, queries)
 	webhookWorker.SetRunner(hookRunner)
 	eventbus.AddNotifyHook(webhookWorker.Hook())
+
+	// Constraint re-evaluation: every task-scoped event re-evaluates its
+	// task, and state-moving kinds its dependents, on the shared runner.
+	constraintReeval := &reeval.Subscriber{
+		DB: db,
+		Go: func(ctx context.Context, _ uint32, job func(context.Context)) bool {
+			return hookRunner.Go(ctx, cfg.NotificationFanoutTimeout, job)
+		},
+	}
+	eventbus.AddNotifyHook(constraintReeval.Hook())
 
 	// Appends made through the cross-service eventlog (itemkit,
 	// memberkit) reach every subscriber registered above. Without this

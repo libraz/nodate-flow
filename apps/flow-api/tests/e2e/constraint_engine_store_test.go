@@ -55,7 +55,7 @@ type failingDueOnDBTX struct {
 }
 
 func (d failingDueOnDBTX) pick(query string) *sql.DB {
-	if strings.Contains(query, "GetTaskDueOnForEngine") {
+	if strings.Contains(query, "GetTaskForEngine") {
 		return d.broken
 	}
 	return d.real
@@ -109,7 +109,7 @@ func TestConstraintEngineRecordsNoVerdictWhenTheDueDateIsUnreadable(t *testing.T
 
 	// Adding a constraint evaluates it, and this one is met, so the row
 	// starts out marked satisfied.
-	satisfiedAt, failedAt := readConstraintMarkers(t, constraintRow.ID)
+	satisfiedAt, failedAt := waitConstraintMarkers(t, constraintRow.ID, func(s, _ sql.NullTime) bool { return s.Valid })
 	require.True(t, satisfiedAt.Valid, "fixture: the constraint must start out satisfied")
 	require.False(t, failedAt.Valid, "fixture: the constraint must not start out failing")
 
@@ -118,24 +118,41 @@ func TestConstraintEngineRecordsNoVerdictWhenTheDueDateIsUnreadable(t *testing.T
 	require.NoError(t, broken.Close())
 
 	wsID, taskInternalID := helpers.AgentTaskInternalIDs(t, testDB, tt.WorkspacePublicID, task.ID)
-	eng := &engine.Engine{Store: &engine.SqlcStore{
+	helpers.WaitReevalIdle(t, wsID)
+	store := &engine.SqlcStore{
 		WorkspaceID: wsID,
 		Queries:     generated.New(failingDueOnDBTX{real: testDB, broken: broken}),
-	}}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	outcomes, err := eng.EvaluateTask(ctx, taskInternalID)
+	loaded, err := store.LoadTask(ctx, taskInternalID)
 	require.Error(t, err,
 		"an unreadable due date must be reported, not answered as 'no due date'")
-	require.Empty(t, outcomes, "no constraint may be given a verdict from facts that failed to load")
+	require.False(t, loaded.Found, "a task whose facts failed to load must not be evaluated")
+	require.Empty(t, loaded.Rows, "no constraint may be given a verdict from facts that failed to load")
 
 	satisfiedAt, failedAt = readConstraintMarkers(t, constraintRow.ID)
 	require.False(t, failedAt.Valid,
 		"a constraint must not be recorded as failing because its due date could not be read")
 	require.True(t, satisfiedAt.Valid,
 		"the verdict from the last successful evaluation must survive an unreadable one")
+}
+
+// waitConstraintMarkers polls the persisted verdict columns until ready
+// accepts them, for markers written by the asynchronous re-evaluation.
+// It returns the markers that satisfied ready.
+func waitConstraintMarkers(t *testing.T, publicID string, ready func(satisfiedAt, failedAt sql.NullTime) bool) (satisfiedAt, failedAt sql.NullTime) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		err := testDB.QueryRow(
+			`SELECT satisfied_at, failed_at FROM task_constraints WHERE public_id = UUID_TO_BIN(?, 0) LIMIT 1`,
+			publicID,
+		).Scan(&satisfiedAt, &failedAt)
+		return err == nil && ready(satisfiedAt, failedAt)
+	}, 5*time.Second, 50*time.Millisecond, "constraint %s markers never reached the expected state (satisfied=%v failed=%v)", publicID, satisfiedAt, failedAt)
+	return satisfiedAt, failedAt
 }
 
 // readConstraintMarkers returns the persisted verdict columns for a

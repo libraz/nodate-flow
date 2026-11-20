@@ -96,7 +96,7 @@ func TestProjectDisableCascadesToChildTasks(t *testing.T) {
 	require.NotEmpty(t, t2.ID)
 
 	// Capture the tasks' updated_at BEFORE the cascade so we can verify
-	// the column is bumped by the UPDATE issued in DisableProjectChildTasks.
+	// the column is bumped by the UPDATE issued by itemkit.DeleteTask.
 	// MySQL UNIX_TIMESTAMP returns a fractional value for fractional-second
 	// columns, so we scan into float64 to keep the comparison stable.
 	var beforeT1, beforeT2 float64

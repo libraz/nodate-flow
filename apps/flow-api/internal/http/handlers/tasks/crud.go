@@ -652,8 +652,6 @@ func Disable(deps Deps) func(context.Context, *DisableTaskInput) (*DisableTaskOu
 				ResourceID:   task.PublicID.String(),
 				CallSite:     "tasks.Disable (itemkit.DeleteTask appended the event)",
 			})
-			// A deleted blocker drops out of its dependents' facts.
-			autoEvaluateConstraints(ctx, deps, ws.ID, task.ID)
 		}
 		// No task.disabled append here: itemkit.DeleteTask already emits
 		// item.deleted plus its legacy task.disabled dual-emit inside the

@@ -283,6 +283,7 @@ func TestMCPTaskWritesMatchREST(t *testing.T) {
 	requireMCPIntegration(t)
 	inst := helpers.StartShared(t)
 	db := inst.DB
+	helpers.RegisterConstraintReevaluation(t, db)
 	deps := mcp.Deps{DB: db, Queries: generated.New(db)}
 	ctx := context.Background()
 	scopes := []string{"read:workspace", "write:workspace"}
@@ -386,9 +387,11 @@ func TestMCPTaskWritesMatchREST(t *testing.T) {
 			mcpVisJSON(t, map[string]any{"taskId": fx.taskPub.String(), "transition": "complete"}))
 		require.NoError(t, err)
 
+		helpers.WaitReevalIdle(t, fx.wsID)
 		var satisfied sql.NullTime
-		require.NoError(t, db.QueryRow(`SELECT satisfied_at FROM task_constraints WHERE public_id = ?`, cons[:]).Scan(&satisfied))
-		require.True(t, satisfied.Valid, "the dependent's dependency constraint must be re-evaluated after the blocker completes")
+		require.Eventually(t, func() bool {
+			return db.QueryRow(`SELECT satisfied_at FROM task_constraints WHERE public_id = ?`, cons[:]).Scan(&satisfied) == nil && satisfied.Valid
+		}, 5*time.Second, 50*time.Millisecond, "the dependent's dependency constraint must be re-evaluated after the blocker completes")
 	})
 
 	t.Run("apply_steps/children of a private parent stay private", func(t *testing.T) {

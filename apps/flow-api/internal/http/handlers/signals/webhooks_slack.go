@@ -9,12 +9,9 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	sl "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/slack"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // slackURLVerification is the envelope `type` Slack POSTs once when a
@@ -134,60 +131,31 @@ func HandleSlackWebhook(deps Deps) http.HandlerFunc {
 		subjectType := resolveSubjectType(kind, "")
 		subjectID := subjectIDFor(subjectType, 0)
 
-		pub := types.New()
-		now := time.Now().UTC()
-		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
-			PublicID:    pub,
+		params := generated.InsertSignalParams{
 			WorkspaceID: wsID,
 			Source:      generated.SignalsSourceSlack,
 			Kind:        kind,
 			ExternalID:  ext,
 			PayloadJson: payload,
-			ReceivedAt:  now,
+			ReceivedAt:  time.Now().UTC(),
 			SubjectType: subjectType,
 			SubjectID:   subjectID,
-		})
-		if err != nil {
-			writeError(w, apierrors.InternalUnexpected)
-			return
 		}
-		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceSlack, ext, signalInternalID, "signals.HandleSlackWebhook") {
-			return
-		}
-
-		// A delivery from outside still changes the workspace, so it is
-		// recorded in both logs like any other ingestion. There is no
-		// authenticated user behind it: Actor.UserID zero is what says so,
-		// and both rows carry no actor rather than a fabricated one.
-		//
-		// It sits after the duplicate check because a retry of the same
-		// event_id collides on the dedupe key and writes no signals row, so
-		// there is no ingestion for it to describe.
-		deps.Mutations.Record(ctx, mutationlog.Actor{WorkspaceID: wsID}, mutationlog.Mutation{
-			EventType:    eventbus.SignalAttached,
-			AuditAction:  "signal.create",
-			ResourceType: "signal",
-			ResourceID:   pub.String(),
-			Payload: map[string]any{
-				"signalId": pub.String(),
-				"source":   "slack",
-				"kind":     kind,
-			},
+		bindTaskMarker(ctx, deps, wsID, body, &params)
+		res, ispec := ingestSignal(ctx, deps, ingestInput{
+			Params:   params,
+			Actor:    mutationlog.Actor{WorkspaceID: wsID},
 			CallSite: "signals.HandleSlackWebhook",
 		})
-
-		// Best-effort signal_judge dispatch.
-		if deps.JudgeEnqueuer != nil {
-			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
-				slog.WarnContext(ctx, "signaljudge enqueue failed",
-					slog.Any("err", jerr),
-					slog.String("handler", "signals.HandleSlackWebhook"),
-					slog.String("signal_public_id", pub.String()),
-					slog.String("kind", kind),
-				)
-			}
+		if ispec != nil {
+			writeError(w, ispec)
+			return
 		}
-		writeJSON(w, http.StatusAccepted, map[string]any{"id": pub.String()})
+		if res.Duplicate {
+			writeIngestDuplicate(w, res)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": res.PublicID.String()})
 	}
 }
 

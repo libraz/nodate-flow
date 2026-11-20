@@ -35,8 +35,10 @@ const (
 	TaskDependencyAdded   = sharedbus.TaskDependencyAdded
 	TaskDependencyRemoved = sharedbus.TaskDependencyRemoved
 
-	TaskConstraintAdded   = sharedbus.TaskConstraintAdded
-	TaskConstraintRemoved = sharedbus.TaskConstraintRemoved
+	TaskConstraintAdded     = sharedbus.TaskConstraintAdded
+	TaskConstraintRemoved   = sharedbus.TaskConstraintRemoved
+	TaskConstraintSatisfied = sharedbus.TaskConstraintSatisfied
+	TaskConstraintFailed    = sharedbus.TaskConstraintFailed
 )
 
 // Label events.

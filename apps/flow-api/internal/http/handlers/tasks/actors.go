@@ -78,7 +78,6 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		completeActorMutation(ctx, deps, ws.ID, task.ID)
 		return &AddTaskActorOutput{Body: TaskActor{
 			ID:     pub.String(),
 			UserID: userPub.String(),
@@ -206,7 +205,6 @@ func RemoveActor(deps Deps) func(context.Context, *RemoveTaskActorInput) (*Remov
 		if missing {
 			return nil, httpErr(apierrors.WsTaskActorNotFound)
 		}
-		completeActorMutation(ctx, deps, ws.ID, task.ID)
 		out := &RemoveTaskActorOutput{}
 		out.Body.Ok = true
 		return out, nil

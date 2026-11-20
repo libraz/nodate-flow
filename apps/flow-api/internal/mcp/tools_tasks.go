@@ -11,7 +11,6 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -652,11 +651,6 @@ func runTransitionTask(ctx context.Context, deps Deps, s *session, raw json.RawM
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
-	// The task's own constraints and its dependents' dependency.* facts
-	// read the state just committed. Best effort, as on REST: the next
-	// evaluation recovers from a failure here.
-	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: s.workspaceID, Queries: deps.Queries}}
-	_ = eng.EvaluateTaskAndDependents(ctx, taskInternal)
 	// taskstate appended the transition event inside the transaction so
 	// the event and the state change commit together; only the audit row
 	// belongs to the transport.

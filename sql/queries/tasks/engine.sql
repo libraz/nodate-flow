@@ -4,11 +4,15 @@
 -- an upstream ACL check is bypassed. The engine never has to know
 -- about public_id resolution.
 
--- name: GetTaskDueOnForEngine :one
-SELECT due_on
+-- name: GetTaskForEngine :one
+-- Load the task an evaluation runs against and lock its row; this is the
+-- evaluation's task-row lock. ErrNoRows means the task is disabled or missing
+-- and is not evaluable.
+SELECT public_id, due_on
 FROM tasks
 WHERE id = ? AND workspace_id = ? AND enabled = TRUE
-LIMIT 1;
+LIMIT 1
+FOR UPDATE;
 
 -- name: ListDependencyStatesForEngine :many
 -- Outgoing dependencies of a task with the referenced task's
@@ -53,3 +57,38 @@ SELECT
 FROM task_constraints
 WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
 ORDER BY sort_weight ASC, id ASC;
+
+-- name: ListDependencyStatesForEngineLocked :many
+-- ListDependencyStatesForEngine with FOR SHARE. Used by the completion gate,
+-- which runs inside a caller transaction whose snapshot may predate the facts.
+-- Also share-locks the target tasks rows so derived_state is read current.
+SELECT
+  tt.public_id   AS to_public_id,
+  tt.derived_state,
+  td.kind        AS dependency_kind
+FROM task_dependencies td
+INNER JOIN tasks tt ON tt.id = td.to_task_id AND tt.enabled = TRUE
+WHERE td.from_task_id = ?
+  AND td.workspace_id = ?
+  AND td.enabled = TRUE
+FOR SHARE;
+
+-- name: ListTaskActorRolesForEngineLocked :many
+-- ListTaskActorRolesForEngine with FOR SHARE. Used by the completion gate,
+-- which runs inside a caller transaction whose snapshot may predate the facts.
+SELECT DISTINCT role
+FROM task_actors
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
+FOR SHARE;
+
+-- name: ListTaskConstraintsForEngineLocked :many
+-- ListTaskConstraintsForEngine with FOR SHARE. Used by the completion gate,
+-- which runs inside a caller transaction whose snapshot may predate the facts.
+SELECT
+  public_id,
+  kind,
+  expression
+FROM task_constraints
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
+ORDER BY sort_weight ASC, id ASC
+FOR SHARE;

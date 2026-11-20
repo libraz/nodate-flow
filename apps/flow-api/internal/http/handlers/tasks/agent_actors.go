@@ -77,7 +77,6 @@ func AddAgentActor(deps Deps) func(context.Context, *AddTaskAgentActorInput) (*A
 		}); err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		completeActorMutation(ctx, deps, ws.ID, task.ID)
 		return &AddTaskAgentActorOutput{Body: TaskAgentActor{
 			ID:      pub.String(),
 			AgentID: agentPub.String(),

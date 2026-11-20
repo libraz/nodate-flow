@@ -167,6 +167,18 @@ WHERE workspace_id = ?
   AND id = ?
   AND task_id IS NULL;
 
+-- name: GetSignalTaskForArchive :one
+-- Internal id of the task a signal is attached to, through task_id or a
+-- task subject. subject_id counts only when it joins a task in the same
+-- workspace. ErrNoRows means the signal is not attached to a task.
+SELECT t.id
+FROM signals s
+INNER JOIN tasks t
+  ON t.workspace_id = s.workspace_id
+ AND t.id = COALESCE(s.task_id, IF(s.subject_type = 'task', s.subject_id, NULL))
+WHERE s.workspace_id = ?
+  AND s.public_id = ?;
+
 -- name: ArchiveInboxItem :execrows
 -- Archive a signal by soft-disabling it. The inbox view excludes disabled rows.
 UPDATE signals

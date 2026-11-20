@@ -12,17 +12,23 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
-const getTaskDueOnForEngine = `-- name: GetTaskDueOnForEngine :one
+const getTaskForEngine = `-- name: GetTaskForEngine :one
 
-SELECT due_on
+SELECT public_id, due_on
 FROM tasks
 WHERE id = ? AND workspace_id = ? AND enabled = TRUE
 LIMIT 1
+FOR UPDATE
 `
 
-type GetTaskDueOnForEngineParams struct {
+type GetTaskForEngineParams struct {
 	ID          uint32 `json:"-"`
 	WorkspaceID uint32 `json:"-"`
+}
+
+type GetTaskForEngineRow struct {
+	PublicID types.PublicID `json:"publicId"`
+	DueOn    sql.NullTime   `json:"dueOn"`
 }
 
 // Queries dedicated to the constraint engine.
@@ -30,11 +36,14 @@ type GetTaskDueOnForEngineParams struct {
 // workspace_id so the SQL boundary enforces tenant isolation even if
 // an upstream ACL check is bypassed. The engine never has to know
 // about public_id resolution.
-func (q *Queries) GetTaskDueOnForEngine(ctx context.Context, arg GetTaskDueOnForEngineParams) (sql.NullTime, error) {
-	row := q.db.QueryRowContext(ctx, getTaskDueOnForEngine, arg.ID, arg.WorkspaceID)
-	var due_on sql.NullTime
-	err := row.Scan(&due_on)
-	return due_on, err
+// Load the task an evaluation runs against and lock its row; this is the
+// evaluation's task-row lock. ErrNoRows means the task is disabled or missing
+// and is not evaluable.
+func (q *Queries) GetTaskForEngine(ctx context.Context, arg GetTaskForEngineParams) (GetTaskForEngineRow, error) {
+	row := q.db.QueryRowContext(ctx, getTaskForEngine, arg.ID, arg.WorkspaceID)
+	var i GetTaskForEngineRow
+	err := row.Scan(&i.PublicID, &i.DueOn)
+	return i, err
 }
 
 const listDependencyStatesForEngine = `-- name: ListDependencyStatesForEngine :many
@@ -74,6 +83,56 @@ func (q *Queries) ListDependencyStatesForEngine(ctx context.Context, arg ListDep
 	items := []ListDependencyStatesForEngineRow{}
 	for rows.Next() {
 		var i ListDependencyStatesForEngineRow
+		if err := rows.Scan(&i.ToPublicID, &i.DerivedState, &i.DependencyKind); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDependencyStatesForEngineLocked = `-- name: ListDependencyStatesForEngineLocked :many
+SELECT
+  tt.public_id   AS to_public_id,
+  tt.derived_state,
+  td.kind        AS dependency_kind
+FROM task_dependencies td
+INNER JOIN tasks tt ON tt.id = td.to_task_id AND tt.enabled = TRUE
+WHERE td.from_task_id = ?
+  AND td.workspace_id = ?
+  AND td.enabled = TRUE
+FOR SHARE
+`
+
+type ListDependencyStatesForEngineLockedParams struct {
+	FromTaskID  uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+type ListDependencyStatesForEngineLockedRow struct {
+	ToPublicID     types.PublicID       `json:"toPublicId"`
+	DerivedState   TasksDerivedState    `json:"derivedState"`
+	DependencyKind TaskDependenciesKind `json:"dependencyKind"`
+}
+
+// ListDependencyStatesForEngine with FOR SHARE. Used by the completion gate,
+// which runs inside a caller transaction whose snapshot may predate the facts.
+// Also share-locks the target tasks rows so derived_state is read current.
+func (q *Queries) ListDependencyStatesForEngineLocked(ctx context.Context, arg ListDependencyStatesForEngineLockedParams) ([]ListDependencyStatesForEngineLockedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDependencyStatesForEngineLocked, arg.FromTaskID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDependencyStatesForEngineLockedRow{}
+	for rows.Next() {
+		var i ListDependencyStatesForEngineLockedRow
 		if err := rows.Scan(&i.ToPublicID, &i.DerivedState, &i.DependencyKind); err != nil {
 			return nil, err
 		}
@@ -164,6 +223,43 @@ func (q *Queries) ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskA
 	return items, nil
 }
 
+const listTaskActorRolesForEngineLocked = `-- name: ListTaskActorRolesForEngineLocked :many
+SELECT DISTINCT role
+FROM task_actors
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
+FOR SHARE
+`
+
+type ListTaskActorRolesForEngineLockedParams struct {
+	TaskID      uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// ListTaskActorRolesForEngine with FOR SHARE. Used by the completion gate,
+// which runs inside a caller transaction whose snapshot may predate the facts.
+func (q *Queries) ListTaskActorRolesForEngineLocked(ctx context.Context, arg ListTaskActorRolesForEngineLockedParams) ([]TaskActorsRole, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskActorRolesForEngineLocked, arg.TaskID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaskActorsRole{}
+	for rows.Next() {
+		var role TaskActorsRole
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaskConstraintsForEngine = `-- name: ListTaskConstraintsForEngine :many
 SELECT
   public_id,
@@ -195,6 +291,53 @@ func (q *Queries) ListTaskConstraintsForEngine(ctx context.Context, arg ListTask
 	items := []ListTaskConstraintsForEngineRow{}
 	for rows.Next() {
 		var i ListTaskConstraintsForEngineRow
+		if err := rows.Scan(&i.PublicID, &i.Kind, &i.Expression); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskConstraintsForEngineLocked = `-- name: ListTaskConstraintsForEngineLocked :many
+SELECT
+  public_id,
+  kind,
+  expression
+FROM task_constraints
+WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
+ORDER BY sort_weight ASC, id ASC
+FOR SHARE
+`
+
+type ListTaskConstraintsForEngineLockedParams struct {
+	TaskID      uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+type ListTaskConstraintsForEngineLockedRow struct {
+	PublicID   types.PublicID      `json:"publicId"`
+	Kind       TaskConstraintsKind `json:"kind"`
+	Expression string              `json:"expression"`
+}
+
+// ListTaskConstraintsForEngine with FOR SHARE. Used by the completion gate,
+// which runs inside a caller transaction whose snapshot may predate the facts.
+func (q *Queries) ListTaskConstraintsForEngineLocked(ctx context.Context, arg ListTaskConstraintsForEngineLockedParams) ([]ListTaskConstraintsForEngineLockedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskConstraintsForEngineLocked, arg.TaskID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaskConstraintsForEngineLockedRow{}
+	for rows.Next() {
+		var i ListTaskConstraintsForEngineLockedRow
 		if err := rows.Scan(&i.PublicID, &i.Kind, &i.Expression); err != nil {
 			return nil, err
 		}

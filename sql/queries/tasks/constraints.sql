@@ -29,25 +29,29 @@ ORDER BY tc.sort_weight ASC, tc.created_at ASC, tc.public_id ASC
 LIMIT ? OFFSET ?;
 
 -- name: SatisfyConstraint :execrows
--- Mark a constraint as satisfied. satisfied_at records when it first became
--- satisfied, so re-evaluating an already satisfied constraint keeps it.
+-- Mark a constraint as satisfied. The row matches only when the outcome
+-- changes, so :execrows = 1 means "changed". An already satisfied row does not
+-- match, which keeps the time it first became satisfied.
 UPDATE task_constraints
-SET satisfied_at = COALESCE(satisfied_at, CURRENT_TIMESTAMP),
+SET satisfied_at = CURRENT_TIMESTAMP,
     failed_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND satisfied_at IS NULL;
 
 -- name: FailConstraint :execrows
--- Mark a constraint as currently failing. Clears satisfied_at so a
--- constraint that stops holding no longer reads as satisfied; failed_at keeps
--- the time the failure began across re-evaluations.
+-- Mark a constraint as currently failing; clears satisfied_at so a constraint
+-- that stops holding no longer reads as satisfied. The row matches only when
+-- the outcome changes, so :execrows = 1 means "changed". An already failing
+-- row does not match, which keeps the time the failure began.
 UPDATE task_constraints
-SET failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP),
+SET failed_at = CURRENT_TIMESTAMP,
     satisfied_at = NULL
 WHERE workspace_id = ?
   AND public_id = ?
-  AND enabled = TRUE;
+  AND enabled = TRUE
+  AND failed_at IS NULL;
 
 -- name: DeleteConstraint :execrows
 -- Soft-delete a constraint. Scoped by the owning task_id so a sibling task's

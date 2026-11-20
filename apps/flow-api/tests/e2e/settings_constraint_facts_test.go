@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"testing"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
 )
 
@@ -42,10 +42,12 @@ func TestSignalReceivedConstraintIsMetByAnAttachedSignal(t *testing.T) {
 		}, &constraintRow)
 	require.NotEmpty(t, constraintRow.ID)
 
-	satisfiedAt, _ := readConstraintMarkers(t, constraintRow.ID)
-	require.False(t, satisfiedAt.Valid, "no signal is attached yet")
-
 	wsID, taskInternalID := helpers.AgentTaskInternalIDs(t, testDB, tt.WorkspacePublicID, task.ID)
+	helpers.WaitReevalIdle(t, wsID)
+	satisfiedAt, failedAt := waitConstraintMarkers(t, constraintRow.ID, func(_, f sql.NullTime) bool { return f.Valid })
+	require.False(t, satisfiedAt.Valid, "no signal is attached yet")
+	require.True(t, failedAt.Valid, "the unmet constraint is marked failing")
+
 	_, err := testDB.Exec(
 		`INSERT INTO signals (public_id, workspace_id, task_id, source, kind, external_id, payload_json,
 			received_at, subject_type, subject_id)
@@ -56,11 +58,11 @@ func TestSignalReceivedConstraintIsMetByAnAttachedSignal(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	eng := &engine.Engine{Store: &engine.SqlcStore{WorkspaceID: wsID, Queries: generated.New(testDB)}}
-	_, err = eng.EvaluateTask(ctx, taskInternalID)
+	_, err = engine.Evaluate(ctx, testDB, wsID, taskInternalID)
 	require.NoError(t, err)
 
-	satisfiedAt, _ = readConstraintMarkers(t, constraintRow.ID)
+	helpers.WaitReevalIdle(t, wsID)
+	satisfiedAt, _ = waitConstraintMarkers(t, constraintRow.ID, func(s, _ sql.NullTime) bool { return s.Valid })
 	require.True(t, satisfiedAt.Valid, "an attached pull_request.merged signal satisfies the constraint")
 }
 

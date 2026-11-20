@@ -16,6 +16,7 @@ import (
 	"database/sql"
 	stderrors "errors"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/constraint/engine"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -172,6 +173,8 @@ type ApplyResult struct {
 //  1. acquires a FOR UPDATE row lock so concurrent transitions
 //     serialize,
 //  2. validates the requested transition against the v1 state machine,
+//     re-evaluating the task's constraints first when a review_required
+//     completion gate is about to read their verdicts,
 //  3. persists the new derived_state via the sqlc query that is the
 //     ONLY sanctioned writer of tasks.derived_state,
 //  4. appends the canonical task.transition.<name> event in the same
@@ -228,6 +231,13 @@ func ApplyTransitionTx(ctx context.Context, tx *dbretry.Tx, p ApplyParams) (Appl
 				return ApplyResult{}, apierrors.WsTaskNotFound, nil
 			}
 			return ApplyResult{}, apierrors.InternalUnexpected, err
+		}
+		// The gate reads the verdict markers, so refresh them from current
+		// facts; a verdict event failure fails the transition with it.
+		if settings.CompletionPolicy == generated.TasksCompletionPolicyReviewRequired {
+			if _, err := engine.EvaluateTaskTx(ctx, tx, p.WorkspaceID, p.TaskID); err != nil {
+				return ApplyResult{}, apierrors.InternalUnexpected, err
+			}
 		}
 		completionGate, err := qtx.CanCompleteTask(ctx, generated.CanCompleteTaskParams{
 			WorkspaceID: p.WorkspaceID,

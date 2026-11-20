@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"testing"
 	"time"
@@ -349,7 +350,12 @@ func removeTaskActorForMutationTest(t *testing.T, token, taskID, actorID string)
 
 func requireActorConstraintVerdict(t *testing.T, constraintID string, satisfied bool) {
 	t.Helper()
-	satisfiedAt, failedAt := readConstraintMarkers(t, constraintID)
+	satisfiedAt, failedAt := waitConstraintMarkers(t, constraintID, func(s, f sql.NullTime) bool {
+		if satisfied {
+			return s.Valid && !f.Valid
+		}
+		return !s.Valid && f.Valid
+	})
 	if satisfied {
 		require.True(t, satisfiedAt.Valid, "actor role constraint must be satisfied")
 		require.False(t, failedAt.Valid, "satisfied actor role constraint must clear failed_at")

@@ -697,26 +697,11 @@ type Querier interface {
 	DisableLabel(ctx context.Context, arg DisableLabelParams) (int64, error)
 	// Soft-delete a page.
 	DisablePage(ctx context.Context, arg DisablePageParams) (int64, error)
-	// Soft-disable a project. The handler must call DisableProjectChildTasks
-	// inside the same transaction to cascade enabled = FALSE down to tasks;
-	// this query alone leaves child tasks live on the underlying table.
+	// Soft-disable a project. The handler must delete the child tasks
+	// (ListEnabledProjectTaskIDsForUpdate + itemkit) inside the same
+	// transaction; this query alone leaves child tasks live on the underlying
+	// table.
 	DisableProject(ctx context.Context, arg DisableProjectParams) (int64, error)
-	// Cascade-disable every currently-enabled task that lives under a project.
-	// Must be called inside the same transaction as DisableProject so callers
-	// observe a consistent snapshot. The views (v_task_list, v_task_detail)
-	// already AND-filter projects.enabled, but bypassing the view (raw SELECT
-	// on tasks, MCP tooling, replay jobs) would otherwise still see live rows
-	// under a disabled project. updated_at is bumped explicitly so audit
-	// consumers can see the cascade event even though the column has an
-	// ON UPDATE clause already.
-	// workspace_id is included as the first WHERE clause for defense-in-depth
-	// per project DB conventions, even though project_id is globally unique.
-	//
-	// affected-rows: not-applicable — a cascade over however many live tasks
-	// the project holds, and a project with none cascades onto nothing.
-	// DisableProject runs in the same transaction and is what reports whether
-	// the project the caller named was there.
-	DisableProjectChildTasks(ctx context.Context, arg DisableProjectChildTasksParams) error
 	// Soft-delete a reaction by public id and user.
 	DisableReaction(ctx context.Context, arg DisableReactionParams) (int64, error)
 	// Soft-disable a task.
@@ -775,9 +760,10 @@ type Querier interface {
 	// stays a plain column reference and the generated types keep the
 	// nullability a LEFT JOIN implies.
 	ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error)
-	// Mark a constraint as currently failing. Clears satisfied_at so a
-	// constraint that stops holding no longer reads as satisfied; failed_at keeps
-	// the time the failure began across re-evaluations.
+	// Mark a constraint as currently failing; clears satisfied_at so a constraint
+	// that stops holding no longer reads as satisfied. The row matches only when
+	// the outcome changes, so :execrows = 1 means "changed". An already failing
+	// row does not match, which keeps the time the failure began.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error)
 	// Fail agent runs that stranded once too often. Without this the rows
 	// requeued above would cycle between pending and claimed forever,
@@ -1145,6 +1131,9 @@ type Querier interface {
 	// event time set by the eventbus producer; created_at is just the row
 	// insertion time and could drift from the event's true occurrence.
 	GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEventPublicIDAndOccurredAtParams) (GetEventPublicIDAndOccurredAtRow, error)
+	// Task an event is attached to, for constraint re-evaluation. A NULL task_id
+	// means the event is not task-scoped; ErrNoRows means no such event here.
+	GetEventTaskForReevaluation(ctx context.Context, arg GetEventTaskForReevaluationParams) (sql.NullInt32, error)
 	// Load one active source signal inside the workspace whose membership the
 	// caller already proved. Payload remains JSON data; source-specific display
 	// fields are projected by the sourceintake package, never treated as HTML.
@@ -1188,6 +1177,10 @@ type Querier interface {
 	// Current authority used by prompt snapshots and proposal-cache hits. An
 	// absent or disabled workspace membership is intentionally no row.
 	GetProposalCacheWorkspaceAccess(ctx context.Context, arg GetProposalCacheWorkspaceAccessParams) (interface{}, error)
+	// Internal id of the task a signal is attached to, through task_id or a
+	// task subject. subject_id counts only when it joins a task in the same
+	// workspace. ErrNoRows means the signal is not attached to a task.
+	GetSignalTaskForArchive(ctx context.Context, arg GetSignalTaskForArchiveParams) (uint32, error)
 	// The bucket recorded by the first drainer to start against this
 	// database, read regardless of enabled so a disabled row still blocks a
 	// drainer pointed elsewhere.
@@ -1228,15 +1221,18 @@ type Querier interface {
 	// FindTaskByPublicId, which resolves the task through the shared task ACL
 	// before it runs.
 	GetTaskAgentMemo(ctx context.Context, arg GetTaskAgentMemoParams) (json.RawMessage, error)
+	// Fetch the embedding row for a single (task_id, model) pair. Returns
+	// sql.ErrNoRows if the task has never been embedded with the given model.
+	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
 	// Queries dedicated to the constraint engine.
 	// Keyed off the internal task_id, but every read also filters on
 	// workspace_id so the SQL boundary enforces tenant isolation even if
 	// an upstream ACL check is bypassed. The engine never has to know
 	// about public_id resolution.
-	GetTaskDueOnForEngine(ctx context.Context, arg GetTaskDueOnForEngineParams) (sql.NullTime, error)
-	// Fetch the embedding row for a single (task_id, model) pair. Returns
-	// sql.ErrNoRows if the task has never been embedded with the given model.
-	GetTaskEmbedding(ctx context.Context, arg GetTaskEmbeddingParams) (GetTaskEmbeddingRow, error)
+	// Load the task an evaluation runs against and lock its row; this is the
+	// evaluation's task-row lock. ErrNoRows means the task is disabled or missing
+	// and is not evaluable.
+	GetTaskForEngine(ctx context.Context, arg GetTaskForEngineParams) (GetTaskForEngineRow, error)
 	// Task review and completion policy queries. Every task-side lookup binds
 	// both workspace_id and task_id so a public id or submission id cannot be
 	// replayed under a sibling task's route.
@@ -1560,6 +1556,10 @@ type Querier interface {
 	// rowset; dependency.open_at_most uses the kind to ignore
 	// non-blocking (informational) links.
 	ListDependencyStatesForEngine(ctx context.Context, arg ListDependencyStatesForEngineParams) ([]ListDependencyStatesForEngineRow, error)
+	// ListDependencyStatesForEngine with FOR SHARE. Used by the completion gate,
+	// which runs inside a caller transaction whose snapshot may predate the facts.
+	// Also share-locks the target tasks rows so derived_state is read current.
+	ListDependencyStatesForEngineLocked(ctx context.Context, arg ListDependencyStatesForEngineLockedParams) ([]ListDependencyStatesForEngineLockedRow, error)
 	// Tasks holding an enabled outgoing edge to the given task. Their
 	// dependency facts (ListDependencyStatesForEngine) read the given task's
 	// derived_state, so a change to it re-opens their constraints.
@@ -1609,6 +1609,10 @@ type Querier interface {
 	// (entry_kind, entry_value) is unique, so ordering by the pair is already a
 	// total order and needs no further tie-breaker.
 	ListEnabledOauthSigninAllowlistEntries(ctx context.Context) ([]ListEnabledOauthSigninAllowlistEntriesRow, error)
+	// Lock and list the enabled tasks under a project, in id order. The project
+	// disable handler deletes each one through itemkit inside the same
+	// transaction as DisableProject.
+	ListEnabledProjectTaskIDsForUpdate(ctx context.Context, arg ListEnabledProjectTaskIDsForUpdateParams) ([]uint32, error)
 	// Incremental polling source for an agent whose schedule_scope is
 	// 'assigned_tasks'. Returns events newer than since_id whose owning task
 	// has this agent as an enabled actor, filtered by the agent's
@@ -1952,6 +1956,14 @@ type Querier interface {
 	ListRetroDraftsForWorkspace(ctx context.Context, arg ListRetroDraftsForWorkspaceParams) ([]ListRetroDraftsForWorkspaceRow, error)
 	// List a user's active sessions ordered by most recent first.
 	ListSessionsForUser(ctx context.Context, arg ListSessionsForUserParams) ([]ListSessionsForUserRow, error)
+	// Subject arm of the signal.received fact, with FOR SHARE; see
+	// ListSignalKindsByTaskForEngineLocked. Follows idx_signals_subject.
+	ListSignalKindsBySubjectForEngineLocked(ctx context.Context, arg ListSignalKindsBySubjectForEngineLockedParams) ([]string, error)
+	// Task_id arm of the signal.received fact, with FOR SHARE for the completion
+	// gate (caller transaction, possibly stale snapshot). Split from the subject
+	// arm so each follows one index (idx_signals_workspace_id_task_id) and the
+	// lock covers only this task's signals, not the workspace.
+	ListSignalKindsByTaskForEngineLocked(ctx context.Context, arg ListSignalKindsByTaskForEngineLockedParams) ([]string, error)
 	// Distinct kinds of the enabled signals attached to a task, through the
 	// legacy task_id fast path or subject_type = 'task'. The constraint
 	// engine's signal.received fact.
@@ -1985,6 +1997,9 @@ type Querier interface {
 	// Distinct role names currently attached to the task via
 	// task_actors. Used to populate Facts.ActorRoles.
 	ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskActorRolesForEngineParams) ([]TaskActorsRole, error)
+	// ListTaskActorRolesForEngine with FOR SHARE. Used by the completion gate,
+	// which runs inside a caller transaction whose snapshot may predate the facts.
+	ListTaskActorRolesForEngineLocked(ctx context.Context, arg ListTaskActorRolesForEngineLockedParams) ([]TaskActorsRole, error)
 	// Human assignees for a page of tasks, in display order. Humans only,
 	// matching assignee_count in _v_task_list_all: the INNER JOIN on users drops
 	// agent actors (user_id IS NULL) and disabled users. The caller passes the
@@ -1993,6 +2008,9 @@ type Querier interface {
 	ListTaskAssigneesForTasks(ctx context.Context, arg ListTaskAssigneesForTasksParams) ([]ListTaskAssigneesForTasksRow, error)
 	// Enabled constraint rows for a task in evaluation order.
 	ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error)
+	// ListTaskConstraintsForEngine with FOR SHARE. Used by the completion gate,
+	// which runs inside a caller transaction whose snapshot may predate the facts.
+	ListTaskConstraintsForEngineLocked(ctx context.Context, arg ListTaskConstraintsForEngineLockedParams) ([]ListTaskConstraintsForEngineLockedRow, error)
 	ListTaskHumanActorsForRole(ctx context.Context, arg ListTaskHumanActorsForRoleParams) ([]ListTaskHumanActorsForRoleRow, error)
 	// Follow a task's enabled intake backlinks to their bounded source details.
 	// Source payload JSON is deliberately not returned: its display projection
@@ -2348,8 +2366,9 @@ type Querier interface {
 	RevokeWorkspaceInvite(ctx context.Context, arg RevokeWorkspaceInviteParams) (int64, error)
 	// Replace the refresh token hash, extend expiry, and record last usage on a refresh rotation.
 	RotateSessionRefreshHash(ctx context.Context, arg RotateSessionRefreshHashParams) error
-	// Mark a constraint as satisfied. satisfied_at records when it first became
-	// satisfied, so re-evaluating an already satisfied constraint keeps it.
+	// Mark a constraint as satisfied. The row matches only when the outcome
+	// changes, so :execrows = 1 means "changed". An already satisfied row does not
+	// match, which keeps the time it first became satisfied.
 	SatisfyConstraint(ctx context.Context, arg SatisfyConstraintParams) (int64, error)
 	// Search enabled pages by title pattern within a workspace.
 	// The recursive CTE filters out pages whose ancestor chain contains any

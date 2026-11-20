@@ -9,12 +9,9 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	goog "github.com/libraz/nodate-flow/apps/flow-api/internal/integrations/google"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/signalkinds"
 )
 
 // headerGoogleMessageNumber is the per-delivery counter Google attaches to
@@ -109,9 +106,7 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 		ext := googleDeliveryKey(channelID, r.Header.Get(headerGoogleMessageNumber))
 		subjectType := resolveSubjectType(kind, "")
 		subjectID := subjectIDFor(subjectType, 0)
-		pub := types.New()
-		signalInternalID, err := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
-			PublicID:    pub,
+		params := generated.InsertSignalParams{
 			WorkspaceID: wsID,
 			Source:      generated.SignalsSourceGoogle,
 			Kind:        kind,
@@ -120,47 +115,21 @@ func HandleGoogleWebhook(deps Deps) http.HandlerFunc {
 			ReceivedAt:  time.Now().UTC(),
 			SubjectType: subjectType,
 			SubjectID:   subjectID,
-		})
-		if err != nil {
-			writeError(w, apierrors.InternalUnexpected)
-			return
 		}
-		if respondIfDuplicate(ctx, w, deps, wsID, generated.SignalsSourceGoogle, ext, signalInternalID, "signals.HandleGoogleWebhook") {
-			return
-		}
-
-		// A delivery from outside still changes the workspace, so it is
-		// recorded in both logs like any other ingestion. There is no
-		// authenticated user behind it: Actor.UserID zero is what says so,
-		// and both rows carry no actor rather than a fabricated one.
-		//
-		// It sits after the duplicate check because a retry of the same
-		// notification collides on the dedupe key and writes no signals row,
-		// so there is no ingestion for it to describe.
-		deps.Mutations.Record(ctx, mutationlog.Actor{WorkspaceID: wsID}, mutationlog.Mutation{
-			EventType:    eventbus.SignalAttached,
-			AuditAction:  "signal.create",
-			ResourceType: "signal",
-			ResourceID:   pub.String(),
-			Payload: map[string]any{
-				"signalId": pub.String(),
-				"source":   "google",
-				"kind":     kind,
-			},
+		bindTaskMarker(ctx, deps, wsID, body, &params)
+		res, ispec := ingestSignal(ctx, deps, ingestInput{
+			Params:   params,
+			Actor:    mutationlog.Actor{WorkspaceID: wsID},
 			CallSite: "signals.HandleGoogleWebhook",
 		})
-
-		// Best-effort signal_judge dispatch.
-		if deps.JudgeEnqueuer != nil {
-			if jerr := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(kind)); jerr != nil {
-				slog.WarnContext(ctx, "signaljudge enqueue failed",
-					slog.Any("err", jerr),
-					slog.String("handler", "signals.HandleGoogleWebhook"),
-					slog.String("signal_public_id", pub.String()),
-					slog.String("kind", kind),
-				)
-			}
+		if ispec != nil {
+			writeError(w, ispec)
+			return
 		}
-		writeJSON(w, http.StatusAccepted, map[string]any{"id": pub.String()})
+		if res.Duplicate {
+			writeIngestDuplicate(w, res)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": res.PublicID.String()})
 	}
 }

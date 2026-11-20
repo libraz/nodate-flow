@@ -2,12 +2,11 @@
 // expressions attached to it and writes satisfied/failed markers
 // back through a Store interface.
 //
-// The engine deliberately owns no database coupling: it consumes a
-// [Store] interface and a pure [constraint.Facts] value so it can be
-// unit-tested with an in-memory fake and later wired to sqlc in a
-// thin adapter. That keeps replay equivalence a property
-// of a single, side-effect-free Go package instead of leaking DB
-// quirks into the evaluation path.
+// The evaluation loop owns no database coupling: it consumes a [Store]
+// interface, a pure [constraint.Facts] value and an [Engine.Emit] callback,
+// so it can be unit-tested with in-memory fakes. The database-backed entry
+// points ([Evaluate], [EvaluateTaskTx], [ListDependents]) live in
+// entry.go and are the only way production code runs an evaluation.
 package engine
 
 import (
@@ -26,18 +25,33 @@ type Row struct {
 	Expression []byte
 }
 
-// Store abstracts the persistence boundary so the engine can be
-// exercised with an in-memory fake. The concrete adapter lives in
-// the router / handler layer and wraps sqlc-generated queries.
-type Store interface {
-	// LoadTask returns the current facts plus every enabled
-	// task_constraints row for the given internal task id.
-	LoadTask(ctx context.Context, taskID uint32) (constraint.Facts, []Row, error)
-	// MarkSatisfied flips a constraint row to satisfied as of now.
-	MarkSatisfied(ctx context.Context, publicID string, now time.Time) error
-	// MarkFailed flips a constraint row to failing as of now.
-	MarkFailed(ctx context.Context, publicID string, now time.Time) error
+// Task is what [Store.LoadTask] returns: the task's public id, its facts
+// and its enabled constraint rows. Found is false when the task is
+// disabled or absent from the workspace; nothing is evaluated then.
+type Task struct {
+	PublicID string
+	Facts    constraint.Facts
+	Rows     []Row
+	Found    bool
 }
+
+// Store abstracts the persistence boundary so the engine can be
+// exercised with an in-memory fake.
+type Store interface {
+	// LoadTask returns the task's facts plus every enabled
+	// task_constraints row for the given internal task id.
+	LoadTask(ctx context.Context, taskID uint32) (Task, error)
+	// MarkSatisfied flips a constraint row to satisfied as of now and
+	// reports whether the stored verdict changed.
+	MarkSatisfied(ctx context.Context, publicID string, now time.Time) (changed bool, err error)
+	// MarkFailed flips a constraint row to failing as of now and reports
+	// whether the stored verdict changed.
+	MarkFailed(ctx context.Context, publicID string, now time.Time) (changed bool, err error)
+}
+
+// EmitFunc records one changed verdict. It is called once per row whose
+// stored verdict changed, after the marker was written.
+type EmitFunc func(ctx context.Context, taskID uint32, taskPublicID string, row Row, satisfied bool) error
 
 // Outcome is the per-row result surfaced to callers (metrics, tests,
 // event payloads). It is intentionally small — the engine never
@@ -47,94 +61,87 @@ type Outcome struct {
 	Kind       string
 	Expression string
 	Satisfied  bool
+	// Changed reports that this evaluation moved the stored verdict,
+	// including the first verdict on a row that had none.
+	Changed bool
 	// ParseError is populated when the stored expression could not
 	// be decoded. The row is left alone in that case: operator has
 	// to fix the bad DSL before the engine will touch it again.
 	ParseError error
 }
 
-// Engine evaluates constraints and writes the resulting markers
-// through Store. It is safe to construct per call; there is no
-// mutable state.
+// Engine evaluates constraints, writes the resulting markers through
+// Store and reports every changed verdict through Emit. It is safe to
+// construct per call; there is no mutable state.
 type Engine struct {
 	Store Store
+	// Emit receives each changed verdict. A change with no Emit is an
+	// error rather than a silently dropped event.
+	Emit EmitFunc
 	// Now lets tests freeze the clock. When nil, time.Now is used.
 	Now func() time.Time
 }
 
-// EvaluateTask loads a task's constraints, evaluates each against the
-// task facts, and writes the resulting satisfied/failed marker for
-// every row it evaluated. The store keeps the time a row first reached
-// its current outcome, so re-evaluating an unchanged row moves nothing.
-// The returned slice mirrors the stored order so callers can surface per-constraint
-// feedback in the UI.
-func (e *Engine) EvaluateTask(ctx context.Context, taskID uint32) ([]Outcome, error) {
+// errEmitMissing is returned when a verdict changed and no Emit was set.
+var errEmitMissing = errors.New("engine: verdict changed but Emit is not set")
+
+// evaluate loads a task's constraints, evaluates each against the task
+// facts, writes the resulting marker for every row it evaluated and emits
+// each changed verdict. The store keeps the time a row first reached its
+// current outcome, so re-evaluating an unchanged row moves nothing and
+// emits nothing. The returned slice mirrors the stored order.
+func (e *Engine) evaluate(ctx context.Context, taskID uint32) ([]Outcome, error) {
 	if e.Store == nil {
 		return nil, errors.New("engine: Store is required")
 	}
-	facts, rows, err := e.Store.LoadTask(ctx, taskID)
+	task, err := e.Store.LoadTask(ctx, taskID)
 	if err != nil {
 		return nil, err
+	}
+	if !task.Found {
+		return nil, nil
 	}
 	now := time.Now()
 	if e.Now != nil {
 		now = e.Now()
 	}
-	outcomes := make([]Outcome, 0, len(rows))
-	for _, r := range rows {
+	outcomes := make([]Outcome, 0, len(task.Rows))
+	for _, r := range task.Rows {
+		out := Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression)}
 		parsed, perr := constraint.Parse(r.Expression)
 		if perr != nil {
-			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), ParseError: perr})
+			out.ParseError = perr
+			outcomes = append(outcomes, out)
 			continue
 		}
-		ok, eerr := constraint.Evaluate(parsed, facts)
+		ok, eerr := constraint.Evaluate(parsed, task.Facts)
 		if eerr != nil {
-			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), ParseError: eerr})
+			out.ParseError = eerr
+			outcomes = append(outcomes, out)
 			continue
 		}
-		outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), Satisfied: ok})
+		out.Satisfied = ok
+		var changed bool
 		if ok {
-			if err := e.Store.MarkSatisfied(ctx, r.PublicID, now); err != nil {
-				return outcomes, err
-			}
+			changed, err = e.Store.MarkSatisfied(ctx, r.PublicID, now)
 		} else {
-			if err := e.Store.MarkFailed(ctx, r.PublicID, now); err != nil {
-				return outcomes, err
-			}
+			changed, err = e.Store.MarkFailed(ctx, r.PublicID, now)
+		}
+		if err != nil {
+			outcomes = append(outcomes, out)
+			return outcomes, err
+		}
+		out.Changed = changed
+		outcomes = append(outcomes, out)
+		if !changed {
+			continue
+		}
+		if e.Emit == nil {
+			return outcomes, errEmitMissing
+		}
+		if err := e.Emit(ctx, taskID, task.PublicID, r, ok); err != nil {
+			return outcomes, err
 		}
 	}
 	return outcomes, nil
-}
-
-// DependentLister is implemented by stores that can name the tasks whose
-// facts read another task's state.
-type DependentLister interface {
-	// ListDependents returns the internal ids of the enabled tasks with
-	// an enabled outgoing dependency edge to taskID.
-	ListDependents(ctx context.Context, taskID uint32) ([]uint32, error)
-}
-
-// EvaluateTaskAndDependents evaluates the task and then every task that
-// depends on it. A task's dependency facts are the derived states of its
-// edge targets, so a change to the task's state or enabled flag moves the
-// outcome of its dependents' constraints, not only its own. Every caller
-// that commits such a change calls this instead of [Engine.EvaluateTask].
-//
-// A failure on one task does not stop the rest; the errors are joined.
-func (e *Engine) EvaluateTaskAndDependents(ctx context.Context, taskID uint32) error {
-	_, err := e.EvaluateTask(ctx, taskID)
-	lister, ok := e.Store.(DependentLister)
-	if !ok {
-		return errors.Join(err, errors.New("engine: Store cannot list dependents"))
-	}
-	ids, lerr := lister.ListDependents(ctx, taskID)
-	if lerr != nil {
-		return errors.Join(err, lerr)
-	}
-	for _, id := range ids {
-		if _, derr := e.EvaluateTask(ctx, id); derr != nil {
-			err = errors.Join(err, derr)
-		}
-	}
-	return err
 }

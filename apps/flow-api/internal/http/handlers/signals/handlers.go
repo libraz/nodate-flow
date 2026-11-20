@@ -5,14 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/resolve"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
@@ -270,118 +267,30 @@ func Create(deps Deps) func(context.Context, *CreateInput) (*CreateOutput, error
 		if len(payload) == 0 {
 			payload = json.RawMessage(`{}`)
 		}
-		ext := sql.NullString{String: in.Body.ExternalID, Valid: in.Body.ExternalID != ""}
-		pub := types.New()
 		now := time.Now().UTC()
-		// Retry on transient FK deadlocks; signals shares FK lock
-		// space with tasks/workspaces.
-		var signalInternalID int64
-		if err := dbretry.Do(ctx, "signals.Create", func(ctx context.Context) error {
-			id, e := deps.Queries.InsertSignal(ctx, generated.InsertSignalParams{
-				PublicID:    pub,
+		res, ispec := ingestSignal(ctx, deps, ingestInput{
+			Params: generated.InsertSignalParams{
 				WorkspaceID: wsID,
 				TaskID:      taskFK,
 				Source:      generated.SignalsSource(in.Body.Source),
 				Kind:        in.Body.Kind,
-				ExternalID:  ext,
+				ExternalID:  sql.NullString{String: in.Body.ExternalID, Valid: in.Body.ExternalID != ""},
 				PayloadJson: payload,
 				ReceivedAt:  now,
 				SubjectType: subjectType,
 				SubjectID:   subjectID,
 				ExpiresAt:   expiresAt,
-			})
-			if e == nil {
-				signalInternalID = id
-			}
-			return e
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// INSERT IGNORE returns LastInsertId()=0 when the row collided on
-		// the workspace-scoped dedupe key (workspace_id, source,
-		// external_id) and nothing was written. In that case the freshly
-		// minted `pub` matches no persisted row, so emitting it would
-		// mis-attribute the response and writing an audit entry would spam
-		// the log on every duplicate redelivery. Short-circuit: resolve the
-		// existing row's public id and return it honestly, skipping the
-		// spurious audit write and the lifecycle/judge side effects (the
-		// judge enqueuer is already 0-guarded). When no existing row can be
-		// found (no dedupe key, e.g. NULL external_id), fall through to the
-		// normal path with the minted id.
-		if signalInternalID == 0 {
-			existing, found, lerr := resolveSignalByDedupeKey(ctx, deps.DB, wsID, generated.SignalsSource(in.Body.Source), ext)
-			if lerr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			if found {
-				return &CreateOutput{Body: Signal{
-					ID:          existing.String(),
-					TaskID:      in.Body.TaskID,
-					Source:      in.Body.Source,
-					Kind:        in.Body.Kind,
-					ExternalID:  in.Body.ExternalID,
-					Payload:     payload,
-					SubjectType: string(subjectType),
-					SubjectID:   in.Body.SubjectID,
-					ReceivedAt:  now.Unix(),
-					ExpiresAt:   in.Body.ExpiresAt,
-					CreatedAt:   now.Unix(),
-				}}, nil
-			}
-		}
-
-		// One call for one change. The timeline row and the audit row now
-		// carry the same payload, so a reader comparing the two tables
-		// cannot find them describing the ingestion differently.
-		//
-		// It is unconditional because signal.attached names the ingestion
-		// itself — an external signal persisted to `signals` — and that
-		// happened whether or not the caller also named a task. task_id is
-		// the link the per-task timeline reads and stays NULL when there
-		// is none.
-		//
-		// A service-token write carries no human actor. Actor.UserID zero
-		// is what says so, and both rows then record no actor rather than
-		// attributing the write to user id 0.
-		var taskPtr *int64
-		if taskLinked {
-			taskPtr = &taskInternal
-		}
-		deps.Mutations.Record(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: wsID}, mutationlog.Mutation{
-			EventType:    eventbus.SignalAttached,
-			AuditAction:  "signal.create",
-			ResourceType: "signal",
-			ResourceID:   pub.String(),
-			TaskID:       taskPtr,
-			Payload: map[string]any{
-				"signalId": pub.String(),
-				"source":   in.Body.Source,
-				"kind":     in.Body.Kind,
 			},
+			// A service-token write has no human actor; UserID zero records none.
+			Actor:    mutationlog.Actor{UserID: actorID, WorkspaceID: wsID},
 			CallSite: "signals.Create",
 		})
-		reevaluateSignalTask(ctx, deps, wsID, taskFK, subjectType, subjectID)
-
-		// Wake any matching signal_judge agents. The
-		// enqueuer is best-effort: a non-nil error is logged but does
-		// not fail the HTTP response — the signal row is the
-		// canonical write. signalInternalID = 0 (duplicate INSERT
-		// IGNORE) short-circuits inside EnqueueForSignal.
-		if deps.JudgeEnqueuer != nil {
-			if err := deps.JudgeEnqueuer.EnqueueForSignal(ctx, signalInternalID, wsID, signalkinds.Kind(in.Body.Kind)); err != nil {
-				slog.WarnContext(ctx, "signaljudge enqueue failed",
-					slog.Any("err", err),
-					slog.String("handler", "signals.Create"),
-					slog.String("workspace_public_id", in.Body.WorkspaceID),
-					slog.String("signal_public_id", pub.String()),
-					slog.String("kind", in.Body.Kind),
-				)
-			}
+		if ispec != nil {
+			return nil, httpErr(ispec)
 		}
 
 		out := &CreateOutput{Body: Signal{
-			ID:          pub.String(),
+			ID:          res.PublicID.String(),
 			TaskID:      in.Body.TaskID,
 			Source:      in.Body.Source,
 			Kind:        in.Body.Kind,

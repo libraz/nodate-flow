@@ -2,6 +2,8 @@ package inbox
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -148,6 +150,19 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 		if err != nil {
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
+		// Read the attached task before the archive so the event carries it.
+		var taskID *int64
+		attached, err := deps.Queries.GetSignalTaskForArchive(ctx, generated.GetSignalTaskForArchiveParams{
+			WorkspaceID: wsID,
+			PublicID:    pub,
+		})
+		switch {
+		case err == nil:
+			id := int64(attached)
+			taskID = &id
+		case !errors.Is(err, sql.ErrNoRows):
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		// Only matches items that are still in the inbox, so a zero count
 		// means the caller archived nothing. Answering ok for that is how an
 		// inbox that refuses to empty looks like it worked.
@@ -177,6 +192,7 @@ func Archive(deps Deps) func(context.Context, *ArchiveInboxInput) (*ArchiveInbox
 			AuditAction:  "inbox.archive",
 			ResourceType: "inbox_item",
 			ResourceID:   pub.String(),
+			TaskID:       taskID,
 			Payload: map[string]any{
 				"inboxItemId": pub.String(),
 			},

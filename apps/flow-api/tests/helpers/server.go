@@ -78,6 +78,7 @@ func init() {
 func StartTestServer(t *testing.T, db *sql.DB) *TestServer {
 	t.Helper()
 	require.NotNil(t, db, "StartTestServer requires a non-nil *sql.DB")
+	RegisterConstraintReevaluation(t, db)
 
 	// Derive a deterministic Ed25519 key so both routers share the
 	// same JWT signing/verification key pair.
@@ -139,6 +140,9 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 	if db == nil {
 		return nil, nil, fmt.Errorf("NewTestServer requires a non-nil *sql.DB")
 	}
+	if err := registerConstraintReevaluation(db); err != nil {
+		return nil, nil, err
+	}
 	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
 	if err != nil {
 		return nil, nil, fmt.Errorf("derive jwt key: %w", err)
@@ -198,6 +202,9 @@ func NewTestServer(db *sql.DB) (*TestServer, func(), error) {
 func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, func(), error) {
 	if db == nil {
 		return nil, nil, fmt.Errorf("NewTestServerWithStorage requires a non-nil *sql.DB")
+	}
+	if err := registerConstraintReevaluation(db); err != nil {
+		return nil, nil, err
 	}
 	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
 	if err != nil {
@@ -274,6 +281,9 @@ func NewTestServerWithStorage(db *sql.DB, bundle *StorageBundle) (*TestServer, f
 func NewTestServerWithServiceToken(db *sql.DB, serviceToken string) (*TestServer, func(), error) {
 	if db == nil {
 		return nil, nil, fmt.Errorf("NewTestServerWithServiceToken requires a non-nil *sql.DB")
+	}
+	if err := registerConstraintReevaluation(db); err != nil {
+		return nil, nil, err
 	}
 	jwtKey, err := authn.DeriveEd25519Key(testCipherHex, "nodate-flow:jwt:v1")
 	if err != nil {

@@ -136,16 +136,18 @@ var classifications = map[eventbus.Kind]classification{
 
 	// Task metadata: the task itself carries the change and the lists
 	// refresh off the stream, so a per-recipient row would be noise.
-	eventbus.TaskAttachmentAdded:   silent,
-	eventbus.TaskAttachmentRemoved: silent,
-	eventbus.TaskDependencyAdded:   silent,
-	eventbus.TaskDependencyRemoved: silent,
-	eventbus.TaskConstraintAdded:   silent,
-	eventbus.TaskConstraintRemoved: silent,
-	eventbus.TaskLabelAdded:        silent,
-	eventbus.TaskLabelRemoved:      silent,
-	eventbus.TaskArchived:          silent,
-	eventbus.TaskUnarchived:        silent,
+	eventbus.TaskAttachmentAdded:     silent,
+	eventbus.TaskAttachmentRemoved:   silent,
+	eventbus.TaskDependencyAdded:     silent,
+	eventbus.TaskDependencyRemoved:   silent,
+	eventbus.TaskConstraintAdded:     silent,
+	eventbus.TaskConstraintRemoved:   silent,
+	eventbus.TaskConstraintSatisfied: silent,
+	eventbus.TaskConstraintFailed:    silent,
+	eventbus.TaskLabelAdded:          silent,
+	eventbus.TaskLabelRemoved:        silent,
+	eventbus.TaskArchived:            silent,
+	eventbus.TaskUnarchived:          silent,
 
 	// Judge-driven task effects. The signal timeline is where these are
 	// read; a notification would duplicate the transition row the Applier

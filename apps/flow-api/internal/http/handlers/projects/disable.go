@@ -2,26 +2,27 @@ package projects
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	nflog "github.com/libraz/nodate-flow/apps/flow-api/internal/log"
 	"github.com/libraz/nodate-flow/packages/go-shared/logutil"
 )
 
 // Disable handles DELETE /projects/{prjId}.
 //
-// The handler runs DisableProjectChildTasks and DisableProject in a single
-// transaction so the cascade is atomic — callers reading the underlying
-// tables (raw SELECTs, MCP tooling, replay jobs) never observe a window
-// where the project is disabled but its tasks still claim enabled = TRUE,
-// nor the inverse. The view layer (v_task_list, v_task_detail) already
-// AND-filters projects.enabled, but bypassing the view would otherwise
-// leak orphan-looking rows.
+// One transaction locks the project's enabled tasks, deletes each through
+// itemkit (the same path as a single task delete, so each emits its
+// item.deleted / task.disabled events and cascades linked calendar events)
+// and then disables the project. Readers of the underlying tables
+// never see a disabled project with live tasks, nor the inverse.
 func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisableProjectOutput, error) {
 	return func(ctx context.Context, _ *DisableProjectInput) (*DisableProjectOutput, error) {
 		prj, ok := middleware.ProjectFromContext(ctx)
@@ -32,70 +33,64 @@ func Disable(deps Deps) func(context.Context, *DisableProjectInput) (*DisablePro
 		if !ok {
 			return nil, httpErr(apierrors.WsProjectNotFound)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
 
-		// Snapshot the count of currently-enabled child tasks BEFORE the
-		// cascade fires so the audit entry reflects the size of the
-		// affected set. Doing this inside the same transaction (after the
-		// implicit row-set lock added by the UPDATE) would also work but
-		// pre-counting is the simplest path that does not depend on the
-		// :exec-only DisableProjectChildTasks generated method exposing a
-		// sql.Result handle.
 		var childCount int64
-		if err := deps.DB.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM tasks
-			 WHERE workspace_id = ? AND project_id = ? AND enabled = TRUE`,
-			ws.ID, prj.ID,
-		).Scan(&childCount); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: count child tasks failed",
-				slog.Any("err", err),
-				slog.String("handler", "projects.Disable"),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("project", prj.PublicID),
-			)
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
+		var notFound bool
+		txErr := dbretry.InTx(ctx, deps.DB, "projects.Disable", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			childCount, notFound = 0, false
+			qtx := deps.Queries.WithTx(tx.RawTx())
+			ids, err := qtx.ListEnabledProjectTaskIDsForUpdate(ctx, generated.ListEnabledProjectTaskIDsForUpdateParams{
+				WorkspaceID: ws.ID,
+				ProjectID:   prj.ID,
+			})
+			if err != nil {
+				nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: child task list failed",
+					slog.Any("err", err),
+					slog.String("handler", "projects.Disable"),
+					logutil.LogEntity("workspace", ws.PublicID),
+					logutil.LogEntity("project", prj.PublicID),
+				)
+				return err
+			}
+			for _, id := range ids {
+				if _, err := itemkit.DeleteTask(ctx, tx, ws.ID, id, actorID); err != nil {
+					nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: child task cascade failed",
+						slog.Any("err", err),
+						slog.String("handler", "projects.Disable"),
+						logutil.LogEntity("workspace", ws.PublicID),
+						logutil.LogEntity("project", prj.PublicID),
+					)
+					return err
+				}
+			}
+			childCount = int64(len(ids))
 
-		tx, err := deps.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		defer tx.Rollback() //nolint:errcheck
-		qtx := deps.Queries.WithTx(tx)
-
-		if err := qtx.DisableProjectChildTasks(ctx, generated.DisableProjectChildTasksParams{
-			WorkspaceID: ws.ID,
-			ProjectID:   prj.ID,
-		}); err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: child task cascade failed",
-				slog.Any("err", err),
-				slog.String("handler", "projects.Disable"),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("project", prj.PublicID),
-			)
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		// Only matches a project that is still live, so a zero count means
-		// the caller named a project that is not there to archive. The child
-		// cascade above ran on nothing in that case.
-		rows, err := qtx.DisableProject(ctx, generated.DisableProjectParams{
-			WorkspaceID: ws.ID,
-			PublicID:    types.FromUUID(prj.PublicID),
+			// Only matches a project that is still live, so a zero count
+			// means the caller named a project that is not there to archive.
+			rows, err := qtx.DisableProject(ctx, generated.DisableProjectParams{
+				WorkspaceID: ws.ID,
+				PublicID:    types.FromUUID(prj.PublicID),
+			})
+			if err != nil {
+				nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: project disable failed",
+					slog.Any("err", err),
+					slog.String("handler", "projects.Disable"),
+					logutil.LogEntity("workspace", ws.PublicID),
+					logutil.LogEntity("project", prj.PublicID),
+				)
+				return err
+			}
+			if rows == 0 {
+				notFound = true
+				return errors.New("project not found")
+			}
+			return nil
 		})
-		if err != nil {
-			nflog.LoggerFromContext(ctx).ErrorContext(ctx, "projects.Disable: project disable failed",
-				slog.Any("err", err),
-				slog.String("handler", "projects.Disable"),
-				logutil.LogEntity("workspace", ws.PublicID),
-				logutil.LogEntity("project", prj.PublicID),
-			)
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-		if rows == 0 {
+		if notFound {
 			return nil, httpErr(apierrors.WsProjectNotFound)
 		}
-
-		if err := tx.Commit(); err != nil {
+		if txErr != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 

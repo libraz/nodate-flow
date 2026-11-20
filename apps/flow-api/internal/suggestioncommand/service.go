@@ -157,6 +157,18 @@ func (s *Service) Execute(ctx context.Context, in ExecuteCommand) (ExecuteResult
 
 		switch in.Action {
 		case "archive":
+			var archivedTaskID *int64
+			attached, err := q.GetSignalTaskForArchive(ctx, generated.GetSignalTaskForArchiveParams{
+				WorkspaceID: in.WorkspaceID,
+				PublicID:    in.InboxItemID,
+			})
+			switch {
+			case err == nil:
+				id := int64(attached)
+				archivedTaskID = &id
+			case !errors.Is(err, sql.ErrNoRows):
+				return apierrors.Wrap(apierrors.InternalUnexpected, err)
+			}
 			rows, err := q.ArchiveInboxItem(ctx, generated.ArchiveInboxItemParams{
 				WorkspaceID: in.WorkspaceID,
 				PublicID:    in.InboxItemID,
@@ -172,6 +184,7 @@ func (s *Service) Execute(ctx context.Context, in ExecuteCommand) (ExecuteResult
 				AuditAction:  "inbox.archive",
 				ResourceType: "inbox_item",
 				ResourceID:   in.InboxItemID.String(),
+				TaskID:       archivedTaskID,
 				Payload: map[string]any{
 					"inboxItemId": in.InboxItemID.String(),
 				},

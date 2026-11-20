@@ -310,6 +310,26 @@ func (q *Queries) GetEventPublicIDAndOccurredAt(ctx context.Context, arg GetEven
 	return i, err
 }
 
+const getEventTaskForReevaluation = `-- name: GetEventTaskForReevaluation :one
+SELECT task_id
+FROM events
+WHERE id = ? AND workspace_id = ?
+`
+
+type GetEventTaskForReevaluationParams struct {
+	ID          uint64 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Task an event is attached to, for constraint re-evaluation. A NULL task_id
+// means the event is not task-scoped; ErrNoRows means no such event here.
+func (q *Queries) GetEventTaskForReevaluation(ctx context.Context, arg GetEventTaskForReevaluationParams) (sql.NullInt32, error) {
+	row := q.db.QueryRowContext(ctx, getEventTaskForReevaluation, arg.ID, arg.WorkspaceID)
+	var task_id sql.NullInt32
+	err := row.Scan(&task_id)
+	return task_id, err
+}
+
 const listTransitionEventsForReplay = `-- name: ListTransitionEventsForReplay :many
 SELECT id, type, occurred_at, reverses_event_id
 FROM events
