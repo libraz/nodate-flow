@@ -85,3 +85,38 @@ export function createIdentifierField(opts: IdentifierFieldOptions = {}): z.ZodS
     .max(max, opts.maxKey ?? 'identifier.validation.max')
     .regex(/^[A-Za-z0-9]+$/, opts.formatKey ?? 'identifier.validation.format');
 }
+
+function randomChars(alphabet: string, length: number): string {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return out;
+}
+
+// A name with non-ASCII characters (e.g. Japanese) would derive a lossy
+// fragment like "q4"; a random value is the honest fallback there.
+const NON_ASCII = /\P{ASCII}/u;
+
+/**
+ * @brief Slug derived from a name, or `${prefix}-` plus 6 random
+ *        `[a-z0-9]` characters when the name yields nothing slug-safe.
+ */
+export function slugOrRandom(name: string, prefix: string): string {
+  const derived = NON_ASCII.test(name) ? '' : slugify(name);
+  return derived || `${prefix}-${randomChars('abcdefghijklmnopqrstuvwxyz0123456789', 6)}`;
+}
+
+/**
+ * @brief Project identifier derived from a name (first 3 letters,
+ *        uppercased), or `P` plus 3 random `[A-Z0-9]` characters.
+ */
+export function identifierOrRandom(name: string): string {
+  const derived = NON_ASCII.test(name)
+    ? ''
+    : name
+        .replace(/[^a-zA-Z]/g, '')
+        .slice(0, 3)
+        .toUpperCase();
+  return derived || `P${randomChars('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 3)}`;
+}

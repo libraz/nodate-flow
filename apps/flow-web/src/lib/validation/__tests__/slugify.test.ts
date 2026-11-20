@@ -9,7 +9,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createSlugField, DNS_LABEL_MAX_LENGTH, slugify } from '../identifier';
+import {
+  createSlugField,
+  DNS_LABEL_MAX_LENGTH,
+  identifierOrRandom,
+  slugify,
+  slugOrRandom,
+} from '../identifier';
 
 const slug = createSlugField({
   requiredKey: 'workspaces.validation.slug_required',
@@ -60,5 +66,23 @@ describe('slugify', () => {
     // The field then reports "required" rather than a format error, which is
     // the same outcome as an untouched slug input.
     expect(slugify('!!!')).toBe('');
+  });
+});
+
+describe('slugOrRandom / identifierOrRandom', () => {
+  it('uses slugify for an ASCII name', () => {
+    expect(slugOrRandom('Sales Team', 'workspace')).toBe(slugify('Sales Team'));
+  });
+
+  it('falls back to a random prefixed slug for a Japanese name', () => {
+    expect(slugOrRandom('営業チーム', 'workspace')).toMatch(/^workspace-[a-z0-9]{6}$/);
+  });
+
+  it('falls back to a random identifier for a Japanese name', () => {
+    expect(identifierOrRandom('営業チーム')).toMatch(/^P[A-Z0-9]{3}$/);
+  });
+
+  it('derives the identifier from ASCII letters', () => {
+    expect(identifierOrRandom('Marketing')).toBe('MAR');
   });
 });

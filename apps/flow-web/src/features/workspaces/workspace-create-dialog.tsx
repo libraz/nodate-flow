@@ -13,7 +13,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { createSlugField, slugify } from '../../lib/validation/identifier';
+import { createSlugField, slugify, slugOrRandom } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
 export interface WorkspaceCreateDialogProps {
@@ -50,6 +50,7 @@ export default function WorkspaceCreateDialog({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const reset = (): void => {
     setName('');
@@ -57,6 +58,7 @@ export default function WorkspaceCreateDialog({
     setSlugTouched(false);
     setDescription('');
     setErrors({});
+    setAdvancedOpen(false);
   };
 
   const handleClose = (): void => {
@@ -69,7 +71,7 @@ export default function WorkspaceCreateDialog({
     e.preventDefault();
     const parsed = schema.safeParse({
       name,
-      slug,
+      slug: slug || slugOrRandom(name, 'workspace'),
       description: description.trim() === '' ? undefined : description,
     });
     if (!parsed.success) {
@@ -81,6 +83,7 @@ export default function WorkspaceCreateDialog({
         if (field === 'description') next.description = issue.message;
       }
       setErrors(next);
+      if (next.slug) setAdvancedOpen(true);
       return;
     }
     setErrors({});
@@ -101,6 +104,7 @@ export default function WorkspaceCreateDialog({
           : undefined;
       if (code === 'WS.WORKSPACE.SLUG_ALREADY_TAKEN') {
         setErrors((prev) => ({ ...prev, slug: 'workspaces.validation.slug_taken' }));
+        setAdvancedOpen(true);
       } else {
         toaster.show({ tone: 'danger', message: t('workspaces.errors.create_failed') });
       }
@@ -140,23 +144,39 @@ export default function WorkspaceCreateDialog({
           )}
         </FormField>
 
-        <FormField
-          label={t('workspaces.form.slug')}
-          description={t('workspaces.form.slug_hint')}
-          required
-          {...(errors.slug ? { error: t(errors.slug) } : {})}
+        <details
+          open={advancedOpen}
+          onToggle={(e) => {
+            setAdvancedOpen(e.currentTarget.open);
+          }}
         >
-          {(control) => (
-            <Input
-              {...control}
-              value={slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setSlug(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
+          <summary
+            style={{
+              cursor: 'pointer',
+              color: 'var(--nf-color-fg-muted)',
+              fontSize: 'var(--nf-text-sm)',
+              marginBlockEnd: 'var(--nf-space-3)',
+            }}
+          >
+            {t('workspaces.form.advanced')}
+          </summary>
+          <FormField
+            label={t('workspaces.form.slug')}
+            description={t('workspaces.form.slug_hint')}
+            {...(errors.slug ? { error: t(errors.slug) } : {})}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                value={slug}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  setSlug(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+        </details>
 
         <FormField
           label={t('workspaces.form.description')}

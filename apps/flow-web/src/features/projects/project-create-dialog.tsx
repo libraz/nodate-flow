@@ -12,7 +12,12 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
-import { createIdentifierField, createSlugField, slugify } from '../../lib/validation/identifier';
+import {
+  createIdentifierField,
+  createSlugField,
+  identifierOrRandom,
+  slugOrRandom,
+} from '../../lib/validation/identifier';
 import { type Project, useCreateProject } from './api';
 
 export interface ProjectCreateDialogProps {
@@ -27,34 +32,6 @@ interface FieldErrors {
   slug?: string;
   identifier?: string;
   description?: string;
-}
-
-/** Random fallbacks for when the name yields nothing slug-safe (e.g. Japanese-only). */
-function randomChars(alphabet: string, length: number): string {
-  let out = '';
-  for (let i = 0; i < length; i++) {
-    out += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-  }
-  return out;
-}
-
-// A name with non-ASCII characters (e.g. Japanese) would derive a lossy
-// fragment like "q4"; a random value is the honest fallback there.
-const NON_ASCII = /\P{ASCII}/u;
-
-function deriveSlug(name: string): string {
-  const derived = NON_ASCII.test(name) ? '' : slugify(name);
-  return derived || `project-${randomChars('abcdefghijklmnopqrstuvwxyz0123456789', 6)}`;
-}
-
-function deriveIdentifier(name: string): string {
-  const derived = NON_ASCII.test(name)
-    ? ''
-    : name
-        .replace(/[^a-zA-Z]/g, '')
-        .slice(0, 3)
-        .toUpperCase();
-  return derived || `P${randomChars('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 3)}`;
 }
 
 const schema = z.object({
@@ -108,8 +85,8 @@ export default function ProjectCreateDialog({
     e.preventDefault();
     // Derived values are filled on submit as well, so a form submitted
     // before any keystroke handler ran still carries valid fallbacks.
-    const slugValue = slug || deriveSlug(name);
-    const identifierValue = identifier || deriveIdentifier(name);
+    const slugValue = slug || slugOrRandom(name, 'project');
+    const identifierValue = identifier || identifierOrRandom(name);
     const parsed = schema.safeParse({
       name,
       slug: slugValue,
@@ -184,8 +161,8 @@ export default function ProjectCreateDialog({
               onChange={(e) => {
                 const nextName = e.target.value;
                 setName(nextName);
-                if (!slugTouched) setSlug(deriveSlug(nextName));
-                if (!identifierTouched) setIdentifier(deriveIdentifier(nextName));
+                if (!slugTouched) setSlug(slugOrRandom(nextName, 'project'));
+                if (!identifierTouched) setIdentifier(identifierOrRandom(nextName));
               }}
               autoFocus
             />

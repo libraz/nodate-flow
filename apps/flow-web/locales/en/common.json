@@ -462,7 +462,8 @@
       "submit": "Save",
       "cancel": "Cancel",
       "close": "Close",
-      "slug_hint": "A short unique name for the workspace. Lowercase letters, numbers and hyphens only."
+      "slug_hint": "A short letters-and-numbers name used in URLs. Leave it empty and one is made from the name; you can change it later in Settings.",
+      "advanced": "Advanced (optional)"
     },
     "detail": {
       "projects_nav_label": "Workspace sub-sections",
@@ -589,7 +590,7 @@
       "description": "A workspace is the shared space for your team's projects, tasks, events and pages. You will be its owner and can invite others later.",
       "name_placeholder": "Acme, Personal, Team Nova...",
       "slug_placeholder": "acme",
-      "slug_hint": "Filled in from the name. Lowercase letters, numbers and hyphens; must be unique on this server. You can change it later in Settings.",
+      "slug_hint": "A short letters-and-numbers name used in URLs. Leave it empty and one is made from the name; you can change it later in Settings.",
       "submit": "Create workspace"
     },
     "description": "A workspace is the shared space for a team: its projects, tasks, calendars, pages and members.",

@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import PageHelp from '../../components/page-help';
-import { createSlugField, slugify } from '../../lib/validation/identifier';
+import { createSlugField, slugify, slugOrRandom } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
 interface FieldErrors {
@@ -45,10 +45,11 @@ export default function SetupPage(): ReactElement {
   const [slugTouched, setSlugTouched] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    const parsed = schema.safeParse({ name, slug });
+    const parsed = schema.safeParse({ name, slug: slug || slugOrRandom(name, 'workspace') });
     if (!parsed.success) {
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
@@ -57,6 +58,7 @@ export default function SetupPage(): ReactElement {
         if (field === 'slug') next.slug = issue.message;
       }
       setErrors(next);
+      if (next.slug) setAdvancedOpen(true);
       return;
     }
     setErrors({});
@@ -74,6 +76,7 @@ export default function SetupPage(): ReactElement {
           : undefined;
       if (code === 'WS.WORKSPACE.SLUG_ALREADY_TAKEN') {
         setErrors((prev) => ({ ...prev, slug: 'workspaces.validation.slug_taken' }));
+        setAdvancedOpen(true);
       } else {
         toaster.show({ tone: 'danger', message: t('workspaces.errors.create_failed') });
       }
@@ -163,26 +166,42 @@ export default function SetupPage(): ReactElement {
             )}
           </FormField>
 
-          <FormField
-            label={t('workspaces.form.slug')}
-            required
-            description={t('workspaces.setup.slug_hint')}
-            {...(errors.slug ? { error: t(errors.slug) } : {})}
+          <details
+            open={advancedOpen}
+            onToggle={(e) => {
+              setAdvancedOpen(e.currentTarget.open);
+            }}
           >
-            {(control) => (
-              <Input
-                {...control}
-                value={slug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setSlug(e.target.value);
-                }}
-                placeholder={t('workspaces.setup.slug_placeholder')}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            )}
-          </FormField>
+            <summary
+              style={{
+                cursor: 'pointer',
+                color: 'var(--nf-color-fg-muted)',
+                fontSize: 'var(--nf-text-sm)',
+                marginBlockEnd: 'var(--nf-space-3)',
+              }}
+            >
+              {t('workspaces.form.advanced')}
+            </summary>
+            <FormField
+              label={t('workspaces.form.slug')}
+              description={t('workspaces.setup.slug_hint')}
+              {...(errors.slug ? { error: t(errors.slug) } : {})}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  value={slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setSlug(e.target.value);
+                  }}
+                  placeholder={t('workspaces.setup.slug_placeholder')}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              )}
+            </FormField>
+          </details>
 
           <Button
             type="submit"
