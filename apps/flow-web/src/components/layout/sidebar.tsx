@@ -21,7 +21,15 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useCallback, useEffect, useId, useState } from 'react';
+import {
+  type ReactElement,
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
@@ -267,6 +275,7 @@ function WorkspaceArea({
   const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname, workspaceId));
   const headingId = useId();
   const moreId = useId();
+  const moreToggleRef = useRef<HTMLButtonElement>(null);
 
   if (workspaces.length === 0) {
     if (railCollapsed) {
@@ -302,6 +311,18 @@ function WorkspaceArea({
   const handleToggleMore = (): void => {
     const next = !moreOpen;
     setMoreOpen(next);
+    if (next) {
+      // Opened children land below the scroll area's edge; bring the toggle to the top.
+      requestAnimationFrame(() => {
+        const reduced =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        moreToggleRef.current?.scrollIntoView({
+          block: 'start',
+          behavior: reduced ? 'auto' : 'smooth',
+        });
+      });
+    }
     try {
       window.localStorage.setItem(MORE_STORAGE_KEY, next ? '1' : '0');
     } catch {
@@ -370,6 +391,7 @@ function WorkspaceArea({
       {railCollapsed ? null : (
         <>
           <button
+            ref={moreToggleRef}
             type="button"
             className={cx(styles.item, styles.moreToggle, 'nf-focus-ring')}
             aria-expanded={moreOpen}

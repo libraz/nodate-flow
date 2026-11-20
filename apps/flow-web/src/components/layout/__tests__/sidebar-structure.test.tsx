@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   pathname: '/today',
@@ -246,5 +246,57 @@ describe('More disclosure', () => {
 
     const toggle = await screen.findByRole('button', { name: 'nav.more' });
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  describe('scrolling the toggle into view', () => {
+    const scrollIntoView = vi.fn();
+
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('scrolls the toggle to the top when the user opens it', async () => {
+      const user = userEvent.setup();
+      renderSidebar();
+      const toggle = await screen.findByRole('button', { name: 'nav.more' });
+
+      await user.click(toggle);
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(toggle);
+      expect(scrollIntoView.mock.calls[0]?.[0]).toMatchObject({ block: 'start' });
+    });
+
+    it('does not scroll when the user closes it', async () => {
+      window.localStorage.setItem('nf.sidebar-more-open', '1');
+      const user = userEvent.setup();
+      renderSidebar();
+      const toggle = await screen.findByRole('button', { name: 'nav.more' });
+
+      await user.click(toggle);
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('does not scroll when an active child route opens it at mount', async () => {
+      mocks.pathname = '/workspaces/ws-1/activity';
+      renderSidebar();
+      const toggle = await screen.findByRole('button', { name: 'nav.more' });
+      await waitFor(() => {
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      });
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
   });
 });
