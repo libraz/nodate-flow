@@ -5,11 +5,13 @@
  *   1. Create a fresh tenant via REST.
  *   2. Inject auth and navigate to the authenticated root.
  *   3. Create a new workspace via the UI.
- *   4. Verify the workspace appears in the sidebar.
+ *   4. Verify the workspace is the active one in the sidebar and listed in
+ *      the sidebar workspace switcher menu.
  */
 
 import { expect, test } from '@playwright/test';
 
+import enCommon from '../locales/en/common.json' with { type: 'json' };
 import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 
@@ -18,10 +20,12 @@ test.describe('workspace', () => {
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
-    // Navigate to the Workspaces page via the sidebar
+    // Navigate to the Workspaces page via the sidebar workspace switcher menu
     await page.goto('/');
-    await expect(page).toHaveURL(/\//, { timeout: 10_000 });
-    await page.getByRole('link', { name: /workspaces/i }).click();
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
+    await page.getByRole('button', { name: enCommon.nav.switchWorkspace }).click();
+    await page.getByRole('menuitem', { name: enCommon.nav.allWorkspaces, exact: true }).click();
+    await expect(page).toHaveURL(/\/workspaces$/, { timeout: 10_000 });
 
     // Look for workspace creation button on the workspaces page
     const createBtn = page
@@ -34,15 +38,16 @@ test.describe('workspace', () => {
     await page.getByLabel(/^name/i).fill(wsName);
     await page.getByRole('button', { name: /save|create/i }).click();
 
-    // Verify workspace was created — after the create dialog closes,
-    // the SPA refetches the workspaces list and renders a new row in
-    // the DataGrid whose name cell is a <Link to="/workspaces/$id">
-    // carrying the new workspace name. Target that visible link
-    // explicitly so we do not match the offscreen <option> nodes
-    // inside the closed workspace-selector <select>, which Playwright
-    // also resolves via a bare `text=` locator but reports as hidden.
-    await expect(page.getByRole('link', { name: wsName, exact: true }).first()).toBeVisible({
+    // Creation activates the new workspace and lands on `/`: the sidebar
+    // heading names it, and the switcher menu lists it as the checked item.
+    await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: wsName, level: 2 })).toBeVisible({
       timeout: 10_000,
     });
+    await page.getByRole('button', { name: enCommon.nav.switchWorkspace }).click();
+    await expect(page.getByRole('menuitemradio', { name: wsName, exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   });
 });

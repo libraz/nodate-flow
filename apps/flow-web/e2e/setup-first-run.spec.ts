@@ -2,7 +2,7 @@
  * /setup first-run onboarding e2e.
  *
  * The setup route is the workspace-creation surface for an authenticated
- * user who has no workspace yet. The route loader redirects to /calendar
+ * user who has no workspace yet. The route loader redirects to `/`
  * when the user already belongs to one, so this spec registers a
  * brand-new auth-only user (no workspace) and drives the form end to
  * end:
@@ -13,7 +13,8 @@
  *      workspaces.
  *   4. Fill name → slug autocompletes from the slugified name.
  *   5. Submit → backend creates the workspace and the SPA navigates to
- *      /calendar.
+ *      `/`, where the onboarding checklist and the sidebar workspace
+ *      heading show the new workspace.
  *
  * Fresh user is created per-test so reruns are deterministic — the
  * shared tenant pool from `globalSetup` already has workspaces and
@@ -26,6 +27,7 @@ import enCommon from '../locales/en/common.json' with { type: 'json' };
 import { AUTH_API_URL } from './fixtures/tenant';
 
 const copy = {
+  onboardingTitle: enCommon.onboarding.title,
   title: enCommon.workspaces.setup.title,
   description: enCommon.workspaces.setup.description,
   namePlaceholder: enCommon.workspaces.setup.name_placeholder,
@@ -95,7 +97,7 @@ async function loginInContext(
 }
 
 test.describe('setup first-run', () => {
-  test('registers, fills the form, creates a workspace, and lands on /calendar', async ({
+  test('registers, fills the form, creates a workspace, and lands on / with the checklist', async ({
     page,
   }) => {
     const fresh = await registerWorkspaceless();
@@ -125,21 +127,25 @@ test.describe('setup first-run', () => {
     await expect(slugInput).toHaveValue(expectedSlug, { timeout: 2_000 });
 
     // Submit → backend creates the workspace and the SPA replaces /setup
-    // with /calendar (it never re-renders the setup form post-success).
+    // with `/` (it never re-renders the setup form post-success).
     await page.getByRole('button', { name: copy.submit, exact: true }).click();
-    await expect(page).toHaveURL(/\/calendar$/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: copy.onboardingTitle })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole('heading', { name: wsName, level: 2 })).toBeVisible();
   });
 
   test('redirects users who already have a workspace away from /setup', async ({ page }) => {
     // The shared `user` tenant from globalSetup already has a workspace.
-    // Visiting /setup must redirect to /calendar without rendering the form.
+    // Visiting /setup must redirect to `/` without rendering the form.
     const { loadTenants } = await import('./fixtures/load-tenants');
     const { injectAuth } = await import('./fixtures/tenant');
     const { user: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     await page.goto('/setup');
-    await expect(page).toHaveURL(/\/calendar$/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
     await expect(page.getByRole('heading', { name: copy.title, level: 1 })).toHaveCount(0);
   });
 });

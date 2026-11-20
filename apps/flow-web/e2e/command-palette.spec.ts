@@ -22,7 +22,7 @@ import { injectAuth } from './fixtures/tenant';
 /**
  * Per-locale palette row label, typed query, and /today heading. The
  * palette filter is a case-insensitive `includes` against the translated
- * `nav.today` key, which is "My tasks" in EN and "今日のタスク" in JA.
+ * `nav.today` key, which is "My tasks" in EN and "マイタスク" in JA.
  */
 interface LocaleStrings {
   rowLabel: RegExp;
@@ -32,7 +32,7 @@ interface LocaleStrings {
 
 const TODAY_STRINGS = {
   en: { rowLabel: /^My tasks$/, query: 'my tasks', heading: /^My tasks$/ },
-  ja: { rowLabel: /^今日のタスク$/, query: '今日のタスク', heading: /^今日のタスク$/ },
+  ja: { rowLabel: /^マイタスク$/, query: 'マイタスク', heading: /^マイタスク$/ },
 } as const satisfies Record<string, LocaleStrings>;
 
 function pickLocale(lang: string | null): LocaleStrings {

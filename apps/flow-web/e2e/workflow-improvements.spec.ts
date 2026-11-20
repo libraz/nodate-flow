@@ -831,10 +831,10 @@ test.describe('workflow improvements business paths', () => {
       const localized = copy.en;
 
       await page.goto('/inbox');
-      await page
-        .locator('header')
-        .getByLabel(localized.common.topbar.workspace.switcher)
-        .selectOption(owner.workspaceId);
+      await page.getByRole('button', { name: localized.common.nav.switchWorkspace }).click();
+      // createTestTenant names the workspace `E2E Workspace <suffix>` and slugs it `ws-<suffix>`.
+      const ownerWorkspaceName = `E2E Workspace ${owner.workspaceSlug.replace(/^ws-/, '')}`;
+      await page.getByRole('menuitemradio', { name: ownerWorkspaceName, exact: true }).click();
       await page
         .getByRole('main')
         .getByLabel(localized.inbox.filter.workspace_label)
@@ -914,7 +914,9 @@ test.describe('workflow improvements business paths', () => {
       const inlineSuggestions = page.getByRole('region', {
         name: localized.ai.triage.result_title,
       });
-      await expect(inlineSuggestions.getByText('snooze', { exact: true })).toBeVisible({
+      await expect(
+        inlineSuggestions.getByText(localized.ai.edit.action.snooze, { exact: true }),
+      ).toBeVisible({
         timeout: 20_000,
       });
       await expect(
@@ -926,7 +928,7 @@ test.describe('workflow improvements business paths', () => {
       await expect(dock.getByText('snooze — manual from manual', { exact: true })).toBeVisible({
         timeout: 15_000,
       });
-      await expect(dock.getByText('snooze', { exact: true })).toBeVisible();
+      await expect(dock.getByText(localized.ai.edit.action.snooze, { exact: true })).toBeVisible();
       await attachView(page, 'triage-deterministic-dock-snooze');
 
       // Keep the browser session open while the owner revokes actual
@@ -956,7 +958,7 @@ test.describe('workflow improvements business paths', () => {
       ).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText(sourceTitle, { exact: true })).toBeVisible();
       await expect(dock.getByText('snooze — manual from manual', { exact: true })).toBeVisible();
-      await expect(dock.getByText('snooze', { exact: true })).toBeVisible();
+      await expect(dock.getByText(localized.ai.edit.action.snooze, { exact: true })).toBeVisible();
       await attachView(page, 'triage-dock-permission-error-pending');
 
       const afterDenied = await requestJson<{
