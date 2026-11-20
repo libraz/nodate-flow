@@ -155,6 +155,7 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   a.created_at
 FROM calendar_event_attendees a
 INNER JOIN users u ON u.id = a.user_id AND u.enabled = TRUE
@@ -170,15 +171,16 @@ type ListCalendarEventAttendeesParams struct {
 }
 
 type ListCalendarEventAttendeesRow struct {
-	ID           uint32                     `json:"-"`
-	PublicID     types.PublicID             `json:"publicId"`
-	UserID       uint32                     `json:"-"`
-	Rsvp         CalendarEventAttendeesRsvp `json:"rsvp"`
-	CanEdit      bool                       `json:"canEdit"`
-	UserPublicID types.PublicID             `json:"userPublicId"`
-	DisplayName  string                     `json:"displayName"`
-	AvatarUrl    sql.NullString             `json:"avatarUrl"`
-	CreatedAt    time.Time                  `json:"createdAt"`
+	ID                    uint32                     `json:"-"`
+	PublicID              types.PublicID             `json:"publicId"`
+	UserID                uint32                     `json:"-"`
+	Rsvp                  CalendarEventAttendeesRsvp `json:"rsvp"`
+	CanEdit               bool                       `json:"canEdit"`
+	UserPublicID          types.PublicID             `json:"userPublicId"`
+	DisplayName           string                     `json:"displayName"`
+	AvatarUrl             sql.NullString             `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32              `json:"-"`
+	CreatedAt             time.Time                  `json:"createdAt"`
 }
 
 // List all attendees for an event with user profile info.
@@ -206,6 +208,7 @@ func (q *Queries) ListCalendarEventAttendees(ctx context.Context, arg ListCalend
 			&i.UserPublicID,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -125,7 +125,7 @@ func ListDiscoverableCalendars(deps Deps) func(context.Context, *ListDiscoverabl
 				CreatedAt:        r.CreatedAt.Unix(),
 			}
 			resp.Description = dbtype.PtrFromNullString(r.Description)
-			resp.OwnerAvatarURL = handlerutil.AvatarURLPtr(r.OwnerAvatarUrl, r.OwnerPublicID)
+			resp.OwnerAvatarURL = handlerutil.AvatarURLPtr(r.OwnerAvatarUrl, r.OwnerAvatarStorageObjectID, r.OwnerPublicID)
 			out.Body.Calendars[i] = resp
 		}
 		return out, nil

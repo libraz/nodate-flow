@@ -21,6 +21,7 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   ta.role,
   ta.updated_at,
   ta.created_at,

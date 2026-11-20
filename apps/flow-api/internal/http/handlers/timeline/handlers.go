@@ -14,7 +14,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/suggestionprivacy"
 	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
@@ -37,7 +36,7 @@ type timelineRow struct {
 	actorPublicID              []byte
 	actorDisplayName           sql.NullString
 	actorAvatarURL             sql.NullString
-	actorAvatarStorageObjectID sql.NullInt64
+	actorAvatarStorageObjectID sql.NullInt32
 	actorAgentPublicID         []byte
 	actorAgentName             string
 	actorSystemSource          sql.NullString
@@ -240,19 +239,12 @@ func toDTO(r timelineRow) Event {
 // over avatar_url so a stale external provider value cannot mask the
 // user-owned object. The internal storage FK is converted to an opaque
 // cache tag before the browser URL is exposed.
-func resolveActorAvatarURL(actorPublicID []byte, stored sql.NullString, storageObjectID sql.NullInt64) string {
+func resolveActorAvatarURL(actorPublicID []byte, stored sql.NullString, storageObjectID sql.NullInt32) string {
 	userPublicID := uuidFromBytes(actorPublicID)
 	if userPublicID == "" {
 		return ""
 	}
-	if storageObjectID.Valid && storageObjectID.Int64 > 0 {
-		return avatarutil.ProxyURL(userPublicID, avatarutil.OpaqueTag(uint64(storageObjectID.Int64)), "")
-	}
-	id, err := uuid.Parse(userPublicID)
-	if err != nil {
-		return ""
-	}
-	return handlerutil.AvatarURL(stored, types.FromUUID(id))
+	return avatarutil.Resolve(storageObjectID, stored, userPublicID, "")
 }
 
 // resolveActorFilter parses the optional actor query parameter into the

@@ -155,7 +155,7 @@ func (s *inviteStub) attendeeRows() driver.Rows {
 	return &stubRows{
 		cols: []string{
 			"id", "public_id", "user_id", "rsvp", "can_edit",
-			"user_public_id", "display_name", "avatar_url", "created_at",
+			"user_public_id", "display_name", "avatar_url", "avatar_storage_object_id", "created_at",
 		},
 		n: s.attendees,
 		row: func(i int) []driver.Value {
@@ -163,7 +163,7 @@ func (s *inviteStub) attendeeRows() driver.Rows {
 			user := types.New()
 			return []driver.Value{
 				int64(i), append([]byte(nil), pub[:]...), int64(i), []byte("pending"), false,
-				append([]byte(nil), user[:]...), "Attendee", nil, time.Now(),
+				append([]byte(nil), user[:]...), "Attendee", nil, nil, time.Now(),
 			}
 		},
 	}

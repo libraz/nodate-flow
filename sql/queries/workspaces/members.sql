@@ -37,6 +37,7 @@ SELECT
   v.email,
   v.display_name,
   v.avatar_url,
+  v.avatar_storage_object_id,
   v.role,
   v.invited_at,
   v.joined_at,

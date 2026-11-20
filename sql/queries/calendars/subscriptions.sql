@@ -47,6 +47,7 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   cs.created_at
 FROM calendar_subscriptions cs
 INNER JOIN users u ON u.id = cs.user_id AND u.enabled = TRUE

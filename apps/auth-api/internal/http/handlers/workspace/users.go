@@ -6,6 +6,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	apierrors "github.com/libraz/nodate-flow/apps/auth-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 )
 
 // ListUsers handles GET /workspaces/{wsId}/users. It returns a minimal
@@ -31,7 +32,7 @@ func ListUsers(deps Deps) func(context.Context, *ListWorkspaceUsersInput) (*List
 			out.Body.Users = append(out.Body.Users, WorkspaceUserSummary{
 				ID:          r.UserPublicID.String(),
 				DisplayName: r.DisplayName,
-				AvatarURL:   nullStr(r.AvatarUrl),
+				AvatarURL:   avatarutil.Resolve(r.AvatarStorageObjectID, r.AvatarUrl, r.UserPublicID.String(), ""),
 			})
 		}
 		return out, nil

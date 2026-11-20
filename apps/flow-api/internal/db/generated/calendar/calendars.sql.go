@@ -315,6 +315,7 @@ SELECT
   uo.public_id AS owner_public_id,
   uo.display_name AS owner_display_name,
   uo.avatar_url AS owner_avatar_url,
+  uo.avatar_storage_object_id AS owner_avatar_storage_object_id,
   c.system_slug,
   c.updated_at,
   c.created_at
@@ -345,20 +346,21 @@ type ListDiscoverableCalendarsInWorkspaceParams struct {
 }
 
 type ListDiscoverableCalendarsInWorkspaceRow struct {
-	ID               uint32         `json:"-"`
-	PublicID         types.PublicID `json:"publicId"`
-	Kind             CalendarsKind  `json:"kind"`
-	Name             string         `json:"name"`
-	Description      sql.NullString `json:"description"`
-	Color            string         `json:"color"`
-	CoverUrl         sql.NullString `json:"coverUrl"`
-	OwnerUserID      sql.NullInt32  `json:"-"`
-	OwnerPublicID    types.PublicID `json:"ownerPublicId"`
-	OwnerDisplayName string         `json:"ownerDisplayName"`
-	OwnerAvatarUrl   sql.NullString `json:"ownerAvatarUrl"`
-	SystemSlug       sql.NullString `json:"systemSlug"`
-	UpdatedAt        sql.NullTime   `json:"updatedAt"`
-	CreatedAt        time.Time      `json:"createdAt"`
+	ID                         uint32         `json:"-"`
+	PublicID                   types.PublicID `json:"publicId"`
+	Kind                       CalendarsKind  `json:"kind"`
+	Name                       string         `json:"name"`
+	Description                sql.NullString `json:"description"`
+	Color                      string         `json:"color"`
+	CoverUrl                   sql.NullString `json:"coverUrl"`
+	OwnerUserID                sql.NullInt32  `json:"-"`
+	OwnerPublicID              types.PublicID `json:"ownerPublicId"`
+	OwnerDisplayName           string         `json:"ownerDisplayName"`
+	OwnerAvatarUrl             sql.NullString `json:"ownerAvatarUrl"`
+	OwnerAvatarStorageObjectID sql.NullInt32  `json:"-"`
+	SystemSlug                 sql.NullString `json:"systemSlug"`
+	UpdatedAt                  sql.NullTime   `json:"updatedAt"`
+	CreatedAt                  time.Time      `json:"createdAt"`
 }
 
 // List teammate personal calendars in a workspace that the actor is not
@@ -392,6 +394,7 @@ func (q *Queries) ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg 
 			&i.OwnerPublicID,
 			&i.OwnerDisplayName,
 			&i.OwnerAvatarUrl,
+			&i.OwnerAvatarStorageObjectID,
 			&i.SystemSlug,
 			&i.UpdatedAt,
 			&i.CreatedAt,

@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
@@ -73,7 +74,7 @@ func rowToMember(r generated.ListWorkspaceMembersRow) WorkspaceMember {
 		UserID:      r.UserPublicID.String(),
 		Email:       r.Email,
 		DisplayName: r.DisplayName,
-		AvatarURL:   nullStr(r.AvatarUrl),
+		AvatarURL:   avatarutil.Resolve(r.AvatarStorageObjectID, r.AvatarUrl, r.UserPublicID.String(), ""),
 		Role:        string(r.Role),
 		InvitedAt:   nullTimeUnix(r.InvitedAt),
 		JoinedAt:    nullTimeUnix(r.JoinedAt),

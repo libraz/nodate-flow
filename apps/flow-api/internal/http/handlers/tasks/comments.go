@@ -235,7 +235,7 @@ func rowToCommentKeyset(r generated.ListCommentsForTaskKeysetRow) TaskComment {
 		AuthorKind:        string(r.AuthorKind),
 		AuthorAgentID:     commentAuthorAgentID(r.AuthorAgentPublicID),
 		AuthorDisplayName: r.AuthorDisplayName,
-		AuthorAvatarURL:   handlerutil.AvatarURL(r.AuthorAvatarUrl, r.AuthorPublicID),
+		AuthorAvatarURL:   handlerutil.AvatarURL(r.AuthorAvatarUrl, r.AuthorAvatarStorageObjectID, r.AuthorPublicID),
 		Body:              r.Body,
 		EditedAt:          nullTimeUnix(r.EditedAt),
 		UpdatedAt:         nullTimeUnix(r.UpdatedAt),

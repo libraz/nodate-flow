@@ -188,7 +188,7 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			Role:        input.Body.Role,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		out.Body.AvatarURL = handlerutil.AvatarURLPtr(user.AvatarUrl, user.PublicID)
+		out.Body.AvatarURL = handlerutil.AvatarURLPtr(user.AvatarUrl, user.AvatarStorageObjectID, user.PublicID)
 
 		// The membership is named by the user it grants, the same way the
 		// two operations that change and withdraw it are, so an
@@ -443,6 +443,6 @@ func memberFromRow(r calendar.ListCalendarMembersRow) MemberResponse {
 		Role:        string(r.Role),
 		CreatedAt:   r.CreatedAt.Unix(),
 	}
-	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.UserPublicID)
+	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.AvatarStorageObjectID, r.UserPublicID)
 	return resp
 }

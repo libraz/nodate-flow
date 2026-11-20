@@ -130,7 +130,7 @@ func (e rangeEvent) createdAt() int64           { return handlerutil.TimeToUnix(
 func (e rangeEvent) creatorID() string          { return creatorPublicIDString(e.r.CreatorPublicID) }
 func (e rangeEvent) creatorDisplayName() string { return e.r.CreatorDisplayName.String }
 func (e rangeEvent) creatorAvatarURL() *string {
-	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorPublicID)
+	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorAvatarStorageObjectID, e.r.CreatorPublicID)
 }
 
 // recurringEvent adapts ListRecurringCalendarEventsByRangeRow.
@@ -154,7 +154,7 @@ func (e recurringEvent) creatorDisplayName() string {
 	return e.r.CreatorDisplayName.String
 }
 func (e recurringEvent) creatorAvatarURL() *string {
-	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorPublicID)
+	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorAvatarStorageObjectID, e.r.CreatorPublicID)
 }
 
 // fullEvent adapts FindCalendarEventByPublicIdRow.
@@ -176,7 +176,7 @@ func (e fullEvent) createdAt() int64           { return handlerutil.TimeToUnix(e
 func (e fullEvent) creatorID() string          { return creatorPublicIDString(e.r.CreatorPublicID) }
 func (e fullEvent) creatorDisplayName() string { return e.r.CreatorDisplayName.String }
 func (e fullEvent) creatorAvatarURL() *string {
-	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorPublicID)
+	return handlerutil.AvatarURLPtr(e.r.CreatorAvatarUrl, e.r.CreatorAvatarStorageObjectID, e.r.CreatorPublicID)
 }
 
 // eventFromRangeRow converts a ListCalendarEventsByRange row into the

@@ -138,6 +138,7 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   cm.created_at
 FROM calendar_members cm
 INNER JOIN users u ON u.id = cm.user_id AND u.enabled = TRUE
@@ -153,15 +154,16 @@ type ListCalendarMembersParams struct {
 }
 
 type ListCalendarMembersRow struct {
-	PublicID     types.PublicID      `json:"publicId"`
-	UserID       uint32              `json:"-"`
-	Role         CalendarMembersRole `json:"role"`
-	MemberColor  string              `json:"memberColor"`
-	SortWeight   int32               `json:"sortWeight"`
-	UserPublicID types.PublicID      `json:"userPublicId"`
-	DisplayName  string              `json:"displayName"`
-	AvatarUrl    sql.NullString      `json:"avatarUrl"`
-	CreatedAt    time.Time           `json:"createdAt"`
+	PublicID              types.PublicID      `json:"publicId"`
+	UserID                uint32              `json:"-"`
+	Role                  CalendarMembersRole `json:"role"`
+	MemberColor           string              `json:"memberColor"`
+	SortWeight            int32               `json:"sortWeight"`
+	UserPublicID          types.PublicID      `json:"userPublicId"`
+	DisplayName           string              `json:"displayName"`
+	AvatarUrl             sql.NullString      `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32       `json:"-"`
+	CreatedAt             time.Time           `json:"createdAt"`
 }
 
 // List a calendar's members with the role and shared colour each holds.
@@ -183,6 +185,7 @@ func (q *Queries) ListCalendarMembers(ctx context.Context, arg ListCalendarMembe
 			&i.UserPublicID,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -170,6 +170,7 @@ SELECT
   v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
+  v.author_avatar_storage_object_id,
   v.body,
   v.edited_at,
   v.updated_at,
@@ -190,17 +191,18 @@ type ListCommentsForTaskParams struct {
 }
 
 type ListCommentsForTaskRow struct {
-	PublicID            types.PublicID     `json:"publicId"`
-	AuthorKind          CommentsAuthorKind `json:"authorKind"`
-	AuthorPublicID      types.PublicID     `json:"authorPublicId"`
-	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
-	AuthorDisplayName   string             `json:"authorDisplayName"`
-	AuthorAvatarUrl     sql.NullString     `json:"authorAvatarUrl"`
-	Body                string             `json:"body"`
-	EditedAt            sql.NullTime       `json:"editedAt"`
-	UpdatedAt           sql.NullTime       `json:"updatedAt"`
-	CreatedAt           time.Time          `json:"createdAt"`
-	Total               interface{}        `json:"total"`
+	PublicID                    types.PublicID     `json:"publicId"`
+	AuthorKind                  CommentsAuthorKind `json:"authorKind"`
+	AuthorPublicID              types.PublicID     `json:"authorPublicId"`
+	AuthorAgentPublicID         interface{}        `json:"authorAgentPublicId"`
+	AuthorDisplayName           string             `json:"authorDisplayName"`
+	AuthorAvatarUrl             sql.NullString     `json:"authorAvatarUrl"`
+	AuthorAvatarStorageObjectID sql.NullInt32      `json:"-"`
+	Body                        string             `json:"body"`
+	EditedAt                    sql.NullTime       `json:"editedAt"`
+	UpdatedAt                   sql.NullTime       `json:"updatedAt"`
+	CreatedAt                   time.Time          `json:"createdAt"`
+	Total                       interface{}        `json:"total"`
 }
 
 // List comments on a task joined with author display fields.
@@ -227,6 +229,7 @@ func (q *Queries) ListCommentsForTask(ctx context.Context, arg ListCommentsForTa
 			&i.AuthorAgentPublicID,
 			&i.AuthorDisplayName,
 			&i.AuthorAvatarUrl,
+			&i.AuthorAvatarStorageObjectID,
 			&i.Body,
 			&i.EditedAt,
 			&i.UpdatedAt,
@@ -254,6 +257,7 @@ SELECT
   v.author_agent_public_id,
   v.author_display_name,
   v.author_avatar_url,
+  v.author_avatar_storage_object_id,
   v.body,
   v.edited_at,
   v.updated_at,
@@ -278,16 +282,17 @@ type ListCommentsForTaskKeysetParams struct {
 }
 
 type ListCommentsForTaskKeysetRow struct {
-	PublicID            types.PublicID     `json:"publicId"`
-	AuthorKind          CommentsAuthorKind `json:"authorKind"`
-	AuthorPublicID      types.PublicID     `json:"authorPublicId"`
-	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
-	AuthorDisplayName   string             `json:"authorDisplayName"`
-	AuthorAvatarUrl     sql.NullString     `json:"authorAvatarUrl"`
-	Body                string             `json:"body"`
-	EditedAt            sql.NullTime       `json:"editedAt"`
-	UpdatedAt           sql.NullTime       `json:"updatedAt"`
-	CreatedAt           time.Time          `json:"createdAt"`
+	PublicID                    types.PublicID     `json:"publicId"`
+	AuthorKind                  CommentsAuthorKind `json:"authorKind"`
+	AuthorPublicID              types.PublicID     `json:"authorPublicId"`
+	AuthorAgentPublicID         interface{}        `json:"authorAgentPublicId"`
+	AuthorDisplayName           string             `json:"authorDisplayName"`
+	AuthorAvatarUrl             sql.NullString     `json:"authorAvatarUrl"`
+	AuthorAvatarStorageObjectID sql.NullInt32      `json:"-"`
+	Body                        string             `json:"body"`
+	EditedAt                    sql.NullTime       `json:"editedAt"`
+	UpdatedAt                   sql.NullTime       `json:"updatedAt"`
+	CreatedAt                   time.Time          `json:"createdAt"`
 }
 
 // Keyset-paginated variant of ListCommentsForTask.
@@ -325,6 +330,7 @@ func (q *Queries) ListCommentsForTaskKeyset(ctx context.Context, arg ListComment
 			&i.AuthorAgentPublicID,
 			&i.AuthorDisplayName,
 			&i.AuthorAvatarUrl,
+			&i.AuthorAvatarStorageObjectID,
 			&i.Body,
 			&i.EditedAt,
 			&i.UpdatedAt,

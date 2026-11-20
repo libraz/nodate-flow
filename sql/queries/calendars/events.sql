@@ -56,6 +56,7 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
+  uc.avatar_storage_object_id AS creator_avatar_storage_object_id,
   ce.block_label,
   COALESCE(ce.recurrence_rule, CAST('null' AS JSON)) AS recurrence_rule,
   ce.recurrence_end,
@@ -96,6 +97,7 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
+  uc.avatar_storage_object_id AS creator_avatar_storage_object_id,
   ce.block_label,
   ce.notification_offset,
   ce.task_id,
@@ -153,6 +155,7 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
+  uc.avatar_storage_object_id AS creator_avatar_storage_object_id,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -346,6 +349,7 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
+  uc.avatar_storage_object_id AS creator_avatar_storage_object_id,
   (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
      WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a
@@ -440,6 +444,7 @@ SELECT
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
   uc.avatar_url AS creator_avatar_url,
+  uc.avatar_storage_object_id AS creator_avatar_storage_object_id,
   (SELECT COUNT(DISTINCT a.user_id) FROM calendar_event_attendees a
      WHERE a.event_id IN (ce.id, ce.recurrence_parent_id) AND a.enabled = TRUE) AS attendee_count,
   EXISTS(SELECT 1 FROM calendar_event_attendees a

@@ -1,6 +1,7 @@
 package avatarutil
 
 import (
+	"database/sql"
 	"slices"
 	"strings"
 	"testing"
@@ -198,5 +199,106 @@ func TestProxyURL(t *testing.T) {
 					tc.userPublicID, tc.tag, tc.publicBaseURL, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestResolve(t *testing.T) {
+	t.Parallel()
+
+	const (
+		uid  = "01900000-0000-7000-8000-000000000001"
+		base = "https://auth.example.com"
+	)
+	tests := []struct {
+		name            string
+		storageObjectID sql.NullInt32
+		stored          sql.NullString
+		want            string
+	}{
+		{
+			name:            "storage object wins over an external URL",
+			storageObjectID: sql.NullInt32{Int32: 42, Valid: true},
+			stored:          sql.NullString{String: "https://lh3.googleusercontent.com/a/AcjK=s96-c", Valid: true},
+			want:            ProxyURL(uid, OpaqueTag(42), base),
+		},
+		{
+			name:            "storage object with empty stored",
+			storageObjectID: sql.NullInt32{Int32: 42, Valid: true},
+			stored:          sql.NullString{String: "", Valid: true},
+			want:            ProxyURL(uid, OpaqueTag(42), base),
+		},
+		{
+			name:            "storage object with null stored",
+			storageObjectID: sql.NullInt32{Int32: 42, Valid: true},
+			want:            ProxyURL(uid, OpaqueTag(42), base),
+		},
+		{
+			name:            "null storage object passes https through",
+			storageObjectID: sql.NullInt32{},
+			stored:          sql.NullString{String: "https://lh3.googleusercontent.com/a/AcjK=s96-c", Valid: true},
+			want:            "https://lh3.googleusercontent.com/a/AcjK=s96-c",
+		},
+		{
+			name:            "zero storage object falls back to stored",
+			storageObjectID: sql.NullInt32{Int32: 0, Valid: true},
+			stored:          sql.NullString{String: "https://cdn.example/a.jpg", Valid: true},
+			want:            "https://cdn.example/a.jpg",
+		},
+		{
+			name:            "negative storage object falls back to stored",
+			storageObjectID: sql.NullInt32{Int32: -1, Valid: true},
+			stored:          sql.NullString{String: "https://cdn.example/a.jpg", Valid: true},
+			want:            "https://cdn.example/a.jpg",
+		},
+		{
+			name:   "no storage object rewrites a storage key to the proxy URL",
+			stored: sql.NullString{String: "avatars/01900000-0000-7000-8000-000000000001/01910000-0000-7000-8000-000000000abc.jpg", Valid: true},
+			want:   base + "/avatars/" + uid + "?v=01910000",
+		},
+		{
+			name: "neither yields empty",
+			want: "",
+		},
+		{
+			name:   "valid but empty stored yields empty",
+			stored: sql.NullString{String: "", Valid: true},
+			want:   "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Resolve(tc.storageObjectID, tc.stored, uid, base); got != tc.want {
+				t.Fatalf("Resolve(%v, %v, %q, %q) = %q; want %q",
+					tc.storageObjectID, tc.stored, uid, base, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolvePtr(t *testing.T) {
+	t.Parallel()
+
+	const (
+		uid  = "01900000-0000-7000-8000-000000000001"
+		base = "https://auth.example.com"
+	)
+
+	if got := ResolvePtr(sql.NullInt32{}, sql.NullString{}, uid, base); got != nil {
+		t.Fatalf("ResolvePtr with neither = %q; want nil", *got)
+	}
+	if got := ResolvePtr(sql.NullInt32{}, sql.NullString{Valid: true}, uid, base); got != nil {
+		t.Fatalf("ResolvePtr with empty stored = %q; want nil", *got)
+	}
+
+	got := ResolvePtr(sql.NullInt32{Int32: 42, Valid: true}, sql.NullString{}, uid, base)
+	if got == nil || *got != ProxyURL(uid, OpaqueTag(42), base) {
+		t.Fatalf("ResolvePtr with storage object = %v; want proxy URL", got)
+	}
+
+	const ext = "https://cdn.example/a.jpg"
+	got = ResolvePtr(sql.NullInt32{}, sql.NullString{String: ext, Valid: true}, uid, base)
+	if got == nil || *got != ext {
+		t.Fatalf("ResolvePtr with external URL = %v; want %q", got, ext)
 	}
 }

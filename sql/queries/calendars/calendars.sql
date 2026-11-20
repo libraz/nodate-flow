@@ -132,6 +132,7 @@ SELECT
   uo.public_id AS owner_public_id,
   uo.display_name AS owner_display_name,
   uo.avatar_url AS owner_avatar_url,
+  uo.avatar_storage_object_id AS owner_avatar_storage_object_id,
   c.system_slug,
   c.updated_at,
   c.created_at

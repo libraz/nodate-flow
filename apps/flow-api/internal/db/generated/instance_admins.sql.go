@@ -127,6 +127,7 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   ia.granted_at,
   ia.revoked_at,
   ia.notes,
@@ -148,18 +149,19 @@ type AdminListInstanceAdminsParams struct {
 }
 
 type AdminListInstanceAdminsRow struct {
-	PublicID             types.PublicID `json:"publicId"`
-	UserPublicID         types.PublicID `json:"userPublicId"`
-	Email                string         `json:"email"`
-	DisplayName          string         `json:"displayName"`
-	AvatarUrl            sql.NullString `json:"avatarUrl"`
-	GrantedAt            time.Time      `json:"grantedAt"`
-	RevokedAt            sql.NullTime   `json:"revokedAt"`
-	Notes                sql.NullString `json:"notes"`
-	Enabled              bool           `json:"enabled"`
-	GrantedByPublicID    types.PublicID `json:"grantedByPublicId"`
-	GrantedByDisplayName sql.NullString `json:"grantedByDisplayName"`
-	Total                interface{}    `json:"total"`
+	PublicID              types.PublicID `json:"publicId"`
+	UserPublicID          types.PublicID `json:"userPublicId"`
+	Email                 string         `json:"email"`
+	DisplayName           string         `json:"displayName"`
+	AvatarUrl             sql.NullString `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32  `json:"-"`
+	GrantedAt             time.Time      `json:"grantedAt"`
+	RevokedAt             sql.NullTime   `json:"revokedAt"`
+	Notes                 sql.NullString `json:"notes"`
+	Enabled               bool           `json:"enabled"`
+	GrantedByPublicID     types.PublicID `json:"grantedByPublicId"`
+	GrantedByDisplayName  sql.NullString `json:"grantedByDisplayName"`
+	Total                 interface{}    `json:"total"`
 }
 
 // List all instance admin grants with user details.
@@ -178,6 +180,7 @@ func (q *Queries) AdminListInstanceAdmins(ctx context.Context, arg AdminListInst
 			&i.Email,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.GrantedAt,
 			&i.RevokedAt,
 			&i.Notes,

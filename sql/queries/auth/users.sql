@@ -115,6 +115,7 @@ SELECT
   email,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,

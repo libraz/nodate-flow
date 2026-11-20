@@ -25,6 +25,7 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   c.created_at,
   COUNT(*) OVER() AS total
 FROM calendar_event_comments c

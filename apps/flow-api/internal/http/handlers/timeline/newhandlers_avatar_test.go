@@ -24,7 +24,7 @@ func TestToDTOActorAvatarProjection(t *testing.T) {
 		name            string
 		actorID         []byte
 		avatarURL       sql.NullString
-		storageObjectID sql.NullInt64
+		storageObjectID sql.NullInt32
 		wantAvatarURL   string
 		wantAvatarField bool
 	}{
@@ -43,14 +43,14 @@ func TestToDTOActorAvatarProjection(t *testing.T) {
 			name:            "uploaded avatar takes precedence over external url",
 			actorID:         actorPublicIDBytes,
 			avatarURL:       sql.NullString{String: "https://images.example.test/stale.png", Valid: true},
-			storageObjectID: sql.NullInt64{Int64: 48213, Valid: true},
+			storageObjectID: sql.NullInt32{Int32: 48213, Valid: true},
 			wantAvatarURL:   avatarutil.ProxyURL(actorPublicID, avatarutil.OpaqueTag(48213), ""),
 			wantAvatarField: true,
 		},
 		{
 			name:            "disabled user join omits avatar and actor identity",
 			avatarURL:       sql.NullString{},
-			storageObjectID: sql.NullInt64{},
+			storageObjectID: sql.NullInt32{},
 		},
 	}
 

@@ -133,7 +133,7 @@ func ListComments(deps Deps) func(context.Context, *ListCommentsInput) (*ListCom
 				Body:        r.Body,
 				CreatedAt:   r.CreatedAt.Unix(),
 			}
-			resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.UserPublicID)
+			resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.AvatarStorageObjectID, r.UserPublicID)
 			resp.EditedAt = dbtype.UnixSecondsFromNullTime(r.EditedAt)
 			out.Body.Comments[i] = resp
 		}
@@ -186,7 +186,7 @@ func CreateComment(deps Deps) func(context.Context, *CreateCommentInput) (*Creat
 			Body:        input.Body.Body,
 			CreatedAt:   handlerutil.NowUnix(),
 		}
-		out.Body.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, profile.PublicID)
+		out.Body.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, profile.AvatarStorageObjectID, profile.PublicID)
 
 		recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, evt.PublicID, evt.Title, mutationlog.Mutation{
 			EventType:    eventbus.CalEventCommentCreated,

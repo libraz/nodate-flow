@@ -5,6 +5,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 
@@ -49,7 +50,7 @@ func rowToAdminUser(r generated.AdminListUsersRow) User {
 		ID:              r.PublicID.String(),
 		Email:           r.Email,
 		DisplayName:     r.DisplayName,
-		AvatarURL:       nullStr(r.AvatarUrl),
+		AvatarURL:       avatarutil.ResolvePtr(r.AvatarStorageObjectID, r.AvatarUrl, r.PublicID.String(), ""),
 		Locale:          r.Locale,
 		LastLoginAt:     nullTimeUnix(r.LastLoginAt),
 		EmailVerifiedAt: nullTimeUnix(r.EmailVerifiedAt),
@@ -66,7 +67,7 @@ func rowToAdminUserDetail(r generated.AdminGetUserRow) User {
 		ID:              r.PublicID.String(),
 		Email:           r.Email,
 		DisplayName:     r.DisplayName,
-		AvatarURL:       nullStr(r.AvatarUrl),
+		AvatarURL:       avatarutil.ResolvePtr(r.AvatarStorageObjectID, r.AvatarUrl, r.PublicID.String(), ""),
 		Locale:          r.Locale,
 		LastLoginAt:     nullTimeUnix(r.LastLoginAt),
 		EmailVerifiedAt: nullTimeUnix(r.EmailVerifiedAt),
@@ -126,7 +127,7 @@ func rowToInstanceAdmin(r generated.AdminListInstanceAdminsRow) InstanceAdmin {
 		UserID:               r.UserPublicID.String(),
 		Email:                r.Email,
 		DisplayName:          r.DisplayName,
-		AvatarURL:            nullStr(r.AvatarUrl),
+		AvatarURL:            avatarutil.ResolvePtr(r.AvatarStorageObjectID, r.AvatarUrl, r.UserPublicID.String(), ""),
 		GrantedAt:            r.GrantedAt.Unix(),
 		GrantedByID:          nullPubID(r.GrantedByPublicID),
 		GrantedByDisplayName: nullStr(r.GrantedByDisplayName),

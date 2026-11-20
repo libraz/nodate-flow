@@ -32,6 +32,7 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   pm.role,
   pm.added_at,
   pm.updated_at,

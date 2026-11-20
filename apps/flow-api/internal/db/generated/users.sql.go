@@ -33,6 +33,7 @@ SELECT
   v.email,
   v.display_name,
   v.avatar_url,
+  v.avatar_storage_object_id,
   v.locale,
   v.timezone,
   v.country,
@@ -48,21 +49,22 @@ WHERE v.public_id = ?
 `
 
 type AdminGetUserRow struct {
-	ID              uint32         `json:"-"`
-	PublicID        types.PublicID `json:"publicId"`
-	Email           string         `json:"email"`
-	DisplayName     string         `json:"displayName"`
-	AvatarUrl       sql.NullString `json:"avatarUrl"`
-	Locale          string         `json:"locale"`
-	Timezone        string         `json:"timezone"`
-	Country         sql.NullString `json:"country"`
-	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
-	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
-	Enabled         bool           `json:"enabled"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       sql.NullTime   `json:"updatedAt"`
-	WorkspaceCount  int64          `json:"workspaceCount"`
-	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
+	ID                    uint32         `json:"-"`
+	PublicID              types.PublicID `json:"publicId"`
+	Email                 string         `json:"email"`
+	DisplayName           string         `json:"displayName"`
+	AvatarUrl             sql.NullString `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32  `json:"-"`
+	Locale                string         `json:"locale"`
+	Timezone              string         `json:"timezone"`
+	Country               sql.NullString `json:"country"`
+	LastLoginAt           sql.NullTime   `json:"lastLoginAt"`
+	EmailVerifiedAt       sql.NullTime   `json:"emailVerifiedAt"`
+	Enabled               bool           `json:"enabled"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	UpdatedAt             sql.NullTime   `json:"updatedAt"`
+	WorkspaceCount        int64          `json:"workspaceCount"`
+	IsInstanceAdmin       bool           `json:"isInstanceAdmin"`
 }
 
 // Find a single user by public_id for admin detail view.
@@ -75,6 +77,7 @@ func (q *Queries) AdminGetUser(ctx context.Context, publicID types.PublicID) (Ad
 		&i.Email,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.AvatarStorageObjectID,
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,
@@ -111,6 +114,7 @@ SELECT
   v.email,
   v.display_name,
   v.avatar_url,
+  v.avatar_storage_object_id,
   v.locale,
   v.timezone,
   v.country,
@@ -140,22 +144,23 @@ type AdminListUsersParams struct {
 }
 
 type AdminListUsersRow struct {
-	ID              uint32         `json:"-"`
-	PublicID        types.PublicID `json:"publicId"`
-	Email           string         `json:"email"`
-	DisplayName     string         `json:"displayName"`
-	AvatarUrl       sql.NullString `json:"avatarUrl"`
-	Locale          string         `json:"locale"`
-	Timezone        string         `json:"timezone"`
-	Country         sql.NullString `json:"country"`
-	LastLoginAt     sql.NullTime   `json:"lastLoginAt"`
-	EmailVerifiedAt sql.NullTime   `json:"emailVerifiedAt"`
-	Enabled         bool           `json:"enabled"`
-	CreatedAt       time.Time      `json:"createdAt"`
-	UpdatedAt       sql.NullTime   `json:"updatedAt"`
-	WorkspaceCount  int64          `json:"workspaceCount"`
-	IsInstanceAdmin bool           `json:"isInstanceAdmin"`
-	Total           interface{}    `json:"total"`
+	ID                    uint32         `json:"-"`
+	PublicID              types.PublicID `json:"publicId"`
+	Email                 string         `json:"email"`
+	DisplayName           string         `json:"displayName"`
+	AvatarUrl             sql.NullString `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32  `json:"-"`
+	Locale                string         `json:"locale"`
+	Timezone              string         `json:"timezone"`
+	Country               sql.NullString `json:"country"`
+	LastLoginAt           sql.NullTime   `json:"lastLoginAt"`
+	EmailVerifiedAt       sql.NullTime   `json:"emailVerifiedAt"`
+	Enabled               bool           `json:"enabled"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	UpdatedAt             sql.NullTime   `json:"updatedAt"`
+	WorkspaceCount        int64          `json:"workspaceCount"`
+	IsInstanceAdmin       bool           `json:"isInstanceAdmin"`
+	Total                 interface{}    `json:"total"`
 }
 
 // Paginated user list for instance admin panel.
@@ -184,6 +189,7 @@ func (q *Queries) AdminListUsers(ctx context.Context, arg AdminListUsersParams) 
 			&i.Email,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.Locale,
 			&i.Timezone,
 			&i.Country,
@@ -687,6 +693,7 @@ SELECT
   email,
   display_name,
   avatar_url,
+  avatar_storage_object_id,
   locale,
   timezone,
   country,
@@ -703,21 +710,22 @@ LIMIT 1
 `
 
 type FindUserByPublicIdRow struct {
-	WorkspaceID          uint32                    `json:"-"`
-	PublicID             types.PublicID            `json:"publicId"`
-	Email                string                    `json:"email"`
-	DisplayName          string                    `json:"displayName"`
-	AvatarUrl            sql.NullString            `json:"avatarUrl"`
-	Locale               string                    `json:"locale"`
-	Timezone             string                    `json:"timezone"`
-	Country              sql.NullString            `json:"country"`
-	WeekStart            UsersWeekStart            `json:"weekStart"`
-	ThemePreference      UsersThemePreference      `json:"themePreference"`
-	CalendarShiftDefault UsersCalendarShiftDefault `json:"calendarShiftDefault"`
-	WorkspaceRole        WorkspaceMembersRole      `json:"workspaceRole"`
-	LastLoginAt          sql.NullTime              `json:"lastLoginAt"`
-	UpdatedAt            sql.NullTime              `json:"updatedAt"`
-	CreatedAt            time.Time                 `json:"createdAt"`
+	WorkspaceID           uint32                    `json:"-"`
+	PublicID              types.PublicID            `json:"publicId"`
+	Email                 string                    `json:"email"`
+	DisplayName           string                    `json:"displayName"`
+	AvatarUrl             sql.NullString            `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32             `json:"-"`
+	Locale                string                    `json:"locale"`
+	Timezone              string                    `json:"timezone"`
+	Country               sql.NullString            `json:"country"`
+	WeekStart             UsersWeekStart            `json:"weekStart"`
+	ThemePreference       UsersThemePreference      `json:"themePreference"`
+	CalendarShiftDefault  UsersCalendarShiftDefault `json:"calendarShiftDefault"`
+	WorkspaceRole         WorkspaceMembersRole      `json:"workspaceRole"`
+	LastLoginAt           sql.NullTime              `json:"lastLoginAt"`
+	UpdatedAt             sql.NullTime              `json:"updatedAt"`
+	CreatedAt             time.Time                 `json:"createdAt"`
 }
 
 // Lookup a user by external public_id (UUID v7) via the v_users view.
@@ -730,6 +738,7 @@ func (q *Queries) FindUserByPublicId(ctx context.Context, publicID types.PublicI
 		&i.Email,
 		&i.DisplayName,
 		&i.AvatarUrl,
+		&i.AvatarStorageObjectID,
 		&i.Locale,
 		&i.Timezone,
 		&i.Country,

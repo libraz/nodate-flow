@@ -121,6 +121,7 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   ta.role,
   ta.updated_at,
   ta.created_at,
@@ -143,15 +144,16 @@ type ListActorsForTaskParams struct {
 }
 
 type ListActorsForTaskRow struct {
-	PublicID     types.PublicID `json:"publicId"`
-	UserPublicID types.PublicID `json:"userPublicId"`
-	Email        string         `json:"email"`
-	DisplayName  string         `json:"displayName"`
-	AvatarUrl    sql.NullString `json:"avatarUrl"`
-	Role         TaskActorsRole `json:"role"`
-	UpdatedAt    sql.NullTime   `json:"updatedAt"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	Total        interface{}    `json:"total"`
+	PublicID              types.PublicID `json:"publicId"`
+	UserPublicID          types.PublicID `json:"userPublicId"`
+	Email                 string         `json:"email"`
+	DisplayName           string         `json:"displayName"`
+	AvatarUrl             sql.NullString `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32  `json:"-"`
+	Role                  TaskActorsRole `json:"role"`
+	UpdatedAt             sql.NullTime   `json:"updatedAt"`
+	CreatedAt             time.Time      `json:"createdAt"`
+	Total                 interface{}    `json:"total"`
 }
 
 // List actors on a task joined with user display fields.
@@ -175,6 +177,7 @@ func (q *Queries) ListActorsForTask(ctx context.Context, arg ListActorsForTaskPa
 			&i.Email,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.Role,
 			&i.UpdatedAt,
 			&i.CreatedAt,

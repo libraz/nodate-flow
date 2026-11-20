@@ -143,6 +143,7 @@ SELECT
   u.public_id AS user_public_id,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   cs.created_at
 FROM calendar_subscriptions cs
 INNER JOIN users u ON u.id = cs.user_id AND u.enabled = TRUE
@@ -158,14 +159,15 @@ type ListCalendarSubscribersParams struct {
 }
 
 type ListCalendarSubscribersRow struct {
-	PublicID     types.PublicID `json:"publicId"`
-	UserID       uint32         `json:"-"`
-	Visible      bool           `json:"visible"`
-	SortWeight   int32          `json:"sortWeight"`
-	UserPublicID types.PublicID `json:"userPublicId"`
-	DisplayName  string         `json:"displayName"`
-	AvatarUrl    sql.NullString `json:"avatarUrl"`
-	CreatedAt    time.Time      `json:"createdAt"`
+	PublicID              types.PublicID `json:"publicId"`
+	UserID                uint32         `json:"-"`
+	Visible               bool           `json:"visible"`
+	SortWeight            int32          `json:"sortWeight"`
+	UserPublicID          types.PublicID `json:"userPublicId"`
+	DisplayName           string         `json:"displayName"`
+	AvatarUrl             sql.NullString `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32  `json:"-"`
+	CreatedAt             time.Time      `json:"createdAt"`
 }
 
 // List all subscribers of a calendar (for member list, color resolution).
@@ -186,6 +188,7 @@ func (q *Queries) ListCalendarSubscribers(ctx context.Context, arg ListCalendarS
 			&i.UserPublicID,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

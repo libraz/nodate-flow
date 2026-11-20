@@ -277,6 +277,7 @@ SELECT
   v.email,
   v.display_name,
   v.avatar_url,
+  v.avatar_storage_object_id,
   v.role,
   v.invited_at,
   v.joined_at,
@@ -296,17 +297,18 @@ type ListWorkspaceMembersParams struct {
 }
 
 type ListWorkspaceMembersRow struct {
-	PublicID     types.PublicID       `json:"publicId"`
-	UserPublicID types.PublicID       `json:"userPublicId"`
-	Email        string               `json:"email"`
-	DisplayName  string               `json:"displayName"`
-	AvatarUrl    sql.NullString       `json:"avatarUrl"`
-	Role         WorkspaceMembersRole `json:"role"`
-	InvitedAt    sql.NullTime         `json:"invitedAt"`
-	JoinedAt     sql.NullTime         `json:"joinedAt"`
-	UpdatedAt    sql.NullTime         `json:"updatedAt"`
-	CreatedAt    time.Time            `json:"createdAt"`
-	Total        interface{}          `json:"total"`
+	PublicID              types.PublicID       `json:"publicId"`
+	UserPublicID          types.PublicID       `json:"userPublicId"`
+	Email                 string               `json:"email"`
+	DisplayName           string               `json:"displayName"`
+	AvatarUrl             sql.NullString       `json:"avatarUrl"`
+	AvatarStorageObjectID sql.NullInt32        `json:"-"`
+	Role                  WorkspaceMembersRole `json:"role"`
+	InvitedAt             sql.NullTime         `json:"invitedAt"`
+	JoinedAt              sql.NullTime         `json:"joinedAt"`
+	UpdatedAt             sql.NullTime         `json:"updatedAt"`
+	CreatedAt             time.Time            `json:"createdAt"`
+	Total                 interface{}          `json:"total"`
 }
 
 // List members of a workspace via v_workspace_members.
@@ -325,6 +327,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMem
 			&i.Email,
 			&i.DisplayName,
 			&i.AvatarUrl,
+			&i.AvatarStorageObjectID,
 			&i.Role,
 			&i.InvitedAt,
 			&i.JoinedAt,

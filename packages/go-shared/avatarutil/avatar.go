@@ -1,17 +1,43 @@
-// Package avatarutil resolves the avatar_url column stored on the users
-// table into a URL safe to hand to a browser. It is shared so every
+// Package avatarutil resolves a user's avatar, either an uploaded object or
+// the avatar_url column on the users table, into a URL safe to hand to a
+// browser. It is shared so every
 // service that surfaces a user profile presents avatars identically and
 // no caller has to re-implement the cache-buster derivation rules.
 package avatarutil
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"path"
 	"strconv"
 	"strings"
 )
+
+// Resolve picks the browser-facing avatar URL for a user row from its sqlc
+// nullable columns: an uploaded object (storageObjectID valid and > 0) wins
+// and yields the proxy URL tagged with OpaqueTag; otherwise a valid stored
+// avatar_url goes through URLForClient. Returns "" when the user has neither.
+func Resolve(storageObjectID sql.NullInt32, stored sql.NullString, userPublicID, publicBaseURL string) string {
+	if storageObjectID.Valid && storageObjectID.Int32 > 0 {
+		//#nosec G115 -- guarded > 0 above, so the int32 -> uint64 conversion cannot wrap.
+		return ProxyURL(userPublicID, OpaqueTag(uint64(storageObjectID.Int32)), publicBaseURL)
+	}
+	if stored.Valid {
+		return URLForClient(stored.String, userPublicID, publicBaseURL)
+	}
+	return ""
+}
+
+// ResolvePtr is Resolve for response fields that omit an absent avatar (nil when "").
+func ResolvePtr(storageObjectID sql.NullInt32, stored sql.NullString, userPublicID, publicBaseURL string) *string {
+	url := Resolve(storageObjectID, stored, userPublicID, publicBaseURL)
+	if url == "" {
+		return nil
+	}
+	return &url
+}
 
 // URLForClient decides whether a stored avatar value should be passed
 // through verbatim (external OIDC provider URL) or rewritten into a

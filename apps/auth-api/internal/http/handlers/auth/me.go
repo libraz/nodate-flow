@@ -60,20 +60,7 @@ func Me(deps Deps) func(context.Context, *struct{}) (*MeOutput, error) {
 // The proxy URL rewriter lives in [avatarutil] so any other service that
 // surfaces the same column produces identical proxy URLs.
 func rowToMe(row generated.FindUserProfileByIdRow, publicBaseURL string) MeBody {
-	var avatar *string
-	switch {
-	case row.AvatarStorageObjectID.Valid:
-		// The tag is a digest of the FK rather than the FK itself: the
-		// id is an AUTO_INCREMENT sequence, and this URL is handed to
-		// the browser. See [avatarutil.OpaqueTag] for what the digest
-		// does and does not protect.
-		avatarID := uint64(row.AvatarStorageObjectID.Int32) //#nosec G115 -- avatar_storage_object_id is an unsigned DB id exposed via sql.NullInt32.
-		s := avatarutil.ProxyURL(row.PublicID.String(), avatarutil.OpaqueTag(avatarID), publicBaseURL)
-		avatar = &s
-	case row.AvatarUrl.Valid:
-		s := avatarutil.URLForClient(row.AvatarUrl.String, row.PublicID.String(), publicBaseURL)
-		avatar = &s
-	}
+	avatar := avatarutil.ResolvePtr(row.AvatarStorageObjectID, row.AvatarUrl, row.PublicID.String(), publicBaseURL)
 	country := ""
 	if row.Country.Valid {
 		country = row.Country.String

@@ -6,6 +6,7 @@ SELECT
   u.email,
   u.display_name,
   u.avatar_url,
+  u.avatar_storage_object_id,
   ia.granted_at,
   ia.revoked_at,
   ia.notes,

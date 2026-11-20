@@ -202,7 +202,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 					CanEdit:     row.CanEdit,
 					CreatedAt:   row.CreatedAt.Unix(),
 				}
-				resp.AvatarURL = handlerutil.AvatarURLPtr(row.AvatarUrl, types.FromUUID(uid))
+				resp.AvatarURL = handlerutil.AvatarURLPtr(row.AvatarUrl, row.AvatarStorageObjectID, types.FromUUID(uid))
 				out.Body.Attendees = append(out.Body.Attendees, resp)
 				continue
 			}
@@ -233,7 +233,7 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 				CanEdit:     false,
 				CreatedAt:   handlerutil.NowUnix(),
 			}
-			resp.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, types.FromUUID(uid))
+			resp.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, profile.AvatarStorageObjectID, types.FromUUID(uid))
 			out.Body.Attendees = append(out.Body.Attendees, resp)
 		}
 
@@ -511,6 +511,6 @@ func attendeeFromRow(r calendar.ListCalendarEventAttendeesRow) AttendeeResponse 
 		CanEdit:     r.CanEdit,
 		CreatedAt:   r.CreatedAt.Unix(),
 	}
-	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.UserPublicID)
+	resp.AvatarURL = handlerutil.AvatarURLPtr(r.AvatarUrl, r.AvatarStorageObjectID, r.UserPublicID)
 	return resp
 }
