@@ -63,7 +63,12 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
   },
   {
     key: 'constraint',
-    chips: [chip('task.constraint.added'), chip('task.constraint.removed')],
+    chips: [
+      chip('task.constraint.added'),
+      chip('task.constraint.removed'),
+      chip('task.constraint.satisfied'),
+      chip('task.constraint.failed'),
+    ],
   },
   {
     key: 'transition',

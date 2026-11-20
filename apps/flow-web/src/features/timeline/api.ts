@@ -37,6 +37,8 @@ export const TIMELINE_KINDS = [
   'task.dependency.removed',
   'task.constraint.added',
   'task.constraint.removed',
+  'task.constraint.satisfied',
+  'task.constraint.failed',
   'task.transition.start',
   'task.transition.block',
   'task.transition.unblock',
