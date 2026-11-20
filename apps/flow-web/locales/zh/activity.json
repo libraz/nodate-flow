@@ -129,7 +129,7 @@
     "ai_invocation": "AI 运行",
     "mcp_invocation": "工具调用（MCP）",
     "mcp_token": "MCP 令牌",
-    "intake_item": "收件项",
+    "intake_item": "受理项",
     "membership": "成员资格",
     "notification": "通知",
     "webhook_subscription": "Webhook"

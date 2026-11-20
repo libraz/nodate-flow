@@ -218,7 +218,12 @@
       "noDue": "No due date"
     },
     "in_workspace": "{workspace}",
-    "no_due_label": "No due date"
+    "no_due_label": "No due date",
+    "complete_task": "Mark “{title}” done",
+    "complete_unavailable": "In-progress tasks are completed from the task page: submit for review, or move it back to open first.",
+    "completed_toast": "Marked “{title}” done",
+    "complete_error": "Could not complete the task",
+    "undo_error": "Could not undo the change"
   },
   "gantt": {
     "title": "Gantt",
@@ -450,7 +455,7 @@
     "empty": "You do not belong to any workspace yet. Create one for your team, or ask an owner for an invite link.",
     "columns": {
       "name": "Name",
-      "slug": "Short name",
+      "slug": "URL name",
       "members": "Members",
       "created": "Created",
       "actions": "Actions"
@@ -573,9 +578,9 @@
     },
     "validation": {
       "name_required": "Name is required.",
-      "slug_required": "Slug is required.",
-      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
-      "slug_taken": "This slug is already taken. Please choose another.",
+      "slug_required": "URL name is required.",
+      "slug_format": "URL name may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This URL name is already taken. Please choose another.",
       "email_required": "Email is required.",
       "email_invalid": "Enter a valid email address."
     },
@@ -685,9 +690,9 @@
     },
     "validation": {
       "name_required": "Name is required.",
-      "slug_required": "Slug is required.",
-      "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
-      "slug_taken": "This slug is already taken in the workspace. Please choose another.",
+      "slug_required": "URL name is required.",
+      "slug_format": "URL name may only contain lowercase letters, numbers, and hyphens.",
+      "slug_taken": "This URL name is already taken in the workspace. Please choose another.",
       "user_id_required": "User ID is required."
     },
     "errors": {
@@ -739,7 +744,9 @@
       "start": "Start date",
       "due": "Due date",
       "submit": "Create",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "assignee_self": "Me ({name})",
+      "assignee_hint": "Leave it as yourself to keep the task on your My tasks."
     },
     "quick_capture": {
       "title": "Quick capture",
@@ -930,14 +937,14 @@
         "title": "Suggested next step",
         "empty": "No suggestion right now.",
         "reason_label": "Reason:",
-        "hint": "AI reads this task's recent activity and proposes a state change. It is only a suggestion; apply it yourself with the Transitions buttons."
+        "hint": "AI reads this task's recent activity and proposes a state change. It is only a suggestion; apply it yourself with the buttons under Change state."
       },
       "ai_activity": {
         "title": "AI reasoning",
         "empty": "No AI activity recorded for this task yet."
       },
       "transitions": {
-        "title": "Transitions",
+        "title": "Change state",
         "start": "Start",
         "block": "Block",
         "unblock": "Unblock",

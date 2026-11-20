@@ -341,10 +341,10 @@
   "workspace": {
     "general": {
       "title": "General",
-      "description": "Rename the workspace, change its slug or description, or delete it.",
+      "description": "Rename the workspace, change its URL name or description, or delete it.",
       "field": {
         "name": "Name",
-        "slug": "Slug",
+        "slug": "URL name",
         "slug_help": "A short unique identifier: lowercase letters, numbers and hyphens. It must be unique on this server, and you type it to confirm deleting the workspace.",
         "description": "Description",
         "icon_url": "Icon URL"
@@ -352,8 +352,8 @@
       "save": "Save changes",
       "validation": {
         "name_required": "Name is required.",
-        "slug_required": "Slug is required.",
-        "slug_format": "Slug may only contain lowercase letters, numbers, and hyphens.",
+        "slug_required": "URL name is required.",
+        "slug_format": "URL name may only contain lowercase letters, numbers, and hyphens.",
         "icon_url_format": "Icon URL must be a valid URL."
       },
       "errors": {
@@ -370,9 +370,9 @@
           "loses_projects_and_tasks": "All projects, tasks, comments, and timeline history",
           "loses_members": "{count, plural, one {# member} other {# members}} and their access",
           "loses_attachments": "Every attachment and uploaded file in object storage",
-          "type_to_confirm_label": "Type the workspace slug to confirm",
+          "type_to_confirm_label": "Type the workspace URL name to confirm",
           "type_to_confirm_help": "Enter {slug} exactly to enable the delete button.",
-          "type_to_confirm_placeholder": "workspace slug",
+          "type_to_confirm_placeholder": "workspace URL name",
           "submit": "Permanently delete",
           "cancel": "Cancel"
         },

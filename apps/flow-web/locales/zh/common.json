@@ -218,7 +218,12 @@
       "noDue": "无截止日期"
     },
     "in_workspace": "{workspace}",
-    "no_due_label": "无截止日期"
+    "no_due_label": "无截止日期",
+    "complete_task": "将“{title}”标记为完成",
+    "complete_unavailable": "进行中的任务需在任务页面中提交审核，或先改回未开始后再完成。",
+    "completed_toast": "已将“{title}”标记为完成",
+    "complete_error": "无法完成该任务",
+    "undo_error": "无法撤销"
   },
   "gantt": {
     "title": "甘特图",
@@ -450,7 +455,7 @@
     "empty": "你还没有加入任何工作区。可以为团队创建一个，或向所有者索取邀请链接。",
     "columns": {
       "name": "名称",
-      "slug": "简称",
+      "slug": "URL 名称",
       "members": "成员",
       "created": "创建时间",
       "actions": "操作"
@@ -573,9 +578,9 @@
     },
     "validation": {
       "name_required": "请填写名称。",
-      "slug_required": "请填写标识。",
-      "slug_format": "标识仅可包含小写字母、数字和连字符。",
-      "slug_taken": "该标识已被占用，请换一个。",
+      "slug_required": "请填写 URL 名称。",
+      "slug_format": "URL 名称仅可包含小写字母、数字和连字符。",
+      "slug_taken": "该 URL 名称已被占用，请换一个。",
       "email_required": "请填写邮箱。",
       "email_invalid": "请输入有效的邮箱地址。"
     },
@@ -685,9 +690,9 @@
     },
     "validation": {
       "name_required": "请填写名称。",
-      "slug_required": "请填写标识。",
-      "slug_format": "标识仅可包含小写字母、数字和连字符。",
-      "slug_taken": "该标识在本工作区中已被占用，请换一个。",
+      "slug_required": "请填写 URL 名称。",
+      "slug_format": "URL 名称仅可包含小写字母、数字和连字符。",
+      "slug_taken": "该 URL 名称在本工作区中已被占用，请换一个。",
       "user_id_required": "请填写用户 ID。"
     },
     "errors": {
@@ -739,7 +744,9 @@
       "start": "开始日期",
       "due": "截止日期",
       "submit": "创建",
-      "cancel": "取消"
+      "cancel": "取消",
+      "assignee_self": "我（{name}）",
+      "assignee_hint": "保持为自己时，任务会显示在“我的任务”中。"
     },
     "quick_capture": {
       "title": "快速记录",
@@ -930,14 +937,14 @@
         "title": "建议的下一步",
         "empty": "暂无建议。",
         "reason_label": "原因：",
-        "hint": "AI 会读取此任务最近的活动并建议状态变更。这只是建议，如需采用，请自己点击“流转”按钮。"
+        "hint": "AI 会读取此任务最近的活动并建议状态变更。这只是建议，如需采用，请自己点击“更改状态”中的按钮。"
       },
       "ai_activity": {
         "title": "AI 推理",
         "empty": "此任务暂无 AI 活动记录。"
       },
       "transitions": {
-        "title": "状态流转",
+        "title": "更改状态",
         "start": "开始",
         "block": "阻塞",
         "unblock": "解除阻塞",

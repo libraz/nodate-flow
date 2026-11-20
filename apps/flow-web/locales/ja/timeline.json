@@ -18,7 +18,7 @@
       "member": "メンバー",
       "dependency": "依存関係",
       "constraint": "制約",
-      "transition": "遷移",
+      "transition": "状態の変更",
       "review": "レビュー",
       "handoff": "引き継ぎ",
       "mention": "メンション",

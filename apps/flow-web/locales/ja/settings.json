@@ -341,10 +341,10 @@
   "workspace": {
     "general": {
       "title": "一般",
-      "description": "ワークスペースの名前・スラッグ・説明を変更するか、ワークスペースを削除します。",
+      "description": "ワークスペースの名前・URL 用の名前・説明を変更するか、ワークスペースを削除します。",
       "field": {
         "name": "名前",
-        "slug": "スラッグ",
+        "slug": "URL 用の名前",
         "slug_help": "短く一意な識別子です（小文字・数字・ハイフン）。サーバー内で重複できず、ワークスペース削除の確認時に入力します。",
         "description": "説明",
         "icon_url": "アイコン URL"
@@ -352,8 +352,8 @@
       "save": "変更を保存",
       "validation": {
         "name_required": "名前は必須です。",
-        "slug_required": "スラッグは必須です。",
-        "slug_format": "スラッグには小文字の英字、数字、ハイフンのみ使用できます。",
+        "slug_required": "URL 用の名前は必須です。",
+        "slug_format": "URL 用の名前には小文字の英字、数字、ハイフンのみ使用できます。",
         "icon_url_format": "アイコン URL は有効な URL を入力してください。"
       },
       "errors": {
@@ -370,9 +370,9 @@
           "loses_projects_and_tasks": "すべてのプロジェクト・タスク・コメント・タイムライン履歴",
           "loses_members": "{count} 名のメンバーとそのアクセス権",
           "loses_attachments": "オブジェクトストレージ上のすべての添付ファイルとアップロード",
-          "type_to_confirm_label": "確認のためワークスペースのスラグを入力",
+          "type_to_confirm_label": "確認のためワークスペースの URL 用の名前を入力",
           "type_to_confirm_help": "削除を有効化するには {slug} を正確に入力してください。",
-          "type_to_confirm_placeholder": "ワークスペースのスラグ",
+          "type_to_confirm_placeholder": "ワークスペースの URL 用の名前",
           "submit": "完全に削除する",
           "cancel": "キャンセル"
         },
@@ -540,7 +540,7 @@
           "read": "読み取り",
           "read_help": "このワークスペースのプロジェクト / タスク / ページ / カレンダーの一覧・取得。",
           "write": "書き込み",
-          "write_help": "作成・更新・状態遷移も許可します。読み取りを含みます。"
+          "write_help": "作成・更新・状態の変更も許可します。読み取りを含みます。"
         }
       },
       "validation": {

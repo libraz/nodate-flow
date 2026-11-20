@@ -1,7 +1,7 @@
 {
   "view": {
     "title": "Inbox",
-    "subtitle": "Your items from connected sources and agents, across all workspaces. Intake is each workspace's separate queue for work nobody has taken on.",
+    "subtitle": "Items from connected sources and agents that you decide how to handle, across all workspaces. Updates about what happened are in Notifications (the bell, top right); requests nobody has taken on yet are in the Intake tab.",
     "empty": "Your inbox is empty",
     "empty_description": "New items from GitHub, Slack, email, webhooks or manual capture land here. Snooze or archive them, or review the source to turn one into a task."
   },

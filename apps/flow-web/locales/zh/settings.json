@@ -341,19 +341,19 @@
   "workspace": {
     "general": {
       "title": "常规",
-      "description": "重命名工作区、修改标识或描述，或删除工作区。",
+      "description": "重命名工作区、修改 URL 名称或描述，或删除工作区。",
       "field": {
         "name": "名称",
-        "slug": "标识",
-        "slug_help": "简短的唯一标识：小写字母、数字和连字符。在本服务器上必须唯一，删除工作区时需要输入它来确认。",
+        "slug": "URL 名称",
+        "slug_help": "简短的唯一名称：小写字母、数字和连字符。在本服务器上必须唯一，删除工作区时需要输入它来确认。",
         "description": "描述",
         "icon_url": "图标 URL"
       },
       "save": "保存更改",
       "validation": {
         "name_required": "请填写名称。",
-        "slug_required": "请填写标识。",
-        "slug_format": "标识仅可包含小写字母、数字和连字符。",
+        "slug_required": "请填写 URL 名称。",
+        "slug_format": "URL 名称仅可包含小写字母、数字和连字符。",
         "icon_url_format": "图标 URL 必须为有效的 URL。"
       },
       "errors": {
@@ -370,9 +370,9 @@
           "loses_projects_and_tasks": "所有项目、任务、评论以及时间线记录",
           "loses_members": "{count} 位成员及其访问权限",
           "loses_attachments": "对象存储中的全部附件和上传文件",
-          "type_to_confirm_label": "请输入工作区标识以确认",
+          "type_to_confirm_label": "请输入工作区的 URL 名称以确认",
           "type_to_confirm_help": "请准确输入 {slug} 以启用删除按钮。",
-          "type_to_confirm_placeholder": "工作区标识",
+          "type_to_confirm_placeholder": "工作区的 URL 名称",
           "submit": "永久删除",
           "cancel": "取消"
         },

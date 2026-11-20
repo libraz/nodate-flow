@@ -56,7 +56,7 @@
     "summary": "Check your assigned work and move to the selected workspace's dashboard and projects.",
     "tips": {
       "t1": "The four counts cover tasks where you hold a role (assignee, reviewer or approver) in any workspace. Overdue and Due today follow your time zone.",
-      "t2": "Your tasks lists up to five open tasks. View all tasks opens My tasks, grouped by due date.",
+      "t2": "My tasks lists up to five open tasks. The round button at the start of a row completes a task you are assigned to; for an in-progress task, open it first. View all tasks opens the full list, grouped by due date.",
       "t3": "Press ⌘K (Ctrl+K on Windows) anywhere to search or run an AI command, and C to start a new task.",
       "t4": "Click the workspace name at the top left to switch to another workspace.",
       "t5": "The dashboard at the bottom belongs to the selected workspace. Use Edit layout to add, reorder or remove widgets."
@@ -66,7 +66,7 @@
     "title": "Inbox",
     "summary": "Items sent to you from connected sources and agents, waiting for you to decide what to do with them.",
     "tips": {
-      "t1": "Inbox shows your own items from every workspace. Intake is a separate queue per workspace for work nobody has taken on yet.",
+      "t1": "Inbox shows the items you decide how to handle, from every workspace. Updates about what happened are in Notifications (the bell, top right); requests nobody has taken on yet are in the Intake tab.",
       "t2": "Snooze hides an item until an hour from now, tomorrow 9:00 or 9:00 a week from now (your time zone). Archive clears it from the inbox.",
       "t3": "Review source, on items not yet linked to a task, creates a task from the item or links it to an existing one. You can also copy a draft acknowledgment.",
       "t4": "Triage with AI scores your items for one workspace and shows suggestions above the list. Nothing changes until you press Apply, which opens the task, snoozes or archives the item. Edit adjusts a suggestion first; Dismiss drops it.",
@@ -80,13 +80,13 @@
     "tips": {
       "t1": "Sections run Overdue, Today, Tomorrow, This week, Later and No due date. Done and cancelled tasks are hidden.",
       "t2": "Tasks show up when you are added as assignee, reviewer or approver. Rows are sorted by due date, then priority.",
-      "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task.",
+      "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task. The round button at the start of a row completes a task you are assigned to; for an in-progress task, open it first.",
       "t4": "Up to 200 tasks are loaded. Press G then T from anywhere to come back to this page."
     }
   },
   "notifications": {
     "title": "Notifications",
-    "summary": "A list of things that need your attention, such as mentions, assignments, comments and schedule changes.",
+    "summary": "A list of things that need your attention, such as mentions, assignments, comments and schedule changes. Items you decide how to handle arrive in the Inbox.",
     "tips": {
       "t1": "Click a notification to open the task or item it is about. It is marked as read at the same time.",
       "t2": "The check button marks one notification as read. The archive button removes it from this list. “Mark all as read” applies to the workspace you are in.",
@@ -151,8 +151,8 @@
     "summary": "A project groups the related tasks of one workspace. Open one to work on its tasks, schedule and members.",
     "tips": {
       "t1": "Click a project name to open it. Inside, the tabs are Overview, Tasks, Gantt and Timeline.",
-      "t2": "New project asks for a name, a slug and a short identifier. The identifier prefixes task references such as NF-42.",
-      "t3": "The slug uses lowercase letters, numbers and hyphens and must be unique in the workspace. It is filled in from the name until you edit it.",
+      "t2": "New project asks for a name, a URL name and a short identifier. The identifier prefixes task references such as NF-42.",
+      "t3": "The URL name uses lowercase letters, numbers and hyphens and must be unique in the workspace. It is filled in from the name until you edit it.",
       "t4": "Status shows whether a project is Active or Archived."
     }
   },
@@ -229,7 +229,7 @@
     "summary": "A workspace is the shared space for your team's projects, tasks, events and pages. Create the first one to get started.",
     "tips": {
       "t1": "You become the workspace owner, and you can invite other people afterwards.",
-      "t2": "The slug is filled in from the name. Edit it if you want a different identifier; it must be unique on this server.",
+      "t2": "The URL name is filled in from the name. Edit it if you want a different identifier; it must be unique on this server.",
       "t3": "Name and URL name can be changed later under Workspace settings, General.",
       "t4": "You can belong to several workspaces; this screen only appears while you have none."
     }
@@ -269,7 +269,7 @@
     "summary": "Everything about one task: edit it, move it between states, hand it to reviewers or agents, and link it to other work.",
     "tips": {
       "t1": "Edit the title with Edit title. Click the empty description to start writing in Markdown. History lists earlier versions you can restore.",
-      "t2": "The right column holds state, priority, dates, Transitions and assignees. Transitions offers only the moves allowed from the current state.",
+      "t2": "The right column holds state, priority, dates, assignees and Change state, which offers only the moves allowed from the current state. Comments sit below the description and attachments.",
       "t3": "Dependencies record what blocks this task or what it blocks, its parent and subtasks, and related or duplicate tasks. Blocked tasks show a lock in lists and boards.",
       "t4": "Review & handoff lets you require a reviewer's approval before the task can be completed, and hand a role to someone else.",
       "t5": "Step decomposition, Suggested next step and Related tasks only propose; you decide what to apply. Agents assigned to the task work on their own and hand it back when they get stuck.",
@@ -403,12 +403,12 @@
   },
   "workspace-settings-general": {
     "title": "General",
-    "summary": "The workspace name, slug and description, plus the option to delete the whole workspace.",
+    "summary": "The workspace name, URL name and description, plus the option to delete the whole workspace.",
     "tips": {
-      "t1": "The slug is a short unique identifier made of lowercase letters, numbers and hyphens. No other workspace on the server can share it.",
+      "t1": "The URL name is a short unique identifier made of lowercase letters, numbers and hyphens. No other workspace on the server can share it.",
       "t2": "The settings menu on the left groups everything else: data, public pages, MCP, webhooks, AI and reports.",
       "t3": "Members and invites are managed from the workspace page, not from settings.",
-      "t4": "Deleting the workspace permanently removes every project, task, comment, attachment and uploaded file. You must type the slug to confirm, and it cannot be undone."
+      "t4": "Deleting the workspace permanently removes every project, task, comment, attachment and uploaded file. You must type the URL name to confirm, and it cannot be undone."
     }
   },
   "workspace-settings-mcp-tokens": {
@@ -470,7 +470,7 @@
     "tips": {
       "t1": "Create a separate workspace for each team or purpose. People see only the workspaces they belong to.",
       "t2": "Open a workspace to see its projects and members. Workspace settings in the workspace sidebar cover AI, integrations, sharing and more.",
-      "t3": "The slug is the workspace's short unique name: lowercase letters, numbers and hyphens."
+      "t3": "The URL name is the workspace's short unique name: lowercase letters, numbers and hyphens."
     }
   }
 }
