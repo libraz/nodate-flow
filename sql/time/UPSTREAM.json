@@ -1,7 +1,7 @@
 {
   "repository": "git@github.com:libraz/nodate-time.git",
   "sourcePath": "sql/time",
-  "ref": "94192641559a22e6204c57c76650f80c0ebcb80f",
+  "ref": "e35451e246c3058d2011caba244790b3d2ca3bb3",
   "files": [
     {
       "path": "constraints/schedule_polls.sql",
@@ -73,7 +73,7 @@
     },
     {
       "path": "triggers/user_album_photo_teardown.sql",
-      "sha256": "eb56d20b4a7c2dcc71b7502d450716eb875cba61049684646def37c41619b48b"
+      "sha256": "bf13597f2d2fe10c59d16fcfd4c56d4960bbb9508c2e06c3d7ccb489471c270c"
     },
     {
       "path": "triggers/workspace_album_photo_teardown.sql",
@@ -97,7 +97,7 @@
     },
     {
       "path": "upgrades/triggers.sql",
-      "sha256": "698f5e2eed552774b6aef54d0617554b25708f2bfb9d44442f1c6efedbedbcb6"
+      "sha256": "360bb2012ea60b2e462cf13cf45390a187681b7fda0f9fea25fa5091b600c6c1"
     },
     {
       "path": "views/storage_objects_unreferenced.sql",
