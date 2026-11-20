@@ -181,6 +181,7 @@
 }
 
 /* Narrow card: badge + text on the first row, the action below the text. */
+/* nf-token-override: container-query breakpoint; var() is not allowed in a query */
 @container (max-inline-size: 32rem) {
   .step {
     display: grid;
