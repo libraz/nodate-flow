@@ -162,6 +162,20 @@
   gap: var(--nf-space-1);
 }
 
+/* Complete control in the first column; the link fills the rest of the row. */
+.taskItem {
+  display: grid;
+  grid-template-columns: var(--nf-space-8) 1fr;
+  align-items: center;
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.taskItem:hover {
+  background: var(--nf-color-surface-hover);
+}
+
 .taskRow {
   display: flex;
   align-items: center;

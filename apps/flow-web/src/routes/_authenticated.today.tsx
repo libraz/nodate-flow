@@ -8,7 +8,6 @@
  * already carries workspace id + name for grouping/display.
  */
 
-import type { components } from '@nodate-flow/sdk';
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
@@ -16,7 +15,6 @@ import Button from '@nodate-flow/ui/primitives/button';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Day } from '@nodate-flow/ui/time';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle } from 'lucide-react';
 import { type CSSProperties, type ReactElement, useMemo } from 'react';
@@ -24,14 +22,19 @@ import { useTranslation } from 'react-i18next';
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import PageFrame from '../components/page-frame';
 import PageHeader from '../components/page-header';
-import type { TaskDerivedState, TaskPriority } from '../features/tasks/api';
+import {
+  type MyTaskListItem,
+  type TaskDerivedState,
+  type TaskPriority,
+  useMyTasksQuery,
+} from '../features/tasks/api';
+import CompleteTaskButton from '../features/tasks/complete-task-button';
 import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
-import { apiRequest } from '../lib/api';
 import { formatDueDate } from '../lib/format-date';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.today.module.css';
 
-type AssignedTask = components['schemas']['MyTaskListItem'];
+type AssignedTask = MyTaskListItem;
 
 type SectionKey = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later' | 'noDue';
 
@@ -79,17 +82,7 @@ function TodayRoute(): ReactElement {
   // the grid still shows it on today.
   const zone = useEffectiveZone();
 
-  const { data: tasks } = useSuspenseQuery({
-    queryKey: ['me', 'tasks'] as const,
-    staleTime: 30_000,
-    queryFn: async (): Promise<AssignedTask[]> => {
-      const data = await apiRequest(
-        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
-        'Failed to load assigned tasks',
-      );
-      return data.tasks ?? [];
-    },
-  });
+  const { data: tasks } = useMyTasksQuery();
 
   const sections = useMemo<Record<SectionKey, AssignedTask[]>>(() => {
     const empty: Record<SectionKey, AssignedTask[]> = {
@@ -166,7 +159,7 @@ function TodayRoute(): ReactElement {
                 return (
                   <li
                     key={task.id}
-                    className={motion.enter}
+                    className={cx(motion.enter, styles.item, isOverdue && styles.itemOverdue)}
                     style={
                       {
                         ...stagger(index),
@@ -174,12 +167,23 @@ function TodayRoute(): ReactElement {
                       } as CSSProperties
                     }
                   >
+                    {task.actorRole === 'assignee' ? (
+                      <CompleteTaskButton
+                        task={{
+                          id: task.id,
+                          title: task.title,
+                          derivedState: task.derivedState as TaskDerivedState,
+                          projectId: task.projectId,
+                        }}
+                      />
+                    ) : (
+                      <span aria-hidden="true" />
+                    )}
                     <Link
                       to="/tasks/$taskId"
                       params={{ taskId: task.id }}
                       className={cx(styles.row, isOverdue && styles.rowOverdue, 'nf-focus-ring')}
                     >
-                      <span aria-hidden className={styles.stateDot} />
                       <span className={styles.taskTitle}>{task.title}</span>
                       {pri > 0 ? (
                         <Badge tone={PRIORITY_TONE[pri]}>{t(PRIORITY_KEY[pri])}</Badge>

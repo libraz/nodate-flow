@@ -6,13 +6,11 @@
  * - Quick actions (create task, search)
  */
 
-import type { components } from '@nodate-flow/sdk';
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import {
   CalendarDays,
@@ -24,7 +22,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useMemo } from 'react';
+import { type CSSProperties, type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   OPEN_COMMAND_PALETTE_EVENT,
@@ -35,14 +33,14 @@ import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import OnboardingChecklist from '../features/onboarding/onboarding-checklist';
+import { type TaskDerivedState, useMyTasksQuery } from '../features/tasks/api';
+import CompleteTaskButton from '../features/tasks/complete-task-button';
+import { STATE_COLOR } from '../features/tasks/constants';
 import { useWorkspacesQuery } from '../features/workspaces/api';
-import { apiRequest } from '../lib/api';
 import { todayKey } from '../lib/date-utils';
 import { useCurrentWorkspaceId } from '../lib/use-current-workspace';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.index.module.css';
-
-type AssignedTask = components['schemas']['MyTaskListItem'];
 
 /* ── Stat card ─────────────────────────────────────────────── */
 
@@ -102,17 +100,7 @@ function TaskSummary(): ReactElement {
   // with the grid for anyone whose profile zone is on the other side of
   // midnight.
   const zone = useEffectiveZone();
-  const { data: tasks } = useSuspenseQuery({
-    queryKey: ['me', 'tasks'] as const,
-    staleTime: 30_000,
-    queryFn: async (): Promise<AssignedTask[]> => {
-      const data = await apiRequest(
-        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
-        'Failed to load assigned tasks',
-      );
-      return data.tasks ?? [];
-    },
-  });
+  const { data: tasks } = useMyTasksQuery();
 
   // The authenticated layout listens for this event.
   const handleCreateTask = (): void => {
@@ -194,7 +182,28 @@ function TaskSummary(): ReactElement {
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
           <ul className={styles.taskList}>
             {recentTasks.map((task, index) => (
-              <li key={task.id} className={motion.enter} style={stagger(index)}>
+              <li
+                key={task.id}
+                className={cx(motion.enter, styles.taskItem)}
+                style={
+                  {
+                    ...stagger(index),
+                    '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
+                  } as CSSProperties
+                }
+              >
+                {task.actorRole === 'assignee' ? (
+                  <CompleteTaskButton
+                    task={{
+                      id: task.id,
+                      title: task.title,
+                      derivedState: task.derivedState as TaskDerivedState,
+                      projectId: task.projectId,
+                    }}
+                  />
+                ) : (
+                  <span aria-hidden="true" />
+                )}
                 <Link
                   to="/tasks/$taskId"
                   params={{ taskId: task.id }}
@@ -233,7 +242,7 @@ function WorkspaceLinks(): ReactElement | null {
         {workspaces.map((ws) => (
           <Link
             key={ws.id}
-            to="/workspaces/$id"
+            to="/workspaces/$id/projects"
             params={{ id: ws.id }}
             className={cx(styles.workspaceLink, 'nf-focus-ring')}
           >

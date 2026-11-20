@@ -1,0 +1,87 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}
+
+.circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: check circle diameter, a control dimension, not a spacing step */
+  inline-size: 1.125rem;
+  /* nf-token-override: check circle diameter, a control dimension, not a spacing step */
+  block-size: 1.125rem;
+  border: 1.5px solid var(--state-tone, var(--nf-color-fg-muted));
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.check {
+  opacity: 0;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.button:hover .check,
+.button:focus-visible .check {
+  opacity: 1;
+}
+
+.button[data-pending] .circle {
+  background: var(--state-tone, var(--nf-color-fg-muted));
+}
+
+.button[data-pending] .check {
+  opacity: 0;
+}
+
+/* Unavailable: dashed ring, dimmed, and no hover affordance. */
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.button[aria-disabled="true"]:not([data-pending]) .circle {
+  border-style: dashed;
+  opacity: 0.5;
+}
+
+.button[aria-disabled="true"]:not([data-pending]) .check {
+  opacity: 0;
+}
+
+/* Visually hidden; read through aria-describedby. */
+.reason {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circle,
+  .check {
+    transition: none;
+  }
+}
