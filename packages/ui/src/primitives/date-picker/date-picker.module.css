@@ -23,6 +23,38 @@
   outline-offset: var(--nf-focus-ring-offset);
 }
 
+/* Field variant: the same box as Input, so a date lines up with the fields around it. */
+.field {
+  box-sizing: border-box;
+  display: block;
+  inline-size: 100%;
+  min-block-size: var(--nf-control-height);
+  padding-inline: var(--nf-space-3);
+  padding-block: var(--nf-space-1-5);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-bg-elevated);
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-regular);
+  line-height: var(--nf-leading-normal);
+  text-align: start;
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.field:hover {
+  background: var(--nf-color-bg-elevated);
+  border-color: var(--nf-color-fg-subtle);
+  color: var(--nf-color-fg);
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--nf-color-focus-ring);
+  box-shadow: var(--nf-shadow-focus);
+}
+
 .panel {
   margin: calc(-1 * var(--nf-space-4));
   padding: var(--nf-space-3);

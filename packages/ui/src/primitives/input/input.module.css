@@ -5,7 +5,7 @@
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-1-5);
   border-radius: var(--nf-radius-sm);
-  border: var(--nf-space-px) solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
   background: var(--nf-color-bg-elevated);
   color: var(--nf-color-fg);
   font-family: var(--nf-font-sans);
@@ -21,7 +21,7 @@
 }
 
 .root:hover:not(:disabled) {
-  border-color: var(--nf-color-border-strong);
+  border-color: var(--nf-color-fg-subtle);
 }
 
 .root:focus-visible {

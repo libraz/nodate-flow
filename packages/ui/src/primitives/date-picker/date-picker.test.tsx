@@ -38,6 +38,28 @@ describe.each(THEMES)('DatePicker [%s]', (theme) => {
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 
+  it('styles the trigger as a form field only for the field variant', () => {
+    const { rerender } = render(
+      <DatePicker
+        value="2026-06-15"
+        onChange={() => undefined}
+        prevLabel="Previous month"
+        nextLabel="Next month"
+      />,
+    );
+    expect(screen.getByRole('button', { name: '2026-06-15' }).className).not.toContain('field');
+    rerender(
+      <DatePicker
+        value="2026-06-15"
+        onChange={() => undefined}
+        prevLabel="Previous month"
+        nextLabel="Next month"
+        variant="field"
+      />,
+    );
+    expect(screen.getByRole('button', { name: '2026-06-15' }).className).toContain('field');
+  });
+
   it('does not render the clear button when onClear is omitted', async () => {
     const user = userEvent.setup();
     render(

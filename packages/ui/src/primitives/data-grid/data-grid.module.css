@@ -89,6 +89,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Text sits on the centre line of a row a taller cell (a select) has grown. */
+  align-content: center;
 }
 
 .cell:last-child {

@@ -29,6 +29,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { useActiveItemInView } from '../../hooks/use-active-item-in-view';
 import { useSlidingIndicator } from '../../hooks/use-sliding-indicator';
 import { cx } from '../../lib/cx';
 import styles from './segmented-control.module.css';
@@ -303,6 +304,7 @@ function SegmentedControl<T extends string>({
     buttonRefs as RefObject<Map<string, HTMLElement>>,
     colourful || value === null ? null : value,
   );
+  useActiveItemInView(rootRef, buttonRefs as RefObject<Map<string, HTMLElement>>, value);
 
   return (
     <div

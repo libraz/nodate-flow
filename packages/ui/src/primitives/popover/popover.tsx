@@ -65,7 +65,15 @@ export interface PopoverProps {
    * by the CSS module; pass to override (e.g. wider kind picker).
    */
   minInlineSize?: string;
+  /**
+   * Focus the panel itself on open (without scrolling the page) instead of
+   * its first tabbable child. The panel is named by `ariaLabel`.
+   */
+  focusPanel?: boolean;
 }
+
+/** An always-empty ref: floating-ui falls back to focusing the panel itself. */
+const noChildFocusRef = { current: null };
 
 /**
  * Popover primitive. See {@link PopoverProps}.
@@ -80,6 +88,7 @@ export default function Popover({
   ariaLabel,
   minBlockSize,
   minInlineSize,
+  focusPanel = false,
 }: PopoverProps): ReactElement {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
@@ -135,7 +144,12 @@ export default function Popover({
         <FloatingPortal>
           {/* Disabled while closing so focus returns to the trigger at once,
               not when the exit animation finishes. */}
-          <FloatingFocusManager context={context} modal={false} disabled={!open}>
+          <FloatingFocusManager
+            context={context}
+            modal={false}
+            disabled={!open}
+            {...(focusPanel ? { initialFocus: noChildFocusRef } : {})}
+          >
             <div
               ref={floatingRef}
               style={lockStyle}

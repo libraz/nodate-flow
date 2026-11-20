@@ -1,3 +1,8 @@
+/*
+ * Tones are the tone's `-subtle` wash with its `-fg` text, never a solid
+ * fill: no single text colour holds 4.5:1 on every solid fill. The wash is
+ * laid over bg-elevated so the pair keeps its contrast on any backdrop.
+ */
 .root {
   display: inline-flex;
   align-items: center;
@@ -11,34 +16,42 @@
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-medium);
   line-height: var(--nf-leading-tight);
+  /* A badge is one token: it never wraps and never gives up width in a row. */
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.success,
+.warning,
+.danger,
+.info,
+.accent {
+  background: linear-gradient(var(--badge-wash), var(--badge-wash)) var(--nf-color-bg-elevated);
+  border-color: transparent;
+  color: var(--badge-fg);
 }
 
 .success {
-  background: var(--nf-color-success);
-  border-color: var(--nf-color-success);
-  color: var(--nf-color-fg-on-accent);
+  --badge-wash: var(--nf-color-success-subtle);
+  --badge-fg: var(--nf-color-success-fg);
 }
 
 .warning {
-  background: var(--nf-color-warning);
-  border-color: var(--nf-color-warning);
-  color: var(--nf-color-fg-on-accent);
+  --badge-wash: var(--nf-color-warning-subtle);
+  --badge-fg: var(--nf-color-warning-fg);
 }
 
 .danger {
-  background: var(--nf-color-danger);
-  border-color: var(--nf-color-danger);
-  color: var(--nf-color-fg-on-accent);
+  --badge-wash: var(--nf-color-danger-subtle);
+  --badge-fg: var(--nf-color-danger-fg);
 }
 
 .info {
-  background: var(--nf-color-info);
-  border-color: var(--nf-color-info);
-  color: var(--nf-color-fg-on-accent);
+  --badge-wash: var(--nf-color-info-subtle);
+  --badge-fg: var(--nf-color-info-fg);
 }
 
 .accent {
-  background: var(--nf-color-accent-subtle);
-  border-color: var(--nf-color-accent);
-  color: var(--nf-color-fg);
+  --badge-wash: var(--nf-color-accent-subtle);
+  --badge-fg: var(--nf-color-accent-fg);
 }

@@ -14,13 +14,14 @@
 
   --nf-color-fg: oklch(0% 0 0);
   --nf-color-fg-muted: oklch(44.95% 0 0);
-  --nf-color-fg-subtle: oklch(61.67% 0 0);
+  --nf-color-fg-subtle: oklch(51.2% 0 0);
   --nf-color-fg-on-accent: oklch(100% 0 0);
   --nf-color-fg-on-danger: oklch(100% 0 0);
 
   /* Hairline borders: 1px is the documented exception to rem-only sizing. */
   --nf-color-border: oklch(88.22% 0 0);
   --nf-color-border-strong: oklch(80.78% 0 0);
+  --nf-color-border-control: oklch(63% 0 0);
   --nf-color-hairline: oklch(90.67% 0 0);
 
   --nf-color-accent: oklch(56.07% 0.2177 26.79);

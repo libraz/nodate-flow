@@ -12,7 +12,7 @@
   line-height: var(--nf-leading-normal);
   color: var(--nf-color-fg);
   background: var(--nf-color-bg-elevated);
-  border: var(--nf-space-px) solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
   border-radius: var(--nf-radius-sm);
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-1-5);
@@ -26,7 +26,7 @@
 }
 
 .input:hover:not(:disabled) {
-  border-color: var(--nf-color-border-strong);
+  border-color: var(--nf-color-fg-subtle);
 }
 
 .input:focus-visible {

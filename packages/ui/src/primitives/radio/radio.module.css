@@ -10,7 +10,7 @@
   inline-size: var(--nf-space-4);
   block-size: var(--nf-space-4);
   margin: 0;
-  border: var(--nf-space-px) solid var(--nf-color-border-strong);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;

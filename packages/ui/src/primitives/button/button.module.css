@@ -32,6 +32,10 @@
   text-transform: var(--nf-control-case);
   letter-spacing: var(--nf-control-tracking);
   line-height: var(--nf-leading-tight);
+  /* A label never wraps and the button never yields width: a crowded row
+     wraps as a whole, it does not stack the label character by character. */
+  white-space: nowrap;
+  flex-shrink: 0;
   /* Links styled as buttons (`as="a"`, `buttonClassName`) drop the underline. */
   text-decoration: none;
   cursor: pointer;
@@ -57,8 +61,22 @@
 }
 
 .root:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+}
+
+/*
+ * Disabled reads as unavailable, not as a faded version of the action: the
+ * label drops to fg-subtle and the filled variants lose their fill. A busy
+ * button is working rather than unavailable, so it keeps its look.
+ */
+.root:disabled:not([aria-busy="true"]) {
+  --btn-fg: var(--nf-color-fg-subtle);
+}
+
+.primary:disabled:not([aria-busy="true"]),
+.danger:disabled:not([aria-busy="true"]) {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
 }
 
 .primary {
@@ -106,7 +124,12 @@
 
 .sm {
   padding-inline: var(--nf-space-3);
-  padding-block: var(--nf-space-1);
+  /* Lands a one-line sm button on --nf-space-8 (32px), level with chips and
+     sm segmented controls. */
+  padding-block: calc(
+    (var(--nf-space-8) - var(--nf-text-xs) * var(--nf-leading-tight) - var(--nf-space-px) * 2) /
+    2
+  );
   font-size: var(--nf-text-xs);
 }
 
@@ -124,10 +147,6 @@
 .root[aria-busy="true"] {
   color: transparent;
   cursor: progress;
-}
-
-.root[aria-busy="true"]:disabled {
-  opacity: 1;
 }
 
 .root[aria-busy="true"]::after {
@@ -153,8 +172,8 @@
 /*
  * Touch hit area.
  *
- * Below `md` the pointer is a fingertip, and the `sm` size resolves to a
- * 26px-tall box — its padding and type scale are sized for a cursor. The
+ * Below `md` the pointer is a fingertip. Every size already lands at or
+ * above 32px tall, but an icon-only `sm` button is narrower than that. The
  * floor here is a minimum, not a size: padding, type and the painted
  * border are untouched, so a button that already clears 32px keeps the
  * exact geometry it has on a wide viewport and the compact size simply

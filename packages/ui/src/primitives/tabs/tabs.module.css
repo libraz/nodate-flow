@@ -4,11 +4,15 @@
   gap: var(--nf-space-3);
 }
 
+/* A row of tabs wider than its container scrolls sideways; tabs never wrap. */
 .tablist {
   position: relative;
   display: flex;
   gap: var(--nf-space-1);
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
 .tab {
@@ -23,12 +27,14 @@
   font-weight: var(--nf-weight-medium);
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-2);
+  white-space: nowrap;
+  flex-shrink: 0;
   transition:
     color var(--nf-duration-fast) var(--nf-ease-standard),
     border-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.tab:hover:not([aria-disabled="true"]) {
+.tab:hover:not([aria-disabled="true"], .tabActive) {
   color: var(--nf-color-fg);
 }
 
@@ -37,9 +43,10 @@
   cursor: not-allowed;
 }
 
+/* Inset, so the scrolling tablist cannot clip it. */
 .tab:focus-visible {
   outline: none;
-  box-shadow: var(--nf-shadow-focus);
+  box-shadow: inset 0 0 0 var(--nf-focus-ring-width) var(--nf-color-focus-ring);
   border-radius: var(--nf-radius-sm);
 }
 

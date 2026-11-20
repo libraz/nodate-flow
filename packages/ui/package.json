@@ -30,6 +30,7 @@
     "./hooks/use-presence": "./src/hooks/use-presence.ts",
     "./hooks/use-presence-list": "./src/hooks/use-presence-list.ts",
     "./hooks/use-first-load-stagger": "./src/hooks/use-first-load-stagger.ts",
+    "./hooks/use-active-item-in-view": "./src/hooks/use-active-item-in-view.ts",
     "./styles/list-motion.module.css": "./src/styles/list-motion.module.css",
     "./a11y/skip-link": "./src/a11y/skip-link.tsx",
     "./a11y/visually-hidden": "./src/a11y/visually-hidden.tsx",

@@ -13,13 +13,14 @@
   --nf-color-overlay: oklch(0% 0 0 / 0.1);
 
   --nf-color-fg: oklch(24.78% 0 0);
-  --nf-color-fg-muted: oklch(53.82% 0 0);
-  --nf-color-fg-subtle: oklch(64.01% 0 0);
+  --nf-color-fg-muted: oklch(50.8% 0 0);
+  --nf-color-fg-subtle: oklch(54% 0 0);
   --nf-color-fg-on-accent: oklch(24.78% 0 0);
   --nf-color-fg-on-danger: oklch(100% 0 0);
 
   --nf-color-border: oklch(94.61% 0 0);
   --nf-color-border-strong: oklch(90.67% 0 0);
+  --nf-color-border-control: oklch(66.4% 0 0);
   --nf-color-hairline: oklch(94.61% 0 0);
 
   --nf-color-accent: oklch(75.01% 0.1616 158.67);
@@ -108,7 +109,7 @@
   --nf-cal-block-fg: oklch(54.87% 0.1149 72.99);
   --nf-cal-free-color: oklch(65.52% 0.1105 212.17);
   --nf-cal-free-subtle: oklch(65.52% 0.1105 212.17 / 0.12);
-  --nf-cal-free-fg: oklch(53.02% 0.0921 212.17);
+  --nf-cal-free-fg: oklch(52.5% 0.0921 212.17);
   --nf-cal-milestone-color: oklch(64.22% 0.1525 315.32);
   --nf-cal-milestone-subtle: oklch(64.2% 0.1514 315.14 / 0.12);
   --nf-cal-milestone-fg: oklch(55.2% 0.1514 315.14);

@@ -4,6 +4,7 @@ import { type ReactElement, StrictMode, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { getOverlayOpenCountForTests } from '../_overlay/overlay-lock';
+import SegmentedControl from '../segmented-control/segmented-control';
 import Dialog from './dialog';
 
 const THEMES = [
@@ -54,6 +55,44 @@ describe.each(THEMES)('Dialog [%s]', (theme) => {
   it('traps focus on first interactive element', () => {
     render(<Harness />);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'OK' }));
+  });
+
+  it('skips tabindex=-1 segments for initial focus and Tab cycling', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dialog open onClose={() => undefined} title="Create">
+        <SegmentedControl
+          ariaLabel="Kind"
+          value="b"
+          onChange={() => undefined}
+          options={[
+            { value: 'a', label: 'A' },
+            { value: 'b', label: 'B' },
+            { value: 'c', label: 'C' },
+          ]}
+        />
+        <button type="button">Save</button>
+      </Dialog>,
+    );
+    const checked = screen.getByRole('radio', { name: 'B' });
+    expect(document.activeElement).toBe(checked);
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Save' }));
+    await user.tab();
+    expect(document.activeElement).not.toBe(screen.getByRole('radio', { name: 'A' }));
+    expect(document.activeElement).not.toBe(screen.getByRole('radio', { name: 'C' }));
+  });
+
+  it('prefers a data-autofocus element for initial focus', () => {
+    render(
+      <Dialog open onClose={() => undefined} title="Create">
+        <button type="button">First</button>
+        <button type="button" data-autofocus>
+          Second
+        </button>
+      </Dialog>,
+    );
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Second' }));
   });
 
   it('closes on Escape', async () => {

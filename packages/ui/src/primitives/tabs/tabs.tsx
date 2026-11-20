@@ -26,6 +26,7 @@ import {
   useId,
   useRef,
 } from 'react';
+import { useActiveItemInView } from '../../hooks/use-active-item-in-view';
 import { useControllableState } from '../../hooks/use-controllable-state';
 import { useSlidingIndicator } from '../../hooks/use-sliding-indicator';
 import { cx } from '../../lib/cx';
@@ -111,6 +112,7 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     // the selected tab's own border shows instead.
     const tablistRef = useRef<HTMLDivElement | null>(null);
     const indicator = useSlidingIndicator(tablistRef, tabRefs, activePanelValue);
+    useActiveItemInView(tablistRef, tabRefs, activePanelValue);
 
     const focusValue = useCallback((next: string) => {
       const node = tabRefs.current.get(next);

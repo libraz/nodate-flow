@@ -11,8 +11,9 @@
   inline-size: var(--nf-space-4);
   block-size: var(--nf-space-4);
   margin: 0;
-  border: var(--nf-space-px) solid var(--nf-color-border-strong);
-  border-radius: var(--nf-radius-xs);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
+  /* Capped at a quarter of the box: a fully rounded square reads as a radio. */
+  border-radius: min(var(--nf-radius-xs), 25%);
   background: var(--nf-color-bg-elevated);
   cursor: pointer;
   transition:

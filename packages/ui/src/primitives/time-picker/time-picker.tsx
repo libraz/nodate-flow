@@ -20,6 +20,11 @@ export interface TimePickerProps {
   step?: number;
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
+  /**
+   * Trigger style: `'pill'` (compact accent chip, default) or `'field'`
+   * (same box as Input, matching DatePicker's field variant).
+   */
+  variant?: 'pill' | 'field';
   /** Additional class on the trigger button. */
   className?: string | undefined;
 }
@@ -51,6 +56,7 @@ export default function TimePicker({
   listLabel,
   step = 15,
   triggerLabel,
+  variant = 'pill',
   className,
 }: TimePickerProps): ReactElement {
   const [open, setOpen] = useState(false);
@@ -104,7 +110,9 @@ export default function TimePicker({
     >
       <button
         type="button"
-        className={className ? `${styles.trigger} ${className}` : styles.trigger}
+        className={[styles.trigger, variant === 'field' && styles.field, className]
+          .filter(Boolean)
+          .join(' ')}
       >
         {triggerLabel ?? (value || '00:00')}
       </button>

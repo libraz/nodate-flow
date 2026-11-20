@@ -1,6 +1,6 @@
 .viewport {
   position: fixed;
-  inset-block-end: var(--nf-space-4);
+  inset-block-end: calc(var(--nf-dock-clearance, 0px) + var(--nf-space-4));
   inset-inline-end: var(--nf-space-4);
   display: flex;
   flex-direction: column;

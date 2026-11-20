@@ -54,6 +54,12 @@ export interface DatePickerProps {
   weekStart?: WeekStartDay;
   /** Custom trigger label. Defaults to the value. */
   triggerLabel?: string;
+  /**
+   * Trigger look. `'pill'` (default) is a compact tinted chip for inline
+   * use; `'field'` matches Input — full width, control height and border —
+   * for a date that sits among other form fields.
+   */
+  variant?: 'pill' | 'field';
   /** Additional class on the trigger button. */
   className?: string | undefined;
   /**
@@ -198,6 +204,7 @@ export default function DatePicker({
   nextLabel,
   weekStart = 'monday',
   triggerLabel,
+  variant = 'pill',
   className,
   onClear,
   clearLabel,
@@ -511,7 +518,7 @@ export default function DatePicker({
     >
       <button
         type="button"
-        className={className ? `${styles.trigger} ${className}` : styles.trigger}
+        className={cx(styles.trigger, variant === 'field' && styles.field, className)}
       >
         {triggerLabel ?? value}
       </button>

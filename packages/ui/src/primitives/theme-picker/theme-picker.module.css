@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
+  container-type: inline-size;
 }
 
 .label {
@@ -14,10 +15,23 @@
 
 /* ---- Theme family cards ---- */
 
+/*
+ * One row of equal cards when the section has room for all of them, three
+ * per row (3 + 2) when it does not, so no family is ever left alone on a row.
+ */
 .themeGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--nf-space-2);
+}
+
+/* nf-breakpoint-override: nf-token-override: the picker's own width at which five cards fit on one row, not a viewport step */
+@container (min-width: 416px) {
+  .themeGrid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
 }
 
 .themeCard {
@@ -26,7 +40,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--nf-space-2);
-  padding: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-2);
   border: 1.5px solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   cursor: pointer;
@@ -73,6 +87,10 @@
 }
 
 .themeName {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-medium);
   color: var(--nf-color-fg-muted);

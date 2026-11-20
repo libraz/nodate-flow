@@ -13,13 +13,14 @@
   --nf-color-overlay: oklch(0% 0 0 / 0.25);
 
   --nf-color-fg: oklch(0% 0 0);
-  --nf-color-fg-muted: oklch(51.47% 0.0059 286.23);
-  --nf-color-fg-subtle: oklch(60.9% 0.0028 286.34);
+  --nf-color-fg-muted: oklch(46% 0.0059 286.23);
+  --nf-color-fg-subtle: oklch(49.4% 0.0028 286.34);
   --nf-color-fg-on-accent: oklch(100% 0 0);
   --nf-color-fg-on-danger: oklch(100% 0 0);
 
   --nf-color-border: oklch(35.88% 0.012 285.78 / 0.15);
   --nf-color-border-strong: oklch(35.88% 0.012 285.78 / 0.28);
+  --nf-color-border-control: oklch(35.88% 0.012 285.78 / 0.63);
   --nf-color-hairline: oklch(35.88% 0.012 285.78 / 0.08);
 
   --nf-color-accent: oklch(57.28% 0.2049 257.42);

@@ -42,16 +42,20 @@
 
 import { type RefObject, useLayoutEffect, useRef } from 'react';
 
+// Elements with tabindex="-1" (e.g. unchecked roving-tabindex radios) are
+// programmatically focusable but not tabbable, so they are excluded everywhere.
 const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'area[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
+  'a[href]:not([tabindex="-1"])',
+  'area[href]:not([tabindex="-1"])',
+  'button:not([disabled]):not([tabindex="-1"])',
+  'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"])',
+  'select:not([disabled]):not([tabindex="-1"])',
+  'textarea:not([disabled]):not([tabindex="-1"])',
   '[tabindex]:not([tabindex="-1"])',
-  '[contenteditable="true"]',
+  '[contenteditable="true"]:not([tabindex="-1"])',
 ].join(',');
+
+const AUTOFOCUS_SELECTOR = '[data-autofocus], [autofocus]';
 
 export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active: boolean): void {
   // Render-phase capture. We snapshot the active element on the FIRST
@@ -78,13 +82,13 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
 
     const getFocusable = (): HTMLElement[] => {
       return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-        (el) => !el.hasAttribute('inert') && el.offsetParent !== null,
+        (el) => !el.closest('[inert], [hidden]') && el.offsetParent !== null,
       );
     };
 
     const focusables = getFocusable();
     if (focusables.length > 0) {
-      focusables[0]?.focus();
+      (focusables.find((el) => el.matches(AUTOFOCUS_SELECTOR)) ?? focusables[0])?.focus();
     } else {
       container.setAttribute('tabindex', '-1');
       container.focus();

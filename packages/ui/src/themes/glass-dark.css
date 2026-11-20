@@ -13,13 +13,14 @@
   --nf-color-overlay: oklch(0% 0 0 / 0.55);
 
   --nf-color-fg: oklch(97.07% 0.0027 286.35);
-  --nf-color-fg-muted: oklch(69.88% 0.013 286.06);
-  --nf-color-fg-subtle: oklch(55.43% 0.0139 285.92);
+  --nf-color-fg-muted: oklch(72.4% 0.013 286.06);
+  --nf-color-fg-subtle: oklch(68.5% 0.0139 285.92);
   --nf-color-fg-on-accent: oklch(0% 0 0);
   --nf-color-fg-on-danger: oklch(100% 0 0);
 
   --nf-color-border: oklch(100% 0 0 / 0.1);
   --nf-color-border-strong: oklch(100% 0 0 / 0.18);
+  --nf-color-border-control: oklch(100% 0 0 / 0.35);
   --nf-color-hairline: oklch(100% 0 0 / 0.06);
 
   --nf-color-accent: oklch(62.43% 0.2056 255.49);
@@ -133,7 +134,7 @@
   --nf-cal-free-fg: oklch(75.56% 0.2082 146.98);
   --nf-cal-milestone-color: oklch(65.6% 0.2274 312.42);
   --nf-cal-milestone-subtle: oklch(65.6% 0.2274 312.42 / 0.2);
-  --nf-cal-milestone-fg: oklch(73.6% 0.1896 312.42);
+  --nf-cal-milestone-fg: oklch(74.2% 0.1896 312.42);
 
   --nf-cal-color-1: oklch(62.31% 0.188 259.81);
   --nf-cal-color-2: oklch(71.48% 0.1257 215.22);

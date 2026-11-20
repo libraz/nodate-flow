@@ -24,14 +24,22 @@
    * `--nf-cal-*-color` fills carry `-on-accent` text too and are held to it.
    */
   --nf-color-fg: oklch(0% 0 0);
-  --nf-color-fg-muted: oklch(51.47% 0.0059 286.23);
-  --nf-color-fg-subtle: oklch(60.9% 0.0028 286.34);
+  /* Both carry body text: each holds 4.5:1 on bg, bg-elevated, bg-sunken,
+     surface, surface-hover and accent-subtle; muted stays a step above subtle. */
+  --nf-color-fg-muted: oklch(46% 0.0059 286.23);
+  --nf-color-fg-subtle: oklch(49.4% 0.0028 286.34);
   --nf-color-fg-on-accent: oklch(100% 0 0);
   --nf-color-fg-on-danger: oklch(100% 0 0);
 
-  /* border */
+  /*
+   * border. `border` / `border-strong` are decorative region edges and stay
+   * faint. `border-control` outlines form controls (input, select, textarea,
+   * combobox, checkbox, radio, switch, segmented group) and holds 3:1 against
+   * bg, surface and bg-elevated, since the edge is what locates the field.
+   */
   --nf-color-border: oklch(35.88% 0.012 285.78 / 0.15);
   --nf-color-border-strong: oklch(35.88% 0.012 285.78 / 0.28);
+  --nf-color-border-control: oklch(35.88% 0.012 285.78 / 0.63);
   --nf-color-hairline: oklch(35.88% 0.012 285.78 / 0.08);
 
   /* accent / brand */

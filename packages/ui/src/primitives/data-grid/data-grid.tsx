@@ -64,7 +64,11 @@ export interface DataGridProps<TData> {
   data: TData[];
   /** Stable row id factory used by TanStack state such as selection. */
   getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string;
-  /** Estimated row height in pixels for the virtualizer. Defaults to 36. */
+  /**
+   * Estimated row height in pixels for the virtualizer. Defaults to 36.
+   * Rendered rows are measured, so rows taller than the estimate (a cell
+   * holding a select or wrapped content) push the rows below them down.
+   */
   estimateSize?: number;
   /** Overscan rows above/below the viewport. Defaults to 5. */
   overscan?: number;
@@ -337,6 +341,14 @@ function DataGridInner<TData>(
     return sum + (col.columnDef.minSize ?? 0);
   }, 0);
 
+  // Each rendered row reports its real height, so a row taller than the estimate never overlaps the next.
+  const rowRef = (callerRef: Ref<HTMLDivElement> | undefined) => (node: HTMLDivElement | null) => {
+    if (!useFallback) virtualizer.measureElement(node);
+    if (typeof callerRef === 'function') return callerRef(node);
+    if (callerRef) callerRef.current = node;
+    return undefined;
+  };
+
   const renderRows: { row: (typeof rows)[number] | undefined; idx: number; start: number }[] =
     useFallback
       ? rows.map((row, idx) => ({ row, idx, start: idx * estimateSize }))
@@ -462,6 +474,8 @@ function DataGridInner<TData>(
                 <div
                   key={row.id}
                   {...rowProps}
+                  ref={rowRef(rowProps?.ref)}
+                  data-index={idx}
                   role="row"
                   aria-rowindex={headerGroups.length + idx + 1}
                   aria-selected={enableRowSelection ? row.getIsSelected() : undefined}

@@ -8,22 +8,25 @@
  * `--nf-color-accent` as the foreground — no border change, just a fill +
  * colour swap.
  *
- * When the parent enables `colourful`, each segment's inactive state uses
- * the tone's `-subtle` variant and the active state uses the full-saturation
- * tone token. The tone-specific blocks below only override the two CSS
- * custom properties `--sc-active-bg` / `--sc-active-fg` /
- * `--sc-inactive-bg` / `--sc-inactive-fg`, which the base `.segment` rules
- * consume — no hardcoded colours anywhere.
+ * When the parent enables `colourful`, each segment takes Badge's scheme:
+ * its label is set in the tone's `-fg`, and the selected segment adds the
+ * tone's `-subtle` wash laid over bg-elevated. The tone-specific blocks
+ * below only override the custom properties `--sc-active-bg` /
+ * `--sc-active-fg` / `--sc-inactive-bg` / `--sc-inactive-fg`, which the base
+ * `.segment` rules consume — no hardcoded colours anywhere.
  *
- * Sizing: md meets the 40×40 min tap target (`--nf-space-10`), sm meets 32×32
- * (`--nf-space-8`). Hairline borders use `--nf-space-px` (the hairline
- * exception).
+ * Sizing: the whole group lands on the row height of its neighbours — md on
+ * `--nf-control-height` (level with md Button and Input), sm on
+ * `--nf-space-8` (level with sm Button and chips). Hairline borders use
+ * `--nf-space-px` (the hairline exception).
  */
 
 /*
  * A grid of equal columns: every segment is as wide as the widest label,
  * so an ordinal picker never reads as uneven steps. Inline by default so
- * the group still hugs its content.
+ * the group still hugs its content. When the row is narrower than the
+ * labels, the group scrolls sideways instead of wrapping them; the
+ * padding leaves room for a segment's focus ring inside the scroller.
  */
 .root {
   display: inline-grid;
@@ -33,8 +36,14 @@
   gap: var(--nf-space-1);
   padding: var(--nf-space-1);
   border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
   background: transparent;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 
   position: relative;
 
@@ -57,11 +66,13 @@
 }
 
 .size-md {
-  min-block-size: var(--nf-space-10);
+  --sc-height: var(--nf-control-height);
+  min-block-size: var(--sc-height);
 }
 
 .size-sm {
-  min-block-size: var(--nf-space-8);
+  --sc-height: var(--nf-space-8);
+  min-block-size: var(--sc-height);
 }
 
 /* The sliding selected fill; segments paint above it. */
@@ -92,27 +103,31 @@
   text-transform: var(--nf-control-case);
   letter-spacing: var(--nf-control-tracking);
   line-height: var(--nf-leading-tight);
+  white-space: nowrap;
   border-radius: var(--nf-radius-sm);
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
     color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-/* md size: 40px tap target, sm text, comfortable inline padding. */
+/* A segment fills the group height minus the group's padding and border. */
+.size-md .segment,
+.size-sm .segment {
+  min-block-size: calc(var(--sc-height) - var(--nf-space-1) * 2 - var(--nf-space-px) * 2);
+  padding-block: 0;
+}
+
+/* md size: sm text, comfortable inline padding. */
 .size-md .segment {
-  min-block-size: var(--nf-space-10);
   min-inline-size: var(--nf-space-10);
   padding-inline: var(--nf-space-3);
-  padding-block: var(--nf-space-2);
   font-size: var(--nf-text-sm);
 }
 
-/* sm size: 32px tap target, xs text, tighter inline padding. */
+/* sm size: xs text, tighter inline padding. */
 .size-sm .segment {
-  min-block-size: var(--nf-space-8);
   min-inline-size: var(--nf-space-8);
   padding-inline: var(--nf-space-2);
-  padding-block: var(--nf-space-1);
   font-size: var(--nf-text-xs);
 }
 
@@ -160,16 +175,17 @@
 }
 
 /*
- * Colourful mode: inactive segments get the tone's `-subtle` fill so the
- * ordinal colour ramp is visible at rest. Active segment uses the full
- * tone as fill and `--nf-color-fg-on-accent` for contrast-safe text.
+ * Colourful mode: the tone's `-fg` labels every segment, so the ordinal
+ * colour ramp shows at rest; the selected one adds the tone's wash (over
+ * bg-elevated, so the pair holds 4.5:1 on any backdrop) and the semibold
+ * weight `.segmentActive` sets. No solid fills: no single text colour holds
+ * 4.5:1 on all of them.
  */
 .segmentColourful {
-  /* Applied in addition to the per-tone class below; shared rules live here. */
-}
-
-.segmentColourful.segmentActive {
-  color: var(--nf-color-fg-on-accent);
+  --sc-inactive-bg: transparent;
+  --sc-active-bg: linear-gradient(var(--sc-wash), var(--sc-wash)) var(--nf-color-bg-elevated);
+  --sc-inactive-fg: var(--sc-tone-fg);
+  --sc-active-fg: var(--sc-tone-fg);
 }
 
 /* Neutral tone — falls back to the group's accent (same as non-colourful). */
@@ -180,78 +196,53 @@
   --sc-active-fg: var(--nf-color-accent-fg);
 }
 
-.toneNeutral.segmentActive {
-  /* Neutral active keeps the accent foreground (not fg-on-accent) because the
-     fill is the subtle tint, not the saturated accent. */
-  color: var(--nf-color-accent-fg);
-}
-
 .toneInfo {
-  --sc-inactive-bg: var(--nf-color-info-subtle);
-  --sc-inactive-fg: var(--nf-color-info-fg);
-  --sc-active-bg: var(--nf-color-info);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-color-info-subtle);
+  --sc-tone-fg: var(--nf-color-info-fg);
 }
 
 .toneSuccess {
-  --sc-inactive-bg: var(--nf-color-success-subtle);
-  --sc-inactive-fg: var(--nf-color-success-fg);
-  --sc-active-bg: var(--nf-color-success);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-color-success-subtle);
+  --sc-tone-fg: var(--nf-color-success-fg);
 }
 
 .toneWarning {
-  --sc-inactive-bg: var(--nf-color-warning-subtle);
-  --sc-inactive-fg: var(--nf-color-warning-fg);
-  --sc-active-bg: var(--nf-color-warning);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-color-warning-subtle);
+  --sc-tone-fg: var(--nf-color-warning-fg);
 }
 
 .toneDanger {
-  --sc-inactive-bg: var(--nf-color-danger-subtle);
-  --sc-inactive-fg: var(--nf-color-danger-fg);
-  --sc-active-bg: var(--nf-color-danger);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-color-danger-subtle);
+  --sc-tone-fg: var(--nf-color-danger-fg);
 }
 
 /*
  * Calendar-kind tones — bind the segmented control to the domain-specific
- * `--nf-cal-<kind>-color` / `-subtle` tokens. Intended for the unified
- * calendar event create/edit dialog's kind picker; the inactive backdrop
- * mirrors the calendar grid pill tint and the active fill matches the
- * event pill colour so the selector reads as "what this will render as".
+ * `--nf-cal-<kind>-subtle` / `-fg` tokens. Intended for the unified
+ * calendar event create/edit dialog's kind picker; the selected wash
+ * mirrors the calendar grid pill tint.
  */
 .toneTask {
-  --sc-inactive-bg: var(--nf-cal-task-subtle);
-  --sc-inactive-fg: var(--nf-cal-task-fg);
-  --sc-active-bg: var(--nf-cal-task-color);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-cal-task-subtle);
+  --sc-tone-fg: var(--nf-cal-task-fg);
 }
 
 .toneEvent {
-  --sc-inactive-bg: var(--nf-cal-event-subtle);
-  --sc-inactive-fg: var(--nf-cal-event-fg);
-  --sc-active-bg: var(--nf-cal-event-color);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-cal-event-subtle);
+  --sc-tone-fg: var(--nf-cal-event-fg);
 }
 
 .toneBlock {
-  --sc-inactive-bg: var(--nf-cal-block-subtle);
-  --sc-inactive-fg: var(--nf-cal-block-fg);
-  --sc-active-bg: var(--nf-cal-block-color);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-cal-block-subtle);
+  --sc-tone-fg: var(--nf-cal-block-fg);
 }
 
 .toneFree {
-  --sc-inactive-bg: var(--nf-cal-free-subtle);
-  --sc-inactive-fg: var(--nf-cal-free-fg);
-  --sc-active-bg: var(--nf-cal-free-color);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-cal-free-subtle);
+  --sc-tone-fg: var(--nf-cal-free-fg);
 }
 
 .toneMilestone {
-  --sc-inactive-bg: var(--nf-cal-milestone-subtle);
-  --sc-inactive-fg: var(--nf-cal-milestone-fg);
-  --sc-active-bg: var(--nf-cal-milestone-color);
-  --sc-active-fg: var(--nf-color-fg-on-accent);
+  --sc-wash: var(--nf-cal-milestone-subtle);
+  --sc-tone-fg: var(--nf-cal-milestone-fg);
 }

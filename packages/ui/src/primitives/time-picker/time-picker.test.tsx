@@ -31,6 +31,22 @@ describe.each(THEMES)('TimePicker [%s]', (theme) => {
     expect(screen.getByRole('listbox', { name: 'Start time' })).toBeDefined();
   });
 
+  it('styles the trigger as a form field only for the field variant', () => {
+    const { rerender } = render(
+      <TimePicker value="09:00" onChange={() => undefined} listLabel="Start time" />,
+    );
+    expect(screen.getByRole('button', { name: '09:00' }).className).not.toContain('field');
+    rerender(
+      <TimePicker
+        value="09:00"
+        onChange={() => undefined}
+        listLabel="Start time"
+        variant="field"
+      />,
+    );
+    expect(screen.getByRole('button', { name: '09:00' }).className).toContain('field');
+  });
+
   it('calls onChange with the selected slot', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

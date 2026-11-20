@@ -6,7 +6,7 @@
   block-size: var(--nf-space-6);
   padding: 0;
   border-radius: var(--nf-radius-pill);
-  border: var(--nf-space-px) solid var(--nf-color-border-strong);
+  border: var(--nf-space-px) solid var(--nf-color-border-control);
   background: var(--nf-color-bg-sunken);
   cursor: pointer;
   transition:
