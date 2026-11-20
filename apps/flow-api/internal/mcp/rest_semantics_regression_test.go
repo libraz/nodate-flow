@@ -141,6 +141,35 @@ func TestMCPToolsMatchRESTAccessAndListing(t *testing.T) {
 			"a member with no project_members row must not see the project, as on REST")
 	})
 
+	t.Run("list_projects/each project carries isArchived", func(t *testing.T) {
+		t.Parallel()
+		fx := seedMCPProjectRoleFixture(t, db)
+		adminID := rsInsertAdmin(t, db, fx.wsID)
+		sess := mcp.NewTestSession(adminID, fx.wsID, scopes)
+		archivedOf := func() any {
+			out, err := mcp.RunListProjects(ctx, deps, sess, mcpVisJSON(t, map[string]any{}))
+			require.NoError(t, err)
+			projects, ok := rsResult(t, out)["projects"].([]any)
+			require.True(t, ok)
+			for _, p := range projects {
+				item := p.(map[string]any)
+				if item["id"] == fx.projectPub.String() {
+					require.Contains(t, item, "isArchived")
+					return item["isArchived"]
+				}
+			}
+			t.Fatalf("project %s not listed", fx.projectPub)
+			return nil
+		}
+		require.Equal(t, false, archivedOf(), "a normal project is not archived")
+		res, err := db.ExecContext(ctx, `UPDATE projects SET is_archived = TRUE WHERE public_id = ?`, fx.projectPub[:])
+		require.NoError(t, err)
+		n, err := res.RowsAffected()
+		require.NoError(t, err)
+		require.EqualValues(t, 1, n, "the fixture project must be archived")
+		require.Equal(t, true, archivedOf(), "an archived project is still listed, flagged")
+	})
+
 	t.Run("list_pages/offset reaches the rows past the first window", func(t *testing.T) {
 		t.Parallel()
 		fx := seedMCPProjectRoleFixture(t, db)

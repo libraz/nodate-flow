@@ -1208,7 +1208,7 @@ export interface paths {
         post?: never;
         /**
          * Soft-disable a project
-         * @description Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.
+         * @description Disables the project and deletes all of its tasks (with their linked calendar events). This cannot be undone. To hide a project while keeping its tasks, archive it instead. Requires project editor role or above.
          */
         delete: operations["projects-disable"];
         options?: never;
@@ -1218,6 +1218,26 @@ export interface paths {
          * @description Updates editable project fields (name, description, status, settings). Requires project editor role or above.
          */
         patch: operations["projects-patch"];
+        trace?: never;
+    };
+    "/projects/{prjId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a project
+         * @description Hides the project from listings' default UI and pickers. Its tasks stay and remain editable; unarchive restores it. Repeating the call is a no-op. Requires project editor role or above.
+         */
+        post: operations["projects-archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/projects/{prjId}/dependencies": {
@@ -1298,6 +1318,26 @@ export interface paths {
         get: operations["projects-timeline-list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{prjId}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived project
+         * @description Hides the project from listings' default UI and pickers. Its tasks stay and remain editable; unarchive restores it. Repeating the call is a no-op. Requires project editor role or above.
+         */
+        post: operations["projects-unarchive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5582,6 +5622,15 @@ export interface components {
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              * @example https://example.com/schemas/ArchiveOutputBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
+        ArchiveProjectBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ArchiveProjectBody.json
              */
             readonly $schema?: string;
             ok: boolean;
@@ -10948,6 +10997,15 @@ export interface components {
             dedupeKey: string;
             ok: boolean;
         };
+        UnarchiveProjectBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnarchiveProjectBody.json
+             */
+            readonly $schema?: string;
+            ok: boolean;
+        };
         UnarchiveTaskOutputBody: {
             /**
              * Format: uri
@@ -13940,6 +13998,37 @@ export interface operations {
             };
         };
     };
+    "projects-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prjId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchiveProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "projects-dependencies-list": {
         parameters: {
             query?: never;
@@ -14097,6 +14186,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListTimelineOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "projects-unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prjId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnarchiveProjectBody"];
                 };
             };
             /** @description Error */

@@ -142,6 +142,28 @@ WHERE workspace_id = ?
   AND public_id = ?
   AND enabled = TRUE;
 
+-- name: ArchiveProject :execrows
+-- Archive an enabled project. A repeat call, or one that loses a concurrent
+-- race, matches zero rows.
+UPDATE projects
+SET is_archived = TRUE,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND is_archived = FALSE;
+
+-- name: UnarchiveProject :execrows
+-- Restore an archived project. A repeat call, or one that loses a concurrent
+-- race, matches zero rows.
+UPDATE projects
+SET is_archived = FALSE,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND is_archived = TRUE;
+
 -- name: FindProjectByIdentifier :one
 -- Resolve a project by its human-readable identifier within a workspace.
 SELECT

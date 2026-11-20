@@ -183,6 +183,9 @@ type Querier interface {
 	ArchiveInboxItem(ctx context.Context, arg ArchiveInboxItemParams) (int64, error)
 	// Archive a single notification.
 	ArchiveNotification(ctx context.Context, arg ArchiveNotificationParams) (int64, error)
+	// Archive an enabled project. A repeat call, or one that loses a concurrent
+	// race, matches zero rows.
+	ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (int64, error)
 	// Set archived_at on a task.
 	// updated_by_user_id is appended so the audit field records who archived
 	// the row (NULL for system writers).
@@ -2447,6 +2450,9 @@ type Querier interface {
 	// updated_by_user_id is appended so the audit field reflects who triggered
 	// the transition (NULL for system writers / event-bus replays).
 	TransitionTaskState(ctx context.Context, arg TransitionTaskStateParams) (int64, error)
+	// Restore an archived project. A repeat call, or one that loses a concurrent
+	// race, matches zero rows.
+	UnarchiveProject(ctx context.Context, arg UnarchiveProjectParams) (int64, error)
 	// Clear archived_at on a task.
 	// updated_by_user_id is appended so the audit field records who unarchived
 	// the row (NULL for system writers).

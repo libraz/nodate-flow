@@ -13,6 +13,31 @@ import (
 	types "github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 )
 
+const archiveProject = `-- name: ArchiveProject :execrows
+UPDATE projects
+SET is_archived = TRUE,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND is_archived = FALSE
+`
+
+type ArchiveProjectParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Archive an enabled project. A repeat call, or one that loses a concurrent
+// race, matches zero rows.
+func (q *Queries) ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archiveProject, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const createProject = `-- name: CreateProject :execlastid
 INSERT INTO projects (
   public_id,
@@ -404,6 +429,31 @@ func (q *Queries) ListProjectsForWorkspace(ctx context.Context, arg ListProjects
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveProject = `-- name: UnarchiveProject :execrows
+UPDATE projects
+SET is_archived = FALSE,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE workspace_id = ?
+  AND public_id = ?
+  AND enabled = TRUE
+  AND is_archived = TRUE
+`
+
+type UnarchiveProjectParams struct {
+	WorkspaceID uint32         `json:"-"`
+	PublicID    types.PublicID `json:"publicId"`
+}
+
+// Restore an archived project. A repeat call, or one that loses a concurrent
+// race, matches zero rows.
+func (q *Queries) UnarchiveProject(ctx context.Context, arg UnarchiveProjectParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, unarchiveProject, arg.WorkspaceID, arg.PublicID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateProject = `-- name: UpdateProject :execrows

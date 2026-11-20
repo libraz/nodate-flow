@@ -57,9 +57,27 @@ func RegisterGlobalEditorWrites(api huma.API, deps Deps) {
 		Method:      http.MethodDelete,
 		Path:        "/projects/{prjId}",
 		Summary:     "Soft-disable a project",
-		Description: "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.",
+		Description: "Disables the project and deletes all of its tasks (with their linked calendar events). This cannot be undone. To hide a project while keeping its tasks, archive it instead. Requires project editor role or above.",
 		Tags:        []string{"Projects"},
 	}, Disable(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "projects-archive",
+		Method:      http.MethodPost,
+		Path:        "/projects/{prjId}/archive",
+		Summary:     "Archive a project",
+		Description: archiveDescription,
+		Tags:        []string{"Projects"},
+	}, Archive(deps))
+
+	huma.Register(api, huma.Operation{
+		OperationID: "projects-unarchive",
+		Method:      http.MethodPost,
+		Path:        "/projects/{prjId}/unarchive",
+		Summary:     "Restore an archived project",
+		Description: archiveDescription,
+		Tags:        []string{"Projects"},
+	}, Unarchive(deps))
 }
 
 // RegisterGlobalLeadWrites wires the global project routes that decide who
@@ -88,3 +106,5 @@ func RegisterGlobalLeadWrites(api huma.API, deps Deps) {
 		Tags:        []string{"Projects"},
 	}, RemoveMember(deps))
 }
+
+const archiveDescription = "Hides the project from listings' default UI and pickers. Its tasks stay and remain editable; unarchive restores it. Repeating the call is a no-op. Requires project editor role or above."

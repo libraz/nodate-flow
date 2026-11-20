@@ -83,7 +83,7 @@ func withFloor(floor auth.Floor, run toolRun) toolRun {
 func registerTools(h *Handler) {
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "list_projects",
-		description:   "List projects in the caller's workspace that the caller can open. Page with limit/offset while hasMore is true.",
+		description:   "List projects in the caller's workspace that the caller can open. Page with limit/offset while hasMore is true. Each project carries isArchived; archived projects are hidden from the app's pickers.",
 		requiredScope: "read:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"limit":  intSchema("Max number of rows (1..200, default 50).", Constraints{Min: intPtr(1), Max: intPtr(200)}),

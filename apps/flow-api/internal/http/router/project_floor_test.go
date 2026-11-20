@@ -23,8 +23,10 @@ var projectPrefixFloors = map[string]auth.Floor{
 	"projects-members-list":      auth.FloorNone,
 
 	// Reshaping the project the caller already works in.
-	"projects-patch":   auth.FloorProjectEditor,
-	"projects-disable": auth.FloorProjectEditor,
+	"projects-patch":     auth.FloorProjectEditor,
+	"projects-disable":   auth.FloorProjectEditor,
+	"projects-archive":   auth.FloorProjectEditor,
+	"projects-unarchive": auth.FloorProjectEditor,
 
 	// Deciding who reaches the project, held one role higher than editing
 	// it: an editor who could also grant roles could promote themselves and

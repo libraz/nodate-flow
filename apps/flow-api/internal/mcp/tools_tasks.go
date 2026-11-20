@@ -71,9 +71,10 @@ func runListProjects(ctx context.Context, deps Deps, s *session, raw json.RawMes
 			continue
 		}
 		items = append(items, map[string]any{
-			"id":   r.PublicID.String(),
-			"slug": r.Slug,
-			"name": r.Name,
+			"id":         r.PublicID.String(),
+			"slug":       r.Slug,
+			"name":       r.Name,
+			"isArchived": r.IsArchived,
 		})
 	}
 	// hasMore is the truncation signal: the window is applied before the

@@ -972,6 +972,23 @@
         "required": ["ok"],
         "type": "object"
       },
+      "ArchiveProjectBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/ArchiveProjectBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "ArchiveTaskOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -12676,6 +12693,23 @@
         "required": ["ok", "dedupeKey"],
         "type": "object"
       },
+      "UnarchiveProjectBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": ["https://example.com/schemas/UnarchiveProjectBody.json"],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ok"],
+        "type": "object"
+      },
       "UnarchiveTaskOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -17676,7 +17710,7 @@
     },
     "/projects/{prjId}": {
       "delete": {
-        "description": "Marks the project as disabled so it disappears from listings and pickers. Tasks remain queryable for audit but reject new edits. Requires project editor role or above.",
+        "description": "Disables the project and deletes all of its tasks (with their linked calendar events). This cannot be undone. To hide a project while keeping its tasks, archive it instead. Requires project editor role or above.",
         "operationId": "projects-disable",
         "parameters": [
           {
@@ -17812,6 +17846,51 @@
           }
         ],
         "summary": "Patch a project",
+        "tags": ["Projects"]
+      }
+    },
+    "/projects/{prjId}/archive": {
+      "post": {
+        "description": "Hides the project from listings' default UI and pickers. Its tasks stay and remain editable; unarchive restores it. Repeating the call is a no-op. Requires project editor role or above.",
+        "operationId": "projects-archive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prjId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Archive a project",
         "tags": ["Projects"]
       }
     },
@@ -18123,6 +18202,51 @@
         ],
         "summary": "List events in a project's timeline",
         "tags": ["Tasks"]
+      }
+    },
+    "/projects/{prjId}/unarchive": {
+      "post": {
+        "description": "Hides the project from listings' default UI and pickers. Its tasks stay and remain editable; unarchive restores it. Repeating the call is a no-op. Requires project editor role or above.",
+        "operationId": "projects-unarchive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prjId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnarchiveProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Restore an archived project",
+        "tags": ["Projects"]
       }
     },
     "/public/invites/accept": {

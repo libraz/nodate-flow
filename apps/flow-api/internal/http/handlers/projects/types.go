@@ -150,6 +150,36 @@ type DisableProjectOutput struct {
 	Body DisableProjectBody
 }
 
+// ArchiveProjectInput is the path for POST /projects/{prjId}/archive.
+type ArchiveProjectInput struct {
+	PrjID string `path:"prjId"`
+}
+
+// ArchiveProjectBody is the response body for POST /projects/{prjId}/archive.
+type ArchiveProjectBody struct {
+	Ok bool `json:"ok"`
+}
+
+// ArchiveProjectOutput is the response for POST /projects/{prjId}/archive.
+type ArchiveProjectOutput struct {
+	Body ArchiveProjectBody
+}
+
+// UnarchiveProjectInput is the path for POST /projects/{prjId}/unarchive.
+type UnarchiveProjectInput struct {
+	PrjID string `path:"prjId"`
+}
+
+// UnarchiveProjectBody is the response body for POST /projects/{prjId}/unarchive.
+type UnarchiveProjectBody struct {
+	Ok bool `json:"ok"`
+}
+
+// UnarchiveProjectOutput is the response for POST /projects/{prjId}/unarchive.
+type UnarchiveProjectOutput struct {
+	Body UnarchiveProjectBody
+}
+
 // ProjectDependencyEdge is one task_dependencies row scoped to a project.
 // Both endpoints are tasks that belong to the same project, so the web
 // client can render arrows between their corresponding rows / bars.
