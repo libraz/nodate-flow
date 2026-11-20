@@ -6,13 +6,14 @@
 
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { TFunction } from 'i18next';
-import { Bot } from 'lucide-react';
+import { Bot, Cog } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { INTEGRATION_SOURCE_COLORS } from '../../lib/source-colors';
 import type { TimelineEvent } from './api';
+import styles from './event-card.module.css';
 
 export { resolveAvatarUrl as resolveActorAvatarUrl };
 
@@ -368,6 +369,23 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
   );
 }
 
+/** Translated label for each source tag; anything unlisted falls back to "System". */
+const SOURCE_LABEL_KEY: Record<string, string> = {
+  github: 'source.github',
+  slack: 'source.slack',
+  google: 'source.google',
+  signal: 'source.signal',
+  ai: 'source.ai',
+  task: 'source.task',
+  comment: 'source.comment',
+  page: 'source.page',
+  workspace: 'source.workspace',
+  project: 'source.project',
+  calendar: 'source.calendar',
+  share: 'source.share',
+  system: 'source.system',
+};
+
 export default function EventCard({ event }: EventCardProps): ReactElement {
   const { t, i18n } = useTranslation('timeline');
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -402,6 +420,9 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
 
   const payloadVisible = hasPayload(event.payload);
   const tag = eventSourceTag(event.type, event.payload);
+  const tagLabel = t(SOURCE_LABEL_KEY[tag.label] ?? 'source.system');
+  // No agent and no user: the server acted on its own, so show a system glyph, not "?".
+  const isSystem = !isAgent && !(event.actorUserId && event.actorUserId.length > 0) && !hasName;
 
   // Only use the optional API projection. Agent / MCP / system events
   // have no user avatar, so they retain the bot glyph or initials path.
@@ -449,7 +470,11 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             zIndex: 1,
           }}
         >
-          {isAgent ? (
+          {isSystem ? (
+            <span role="img" aria-label={actorLabel} className={styles.systemActor}>
+              <Cog size={12} strokeWidth={1.75} aria-hidden="true" />
+            </span>
+          ) : isAgent ? (
             <span
               role="img"
               aria-label={actorLabel}
@@ -500,17 +525,13 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
             {translated}
           </span>
           <span
+            className={styles.sourceTag}
             style={{
-              padding: '0 var(--nf-space-1-5)',
-              borderRadius: 'var(--nf-radius-xs)',
-              border: `1px solid ${tag.color}`,
               color: tag.color,
-              fontSize: 'var(--nf-text-micro)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              background: `color-mix(in oklab, ${tag.color} 10%, transparent)`,
             }}
           >
-            {tag.label}
+            {tagLabel}
           </span>
           <span
             style={{

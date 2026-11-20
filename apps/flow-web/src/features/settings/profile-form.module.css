@@ -14,6 +14,14 @@
   gap: var(--nf-space-4);
 }
 
+/*
+ * The five theme families share one row on the narrow measure (and wrap
+ * 3 + 2 on phones) instead of leaving the fifth alone on a second row.
+ */
+.appearance [role="radiogroup"] {
+  grid-template-columns: repeat(auto-fit, minmax(min(4.5rem, 100%), 1fr));
+}
+
 .skeletonTitle {
   /* nf-token-override: placeholder sized to the content it stands in for, not a spacing step */
   block-size: 1.25rem;

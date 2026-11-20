@@ -6,7 +6,7 @@
   "copy_link": "Copy link",
   "link_copied": "Link copied to clipboard",
   "link_unavailable": "The share link is shown only once, right after the view is published.",
-  "link_unavailable_hint": "To get a link again, unpublish the view and publish it again. The previous link will stop working.",
+  "link_unavailable_hint": "The link is shown only once, right after publishing. If you lose it, unpublish and publish again to get a new link; the old link then stops working.",
   "safety_check": {
     "title": "Safety check",
     "description": "Scanning for sensitive data before publishing...",
@@ -44,5 +44,6 @@
       "network_title": "Network error",
       "network_body": "We could not reach the server. Check your connection and try again."
     }
-  }
+  },
+  "intro": "Publishing creates a read-only public page of this saved view. Anyone with the link can see the tasks in it (title, status, priority, due date) without signing in."
 }

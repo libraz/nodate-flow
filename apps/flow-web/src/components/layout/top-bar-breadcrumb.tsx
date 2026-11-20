@@ -41,6 +41,12 @@ export default function TopBarBreadcrumb(): ReactElement | null {
   return <WorkspaceBreadcrumb key={state.workspaceId} workspaceId={state.workspaceId} />;
 }
 
+/*
+ * The workspace crumb carries `breadcrumbWorkspace`, hidden while the
+ * top bar shows the workspace switcher beside it (full width); at compact
+ * widths the switcher moves into the drawer and the crumb returns.
+ */
+
 /**
  * WorkspaceBreadcrumb — workspace-only trail. Rendered on cross-
  * workspace pages (`/inbox`, `/today`, …) whenever a workspace id is
@@ -52,7 +58,7 @@ function WorkspaceBreadcrumb({ workspaceId }: { workspaceId: string }): ReactEle
   if (!workspace) return null;
   return (
     <Breadcrumb label={t('common.breadcrumb')} className={styles.breadcrumb}>
-      <BreadcrumbItem asChild>
+      <BreadcrumbItem asChild className={styles.breadcrumbWorkspace}>
         <Link to="/workspaces/$id" params={{ id: workspaceId }}>
           {workspace.name}
         </Link>
@@ -82,12 +88,12 @@ function ProjectBreadcrumb({
   const viewLabel = view ? t(PROJECT_VIEW_KEY[view]) : null;
   return (
     <Breadcrumb label={t('common.breadcrumb')} className={styles.breadcrumb}>
-      <BreadcrumbItem asChild>
+      <BreadcrumbItem asChild className={styles.breadcrumbWorkspace}>
         <Link to="/workspaces/$id" params={{ id: workspaceId }}>
           {workspace.name}
         </Link>
       </BreadcrumbItem>
-      <BreadcrumbSeparator />
+      <BreadcrumbSeparator className={styles.breadcrumbWorkspace} />
       <BreadcrumbItem asChild>
         <Link
           to="/workspaces/$id/projects/$projectId/tasks"

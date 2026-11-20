@@ -1,0 +1,96 @@
+/*
+ * Add-provider dialog: the kind choice is a set of two-line options (name
+ * above what it connects to) so the difference is read before choosing.
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.notice {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.kindGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.kindLegend {
+  padding: 0;
+  margin-block-end: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.kindHelp {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+.kindOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  gap: var(--nf-space-2);
+}
+
+.kindOption {
+  display: flex;
+  align-items: start;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.kindOption:hover,
+.kindOption:has(:focus-visible) {
+  background: var(--nf-color-bg-sunken);
+}
+
+/* The chosen kind reads as chosen without relying on the radio dot alone. */
+.kindOption:has(:checked) {
+  background: var(--nf-color-accent-subtle);
+  border-color: var(--nf-color-accent);
+}
+
+.kindBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  min-inline-size: 0;
+}
+
+.kindLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.kindHint {
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}

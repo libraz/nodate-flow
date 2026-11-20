@@ -1,0 +1,176 @@
+/* Dashboard widget bodies — calm list rhythm, hierarchy from weight and spacing. */
+
+.body {
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-3) var(--nf-space-4);
+  padding-inline: var(--nf-space-4);
+  overflow-y: auto;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.item:first-child {
+  border-block-start: none;
+  padding-block-start: 0;
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  margin-block-start: var(--nf-space-0-5);
+  color: var(--nf-color-fg-muted);
+}
+
+.itemText {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+}
+
+.itemPrimary {
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-snug);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.itemPrimary:hover {
+  text-decoration: underline;
+}
+
+.itemClamp {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.itemSecondary {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  line-height: var(--nf-leading-snug);
+}
+
+.itemEmphasis {
+  color: var(--nf-color-danger-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.unreadMark {
+  color: var(--nf-color-accent-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.seeAll {
+  align-self: flex-start;
+  margin-block-start: auto;
+  color: var(--nf-color-accent-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  text-decoration: none;
+}
+
+.seeAll:hover {
+  text-decoration: underline;
+}
+
+/* Empty / error / coming-soon message */
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.messageTitle {
+  margin: 0;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+}
+
+.messageHint {
+  margin: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  line-height: var(--nf-leading-normal);
+}
+
+.messageAction {
+  align-self: flex-start;
+  margin-block-start: var(--nf-space-1);
+}
+
+/* Loading skeleton */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.skeletonLine {
+  /* nf-token-override: placeholder sized to a text line */
+  block-size: 0.875rem;
+  border-radius: var(--nf-radius-sm);
+}
+
+.skeletonLineShort {
+  composes: skeletonLine;
+  inline-size: 60%;
+}
+
+/* Task summary figures */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+  gap: var(--nf-space-4);
+  margin: 0;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--nf-space-0-5);
+  margin: 0;
+}
+
+.figureValue {
+  margin: 0;
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-3xl);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.figureValueEmphasis {
+  composes: figureValue;
+  color: var(--nf-color-danger-fg);
+}
+
+.figureLabel {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+}

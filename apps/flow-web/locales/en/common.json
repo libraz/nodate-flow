@@ -12,7 +12,9 @@
       "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     },
     "undo": "Undo",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "confirm_title": "Are you sure?",
+    "confirm": "Confirm"
   },
   "landing": {
     "hello": "Hello.",
@@ -28,7 +30,9 @@
     "stat_due_today": "Due today",
     "stat_done": "Completed",
     "recent_tasks": "Your tasks",
-    "view_all_tasks": "View all tasks →"
+    "view_all_tasks": "View all tasks →",
+    "description": "Your assigned work across all workspaces, with the dashboard of your first workspace below.",
+    "stat_hint": "Counts tasks where you are assignee, reviewer or approver in any workspace. Overdue and Due today follow your time zone."
   },
   "nav": {
     "theme": "Theme",
@@ -49,18 +53,21 @@
     "retroDrafts": "Retrospective drafts",
     "archive": "Archive",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "insightsPriorityHint": "Proposed priority changes for open tasks. Nothing changes until you apply one.",
+    "archiveHint": "Tasks you archived. You can restore them."
   },
   "topbar": {
     "workspace": {
       "switcher": "Switch workspace",
-      "none": "Select a workspace"
+      "none": "Select a workspace",
+      "current": "Current workspace: {name}"
     },
     "search": {
-      "placeholder": "Search tasks, projects, people..."
+      "placeholder": "Search tasks or jump to a page… (type > for AI commands)"
     },
     "user_menu": {
-      "open": "Open account menu",
+      "open": "Account menu",
       "settings": "Settings",
       "avatar_alt": "{name}'s profile picture"
     },
@@ -78,10 +85,10 @@
     "quick_actions": "Quick actions",
     "new_task": "New task",
     "quick_capture": "Quick capture",
-    "ai_assist": "AI assist",
+    "ai_assist": "AI command",
     "command_palette": {
       "title": "Command palette",
-      "placeholder": "Type a command or search…",
+      "placeholder": "Search tasks and projects, or type > for an AI command",
       "empty": "No results.",
       "searching": "Searching…",
       "group_navigation": "Navigation",
@@ -99,7 +106,7 @@
       "resolving": "Resolving command…",
       "confidence": "Confidence: {score}%",
       "confirm_execute": "Press Enter to execute",
-      "confirm_low": "Confirm: {tool}?",
+      "confirm_low": "I am not sure I understood. Check the details above, then press Enter to run it.",
       "command_hint": "Type > for AI commands",
       "no_workspace": "Select a workspace first to use AI commands.",
       "error": "Could not resolve the command. Please try again.",
@@ -109,8 +116,27 @@
       "unresolved_missing": "The command is missing {argument}. Nothing was changed.",
       "unresolved_not_found": "Nothing here matches “{term}”. Nothing was changed.",
       "unresolved_ambiguous": "“{term}” matches more than one item. Be more specific.",
-      "execute_failed": "The command could not be completed. Nothing was changed."
-    }
+      "execute_failed": "The command could not be completed. Nothing was changed.",
+      "command_ready": "Press Enter to have AI interpret your request. Nothing runs yet.",
+      "confidence_hint": "How sure AI is that it understood your request. Below 80% you are asked to check the details first.",
+      "tool": {
+        "create_task": "Create task",
+        "update_task": "Update task",
+        "transition_task": "Change task state",
+        "add_comment": "Add comment",
+        "search_tasks": "Search tasks",
+        "list_tasks": "Show tasks",
+        "list_projects": "Show projects"
+      },
+      "step": {
+        "interpret": "Interpret",
+        "confirm": "Confirm",
+        "run": "Run"
+      },
+      "details": "Details"
+    },
+    "quick_capture_hint": "Create a task with just a title in the project you are viewing, or your first project. Priority is set to Medium.",
+    "ai_assist_hint": "Type a request in plain language, for example complete the login bug. AI proposes an action and runs it only after you press Enter again."
   },
   "glass_dock": {
     "unavailable": "AI suggestions unavailable"
@@ -153,7 +179,7 @@
   "today": {
     "title": "My tasks",
     "subtitle": "Tasks assigned to you across all workspaces, grouped by due date.",
-    "empty": "Nothing assigned to you.",
+    "empty": "Nothing is assigned to you yet. Tasks appear here when you are added as assignee, reviewer or approver.",
     "loading": "Loading your tasks…",
     "error": "Failed to load your tasks.",
     "sections": {
@@ -172,7 +198,7 @@
     "prev": "Earlier",
     "next": "Later",
     "today": "Today",
-    "empty": "No scheduled tasks in this project yet.",
+    "empty": "No scheduled tasks yet. Set a start date or a due date on a task and it appears here.",
     "unscheduled": "{count, plural, one {# unscheduled task} other {# unscheduled tasks}}",
     "zoom_in": "Zoom in",
     "zoom_out": "Zoom out",
@@ -181,11 +207,13 @@
     "zoom_month": "Month",
     "zoom_preset_aria": "Zoom preset",
     "critical_path": "Critical path",
-    "critical_path_none": "No critical path found."
+    "critical_path_none": "No critical path found.",
+    "description": "A read-only schedule. Bars run from each task's start date to its due date and arrows show blocking dependencies. Click a bar to open the task.",
+    "critical_path_hint": "Highlights the longest chain of tasks that block one another. A delay anywhere on it delays the end of the project."
   },
   "calendar": {
     "title": "Calendar",
-    "subtitle": "Tasks and events across every workspace, on a monthly grid.",
+    "subtitle": "Tasks assigned to you and events from every workspace, on a monthly grid. Click a day to add, drag to reschedule.",
     "prev": "Previous month",
     "next": "Next month",
     "today": "Today",
@@ -196,8 +224,8 @@
     "empty": "No scheduled tasks this month.",
     "noDue": "No due date",
     "more": "+{count} more",
-    "click_to_add": "Click to add",
-    "drag_to_reschedule": "Drag to reschedule",
+    "click_to_add": "Click to add. Shift+click to add a block.",
+    "drag_to_reschedule": "Drag to another day to move it. Repeating events ask which occurrences to change.",
     "reschedule_success": "Due date updated",
     "reschedule_error": "Failed to update due date",
     "event_move_success": "Event moved",
@@ -222,7 +250,7 @@
       "tasks_due": "Tasks (due)",
       "events": "Events",
       "blocks": "Blocks",
-      "free": "Free",
+      "free": "Free time",
       "milestone": "Milestones",
       "holidays": "Holidays"
     },
@@ -256,8 +284,7 @@
       "title": "Calendar settings",
       "tab": {
         "general": "General",
-        "members": "Members",
-        "sync": "Sync"
+        "members": "Members"
       },
       "general": {
         "name_label": "Name",
@@ -292,9 +319,6 @@
         "success": "Calendar deleted",
         "error": "Could not delete the calendar."
       },
-      "sync": {
-        "placeholder": "Sync settings will appear here in a future release."
-      },
       "members": {
         "empty": "No members yet.",
         "add": "Add",
@@ -323,8 +347,8 @@
     },
     "memos": {
       "title": "Memos",
-      "menu_item": "Memos",
-      "empty": "No memos yet",
+      "menu_item": "Memos (to-dos for this calendar)",
+      "empty": "No memos yet. Add a small to-do for this calendar below; tick it when it is done.",
       "add_placeholder": "Add a memo…",
       "add": "Add",
       "add_error": "Failed to add memo",
@@ -342,27 +366,29 @@
       "body_add": "Add notes",
       "body_show": "Show notes",
       "body_collapse": "Hide notes"
-    }
+    },
+    "layerHint": "Blocks: time you set aside. Free: time you marked as available. Milestones: date markers."
   },
   "calendars_rail": {
     "title": "Calendars",
-    "add_teammate": "Add teammate calendar...",
+    "add_teammate": "Add a teammate's calendar…",
     "actions": {
       "show": "Show",
       "hide": "Hide",
       "leave": "Leave calendar",
       "settings": "Settings…",
-      "menu": "Calendar actions",
-      "toggle_visibility": "Toggle visibility"
+      "menu": "Calendar actions: memos, settings, leave",
+      "toggle_visibility": "Show or hide this calendar on the grid"
     },
     "discover": {
       "title": "Add teammate calendar",
       "search_placeholder": "Search by name...",
-      "empty": "No teammate calendars to subscribe to",
+      "empty": "No teammate calendars to add. Calendars appear here when teammates in this workspace have a personal calendar you are not yet subscribed to.",
       "subscribe": "Subscribe",
       "subscribed_toast": "Subscribed to {name}",
       "load_error": "Could not load teammate calendars. Please try again.",
-      "subscribe_error": "Could not subscribe. Please try again."
+      "subscribe_error": "Could not subscribe. Please try again.",
+      "hint": "Subscribing adds the calendar to your list so you can see its events. You can leave it again at any time."
     },
     "errors": {
       "visibility_failed": "Could not change the calendar visibility",
@@ -394,10 +420,10 @@
   "workspaces": {
     "title": "Workspaces",
     "new": "New workspace",
-    "empty": "No workspaces yet. Create your first one to get started.",
+    "empty": "You do not belong to any workspace yet. Create one for your team, or ask an owner for an invite link.",
     "columns": {
       "name": "Name",
-      "slug": "Slug",
+      "slug": "Short name",
       "members": "Members",
       "created": "Created",
       "actions": "Actions"
@@ -408,24 +434,20 @@
       "description": "Description",
       "submit": "Save",
       "cancel": "Cancel",
-      "close": "Close"
+      "close": "Close",
+      "slug_hint": "A short unique name for the workspace. Lowercase letters, numbers and hyphens only."
     },
     "detail": {
-      "tabs": {
-        "label": "Workspace detail tabs",
-        "overview": "Overview",
-        "members": "Members",
-        "settings": "Settings"
-      },
       "projects_nav_label": "Workspace sub-sections",
-      "overview_empty": "No projects yet in this workspace."
+      "overview_empty": "No projects yet. A project holds the tasks for one piece of work. Create the first one."
     },
     "nav": {
       "overview": "Overview",
       "projects": "Projects",
       "timeline": "Timeline",
       "settings": "Settings",
-      "label": "Workspace sections"
+      "label": "Workspace sections",
+      "members": "Members"
     },
     "not_found": {
       "title": "Workspace not found",
@@ -438,14 +460,15 @@
       "email": "Email",
       "role": "Role",
       "added_at": "Added",
-      "pending": "Pending",
+      "pending": "Not joined yet",
       "change_role": "Change role",
       "remove": "Remove",
       "remove_confirm": "Remove {name} from this workspace?",
       "removed": "Member removed",
       "remove_failed": "Failed to remove the member",
       "role_updated": "Role updated",
-      "role_update_failed": "Failed to change the role"
+      "role_update_failed": "Failed to change the role",
+      "role_hint": "Owner and admin can manage everything. Member can work on tasks. Guest can only view."
     },
     "invites": {
       "create": "Create invite link",
@@ -504,7 +527,10 @@
       "error_title": "Invite unavailable",
       "error_network": "We could not check this invite. Check your connection and try again.",
       "error_back": "Go home",
-      "revoke_confirm": "Revoke this invite link? Anyone who has not used it yet will no longer be able to join with it."
+      "revoke_confirm": "Revoke this invite link? Anyone who has not used it yet will no longer be able to join with it.",
+      "max_usesHint": "Anyone with this link can join until it expires or the use limit is reached. Each person who joins counts as one use.",
+      "labelHint": "For your own reference in the invite list. The person joining does not see it.",
+      "link_once": "Copy the link now. It is shown only here; if you lose it, create a new link."
     },
     "roles": {
       "owner": "Owner",
@@ -533,11 +559,18 @@
     },
     "setup": {
       "title": "Create your workspace",
-      "description": "Set up your first workspace to start capturing tasks, events, and pages.",
+      "description": "A workspace is the shared space for your team's projects, tasks, events and pages. You will be its owner and can invite others later.",
       "name_placeholder": "Acme, Personal, Team Nova...",
       "slug_placeholder": "acme",
-      "slug_hint": "Lowercase letters, numbers, and hyphens only.",
+      "slug_hint": "Filled in from the name. Lowercase letters, numbers and hyphens; must be unique on this server. You can change it later in Settings.",
       "submit": "Create workspace"
+    },
+    "description": "A workspace is the shared space for a team: its projects, tasks, calendars, pages and members.",
+    "role_desc": {
+      "owner": "Manages everything, including deleting the workspace and making others owners.",
+      "admin": "Manages members, settings and all work. Cannot delete the workspace.",
+      "member": "Creates and works on tasks, pages and events.",
+      "guest": "Can view everything but cannot change anything."
     }
   },
   "projects": {
@@ -575,7 +608,8 @@
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "key_description": "Lowercase letters, numbers and hyphens. Must be unique in the workspace. Filled in from the name until you edit it."
     },
     "visibility": {
       "private": "Private",
@@ -584,7 +618,7 @@
     },
     "detail": {
       "description_empty": "No description for this project yet.",
-      "overview_empty": "No tasks in this project yet.",
+      "overview_empty": "No tasks in this project yet. Create the first one from the Tasks tab.",
       "active_tasks": "Active tasks",
       "progress": "Progress {pct}%",
       "view_all_tasks": "View all tasks",
@@ -598,14 +632,15 @@
       "title": "Members",
       "add": "Add member",
       "email": "Email",
-      "user_id": "User ID",
+      "user_id": "Member",
       "role": "Role",
       "added_at": "Added",
-      "empty": "No members yet.",
+      "empty": "No members yet. Add people to give them a role in this project. Workspace owners and admins have access without being added.",
       "remove": "Remove",
       "removed": "Member removed",
       "remove_failed": "Failed to remove the member",
-      "remove_confirm": "Remove {name} from this project?"
+      "remove_confirm": "Remove {name} from this project?",
+      "role_description": "Viewer can read. Commenter can also comment. Editor can also create and edit tasks. Lead can also decide who else has access."
     },
     "roles": {
       "lead": "Lead",
@@ -630,7 +665,8 @@
       "update_failed": "Could not update the project. Please try again.",
       "disable_failed": "Could not disable the project. Please try again.",
       "add_member_failed": "Could not add the member. Please try again."
-    }
+    },
+    "description": "A project groups the related tasks of this workspace. Open one to see its tasks, Gantt chart, timeline and members."
   },
   "tasks": {
     "title": "Tasks",
@@ -644,7 +680,7 @@
     "views": {
       "board": "Board",
       "list": "List",
-      "graph": "Graph",
+      "graph": "Dependencies",
       "spreadsheet": "Spreadsheet"
     },
     "list": {
@@ -656,7 +692,7 @@
     "columns": {
       "title": "Title",
       "status": "Status",
-      "deps": "Deps",
+      "deps": "Blocked by",
       "assignee": "Assignee",
       "due": "Due",
       "priority": "Priority",
@@ -709,7 +745,8 @@
       "chip_status": "Status: {value}",
       "chip_assignee": "Assignee: {value}",
       "chip_search": "Search: {value}",
-      "chip_priority": "Priority: {value}"
+      "chip_priority": "Priority: {value}",
+      "search_hint": "Searches task titles in this project. Combine it with the state, priority and assignee filters."
     },
     "validation": {
       "title_required": "Title is required.",
@@ -729,7 +766,7 @@
       "moved_to": "Moved to {state}",
       "move_menu": "Move task",
       "move_to": "Move to {state}",
-      "dnd_disabled_hint": "Use the state dropdown to change a task's state."
+      "dnd_disabled_hint": "Dragging is off. Use the Move task menu on a card to change its state."
     },
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",
@@ -794,13 +831,14 @@
       "listbox_label": "People you can mention",
       "loading": "Loading people…",
       "load_failed": "Could not load the people in this workspace",
-      "results": "{count, plural, =0 {No matching people} one {# person} other {# people}}"
+      "results": "{count, plural, =0 {No matching people} one {# person} other {# people}}",
+      "hint": "Type @ to mention a workspace member. They get a notification."
     },
     "detail": {
       "title_edit": "Edit title",
       "title_edit_named": "Edit title: {title}",
       "description_edit": "Edit description",
-      "description_empty": "No description yet.",
+      "description_empty": "No description yet. Click to add one. Markdown is supported.",
       "save": "Save",
       "cancel": "Cancel",
       "priority_label": "Priority",
@@ -821,7 +859,8 @@
         "title": "Related tasks",
         "empty": "No related tasks found.",
         "duplicate": "Likely duplicate",
-        "related": "Related"
+        "related": "Related",
+        "hint": "Tasks that look similar, found by comparing titles and descriptions. The number is a similarity score from 0 to 1."
       },
       "dependencies": {
         "title": "Dependencies",
@@ -832,7 +871,7 @@
         "subtasks": "Subtasks",
         "duplicateOf": "Duplicate of",
         "duplicatedBy": "Duplicated by",
-        "empty": "No dependencies yet.",
+        "empty": "No dependencies yet. Add one to show what blocks this task, what it blocks, or which tasks are its parent, subtasks or duplicates.",
         "add": "Add dependency",
         "addCancel": "Cancel",
         "remove": "Remove",
@@ -850,12 +889,14 @@
         "searchHint": "Type to search tasks in this workspace.",
         "addError": "Failed to add dependency.",
         "removeError": "Failed to remove dependency.",
-        "removed": "Removed dependency on \"{title}\"."
+        "removed": "Removed dependency on \"{title}\".",
+        "kindHint": "Read it as: this task [Blocks / Relates to / Is a subtask of / Duplicates] the task you pick."
       },
       "infer_state": {
         "title": "Suggested next step",
         "empty": "No suggestion right now.",
-        "reason_label": "Reason (English):"
+        "reason_label": "Reason:",
+        "hint": "AI reads this task's recent activity and proposes a state change. It is only a suggestion; apply it yourself with the Transitions buttons."
       },
       "ai_activity": {
         "title": "AI reasoning",
@@ -866,10 +907,11 @@
         "start": "Start",
         "block": "Block",
         "unblock": "Unblock",
-        "submit": "Submit",
+        "submit": "Submit for review",
         "complete": "Complete",
         "reopen": "Reopen",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "hint": "Only moves allowed from the current state are shown. Done and Cancelled tasks can only be reopened."
       }
     },
     "history": {
@@ -931,7 +973,9 @@
       "granularity_label": "Detail level",
       "granularity_coarse": "Coarse",
       "granularity_standard": "Standard",
-      "granularity_fine": "Fine"
+      "granularity_fine": "Fine",
+      "granularity_hint": "Coarse gives fewer, larger steps. Fine gives more, smaller ones.",
+      "description": "AI splits this task into steps. Edit or untick the ones you do not want, then create the rest as subtasks. Nothing is created until you confirm."
     },
     "smart_create": {
       "assist_button": "AI Assist",
@@ -945,7 +989,8 @@
       "error": "Could not generate suggestions. You can still create the task manually.",
       "no_provider": "No AI provider configured for this workspace.",
       "priority_urgent": "Urgent",
-      "priority_unknown": "{value}"
+      "priority_unknown": "{value}",
+      "assist_hint": "Sends the title and description to the workspace's AI provider, looks at similar past tasks and suggests assignees and subtasks. Nothing is created until you press Apply suggestions and create."
     },
     "attachments": {
       "title": "Attachments",
@@ -988,14 +1033,15 @@
       "creating": "Saving...",
       "delete": "Delete",
       "delete_confirm": "Delete this saved view?",
-      "empty": "No saved views",
+      "empty": "No saved views yet. Set some filters, give them a name below and save to reuse them.",
       "default_badge": "Default",
       "public_badge": "Public",
       "apply": "Apply",
       "share": "Share view",
       "load_failed": "Failed to load saved views",
       "save_failed": "Failed to save view",
-      "delete_failed": "Failed to delete view"
+      "delete_failed": "Failed to delete view",
+      "save_hint": "Saves the filters you have set right now (search, state, priority, assignee) under this name."
     },
     "retro": {
       "queue": {
@@ -1020,9 +1066,16 @@
           "cancel": "Cancel"
         },
         "prev_page": "Previous page",
-        "next_page": "Next page"
+        "next_page": "Next page",
+        "empty_description": "When AI sees completed work worth looking back on, it drafts a retrospective task here for you to accept or discard.",
+        "accept_hint": "Turns this draft into a regular open task.",
+        "discard_hint": "Archives the draft. You can restore it from the Archive page."
       }
-    }
+    },
+    "description": "All tasks in this project. Switch between board, list, dependencies and spreadsheet; your choice is remembered on this device.",
+    "views_hint": "Board groups tasks by state. List and Spreadsheet show one row per task; Spreadsheet is built for fast keyboard editing. Dependencies draws which tasks block which.",
+    "empty_filtered": "No tasks match the current filters. Clear the filters to see all tasks.",
+    "views_label": "Task view"
   },
   "auth": {
     "login": {
@@ -1120,8 +1173,8 @@
     "inbox": {
       "title": "Pending invites",
       "count_badge": "{count}",
-      "empty": "No pending invites.",
-      "rsvp_hint": "To RSVP, click the link in the invite email.",
+      "empty": "No pending invites. When someone invites your email address to an event, it shows up here.",
+      "rsvp_hint": "Open the link in the invitation email to respond.",
       "load_error": "Failed to load invites.",
       "calendar_workspace": "{calendar} · {workspace}",
       "undated": "Date to be announced",
@@ -1164,11 +1217,13 @@
     "go_pages": "Go to Pages",
     "go_workspaces": "Go to Workspaces",
     "go_settings": "Go to Settings",
-    "show_help": "Show shortcuts"
+    "show_help": "Show shortcuts",
+    "chord_hint": "Press the keys one after another: G, then the second key.",
+    "command_palette": "Open the command palette"
   },
   "timeboxes": {
     "title": "Timeboxes",
-    "description": "Group tasks into focused work sessions.",
+    "description": "Group tasks into a period such as a sprint, and track them from planned to completed.",
     "new": "New timebox",
     "empty": "No timeboxes yet",
     "section": {
@@ -1184,10 +1239,15 @@
     },
     "action": {
       "start": "Start",
-      "stop": "Stop",
+      "stop": "Complete",
       "cancel": "Cancel",
       "edit": "Edit",
-      "delete": "Delete"
+      "delete": "Delete",
+      "stopHint": "Stop marks the timebox as completed. Cancel ends it without completing.",
+      "end_incomplete": "End without completing",
+      "completeHint": "Ends the timebox and records it as completed.",
+      "cancelPlanHint": "Drops this planned timebox without starting it. It moves to Cancelled.",
+      "endIncompleteHint": "Ends the timebox without completing it. It moves to Cancelled."
     },
     "delete": {
       "confirm": "Delete this timebox? Linked tasks remain in the workspace.",
@@ -1206,7 +1266,8 @@
     },
     "add_task_id": {
       "label": "Task ID",
-      "hint": "Paste the task's UUID. Workspace task picker is on the way."
+      "hint": "Open the task and copy its ID from the address bar (the part after /tasks/), then paste it here.",
+      "placeholder": "Paste a task ID"
     },
     "remove_task": {
       "label": "Remove",
@@ -1237,9 +1298,17 @@
       "starts_on": "Starts on",
       "ends_on": "Ends on",
       "project": {
+        "hint": "Limit this timebox to one project, or leave it workspace-wide.",
         "label": "Project (optional)",
         "placeholder": "Workspace-wide"
       }
+    },
+    "empty_description": "Create a timebox for a sprint or a focus week, then link the tasks you want to finish in it.",
+    "add_task_search": {
+      "label": "Task to link",
+      "placeholder": "Search tasks by title…",
+      "empty": "No matching tasks in this workspace.",
+      "hint": "Type part of a task title, choose it from the list, then press Link a task."
     }
   },
   "taskWorkflow": {
@@ -1255,12 +1324,12 @@
     "configure": "Review & handoff",
     "collapse": "Hide workflow",
     "completionPolicy": "Completion policy",
-    "policyHelp": "Review is opt-in. Required checks are the only task constraints that gate completion.",
+    "policyHelp": "Manual completion lets the task be completed directly. Review required means the work is submitted and a reviewer approves it first. Only the checks you tick below hold up completion; other constraints do not.",
     "requiredChecks": "Required checks",
     "noRequiredChecks": "No checks gate completion.",
-    "loadChecks": "Load available task checks",
+    "loadChecks": "Choose required checks",
     "loadingChecks": "Loading checks…",
-    "requiredCheckNamed": "Require check {id}",
+    "requiredCheckNamed": "Require check: {kind} {expression}",
     "unsupportedCheck": "Cannot be required",
     "checkSatisfied": "Satisfied",
     "checkOpen": "Open",
@@ -1349,7 +1418,12 @@
     "reasonRequired": "Add a short reason before requesting changes.",
     "evidenceUrlPlaceholder": "https://…",
     "unknownMember": "Member no longer available",
-    "handoffDueSuffix": "· Due {due}"
+    "handoffDueSuffix": "· Due {due}",
+    "description": "Choose whether this task needs a reviewer's approval before it can be completed, submit work for review, and hand a role to someone else.",
+    "revision_hint": "Goes up each time the work changes. An approval or submission for an older revision no longer applies.",
+    "handoffs_hint": "Ask someone to take over one of your roles on this task. You stay responsible until they accept, and you can withdraw the request while it is pending.",
+    "rolesDescription": "Reviewers and approvers can decide on work that is submitted for review. Choose them before submitting.",
+    "expand": "Show workflow"
   },
   "active_timebox_bar": {
     "label": "Active timebox",
@@ -1358,5 +1432,10 @@
     "stop": "Stop",
     "stop_confirm": "Stop this timebox? It will be marked as completed.",
     "stop_success": "Timebox stopped"
+  },
+  "help": {
+    "trigger": "How this page works",
+    "eyebrow": "Guide",
+    "shortcuts": "Keyboard shortcuts"
   }
 }

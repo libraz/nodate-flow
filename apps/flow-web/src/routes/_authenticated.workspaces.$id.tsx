@@ -2,7 +2,7 @@
  * /workspaces/$id — workspace detail layout.
  *
  * Renders a horizontal sub-nav (Overview / Projects / Timeline /
- * Settings) so the nested routes are reachable from the UI without
+ * Members / Settings) so the nested routes are reachable from the UI without
  * typing URLs. When no child route is matched, the workspace overview
  * is rendered inline.
  *
@@ -20,39 +20,18 @@
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import {
-  createFileRoute,
-  Link,
-  Outlet,
-  useChildMatches,
-  useNavigate,
-} from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useChildMatches } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 
 import PageFrame from '../components/page-frame';
 import { useWorkspaceQuery } from '../features/workspaces/api';
-import WorkspaceDetail, { type WorkspaceDetailTab } from '../features/workspaces/workspace-detail';
+import WorkspaceDetail from '../features/workspaces/workspace-detail';
 import styles from '../features/workspaces/workspaces.module.css';
 import { authApiProbe } from '../lib/api';
 import { ApiError } from '../lib/api-error';
 
-/**
- * Allowed values for the `?tab=` search param across the workspace
- * subtree. The workspace overview only consumes `overview` / `members`,
- * but the nested project-detail route also reads `?tab=` and adds
- * `settings`, so the parent schema is a superset to keep child routes'
- * own search schemas compatible. The workspace overview itself maps
- * anything outside its own set (`overview` / `members`) to the default.
- */
-const TAB_VALUES = ['overview', 'members', 'settings'] as const;
-
-const searchSchema = z.object({
-  tab: z.enum(TAB_VALUES).optional().catch('overview'),
-});
-
-type SubNavKey = 'overview' | 'projects' | 'timeline' | 'settings';
+type SubNavKey = 'overview' | 'projects' | 'timeline' | 'members' | 'settings';
 
 interface SubNavItem {
   key: SubNavKey;
@@ -60,6 +39,7 @@ interface SubNavItem {
     | '/workspaces/$id'
     | '/workspaces/$id/projects'
     | '/workspaces/$id/timeline'
+    | '/workspaces/$id/members'
     | '/workspaces/$id/settings';
 }
 
@@ -67,6 +47,7 @@ const SUB_NAV: readonly SubNavItem[] = [
   { key: 'overview', to: '/workspaces/$id' },
   { key: 'projects', to: '/workspaces/$id/projects' },
   { key: 'timeline', to: '/workspaces/$id/timeline' },
+  { key: 'members', to: '/workspaces/$id/members' },
   { key: 'settings', to: '/workspaces/$id/settings' },
 ];
 
@@ -76,6 +57,7 @@ function labelKeyFor(
   | 'workspaces.nav.overview'
   | 'workspaces.nav.projects'
   | 'workspaces.nav.timeline'
+  | 'workspaces.nav.members'
   | 'workspaces.nav.settings' {
   switch (key) {
     case 'overview':
@@ -84,6 +66,8 @@ function labelKeyFor(
       return 'workspaces.nav.projects';
     case 'timeline':
       return 'workspaces.nav.timeline';
+    case 'members':
+      return 'workspaces.nav.members';
     case 'settings':
       return 'workspaces.nav.settings';
   }
@@ -106,8 +90,6 @@ function useInsideProjectRoute(): boolean {
 function WorkspaceDetailRoute(): ReactElement {
   const { t } = useTranslation('common');
   const { id } = Route.useParams();
-  const { tab } = Route.useSearch();
-  const navigate = useNavigate();
   const childMatches = useChildMatches();
   const hasChildRoute = childMatches.length > 0;
   const insideProject = useInsideProjectRoute();
@@ -120,13 +102,6 @@ function WorkspaceDetailRoute(): ReactElement {
   // own chrome, so the layout bails out entirely (see `insideProject`
   // branch below).
   const { data: workspace } = useWorkspaceQuery(id);
-  // The Tabs primitive inside WorkspaceDetail is driven by the `?tab=`
-  // search param so reloads and deep links (e.g. `?tab=members`)
-  // restore the right panel instead of snapping back to overview. The
-  // schema allows a superset (including `settings` for the nested
-  // project route); anything outside the workspace's own tab set
-  // resolves to `overview`.
-  const activeTab: WorkspaceDetailTab = tab === 'members' ? 'members' : 'overview';
 
   if (insideProject) {
     return (
@@ -173,22 +148,7 @@ function WorkspaceDetailRoute(): ReactElement {
           </div>
         }
       >
-        {hasChildRoute ? (
-          <Outlet />
-        ) : (
-          <WorkspaceDetail
-            id={id}
-            tab={activeTab}
-            onTabChange={(next) => {
-              void navigate({
-                to: '/workspaces/$id',
-                params: { id },
-                search: (prev) => ({ ...prev, tab: next === 'overview' ? undefined : next }),
-                replace: true,
-              });
-            }}
-          />
-        )}
+        {hasChildRoute ? <Outlet /> : <WorkspaceDetail id={id} />}
       </Suspense>
     </PageFrame>
   );
@@ -277,7 +237,6 @@ function errorCodeOf(err: unknown): string | undefined {
 
 export const Route = createFileRoute('/_authenticated/workspaces/$id')({
   component: WorkspaceDetailRoute,
-  validateSearch: (raw) => searchSchema.parse(raw),
   errorComponent: ({ error }) => {
     if (errorCodeOf(error) === 'WS.WORKSPACE.NOT_FOUND') {
       return <WorkspaceNotFound />;

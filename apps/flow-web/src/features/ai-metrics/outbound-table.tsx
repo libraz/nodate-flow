@@ -30,6 +30,8 @@ export default function OutboundTable({ rows }: OutboundTableProps): ReactElemen
           {t('outbound.title')}
         </h2>
         <p className={styles.outboundDescription}>{t('outbound.description')}</p>
+        {/* Column definitions stay visible: they say which counter signals a problem. */}
+        <p className={styles.outboundDescription}>{t('outbound.column.help')}</p>
       </header>
       {rows.length === 0 ? (
         <div className={styles.outboundEmpty}>{t('outbound.empty')}</div>

@@ -1,14 +1,14 @@
 {
   "view": {
     "title": "通知",
-    "empty": "暂无通知",
+    "empty": "没有通知。被提及、被分配、有新评论或日程变更时会显示在这里。",
     "mark_all_read": "全部标为已读",
     "load_more": "加载更多",
     "loading_more": "正在加载更多通知…"
   },
   "action": {
     "mark_read": "标为已读",
-    "archive": "归档"
+    "archive": "归档（从此列表移除）"
   },
   "severity": {
     "low": "低",

@@ -1,5 +1,5 @@
 /**
- * StateGraph — 3.WEB-2 minimal directed-graph visualisation of the
+ * StateGraph — minimal directed-graph visualisation of the
  * task state machine. SVG-based with a fixed hand-laid layout (5 nodes
  * only) so we don't need a graph library. The `current` prop
  * highlights the active derived_state.
@@ -9,6 +9,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CONSTRAINT_STATE_COLORS } from '../../lib/source-colors';
+import styles from './constraints.module.css';
 
 const STATES = ['open', 'waiting', 'review', 'done', 'cancelled'] as const;
 export type GraphState = (typeof STATES)[number];
@@ -64,8 +65,11 @@ export default function StateGraph({ current, activeSources }: StateGraphProps):
   const { t } = useTranslation(['constraints', 'common']);
   const openPos = POSITIONS.open;
   return (
-    <figure aria-label={t('stateGraph.title')}>
-      <figcaption>{t('stateGraph.title')}</figcaption>
+    <figure aria-label={t('stateGraph.title')} className={styles.stateFigure}>
+      <figcaption className={styles.stateCaption}>
+        <span className={styles.stateCaptionTitle}>{t('stateGraph.title')}</span>
+        <span className={styles.stateCaptionNote}>{t('stateGraph.description')}</span>
+      </figcaption>
       <svg role="img" aria-label={t('stateGraph.legend')} viewBox="-90 0 600 240" width="100%">
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">

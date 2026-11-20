@@ -14,7 +14,11 @@ function ProfileRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <div className={ui.page}>
-      <PageHeader title={t('profile.title')} />
+      <PageHeader
+        title={t('profile.title')}
+        description={t('profile.description')}
+        help="settings-profile"
+      />
       <Suspense fallback={<ProfileFormSkeleton />}>
         <ProfileForm />
       </Suspense>

@@ -23,7 +23,7 @@ function WorkspaceActivityRoute(): ReactElement {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <PageHeader title={t('view.title')} description={t('view.description')} />
+      <PageHeader title={t('view.title')} description={t('view.description')} help="activity" />
       <ActivityFeed workspaceId={id} source={source} onSourceChange={setSource} />
     </div>
   );

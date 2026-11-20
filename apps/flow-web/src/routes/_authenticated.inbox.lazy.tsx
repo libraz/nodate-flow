@@ -36,7 +36,7 @@ function InboxRoute(): ReactElement {
 
   return (
     <PageFrame>
-      <PageHeader title={t('view.title')} description={t('view.subtitle')} />
+      <PageHeader title={t('view.title')} description={t('view.subtitle')} help="inbox" />
       <Tabs
         aria-label={t('view.title')}
         defaultValue="inbox"

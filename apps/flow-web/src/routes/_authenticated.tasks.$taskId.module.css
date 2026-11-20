@@ -151,3 +151,106 @@
   /* nf-token-override: same footprint as the inline size above */
   block-size: 1.25rem;
 }
+
+/* ── Sidebar cards ─────────────────────────────────────────────── */
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.cardHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+}
+
+.startAligned {
+  align-self: flex-start;
+}
+
+/* One full-width row per transition: the action at the start, where it lands at the end. */
+.transitionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.transitionList > .transitionButton {
+  inline-size: 100%;
+  justify-content: space-between;
+}
+
+.transitionList > .transitionCancel {
+  --btn-fg: var(--nf-color-danger-fg);
+}
+
+.transitionLanding {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-regular);
+}
+
+.transitionDot,
+.metaDot {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+  flex-shrink: 0;
+}
+
+/* The filled Complete button would swallow a bare dot; ring it in the label colour. */
+.transitionDot {
+  outline: var(--nf-space-px) solid currentColor;
+}
+
+/* ── Narrow-screen metadata strip ──────────────────────────────── */
+
+.metaStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2) var(--nf-space-4);
+  margin: 0;
+  padding-block: var(--nf-space-2);
+  border-block: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.metaLabel {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.metaValue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}

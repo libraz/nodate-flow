@@ -150,6 +150,7 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
         <WidgetCard
           key={entry.key}
           widget={entry.item}
+          workspaceId={wsId}
           present={entry.present}
           onExited={() => {
             presence.onExited(entry.key);
@@ -176,13 +177,18 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
 
 export interface DashboardViewProps {
   workspaceId: string;
+  /** Shown under the heading so the reader knows whose widgets these are. */
+  workspaceName: string;
 }
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function DashboardView({ workspaceId }: DashboardViewProps): ReactElement {
+export default function DashboardView({
+  workspaceId,
+  workspaceName,
+}: DashboardViewProps): ReactElement {
   const { t } = useTranslation('dashboard');
   const [editing, setEditing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -190,7 +196,10 @@ export default function DashboardView({ workspaceId }: DashboardViewProps): Reac
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h2 className={styles.title}>{t('title')}</h2>
+        <div className={styles.heading}>
+          <h2 className={styles.title}>{t('title')}</h2>
+          <p className={styles.scope}>{t('scope', { name: workspaceName })}</p>
+        </div>
         <div className={styles.actions}>
           <Button
             variant={editing ? 'primary' : 'ghost'}

@@ -274,3 +274,35 @@ export function useDetachEventFromShare(
     },
   });
 }
+
+export interface PatchPublicShareArgs {
+  shareId: string;
+  patch: PatchPublicShareInput;
+}
+
+/**
+ * Mutation: patch a share's metadata. Setting `expiresAt` replaces the
+ * expiry; `clearExpiresAt: true` removes it and wins over `expiresAt`.
+ */
+export function usePatchPublicShare(
+  workspaceId: string,
+): UseMutationResult<PublicShare, ApiError, PatchPublicShareArgs> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ shareId, patch }: PatchPublicShareArgs): Promise<PublicShare> => {
+      const data = await apiRequest(
+        (client) =>
+          client.PATCH('/workspaces/{wsId}/public-shares/{shareId}', {
+            params: { path: { wsId: workspaceId, shareId } },
+            body: patch,
+          }),
+        'Failed to update public share page',
+      );
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: publicSharesKeys.detail(workspaceId, vars.shareId) });
+      void qc.invalidateQueries({ queryKey: publicSharesKeys.list(workspaceId) });
+    },
+  });
+}

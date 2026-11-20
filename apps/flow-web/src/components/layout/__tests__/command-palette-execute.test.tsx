@@ -67,12 +67,14 @@ function openPalette(): HTMLInputElement {
 
 /**
  * Types a command and presses Enter twice: once to resolve (waiting for
- * the resolved tool name to appear), once to execute.
+ * the palette to reach its confirm step), once to execute.
  */
-async function runCommand(input: HTMLInputElement, prompt: string, tool: string): Promise<void> {
+async function runCommand(input: HTMLInputElement, prompt: string): Promise<void> {
   fireEvent.change(input, { target: { value: `> ${prompt}` } });
   fireEvent.keyDown(input, { key: 'Enter' });
-  await screen.findByText(tool);
+  await waitFor(() => {
+    expect(screen.getByRole('listitem', { current: 'step' }).textContent).toMatch(/confirm/i);
+  });
   fireEvent.keyDown(input, { key: 'Enter' });
 }
 
@@ -103,7 +105,7 @@ describe('NL command execution', () => {
     });
 
     const input = openPalette();
-    await runCommand(input, 'mark the login bug done', 'transition_task');
+    await runCommand(input, 'mark the login bug done');
 
     await waitFor(() => {
       expect(mocks.post).toHaveBeenCalledWith('/tasks/{id}/transitions', {
@@ -136,7 +138,7 @@ describe('NL command execution', () => {
     });
 
     const input = openPalette();
-    await runCommand(input, 'add a task to write the changelog', 'create_task');
+    await runCommand(input, 'add a task to write the changelog');
 
     await waitFor(() => {
       expect(mocks.post).toHaveBeenCalledWith('/tasks', {
@@ -159,7 +161,7 @@ describe('NL command execution', () => {
     });
 
     const input = openPalette();
-    await runCommand(input, 'plan the offsite', 'smart_create_task');
+    await runCommand(input, 'plan the offsite');
 
     expect(await screen.findByText('dock.command_palette.unsupported')).toBeTruthy();
     await waitFor(() => {
@@ -183,7 +185,7 @@ describe('NL command execution', () => {
     });
 
     const input = openPalette();
-    await runCommand(input, 'close the missing task', 'transition_task');
+    await runCommand(input, 'close the missing task');
 
     expect(await screen.findByText('dock.command_palette.unresolved_not_found')).toBeTruthy();
     expect(mocks.navigate).not.toHaveBeenCalled();

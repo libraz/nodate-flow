@@ -17,7 +17,7 @@
     "notification_feed": "通知"
   },
   "empty": "ウィジェットがありません",
-  "empty_description": "ウィジェットを追加してダッシュボードをカスタマイズしましょう。",
+  "empty_description": "「ウィジェットを追加」で種類を選んでグリッドに置きます。「レイアウトを編集」では、ドラッグで並べ替えたりウィジェットを削除したりできます。",
   "resize_label": "リサイズ",
   "confirm_remove": "このウィジェットを削除しますか？",
   "widget_title_label": "ウィジェットタイトル",
@@ -26,5 +26,45 @@
     "timebox_label": "タイムボックス",
     "project_label": "プロジェクト"
   },
-  "remove_widget_confirm": "このウィジェットをダッシュボードから削除しますか？"
+  "remove_widget_confirm": "このウィジェットをダッシュボードから削除しますか？",
+  "scope": "{name} のウィジェット",
+  "widgets": {
+    "see_all": "すべて見る",
+    "loading": "ウィジェットを読み込み中",
+    "retry": "再試行",
+    "error_title": "このウィジェットを読み込めませんでした",
+    "error_hint": "ほかのウィジェットには影響しません。",
+    "task_summary": {
+      "open": "未完了",
+      "review": "レビュー中",
+      "waiting": "待機中",
+      "done": "完了",
+      "overdue": "期限超過",
+      "empty_title": "タスクはまだありません",
+      "empty_hint": "このワークスペースにタスクができると、件数がここに表示されます。"
+    },
+    "overdue_tasks": {
+      "empty_title": "期限超過のタスクはありません",
+      "empty_hint": "期限を過ぎた未完了のタスクがここに表示されます。",
+      "days_overdue": "{count}日超過",
+      "due": "期限 {date}"
+    },
+    "signals_feed": {
+      "empty_title": "シグナルはまだありません",
+      "empty_hint": "このワークスペースのタスクに紐づいたシグナルがここに表示されます。"
+    },
+    "ai_suggestions": {
+      "empty_title": "現在、提案はありません",
+      "empty_hint": "受信箱に対するAIの提案がここに表示されます。適用するまでは何も変更されません。"
+    },
+    "notification_feed": {
+      "empty_title": "通知はありません",
+      "empty_hint": "このワークスペースでのメンション、割り当て、コメント、予定の変更がここに表示されます。",
+      "unread": "未読"
+    },
+    "burndown": {
+      "coming_soon_title": "近日公開",
+      "coming_soon_hint": "バーンダウンチャートはまだ利用できません。このウィジェットは削除できます。"
+    }
+  }
 }

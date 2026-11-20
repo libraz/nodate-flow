@@ -439,5 +439,5 @@
 .empty {
   padding-block: var(--nf-space-12);
   text-align: center;
-  color: var(--nf-color-fg-subtle);
+  color: var(--nf-color-fg-muted);
 }

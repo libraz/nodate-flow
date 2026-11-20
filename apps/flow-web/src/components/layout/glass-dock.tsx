@@ -52,6 +52,20 @@ const ACTIONS: readonly DockAction[] = [
   { key: 'ai_assist', icon: Sparkles, target: { kind: 'palette_command' } },
 ];
 
+/** One-line explanation shown under the label; `new_task` is self-explanatory. */
+function actionHintKey(
+  key: DockAction['key'],
+): 'dock.quick_capture_hint' | 'dock.ai_assist_hint' | null {
+  switch (key) {
+    case 'new_task':
+      return null;
+    case 'quick_capture':
+      return 'dock.quick_capture_hint';
+    case 'ai_assist':
+      return 'dock.ai_assist_hint';
+  }
+}
+
 function actionLabelKey(
   key: DockAction['key'],
 ): 'dock.new_task' | 'dock.quick_capture' | 'dock.ai_assist' {
@@ -99,6 +113,16 @@ export default function GlassDock(): ReactElement {
       <div className={styles.dock} role="toolbar" aria-label={t('dock.quick_actions')}>
         {ACTIONS.map((action) => {
           const label = t(actionLabelKey(action.key));
+          const hintKey = actionHintKey(action.key);
+          const tip =
+            hintKey === null ? (
+              label
+            ) : (
+              <span className={styles.tip}>
+                <span className={styles.tipLabel}>{label}</span>
+                <span className={styles.tipHint}>{t(hintKey)}</span>
+              </span>
+            );
           const handleClick = (): void => {
             if (action.target.kind === 'palette_command') {
               setPaletteCommandMode(true);
@@ -117,7 +141,7 @@ export default function GlassDock(): ReactElement {
             void navigate({ to: action.target.href });
           };
           return (
-            <Tooltip key={action.key} content={label}>
+            <Tooltip key={action.key} content={tip}>
               <button
                 type="button"
                 className={`${styles.button} nf-focus-ring`}

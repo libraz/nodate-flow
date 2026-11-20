@@ -2,7 +2,7 @@
  * ArchivedErrorState smoke test.
  *
  * The wrapper now delegates to the shared {@link ErrorFallback}
- * primitive (per commit 5bf9eca: degrade per-section, compact intent).
+ * primitive (degrade per-section, compact intent).
  * The test asserts the translated copy lands in the DOM under
  * `role="alert"` and the retry CTA forwards to `onRetry`.
  */

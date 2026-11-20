@@ -1,10 +1,13 @@
 .dock {
   position: fixed;
-  inset-block-end: var(--nf-space-6);
+  /* Size and offset come from the app shell, shared with the AI suggestions pill. */
+  inset-block-end: var(--nf-dock-offset);
   /* Centred without a transform so it holds under RTL and leaves `translate` to the enter animation. */
   inset-inline: 0;
   margin-inline: auto;
   inline-size: fit-content;
+  box-sizing: border-box;
+  block-size: var(--nf-dock-block-size);
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
@@ -24,10 +27,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 2.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 2.5rem;
+  inline-size: var(--nf-dock-control-size);
+  block-size: var(--nf-dock-control-size);
   background: transparent;
   border: none;
   border-radius: var(--nf-radius-md);
@@ -70,4 +71,27 @@
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-subtle);
+}
+
+/* Touch devices have no keyboard to press the shortcut with. */
+@media (hover: none) and (pointer: coarse) {
+  .divider,
+  .shortcut {
+    display: none;
+  }
+}
+
+.tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+}
+
+.tipLabel {
+  font-weight: var(--nf-weight-semibold);
+}
+
+.tipHint {
+  font-weight: var(--nf-weight-regular);
+  line-height: var(--nf-leading-normal);
 }

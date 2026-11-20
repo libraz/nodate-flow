@@ -1,12 +1,13 @@
 {
   "action": {
     "apply": "应用",
+    "apply_hint": "立即执行建议的操作：打开任务，或将收件箱事项稍后提醒/归档。不会再次确认。",
     "dismiss": "忽略",
     "edit": "编辑"
   },
   "agents": {
     "title": "AI 代理",
-    "subtitle": "管理工作区代理的触发模式和紧急停止开关。",
+    "subtitle": "创建处理任务的代理，选择每个代理何时运行，并可随时立即暂停。",
     "empty": "尚无 AI 代理。请先创建 AI 提供商并设置默认模型。",
     "pause": "暂停",
     "resume": "恢复",
@@ -15,20 +16,28 @@
       "paused": "已暂停"
     },
     "scheduleKind": {
+      "help": "该代理何时运行：从不、按服务器定时周期、列出的事件发生时，或仅在点击「立即运行」时。",
       "label": "触发方式",
       "options": {
         "disabled": "已禁用",
-        "interval": "每个周期",
+        "interval": "定时运行",
         "on_event": "事件触发",
         "manual": "仅手动"
+      },
+      "descriptions": {
+        "disabled": "不会自动运行，仍可使用「立即运行」。",
+        "interval": "按服务器的定期计划运行。",
+        "on_event": "在列出的事件发生时运行。",
+        "manual": "仅在点击「立即运行」时运行。"
       }
     },
     "errors": {
       "scheduleFailed": "更新触发方式失败",
-      "pauseFailed": "切换紧急停止开关失败",
+      "pauseFailed": "无法暂停或恢复代理",
       "triggerFailed": "触发代理失败"
     },
     "trigger": {
+      "help": "立即排队运行一次。代理暂停时不可用。",
       "label": "立即运行",
       "queued": "已加入运行队列"
     },
@@ -37,10 +46,11 @@
       "placeholder": "task.updated, signal.attached",
       "save": "保存触发器",
       "saved": "已保存触发器",
-      "failed": "更新事件触发器失败"
+      "failed": "更新事件触发器失败",
+      "help": "以逗号分隔输入精确的事件名，例如 task.updated, signal.attached。其中任何一个发生时代理就会运行。"
     },
     "create": {
-      "open": "+ 代理",
+      "open": "新建代理",
       "title": "新建代理",
       "name": "名称",
       "model": "模型",
@@ -50,8 +60,11 @@
       "success": "已创建代理",
       "failed": "创建代理失败",
       "missingFields": "请填写名称、模型和系统提示词",
-      "noModels": "尚未注册任何模型。请先添加 AI 提供商和模型。"
-    }
+      "noModels": "尚未注册任何模型。请先添加 AI 提供商和模型。",
+      "systemPrompt_help": "代理每次运行都遵循的固定指令，例如其角色和必须遵守的规则。创建后无法在此页面编辑。",
+      "model_help": "该代理运行所用的模型。列表来自本工作区已添加的 AI 服务商。"
+    },
+    "pause_help": "暂停后，该代理不会因任何触发方式运行（包括「立即运行」）。点「恢复」重新启用。"
   },
   "empty": "暂无建议",
   "loading": "思考中...",
@@ -69,7 +82,9 @@
     "already_resolved": "此建议已处理。请先刷新建议列表再继续。",
     "opened": "已打开任务。选择操作之前，此建议仍会保持待处理状态。",
     "success": "{count, plural, other {已生成 # 条 AI 建议}}",
-    "success_empty": "分类完成 — 暂无建议"
+    "success_empty": "分类完成 — 暂无建议",
+    "hint": "AI 会检查一个工作区中最多 20 条事项（筛选器所选的工作区；选择“所有工作区”时为你的第一个工作区），并建议打开、稍后提醒或归档。点击“应用”之前不会有任何改动。",
+    "score_hint": "AI 对此事项给出的分数（0 到 1）。分数越高，越可能需要尽快处理。"
   },
   "edit": {
     "title": "编辑建议",
@@ -83,7 +98,8 @@
       "open": "打开",
       "snooze": "稍后提醒",
       "archive": "归档"
-    }
+    },
+    "hint": "修改建议的操作或理由后保存。之后应用该建议时，将使用你在此保存的内容。"
   },
   "glass_dock": {
     "title": "AI 建议",
@@ -95,7 +111,8 @@
       "dismiss_failed": "无法忽略该建议",
       "edit_failed": "无法保存该建议",
       "identity_changed": "账号或工作区已切换。请重新打开该建议后再试。"
-    }
+    },
+    "description": "用自然语言描述任务来筛选，并查看 AI 对此工作区的建议。应用建议之前不会有任何改动。"
   },
   "state_suggestions": {
     "title": "下一步建议"
@@ -108,23 +125,23 @@
       "due_soon": "即将截止"
     },
     "page_title": "提醒",
-    "page_subtitle": "引擎根据您的截止日期和进度标记的任务。",
+    "page_subtitle": "3 天内到期或已逾期的未完成任务，依据截止日期自动列出。",
     "view_all": "查看全部",
-    "empty": "目前没有提醒。",
+    "empty": "目前没有提醒。设有截止日期的任务会在到期前 3 天内或逾期后显示在这里。",
     "error": "无法加载提醒",
     "retry": "重试",
     "count": "{count, plural, other {{count} 个提醒}}",
     "bucket": {
       "overdue": "已逾期",
       "today": "今日",
-      "soon": "即将",
+      "soon": "3 天内",
       "later": "稍后"
     },
     "due": "截止 {date}",
     "days": {
-      "overdue": "已逾期 {count} 天",
+      "overdue": "{count, plural, other {已逾期 # 天}}",
       "today": "今日截止",
-      "future": "还剩 {count} 天"
+      "future": "{count, plural, other {还剩 # 天}}"
     }
   },
   "auto_actions": {
@@ -134,7 +151,8 @@
       "assign_owner": "指派负责人",
       "nudge_assignee": "催办",
       "close_stale_review": "关闭审阅"
-    }
+    },
+    "hint": "工作区的自动操作规则认为值得执行的操作。点击某一项即可打开任务并自行决定。"
   },
   "transition_label": {
     "start": "开始",
@@ -168,14 +186,21 @@
   },
   "nl_query": {
     "label": "用自然语言提问",
-    "placeholder": "查看本周所有被阻塞的内容",
+    "placeholder": "进行中的高优先级任务",
     "submit": "提交",
     "compiling": "处理中...",
     "unparseable": "无法理解您的输入，请尝试换种说法。",
     "error": "处理查询失败",
     "apply": "应用筛选",
-    "applied": "已应用筛选",
+    "applied": "在查看项目时，会应用优先级和状态。其他条件仅供参考。",
     "sort_label": "排序",
-    "group_label": "分组"
+    "group_label": "分组",
+    "hint": "优先级和状态会作为筛选条件应用到你正在查看的项目，并替换其现有筛选。其他条件只会显示，不会应用。",
+    "applied_group": "已应用",
+    "reference_group": "未应用"
+  },
+  "consequence": {
+    "applies_now": "立即生效",
+    "suggestion": "仅为建议"
   }
 }

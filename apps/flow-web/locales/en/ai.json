@@ -2,7 +2,7 @@
   "autonomy": {
     "matrix": {
       "title": "Autonomy by signal kind",
-      "description": "Pick how confident actions should be for each signal kind. The workspace defaults apply when no override exists.",
+      "description": "For each kind of signal (an external or scheduled event such as Slack presence or a calendar day arriving), choose how far the system may go: Suggest only shows a suggestion, Draft creates a draft for you to review, Auto applies the change. Kinds without an override use the workspace defaults.",
       "header": {
         "kind": "Signal kind",
         "mode": "Autonomy"
@@ -15,7 +15,8 @@
       "empty": "No signal kinds configured",
       "row_aria": "Autonomy level for {kind}",
       "changed_announce": "{kind} set to {mode}",
-      "default_hint": "Default: {mode}"
+      "default_hint": "Default: {mode}",
+      "unsaved": "Unsaved"
     },
     "mode": {
       "suggest": "Suggest",
@@ -45,7 +46,10 @@
       "api_key_placeholder": "sk-...",
       "base_url": "Base URL (optional)",
       "default_model": "Default model (optional)",
-      "base_url_description": "Only for kinds that target a custom endpoint. The openai kind always uses the official OpenAI endpoint; for Azure, a proxy or a gateway, choose OpenAI-compatible."
+      "base_url_description": "Only for kinds that target a custom endpoint. The openai kind always uses the official OpenAI endpoint; for Azure, a proxy or a gateway, choose OpenAI-compatible.",
+      "kind_help": "Which service to call. Use OpenAI-compatible for Azure, a proxy, a gateway or a local server. Ollama talks to a local Ollama server (http://localhost:11434 unless you set a base URL).",
+      "name_help": "A label for this provider in the list, such as Production Anthropic. It is not sent to the service.",
+      "default_model_help": "The model name to call, as listed in your provider's documentation. Leave empty to use the current default for this kind."
     },
     "kind": {
       "anthropic": "Anthropic",
@@ -58,8 +62,9 @@
       "save": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
-      "confirm_delete": "Delete this provider?",
-      "rotate": "Rotate key"
+      "confirm_delete": "Delete this provider? AI features that rely on it stop working until another provider is available. The stored key is erased and cannot be recovered.",
+      "rotate": "Rotate key",
+      "rotate_hint": "Replace the stored API key with a new one. The old key is discarded immediately."
     },
     "rotate_dialog": {
       "title": "Rotate API key",
@@ -102,6 +107,19 @@
         "retry": "Try again",
         "update_failed": "Could not update embedding settings. Try again."
       }
-    }
+    },
+    "description": "Register the LLM services this workspace's AI features run on. API keys are write-only: once saved they are shown masked and can only be rotated or deleted.",
+    "empty_hint": "Add a provider and its API key to turn on the AI features in this workspace. If you add several, the most recently added one is used by default.",
+    "kind_hint": {
+      "anthropic": "Claude models",
+      "openai": "Official OpenAI endpoint only",
+      "google": "Gemini models",
+      "ollama": "A local Ollama server",
+      "openai_compat": "Azure, proxies, gateways and local servers"
+    },
+    "default_badge": "Default",
+    "default_note": "AI features use the provider marked Default, which is the most recently added one. An agent uses the provider of the model it was given.",
+    "no_key": "No key",
+    "ollama_no_key_note": "Local Ollama needs no API key."
   }
 }

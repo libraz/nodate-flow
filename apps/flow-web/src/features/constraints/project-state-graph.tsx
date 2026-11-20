@@ -68,7 +68,8 @@ const COL_WIDTH = NODE_WIDTH + COL_GAP;
 const HEADER_HEIGHT = 36;
 const PADDING_X = 24;
 const PADDING_Y = 16;
-const MAX_TITLE_LEN = 18;
+/** Label budget in half-width units: a CJK character counts as two. Fits 12px text in a node. */
+const MAX_TITLE_UNITS = 22;
 
 interface NodePosition {
   x: number;
@@ -127,8 +128,15 @@ function computeLayout(tasks: readonly TaskListItem[]): {
 
 /** Truncate a title for display inside a node. */
 function truncateTitle(title: string): string {
-  if (title.length <= MAX_TITLE_LEN) return title;
-  return `${title.slice(0, MAX_TITLE_LEN - 1)}\u2026`;
+  let units = 0;
+  let out = '';
+  for (const ch of title) {
+    const w = (ch.codePointAt(0) ?? 0) >= 0x2e80 ? 2 : 1;
+    if (units + w > MAX_TITLE_UNITS - 1) return `${out}…`;
+    units += w;
+    out += ch;
+  }
+  return out;
 }
 
 /**
@@ -213,11 +221,10 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
         viewBox={`0 0 ${width} ${height}`}
         width={width}
         height={height}
-        style={{ maxInlineSize: '100%', blockSize: 'auto' }}
       >
         <defs>
           <marker id="dep-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill="var(--nf-color-border)" />
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--nf-color-fg-muted)" />
           </marker>
         </defs>
 
@@ -252,10 +259,9 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
                   : undefined
               }
               fill="none"
-              stroke="var(--nf-color-border)"
+              stroke="var(--nf-color-fg-muted)"
               strokeWidth={1.5}
               markerEnd="url(#dep-arrow)"
-              opacity={0.7}
             />
           );
         })}
@@ -305,7 +311,7 @@ export default function ProjectStateGraph({ projectId }: ProjectStateGraphProps)
               <text
                 x={x + NODE_WIDTH / 2}
                 y={y + NODE_HEIGHT / 2 + 4}
-                fontSize="11"
+                fontSize="12"
                 textAnchor="middle"
                 fill={STATE_BORDER[state]}
               >

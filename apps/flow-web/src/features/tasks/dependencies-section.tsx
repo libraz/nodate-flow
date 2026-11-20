@@ -19,8 +19,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { X } from 'lucide-react';
-import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Plus, X } from 'lucide-react';
+import { type ReactElement, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import {
@@ -142,12 +142,12 @@ export default function DependenciesSection({
         {!picking ? (
           <Button
             type="button"
-            variant="ghost"
             size="sm"
             onClick={() => {
               setPicking(true);
             }}
           >
+            <Plus size={14} aria-hidden />
             {t('tasks.detail.dependencies.add')}
           </Button>
         ) : null}
@@ -309,6 +309,7 @@ function DependencyPicker({
 }): ReactElement {
   const { t } = useTranslation('common');
   const [kind, setKind] = useState<AddableKind>('blocks');
+  const kindHintId = useId();
   const [input, setInput] = useState('');
   const [debounced, setDebounced] = useState('');
   const add = useAddTaskDependency();
@@ -350,6 +351,7 @@ function DependencyPicker({
       <div className={styles.pickerControls}>
         <Select
           aria-label={t('tasks.detail.dependencies.kindLabel')}
+          aria-describedby={kindHintId}
           value={kind}
           onChange={(e) => {
             setKind(e.target.value as AddableKind);
@@ -375,6 +377,9 @@ function DependencyPicker({
           {t('tasks.detail.dependencies.addCancel')}
         </Button>
       </div>
+      <p id={kindHintId} className={styles.pickerHint}>
+        {t('tasks.detail.dependencies.kindHint')}
+      </p>
       <div key={stage} className={styles.pickerBody}>
         {debounced.length === 0 ? (
           <p className={styles.pickerHint}>{t('tasks.detail.dependencies.searchHint')}</p>

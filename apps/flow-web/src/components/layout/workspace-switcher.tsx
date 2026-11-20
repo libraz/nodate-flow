@@ -1,12 +1,16 @@
 /**
- * WorkspaceSwitcher — native `<select>` dropdown that switches the
- * active workspace.
+ * WorkspaceSwitcher — shows the active workspace and, when there is a
+ * choice, switches it.
  *
- * Rendered in two places:
- *   - the desktop topbar left slot (`top-bar.tsx`), and
- *   - the sidebar drawer header (`sidebar.tsx`) — which is the only
- *     reachable copy at mobile widths where the topbar left slot is
- *     collapsed.
+ *   - 0 workspaces: renders nothing.
+ *   - 1 workspace: a static identity link (monogram + name) to that
+ *     workspace; a choice of one is context, not a control.
+ *   - 2+ workspaces: a native `<select>` dropdown.
+ *
+ * Rendered in two places, only one of which is visible at any width:
+ *   - the topbar left slot (`top-bar.tsx`), and
+ *   - the sidebar header (`sidebar.tsx`) — shown only while the topbar
+ *     copy is hidden (narrow header, e.g. the mobile drawer).
  *
  * Navigation: switching a workspace navigates to `/workspaces/{id}`
  * unless the current route is a cross-workspace page (calendar /
@@ -20,9 +24,10 @@
  * constrains its width per mount point.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Select from '@nodate-flow/ui/primitives/select';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,15 +38,36 @@ import styles from './top-bar.module.css';
 /** Pages where switching workspace should NOT navigate away. */
 const STAY_ON_PAGE_PREFIXES = ['/calendar', '/today', '/inbox', '/settings', '/pages'];
 
-export default function WorkspaceSwitcher(): ReactElement {
+export default function WorkspaceSwitcher(): ReactElement | null {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const routeWsId = useCurrentWorkspaceId() ?? '';
-  // Auto-select when there is exactly one workspace.
-  const currentId = routeWsId || (workspaces.length === 1 ? (workspaces[0]?.id ?? '') : '');
+  const currentId = routeWsId;
+
+  if (workspaces.length === 0) return null;
+
+  const only = workspaces.length === 1 ? workspaces[0] : undefined;
+  if (only) {
+    const label = t('topbar.workspace.current', { name: only.name });
+    const monogram = (Array.from(only.name.trim())[0] ?? '').toUpperCase();
+    return (
+      <Link
+        to="/workspaces/$id"
+        params={{ id: only.id }}
+        className={cx(styles.workspaceCurrent, 'nf-focus-ring')}
+        aria-label={label}
+        title={label}
+      >
+        <span className={styles.workspaceMonogram} aria-hidden="true">
+          {monogram}
+        </span>
+        <span className={styles.workspaceCurrentName}>{only.name}</span>
+      </Link>
+    );
+  }
 
   return (
     <Select

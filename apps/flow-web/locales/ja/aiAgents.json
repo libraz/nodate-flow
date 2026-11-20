@@ -58,7 +58,7 @@
         "stuck": "停止中 — 確認してください"
       },
       "last_run_ago": "{time}前に最終実行",
-      "attempts": "試行: {current}/{max}",
+      "attempts": "試行: {current} 回",
       "cost_today": "本日のコスト: ${amount}",
       "hand_back": "手元に戻す",
       "run_history": "実行履歴",
@@ -71,8 +71,10 @@
         "remove": "{name} の割り当てを解除",
         "failed": "エージェントの割り当てに失敗しました",
         "remove_failed": "エージェントの割り当て解除に失敗しました",
-        "removed": "{name} をこのタスクから外しました。"
-      }
+        "removed": "{name} をこのタスクから外しました。",
+        "description": "割り当てたエージェントは、トリガー設定に従ってこのタスクに取り組みます。確信が持てない、コスト上限に達した、エラーが出た、制約が衝突した場合は、タスクを自分に戻します。"
+      },
+      "hand_back_hint": "エージェントからこのタスクを引き取ります。"
     }
   },
   "handoff_reason": {

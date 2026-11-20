@@ -26,6 +26,7 @@ export const namespaces = [
   'sharing',
   'signal-kinds',
   'system-info',
+  'help',
 ] as const;
 
 /** Union of all known i18n namespace names. */

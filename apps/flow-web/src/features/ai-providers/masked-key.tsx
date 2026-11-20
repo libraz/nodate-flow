@@ -9,11 +9,24 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface MaskedKeyProps {
-  value: string;
+  /** Absent when the provider has no key (local Ollama). */
+  value?: string | undefined;
 }
 
 export default function MaskedKey({ value }: MaskedKeyProps): ReactElement {
   const { t } = useTranslation('ai');
+  if (value === undefined || value === '') {
+    return (
+      <span
+        style={{
+          fontSize: 'var(--nf-text-sm)',
+          color: 'var(--nf-color-fg-muted)',
+        }}
+      >
+        {t('providers.no_key')}
+      </span>
+    );
+  }
   return (
     <span
       role="img"

@@ -229,7 +229,11 @@ export default function NotificationsForm(): ReactElement {
   return (
     <div className={styles.panel}>
       {workspaces.length > 1 && (
-        <FormField label={t('notifications.workspace_label')} className={styles.workspacePicker}>
+        <FormField
+          label={t('notifications.workspace_label')}
+          description={t('notifications.workspace_help')}
+          className={styles.workspacePicker}
+        >
           {(control) => (
             <Select
               {...control}

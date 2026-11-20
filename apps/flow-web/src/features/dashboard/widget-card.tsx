@@ -1,6 +1,6 @@
 /**
  * WidgetCard — renders a single dashboard widget with header and
- * placeholder body content based on the widget type.
+ * body content based on the widget type.
  *
  * In edit mode, shows a remove button and visual resize indicator.
  */
@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { WidgetItem, WidgetType } from './api';
 import styles from './dashboard.module.css';
+import WidgetBody from './widgets/widget-body';
 
 // ---------------------------------------------------------------------------
 // Icon mapping
@@ -37,42 +38,12 @@ const widgetIconMap = new Map<WidgetType, LucideIcon>([
 ]);
 
 // ---------------------------------------------------------------------------
-// i18n key mapping (static — no dynamic key construction)
-// ---------------------------------------------------------------------------
-
-const widgetTypeI18nKey = new Map<WidgetType, string>([
-  ['task_summary', 'widget_type.task_summary'],
-  ['burndown', 'widget_type.burndown'],
-  ['signals_feed', 'widget_type.signals_feed'],
-  ['ai_suggestions', 'widget_type.ai_suggestions'],
-  ['overdue_tasks', 'widget_type.overdue_tasks'],
-  ['notification_feed', 'widget_type.notification_feed'],
-]);
-
-// ---------------------------------------------------------------------------
-// Widget body placeholder
-// ---------------------------------------------------------------------------
-
-function WidgetBodyPlaceholder({ widgetType }: { widgetType: WidgetType }): ReactElement {
-  const { t } = useTranslation('dashboard');
-  const TypeIcon = widgetIconMap.get(widgetType) ?? SquareKanban;
-
-  return (
-    <div className={styles.widgetBody}>
-      <div className={styles.widgetBodyIcon}>
-        <Icon icon={TypeIcon} decorative size={32} />
-      </div>
-      <span>{t(widgetTypeI18nKey.get(widgetType) ?? 'widget_type.task_summary')}</span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 export interface WidgetCardProps {
   widget: WidgetItem;
+  workspaceId: string;
   editing: boolean;
   dragging?: boolean | undefined;
   /** First-load stagger style from the grid (`--stagger-index`). */
@@ -92,6 +63,7 @@ export interface WidgetCardProps {
 
 export default function WidgetCard({
   widget,
+  workspaceId,
   editing,
   dragging,
   enterStyle,
@@ -160,7 +132,7 @@ export default function WidgetCard({
         )}
       </div>
 
-      <WidgetBodyPlaceholder widgetType={widget.widgetType} />
+      <WidgetBody widgetType={widget.widgetType} workspaceId={workspaceId} />
 
       {editing && (
         <div className={styles.resizeHandle} aria-hidden="true">

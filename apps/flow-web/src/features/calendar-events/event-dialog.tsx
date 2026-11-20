@@ -33,7 +33,16 @@ import Textarea from '@nodate-flow/ui/primitives/textarea';
 import TimePicker from '@nodate-flow/ui/primitives/time-picker';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import type { Zone } from '@nodate-flow/ui/time';
+import {
+  CalendarCheck,
+  CalendarDays,
+  CheckSquare,
+  Flag,
+  type LucideIcon,
+  Shield,
+} from 'lucide-react';
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -576,6 +585,22 @@ const TIME_FIELDS: readonly TrackedField[] = [
 
 const KIND_OPTIONS: ItemKind[] = ['task', 'event', 'block', 'free', 'milestone'];
 
+const KIND_ICONS: Record<ItemKind, LucideIcon> = {
+  task: CheckSquare,
+  event: CalendarDays,
+  block: Shield,
+  free: CalendarCheck,
+  milestone: Flag,
+};
+
+const KIND_DESC_KEYS = {
+  task: 'kind_desc.task',
+  event: 'kind_desc.event',
+  block: 'kind_desc.block',
+  free: 'kind_desc.free',
+  milestone: 'kind_desc.milestone',
+} as const;
+
 export default function EventDialog({
   open,
   workspaceId,
@@ -912,14 +937,23 @@ export default function EventDialog({
 
   const headerTitle = t(DIALOG_TITLE_KEYS[isCreate ? 'create' : 'edit'][kind]);
 
-  const kindOptions: SegmentedControlOption<ItemKind>[] = KIND_OPTIONS.map((k) => ({
-    value: k,
-    label: t(KIND_LABEL_KEYS[k]),
-    tone: k,
-    // Task kind is not a valid edit target (event→task morph has no
-    // backend semantics). Lock the picker when editing.
-    disabled: isEdit && k === 'task',
-  }));
+  const kindOptions: SegmentedControlOption<ItemKind>[] = KIND_OPTIONS.map((k) => {
+    const KindIcon = KIND_ICONS[k];
+    return {
+      value: k,
+      label: (
+        <span className={styles.kindOption}>
+          <KindIcon size={14} aria-hidden />
+          {t(KIND_LABEL_KEYS[k])}
+        </span>
+      ),
+      ariaLabel: t(KIND_LABEL_KEYS[k]),
+      tone: k,
+      // Task kind is not a valid edit target (event→task morph has no
+      // backend semantics). Lock the picker when editing.
+      disabled: isEdit && k === 'task',
+    };
+  });
 
   const calendarOptions = useMemo(
     () =>
@@ -1276,6 +1310,11 @@ export default function EventDialog({
               value={kind}
               onChange={editing('kind', setKind)}
             />
+            {/* What the chosen kind is, and for a new block the grid shortcut. */}
+            <p className={styles.kindDescription} aria-live="polite">
+              {t(KIND_DESC_KEYS[kind])}
+              {isCreate && kind === 'block' ? ` ${t('dialog.blockShortcutHint')}` : null}
+            </p>
 
             {mode.kind === 'edit' ? (
               <CreatorChip
@@ -1300,7 +1339,11 @@ export default function EventDialog({
             </FormField>
 
             {showCalendar ? (
-              <FormField label={t('field.calendar')} error={calendarError ?? undefined}>
+              <FormField
+                label={t('field.calendar')}
+                description={t('field.calendarHint')}
+                error={calendarError ?? undefined}
+              >
                 {() => (
                   <Combobox
                     options={calendarOptions}
@@ -1319,6 +1362,7 @@ export default function EventDialog({
                   <FormField label={t('field.start')}>
                     {() => (
                       <DatePicker
+                        variant="field"
                         value={startDate}
                         onChange={editing('startDate', setStartDate)}
                         weekdayLabels={weekdayLabels}
@@ -1337,9 +1381,10 @@ export default function EventDialog({
                   <span className={styles.arrow} aria-hidden>
                     →
                   </span>
-                  <FormField label={t('field.end')}>
+                  <FormField label={t('field.end')} description={t('field.taskDatesHint')}>
                     {() => (
                       <DatePicker
+                        variant="field"
                         value={endDate}
                         onChange={editing('endDate', setEndDate)}
                         weekdayLabels={weekdayLabels}
@@ -1359,6 +1404,7 @@ export default function EventDialog({
                 <FormField label={t('field.date')}>
                   {() => (
                     <DatePicker
+                      variant="field"
                       value={startDate}
                       onChange={(v) => {
                         markDirty('startDate');
@@ -1386,6 +1432,7 @@ export default function EventDialog({
                       <div className={styles.inlineRow}>
                         <div className={styles.inlineGrow}>
                           <DatePicker
+                            variant="field"
                             value={startDate}
                             onChange={editing('startDate', setStartDate)}
                             weekdayLabels={weekdayLabels}
@@ -1402,6 +1449,7 @@ export default function EventDialog({
                         </div>
                         {allDay ? null : (
                           <TimePicker
+                            variant="field"
                             value={startTime}
                             listLabel={t('field.startTime')}
                             onChange={editing('startTime', setStartTime)}
@@ -1419,6 +1467,7 @@ export default function EventDialog({
                       <div className={styles.inlineRow}>
                         <div className={styles.inlineGrow}>
                           <DatePicker
+                            variant="field"
                             value={endDate}
                             onChange={editing('endDate', setEndDate)}
                             weekdayLabels={weekdayLabels}
@@ -1436,6 +1485,7 @@ export default function EventDialog({
                         </div>
                         {allDay ? null : (
                           <TimePicker
+                            variant="field"
                             value={endTime}
                             listLabel={t('field.endTime')}
                             onChange={editing('endTime', setEndTime)}
@@ -1446,6 +1496,7 @@ export default function EventDialog({
                     )}
                   </FormField>
                   {/* Switch first, label after — matches "toggle | what it controls" reading. */}
+                  {/* Own row under start/end, so a long label wraps instead of clipping. */}
                   <label htmlFor="nf-event-dialog-allday" className={styles.timeRowAllDay}>
                     <Switch
                       id="nf-event-dialog-allday"
@@ -1474,6 +1525,7 @@ export default function EventDialog({
                     {projects.length > 0 ? (
                       <FormField
                         label={t('field.project')}
+                        description={t('field.projectHint')}
                         error={projectError ?? undefined}
                         className={styles.inlineGrow}
                       >
@@ -1517,7 +1569,7 @@ export default function EventDialog({
 
               {showEventFields ? (
                 <div className={styles.kindBlock}>
-                  <FormField label={t('field.showAs')}>
+                  <FormField label={t('field.showAs')} description={t('field.showAsHint')}>
                     {() => (
                       <SegmentedControl
                         ariaLabel={t('field.showAs')}
@@ -1565,7 +1617,7 @@ export default function EventDialog({
 
               {showBlockFields ? (
                 <div className={styles.kindBlock}>
-                  <FormField label={t('field.blockLabel')}>
+                  <FormField label={t('field.blockLabel')} description={t('field.blockLabelHint')}>
                     {() => (
                       <>
                         <ToggleChipGroup label={t('field.blockLabel')}>
@@ -1601,20 +1653,22 @@ export default function EventDialog({
             </div>
 
             {/* More options disclosure */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded((s) => !s)}
-              className={styles.disclosureToggle}
-              aria-expanded={expanded}
-              aria-controls={disclosureId}
-            >
-              {t('action.moreOptions')}
-            </Button>
+            <Tooltip content={t('action.moreOptionsHint')} placement="right">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setExpanded((s) => !s)}
+                className={styles.disclosureToggle}
+                aria-expanded={expanded}
+                aria-controls={disclosureId}
+              >
+                {t('action.moreOptions')}
+              </Button>
+            </Tooltip>
             <Collapse open={expanded} id={disclosureId}>
               <div className={styles.disclosurePanel}>
-                <FormField label={t('field.recurrence')}>
+                <FormField label={t('field.recurrence')} description={t('field.recurrenceHint')}>
                   {(control) => (
                     <Select
                       {...control}
@@ -1655,7 +1709,10 @@ export default function EventDialog({
                     </Select>
                   )}
                 </FormField>
-                <FormField label={t('field.notification')}>
+                <FormField
+                  label={t('field.notification')}
+                  description={t('field.notificationHint')}
+                >
                   {(control) => (
                     <Select
                       {...control}

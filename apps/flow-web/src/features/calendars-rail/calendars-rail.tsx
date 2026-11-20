@@ -34,10 +34,11 @@ import Popover from '@nodate-flow/ui/primitives/popover';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, Eye, EyeOff, MoreVertical } from 'lucide-react';
-import { type ReactElement, useState } from 'react';
+import { type ButtonHTMLAttributes, type ReactElement, type Ref, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../lib/api';
@@ -69,6 +70,35 @@ interface CalendarsRailProps {
  * while the per-workspace query is pending so the layout doesn't
  * jitter.
  */
+interface MenuTriggerProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  ref?: Ref<HTMLSpanElement>;
+  label: string;
+  expanded: boolean;
+}
+
+/**
+ * The Popover takes its ref and handlers on the span, so the tooltip can
+ * own the button's ref; clicks on the button bubble to the span.
+ */
+function MenuTrigger({ ref, label, expanded, ...buttonProps }: MenuTriggerProps): ReactElement {
+  return (
+    <span ref={ref} className={styles.menuAnchor}>
+      <Tooltip content={label}>
+        <button
+          type="button"
+          className={styles.iconButton}
+          aria-label={label}
+          {...buttonProps}
+          aria-haspopup="menu"
+          aria-expanded={expanded}
+        >
+          <MoreVertical size={14} aria-hidden />
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
 export default function CalendarsRail({
   workspaces,
   selfUserId,
@@ -179,6 +209,7 @@ function CalendarsSection({
             {t('calendars_rail.discover.title')}
           </h3>
         </header>
+        <p className={styles.discoverHint}>{t('calendars_rail.discover.hint')}</p>
         <DiscoverList
           workspaceId={workspace.id}
           onClose={() => {
@@ -380,31 +411,25 @@ function CalendarRow({ workspaceId, calendar, selfUserId }: CalendarRowProps): R
         {calendar.name}
       </span>
       <span className={styles.actions}>
-        <button
-          type="button"
-          className={styles.iconButton}
-          onClick={handleToggleVisibility}
-          disabled={pending}
-          aria-label={t('calendars_rail.actions.toggle_visibility')}
-          aria-pressed={calendar.visible}
-        >
-          <Icon size={14} aria-hidden />
-        </button>
+        <Tooltip content={t('calendars_rail.actions.toggle_visibility')}>
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={handleToggleVisibility}
+            disabled={pending}
+            aria-label={t('calendars_rail.actions.toggle_visibility')}
+            aria-pressed={calendar.visible}
+          >
+            <Icon size={14} aria-hidden />
+          </button>
+        </Tooltip>
         <Popover
           placement="bottom-end"
           open={menuOpen}
           onOpenChange={setMenuOpen}
           content={menuContent}
         >
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label={t('calendars_rail.actions.menu')}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-          >
-            <MoreVertical size={14} aria-hidden />
-          </button>
+          <MenuTrigger label={t('calendars_rail.actions.menu')} expanded={menuOpen} />
         </Popover>
       </span>
       {/* Mounted whether open or not, so closing plays the drawer's exit

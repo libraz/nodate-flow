@@ -17,7 +17,7 @@
     "notification_feed": "通知"
   },
   "empty": "暂无小组件",
-  "empty_description": "添加小组件以自定义你的仪表板。",
+  "empty_description": "点击“添加小组件”选择类型并放到网格上。“编辑布局”可拖动小组件调整顺序，或将其移除。",
   "resize_label": "调整大小",
   "confirm_remove": "移除此小组件？",
   "widget_title_label": "小组件标题",
@@ -26,5 +26,45 @@
     "timebox_label": "时间盒",
     "project_label": "项目"
   },
-  "remove_widget_confirm": "要从仪表板中移除此小组件吗？"
+  "remove_widget_confirm": "要从仪表板中移除此小组件吗？",
+  "scope": "{name} 的小组件",
+  "widgets": {
+    "see_all": "查看全部",
+    "loading": "正在加载小组件",
+    "retry": "重试",
+    "error_title": "无法加载此小组件",
+    "error_hint": "不影响其他小组件。",
+    "task_summary": {
+      "open": "进行中",
+      "review": "审核中",
+      "waiting": "等待中",
+      "done": "已完成",
+      "overdue": "已逾期",
+      "empty_title": "暂无任务",
+      "empty_hint": "此工作区有任务后，数量会显示在这里。"
+    },
+    "overdue_tasks": {
+      "empty_title": "没有逾期任务",
+      "empty_hint": "已过截止日期且未完成的任务会显示在这里。",
+      "days_overdue": "已逾期 {count} 天",
+      "due": "截止 {date}"
+    },
+    "signals_feed": {
+      "empty_title": "暂无信号",
+      "empty_hint": "关联到此工作区任务的信号会显示在这里。"
+    },
+    "ai_suggestions": {
+      "empty_title": "当前没有建议",
+      "empty_hint": "针对收件箱的 AI 建议会显示在这里。在你应用之前不会有任何更改。"
+    },
+    "notification_feed": {
+      "empty_title": "没有通知",
+      "empty_hint": "此工作区中的提及、分配、评论和日程变更会显示在这里。",
+      "unread": "未读"
+    },
+    "burndown": {
+      "coming_soon_title": "即将推出",
+      "coming_soon_hint": "燃尽图暂不可用。你可以移除此小组件。"
+    }
+  }
 }

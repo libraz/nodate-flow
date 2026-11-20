@@ -14,6 +14,7 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Bot, History } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -164,24 +165,26 @@ export default function AgentPanel({
           </span>
         ) : null}
         <span className={styles.metaItem}>
-          {t('task_detail.agent.attempts', { current: agentContext.attempts, max: '—' })}
+          {t('task_detail.agent.attempts', { current: agentContext.attempts })}
         </span>
       </div>
 
       <div className={styles.actions}>
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={handleHandBack}
-          disabled={handoffToUser.isPending}
-        >
-          {handoffToUser.isPending ? (
-            <Spinner size="sm" label={t('task_detail.agent.hand_back')} />
-          ) : (
-            t('task_detail.agent.hand_back')
-          )}
-        </Button>
+        <Tooltip content={t('task_detail.agent.hand_back_hint')}>
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={handleHandBack}
+            disabled={handoffToUser.isPending}
+          >
+            {handoffToUser.isPending ? (
+              <Spinner size="sm" label={t('task_detail.agent.hand_back')} />
+            ) : (
+              t('task_detail.agent.hand_back')
+            )}
+          </Button>
+        </Tooltip>
         <Button type="button" variant="ghost" size="sm" onClick={handleOpenHistory}>
           <History size={14} strokeWidth={1.75} aria-hidden="true" />
           {t('task_detail.agent.run_history')}

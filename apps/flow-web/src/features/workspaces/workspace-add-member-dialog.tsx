@@ -10,7 +10,6 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,13 +17,18 @@ import { z } from 'zod';
 
 import { formatApiError } from '../../lib/api-error';
 import { type AddMemberInput, useAddMember } from './api';
+import RoleChoice from './role-choice';
 
 type Role = AddMemberInput['role'];
 
 const ROLES: readonly Role[] = ['owner', 'admin', 'member', 'guest'];
+/** Only an owner may grant owner; the server refuses it from an admin. */
+const NON_OWNER_ROLES: readonly Role[] = ['admin', 'member', 'guest'];
 
 export interface WorkspaceAddMemberDialogProps {
   workspaceId: string;
+  /** Whether the current user is an owner, and so may add another owner. */
+  canGrantOwner: boolean;
   open: boolean;
   onClose: () => void;
 }
@@ -42,6 +46,7 @@ const schema = z.object({
 
 export default function WorkspaceAddMemberDialog({
   workspaceId,
+  canGrantOwner,
   open,
   onClose,
 }: WorkspaceAddMemberDialogProps): ReactElement {
@@ -52,6 +57,7 @@ export default function WorkspaceAddMemberDialog({
   const [role, setRole] = useState<Role>('member');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const roles = canGrantOwner ? ROLES : NON_OWNER_ROLES;
 
   const reset = (): void => {
     setEmail('');
@@ -95,19 +101,6 @@ export default function WorkspaceAddMemberDialog({
     }
   };
 
-  const roleLabel = (r: Role): string => {
-    switch (r) {
-      case 'owner':
-        return t('workspaces.roles.owner');
-      case 'admin':
-        return t('workspaces.roles.admin');
-      case 'member':
-        return t('workspaces.roles.member');
-      case 'guest':
-        return t('workspaces.roles.guest');
-    }
-  };
-
   return (
     <Dialog open={open} onClose={handleClose} title={t('workspaces.members.add')}>
       <form
@@ -136,30 +129,14 @@ export default function WorkspaceAddMemberDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.members.role')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={role}
-              onChange={(e) => {
-                setRole(e.target.value as Role);
-              }}
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+        <RoleChoice roles={roles} value={role} onChange={setRole} disabled={submitting} />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
             {t('workspaces.form.cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={submitting}>
-            {t('workspaces.form.submit')}
+            {t('workspaces.members.add')}
           </Button>
         </div>
       </form>

@@ -8,9 +8,9 @@
  *   - **Soon**    (`daysUntilDue` in [1, 3])   → tone: info
  *   - **Later**   (`daysUntilDue > 3`)         → tone: neutral
  *
- * The reminder engine itself runs server-side and reflects derived
- * state (overdue / due_today / due_soon) plus the message string. This
- * page is read-only.
+ * The reminder engine is rule-based and runs server-side; each row shows
+ * the task, a localized day count and the due date. This page is
+ * read-only.
  *
  * **Snooze / dismiss are intentionally absent.** No such endpoints
  * exist on flow-api today — the only reminder endpoint is the GET
@@ -52,13 +52,6 @@ const BUCKET_KEY: Record<BucketId, string> = {
   soon: 'reminders.bucket.soon',
   later: 'reminders.bucket.later',
 };
-
-/** Engine kinds with a label; an unknown kind shows its raw name. */
-const KIND_KEY = new Map<string, string>([
-  ['overdue', 'reminders.kind.overdue'],
-  ['due_today', 'reminders.kind.due_today'],
-  ['due_soon', 'reminders.kind.due_soon'],
-]);
 
 const SKELETON_ROWS = ['a', 'b', 'c'] as const;
 
@@ -134,12 +127,14 @@ function ReminderRow({ reminder, locale, style }: ReminderRowProps): ReactElemen
     daysText = t('reminders.days.future', { count: days });
   }
   const dueDate = formatDueOn(reminder.dueOn, locale);
-  const kindKey = KIND_KEY.get(reminder.kind);
   return (
     <li className={cx(styles.row, motion.enter)} style={style}>
       <div className={styles.rowMain}>
+        {/*
+         * The bucket heading already names the kind; the row shows the
+         * localized day count.
+         */}
         <div className={styles.rowHeader}>
-          <Badge tone="accent">{kindKey ? t(kindKey) : reminder.kind}</Badge>
           <Link
             to="/tasks/$taskId"
             params={{ taskId: reminder.taskId }}
@@ -148,7 +143,6 @@ function ReminderRow({ reminder, locale, style }: ReminderRowProps): ReactElemen
             {reminder.title}
           </Link>
         </div>
-        {reminder.message ? <p className={styles.rowMessage}>{reminder.message}</p> : null}
       </div>
       <div className={styles.rowMeta}>
         <span>{daysText}</span>
@@ -247,6 +241,7 @@ export default function RemindersPage(): ReactElement {
       <PageHeader
         title={t('reminders.page_title')}
         description={t('reminders.page_subtitle')}
+        help="reminders"
         actions={
           <p className={styles.count}>
             {remindersQuery.isPending ? null : t('reminders.count', { count: total })}

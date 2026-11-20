@@ -121,13 +121,6 @@
   color: var(--nf-color-accent-fg);
 }
 
-.rowMessage {
-  margin: 0;
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-  overflow-wrap: anywhere;
-}
-
 .rowMeta {
   display: flex;
   flex-direction: column;

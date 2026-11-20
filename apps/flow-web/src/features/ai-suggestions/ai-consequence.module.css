@@ -1,0 +1,23 @@
+/* AI consequence marker: filled = changes data now, outline = proposal only. */
+
+.icon {
+  flex-shrink: 0;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+  white-space: nowrap;
+}
+
+.applies {
+  color: var(--nf-color-accent-fg);
+}
+
+.suggests {
+  color: var(--nf-color-fg-muted);
+}

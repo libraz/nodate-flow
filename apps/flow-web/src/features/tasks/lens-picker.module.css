@@ -8,15 +8,26 @@
  */
 
 .trigger {
+  display: inline-flex;
+  align-items: center;
+  /* Shares the filter bar's control height. */
+  min-block-size: var(--nf-control-height);
   background: none;
   border: 1px solid var(--nf-color-border);
   border-radius: var(--nf-radius-xs);
-  padding-block: var(--nf-space-1);
+  padding-block: 0;
   padding-inline: var(--nf-space-3);
   color: var(--nf-color-fg-muted);
   cursor: pointer;
   font: inherit;
   font-size: var(--nf-text-sm);
+}
+
+.saveHint {
+  margin: 0;
+  padding-inline: var(--nf-space-2);
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
 }
 
 .panel {

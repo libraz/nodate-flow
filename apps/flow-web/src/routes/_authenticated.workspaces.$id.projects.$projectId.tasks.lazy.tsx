@@ -6,16 +6,20 @@
  * "New task" button, and an <Outlet /> for the active view.
  */
 
+import Icon from '@nodate-flow/ui/icon';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createLazyFileRoute, getRouteApi, Outlet, useNavigate } from '@tanstack/react-router';
+import { Plus } from 'lucide-react';
 import { type ReactElement, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useProjectQuery } from '../features/projects/api';
+import ProjectSectionHeader from '../features/projects/project-section-header';
 import TaskCreateDialog from '../features/tasks/task-create-dialog';
 import TaskFiltersBar from '../features/tasks/task-filters-bar';
 import TaskViewSwitcher from '../features/tasks/task-view-switcher';
+import styles from './_authenticated.workspaces.$id.projects.$projectId.tasks.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/projects/$projectId/tasks');
 
@@ -43,44 +47,27 @@ function TasksSectionLayout(): ReactElement {
   }, [search.new, navigate, id, projectId]);
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-5)',
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--nf-space-4)',
-          flexWrap: 'wrap',
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 'var(--nf-text-section-title)',
-            fontWeight: 'var(--nf-weight-semibold)',
-            lineHeight: 'var(--nf-leading-tight)',
-            margin: 0,
-          }}
-        >
-          {t('tasks.title')}
-        </h2>
-        <div style={{ display: 'flex', gap: 'var(--nf-space-3)', alignItems: 'center' }}>
-          <TaskViewSwitcher />
-          <Button
-            variant="primary"
-            onClick={() => {
-              setCreateOpen(true);
-            }}
-          >
-            {t('tasks.new')}
-          </Button>
-        </div>
-      </header>
+    <section className={styles.section}>
+      <ProjectSectionHeader
+        title={t('tasks.title')}
+        help="project-tasks"
+        description={t('tasks.description')}
+        actions={
+          <>
+            <TaskViewSwitcher />
+            <Button
+              variant="primary"
+              className={styles.newTask}
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+            >
+              <Icon icon={Plus} decorative />
+              {t('tasks.new')}
+            </Button>
+          </>
+        }
+      />
 
       <TaskFiltersBar projectId={projectId} workspaceId={project.workspaceId} />
 

@@ -161,6 +161,7 @@ export default function ProjectCreateDialog({
 
         <FormField
           label={t('projects.form.key')}
+          description={t('projects.form.key_description')}
           required
           {...(errors.slug ? { error: t(errors.slug) } : {})}
         >

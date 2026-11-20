@@ -37,20 +37,19 @@
   position: sticky;
   inset-block-start: 0;
   z-index: var(--nf-z-sticky);
-  background: var(--nf-color-bg-elevated);
-  border-block-end: 2px solid var(--nf-color-border);
+  background: var(--nf-color-bg-sunken);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border-strong);
 }
 
+/* Header and row rules follow the DataGrid primitive, so List and Spreadsheet read as one table. */
 .headerCell {
   display: flex;
   align-items: center;
   padding-block: var(--nf-space-2);
   padding-inline: var(--nf-space-3);
-  font-size: var(--nf-text-xs);
+  font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
-  color: var(--nf-color-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--nf-color-fg);
   user-select: none;
   border-inline-end: 1px solid var(--nf-color-border);
 }
@@ -70,12 +69,8 @@
 .bodyRow {
   display: grid;
   grid-template-columns: 2.5rem 1fr 7rem 6rem 8rem 7.5rem 7.5rem;
-  border-block-end: 1px solid var(--nf-color-border);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-hairline);
   transition: background var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.bodyRow:nth-child(even) {
-  background: var(--nf-color-bg-sunken);
 }
 
 .bodyRow:hover {

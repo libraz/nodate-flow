@@ -1,0 +1,12 @@
+/* Project tasks section. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+}
+
+.newTask {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

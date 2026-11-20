@@ -322,6 +322,18 @@
   color: var(--nf-color-fg);
 }
 
+.formHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+/* Consequence marker beside an AI action that writes data immediately. */
+.aiEffect {
+  display: inline-flex;
+  align-self: center;
+}
+
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;

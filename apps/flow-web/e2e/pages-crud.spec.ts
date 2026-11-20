@@ -16,7 +16,13 @@
 
 import { expect, test } from '@playwright/test';
 
-import { cleanupTenant, createTestTenant, injectAuth, type TestTenant } from './fixtures/tenant';
+import {
+  API_BASE_URL,
+  cleanupTenant,
+  createTestTenant,
+  injectAuth,
+  type TestTenant,
+} from './fixtures/tenant';
 
 test.describe('pages crud', () => {
   let tenant: TestTenant | null = null;
@@ -126,5 +132,76 @@ test.describe('pages crud', () => {
       timeout: 10_000,
     });
     await expect(page.getByRole('link', { name: updatedTitle })).toHaveCount(0);
+  });
+  test('AI generation lands on the page in edit mode and the next save is a PATCH', async ({
+    page,
+  }) => {
+    const t = tenant;
+    if (!t) throw new Error('tenant not initialised');
+    await injectAuth(page.context(), t);
+
+    // The generate endpoint is stubbed (no LLM in the stack): it answers
+    // with a page that really exists, so the edit-mode route can load it.
+    const generatedTitle = `E2E Generated ${Date.now()}`;
+    const created = await fetch(`${API_BASE_URL}/workspaces/${t.workspaceId}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${t.accessToken}` },
+      body: JSON.stringify({ title: generatedTitle, body: 'Drafted body.' }),
+    });
+    expect(created.ok).toBe(true);
+    const generated = (await created.json()) as { id: string };
+    await page.route('**/pages/generate', async (route) => {
+      const real = await fetch(
+        `${API_BASE_URL}/workspaces/${t.workspaceId}/pages/${generated.id}`,
+        {
+          headers: { authorization: `Bearer ${t.accessToken}` },
+        },
+      );
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(await real.json()),
+      });
+    });
+
+    await page.goto('/pages');
+    await expect(page.getByRole('searchbox')).toBeVisible({ timeout: 10_000 });
+    await page
+      .getByRole('button', { name: /^(new page|新しいページ)$/i })
+      .last()
+      .click();
+
+    const titleField = page.getByLabel(/^(title|タイトル)$/i);
+    await titleField.fill(generatedTitle);
+    await page.getByRole('button', { name: /^(generate with ai|AIで生成)/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('textbox').fill('Write a short overview.');
+    await dialog
+      .getByRole('button', { name: /^(generate and create page|生成してページを作成)/i })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`/pages/${generated.id}\\?.*mode=edit`), {
+      timeout: 10_000,
+    });
+
+    // Already persisted by generation, so the editor is in edit mode and
+    // saving issues a PATCH rather than creating a second page.
+    const editedTitle = `${generatedTitle} (edited)`;
+    const editTitleField = page.getByLabel(/^(title|タイトル)$/i);
+    await expect(editTitleField).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /^(generate with ai|AIで生成)/i })).toHaveCount(
+      0,
+    );
+    await editTitleField.fill(editedTitle);
+    const patch = page.waitForRequest(
+      (r) => r.method() === 'PATCH' && r.url().includes(`/pages/${generated.id}`),
+    );
+    const editForm = page.locator('form').filter({ has: editTitleField });
+    await editForm.getByRole('button', { name: /^(edit page|ページを編集)$/i }).click();
+    await patch;
+    await expect(page.getByRole('heading', { level: 1, name: editedTitle })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

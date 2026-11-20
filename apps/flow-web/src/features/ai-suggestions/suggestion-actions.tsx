@@ -6,9 +6,11 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AiSparkle } from './ai-consequence';
 import styles from './suggestion-actions.module.css';
 
 export interface SuggestionActionsProps {
@@ -28,9 +30,13 @@ export default function SuggestionActions({
   const { t } = useTranslation('ai-suggestions');
   return (
     <div className={styles.row}>
-      <Button type="button" variant="primary" size="sm" onClick={onApply} disabled={disabled}>
-        {t('action.apply')}
-      </Button>
+      {/* Apply changes data with no further confirmation, so it carries the filled sparkle. */}
+      <Tooltip content={t('action.apply_hint')}>
+        <Button type="button" variant="primary" size="sm" onClick={onApply} disabled={disabled}>
+          <AiSparkle kind="applies" />
+          {t('action.apply')}
+        </Button>
+      </Tooltip>
       <Button type="button" variant="ghost" size="sm" onClick={onEdit} disabled={disabled}>
         {t('action.edit')}
       </Button>

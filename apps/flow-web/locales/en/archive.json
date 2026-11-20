@@ -40,7 +40,7 @@
   },
   "empty": {
     "noneTitle": "Nothing stored yet",
-    "noneBody": "When you archive a task, it'll be safely kept here.",
+    "noneBody": "Archived tasks are kept here, not deleted. Archive a task from the Move task menu on a board card, and restore it from this page any time.",
     "noneCta": "Browse open tasks",
     "filteredTitle": "Couldn't find any matching archive",
     "filteredBody": "Try widening your time range or clearing project filter.",

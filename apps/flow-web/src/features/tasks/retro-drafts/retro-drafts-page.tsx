@@ -194,6 +194,7 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
           </svg>
         }
         title={t('tasks.retro.queue.empty')}
+        description={t('tasks.retro.queue.empty_description')}
       />
     );
   } else {
@@ -250,6 +251,7 @@ export default function RetroDraftsPage({ workspaceId }: RetroDraftsPageProps): 
     <section className={styles.page} aria-labelledby="retro-drafts-title">
       <PageHeader
         titleId="retro-drafts-title"
+        help="retro-drafts"
         title={t('tasks.retro.queue.title')}
         description={t('tasks.retro.queue.description')}
       />

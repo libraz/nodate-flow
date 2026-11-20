@@ -128,7 +128,9 @@ test.describe('task detail — create event from task', () => {
     }
   });
 
-  test('A: trigger opens the dialog with workspace + calendar pickers', async ({ page }) => {
+  test('A: trigger opens the dialog with only the calendar picker for a single-workspace user', async ({
+    page,
+  }) => {
     tenant = await createTestTenant();
     await ensurePersonalCalendar(tenant);
     const task = await seedTaskWithDueDate(tenant, `Event from task A ${Date.now().toString(36)}`);
@@ -141,11 +143,9 @@ test.describe('task detail — create event from task', () => {
     const dialog = page.getByRole('dialog', { name: copy.dialogTitle });
     await expect(dialog).toBeVisible({ timeout: 5_000 });
 
-    // The workspace combobox shows the actor's only workspace selected by
-    // default (its label = workspace name from createTestTenant).
-    const wsPicker = dialog.getByRole('combobox', { name: copy.workspaceLabel });
-    await expect(wsPicker).toBeVisible();
-    await expect(wsPicker).not.toHaveValue('');
+    // The actor belongs to exactly one workspace, so the dialog does not
+    // render a workspace picker.
+    await expect(dialog.getByRole('combobox', { name: copy.workspaceLabel })).toHaveCount(0);
 
     // The calendar picker is also mounted (auto-create personal calendar
     // produced exactly one writable row).

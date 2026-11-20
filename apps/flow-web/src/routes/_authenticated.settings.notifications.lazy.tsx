@@ -16,7 +16,11 @@ function NotificationsRoute(): ReactElement {
   const { t } = useTranslation('settings');
   return (
     <div className={ui.page}>
-      <PageHeader title={t('notifications.title')} />
+      <PageHeader
+        title={t('notifications.title')}
+        description={t('notifications.description')}
+        help="settings-notifications"
+      />
       <Suspense fallback={<NotificationsFormSkeleton />}>
         <NotificationsForm />
       </Suspense>

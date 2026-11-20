@@ -1,0 +1,23 @@
+/* Timeline event card pieces that carry no per-event values. */
+
+.sourceTag {
+  padding-inline: var(--nf-space-1-5);
+  border-radius: var(--nf-radius-xs);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-normal);
+  white-space: nowrap;
+}
+
+.systemActor {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+}

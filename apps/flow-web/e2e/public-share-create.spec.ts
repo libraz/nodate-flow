@@ -24,6 +24,7 @@
 
 import { expect, test } from '@playwright/test';
 
+import enSettings from '../locales/en/settings.json' with { type: 'json' };
 import { cleanupTenant, createTestTenant, injectAuth, type TestTenant } from './fixtures/tenant';
 
 test.describe('public share create', () => {
@@ -166,5 +167,35 @@ test.describe('public share create', () => {
     await expect(
       page.getByText(/no public share pages yet\.|公開シェアページはまだありません。/i),
     ).toBeVisible();
+  });
+  test('choosing an expiry at creation shows it on the share detail', async ({ page }) => {
+    const t = tenant;
+    if (!t) throw new Error('tenant not initialised');
+    await injectAuth(page.context(), t);
+    const expiry = enSettings.workspace.public_shares.expiry;
+
+    await page.goto(`/workspaces/${t.workspaceId}/settings/public-shares`);
+    await page.getByTestId('public-share-create-open').click();
+
+    const dialog = page.getByRole('dialog');
+    const shareTitle = `Expiring ${Date.now().toString(36)}`;
+    await dialog
+      .getByPlaceholder(/e\.g\. Group A Official Schedule|例: グループ A 公式スケジュール/i)
+      .fill(shareTitle);
+
+    // "Never expires" is the default; switching to a set time uses the
+    // pre-filled suggestion (a week out, 09:00).
+    await dialog.getByText(expiry.at, { exact: true }).click();
+    await dialog.getByTestId('public-share-create-submit').click();
+
+    await expect(
+      dialog.getByRole('heading', { name: /^(share page created|シェアページを作成しました)$/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await dialog.getByTestId('public-share-create-done').click();
+    await expect(dialog).toBeHidden({ timeout: 5_000 });
+
+    await page.getByRole('link', { name: shareTitle, exact: true }).click();
+    await expect(page.getByText(/^Expires /)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(expiry.status_never, { exact: true })).toHaveCount(0);
   });
 });

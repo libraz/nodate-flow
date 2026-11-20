@@ -12,6 +12,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { KeyRound } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,6 +20,8 @@ import { formatApiError } from '../../lib/api-error';
 import type { CreateInviteInput } from './invite-api';
 import { useCreateInvite } from './invite-api';
 import { workspaceInviteUrl } from './invite-link';
+import RoleChoice from './role-choice';
+import styles from './workspaces.module.css';
 
 type Role = CreateInviteInput['role'];
 
@@ -120,25 +123,16 @@ export default function WorkspaceInviteDialog({
     }
   };
 
-  const roleLabel = (r: Role): string => {
-    switch (r) {
-      case 'owner':
-        return t('workspaces.roles.owner');
-      case 'admin':
-        return t('workspaces.roles.admin');
-      case 'member':
-        return t('workspaces.roles.member');
-      case 'guest':
-        return t('workspaces.roles.guest');
-    }
-  };
-
   if (generatedUrl) {
     return (
       <Dialog open={open} onClose={handleClose} title={t('workspaces.invites.link_ready_title')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
           <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)' }}>
             {t('workspaces.invites.link_ready_description')}
+          </p>
+          <p className={styles.onceCallout} role="note">
+            <KeyRound size={16} aria-hidden className={styles.onceIcon} />
+            <span>{t('workspaces.invites.link_once')}</span>
           </p>
           <div
             style={{
@@ -185,23 +179,7 @@ export default function WorkspaceInviteDialog({
         noValidate
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}
       >
-        <FormField label={t('workspaces.members.role')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={role}
-              onChange={(e) => {
-                setRole(e.target.value as Role);
-              }}
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+        <RoleChoice roles={ROLES} value={role} onChange={setRole} disabled={submitting} />
 
         <FormField label={t('workspaces.invites.expires')}>
           {(control) => (
@@ -221,7 +199,10 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.invites.max_uses')}>
+        <FormField
+          label={t('workspaces.invites.max_uses')}
+          description={t('workspaces.invites.max_usesHint')}
+        >
           {(control) => (
             <Select
               {...control}
@@ -239,7 +220,10 @@ export default function WorkspaceInviteDialog({
           )}
         </FormField>
 
-        <FormField label={t('workspaces.invites.label')}>
+        <FormField
+          label={t('workspaces.invites.label')}
+          description={t('workspaces.invites.labelHint')}
+        >
           {(control) => (
             <Input
               {...control}

@@ -24,17 +24,18 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Markdown from '@nodate-flow/ui/primitives/markdown';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
-import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Separator from '@nodate-flow/ui/primitives/separator';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
-import { X } from 'lucide-react';
+import { History, Pencil, Plus, X } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageFrame from '../components/page-frame';
+import PageHelp from '../components/page-help';
+import AiConsequence from '../features/ai-suggestions/ai-consequence';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import ConstraintEditor from '../features/constraints/constraint-editor';
 import StateGraph from '../features/constraints/state-graph';
@@ -48,7 +49,7 @@ import AgentPanel from '../features/tasks/agent-panel/agent-panel';
 import AIAgentsSection from '../features/tasks/ai-agents/section';
 import AIAgentsSkeleton from '../features/tasks/ai-agents/skeleton';
 import {
-  TASK_PRIORITIES,
+  landingStateFor,
   type TaskDerivedState,
   type TaskPriority,
   TRANSITIONS_BY_STATE,
@@ -65,12 +66,19 @@ import {
   useUpdateTask,
 } from '../features/tasks/api';
 import CommentRow from '../features/tasks/comment-row';
-import { PRIORITY_COLOR, PRIORITY_KEY, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
+import {
+  PRIORITY_COLOR,
+  PRIORITY_KEY,
+  STATE_COLOR,
+  STATE_KEY,
+  STATE_TONE,
+} from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
 import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
 import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
+import PriorityControl from '../features/tasks/priority-control';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskSourceLinks from '../features/tasks/task-source-links';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
@@ -98,51 +106,31 @@ const TRANSITION_KEY: Record<TransitionName, string> = {
   cancel: 'tasks.detail.transitions.cancel',
 };
 
-/**
- * String token for each task priority rank. The underlying API model stores
- * priority as an integer 0–4 but the `SegmentedControl` primitive is generic
- * over `T extends string`; these tokens provide a typesafe bridge.
- */
-type PriorityToken = 'none' | 'low' | 'medium' | 'high' | 'urgent';
-
-/** Map numeric priority to its segmented-control token. */
-const PRIORITY_TO_TOKEN: Record<TaskPriority, PriorityToken> = {
-  0: 'none',
-  1: 'low',
-  2: 'medium',
-  3: 'high',
-  4: 'urgent',
-};
-
-/** Inverse of {@link PRIORITY_TO_TOKEN}. */
-const TOKEN_TO_PRIORITY: Record<PriorityToken, TaskPriority> = {
-  none: 0,
-  low: 1,
-  medium: 2,
-  high: 3,
-  urgent: 4,
-};
-
-/**
- * Per-rank tone used by the `colourful` segmented control. Mirrors the
- * ordinal colour ramp of `PRIORITY_COLOR` (neutral → info → success →
- * warning → danger) but maps onto the primitive's tone vocabulary.
- */
-const PRIORITY_SEGMENT_TONE: Record<
-  TaskPriority,
-  'neutral' | 'info' | 'success' | 'warning' | 'danger'
-> = {
-  0: 'neutral',
-  1: 'info',
-  2: 'success',
-  3: 'warning',
-  4: 'danger',
-};
-
+// Cancel stays a bordered button with danger text: as loud as Complete it invites misclicks.
 const TRANSITION_VARIANT: Partial<Record<TransitionName, ButtonVariant>> = {
   complete: 'primary',
-  cancel: 'danger',
 };
+
+/** Sidebar card heading with an optional one-paragraph explanation under it. */
+function CardHeading({
+  title,
+  hint,
+  marker,
+}: {
+  title: string;
+  hint?: string;
+  marker?: ReactElement;
+}): ReactElement {
+  return (
+    <div className={css.cardHead}>
+      <div className={css.cardTitleRow}>
+        <h2 className={css.cardTitle}>{title}</h2>
+        {marker}
+      </div>
+      {hint ? <p className={css.cardHint}>{hint}</p> : null}
+    </div>
+  );
+}
 
 interface TaskDetailPanelProps {
   id: string;
@@ -211,7 +199,7 @@ function TaskFavoriteStar({
  * unchanged values: the button is disabled in those cases, and a keyboard
  * Enter submit on an empty value surfaces an inline `role="alert"`
  * message instead of silently closing the editor. This mirrors the
- * project rename guard established in commit a8cae17.
+ * project rename guard (empty and unchanged values are rejected).
  */
 function TitleEditor({
   id,
@@ -273,16 +261,17 @@ function TitleEditor({
         }}
       >
         <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
+        <PageHelp topic="task-detail" />
         <Suspense fallback={<Skeleton className={css.starSkeleton} />}>
           <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
         </Suspense>
         <Button
           type="button"
-          variant="ghost"
           size="sm"
           onClick={enterEdit}
           aria-label={t('tasks.detail.title_edit_named', { title: initial })}
         >
+          <Pencil size={14} aria-hidden />
           {t('tasks.detail.title_edit')}
         </Button>
       </div>
@@ -433,7 +422,8 @@ function DescriptionEditor({
         </div>
         {!isEmpty && (
           <div>
-            <Button type="button" variant="ghost" onClick={enterEdit}>
+            <Button type="button" size="sm" onClick={enterEdit}>
+              <Pencil size={14} aria-hidden />
               {t('tasks.detail.description_edit')}
             </Button>
           </div>
@@ -521,11 +511,11 @@ function DescriptionSection({
       >
         <Button
           type="button"
-          variant="ghost"
           size="sm"
           onClick={() => setHistoryOpen(true)}
           aria-label={t('tasks.history.title')}
         >
+          <History size={14} aria-hidden />
           {t('tasks.history.open')}
         </Button>
       </div>
@@ -574,7 +564,7 @@ function TaskActionsCard({
         gap: 'var(--nf-space-2)',
       }}
     >
-      <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>{t('tasks.actions.title')}</h2>
+      <CardHeading title={t('tasks.actions.title')} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
         <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
           {t('tasks.actions.create_event.trigger')}
@@ -787,12 +777,13 @@ function AssigneesSection({
       ) : (
         <Button
           type="button"
-          variant="ghost"
           size="sm"
+          className={css.startAligned}
           onClick={() => {
             setPicking(true);
           }}
         >
+          <Plus size={14} aria-hidden />
           {t('tasks.detail.assignees.add')}
         </Button>
       )}
@@ -888,7 +879,10 @@ function Sidebar({
     );
   };
 
-  const legal = TRANSITIONS_BY_STATE[state] ?? [];
+  const legal = (TRANSITIONS_BY_STATE[state] ?? []).flatMap((name) => {
+    const landing = landingStateFor(state, name);
+    return landing ? [{ name, landing }] : [];
+  });
 
   return (
     <aside
@@ -951,22 +945,11 @@ function Sidebar({
               }}
             />
           </span>
-          <SegmentedControl<PriorityToken>
-            ariaLabel={t('tasks.priority.aria_label')}
-            colourful
-            size="sm"
-            value={PRIORITY_TO_TOKEN[priority]}
+          <PriorityControl
+            value={priority}
             onChange={(next) => {
-              void handlePriorityChange(TOKEN_TO_PRIORITY[next]);
+              void handlePriorityChange(next);
             }}
-            options={TASK_PRIORITIES.map((p) => {
-              const token = PRIORITY_TO_TOKEN[p];
-              return {
-                value: token,
-                label: t(PRIORITY_KEY[p]),
-                tone: PRIORITY_SEGMENT_TONE[p],
-              };
-            })}
           />
         </div>
         <FormField label={t('tasks.form.start')}>
@@ -1011,20 +994,31 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.transitions.title')}
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
-          {legal.map((name) => (
+        <CardHeading
+          title={t('tasks.detail.transitions.title')}
+          hint={t('tasks.detail.transitions.hint')}
+        />
+        <div className={css.transitionList}>
+          {legal.map(({ name, landing }) => (
             <Button
               key={name}
               type="button"
               variant={TRANSITION_VARIANT[name] ?? 'default'}
+              className={cx(css.transitionButton, name === 'cancel' && css.transitionCancel)}
               onClick={() => {
                 handleTransition(name);
               }}
             >
-              {t(TRANSITION_KEY[name])}
+              <span>{t(TRANSITION_KEY[name])}</span>
+              <span className={css.transitionLanding}>
+                <span aria-hidden="true">→</span>
+                <span
+                  aria-hidden="true"
+                  className={css.transitionDot}
+                  style={{ background: STATE_COLOR[landing] }}
+                />
+                {t(STATE_KEY[landing])}
+              </span>
             </Button>
           ))}
         </div>
@@ -1040,9 +1034,7 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.assignees.title')}
-        </h2>
+        <CardHeading title={t('tasks.detail.assignees.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
@@ -1056,9 +1048,10 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('taskWorkflow.rolesHeading')}
-        </h2>
+        <CardHeading
+          title={t('taskWorkflow.rolesHeading')}
+          hint={t('taskWorkflow.rolesDescription')}
+        />
         <Suspense fallback={<SectionSkeleton />}>
           <TaskRoleAssignments key={id} taskId={id} workspaceId={workspaceId} />
         </Suspense>
@@ -1072,9 +1065,10 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {tAgents('task_detail.agent.assign.title')}
-        </h2>
+        <CardHeading
+          title={tAgents('task_detail.agent.assign.title')}
+          hint={tAgents('task_detail.agent.assign.description')}
+        />
         <Suspense fallback={<SectionSkeleton />}>
           <AgentAssignSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
@@ -1127,9 +1121,11 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.infer_state.title')}
-        </h2>
+        <CardHeading
+          title={t('tasks.detail.infer_state.title')}
+          hint={t('tasks.detail.infer_state.hint')}
+          marker={<AiConsequence kind="suggests" />}
+        />
         <Suspense fallback={<SectionSkeleton />}>
           <InferStateSection taskId={id} />
         </Suspense>
@@ -1147,9 +1143,10 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.duplicates.title')}
-        </h2>
+        <CardHeading
+          title={t('tasks.detail.duplicates.title')}
+          hint={t('tasks.detail.duplicates.hint')}
+        />
         <Suspense fallback={<SectionSkeleton />}>
           <RelatedTasksSection taskId={id} />
         </Suspense>
@@ -1163,14 +1160,57 @@ function Sidebar({
           gap: 'var(--nf-space-2)',
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 'var(--nf-text-base)' }}>
-          {t('tasks.detail.activity.title')}
-        </h2>
+        <CardHeading title={t('tasks.detail.activity.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <TaskMiniTimeline taskId={id} />
         </Suspense>
       </Card>
     </aside>
+  );
+}
+
+/**
+ * On narrow screens the sidebar lands below the whole main column, so the
+ * key metadata is repeated read-only under the title.
+ */
+function TaskMetaStrip({
+  state,
+  priority,
+  dueOn,
+  locale,
+}: {
+  state: TaskDerivedState;
+  priority: TaskPriority;
+  dueOn: string | undefined;
+  locale: string;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  return (
+    <dl className={css.metaStrip}>
+      <div className={css.metaItem}>
+        <dt className={css.metaLabel}>{t('tasks.detail.state_label')}</dt>
+        <dd className={css.metaValue}>
+          <StateBadge state={state} />
+        </dd>
+      </div>
+      <div className={css.metaItem}>
+        <dt className={css.metaLabel}>{t('tasks.detail.priority_label')}</dt>
+        <dd className={css.metaValue}>
+          <span
+            aria-hidden="true"
+            className={css.metaDot}
+            style={{ background: PRIORITY_COLOR[priority] }}
+          />
+          {t(PRIORITY_KEY[priority])}
+        </dd>
+      </div>
+      {dueOn ? (
+        <div className={css.metaItem}>
+          <dt className={css.metaLabel}>{t('tasks.detail.due_label')}</dt>
+          <dd className={css.metaValue}>{formatDueDate(dueOn, locale)}</dd>
+        </div>
+      ) : null}
+    </dl>
   );
 }
 
@@ -1369,6 +1409,9 @@ function TaskDetailPanel({ id }: TaskDetailPanelProps): ReactElement {
           <TaskBreadcrumb workspaceId={task.workspaceId} projectId={task.projectId} />
         </Suspense>
         <TitleEditor id={id} initial={task.title} workspaceId={task.workspaceId} />
+        {isNarrow ? (
+          <TaskMetaStrip state={state} priority={priority} dueOn={task.dueOn} locale={locale} />
+        ) : null}
         {task.agentContext?.agent ? (
           <AgentPanel taskId={id} agentContext={task.agentContext} locale={locale} />
         ) : null}

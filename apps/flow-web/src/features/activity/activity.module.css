@@ -143,12 +143,24 @@
   overflow-wrap: anywhere;
 }
 
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+}
+
+.filterHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
 .sourceChip {
   padding-inline: var(--nf-space-1-5);
   border-radius: var(--nf-radius-xs);
   border: var(--nf-space-px) solid var(--source-tone);
   color: var(--source-tone);
-  font-size: var(--nf-text-micro);
+  font-size: var(--nf-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -170,13 +182,23 @@
   color: var(--nf-color-fg-muted);
 }
 
-.resource {
+.resource,
+.resourceLink {
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--nf-font-mono);
+}
+
+.resourceLink {
+  color: var(--nf-color-accent-fg);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.resourceLink:hover {
+  color: var(--nf-color-fg);
 }
 
 .severity {

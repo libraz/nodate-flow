@@ -4,11 +4,13 @@
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
@@ -106,7 +108,8 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
     <div className={ui.page}>
       <PageHeader
         title={t('providers.title')}
-        description={t('providers.write_only_notice')}
+        description={t('providers.description')}
+        help="workspace-settings-ai-providers"
         actions={
           <Button variant="primary" disabled={isError} onClick={openAdd}>
             {t('providers.add')}
@@ -141,29 +144,40 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
       ) : providers.length === 0 ? (
         <EmptyState
           title={t('providers.empty')}
+          description={t('providers.empty_hint')}
           className={ui.empty}
           action={<Button onClick={openAdd}>{t('providers.add')}</Button>}
         />
       ) : (
-        <ul className={styles.list}>
-          {entries.map(({ key, item: p, present }) => (
-            <PresenceItem
-              key={key}
-              as="li"
-              present={present}
-              onExited={() => {
-                onExited(key);
-              }}
-              className={initialIds !== null && !initialIds.has(p.id) ? styles.arrived : undefined}
-            >
-              <div className={styles.row}>
-                <div className={styles.identity}>
-                  <strong className={styles.name}>{p.name}</strong>
-                  <span className={styles.meta}>
-                    {kindLabel(p.kind)}
-                    {p.defaultModel ? ` · ${p.defaultModel}` : ''}
-                  </span>
-                  {/*
+        <>
+          {/* The resolver uses the newest enabled provider; the list is newest first. */}
+          <p className={styles.defaultNote}>{t('providers.default_note')}</p>
+          <ul className={styles.list}>
+            {entries.map(({ key, item: p, present }) => (
+              <PresenceItem
+                key={key}
+                as="li"
+                present={present}
+                onExited={() => {
+                  onExited(key);
+                }}
+                className={
+                  initialIds !== null && !initialIds.has(p.id) ? styles.arrived : undefined
+                }
+              >
+                <div className={styles.row}>
+                  <div className={styles.identity}>
+                    <span className={styles.nameRow}>
+                      <strong className={styles.name}>{p.name}</strong>
+                      {p.id === providers[0]?.id ? (
+                        <Badge tone="accent">{t('providers.default_badge')}</Badge>
+                      ) : null}
+                    </span>
+                    <span className={styles.meta}>
+                      {kindLabel(p.kind)}
+                      {p.defaultModel ? ` · ${p.defaultModel}` : ''}
+                    </span>
+                    {/*
                     The endpoint a provider talks to is part of what the
                     provider is, and it was the one configured field the
                     list never showed. An admin looking at this page
@@ -173,39 +187,46 @@ export default function ProviderList({ workspaceId }: ProviderListProps): ReactE
                     now refuses to build and which used to take the whole
                     workspace's AI down with it.
                   */}
-                  {p.baseUrl ? <TruncatedText text={p.baseUrl} className={styles.baseUrl} /> : null}
-                  {p.kind === 'openai' && p.baseUrl ? (
-                    <span role="status" className={styles.invalid}>
-                      {t('providers.invalid_base_url')}
-                    </span>
-                  ) : null}
-                  <MaskedKey value={p.apiKeyMasked} />
+                    {p.baseUrl ? (
+                      <TruncatedText text={p.baseUrl} className={styles.baseUrl} />
+                    ) : null}
+                    {p.kind === 'openai' && p.baseUrl ? (
+                      <span role="status" className={styles.invalid}>
+                        {t('providers.invalid_base_url')}
+                      </span>
+                    ) : null}
+                    <MaskedKey value={p.apiKeyMasked} />
+                  </div>
+                  <div className={styles.actions}>
+                    {p.kind === 'ollama' ? null : (
+                      <Tooltip content={t('providers.action.rotate_hint')}>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setRotateId(p.id);
+                          }}
+                        >
+                          {t('providers.action.rotate')}
+                        </Button>
+                      </Tooltip>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={del.isPending}
+                      aria-busy={deletingId === p.id}
+                      onClick={() => {
+                        void handleDelete(p.id);
+                      }}
+                    >
+                      {t('providers.action.delete')}
+                    </Button>
+                  </div>
                 </div>
-                <div className={styles.actions}>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setRotateId(p.id);
-                    }}
-                  >
-                    {t('providers.action.rotate')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    disabled={del.isPending}
-                    aria-busy={deletingId === p.id}
-                    onClick={() => {
-                      void handleDelete(p.id);
-                    }}
-                  >
-                    {t('providers.action.delete')}
-                  </Button>
-                </div>
-              </div>
-            </PresenceItem>
-          ))}
-        </ul>
+              </PresenceItem>
+            ))}
+          </ul>
+        </>
       )}
 
       {error?.status === 403 ? null : <EmbeddingSettingsPanel workspaceId={workspaceId} />}

@@ -29,14 +29,14 @@
   },
   "integrations": {
     "title": "Integrations",
-    "description": "Connect your personal GitHub, Slack, Google Calendar, and Discord accounts so {appName} can act on your behalf. Tokens are encrypted at rest.",
+    "description": "Connect your own GitHub, Slack, Google Calendar and Discord accounts. Connections are personal to you, and tokens are stored encrypted. Disconnect any time; you will need to authorise again to reconnect.",
     "connect": "Connect",
     "disconnect": "Disconnect",
     "disconnect_confirm": "Disconnect {provider}? You will need to re-authorise to use it again.",
     "disconnected": "Integration disconnected",
     "connected_as": "Connected as {account} · {time}",
     "connected_toast": "{provider} connected.",
-    "not_configured": "Not configured on this server. Ask the administrator to set the OAuth credentials.",
+    "not_configured": "Not available on this server yet. An administrator needs to set up the OAuth credentials first.",
     "provider": {
       "github": {
         "name": "GitHub",
@@ -59,18 +59,24 @@
       "connect_failed": "Could not start the connect flow. Please try again.",
       "disconnect_failed": "Could not disconnect the integration. Please try again.",
       "callback_failed": "Connect flow failed: {reason}"
-    }
+    },
+    "not_configured_badge": "Not set up"
   },
   "ai_activity": {
     "title": "AI activity",
-    "description": "A read-only audit of recent LLM calls made on behalf of this workspace. Prompts and responses are redacted at write time.",
+    "description": "The latest 50 LLM calls made for this workspace. Prompts are redacted when recorded, so the original text cannot be recovered here.",
     "empty": "No LLM calls recorded yet.",
-    "error_code": "Error: {code}"
+    "error_code": "Error: {code}",
+    "status": {
+      "ok": "OK",
+      "blocked": "Blocked",
+      "error": "Error"
+    }
   },
   "audit_log": {
     "title": "Audit log",
-    "description": "A read-only log of actions performed in this workspace. Metadata is redacted at write time.",
-    "empty": "No audit entries recorded yet.",
+    "description": "A read-only record of who did what in this workspace and when. Sensitive values are redacted when entries are written, and entries cannot be edited here.",
+    "empty": "No audit entries yet. Actions performed in this workspace will appear here as they happen.",
     "empty_filtered": "No entries match your filters. Clear filters to see all entries.",
     "unknown_actor": "System",
     "export_csv": "Export CSV",
@@ -99,7 +105,9 @@
       "prev": "Previous",
       "next": "Next",
       "page_of": "Page {current} of {total}"
-    }
+    },
+    "export_csv_hint": "Saves only the rows on this page (50 at most) with your current filters. For more, narrow the dates and export page by page.",
+    "export_csv_page": "Export this page (CSV)"
   },
   "sections_label": "Workspace settings sections",
   "settings_sections_label": "Settings sections",
@@ -109,7 +117,7 @@
   },
   "weekly_digest": {
     "title": "Weekly digest",
-    "description": "A deterministic snapshot of this workspace: state counts, what was completed in the last seven days, and what is overdue.",
+    "description": "A snapshot of this workspace, calculated each time you open it: task counts by state, what was completed in the last seven days, and what is overdue.",
     "counts": {
       "open": "Open",
       "waiting": "In progress",
@@ -121,10 +129,11 @@
     "overdue_open": "Overdue",
     "empty_completed": "Nothing completed in the last seven days.",
     "empty_overdue": "No overdue tasks.",
-    "markdown": "Markdown",
+    "markdown": "Copy as text (Markdown)",
     "copy": "Copy",
     "copied": "Copied",
-    "copy_failed": "Could not copy to the clipboard."
+    "copy_failed": "Could not copy to the clipboard.",
+    "countsHint": "Number of tasks in each state right now, not only from the last seven days."
   },
   "profile": {
     "title": "Profile",
@@ -196,7 +205,9 @@
     },
     "section_identity": "Profile details",
     "section_appearance": "Appearance",
-    "section_appearance_help": "Theme changes apply immediately and are not part of Save."
+    "section_appearance_help": "Theme changes apply immediately and are not part of Save.",
+    "description": "Your name, language, timezone and appearance. Applies to your account in every workspace.",
+    "timezone_help": "Dates and times are shown in this timezone."
   },
   "notifications": {
     "title": "Notifications",
@@ -232,7 +243,9 @@
     },
     "errors": {
       "update_failed": "Could not update your notification preferences. Please try again."
-    }
+    },
+    "description": "Choose which activity appears in your in-app notification bell, per workspace.",
+    "workspace_help": "Notification settings are saved separately for each workspace."
   },
   "security": {
     "title": "Security",
@@ -322,16 +335,17 @@
         "revoke_all_failed": "Could not revoke the other sessions. Please try again."
       },
       "revoke_all_help": "Sign out every device except this one."
-    }
+    },
+    "description": "Password, two-factor authentication and the devices signed in to your account."
   },
   "workspace": {
     "general": {
       "title": "General",
-      "description": "Update the workspace name, slug, description, and icon.",
+      "description": "Rename the workspace, change its slug or description, or delete it.",
       "field": {
         "name": "Name",
         "slug": "Slug",
-        "slug_help": "Lowercase letters, numbers, and hyphens.",
+        "slug_help": "A short unique identifier: lowercase letters, numbers and hyphens. It must be unique on this server, and you type it to confirm deleting the workspace.",
         "description": "Description",
         "icon_url": "Icon URL"
       },
@@ -370,15 +384,15 @@
     },
     "public_shares": {
       "title": "Public share pages",
-      "description": "Workspace-owned read-only URLs for publishing selected events to the public. The URL is the capability — anyone with it can view the page.",
+      "description": "Publish chosen events on a read-only web page. Anyone who has the link can open it without signing in, so only share the link with people who should see these events.",
       "create": "Create share",
-      "empty": "No public share pages yet.",
-      "rotate": "Rotate",
+      "empty": "No public share pages yet. Create one, then add the events you want to publish.",
+      "rotate": "Rotate URL",
       "rotate_confirm": "Rotate the URL? The current URL will stop working immediately.",
       "delete": "Delete",
       "delete_confirm": "Delete \"{title}\"? The URL will become invalid and events will no longer be published.",
       "deleted": "Share page deleted",
-      "never_expires": "—",
+      "never_expires": "Never",
       "table": {
         "title": "Title",
         "events": "Events",
@@ -399,10 +413,11 @@
           "title": "Title",
           "title_placeholder": "e.g. Group A Official Schedule",
           "description": "Description",
-          "description_help": "Markdown is not rendered yet; plain text only.",
+          "description_help": "Shown under the title as plain text. Markdown is not rendered.",
           "holidays_country": "Holiday overlay country",
-          "holidays_country_help": "Choose a country to overlay its public holidays on the share page. Leave unset for no holiday overlay.",
-          "holidays_country_unset": "No holiday overlay"
+          "holidays_country_help": "Optionally mark this country's public holidays on the page. Leave unset to show none.",
+          "holidays_country_unset": "No holiday overlay",
+          "title_help": "Shown as the heading of the public page. Everyone with the link sees it."
         },
         "reveal_warning": "Copy this URL now. The token is stored hashed — you will not be able to see it again.",
         "rotate_warning": "The previous URL has been invalidated. Share this new URL with anyone who still needs access.",
@@ -416,8 +431,8 @@
       "detail": {
         "back": "Back to share pages",
         "events_title": "Published events",
-        "events_description": "Events listed here appear on the public page in the order shown. Confidential events are refused at attach time.",
-        "empty_events": "No events yet. Add events from this workspace to publish them.",
+        "events_description": "These events appear on the public page in this order. Visitors see each event's title, time, place and notes. Private events show their time only, and confidential events cannot be added.",
+        "empty_events": "Nothing is published yet, so the page is empty. Use Add events to pick events from this workspace.",
         "add_events": "Add events",
         "detach": "Remove",
         "detached": "Event removed",
@@ -446,7 +461,7 @@
           "hint": "Showing events within the selected range. Use the checkboxes to pick the events to publish.",
           "no_candidates": "No events in this range.",
           "already_attached": "Already published",
-          "confidential": "Confidential",
+          "confidential": "Private (cannot be published)",
           "select": "Select",
           "attach": "Attach {count, plural, one {# event} other {# events}}",
           "attached_toast": "{attached} attached, {skipped} skipped",
@@ -463,21 +478,42 @@
           "over": "Event {active} is now over event {over}.",
           "dropped": "Event {active} was dropped over event {over}.",
           "cancelled": "Drag for event {id} was cancelled."
-        }
+        },
+        "detach_hint": "Takes the event off this public page only. The event stays in the calendar."
+      },
+      "rotate_hint": "Issue a new URL. The old one stops working immediately and the new one is shown only once.",
+      "expiry": {
+        "label": "Link expiry",
+        "help": "After this time the link stops working. The time is read in your local time zone.",
+        "never": "Never expires",
+        "at": "Expires at a set time",
+        "time_label": "Expiry time",
+        "error_past": "Choose a time in the future.",
+        "saved": "Expiry updated",
+        "cleared": "Expiry removed. The link no longer expires.",
+        "save_failed": "Could not update the expiry. Please try again.",
+        "status_never": "Never expires",
+        "status_expires": "Expires {when}",
+        "status_expired": "Expired {when}. The link no longer works.",
+        "change": "Change expiry",
+        "clear": "Remove expiry",
+        "save": "Save",
+        "expired_tag": "Expired"
       }
     },
     "mcp_tokens": {
       "title": "MCP tokens",
-      "description": "Personal access tokens used to authenticate MCP clients against this workspace.",
+      "description": "Tokens that let an MCP client, such as an AI assistant, work in this workspace as you. Each token is limited to this workspace and to the scopes you pick.",
       "create": "Create token",
-      "empty": "No tokens yet. Create one to connect an MCP client.",
+      "empty": "No tokens yet. Create one, then give it to your MCP client together with this server's /mcp address.",
       "table": {
         "name": "Name",
         "prefix": "Prefix",
         "scopes": "Scopes",
         "created_at": "Created",
         "last_used_at": "Last used",
-        "actions": "Actions"
+        "actions": "Actions",
+        "prefix_help": "The first characters of the token, so you can recognise it. The full token cannot be shown again."
       },
       "never_used": "Never",
       "revoke": "Revoke",
@@ -488,11 +524,12 @@
         "reveal_title": "Token created",
         "field": {
           "name": "Name",
+          "name_help": "A label to tell tokens apart, such as the machine or client that uses it. Not secret.",
           "name_placeholder": "e.g. Local dev laptop",
           "scopes": "Scopes",
           "scopes_help": "Every MCP tool call requires at least one scope. A token with none can connect and list tools, but every call is refused."
         },
-        "reveal_warning": "Copy this token now. You will not be able to see it again.",
+        "reveal_warning": "Copy this token now. It is shown only once; if you lose it, revoke it and create a new one.",
         "token_label": "Token",
         "copy": "Copy",
         "copied": "Copied",
@@ -518,20 +555,20 @@
     },
     "auto_actions": {
       "title": "Auto-actions",
-      "description": "Configure how {appName} autonomously manages tasks in this workspace. When enabled, the system periodically evaluates tasks and applies actions like escalating overdue items or closing stale reviews.",
+      "description": "Let {appName} check tasks on a schedule and handle clear cases itself. Some actions change tasks without asking (raising the priority of overdue tasks, closing stale reviews); others only record a suggestion.",
       "enabled": {
         "label": "Enable auto-actions",
         "description": "Allow the system to automatically apply actions to tasks."
       },
       "interval": {
         "label": "Evaluation interval",
-        "description": "How often the system checks tasks and applies actions.",
+        "description": "How often tasks are checked, in minutes (up to 1440). Set 0 to stop checking.",
         "minutes": "min",
         "disabled": "Disabled"
       },
       "threshold": {
         "label": "Confidence threshold",
-        "description": "Minimum confidence score required for an action to be applied automatically. Lower values apply more actions; higher values are more conservative.",
+        "description": "How sure the system must be before it applies an action on its own. Lower means more actions, with more chance of a wrong one; higher is more cautious.",
         "low": "Aggressive",
         "medium": "Balanced",
         "high": "Conservative"
@@ -539,28 +576,29 @@
       "save": "Save",
       "rules": {
         "title": "Rule configuration",
-        "description": "Enable or disable individual rules and adjust their sensitivity.",
+        "description": "Turn individual rules on or off and tune them. Rules only run while auto-actions are enabled above.",
         "column": {
           "rule": "Rule",
           "enabled": "Enabled",
           "confidence": "Confidence",
-          "idle_hours": "Idle threshold (hours)"
+          "idle_hours": "Idle threshold (hours)",
+          "idle_hours_help": "How many hours without activity before the rule counts a task as idle."
         },
         "escalate_overdue": {
           "label": "Escalate overdue",
-          "description": "Bumps priority when a task passes its due date."
+          "description": "Automatically raises the priority of a task once it passes its due date."
         },
         "assign_owner": {
           "label": "Assign owner",
-          "description": "Suggests an owner when a task has no assignee and has been idle."
+          "description": "Records a suggestion to pick an owner when a task has no assignee and has been idle. It does not assign anyone."
         },
         "nudge_assignee": {
           "label": "Nudge assignee",
-          "description": "Suggests a nudge when an assigned task has no progress."
+          "description": "Records a suggestion to nudge the assignee when an assigned task makes no progress. It does not send anything."
         },
         "close_stale_review": {
           "label": "Close stale review",
-          "description": "Closes reviews that have been open without activity."
+          "description": "Automatically closes a review that has had no activity for the idle time set here."
         },
         "idle_na": "N/A (uses due date)",
         "save": "Save rules",
@@ -578,10 +616,10 @@
   "settings": {
     "data": {
       "title": "Imports & Exports",
-      "description": "Manage CSV and 3rd-party imports and export workspace tasks.",
+      "description": "Export the workspace's tasks as CSV or JSON, or import tasks from a CSV file. Only CSV imports can run at the moment.",
       "export": {
         "title": "Export tasks",
-        "description": "Download every task in this workspace as CSV or JSON.",
+        "description": "Download this workspace's tasks as CSV or JSON, up to 10,000 per file. Comments, attachments and other data are not included.",
         "format": {
           "label": "Format",
           "csv": "CSV",
@@ -616,7 +654,8 @@
           "github": "GitHub",
           "jira": "Jira",
           "linear": "Linear",
-          "csv": "CSV"
+          "csv": "CSV",
+          "coming_soon": "{source} (coming soon)"
         },
         "cancel": "Cancel",
         "cancel_confirm": "Cancel this import job?",
@@ -631,22 +670,24 @@
           },
           "config": {
             "label": "Configuration JSON",
-            "hint": "Source-specific settings for this import, stored and returned exactly as written.",
+            "hint": "For CSV, put the whole CSV text into a field named csv (up to 1 MiB and 5,000 rows). Columns: title, description, priority, dueOn, startedOn. A file exported from this page works as is. Task state cannot be imported.",
             "no_credentials": "Not a place for credentials: no tokens, API keys, or passwords. This field is not encrypted, and the server refuses them.",
             "credentials_where": "Connect the service in integration settings instead",
             "invalid": "Configuration must be valid JSON."
           },
           "submit": "Start import",
           "success": "Import job started",
-          "error": "Failed to start import"
+          "error": "Failed to start import",
+          "source_help": "Only CSV can be imported today. GitHub, Jira and Linear are coming soon."
         },
         "load_error": "Could not load import jobs.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "empty_hint": "Import tasks from a CSV with New import job. Progress and any errors appear here."
       }
     },
     "webhooks": {
       "title": "Webhooks",
-      "description": "Outbound HTTP delivery for workspace events.",
+      "description": "Send an HTTP POST to your own server when selected events happen in this workspace. Each request is signed so you can verify it came from here.",
       "empty": "No webhooks yet",
       "new": "New webhook",
       "col": {
@@ -654,7 +695,8 @@
         "description": "Description",
         "event_types": "Event types",
         "active": "Active",
-        "actions": "Actions"
+        "actions": "Actions",
+        "active_help": "Turn off to pause deliveries. Events that happen while it is off are not sent later."
       },
       "action": {
         "menu_label": "Webhook actions",
@@ -683,6 +725,7 @@
       "create": {
         "title": "New webhook",
         "url": {
+          "hint": "Must be a public HTTPS address. Local and private-network addresses are refused. The URL cannot be edited later.",
           "label": "Delivery URL",
           "placeholder": "https://example.com/hooks/nodate-flow"
         },
@@ -692,7 +735,9 @@
         },
         "event_types": {
           "label": "Event types",
-          "hint": "Comma-separated patterns (e.g. task.created, task.updated)"
+          "hint": "Exact event names separated by commas, such as task.created, task.transition.complete. Enter * for every event. Patterns like task.* are not supported.",
+          "required": "Enter * for every event, or at least one event name.",
+          "no_patterns": "Patterns such as task.* are not supported. Use exact event names, or * on its own."
         },
         "submit": "Create webhook",
         "cancel": "Cancel",
@@ -704,7 +749,8 @@
           "warning": "Copy this now or come back via Show secret to retrieve it again.",
           "copy": "Copy",
           "copied": "Secret copied",
-          "copy_failed": "Failed to copy secret"
+          "copy_failed": "Failed to copy secret",
+          "hint": "Each request carries X-Nodate-Signature (v0= plus HMAC-SHA256 of v0:timestamp:body, keyed with this secret) and X-Nodate-Timestamp. Verify both on your server and keep the secret private."
         },
         "done": "Done",
         "error": "Failed to create webhook"
@@ -727,12 +773,18 @@
         "status": {
           "pending": "Pending",
           "delivered": "Delivered",
-          "failed": "Failed",
-          "dead": "Dead"
-        }
+          "failed": "Failed, will retry",
+          "dead": "Gave up"
+        },
+        "status_note": "Failed deliveries are retried automatically with growing delays. Gave up means the retries ran out, or the webhook was turned off or deleted before delivery."
       },
       "load_error": "Could not load webhooks.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "empty_hint": "Create a webhook to have this workspace call your server when events happen. You can then use Send test to check it."
     }
+  },
+  "secret_callout": {
+    "once_title": "Copy it now. It is shown only once.",
+    "keep_title": "Keep this secret private"
   }
 }

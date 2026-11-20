@@ -1,0 +1,25 @@
+/* Inline "?" next to a terse header; quiet until hovered or focused. */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-inline-start: var(--nf-space-1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: help;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover {
+  color: var(--nf-color-fg);
+}
+
+.trigger:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}

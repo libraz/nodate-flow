@@ -8,11 +8,6 @@
   gap: var(--nf-space-6);
 }
 
-.empty {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-}
-
 .tableWrap {
   overflow-x: auto;
 }

@@ -24,7 +24,8 @@
       }
     },
     "discard_unsaved": "放弃未保存的更改？",
-    "discard_confirm": "放弃"
+    "discard_confirm": "放弃",
+    "blockShortcutHint": "提示：在日历上按住 Shift 点击某天即可直接创建时间块。"
   },
   "field": {
     "title": "标题",
@@ -33,11 +34,11 @@
     "end": "结束",
     "startTime": "开始时间",
     "endTime": "结束时间",
-    "allDay": "全天",
+    "allDay": "全天（不设开始和结束时间）",
     "location": "地点",
     "memo": "备注",
     "blockLabel": "时间块标签",
-    "showAs": "显示为",
+    "showAs": "对他人显示的状态",
     "recurrence": "重复",
     "notification": "提醒",
     "project": "项目",
@@ -45,7 +46,14 @@
     "description": "描述",
     "date": "日期",
     "flexibility": "能否调整",
-    "flexibilityHint": "与「显示为」是不同的维度，后者是外部日历读取的值。"
+    "flexibilityHint": "如有需要，这段时间能否调整。其他人看不到此项，只能看到上方的可用状态。",
+    "showAsHint": "决定别人查看你的空闲状态时，这段时间如何显示。",
+    "blockLabelHint": "时段在日历上显示的名称。选择“外出”会同时标记为不在；其他标签则标记为忙碌。",
+    "projectHint": "任务会创建在该项目中，并显示在截止日期当天的日历上。",
+    "taskDatesHint": "结束日期将作为任务的截止日期。",
+    "calendarHint": "谁能看到该项取决于你选择的日历。",
+    "recurrenceHint": "编辑或删除重复日程时，会询问更改适用于仅此次、此次及之后，还是全部。",
+    "notificationHint": "在开始前向你发送提醒。"
   },
   "placeholder": {
     "title": {
@@ -55,7 +63,7 @@
       "free": "可用于…",
       "milestone": "发布、截止…"
     },
-    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR（每周一、三、五）"
   },
   "showAs": {
     "busy": "忙碌",
@@ -146,7 +154,8 @@
     "cancel": "取消",
     "delete": "删除",
     "deleteConfirm": "删除此{kind}？",
-    "moreOptions": "更多选项"
+    "moreOptions": "更多选项",
+    "moreOptionsHint": "重复、通知和备注"
   },
   "toast": {
     "created": {
@@ -205,7 +214,9 @@
         "remove_failed": "无法移除参与者"
       },
       "removed_toast": "已移除 {name}",
-      "leave_confirm": "要将自己从此活动中移除吗？"
+      "leave_confirm": "要将自己从此活动中移除吗？",
+      "can_editHint": "允许此人修改日程内容",
+      "send_inviteHint": "生成邀请链接并复制到剪贴板，请粘贴到消息中自行发送。"
     },
     "creator": {
       "label": "创建者",
@@ -282,7 +293,7 @@
       "revoke_success": "已撤销邀请",
       "revoke_error": "撤销邀请失败",
       "expires_at": "{date} 过期",
-      "create_hint": "可在「参与者」标签中创建邀请。",
+      "create_hint": "还没有邀请链接。可在“参与者”标签页用“发送邀请链接”创建。",
       "status": {
         "pending": "待回应",
         "sent": "已发送",
@@ -323,7 +334,15 @@
         "delta_days": "{days} 天",
         "delta_negative": "提前 {value}",
         "delta_positive": "推迟 {value}"
-      }
+      },
+      "triggerHint": "移动日程，并预览哪些关联任务可以一起移动"
     }
+  },
+  "kind_desc": {
+    "task": "要完成的工作。保存到项目中，并显示在截止日期上。",
+    "event": "在固定时间的会议或约会。",
+    "block": "为工作或专注预留的时间。其他人会看到你忙碌（选择“外出”时显示为不在）。",
+    "free": "标记为可用的时间，方便他人知道何时可以联系你。",
+    "milestone": "没有时间的日期标记，例如发布或截止日期。"
   }
 }

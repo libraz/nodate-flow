@@ -14,6 +14,19 @@
   flex-wrap: wrap;
 }
 
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.scope {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
 .title {
   font-size: var(--nf-text-section-title);
   font-weight: var(--nf-weight-semibold);
@@ -174,19 +187,6 @@
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 /* Widget body */
-.widgetBody {
-  flex: 1;
-  padding-block: var(--nf-space-4);
-  padding-inline: var(--nf-space-4);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--nf-space-2);
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-}
-
 .widgetBodyIcon {
   color: var(--nf-color-fg-muted);
   opacity: 0.5;

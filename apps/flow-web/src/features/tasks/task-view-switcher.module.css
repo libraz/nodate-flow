@@ -1,0 +1,14 @@
+/* View switcher: the segmented control scrolls sideways on its own; the root only anchors the tooltip. */
+
+.root {
+  display: inline-flex;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  white-space: nowrap;
+}

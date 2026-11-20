@@ -16,34 +16,24 @@ import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import {
+  landingStateFor,
   type TaskDerivedState,
   TRANSITIONS_BY_STATE,
   type TransitionName,
   useArchiveTask,
   useUnarchiveTask,
 } from './api';
-import { STATE_KEY } from './constants';
+import { STATE_COLOR, STATE_KEY } from './constants';
 import styles from './task-move-menu.module.css';
 
-/** Maps a transition verb to the state the task lands in. */
-const LANDING_STATE: Record<TransitionName, TaskDerivedState> = {
-  start: 'waiting',
-  block: 'open',
-  unblock: 'waiting',
-  submit: 'review',
-  complete: 'done',
-  reopen: 'open',
-  cancel: 'cancelled',
-};
-
 const TRANSITION_LABEL_KEY: Record<TransitionName, string> = {
-  start: 'tasks.transitions.start',
-  block: 'tasks.transitions.block',
-  unblock: 'tasks.transitions.unblock',
-  submit: 'tasks.transitions.submit',
-  complete: 'tasks.transitions.complete',
-  reopen: 'tasks.transitions.reopen',
-  cancel: 'tasks.transitions.cancel',
+  start: 'tasks.detail.transitions.start',
+  block: 'tasks.detail.transitions.block',
+  unblock: 'tasks.detail.transitions.unblock',
+  submit: 'tasks.detail.transitions.submit',
+  complete: 'tasks.detail.transitions.complete',
+  reopen: 'tasks.detail.transitions.reopen',
+  cancel: 'tasks.detail.transitions.cancel',
 };
 
 export interface TaskMoveMenuProps {
@@ -66,15 +56,19 @@ export default function TaskMoveMenu({
   const { t } = useTranslation(['common', 'labels']);
   const [open, setOpen] = useState(false);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
-  const legal = TRANSITIONS_BY_STATE[state] ?? [];
+  // Each legal verb paired with where the server will actually put the task.
+  const legal = (TRANSITIONS_BY_STATE[state] ?? []).flatMap((name) => {
+    const landing = landingStateFor(state, name);
+    return landing ? [{ name, landing }] : [];
+  });
 
   const archiveMutation = useArchiveTask();
   const unarchiveMutation = useUnarchiveTask();
   const isArchived = archivedAt != null && archivedAt > 0;
 
-  const handleSelect = (transition: TransitionName) => {
+  const handleSelect = (transition: TransitionName, landing: TaskDerivedState) => {
     setOpen(false);
-    onTransition(transition, LANDING_STATE[transition]);
+    onTransition(transition, landing);
   };
 
   // mutateAsync: the menu (and its card) may be gone by the time Undo is pressed.
@@ -166,8 +160,7 @@ export default function TaskMoveMenu({
       placement="bottom-end"
       content={
         <div role="menu" aria-label={t('tasks.board.move_menu')} className={styles.menuList}>
-          {legal.map((name, idx) => {
-            const landing = LANDING_STATE[name];
+          {legal.map(({ name, landing }, idx) => {
             return (
               <button
                 key={name}
@@ -177,11 +170,19 @@ export default function TaskMoveMenu({
                 role="menuitem"
                 type="button"
                 className={styles.menuItem}
-                onClick={() => handleSelect(name)}
+                onClick={() => handleSelect(name, landing)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
               >
                 <span>{t(TRANSITION_LABEL_KEY[name])}</span>
-                <span className={styles.menuItemLanding}>→ {t(STATE_KEY[landing])}</span>
+                <span className={styles.menuItemLanding}>
+                  <span aria-hidden="true">→</span>
+                  <span
+                    aria-hidden="true"
+                    className={styles.menuItemDot}
+                    style={{ background: STATE_COLOR[landing] }}
+                  />
+                  {t(STATE_KEY[landing])}
+                </span>
               </button>
             );
           })}

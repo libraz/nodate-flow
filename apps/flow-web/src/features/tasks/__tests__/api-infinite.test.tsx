@@ -45,6 +45,7 @@ function aTask(id: string, priority = 0): TaskListItem {
     priority,
     primaryAssigneeId: null,
     assigneeCount: 0,
+    assignees: [],
     sortWeight: 0,
     createdAt: 1_700_000_000,
     updatedAt: 1_700_000_000,

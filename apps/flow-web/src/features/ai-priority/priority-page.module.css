@@ -23,6 +23,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.kpiGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+}
+
 .kpi {
   display: inline-flex;
   align-items: baseline;

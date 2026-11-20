@@ -13,6 +13,7 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import ToggleChip from '@nodate-flow/ui/primitives/toggle-chip';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
 import { Inbox as InboxIcon } from 'lucide-react';
@@ -20,6 +21,7 @@ import { type ChangeEvent, type ReactElement, useEffect, useId, useState } from 
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { formatApiError } from '../../lib/api-error';
+import AiConsequence, { AiSparkle } from '../ai-suggestions/ai-consequence';
 import EditSuggestionDialog, {
   type EditSuggestionPatch,
 } from '../ai-suggestions/edit-suggestion-dialog';
@@ -49,8 +51,11 @@ export default function InboxList(): ReactElement {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<WorkspaceFilter>('all');
   const [handoffOnly, setHandoffOnly] = useState<boolean>(false);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
+  // Triage is per workspace: with "All workspaces" it runs on the first one,
+  // and the status line under the toolbar says so.
   const triageWorkspaceId =
     selectedWorkspaceId === 'all' ? (workspaces[0]?.id ?? '') : selectedWorkspaceId;
+  const triageWorkspaceName = workspaces.find((ws) => ws.id === triageWorkspaceId)?.name ?? '';
   const triage = useInboxTriageMutation(triageWorkspaceId);
   const suggestionAction = useSuggestionActionExecutor(triageWorkspaceId || undefined, (taskId) =>
     navigate({ to: '/tasks/$taskId', params: { taskId } }),
@@ -62,6 +67,7 @@ export default function InboxList(): ReactElement {
   const suggestionPresence = usePresenceList(suggestions, (s) => s.inboxItemId);
   const stagger = useFirstLoadStagger();
   const workspaceSelectId = useId();
+  const triageStatusId = useId();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: Reset the draft when the workspace or actor changes.
   useEffect(() => {
@@ -149,6 +155,19 @@ export default function InboxList(): ReactElement {
     }
   };
 
+  const triageItemCount = items.filter((item) => item.workspaceId === triageWorkspaceId).length;
+  const triageDisabled = !triageWorkspaceId || triage.isPending || triageItemCount === 0;
+  let triageStatus: string;
+  if (!triageWorkspaceId) {
+    triageStatus = t('triage_status.no_workspace');
+  } else if (triageItemCount === 0) {
+    triageStatus = t('triage_status.nothing', { workspace: triageWorkspaceName });
+  } else if (selectedWorkspaceId === 'all' && workspaces.length > 1) {
+    triageStatus = t('triage_status.all', { workspace: triageWorkspaceName });
+  } else {
+    triageStatus = t('triage_status.one', { workspace: triageWorkspaceName });
+  }
+
   const visibleEntries = itemPresence.entries.filter(
     ({ item }) =>
       (selectedWorkspaceId === 'all' || item.workspaceId === selectedWorkspaceId) &&
@@ -158,41 +177,54 @@ export default function InboxList(): ReactElement {
   return (
     <div className={styles.body}>
       <div className={styles.toolbar}>
-        <label className={styles.workspaceField} htmlFor={workspaceSelectId}>
-          {t('filter.workspace_label')}
-          <Select
-            id={workspaceSelectId}
-            value={selectedWorkspaceId}
-            onChange={handleWorkspaceChange}
-            className={styles.workspaceSelect}
+        {workspaces.length > 1 && (
+          <label className={styles.workspaceField} htmlFor={workspaceSelectId}>
+            {t('filter.workspace_label')}
+            <Select
+              id={workspaceSelectId}
+              value={selectedWorkspaceId}
+              onChange={handleWorkspaceChange}
+              className={styles.workspaceSelect}
+            >
+              <option value="all">{t('filter.workspace_all')}</option>
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
+        <Tooltip content={t('filter.handoff_hint')}>
+          <ToggleChip pressed={handoffOnly} onPressedChange={setHandoffOnly}>
+            {t('filter.handoff')}
+          </ToggleChip>
+        </Tooltip>
+        <Tooltip content={tAi('triage.hint')}>
+          <Button
+            type="button"
+            className={styles.toolbarEnd}
+            onClick={handleTriageClick}
+            disabled={triageDisabled}
+            aria-busy={triage.isPending}
+            aria-describedby={triageStatusId}
           >
-            <option value="all">{t('filter.workspace_all')}</option>
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <ToggleChip pressed={handoffOnly} onPressedChange={setHandoffOnly}>
-          {t('filter.handoff')}
-        </ToggleChip>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          className={styles.toolbarEnd}
-          onClick={handleTriageClick}
-          disabled={!triageWorkspaceId || triage.isPending || items.length === 0}
-          aria-busy={triage.isPending}
-        >
-          {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
-        </Button>
+            <AiSparkle kind="suggests" />
+            {triage.isPending ? tAi('triage.running') : tAi('triage.trigger')}
+          </Button>
+        </Tooltip>
       </div>
+      <p id={triageStatusId} className={styles.triageStatus}>
+        {triageStatus}
+      </p>
 
       {suggestionPresence.entries.length > 0 ? (
         <section aria-label={tAi('triage.result_title')} className={styles.suggestions}>
-          <h2 className={styles.sectionTitle}>{tAi('triage.result_title')}</h2>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>{tAi('triage.result_title')}</h2>
+            <AiConsequence kind="suggests" />
+          </div>
+          <p className={styles.sectionHint}>{tAi('triage.score_hint')}</p>
           <ul className={styles.list}>
             {suggestionPresence.entries.map((entry, index) => (
               <PresenceItem
@@ -225,6 +257,7 @@ export default function InboxList(): ReactElement {
           icon={<InboxIcon size={40} strokeWidth={1.25} aria-hidden="true" />}
           title={t('view.empty')}
           titleAs="p"
+          description={t('view.empty_description')}
         />
       ) : (
         <ul className={styles.list}>

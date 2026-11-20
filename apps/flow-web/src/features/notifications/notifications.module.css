@@ -1,7 +1,3 @@
-.bellWrapper {
-  position: relative;
-}
-
 .badge {
   position: absolute;
   inset-block-start: calc(var(--nf-space-1) * -1);
@@ -18,7 +14,7 @@
   background: var(--nf-color-danger);
   color: var(--nf-color-fg-on-danger);
   font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-micro);
+  font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -27,42 +23,27 @@
   animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
-.dropdown {
-  position: absolute;
-  inset-block-start: calc(100% + var(--nf-space-2));
-  inset-inline-end: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 22rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  max-block-size: 28rem;
-  overflow-y: auto;
-  background: var(--nf-color-bg-elevated);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  box-shadow: var(--nf-shadow-lg);
-  z-index: var(--nf-z-dropdown);
-  animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
-}
-
-.dropdown:focus {
-  outline: none;
-}
-
-.dropdown:focus-visible {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
+.bellButton {
+  position: relative;
 }
 
 /*
- * Wraps the dropdown so its exit can play before unmount. The wrapper is
- * static, so the absolutely positioned panel still anchors to the bell.
+ * Panel hosted by the Popover primitive. The attribute selector outranks the
+ * primitive's single-class `.popover` rule regardless of stylesheet order.
  */
-.dropdownPresence[data-state="closed"] {
-  pointer-events: none;
+.dropdownPanel[role="dialog"] {
+  padding: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 22rem;
+  max-inline-size: calc(100vw - var(--nf-space-4) * 2);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: 28rem;
+  overflow-y: auto;
 }
 
-.dropdownPresence[data-state="closed"] .dropdown {
-  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+.dropdownBody {
+  display: flex;
+  flex-direction: column;
 }
 
 .dropdownHeader {
@@ -79,6 +60,56 @@
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
 }
 
+.dropdownTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.helpToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+}
+
+.helpToggle:hover,
+.helpToggle[aria-expanded="true"] {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.helpSummary {
+  margin: 0;
+  color: var(--nf-color-fg);
+}
+
+.helpTips {
+  margin: 0;
+  padding-inline-start: var(--nf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
 .dropdownTitle {
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-semibold);
@@ -87,6 +118,7 @@
 }
 
 .markAllButton {
+  min-block-size: var(--nf-space-8);
   padding-block: var(--nf-space-1);
   padding-inline: var(--nf-space-2);
   font-family: var(--nf-font-sans);
@@ -183,6 +215,15 @@
   font-weight: var(--nf-weight-medium);
 }
 
+.notifResource {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .notifMeta {
   display: flex;
   align-items: center;
@@ -230,10 +271,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 1.75rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.75rem;
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
   background: transparent;
   border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-sm);
@@ -271,12 +310,6 @@
   padding-inline: var(--nf-space-4);
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
-}
-
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--nf-z-dropdown) - 1);
 }
 
 .loadMoreRow {

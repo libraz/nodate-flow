@@ -26,7 +26,7 @@
     "title": "标签",
     "search_placeholder": "搜索标签…",
     "empty": "未找到标签。",
-    "no_labels": "暂无可用标签。",
+    "no_labels": "还没有标签。输入名称并选择“创建”即可添加。",
     "create_new": "创建「{name}」",
     "apply": "应用"
   },
@@ -102,14 +102,16 @@
   },
   "favorites": {
     "title": "收藏",
-    "add": "添加到收藏",
+    "add": "加入收藏（显示在侧边栏）",
     "remove": "从收藏中移除",
     "added": "已添加到收藏",
     "removed": "已从收藏中移除",
-    "empty": "暂无收藏。给项目加星标可快速找到它们。",
+    "empty": "还没有收藏。点击项目或任务上的星标，即可固定到侧边栏。",
     "error_add": "无法添加到收藏，请重试。",
     "error_remove": "无法从收藏中移除，请重试。",
-    "sidebar_title": "收藏"
+    "sidebar_title": "收藏",
+    "untitled_task": "任务",
+    "untitled_project": "项目"
   },
   "reactions": {
     "add": "添加表情回应",

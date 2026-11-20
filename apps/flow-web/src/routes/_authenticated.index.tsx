@@ -26,7 +26,10 @@ import {
 } from 'lucide-react';
 import { type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/glass-dock';
+import {
+  OPEN_COMMAND_PALETTE_EVENT,
+  OPEN_CREATE_TASK_EVENT,
+} from '../components/layout/glass-dock';
 import PageFrame from '../components/page-frame';
 import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
@@ -34,6 +37,7 @@ import DashboardView from '../features/dashboard/dashboard-view';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { apiRequest } from '../lib/api';
 import { todayKey } from '../lib/date-utils';
+import { useCurrentWorkspaceId } from '../lib/use-current-workspace';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.index.module.css';
 
@@ -162,6 +166,7 @@ function TaskSummary(): ReactElement {
           tone="success"
         />
       </div>
+      <p className={styles.statHint}>{t('home.stat_hint')}</p>
 
       {recentTasks.length > 0 && (
         <section>
@@ -240,9 +245,11 @@ function WorkspaceLinksSkeleton(): ReactElement {
 
 function HomeDashboard(): ReactElement | null {
   const { data: workspaces } = useWorkspacesQuery();
-  const firstWs = workspaces[0];
-  if (!firstWs) return null;
-  return <DashboardView workspaceId={firstWs.id} />;
+  const currentWsId = useCurrentWorkspaceId();
+  // Fall back to the first workspace when there is no current id or it is not listed.
+  const ws = workspaces.find((w) => w.id === currentWsId) ?? workspaces[0];
+  if (!ws) return null;
+  return <DashboardView workspaceId={ws.id} workspaceName={ws.name} />;
 }
 
 /* ── Main dashboard ────────────────────────────────────────── */
@@ -254,25 +261,28 @@ function HomePage(): ReactElement {
     ? t('home.greeting_name', { name: user.displayName })
     : t('landing.hello');
 
-  // Both buttons open the shared command palette; the layout listens for the event.
-  const openPalette = (): void => {
+  // The authenticated layout listens for both events.
+  const handleCreateTask = (): void => {
+    window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
+  };
+  const handleSearch = (): void => {
     window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
   };
 
   return (
     <PageFrame>
-      <PageHeader title={greeting} description={t('landing.tagline')} />
+      <PageHeader title={greeting} description={t('home.description')} help="home" />
 
       <div className={styles.quickActions}>
         <button
           type="button"
-          onClick={openPalette}
+          onClick={handleCreateTask}
           className={cx(styles.action, styles.actionPrimary, 'nf-focus-ring')}
         >
           <Icon icon={Plus} decorative />
           {t('home.quick_create')}
         </button>
-        <button type="button" onClick={openPalette} className={cx(styles.action, 'nf-focus-ring')}>
+        <button type="button" onClick={handleSearch} className={cx(styles.action, 'nf-focus-ring')}>
           <Icon icon={Search} decorative />
           {t('home.quick_search')}
         </button>

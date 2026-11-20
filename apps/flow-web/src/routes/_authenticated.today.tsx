@@ -127,7 +127,7 @@ function TodayRoute(): ReactElement {
 
   return (
     <PageFrame>
-      <PageHeader title={t('today.title')} description={t('today.subtitle')} />
+      <PageHeader title={t('today.title')} description={t('today.subtitle')} help="my-tasks" />
 
       {totalCount === 0 ? (
         <EmptyState

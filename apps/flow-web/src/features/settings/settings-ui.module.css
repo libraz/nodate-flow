@@ -58,6 +58,53 @@
   color: var(--nf-color-fg-muted);
 }
 
+/*
+ * One setting per row: label with its description on the inline-start
+ * side, the control on the inline-end side. Rows inside a section are
+ * divided by a hairline; on narrow widths the control drops under the text.
+ */
+.settingRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nf-space-3) var(--nf-space-6);
+  flex-wrap: wrap;
+}
+
+.settingRow + .settingRow {
+  padding-block-start: var(--nf-space-4);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+.settingText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  /* nf-token-override: component dimension, not a spacing step */
+  flex: 1 1 16rem;
+  min-inline-size: 0;
+}
+
+.settingLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.settingDescription {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.settingControl {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-block-size: var(--nf-control-height);
+  flex: 0 1 auto;
+}
+
 /* Save status on the inline-start side of the one primary action. */
 .actions {
   display: flex;
@@ -176,6 +223,20 @@
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-warning-subtle);
   animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.secretHead {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  color: var(--nf-color-warning-fg);
+}
+
+.secretTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-warning-fg);
 }
 
 .secretWarning {

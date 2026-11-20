@@ -7,14 +7,16 @@
 .exportRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--nf-space-3);
 }
 
+/* Label beside the control so the row centres the control and the button on one line. */
 .formatGroup {
   display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-3);
 }
 
 .formatLegend {

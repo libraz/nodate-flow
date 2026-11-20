@@ -18,7 +18,9 @@
 import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link } from '@tanstack/react-router';
+import { CircleCheck } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -122,18 +124,21 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
           >
             {t('active_timebox_bar.open')}
           </Link>
-          <Button
-            type="button"
-            size="sm"
-            variant="primary"
-            onClick={() => {
-              void handleStop();
-            }}
-            disabled={updateStatus.isPending}
-            aria-busy={updateStatus.isPending || undefined}
-          >
-            {t('active_timebox_bar.stop')}
-          </Button>
+          <Tooltip content={t('timeboxes.action.completeHint')}>
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                void handleStop();
+              }}
+              disabled={updateStatus.isPending}
+              aria-busy={updateStatus.isPending || undefined}
+            >
+              <CircleCheck size={14} aria-hidden />
+              {t('timeboxes.action.stop')}
+            </Button>
+          </Tooltip>
         </div>
       </div>
     </Collapse>

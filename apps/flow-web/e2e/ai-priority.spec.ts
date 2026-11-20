@@ -76,6 +76,7 @@ const copy = {
   errorFetchFailed: enAiPriority.error.fetchFailed,
   errorRetry: enAiPriority.error.retry,
   jaPageTitle: jaAiPriority.page.title,
+  reasonOverdue: enAiPriority.reason_code.overdue,
 } as const;
 
 /**
@@ -173,6 +174,12 @@ test.describe('ai priority suggestions', () => {
     // The seeded task title must appear on a suggestion card.
     const cardTitle = page.getByText(taskTitle);
     await expect(cardTitle).toBeVisible({ timeout: 10_000 });
+
+    // The overdue seed fires the `overdue` reason code, rendered from
+    // the locale rather than a server-composed sentence.
+    await expect(page.getByText(copy.reasonOverdue)).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Locate the Apply button via its aria-label which pins it to this
     // specific card (`card.applyAria` includes the task title), so

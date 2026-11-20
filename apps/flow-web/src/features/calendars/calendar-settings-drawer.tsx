@@ -2,11 +2,10 @@
  * CalendarSettingsDrawer — host for per-calendar admin operations.
  *
  * Mounts as a right-side drawer triggered from the calendars rail's
- * row menu. The drawer is split into three tabs:
+ * row menu. The drawer is split into two tabs:
  *
  *   - General: rename, change color, edit description, delete.
  *   - Members: Calendar Members manager.
- *   - Sync   (placeholder): reserved for future sync settings.
  *
  * The drawer manages tab state internally and lazily mounts each
  * tab's body so a slow query in one panel doesn't block the others.
@@ -75,13 +74,6 @@ export default function CalendarSettingsDrawer({
                 <Suspense fallback={fallback}>
                   <CalendarMembersTab workspaceId={workspaceId} calendarId={calendarId} />
                 </Suspense>
-              ),
-            },
-            {
-              value: 'sync',
-              label: t('calendar.settings.tab.sync'),
-              content: (
-                <p className={styles.placeholder}>{t('calendar.settings.sync.placeholder')}</p>
               ),
             },
           ]}

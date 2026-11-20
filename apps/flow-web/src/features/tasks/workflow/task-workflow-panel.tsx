@@ -10,16 +10,19 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { QueryErrorResetBoundary, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import PageHelp from '../../../components/page-help';
 import { formatApiError } from '../../../lib/api-error';
 import { confirmAction } from '../../../lib/confirm-action';
 import { endOfDayUnix } from '../../../lib/date-utils';
 import { formatDateOnly, formatEpoch, formatEpochDateTime } from '../../../lib/format';
 import { useEffectiveZone } from '../../../lib/use-effective-timezone';
 import { useWeekStart } from '../../../lib/use-week-start';
-import { useEvaluateConstraints } from '../../constraints/api';
+import { type ConstraintOutcome, useEvaluateConstraints } from '../../constraints/api';
+import { KIND_LABEL_KEY } from '../../constraints/constraint-editor';
 import { safeSourceUrl } from '../../inbox/source-intake/safe-source-url';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskActor, useListAttachments, useTaskActorsQuery, useTaskQuery } from '../api';
@@ -201,6 +204,7 @@ function TaskWorkflowPanelContent({
   projectId,
 }: TaskWorkflowPanelProps): ReactElement {
   const { t, i18n } = useTranslation('common');
+  const { t: tConstraints } = useTranslation('constraints');
   const zone = useEffectiveZone();
   const weekStart = useWeekStart();
   const queryClient = useQueryClient();
@@ -221,9 +225,7 @@ function TaskWorkflowPanelContent({
   const [selectedReviewerId, setSelectedReviewerId] = useState('');
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
   const [selectedConstraintIds, setSelectedConstraintIds] = useState<string[]>([]);
-  const [constraintOutcomes, setConstraintOutcomes] = useState<
-    Array<{ id: string; satisfied: boolean; parseError?: string }>
-  >([]);
+  const [constraintOutcomes, setConstraintOutcomes] = useState<ConstraintOutcome[]>([]);
   const [decisionReason, setDecisionReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [handoffRole, setHandoffRole] = useState<HandoffRole>('assignee');
@@ -500,7 +502,11 @@ function TaskWorkflowPanelContent({
     <Card className={css.card}>
       <div className={css.header}>
         <div className={css.itemBody}>
-          <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
+          <div className={css.titleRow}>
+            <h2 className={css.heading}>{t('taskWorkflow.title')}</h2>
+            <PageHelp topic="task-review-handoff" />
+          </div>
+          <p className={css.description}>{t('taskWorkflow.description')}</p>
           <div className={css.summary}>
             <span className={css.numeric}>
               {t('taskWorkflow.revision', { revision: currentRevision })}
@@ -523,17 +529,18 @@ function TaskWorkflowPanelContent({
         </div>
         <Button
           type="button"
-          variant="ghost"
           size="sm"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? t('taskWorkflow.collapse') : t('taskWorkflow.configure')}
+          {expanded ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+          {expanded ? t('taskWorkflow.collapse') : t('taskWorkflow.expand')}
         </Button>
       </div>
 
       {!expanded ? null : (
         <>
+          <p className={css.muted}>{t('taskWorkflow.revision_hint')}</p>
           {isPolicyEditable ? (
             <div className={css.section}>
               <h3 className={css.sectionTitle}>{t('taskWorkflow.completionPolicy')}</h3>
@@ -592,7 +599,10 @@ function TaskWorkflowPanelContent({
                       {constraintOutcomes.map((outcome) => (
                         <li key={outcome.id} className={css.checkRow}>
                           <Checkbox
-                            aria-label={t('taskWorkflow.requiredCheckNamed', { id: outcome.id })}
+                            aria-label={t('taskWorkflow.requiredCheckNamed', {
+                              kind: tConstraints(KIND_LABEL_KEY[outcome.kind]),
+                              expression: outcome.expression,
+                            })}
                             checked={selectedConstraintIds.includes(outcome.id)}
                             disabled={Boolean(outcome.parseError)}
                             onChange={(event) => {
@@ -603,7 +613,12 @@ function TaskWorkflowPanelContent({
                               );
                             }}
                           />
-                          <span className={css.checkId}>{outcome.id}</span>
+                          <span className={css.checkKind}>
+                            {tConstraints(KIND_LABEL_KEY[outcome.kind])}
+                          </span>
+                          <code className={css.checkId} title={outcome.expression}>
+                            {outcome.expression}
+                          </code>
                           {outcome.parseError ? (
                             <span className={css.muted}>{t('taskWorkflow.unsupportedCheck')}</span>
                           ) : (
@@ -1029,6 +1044,7 @@ function TaskWorkflowPanelContent({
           {allowedHandoffRoles.length > 0 ? (
             <section className={css.section} aria-label={t('taskWorkflow.handoffs')}>
               <h3 className={css.sectionTitle}>{t('taskWorkflow.handoffs')}</h3>
+              <p className={css.muted}>{t('taskWorkflow.handoffs_hint')}</p>
               <form className={css.form} onSubmit={(event) => void handleCreateHandoff(event)}>
                 <SegmentedControl<HandoffRole>
                   ariaLabel={t('taskWorkflow.handoffRole')}

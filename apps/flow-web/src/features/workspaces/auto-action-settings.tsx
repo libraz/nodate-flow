@@ -13,7 +13,6 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
-import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -24,7 +23,10 @@ import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { APP_NAME } from '../../lib/brand';
 import AutonomyMatrix from '../ai/autonomy/autonomy-matrix';
+import AiConsequence, { type AiConsequenceKind } from '../ai-suggestions/ai-consequence';
+import ColumnHelp from '../settings/column-help';
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
+import SettingRow from '../settings/setting-row';
 import ui from '../settings/settings-ui.module.css';
 import {
   type AutoActionRule,
@@ -108,6 +110,7 @@ export default function AutoActionSettingsPage({
       <PageHeader
         title={t('workspace.auto_actions.title')}
         description={t('workspace.auto_actions.description', { appName: APP_NAME })}
+        help="workspace-settings-auto-actions"
       />
 
       <form
@@ -117,15 +120,15 @@ export default function AutoActionSettingsPage({
         className={ui.section}
       >
         {/* Enabled toggle */}
-        <FormField
+        <SettingRow
           label={t('workspace.auto_actions.enabled.label')}
           description={t('workspace.auto_actions.enabled.description')}
         >
           {(control) => <Switch {...control} checked={enabled} onCheckedChange={setEnabled} />}
-        </FormField>
+        </SettingRow>
 
         {/* Interval (minutes) */}
-        <FormField
+        <SettingRow
           label={t('workspace.auto_actions.interval.label')}
           description={t('workspace.auto_actions.interval.description')}
         >
@@ -160,15 +163,24 @@ export default function AutoActionSettingsPage({
               </span>
             </div>
           )}
-        </FormField>
+        </SettingRow>
 
         {/* Threshold slider */}
-        <FormField
+        <SettingRow
           label={t('workspace.auto_actions.threshold.label')}
           description={t('workspace.auto_actions.threshold.description')}
         >
           {(control) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1-5)' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--nf-space-1-5)',
+                // nf-token-override: component dimension, not a spacing step
+                inlineSize: '16rem',
+                maxInlineSize: '100%',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-3)' }}>
                 <input
                   {...control}
@@ -206,7 +218,7 @@ export default function AutoActionSettingsPage({
               </span>
             </div>
           )}
-        </FormField>
+        </SettingRow>
 
         <div className={ui.actions}>
           <SaveStatus saved={saveStatus.saved} dirty={dirty} />
@@ -245,6 +257,16 @@ const RULE_KINDS = [
 ] as const;
 
 type RuleKind = (typeof RULE_KINDS)[number];
+
+/**
+ * What a rule does when it fires: escalate and close change the task
+ * without asking; assign and nudge only record a suggestion.
+ */
+const APPLYING_RULES: ReadonlySet<RuleKind> = new Set(['escalate_overdue', 'close_stale_review']);
+
+function ruleConsequence(kind: RuleKind): AiConsequenceKind {
+  return APPLYING_RULES.has(kind) ? 'applies' : 'suggests';
+}
 
 /** Local draft state for a single rule row. */
 interface RuleDraft {
@@ -384,7 +406,10 @@ function AutoActionRulesSection({
               <th scope="col">{t('workspace.auto_actions.rules.column.rule')}</th>
               <th scope="col">{t('workspace.auto_actions.rules.column.enabled')}</th>
               <th scope="col">{t('workspace.auto_actions.rules.column.confidence')}</th>
-              <th scope="col">{t('workspace.auto_actions.rules.column.idle_hours')}</th>
+              <th scope="col">
+                {t('workspace.auto_actions.rules.column.idle_hours')}
+                <ColumnHelp text={t('workspace.auto_actions.rules.column.idle_hours_help')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -411,6 +436,7 @@ function AutoActionRulesSection({
                       <span className={ui.muted} style={{ fontSize: 'var(--nf-text-xs)' }}>
                         {t(`workspace.auto_actions.rules.${kind}.description`)}
                       </span>
+                      <AiConsequence kind={ruleConsequence(kind)} />
                     </div>
                   </td>
 

@@ -1,12 +1,15 @@
 {
   "view": {
     "title": "Inbox",
-    "subtitle": "Signals from connected sources land here for triage.",
-    "empty": "Your inbox is empty"
+    "subtitle": "Your items from connected sources and agents, across all workspaces. Intake is each workspace's separate queue for work nobody has taken on.",
+    "empty": "Your inbox is empty",
+    "empty_description": "New items from GitHub, Slack, email, webhooks or manual capture land here. Snooze or archive them, or review the source to turn one into a task."
   },
   "action": {
     "archive": "Archive",
-    "snooze": "Snooze"
+    "archive_hint": "Clears this item from your inbox.",
+    "snooze": "Snooze",
+    "snooze_hint": "Hide this item for now. It comes back in 1 hour, tomorrow at 9:00, or at 9:00 a week from now (your time zone)."
   },
   "snooze": {
     "one_hour": "1 hour",
@@ -23,7 +26,8 @@
   "filter": {
     "workspace_label": "Workspace",
     "workspace_all": "All workspaces",
-    "handoff": "Agent stuck"
+    "handoff": "Handed back by agent",
+    "handoff_hint": "Show only items where an AI agent stopped and handed the task back to you."
   },
   "toast": {
     "archived": "Archived",
@@ -62,7 +66,9 @@
     "close": "Close",
     "searching": "Searching…",
     "task_sources": "Source material",
-    "error": "Could not complete this source action"
+    "error": "Could not complete this source action",
+    "review_hint": "Open the original message, then create a task from it or link it to an existing task.",
+    "destination_hint": "Create a new task from this source, or link it to a task that already exists. Either way the source is attached to the task as source material."
   },
   "tab": {
     "inbox": "Inbox",
@@ -70,11 +76,12 @@
   },
   "intake": {
     "no_workspace": "Join a workspace to start triaging intake items.",
-    "empty": "No intake items waiting for triage.",
+    "empty": "No intake items waiting. Add one above, or items sent to this workspace will show up here.",
     "quick_add": {
       "placeholder": "Capture a new intake item…",
       "submit": "Add",
-      "error": "Failed to add intake item"
+      "error": "Failed to add intake item",
+      "hint": "Adds a pending item to the selected workspace's queue. It stays an item until you convert it into a task."
     },
     "convert": {
       "action": "Convert",
@@ -91,7 +98,18 @@
     "dismiss": {
       "action": "Dismiss",
       "success": "Intake item dismissed",
-      "error": "Failed to dismiss intake item"
-    }
+      "error": "Failed to dismiss intake item",
+      "hint": "Removes this item from the queue without creating a task."
+    },
+    "description": "A queue of work that has not been decided yet. Convert an item into a task in a project, or dismiss it."
+  },
+  "kind": {
+    "agent_task_handoff_to_user": "Agent handed the task back"
+  },
+  "triage_status": {
+    "one": "AI triage runs on {workspace}.",
+    "all": "With All workspaces selected, AI triage runs on {workspace}. Choose a workspace to triage a different one.",
+    "nothing": "AI triage is unavailable: {workspace} has no inbox items to review.",
+    "no_workspace": "Join a workspace to use AI triage."
   }
 }

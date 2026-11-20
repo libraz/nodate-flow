@@ -13,10 +13,11 @@
   align-items: center;
 }
 
-/* Square icon buttons: the aspect ratio gives every glyph an equal hit target. */
+/* Square 32px icon buttons, level with the sm controls beside them. */
 .toolButton {
-  aspect-ratio: 1;
-  padding: var(--nf-space-1);
+  inline-size: var(--nf-space-8);
+  block-size: var(--nf-space-8);
+  padding: 0;
 }
 
 .toolBold {

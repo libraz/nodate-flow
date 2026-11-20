@@ -15,7 +15,7 @@ function PagesIndex(): ReactElement {
   const { t } = useTranslation('pages');
   return (
     <PageFrame width="full" className={styles.frame}>
-      <PageHeader title={t('title')} />
+      <PageHeader title={t('title')} description={t('description')} help="pages" />
       <PageList activePageId={undefined} />
     </PageFrame>
   );

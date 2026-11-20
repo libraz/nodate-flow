@@ -58,7 +58,7 @@
         "stuck": "停滞 — 需要您介入"
       },
       "last_run_ago": "{time}前最后运行",
-      "attempts": "尝试: {current}/{max}",
+      "attempts": "尝试次数：{current}",
       "cost_today": "今日成本: ${amount}",
       "hand_back": "交还给我",
       "run_history": "运行历史",
@@ -71,8 +71,10 @@
         "remove": "取消分配 {name}",
         "failed": "分配代理失败",
         "remove_failed": "取消分配代理失败",
-        "removed": "已将 {name} 从此任务移除。"
-      }
+        "removed": "已将 {name} 从此任务移除。",
+        "description": "分配的智能体会按其触发设置处理此任务；当它不确定、达到费用上限、出错或发现约束冲突时，会把任务交还给你。"
+      },
+      "hand_back_hint": "从智能体手中接管此任务。"
     }
   },
   "handoff_reason": {

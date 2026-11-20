@@ -3,7 +3,7 @@
  *
  * Shows root pages with expand/collapse for children. Children are
  * lazy-loaded when a node is expanded (useChildPagesQuery). Active
- * page is highlighted. A "New page" button sits at the bottom.
+ * page is highlighted. The single "New page" action sits in the header.
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
@@ -135,14 +135,9 @@ export default function PageTree({
     <div className={styles.treeSidebar}>
       <div className={styles.treeHeader}>
         <h2 className={styles.treeTitle}>{t('tree.root')}</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCreatePage}
-          aria-label={t('create')}
-        >
-          <Plus size={16} aria-hidden />
+        <Button type="button" variant="ghost" size="sm" onClick={onCreatePage}>
+          <Plus size={14} aria-hidden />
+          {t('create')}
         </Button>
       </div>
 
@@ -162,11 +157,6 @@ export default function PageTree({
           ))}
         </ul>
       )}
-
-      <Button type="button" variant="default" size="sm" onClick={onCreatePage}>
-        <Plus size={14} aria-hidden />
-        {t('create')}
-      </Button>
     </div>
   );
 }

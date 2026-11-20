@@ -45,6 +45,7 @@ import {
   useTasksInfiniteQuery,
   useUpdateTask,
 } from './api';
+import AssigneeSummary from './assignee-summary';
 import {
   PRIORITY_COLOR,
   PRIORITY_KEY,
@@ -462,7 +463,7 @@ function InlineDueCell({
       data-overdue={overdue}
       className={css.editTrigger}
     >
-      {displayDate}
+      <span className={css.editTriggerText}>{displayDate}</span>
     </span>
   );
 }
@@ -583,6 +584,11 @@ function scrollParentOf(node: HTMLElement): HTMLElement | null {
 export default function TaskListView({ projectId }: TaskListViewProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const filters = useTaskFilters(projectId);
+  const hasActiveFilter =
+    Boolean(filters.search) ||
+    (filters.states?.length ?? 0) > 0 ||
+    (filters.priority?.length ?? 0) > 0 ||
+    Boolean(filters.assigneeId);
   // OFFSET-paginated infinite list. We flat-map pages here; the project list
   // intentionally stays on the backend sort_weight order so DnD reorder works
   // beyond the first fetched page.
@@ -778,9 +784,9 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     () => [
       {
         id: 'drag',
-        size: 32,
-        minSize: 32,
-        maxSize: 32,
+        size: 40,
+        minSize: 40,
+        maxSize: 40,
         enableSorting: false,
         header: () => null,
         cell: ({ row }) => (
@@ -868,39 +874,14 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
         minSize: 96,
         enableSorting: false,
         header: () => t('tasks.columns.assignee'),
-        cell: ({ row }) => {
-          const count = row.original.assigneeCount;
-          if (count === 0) return <span className={css.muted}>—</span>;
-          return (
-            <span
-              style={{
-                display: 'inline-flex',
-                gap: 'var(--nf-space-1-5)',
-                alignItems: 'center',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  // nf-token-override: component dimension, not a spacing step
-                  inlineSize: '0.5rem',
-                  // nf-token-override: component dimension, not a spacing step
-                  blockSize: '0.5rem',
-                  borderRadius: 'var(--nf-radius-pill)',
-                  background: 'var(--nf-color-accent)',
-                }}
-              />
-              {t('tasks.assignee.count', { count })}
-            </span>
-          );
-        },
+        cell: ({ row }) => <AssigneeSummary task={row.original} emptyClassName={css.muted} />,
       },
       {
         id: 'due',
         accessorKey: 'dueOn',
-        size: 100,
-        minSize: 72,
+        // Fits a bold overdue date with its weekday, e.g. "2026/11/10(Tue)".
+        size: 124,
+        minSize: 116,
         header: () => t('tasks.columns.due'),
         cell: ({ row }) => <DueCell task={row.original} locale={locale} />,
       },
@@ -945,7 +926,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           columns={columns}
           data={tasks}
           getRowId={(row) => row.id}
-          emptyContent={t('tasks.empty')}
+          emptyContent={hasActiveFilter ? t('tasks.empty_filtered') : t('tasks.empty')}
           enableRowSelection
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}

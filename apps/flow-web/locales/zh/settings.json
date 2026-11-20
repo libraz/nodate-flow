@@ -29,14 +29,14 @@
   },
   "integrations": {
     "title": "集成",
-    "description": "连接你的 GitHub、Slack、Google 日历和 Discord 个人账户，让 {appName} 可以代你执行操作。令牌将以加密形式存储。",
+    "description": "连接你自己的 GitHub、Slack、Google 日历和 Discord 账号。连接仅属于你个人，令牌加密存储。可随时断开，重新连接需再次授权。",
     "connect": "连接",
     "disconnect": "断开",
     "disconnect_confirm": "断开 {provider}？再次使用前需要重新授权。",
     "disconnected": "已断开集成",
     "connected_as": "已以 {account} 连接 · {time}",
     "connected_toast": "已连接 {provider}。",
-    "not_configured": "本服务器未配置该集成，请联系管理员设置 OAuth 凭据。",
+    "not_configured": "此服务器暂不可用，需要管理员先设置 OAuth 凭据。",
     "provider": {
       "github": {
         "name": "GitHub",
@@ -59,18 +59,24 @@
       "connect_failed": "无法发起连接流程，请重试。",
       "disconnect_failed": "无法断开集成，请重试。",
       "callback_failed": "连接流程失败：{reason}"
-    }
+    },
+    "not_configured_badge": "未配置"
   },
   "ai_activity": {
     "title": "AI 活动",
-    "description": "对最近为本工作区发起的 LLM 调用进行只读审计。提示词与响应在写入时已脱敏。",
+    "description": "此工作区最近的 50 次 LLM 调用。提示词在记录时已脱敏，无法在此还原原文。",
     "empty": "暂无 LLM 调用记录。",
-    "error_code": "错误：{code}"
+    "error_code": "错误：{code}",
+    "status": {
+      "ok": "成功",
+      "blocked": "已拦截",
+      "error": "错误"
+    }
   },
   "audit_log": {
     "title": "审计日志",
-    "description": "工作区操作的只读日志。元数据在写入时已脱敏。",
-    "empty": "暂无审计记录。",
+    "description": "只读记录，显示谁在何时在此工作区做了什么。敏感值在写入时已脱敏，条目无法在此编辑。",
+    "empty": "暂无审计条目。在此工作区执行的操作发生后会显示在这里。",
     "empty_filtered": "没有符合筛选条件的记录。清除筛选可查看全部。",
     "unknown_actor": "系统",
     "export_csv": "导出 CSV",
@@ -99,7 +105,9 @@
       "prev": "上一页",
       "next": "下一页",
       "page_of": "第 {current} / {total} 页"
-    }
+    },
+    "export_csv_hint": "只保存当前页（最多 50 条）并应用当前筛选。如需更多，请缩小日期范围并逐页导出。",
+    "export_csv_page": "导出本页（CSV）"
   },
   "sections_label": "工作区设置板块",
   "settings_sections_label": "设置板块",
@@ -109,7 +117,7 @@
   },
   "weekly_digest": {
     "title": "每周摘要",
-    "description": "本工作区的确定性快照：状态计数、过去七天完成的事项以及已逾期事项。",
+    "description": "此工作区的快照，每次打开时重新计算：各状态任务数、过去 7 天完成的任务和已逾期任务。",
     "counts": {
       "open": "未开始",
       "waiting": "进行中",
@@ -121,10 +129,11 @@
     "overdue_open": "已逾期",
     "empty_completed": "过去七天没有完成的事项。",
     "empty_overdue": "暂无逾期任务。",
-    "markdown": "Markdown",
+    "markdown": "复制为文本（Markdown）",
     "copy": "复制",
     "copied": "已复制",
-    "copy_failed": "无法复制到剪贴板。"
+    "copy_failed": "无法复制到剪贴板。",
+    "countsHint": "当前各状态的任务数，并不仅限于过去 7 天。"
   },
   "profile": {
     "title": "个人资料",
@@ -196,7 +205,9 @@
     },
     "section_identity": "基本信息",
     "section_appearance": "外观",
-    "section_appearance_help": "主题更改会立即生效，不需要点击保存。"
+    "section_appearance_help": "主题更改会立即生效，不需要点击保存。",
+    "description": "姓名、语言、时区和外观设置。属于账号，适用于所有工作区。",
+    "timezone_help": "日期和时间将按此时区显示。"
   },
   "notifications": {
     "title": "通知",
@@ -232,7 +243,9 @@
     },
     "errors": {
       "update_failed": "更新通知设置失败，请重试。"
-    }
+    },
+    "description": "按工作区选择哪些动态显示在应用内通知铃铛中。",
+    "workspace_help": "通知设置按工作区分别保存。"
   },
   "security": {
     "title": "安全",
@@ -322,16 +335,17 @@
         "revoke_all_failed": "无法撤销其他会话，请重试。"
       },
       "revoke_all_help": "将除本设备外的所有设备退出登录。"
-    }
+    },
+    "description": "管理密码、两步验证以及已登录你账号的设备。"
   },
   "workspace": {
     "general": {
       "title": "常规",
-      "description": "更新工作区名称、标识、描述与图标。",
+      "description": "重命名工作区、修改标识或描述，或删除工作区。",
       "field": {
         "name": "名称",
         "slug": "标识",
-        "slug_help": "仅可使用小写字母、数字和连字符。",
+        "slug_help": "简短的唯一标识：小写字母、数字和连字符。在本服务器上必须唯一，删除工作区时需要输入它来确认。",
         "description": "描述",
         "icon_url": "图标 URL"
       },
@@ -370,15 +384,15 @@
     },
     "public_shares": {
       "title": "公开分享页",
-      "description": "由工作区拥有的只读 URL，用于将选定的事件公开发布。URL 即权限——任何持有者都可查看页面。",
+      "description": "把选定的事件发布成只读网页。任何拿到链接的人无需登录即可打开，请只把链接发给应该看到这些事件的人。",
       "create": "创建分享",
-      "empty": "暂无公开分享页。",
-      "rotate": "重置",
+      "empty": "还没有公开分享页。先创建一个，再添加要发布的事件。",
+      "rotate": "轮换 URL",
       "rotate_confirm": "重置 URL？当前 URL 将立即失效。",
       "delete": "删除",
       "delete_confirm": "删除「{title}」？该 URL 将失效，事件也将不再发布。",
       "deleted": "已删除分享页",
-      "never_expires": "—",
+      "never_expires": "永不过期",
       "table": {
         "title": "标题",
         "events": "事件",
@@ -399,10 +413,11 @@
           "title": "标题",
           "title_placeholder": "例如：A 组官方日程",
           "description": "描述",
-          "description_help": "暂未渲染 Markdown，仅支持纯文本。",
+          "description_help": "以纯文本显示在标题下方，不会渲染 Markdown。",
           "holidays_country": "节假日叠加国家/地区",
-          "holidays_country_help": "选择一个国家/地区，将其法定假日叠加在分享页上。留空则不叠加。",
-          "holidays_country_unset": "不叠加节假日"
+          "holidays_country_help": "可选：在页面上标出该国的公共假日。留空则不显示。",
+          "holidays_country_unset": "不叠加节假日",
+          "title_help": "作为公开页面的标题显示，所有拿到链接的人都能看到。"
         },
         "reveal_warning": "请立即复制此 URL。令牌以哈希形式存储——之后将无法再次查看。",
         "rotate_warning": "之前的 URL 已失效。请将新 URL 分享给仍需要访问的人。",
@@ -416,8 +431,8 @@
       "detail": {
         "back": "返回分享页列表",
         "events_title": "已发布事件",
-        "events_description": "此处列出的事件将按显示顺序出现在公开页面。机密事件会在添加时被拒绝。",
-        "empty_events": "暂无事件。从此工作区添加事件以发布。",
+        "events_description": "这些事件将按此顺序出现在公开页面上。访客可以看到每个事件的标题、时间、地点和备注。私密事件只显示时间，机密事件无法添加。",
+        "empty_events": "尚未发布任何内容，页面是空的。点击「添加事件」从本工作区选择事件。",
         "add_events": "添加事件",
         "detach": "移除",
         "detached": "已移除事件",
@@ -446,7 +461,7 @@
           "hint": "显示所选范围内的事件。使用复选框选择要发布的事件。",
           "no_candidates": "此范围内没有事件。",
           "already_attached": "已发布",
-          "confidential": "机密",
+          "confidential": "私密（无法发布）",
           "select": "选择",
           "attach": "添加 {count, plural, other {# 个事件}}",
           "attached_toast": "已添加 {attached} 个，跳过 {skipped} 个",
@@ -463,21 +478,42 @@
           "over": "事件 {active} 现在位于事件 {over} 之上。",
           "dropped": "事件 {active} 已放置在事件 {over} 上方。",
           "cancelled": "已取消事件 {id} 的拖动。"
-        }
+        },
+        "detach_hint": "仅从公开页面撤下，事件仍保留在日历中。"
+      },
+      "rotate_hint": "签发新链接。旧链接立即失效，新链接只显示一次。",
+      "expiry": {
+        "label": "链接有效期",
+        "help": "超过该时间后链接将失效。时间按你本地时区计算。",
+        "never": "永不过期",
+        "at": "指定到期时间",
+        "time_label": "到期时刻",
+        "error_past": "请选择未来的时间。",
+        "saved": "有效期已更新",
+        "cleared": "已取消有效期。链接不再过期。",
+        "save_failed": "无法更新有效期，请重试。",
+        "status_never": "永不过期",
+        "status_expires": "将于 {when} 过期",
+        "status_expired": "已于 {when} 过期，链接已失效。",
+        "change": "更改有效期",
+        "clear": "取消有效期",
+        "save": "保存",
+        "expired_tag": "已过期"
       }
     },
     "mcp_tokens": {
       "title": "MCP 令牌",
-      "description": "用于通过 MCP 客户端对本工作区进行身份验证的个人访问令牌。",
+      "description": "让 AI 助手等 MCP 客户端以你的身份在此工作区工作的令牌。每个令牌仅限此工作区和你所选的权限范围。",
       "create": "创建令牌",
-      "empty": "暂无令牌。创建一个以连接 MCP 客户端。",
+      "empty": "还没有令牌。创建一个，然后连同本服务器的 /mcp 地址一起配置到 MCP 客户端。",
       "table": {
         "name": "名称",
         "prefix": "前缀",
         "scopes": "作用域",
         "created_at": "创建时间",
         "last_used_at": "最近使用",
-        "actions": "操作"
+        "actions": "操作",
+        "prefix_help": "令牌的开头部分，用于识别。完整令牌无法再次显示。"
       },
       "never_used": "从未使用",
       "revoke": "撤销",
@@ -488,11 +524,12 @@
         "reveal_title": "已创建令牌",
         "field": {
           "name": "名称",
+          "name_help": "用来区分令牌的标签，例如使用它的设备或客户端。不是机密信息。",
           "name_placeholder": "例如：本地开发笔记本",
           "scopes": "作用域",
           "scopes_help": "MCP 工具调用至少需要一个作用域。没有作用域的令牌可以连接并列出工具，但所有调用都会被拒绝。"
         },
-        "reveal_warning": "请立即复制此令牌，之后将无法再次查看。",
+        "reveal_warning": "请立即复制此令牌。它只显示一次，丢失后请撤销并重新创建。",
         "token_label": "令牌",
         "copy": "复制",
         "copied": "已复制",
@@ -518,20 +555,20 @@
     },
     "auto_actions": {
       "title": "自动操作",
-      "description": "配置 {appName} 如何自主管理本工作区中的任务。启用后，系统会定期评估任务并应用诸如升级逾期项目或关闭长期未动审核等操作。",
+      "description": "让 {appName} 定期检查任务并自行处理明确的情况。部分动作会不经确认直接修改任务（提高逾期任务优先级、关闭停滞评审），其余只记录建议。",
       "enabled": {
         "label": "启用自动操作",
         "description": "允许系统自动对任务应用操作。"
       },
       "interval": {
         "label": "评估间隔",
-        "description": "系统检查任务并应用操作的频率。",
+        "description": "检查任务的间隔，单位为分钟（最大 1440）。设为 0 表示不检查。",
         "minutes": "分钟",
         "disabled": "已禁用"
       },
       "threshold": {
         "label": "置信度阈值",
-        "description": "自动应用操作所需的最低置信度分数。值越低应用越多操作；值越高越保守。",
+        "description": "系统在自动执行动作前需要有多大把握。越低动作越多、出错机会也越多；越高越保守。",
         "low": "激进",
         "medium": "平衡",
         "high": "保守"
@@ -539,28 +576,29 @@
       "save": "保存",
       "rules": {
         "title": "规则配置",
-        "description": "启用或禁用单个规则并调整其灵敏度。",
+        "description": "逐条开关并调整规则。只有上方启用了自动操作，规则才会运行。",
         "column": {
           "rule": "规则",
           "enabled": "启用",
           "confidence": "置信度",
-          "idle_hours": "闲置阈值（小时）"
+          "idle_hours": "闲置阈值（小时）",
+          "idle_hours_help": "多少小时没有任何动静，规则才会把任务视为闲置。"
         },
         "escalate_overdue": {
           "label": "升级逾期",
-          "description": "任务超过截止日期时提升优先级。"
+          "description": "任务超过截止日期后，自动提高其优先级。"
         },
         "assign_owner": {
           "label": "分配负责人",
-          "description": "当任务无负责人且长时间闲置时建议负责人。"
+          "description": "当任务没有负责人且长期无动静时，记录一条指定负责人的建议。不会自动分配任何人。"
         },
         "nudge_assignee": {
           "label": "提醒负责人",
-          "description": "当已指派任务无进展时建议提醒负责人。"
+          "description": "当已分配的任务没有进展时，记录一条提醒负责人的建议。不会自动发送任何内容。"
         },
         "close_stale_review": {
           "label": "关闭长期未动审核",
-          "description": "关闭长时间无活动的审核。"
+          "description": "当评审在此处设定的闲置时间内没有任何动静时，自动将其关闭。"
         },
         "idle_na": "不适用（使用截止日期）",
         "save": "保存规则",
@@ -578,10 +616,10 @@
   "settings": {
     "data": {
       "title": "导入与导出",
-      "description": "管理 CSV 和第三方导入，并导出工作区任务。",
+      "description": "将工作区任务导出为 CSV 或 JSON，或从 CSV 导入任务。目前只有 CSV 导入可以运行。",
       "export": {
         "title": "导出任务",
-        "description": "将此工作区的所有任务下载为 CSV 或 JSON。",
+        "description": "将此工作区的任务下载为 CSV 或 JSON，每个文件最多 10,000 条。评论、附件等其他数据不包含在内。",
         "format": {
           "label": "格式",
           "csv": "CSV",
@@ -616,7 +654,8 @@
           "github": "GitHub",
           "jira": "Jira",
           "linear": "Linear",
-          "csv": "CSV"
+          "csv": "CSV",
+          "coming_soon": "{source}（即将推出）"
         },
         "cancel": "取消",
         "cancel_confirm": "取消此导入任务？",
@@ -631,22 +670,24 @@
           },
           "config": {
             "label": "配置 JSON",
-            "hint": "本次导入的来源特定设置，将按原样保存并原样返回。",
+            "hint": "导入 CSV 时，把完整的 CSV 文本放进名为 csv 的字段（最大 1 MiB、5,000 行）。列为 title、description、priority、dueOn、startedOn。从本页导出的文件可直接使用。任务状态无法导入。",
             "no_credentials": "此处不是填写凭据的地方：请勿填写令牌、API 密钥或密码。该字段不加密，服务器也会拒绝。",
             "credentials_where": "请改在集成设置中连接该服务",
             "invalid": "配置必须是有效的 JSON。"
           },
           "submit": "开始导入",
           "success": "已开始导入任务",
-          "error": "开始导入失败"
+          "error": "开始导入失败",
+          "source_help": "目前只能导入 CSV。GitHub、Jira、Linear 即将支持。"
         },
         "load_error": "无法加载导入任务。",
-        "retry": "重试"
+        "retry": "重试",
+        "empty_hint": "点击「新建导入任务」可从 CSV 导入任务，进度和错误会显示在这里。"
       }
     },
     "webhooks": {
       "title": "Webhook",
-      "description": "工作区事件的外部 HTTP 投递。",
+      "description": "当此工作区发生所选事件时，向你自己的服务器发送 HTTP POST。每个请求都带签名，可用来验证其来源。",
       "empty": "暂无 Webhook",
       "new": "新建 Webhook",
       "col": {
@@ -654,7 +695,8 @@
         "description": "描述",
         "event_types": "事件类型",
         "active": "启用",
-        "actions": "操作"
+        "actions": "操作",
+        "active_help": "关闭后暂停投递。关闭期间发生的事件不会事后补发。"
       },
       "action": {
         "menu_label": "Webhook 操作",
@@ -683,6 +725,7 @@
       "create": {
         "title": "新建 Webhook",
         "url": {
+          "hint": "必须是公网 HTTPS 地址，本地和内网地址会被拒绝。之后无法修改 URL。",
           "label": "投递 URL",
           "placeholder": "https://example.com/hooks/nodate-flow"
         },
@@ -692,7 +735,9 @@
         },
         "event_types": {
           "label": "事件类型",
-          "hint": "用逗号分隔的模式（例如 task.created, task.updated）"
+          "hint": "以逗号分隔输入精确的事件名，例如 task.created, task.transition.complete。输入 * 表示全部事件。不支持 task.* 这类通配。",
+          "required": "输入 * 表示所有事件，或至少输入一个事件名。",
+          "no_patterns": "不支持 task.* 这类模式。请输入完整的事件名，或单独输入 *。"
         },
         "submit": "创建 Webhook",
         "cancel": "取消",
@@ -704,7 +749,8 @@
           "warning": "请立即复制，或稍后通过「显示密钥」再次获取。",
           "copy": "复制",
           "copied": "已复制密钥",
-          "copy_failed": "复制密钥失败"
+          "copy_failed": "复制密钥失败",
+          "hint": "每个请求都带有 X-Nodate-Signature（以此密钥对 v0:时间戳:正文 计算 HMAC-SHA256，前缀 v0=）和 X-Nodate-Timestamp。请在服务器端同时校验，并妥善保管密钥。"
         },
         "done": "完成",
         "error": "创建 Webhook 失败"
@@ -727,12 +773,18 @@
         "status": {
           "pending": "等待中",
           "delivered": "已投递",
-          "failed": "失败",
-          "dead": "已死亡"
-        }
+          "failed": "失败（将重试）",
+          "dead": "已放弃"
+        },
+        "status_note": "投递失败后会以逐渐延长的间隔自动重试。「已放弃」表示重试次数已用完，或在投递前 Webhook 被关闭或删除。"
       },
       "load_error": "无法加载 Webhook。",
-      "retry": "重试"
+      "retry": "重试",
+      "empty_hint": "创建 Webhook 后，事件发生时本工作区会调用你的服务器。之后可用「发送测试」检查是否正常。"
     }
+  },
+  "secret_callout": {
+    "once_title": "请立即复制，仅显示这一次。",
+    "keep_title": "请妥善保管此密钥"
   }
 }

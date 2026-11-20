@@ -15,6 +15,7 @@ import enCommon from '../../locales/en/common.json';
 import enConstraints from '../../locales/en/constraints.json';
 import enDashboard from '../../locales/en/dashboard.json';
 import enErrors from '../../locales/en/errors.json';
+import enHelp from '../../locales/en/help.json';
 import enInbox from '../../locales/en/inbox.json';
 import enLabels from '../../locales/en/labels.json';
 import enLinkedEvents from '../../locales/en/linkedEvents.json';
@@ -39,6 +40,7 @@ import jaCommon from '../../locales/ja/common.json';
 import jaConstraints from '../../locales/ja/constraints.json';
 import jaDashboard from '../../locales/ja/dashboard.json';
 import jaErrors from '../../locales/ja/errors.json';
+import jaHelp from '../../locales/ja/help.json';
 import jaInbox from '../../locales/ja/inbox.json';
 import jaLabels from '../../locales/ja/labels.json';
 import jaLinkedEvents from '../../locales/ja/linkedEvents.json';
@@ -63,6 +65,7 @@ import zhCommon from '../../locales/zh/common.json';
 import zhConstraints from '../../locales/zh/constraints.json';
 import zhDashboard from '../../locales/zh/dashboard.json';
 import zhErrors from '../../locales/zh/errors.json';
+import zhHelp from '../../locales/zh/help.json';
 import zhInbox from '../../locales/zh/inbox.json';
 import zhLabels from '../../locales/zh/labels.json';
 import zhLinkedEvents from '../../locales/zh/linkedEvents.json';
@@ -137,6 +140,7 @@ export function initI18n(): typeof i18n {
         'sharing',
         'signal-kinds',
         'system-info',
+        'help',
       ],
       resources: {
         en: {
@@ -164,6 +168,7 @@ export function initI18n(): typeof i18n {
           sharing: enSharing,
           'signal-kinds': enSignalKinds,
           'system-info': enSystemInfo,
+          help: enHelp,
         },
         ja: {
           archive: jaArchive,
@@ -190,6 +195,7 @@ export function initI18n(): typeof i18n {
           sharing: jaSharing,
           'signal-kinds': jaSignalKinds,
           'system-info': jaSystemInfo,
+          help: jaHelp,
         },
         zh: {
           archive: zhArchive,
@@ -216,6 +222,7 @@ export function initI18n(): typeof i18n {
           sharing: zhSharing,
           'signal-kinds': zhSignalKinds,
           'system-info': zhSystemInfo,
+          help: zhHelp,
         },
       },
       interpolation: { escapeValue: false },

@@ -19,6 +19,19 @@
   font-size: var(--nf-text-base);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+}
+
 .summary {
   display: flex;
   flex-wrap: wrap;
@@ -132,6 +145,11 @@
 
 .numeric {
   font-variant-numeric: tabular-nums;
+}
+
+.checkKind {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
 }
 
 .checkId {

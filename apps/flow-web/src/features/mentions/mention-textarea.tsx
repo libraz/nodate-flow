@@ -117,6 +117,9 @@ export default function MentionTextarea({
 
   const baseId = useId();
   const listId = `${baseId}-list`;
+  const hintId = `${baseId}-hint`;
+  const describedBy =
+    [ariaDescribedBy, enabled ? hintId : undefined].filter(Boolean).join(' ') || undefined;
   const optionId = (index: number): string => `${baseId}-opt-${String(index)}`;
 
   const close = (): void => {
@@ -266,7 +269,7 @@ export default function MentionTextarea({
         autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        aria-describedby={ariaDescribedBy}
+        aria-describedby={describedBy}
         aria-invalid={ariaInvalid}
         role={open ? 'combobox' : undefined}
         aria-expanded={open ? true : undefined}
@@ -280,6 +283,11 @@ export default function MentionTextarea({
         optionId={optionId}
         onChoose={choose}
       />
+      {enabled ? (
+        <p id={hintId} className={styles.hint}>
+          {t('tasks.mentions.hint')}
+        </p>
+      ) : null}
       {enabled ? (
         <VisuallyHidden>
           <span role="status">{status}</span>

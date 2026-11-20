@@ -13,8 +13,9 @@
  * under the wrong workspace.
  */
 
+import { useActiveItemInView } from '@nodate-flow/ui/hooks/use-active-item-in-view';
 import { createFileRoute, Link, Outlet, useChildMatches } from '@tanstack/react-router';
-import { type ReactElement, Suspense } from 'react';
+import { type ReactElement, Suspense, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Forbidden from '../components/forbidden';
@@ -99,9 +100,18 @@ function ProjectLayout(): ReactElement {
   const { id, projectId } = Route.useParams();
   const { data: project } = useProjectQuery(projectId);
   // Task list/board/spreadsheet and gantt are grid surfaces; overview and timeline read as pages.
-  const gridView = useChildMatches().some(
+  const childMatches = useChildMatches();
+  const gridView = childMatches.some(
     (m) => m.routeId.includes('/tasks') || m.routeId.includes('/gantt'),
   );
+  const activeNavKey: ProjectSubNavKey =
+    PROJECT_SUB_NAV.find(
+      (item) =>
+        item.key !== 'overview' && childMatches.some((m) => m.routeId.includes(`/${item.key}`)),
+    )?.key ?? 'overview';
+  const navRef = useRef<HTMLElement | null>(null);
+  const navItemRefs = useRef<Map<string, HTMLElement>>(new Map());
+  useActiveItemInView(navRef, navItemRefs, activeNavKey);
   // ProjectLayout always renders the project name as the page-level h1;
   // child routes (overview / tasks / gantt / timeline) do not re-emit
   // their own name heading.
@@ -117,16 +127,21 @@ function ProjectLayout(): ReactElement {
       <PageHeader
         title={project.name}
         description={project.description}
+        help="project"
         actions={
           <Suspense fallback={null}>
             <ProjectFavoriteStar projectId={projectId} workspaceId={id} />
           </Suspense>
         }
       />
-      <nav aria-label={t('projects.nav.label')} className={styles.subNav}>
+      <nav ref={navRef} aria-label={t('projects.nav.label')} className={styles.subNav}>
         {PROJECT_SUB_NAV.map((item) => (
           <Link
             key={item.key}
+            ref={(el) => {
+              if (el) navItemRefs.current.set(item.key, el);
+              else navItemRefs.current.delete(item.key);
+            }}
             to={item.to}
             params={{ id, projectId }}
             activeOptions={{ exact: item.key === 'overview' }}

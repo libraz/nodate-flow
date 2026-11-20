@@ -85,6 +85,12 @@
   font-weight: var(--nf-weight-medium);
 }
 
+.destinationHint {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
 .fields {
   display: flex;
   flex-direction: column;

@@ -10,10 +10,12 @@ import DataGrid from '@nodate-flow/ui/primitives/data-grid';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ColumnDef } from '@tanstack/react-table';
+import { Link2, UserMinus, UserPlus } from 'lucide-react';
 import { type ReactElement, Suspense, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import PageHelp from '../../components/page-help';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpoch } from '../../lib/format';
@@ -27,6 +29,7 @@ import {
 import WorkspaceAddMemberDialog from './workspace-add-member-dialog';
 import WorkspaceInviteDialog from './workspace-invite-dialog';
 import WorkspaceInvitesList from './workspace-invites-list';
+import styles from './workspaces.module.css';
 
 export interface WorkspaceMembersTableProps {
   workspaceId: string;
@@ -159,14 +162,16 @@ export default function WorkspaceMembersTable({
                 removeMember.isPending && removeMember.variables?.userId === member.userId;
               return (
                 <Button
-                  variant="danger"
+                  variant="ghost"
                   size="sm"
+                  className={styles.removeButton}
                   disabled={removing}
                   aria-busy={removing || undefined}
                   onClick={() => {
                     void handleRemove(member);
                   }}
                 >
+                  <UserMinus size={14} aria-hidden />
                   {t('workspaces.members.remove')}
                 </Button>
               );
@@ -177,36 +182,31 @@ export default function WorkspaceMembersTable({
   ];
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2
-          style={{
-            fontSize: 'var(--nf-text-xl)',
-            fontWeight: 'var(--nf-weight-semibold)',
-            margin: 0,
-          }}
-        >
-          {t('workspaces.members.title')}
-        </h2>
+    <section className={styles.membersSection}>
+      <header className={styles.membersHeader}>
+        <div className={styles.membersTitleRow}>
+          <h2 className={styles.membersTitle}>{t('workspaces.members.title')}</h2>
+          <PageHelp topic="workspace-members" />
+        </div>
         {isAdmin ? (
-          <div style={{ display: 'flex', gap: 'var(--nf-space-2)' }}>
+          <div className={styles.membersActions}>
             <Button
-              variant="ghost"
-              size="sm"
+              variant="default"
               data-testid="invite-create-open"
               onClick={() => {
                 setInviteOpen(true);
               }}
             >
+              <Link2 size={16} aria-hidden />
               {t('workspaces.invites.create')}
             </Button>
             <Button
               variant="primary"
-              size="sm"
               onClick={() => {
                 setAddOpen(true);
               }}
             >
+              <UserPlus size={16} aria-hidden />
               {t('workspaces.members.add')}
             </Button>
           </div>
@@ -230,6 +230,7 @@ export default function WorkspaceMembersTable({
 
       <WorkspaceAddMemberDialog
         workspaceId={workspaceId}
+        canGrantOwner={currentMember?.role === 'owner'}
         open={addOpen}
         onClose={() => {
           setAddOpen(false);

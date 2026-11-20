@@ -1,22 +1,23 @@
 {
   "view": {
     "title": "Activity",
-    "description": "A unified feed of audit, AI, and MCP activity across this workspace.",
+    "description": "A record of what happened in this workspace: changes by people, AI runs and calls from connected tools.",
     "list_label": "Workspace activity",
     "loading": "Loading activity…",
     "loading_more": "Loading…",
     "load_more": "Load more",
-    "empty": "No activity yet.",
+    "empty": "No activity yet. Creating tasks, editing pages, running AI and using connected tools will be recorded here.",
     "empty_filtered": "No activity for this source.",
     "error": "Couldn't load activity. Please try again.",
     "retry": "Retry"
   },
   "filter": {
     "source_label": "Source",
-    "all_sources": "All"
+    "all_sources": "All",
+    "source_hint": "Changes: actions by people. AI: AI runs. MCP: calls from connected tools."
   },
   "source": {
-    "audit": "Audit",
+    "audit": "Changes",
     "ai": "AI",
     "mcp": "MCP"
   },
@@ -111,5 +112,26 @@
     "workspace_create": "created the workspace",
     "workspace_delete": "deleted the workspace",
     "workspace_update": "updated the workspace"
+  },
+  "resource": {
+    "task": "Task",
+    "page": "Page",
+    "project": "Project",
+    "comment": "Comment",
+    "timebox": "Timebox",
+    "calendar": "Calendar",
+    "calendar_event": "Calendar event",
+    "label": "Label",
+    "lens": "Saved view",
+    "attachment": "Attachment",
+    "ai_agent": "AI agent",
+    "ai_provider": "AI provider",
+    "ai_invocation": "AI run",
+    "mcp_invocation": "Tool call (MCP)",
+    "mcp_token": "MCP token",
+    "intake_item": "Intake item",
+    "membership": "Membership",
+    "notification": "Notification",
+    "webhook_subscription": "Webhook"
   }
 }

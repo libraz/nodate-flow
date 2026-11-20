@@ -349,6 +349,7 @@ export default function ProfileForm(): ReactElement {
 
           <FormField
             label={t('profile.timezone')}
+            description={t('profile.timezone_help')}
             {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
           >
             {(control2) => (
@@ -400,7 +401,10 @@ export default function ProfileForm(): ReactElement {
       </section>
 
       {/* Theme picker — changes apply immediately (synced to server via ThemeProvider). */}
-      <section className={ui.section} aria-labelledby="profile-appearance-title">
+      <section
+        className={`${ui.section} ${styles.appearance}`}
+        aria-labelledby="profile-appearance-title"
+      >
         <div className={ui.sectionHeader}>
           <h2 id="profile-appearance-title" className={ui.sectionTitle}>
             {t('profile.section_appearance')}

@@ -1,0 +1,47 @@
+/* Project tab heading: title, help and description, with controls at the end. */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--nf-space-3) var(--nf-space-4);
+  flex-wrap: wrap;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  flex: 1 1 20rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--nf-text-section-title);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-tight);
+}
+
+.description {
+  margin: 0;
+  max-inline-size: 65ch;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  flex-wrap: wrap;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}

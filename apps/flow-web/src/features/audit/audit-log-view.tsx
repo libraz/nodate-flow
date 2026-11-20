@@ -12,6 +12,7 @@ import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ChangeEvent, type ReactElement, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -352,10 +353,14 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
       <PageHeader
         title={t('audit_log.title')}
         description={t('audit_log.description')}
+        help="workspace-settings-audit-log"
         actions={
-          <Button variant="default" onClick={handleExport} disabled={data.entries.length === 0}>
-            {t('audit_log.export_csv')}
-          </Button>
+          // The export holds only the rows on screen, so the label says so.
+          <Tooltip content={t('audit_log.export_csv_hint')}>
+            <Button variant="default" onClick={handleExport} disabled={data.entries.length === 0}>
+              {t('audit_log.export_csv_page')}
+            </Button>
+          </Tooltip>
         }
       />
 
@@ -452,7 +457,6 @@ export default function AuditLogView({ workspaceId }: { workspaceId: string }): 
 
         <Button
           variant="ghost"
-          size="sm"
           onClick={handleClearFilters}
           disabled={!hasActiveFilter}
           className={styles.clear}

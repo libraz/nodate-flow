@@ -86,3 +86,15 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.countsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.countsHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

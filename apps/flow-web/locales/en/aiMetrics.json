@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "AI Metrics",
-    "description": "Acceptance and provider rate-limit telemetry for this workspace's AI surfaces."
+    "description": "How many AI proposals were accepted or dismissed, and how often calls to each AI provider were sent, delayed or refused by rate limits."
   },
   "window": {
     "label": "Window",
@@ -25,7 +25,8 @@
       "destination": "Provider",
       "allowed": "Allowed",
       "waited": "Waited",
-      "denied": "Denied"
+      "denied": "Denied",
+      "help": "Allowed: sent right away. Waited: delayed by the rate limiter, then sent. Denied: refused because the limit was exceeded."
     }
   },
   "error": {

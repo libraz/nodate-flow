@@ -5,7 +5,8 @@
     "loading": "タイムラインを読み込み中…",
     "load_more": "さらに読み込む",
     "today": "今日",
-    "yesterday": "昨日"
+    "yesterday": "昨日",
+    "description": "何が起きたかの時系列の記録です。タスクの変更、コメント、レビュー、シグナル、AI やエージェントの動きが並びます。イベントの種類や人で絞り込めます。"
   },
   "filter": {
     "kind_all": "すべてのイベント種別",
@@ -417,5 +418,20 @@
       "target_not_found": "対象のアクションが見つかりません",
       "fetch_error": "アクションを取り消せませんでした。もう一度お試しください。"
     }
+  },
+  "source": {
+    "github": "GitHub",
+    "slack": "Slack",
+    "google": "Google",
+    "signal": "シグナル",
+    "ai": "AI",
+    "task": "タスク",
+    "comment": "コメント",
+    "page": "ページ",
+    "workspace": "ワークスペース",
+    "project": "プロジェクト",
+    "calendar": "カレンダー",
+    "share": "共有",
+    "system": "システム"
   }
 }

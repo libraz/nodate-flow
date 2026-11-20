@@ -13,17 +13,36 @@
 
 .toolbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--nf-space-2);
   flex-wrap: wrap;
 }
 
 .workspaceField {
   display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
+  align-items: center;
+  gap: var(--nf-space-2);
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
+}
+
+.description {
+  margin: 0;
+  max-inline-size: 60ch;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.hint {
+  margin: calc(var(--nf-space-1) * -1) 0 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+/* Keeps the short label on one line next to the flexible input. */
+.quickAddSubmit {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .quickAdd {

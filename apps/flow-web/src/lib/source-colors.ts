@@ -100,16 +100,15 @@ export const CONSTRAINT_STATE_COLORS = {
 } as const;
 
 /**
- * Brand and category colors for timeline event source tags. External
- * sources reuse the upstream brand hex; internal categories (signal /
- * ai / task) use a short curated palette so each lane in the timeline
- * stays distinguishable at a glance.
+ * Text-strength colour tokens for timeline event source tags, one per lane.
+ * The tag paints its label in this colour over a light wash of the same, so
+ * each value must be an `-fg` token that holds 4.5:1 on that wash.
  */
 export const INTEGRATION_SOURCE_COLORS = {
-  github: '#6e5494',
-  slack: '#4a154b',
-  google: '#4285f4',
-  signal: '#0ea5e9',
-  ai: '#10b981',
-  task: '#f59e0b',
+  github: 'var(--nf-color-state-review-fg)',
+  slack: 'var(--nf-color-accent-fg)',
+  google: 'var(--nf-color-info-fg)',
+  signal: 'var(--nf-color-info-fg)',
+  ai: 'var(--nf-color-success-fg)',
+  task: 'var(--nf-color-warning-fg)',
 } as const;

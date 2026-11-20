@@ -14,27 +14,50 @@
   gap: var(--nf-space-3);
 }
 
-/* Reserve a minimum height for fields whose validation errors can
-   appear inline. Without the reservation, the dialog body jumps
-   when the error row mounts (morphic UI rule). The min-height
-   accommodates the rendered <FormField> error line. */
+/* Wraps fields whose validation error can mount; spacing comes from the form gap. */
 .fieldWithError {
-  /* nf-token-override: component dimension, not a spacing step */
-  min-block-size: 5.5rem;
   display: flex;
   flex-direction: column;
+}
+
+.priorityField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.priorityLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
 }
 
 /* ── Smart-create AI Assist section ─────────────────────────────────── */
 
 .smartSection {
   animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-sm);
-  padding: var(--nf-space-4);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+  padding-block-start: var(--nf-space-4);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
+}
+
+.smartIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-3);
+}
+
+.smartTrigger {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.smartHint {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
 }
 
 .smartStage {

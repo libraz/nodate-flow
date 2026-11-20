@@ -1,7 +1,8 @@
 /**
- * NotificationDropdown — dropdown panel showing the notification list
- * with mark-read, archive, and mark-all-read actions. Rendered inside
- * a Suspense boundary by NotificationBell.
+ * NotificationDropdown — body of the notification panel: the list with
+ * mark-read, archive, and mark-all-read actions. NotificationBell hosts it
+ * in a Popover (which owns the dialog role, Escape, outside click and focus
+ * return) inside a Suspense boundary.
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
@@ -10,10 +11,11 @@ import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
-import { Archive, BellOff, Check } from 'lucide-react';
-import { type ReactElement, useEffect, useMemo, useRef } from 'react';
+import { Archive, BellOff, Check, CircleHelp } from 'lucide-react';
+import { type ReactElement, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
@@ -41,8 +43,7 @@ function formatRelative(unixSec: number, locale: string): string {
 }
 
 interface NotificationDropdownProps {
-  /** DOM id applied to the dialog, matched by the bell's aria-controls. */
-  id: string;
+  /** Closes the hosting popover, e.g. before navigating away. */
   onClose: () => void;
 }
 
@@ -145,6 +146,11 @@ function NotificationRow({
       <span className={isUnread ? styles.unreadDot : styles.readDot} aria-hidden="true" />
       <div className={styles.notifContent}>
         <p className={styles.notifTitle}>{notificationTitle(item, t)}</p>
+        {item.resourceTitle && (
+          <p className={styles.notifResource} title={item.resourceTitle}>
+            {item.resourceTitle}
+          </p>
+        )}
         <div className={styles.notifMeta}>
           {item.actorDisplayName && (
             <span className={styles.notifActor}>{item.actorDisplayName}</span>
@@ -154,36 +160,59 @@ function NotificationRow({
       </div>
       <div className={styles.notifActions}>
         {isUnread && (
+          <Tooltip content={t('action.mark_read')}>
+            <button
+              type="button"
+              className={cx(styles.actionButton, 'nf-focus-ring')}
+              onClick={handleMarkRead}
+              aria-label={t('action.mark_read')}
+            >
+              <Icon icon={Check} decorative />
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip content={t('action.archive')}>
           <button
             type="button"
             className={cx(styles.actionButton, 'nf-focus-ring')}
-            onClick={handleMarkRead}
-            aria-label={t('action.mark_read')}
+            onClick={(e) => {
+              void handleArchive(e);
+            }}
+            aria-label={t('action.archive')}
+            disabled={archive.isPending}
+            aria-busy={archive.isPending || undefined}
           >
-            <Icon icon={Check} decorative />
+            <Icon icon={Archive} decorative />
           </button>
-        )}
-        <button
-          type="button"
-          className={cx(styles.actionButton, 'nf-focus-ring')}
-          onClick={(e) => {
-            void handleArchive(e);
-          }}
-          aria-label={t('action.archive')}
-          disabled={archive.isPending}
-          aria-busy={archive.isPending || undefined}
-        >
-          <Icon icon={Archive} decorative />
-        </button>
+        </Tooltip>
       </div>
     </div>
   );
 }
 
-export default function NotificationDropdown({
-  id,
-  onClose,
-}: NotificationDropdownProps): ReactElement {
+/** The `help:notifications` topic, shown in place under the panel header. */
+function NotificationsHelp({ id }: { id: string }): ReactElement {
+  const { t } = useTranslation('help');
+  const rawTips = t('notifications.tips', { returnObjects: true, defaultValue: {} });
+  const tips: string[] =
+    typeof rawTips === 'object' && rawTips !== null && !Array.isArray(rawTips)
+      ? Object.values(rawTips).filter((v): v is string => typeof v === 'string')
+      : [];
+  return (
+    <section id={id} className={styles.help} aria-label={t('notifications.title')}>
+      <p className={styles.helpSummary}>{t('notifications.summary')}</p>
+      {tips.length > 0 ? (
+        <ul className={styles.helpTips}>
+          {tips.map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+export default function NotificationDropdown({ onClose }: NotificationDropdownProps): ReactElement {
   const { t, i18n } = useTranslation('notifications');
   const locale = i18n.resolvedLanguage ?? 'en';
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = useNotificationsInfiniteQuery();
@@ -196,12 +225,10 @@ export default function NotificationDropdown({
   const wsId = useCurrentWorkspaceId();
   const markAll = useMarkAllRead(wsId);
   const navigate = useNavigate();
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Move focus into the panel so arrow/Tab/Escape act on it right away.
-  useEffect(() => {
-    panelRef.current?.focus();
-  }, []);
+  // Inline rather than the PageHelp popover: a popover nested in this one
+  // would count as an outside press and close the panel it explains.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpId = useId();
 
   const handleNavigate = (href: string): void => {
     onClose();
@@ -227,71 +254,71 @@ export default function NotificationDropdown({
   };
 
   return (
-    <>
-      {/* Invisible backdrop to capture outside clicks */}
-      <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
-      <div
-        ref={panelRef}
-        id={id}
-        className={styles.dropdown}
-        role="dialog"
-        aria-label={t('view.title')}
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation();
-            onClose();
-          }
-        }}
-      >
-        <div className={styles.dropdownHeader}>
+    <div className={styles.dropdownBody}>
+      <div className={styles.dropdownHeader}>
+        <div className={styles.dropdownTitleRow}>
           <h2 className={styles.dropdownTitle}>{t('view.title')}</h2>
-          <button
-            type="button"
-            className={cx(styles.markAllButton, 'nf-focus-ring')}
-            onClick={() => {
-              void handleMarkAll();
-            }}
-            disabled={!hasUnread || !wsId}
-          >
-            {t('view.mark_all_read')}
-          </button>
-        </div>
-        {entries.length === 0 ? (
-          <div className={styles.empty}>
-            <Icon icon={BellOff} decorative />
-            <span>{t('view.empty')}</span>
-          </div>
-        ) : (
-          <ul className={styles.notifList}>
-            {entries.map((entry, index) => (
-              <PresenceItem
-                key={entry.key}
-                as="li"
-                present={entry.present}
-                onExited={() => onExited(entry.key)}
-                className={motion.enter}
-                style={stagger(index)}
-              >
-                <NotificationRow item={entry.item} locale={locale} onNavigate={handleNavigate} />
-              </PresenceItem>
-            ))}
-          </ul>
-        )}
-        {hasNextPage ? (
-          <div className={styles.loadMoreRow}>
+          <Tooltip content={t('common:help.trigger')}>
             <button
               type="button"
-              className={cx(styles.loadMoreButton, 'nf-focus-ring')}
-              onClick={handleLoadMore}
-              disabled={isFetchingNextPage}
-              aria-busy={isFetchingNextPage}
+              className={cx(styles.helpToggle, 'nf-focus-ring')}
+              aria-label={t('common:help.trigger')}
+              aria-expanded={helpOpen}
+              aria-controls={helpId}
+              onClick={() => {
+                setHelpOpen((v) => !v);
+              }}
             >
-              {isFetchingNextPage ? t('view.loading_more') : t('view.load_more')}
+              <Icon icon={CircleHelp} decorative />
             </button>
-          </div>
-        ) : null}
+          </Tooltip>
+        </div>
+        <button
+          type="button"
+          className={cx(styles.markAllButton, 'nf-focus-ring')}
+          onClick={() => {
+            void handleMarkAll();
+          }}
+          disabled={!hasUnread || !wsId}
+        >
+          {t('view.mark_all_read')}
+        </button>
       </div>
-    </>
+      {helpOpen ? <NotificationsHelp id={helpId} /> : null}
+      {entries.length === 0 ? (
+        <div className={styles.empty}>
+          <Icon icon={BellOff} decorative />
+          <span>{t('view.empty')}</span>
+        </div>
+      ) : (
+        <ul className={styles.notifList}>
+          {entries.map((entry, index) => (
+            <PresenceItem
+              key={entry.key}
+              as="li"
+              present={entry.present}
+              onExited={() => onExited(entry.key)}
+              className={motion.enter}
+              style={stagger(index)}
+            >
+              <NotificationRow item={entry.item} locale={locale} onNavigate={handleNavigate} />
+            </PresenceItem>
+          ))}
+        </ul>
+      )}
+      {hasNextPage ? (
+        <div className={styles.loadMoreRow}>
+          <button
+            type="button"
+            className={cx(styles.loadMoreButton, 'nf-focus-ring')}
+            onClick={handleLoadMore}
+            disabled={isFetchingNextPage}
+            aria-busy={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? t('view.loading_more') : t('view.load_more')}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * ReplayPanel — 3.WEB-3 timeline replay UI.
+ * ReplayPanel — timeline replay UI.
  *
  * Shows the recomputed derived_state next to the stored value and
  * flags drift. Uses {@link useTaskReplayQuery} under the hood.
@@ -67,6 +67,7 @@ export default function ReplayPanel({ taskId }: ReplayPanelProps): ReactElement 
           {t('replay.refresh')}
         </Button>
       </header>
+      <p className={styles.description}>{t('replay.description')}</p>
       <div key={bodyState} className={styles.body}>
         {q.isLoading ? (
           <div aria-busy="true">

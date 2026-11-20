@@ -1,14 +1,14 @@
 {
   "view": {
     "title": "通知",
-    "empty": "通知はありません",
+    "empty": "通知はありません。メンション・担当の変更・コメント・予定の変更があると、ここに届きます。",
     "mark_all_read": "すべて既読にする",
     "load_more": "さらに読み込む",
     "loading_more": "通知を読み込んでいます…"
   },
   "action": {
     "mark_read": "既読にする",
-    "archive": "アーカイブ"
+    "archive": "アーカイブ（この一覧から外す）"
   },
   "severity": {
     "low": "低",

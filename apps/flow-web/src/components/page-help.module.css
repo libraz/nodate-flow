@@ -1,0 +1,147 @@
+/* Per-page help: a quiet "?" trigger and the reading panel it opens. */
+
+.anchor {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: var(--nf-space-2);
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nf-radius-pill);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.trigger:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+}
+
+.panel {
+  /* nf-token-override: reading measure, not a spacing step */
+  inline-size: 22rem;
+  max-inline-size: 90vw;
+  padding: var(--nf-space-5);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1-5);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nf-color-fg-muted);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--nf-font-display);
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  line-height: var(--nf-leading-snug);
+  color: var(--nf-color-fg);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+.tips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tip {
+  position: relative;
+  padding-inline-start: var(--nf-space-4);
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg);
+}
+
+.tip::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  /* nf-token-override: marker sits on the first line's x-height */
+  inset-block-start: 0.6em;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 6px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 6px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-accent);
+}
+
+.foot {
+  padding-block-start: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.shortcuts {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.shortcuts:hover {
+  color: var(--nf-color-fg);
+}
+
+.shortcuts:focus-visible {
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
+  outline-offset: var(--nf-focus-ring-offset);
+  border-radius: var(--nf-radius-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .shortcuts {
+    transition: none;
+  }
+}

@@ -32,7 +32,13 @@
   min-inline-size: 0;
 }
 
+/* Inline flow keeps the help trigger on the last line of a wrapped title. */
+.titleRow {
+  min-inline-size: 0;
+}
+
 .title {
+  display: inline;
   margin: 0;
   font-family: var(--nf-font-display);
   font-size: var(--nf-text-page-title);

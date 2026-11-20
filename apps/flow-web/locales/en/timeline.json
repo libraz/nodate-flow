@@ -5,7 +5,8 @@
     "loading": "Loading timeline…",
     "load_more": "Load more",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "description": "A chronological record of what happened: task changes, comments, reviews, signals, and AI and agent activity. Filter by event type or person."
   },
   "filter": {
     "kind_all": "All event types",
@@ -417,5 +418,20 @@
       "target_not_found": "Action no longer exists",
       "fetch_error": "Couldn't reverse the action. Please try again."
     }
+  },
+  "source": {
+    "github": "GitHub",
+    "slack": "Slack",
+    "google": "Google",
+    "signal": "Signal",
+    "ai": "AI",
+    "task": "Task",
+    "comment": "Comment",
+    "page": "Page",
+    "workspace": "Workspace",
+    "project": "Project",
+    "calendar": "Calendar",
+    "share": "Share",
+    "system": "System"
   }
 }

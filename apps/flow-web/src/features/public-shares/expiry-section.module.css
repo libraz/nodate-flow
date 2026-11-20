@@ -1,0 +1,57 @@
+/**
+ * Share detail expiry section styling.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+}
+
+.heading {
+  margin: 0 0 var(--nf-space-1);
+  font-size: var(--nf-text-base);
+}
+
+.status,
+.statusExpired {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.status {
+  color: var(--nf-color-fg-muted);
+}
+
+.statusExpired {
+  color: var(--nf-color-danger-fg);
+  font-weight: var(--nf-weight-medium);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 28rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+}
+
+.spacer {
+  flex: 1;
+}

@@ -76,6 +76,8 @@ export default function WorkspaceList(): ReactElement {
     <PageFrame>
       <PageHeader
         title={t('workspaces.title')}
+        description={t('workspaces.description')}
+        help="workspaces"
         actions={
           <Button variant="primary" onClick={handleCreate}>
             {t('workspaces.new')}
@@ -99,7 +101,7 @@ export default function WorkspaceList(): ReactElement {
             }
           />
         }
-        className={styles.grid}
+        {...(workspaces.length === 0 ? { className: styles.gridEmpty } : {})}
       />
 
       <WorkspaceCreateDialog

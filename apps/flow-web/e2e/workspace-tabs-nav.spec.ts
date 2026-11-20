@@ -2,7 +2,7 @@
  * Workspace detail tab strip navigation E2E.
  *
  * The workspace detail layout (`/workspaces/$id`) renders a horizontal
- * sub-nav with Overview / Projects / Timeline / Settings. Each link
+ * sub-nav with Overview / Projects / Members / Timeline / Settings. Each link
  * routes to a different child segment. A regression where one of those
  * `to` props points at a stale path or where the link disappears under
  * a wrong condition currently ships green because no spec drives the
@@ -19,7 +19,9 @@ import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 
 test.describe('workspace tab strip', () => {
-  test('navigates to projects, timeline, and settings via tab clicks', async ({ page }) => {
+  test('navigates to projects, members, timeline, and settings via tab clicks', async ({
+    page,
+  }) => {
     const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
@@ -34,6 +36,15 @@ test.describe('workspace tab strip', () => {
       .getByRole('link', { name: enCommon.workspaces.nav.projects, exact: true })
       .click();
     await expect(page).toHaveURL(new RegExp(`/workspaces/${tenant.workspaceId}/projects$`), {
+      timeout: 10_000,
+    });
+    await expect(page.getByRole('main')).toBeVisible();
+
+    // Members tab → /workspaces/$id/members (a child route, not ?tab=)
+    await tabStrip
+      .getByRole('link', { name: enCommon.workspaces.nav.members, exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/workspaces/${tenant.workspaceId}/members$`), {
       timeout: 10_000,
     });
     await expect(page.getByRole('main')).toBeVisible();

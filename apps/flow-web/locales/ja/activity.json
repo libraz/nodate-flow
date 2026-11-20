@@ -1,22 +1,23 @@
 {
   "view": {
     "title": "アクティビティ",
-    "description": "このワークスペースの監査・AI・MCP のアクティビティを統合したフィードです。",
+    "description": "このワークスペースで起きたことの記録です。メンバーの変更、AI の実行、連携ツールからの呼び出しが並びます。",
     "list_label": "ワークスペースのアクティビティ",
     "loading": "アクティビティを読み込み中…",
     "loading_more": "読み込み中…",
     "load_more": "さらに読み込む",
-    "empty": "まだアクティビティはありません。",
+    "empty": "まだアクティビティはありません。タスクの作成、ページの編集、AI の実行、連携ツールの利用が、ここに記録されます。",
     "empty_filtered": "このソースのアクティビティはありません。",
     "error": "アクティビティを読み込めませんでした。もう一度お試しください。",
     "retry": "再試行"
   },
   "filter": {
     "source_label": "ソース",
-    "all_sources": "すべて"
+    "all_sources": "すべて",
+    "source_hint": "変更: メンバーの操作。AI: AI の実行。MCP: 連携ツールからの呼び出し。"
   },
   "source": {
-    "audit": "監査",
+    "audit": "変更",
     "ai": "AI",
     "mcp": "MCP"
   },
@@ -111,5 +112,26 @@
     "workspace_create": "ワークスペースを作成しました",
     "workspace_delete": "ワークスペースを削除しました",
     "workspace_update": "ワークスペースを更新しました"
+  },
+  "resource": {
+    "task": "タスク",
+    "page": "ページ",
+    "project": "プロジェクト",
+    "comment": "コメント",
+    "timebox": "タイムボックス",
+    "calendar": "カレンダー",
+    "calendar_event": "予定",
+    "label": "ラベル",
+    "lens": "保存したビュー",
+    "attachment": "添付ファイル",
+    "ai_agent": "AI エージェント",
+    "ai_provider": "AI プロバイダー",
+    "ai_invocation": "AI の実行",
+    "mcp_invocation": "ツール呼び出し（MCP）",
+    "mcp_token": "MCP トークン",
+    "intake_item": "受付アイテム",
+    "membership": "メンバーシップ",
+    "notification": "通知",
+    "webhook_subscription": "Webhook"
   }
 }

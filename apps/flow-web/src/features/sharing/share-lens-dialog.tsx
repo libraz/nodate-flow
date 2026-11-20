@@ -123,6 +123,7 @@ export default function ShareLensDialog({
   return (
     <Dialog open={open} onClose={handleClose} title={t('title')}>
       <div className={styles.dialog}>
+        <p className={styles.confirmText}>{t('intro')}</p>
         {/* Status badge */}
         <div className={styles.statusSection}>
           <span
@@ -156,6 +157,7 @@ export default function ShareLensDialog({
                     onError={selectLink}
                   />
                 </div>
+                <p className={styles.warningText}>{t('link_unavailable')}</p>
               </div>
             ) : (
               /*

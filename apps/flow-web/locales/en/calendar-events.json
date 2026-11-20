@@ -24,7 +24,8 @@
       }
     },
     "discard_unsaved": "Discard unsaved changes?",
-    "discard_confirm": "Discard"
+    "discard_confirm": "Discard",
+    "blockShortcutHint": "Tip: Shift+click a day on the calendar to start a block."
   },
   "field": {
     "title": "Title",
@@ -33,11 +34,11 @@
     "end": "End",
     "startTime": "Start time",
     "endTime": "End time",
-    "allDay": "All day",
+    "allDay": "All day (no start or end time)",
     "location": "Location",
-    "memo": "Memo",
+    "memo": "Notes",
     "blockLabel": "Block label",
-    "showAs": "Show as",
+    "showAs": "Availability shown to others",
     "recurrence": "Recurrence",
     "notification": "Notification",
     "project": "Project",
@@ -45,7 +46,14 @@
     "description": "Description",
     "date": "Date",
     "flexibility": "Can it move?",
-    "flexibilityHint": "Separate from \"Show as\", which is what other calendars read."
+    "flexibilityHint": "Whether this time could be moved if needed. Others do not see this; they see only the availability above.",
+    "showAsHint": "How this time appears to people who look at your availability.",
+    "blockLabelHint": "Names the block on the calendar. “Out of office” also marks you as away; the other labels mark you as busy.",
+    "projectHint": "The task is created in this project and appears on the calendar on its due date.",
+    "taskDatesHint": "The end date becomes the task's due date.",
+    "calendarHint": "Who can see this item depends on the calendar you choose.",
+    "recurrenceHint": "When you edit or delete a repeating event, you will be asked whether the change applies to this event, this and following, or all events.",
+    "notificationHint": "Sends you a reminder before the event starts."
   },
   "placeholder": {
     "title": {
@@ -55,7 +63,7 @@
       "free": "Available for …",
       "milestone": "Release, deadline, …"
     },
-    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR (every Monday, Wednesday and Friday)"
   },
   "showAs": {
     "busy": "Busy",
@@ -146,7 +154,8 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "deleteConfirm": "Delete this {kind}?",
-    "moreOptions": "More options"
+    "moreOptions": "More options",
+    "moreOptionsHint": "Repeat, notification and notes"
   },
   "toast": {
     "created": {
@@ -205,7 +214,9 @@
         "remove_failed": "Could not remove the attendee"
       },
       "removed_toast": "Removed {name}",
-      "leave_confirm": "Remove yourself from this event?"
+      "leave_confirm": "Remove yourself from this event?",
+      "can_editHint": "Lets this person change the event's details",
+      "send_inviteHint": "Creates an invite link and copies it to your clipboard. Paste it into a message to send it yourself."
     },
     "creator": {
       "label": "Created by",
@@ -282,7 +293,7 @@
       "revoke_success": "Invite revoked",
       "revoke_error": "Failed to revoke invite",
       "expires_at": "Expires {date}",
-      "create_hint": "Issue invites from the Attendees tab.",
+      "create_hint": "No invite links yet. Create one from the Attendees tab with “Send invite link”.",
       "status": {
         "pending": "Pending",
         "sent": "Sent",
@@ -323,7 +334,15 @@
         "delta_days": "{days}d",
         "delta_negative": "−{value} earlier",
         "delta_positive": "+{value} later"
-      }
+      },
+      "triggerHint": "Move the event and preview which linked tasks can move with it"
     }
+  },
+  "kind_desc": {
+    "task": "Work to do. It is saved to a project and appears on its due date.",
+    "event": "A meeting or appointment at a set time.",
+    "block": "Time you set aside for work or focus. Others see you as busy, or away for “Out of office”.",
+    "free": "Time you mark as available, so others can see when to reach you.",
+    "milestone": "A date marker with no time, such as a release or deadline."
   }
 }

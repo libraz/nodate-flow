@@ -17,7 +17,7 @@
     "notification_feed": "Notifications"
   },
   "empty": "No widgets yet",
-  "empty_description": "Add widgets to customize your dashboard.",
+  "empty_description": "Press Add widget to pick a widget type and place it on the grid. Edit layout lets you drag widgets to reorder them or remove them.",
   "resize_label": "Resize",
   "confirm_remove": "Remove this widget?",
   "widget_title_label": "Widget title",
@@ -26,5 +26,45 @@
     "timebox_label": "Timebox",
     "project_label": "Project"
   },
-  "remove_widget_confirm": "Remove this widget from the dashboard?"
+  "remove_widget_confirm": "Remove this widget from the dashboard?",
+  "scope": "Widgets for {name}",
+  "widgets": {
+    "see_all": "See all",
+    "loading": "Loading widget",
+    "retry": "Try again",
+    "error_title": "Could not load this widget",
+    "error_hint": "Other widgets are not affected.",
+    "task_summary": {
+      "open": "Open",
+      "review": "In review",
+      "waiting": "Waiting",
+      "done": "Done",
+      "overdue": "Overdue",
+      "empty_title": "No tasks yet",
+      "empty_hint": "Counts appear here once this workspace has tasks."
+    },
+    "overdue_tasks": {
+      "empty_title": "Nothing is overdue",
+      "empty_hint": "Unfinished tasks whose due date has passed appear here.",
+      "days_overdue": "{count, plural, one {# day overdue} other {# days overdue}}",
+      "due": "Due {date}"
+    },
+    "signals_feed": {
+      "empty_title": "No signals yet",
+      "empty_hint": "Signals attached to tasks in this workspace appear here."
+    },
+    "ai_suggestions": {
+      "empty_title": "No suggestions right now",
+      "empty_hint": "AI proposals for your inbox appear here. Nothing changes until you apply one."
+    },
+    "notification_feed": {
+      "empty_title": "No notifications",
+      "empty_hint": "Mentions, assignments, comments and schedule changes in this workspace appear here.",
+      "unread": "Unread"
+    },
+    "burndown": {
+      "coming_soon_title": "Coming soon",
+      "coming_soon_hint": "Burndown charts are not available yet. You can remove this widget."
+    }
+  }
 }

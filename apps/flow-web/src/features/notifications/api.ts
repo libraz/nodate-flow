@@ -47,6 +47,7 @@ export interface NotificationItem {
   resourceType: string;
   resourceId: string | null;
   title: string;
+  resourceTitle: string | null;
   body: string | null;
   severity: NotificationSeverity;
   channel: string;
@@ -67,6 +68,7 @@ function dtoToItem(dto: components['schemas']['NotificationDTO'], total: number)
     resourceType: dto.resourceType,
     resourceId: dto.resourceId ?? null,
     title: dto.title,
+    resourceTitle: dto.resourceTitle ?? null,
     body: dto.body ?? null,
     severity: dto.severity as NotificationSeverity,
     channel: dto.channel,

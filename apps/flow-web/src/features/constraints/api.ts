@@ -142,7 +142,7 @@ export function useExplainConstraint(): UseMutationResult<
 }
 
 /**
- * useRemoveConstraint — manual intervention (4.WEB-3): drop a
+ * useRemoveConstraint — manual intervention: drop a
  * constraint that the operator deems no longer relevant. This is the
  * "force satisfy" escape hatch — removing the row makes the engine
  * stop blocking on it.

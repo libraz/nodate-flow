@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "AI 指标",
-    "description": "此工作区 AI 功能的采纳率和各提供方限流统计。"
+    "description": "AI 建议被采纳或忽略的数量，以及对各 AI 服务商的调用因速率限制被立即发送、延迟或拒绝的次数。"
   },
   "window": {
     "label": "时间范围",
@@ -25,7 +25,8 @@
       "destination": "提供方",
       "allowed": "通过",
       "waited": "等待",
-      "denied": "拒绝"
+      "denied": "拒绝",
+      "help": "允许：立即发送。等待：被限流延迟后发送。拒绝：因超出限制而被拒绝。"
     }
   },
   "error": {

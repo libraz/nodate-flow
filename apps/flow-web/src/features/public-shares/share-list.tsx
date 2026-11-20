@@ -7,8 +7,10 @@
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +19,7 @@ import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
+import ui from '../settings/settings-ui.module.css';
 import {
   type PublicShare,
   type PublicShareWithToken,
@@ -41,11 +44,14 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
   const [createOpen, setCreateOpen] = useState(false);
   const [rotatedShare, setRotatedShare] = useState<PublicShareWithToken | null>(null);
   const locale = i18n.resolvedLanguage ?? 'en';
+  // The column appears only once some share carries an expiry.
+  const showExpiry = shares.some((share) => share.expiresAt != null);
 
   const handleDelete = async (share: PublicShare): Promise<void> => {
     if (
       !(await confirmAction({
         message: t('workspace.public_shares.delete_confirm', { title: share.title }),
+        confirmLabel: t('workspace.public_shares.delete'),
       }))
     ) {
       return;
@@ -62,7 +68,13 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
   };
 
   const handleRotate = async (share: PublicShare): Promise<void> => {
-    if (!(await confirmAction({ message: t('workspace.public_shares.rotate_confirm') }))) return;
+    if (
+      !(await confirmAction({
+        message: t('workspace.public_shares.rotate_confirm'),
+        confirmLabel: t('workspace.public_shares.rotate'),
+      }))
+    )
+      return;
     try {
       const result = await rotate.mutateAsync(share.id);
       setRotatedShare(result);
@@ -79,6 +91,7 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
       <PageHeader
         title={t('workspace.public_shares.title')}
         description={t('workspace.public_shares.description')}
+        help="workspace-settings-public-shares"
         actions={
           <Button
             type="button"
@@ -94,7 +107,21 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
       />
 
       {entries.length === 0 ? (
-        <p className={styles.empty}>{t('workspace.public_shares.empty')}</p>
+        <EmptyState
+          titleAs="p"
+          title={t('workspace.public_shares.empty')}
+          className={ui.empty}
+          action={
+            <Button
+              type="button"
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+            >
+              {t('workspace.public_shares.create')}
+            </Button>
+          }
+        />
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -102,9 +129,11 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
               <tr className={styles.headerRow}>
                 <th className={styles.headerCell}>{t('workspace.public_shares.table.title')}</th>
                 <th className={styles.headerCell}>{t('workspace.public_shares.table.events')}</th>
-                <th className={styles.headerCell}>
-                  {t('workspace.public_shares.table.expires_at')}
-                </th>
+                {showExpiry ? (
+                  <th className={styles.headerCell}>
+                    {t('workspace.public_shares.table.expires_at')}
+                  </th>
+                ) : null}
                 <th className={styles.headerCell}>
                   {t('workspace.public_shares.table.created_at')}
                 </th>
@@ -136,29 +165,37 @@ export default function ShareList({ workspaceId }: ShareListProps): ReactElement
                     </div>
                   </td>
                   <td className={styles.cell}>{share.eventCount}</td>
-                  <td className={styles.cell}>
-                    {formatEpochDateTime(share.expiresAt, locale) ??
-                      t('workspace.public_shares.never_expires')}
-                  </td>
+                  {showExpiry ? (
+                    <td className={styles.cell}>
+                      {formatEpochDateTime(share.expiresAt, locale) ??
+                        t('workspace.public_shares.never_expires')}
+                      {share.expiresAt != null && share.expiresAt * 1000 <= Date.now()
+                        ? ` · ${t('workspace.public_shares.expiry.expired_tag')}`
+                        : null}
+                    </td>
+                  ) : null}
                   <td className={styles.cell}>
                     {formatEpochDateTime(share.createdAt, locale) ?? '—'}
                   </td>
                   <td className={styles.cellActions}>
+                    <Tooltip content={t('workspace.public_shares.rotate_hint')}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        data-testid="public-share-rotate"
+                        disabled={rotate.isPending}
+                        aria-busy={(rotate.isPending && rotate.variables === share.id) || undefined}
+                        onClick={() => {
+                          void handleRotate(share);
+                        }}
+                      >
+                        {t('workspace.public_shares.rotate')}
+                      </Button>
+                    </Tooltip>
                     <Button
                       type="button"
-                      variant="ghost"
-                      data-testid="public-share-rotate"
-                      disabled={rotate.isPending}
-                      aria-busy={(rotate.isPending && rotate.variables === share.id) || undefined}
-                      onClick={() => {
-                        void handleRotate(share);
-                      }}
-                    >
-                      {t('workspace.public_shares.rotate')}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
+                      size="sm"
+                      variant="danger"
                       data-testid="public-share-delete"
                       disabled={deleteShare.isPending}
                       aria-busy={

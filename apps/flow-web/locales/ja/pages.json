@@ -4,9 +4,9 @@
   "edit": "ページを編集",
   "delete": "ページを削除",
   "empty": "ページがありません",
-  "empty_description": "ページを作成してプロジェクトのドキュメントを整理しましょう。",
+  "empty_description": "ページには、メモ・仕様・プロジェクト資料を残せます。新規作成するか、タイトルと指示から AI に下書きを作らせられます。",
   "no_selection": "ページを選択してください",
-  "no_selection_description": "左の一覧からページを選ぶか、新しいページを作成してください。",
+  "no_selection_description": "左のツリーからページを選ぶか、「新規ページ」で作成します。",
   "page_title_label": "タイトル",
   "page_body_label": "コンテンツ",
   "parent_label": "親ページ",
@@ -15,16 +15,17 @@
   "project_none": "ワークスペース全体",
   "confirm_delete": "このページを削除しますか？",
   "ai_generate": "AIで生成",
-  "ai_badge": "AI",
+  "ai_badge": "AI で下書きしたページ",
   "generate": {
     "dialog_title": "AIでページを生成",
     "context_label": "ページタイトル",
     "prompt_label": "指示",
     "prompt_placeholder": "このページで扱う内容、対象読者、主要なセクション、トーンなど、AIに伝えたい情報を入力してください。",
-    "prompt_help": "上のページタイトルをコンテキストとし、入力した指示に従って生成します。",
+    "prompt_help": "ページタイトルは文脈として、入力した指示は依頼内容として使われます。生成に成功すると、このタイトルで新しいページが作成されます。タイトルは重複できません。",
     "submit": "生成",
     "cancel": "キャンセル",
-    "error": "ページの生成に失敗しました。再度お試しください。"
+    "error": "ページの生成に失敗しました。再度お試しください。",
+    "submit_creates": "生成してページを作成"
   },
   "children": "サブページ",
   "breadcrumb_label": "パンくずリスト",
@@ -40,5 +41,9 @@
     "save_failed": "ページを保存できませんでした",
     "create_failed": "ページを作成できませんでした",
     "delete_failed": "ページを削除できませんでした"
-  }
+  },
+  "description": "メモ・仕様・プロジェクト資料を書いて、ツリーで整理できます。",
+  "parent_hint": "このページを、ツリー上で別のページの下に置きます。",
+  "project_hint": "プロジェクトに紐づけるか、ワークスペース全体のページにするかを選びます。",
+  "ai_generate_hint": "タイトルと指示から、AI が下書きしたページを新規作成します。内容は確認してから使ってください。"
 }

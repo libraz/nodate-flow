@@ -1,7 +1,7 @@
 /**
  * Task replay feature — GET /tasks/{id}/replay.
  *
- * Powers the 3.WEB-3 timeline replay panel: recomputes derived_state
+ * Powers the timeline replay panel: recomputes derived_state
  * from the task.transition.* event log and reports whether replay
  * agrees with the stored tasks.derived_state.
  */

@@ -17,30 +17,29 @@
  *   Stop   = active -> completed
  *   Cancel = * -> cancelled
  *
- * Workspace task pickers do not yet have a clean per-workspace tasks
- * list endpoint surfaced through the SDK in a way that matches the
- * "ID-by-paste" requirement, so the inline "add task" affordance is a
- * paste-UUID input. The translation hint string flags this as a
- * temporary state.
+ * Tasks are linked through a title search over the workspace
+ * (`useTaskSearch`, the same lookup the dependency picker uses).
  */
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
-import Input from '@nodate-flow/ui/primitives/input';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { getRouteApi } from '@tanstack/react-router';
-import { ChevronRight } from 'lucide-react';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { ChevronRight, CircleCheck, CircleSlash } from 'lucide-react';
+import { type FormEvent, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import type { TaskDerivedState } from '../tasks/api';
+import { type TaskDerivedState, useTaskSearch } from '../tasks/api';
 import { STATE_KEY, STATE_TONE } from '../tasks/constants';
 import {
   asTimeboxStatus,
@@ -113,8 +112,17 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
   const tasks: TimeboxTask[] = tasksQuery.data ?? [];
   const removeTask = useRemoveTimeboxTaskMutation();
   const addTask = useAddTimeboxTaskMutation();
-  const [taskIdInput, setTaskIdInput] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  // Remounting the combobox after a link clears the typed title.
+  const [pickerKey, setPickerKey] = useState(0);
+  const hintId = useId();
   const taskPresence = usePresenceList(tasks, (task) => task.id);
+  const search = useTaskSearch(workspaceId, searchQuery, searchQuery.trim().length > 0);
+  const linkedIds = new Set(tasks.map((task) => task.id));
+  const searchOptions = (search.data ?? [])
+    .filter((task) => !linkedIds.has(task.id))
+    .map((task) => ({ value: task.id, label: task.title }));
 
   const handleRemove = async (taskId: string): Promise<void> => {
     try {
@@ -130,11 +138,12 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
 
   const handleAdd = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    const trimmed = taskIdInput.trim();
-    if (trimmed.length === 0) return;
+    if (selectedTaskId.length === 0) return;
     try {
-      await addTask.mutateAsync({ wsId: workspaceId, timeboxId, taskId: trimmed });
-      setTaskIdInput('');
+      await addTask.mutateAsync({ wsId: workspaceId, timeboxId, taskId: selectedTaskId });
+      setSelectedTaskId('');
+      setSearchQuery('');
+      setPickerKey((k) => k + 1);
       toaster.show({ tone: 'success', message: t('timeboxes.add_task.success') });
     } catch (err) {
       toaster.show({ tone: 'danger', message: formatApiError(err, t, 'timeboxes.add_task.error') });
@@ -188,26 +197,36 @@ function TaskList({ workspaceId, timeboxId }: TaskListProps): ReactElement {
         }}
         className={styles.addTaskRow}
       >
-        <Input
-          className={styles.addTaskInput}
-          aria-label={t('timeboxes.add_task_id.label')}
-          placeholder={t('timeboxes.add_task_id.label')}
-          value={taskIdInput}
-          onChange={(e) => {
-            setTaskIdInput(e.target.value);
+        <Combobox
+          key={pickerKey}
+          className={cx(styles.addTaskInput)}
+          aria-label={t('timeboxes.add_task_search.label')}
+          placeholder={t('timeboxes.add_task_search.placeholder')}
+          options={searchOptions}
+          value={selectedTaskId}
+          onChange={setSelectedTaskId}
+          onSearch={(query) => {
+            setSearchQuery(query);
+            setSelectedTaskId('');
           }}
+          isLoading={search.isFetching}
+          loadingMessage={t('common.loading')}
+          emptyMessage={t('timeboxes.add_task_search.empty')}
         />
         <Button
           type="submit"
           variant="default"
           size="sm"
-          disabled={taskIdInput.trim().length === 0 || addTask.isPending}
+          disabled={selectedTaskId.length === 0 || addTask.isPending}
           aria-busy={addTask.isPending || undefined}
+          aria-describedby={hintId}
         >
           {t('timeboxes.add_task.label')}
         </Button>
       </form>
-      <p className={styles.addTaskHint}>{t('timeboxes.add_task_id.hint')}</p>
+      <p id={hintId} className={styles.addTaskHint}>
+        {t('timeboxes.add_task_search.hint')}
+      </p>
     </div>
   );
 }
@@ -336,17 +355,19 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
             >
               {t('timeboxes.action.edit')}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              {...transitionProps('cancelled')}
-              onClick={() => {
-                void transition('cancelled', 'timeboxes.transition.error');
-              }}
-            >
-              {t('timeboxes.action.cancel')}
-            </Button>
+            <Tooltip content={t('timeboxes.action.cancelPlanHint')}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                {...transitionProps('cancelled')}
+                onClick={() => {
+                  void transition('cancelled', 'timeboxes.transition.error');
+                }}
+              >
+                {t('timeboxes.action.cancel')}
+              </Button>
+            </Tooltip>
             <Button
               type="button"
               size="sm"
@@ -362,28 +383,34 @@ function TimeboxCard({ timebox, workspaceId, locale, onEdit }: TimeboxCardProps)
         ) : null}
         {status === 'active' ? (
           <>
-            <Button
-              type="button"
-              size="sm"
-              variant="primary"
-              {...transitionProps('completed')}
-              onClick={() => {
-                void transition('completed', 'timeboxes.transition.error');
-              }}
-            >
-              {t('timeboxes.action.stop')}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              {...transitionProps('cancelled')}
-              onClick={() => {
-                void transition('cancelled', 'timeboxes.transition.error');
-              }}
-            >
-              {t('timeboxes.action.cancel')}
-            </Button>
+            <Tooltip content={t('timeboxes.action.completeHint')}>
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                {...transitionProps('completed')}
+                onClick={() => {
+                  void transition('completed', 'timeboxes.transition.error');
+                }}
+              >
+                <CircleCheck size={14} aria-hidden />
+                {t('timeboxes.action.stop')}
+              </Button>
+            </Tooltip>
+            <Tooltip content={t('timeboxes.action.endIncompleteHint')}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                {...transitionProps('cancelled')}
+                onClick={() => {
+                  void transition('cancelled', 'timeboxes.transition.error');
+                }}
+              >
+                <CircleSlash size={14} aria-hidden />
+                {t('timeboxes.action.end_incomplete')}
+              </Button>
+            </Tooltip>
             <Button
               type="button"
               size="sm"
@@ -501,6 +528,7 @@ export default function TimeboxesPage(): ReactElement {
       <PageHeader
         title={t('timeboxes.title')}
         description={t('timeboxes.description')}
+        help="timeboxes"
         actions={
           <Button type="button" variant="primary" onClick={openCreate}>
             {t('timeboxes.new')}
@@ -571,7 +599,7 @@ export default function TimeboxesPage(): ReactElement {
         <EmptyState
           className={styles.empty}
           title={t('timeboxes.empty')}
-          description={t('timeboxes.description')}
+          description={t('timeboxes.empty_description')}
           action={
             <Button type="button" variant="primary" onClick={openCreate}>
               {t('timeboxes.new')}

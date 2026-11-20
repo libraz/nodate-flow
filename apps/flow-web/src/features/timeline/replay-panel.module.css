@@ -24,6 +24,12 @@
   font-weight: var(--nf-weight-semibold);
 }
 
+.description {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
 /* Keyed by state so each swap replays the fade. */
 .body {
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);

@@ -67,6 +67,13 @@
   gap: var(--nf-space-3);
 }
 
+/* Scope note under the stat row: which tasks the four counts cover. */
+.statHint {
+  margin: calc(var(--nf-space-2) * -1) 0 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
 /* Replays the swap from the skeleton row to the real cards. */
 .statsEnter {
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);

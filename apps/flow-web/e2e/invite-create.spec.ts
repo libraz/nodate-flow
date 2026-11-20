@@ -44,12 +44,14 @@ test.describe('invite create', () => {
     if (!t) throw new Error('tenant not initialised');
     await injectAuth(page.context(), t);
 
-    // The Members tab is a `?tab=members` variant of the workspace
+    // The Members tab is a `/members` variant of the workspace
     // detail route — cheaper than driving the sidebar + tab click.
-    await page.goto(`/workspaces/${t.workspaceId}?tab=members`);
+    await page.goto(`/workspaces/${t.workspaceId}/members`);
 
     // Members section heading — regex tolerant to EN/JA copy.
-    await expect(page.getByRole('heading', { name: /^(members|メンバー)$/i })).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: /^(members|メンバー)$/i, level: 2 }),
+    ).toBeVisible({
       timeout: 15_000,
     });
 
@@ -63,12 +65,9 @@ test.describe('invite create', () => {
       dialog.getByRole('heading', { name: /create invite link|招待リンクの作成/i }),
     ).toBeVisible();
 
-    // Pick a non-default role so the spec proves the role select is
-    // actually wired through the submission — default is "member".
-    // The option `value` attributes are untranslated role slugs, so
-    // selecting by value sidesteps locale-sensitive label matching.
-    const roleSelect = dialog.getByLabel(/^(role|ロール)$/i);
-    await roleSelect.selectOption('admin');
+    // Pick a non-default role so the spec proves the role choice is
+    // wired through the submission — default is "member".
+    await dialog.getByRole('radio', { name: /^(admin|管理者)/i }).check();
 
     // Label helps the list assertion below — the first column shows
     // the label when set and a placeholder when blank.
@@ -114,9 +113,11 @@ test.describe('invite create', () => {
     if (!t) throw new Error('tenant not initialised');
     await injectAuth(page.context(), t);
 
-    await page.goto(`/workspaces/${t.workspaceId}?tab=members`);
+    await page.goto(`/workspaces/${t.workspaceId}/members`);
 
-    await expect(page.getByRole('heading', { name: /^(members|メンバー)$/i })).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: /^(members|メンバー)$/i, level: 2 }),
+    ).toBeVisible({
       timeout: 15_000,
     });
 

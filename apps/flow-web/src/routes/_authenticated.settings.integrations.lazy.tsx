@@ -50,7 +50,11 @@ function IntegrationsRoute(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <PageHeader title={t('integrations.title')} />
+      <PageHeader
+        title={t('integrations.title')}
+        description={t('integrations.description')}
+        help="settings-integrations"
+      />
       <Suspense
         fallback={
           <div className={ui.skeletonStack} aria-hidden="true">

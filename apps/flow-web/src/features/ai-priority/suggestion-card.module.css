@@ -80,13 +80,6 @@
   gap: var(--nf-space-2);
 }
 
-.priorityDot {
-  inline-size: var(--nf-space-2);
-  block-size: var(--nf-space-2);
-  border-radius: var(--nf-radius-pill);
-  flex: 0 0 auto;
-}
-
 .arrow {
   color: var(--nf-color-fg-muted);
   flex: 0 0 auto;
@@ -143,10 +136,9 @@
 
 .actions {
   display: flex;
-  flex-direction: column;
   gap: var(--nf-space-2);
-  align-items: stretch;
-  justify-content: flex-start;
+  align-items: flex-start;
+  justify-content: flex-end;
   flex: 0 0 auto;
 }
 
@@ -154,10 +146,5 @@
 @media (max-width: 767px) {
   .card {
     flex-direction: column;
-  }
-
-  .actions {
-    flex-direction: row;
-    justify-content: flex-end;
   }
 }

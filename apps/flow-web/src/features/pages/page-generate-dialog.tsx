@@ -4,9 +4,10 @@
  *
  * The page editor owns the working `title` and `projectId`; this dialog
  * surfaces the title as read-only context, lets the user supply a free-form
- * `prompt`, and submits all three to {@link useGeneratePage}. On success the
- * generated body is handed back through `onGenerated` so the editor can
- * populate its own `body` state.
+ * `prompt`, and submits all three to {@link useGeneratePage}. The server
+ * creates the page itself, so the response is an already-saved page, not a
+ * draft body; it is handed back through `onGenerated` and the caller moves to
+ * that page rather than saving the form again.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -14,11 +15,11 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Sparkles } from 'lucide-react';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import { AiSparkle } from '../ai-suggestions/ai-consequence';
 import { type PageItem, useGeneratePage } from './api';
 import styles from './pages.module.css';
 
@@ -139,8 +140,8 @@ export default function PageGenerateDialog({
             disabled={submitDisabled}
             aria-busy={isGenerating || undefined}
           >
-            <Sparkles size={14} aria-hidden />
-            {t('generate.submit')}
+            <AiSparkle kind="applies" />
+            {t('generate.submit_creates')}
           </Button>
         </div>
       </form>

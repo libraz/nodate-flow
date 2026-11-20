@@ -18,6 +18,7 @@ import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type CSSProperties, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
+import { AiSparkle } from '../ai-suggestions/ai-consequence';
 import { PRIORITY_KEY, PRIORITY_TONE } from './constants';
 import {
   type StepGranularity,
@@ -183,7 +184,10 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
 
   return (
     <Card className={css.card}>
-      <h2 className={css.title}>{t('tasks.steps.title')}</h2>
+      <div className={css.head}>
+        <h2 className={css.title}>{t('tasks.steps.title')}</h2>
+        <p className={css.description}>{t('tasks.steps.description')}</p>
+      </div>
 
       {!hasProposed ? (
         <div key="form" className={cx(css.form, css.stage)}>
@@ -200,6 +204,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
                 label: t(GRANULARITY_KEY[g]),
               }))}
             />
+            <p className={css.fieldHint}>{t('tasks.steps.granularity_hint')}</p>
           </div>
           {/* The button stays in place while the proposal runs, so the panel does not jump. */}
           <Button
@@ -210,6 +215,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
               void handlePropose();
             }}
           >
+            <AiSparkle kind="suggests" />
             {propose.isPending ? t('tasks.steps.proposing') : t('tasks.steps.propose_button')}
           </Button>
         </div>
@@ -253,6 +259,7 @@ export default function TaskStepsPanel({ taskId }: TaskStepsPanelProps): ReactEl
                 void handleApply();
               }}
             >
+              <AiSparkle kind="applies" />
               {apply.isPending ? t('tasks.steps.applying') : t('tasks.steps.apply_button')}
             </Button>
           </div>

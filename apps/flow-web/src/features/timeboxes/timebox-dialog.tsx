@@ -260,7 +260,10 @@ export default function TimeboxDialog({
         </div>
 
         {mode === 'create' ? (
-          <FormField label={t('timeboxes.field.project.label')}>
+          <FormField
+            label={t('timeboxes.field.project.label')}
+            description={t('timeboxes.field.project.hint')}
+          >
             {(control) => (
               <Select
                 {...control}

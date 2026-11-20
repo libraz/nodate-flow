@@ -45,3 +45,15 @@
 .value {
   color: var(--nf-color-fg);
 }
+
+/* Reserves the chip's footprint while data resolves; matches .meter metrics. */
+.placeholder {
+  display: inline-block;
+  /* nf-token-override: reserved width of the "AI · $0.00" chip */
+  inline-size: 5.5rem;
+  /* nf-token-override: chip height (text-xs line + block padding + border) */
+  block-size: 1.625rem;
+  border: var(--nf-space-px) solid transparent;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-surface-hover);
+}

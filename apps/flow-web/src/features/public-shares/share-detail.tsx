@@ -32,8 +32,10 @@ import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, GripVertical, Plus } from 'lucide-react';
@@ -41,6 +43,7 @@ import { type CSSProperties, type ReactElement, Suspense, useEffect, useState } 
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
+import ui from '../settings/settings-ui.module.css';
 import AddEventsDialog from './add-events-dialog';
 import {
   type ShareEvent,
@@ -50,6 +53,7 @@ import {
   usePublicShareDetailQuery,
   useReorderShareEvents,
 } from './api';
+import ExpirySection from './expiry-section';
 import styles from './share-detail.module.css';
 import ShareOverrideNotice from './share-override-notice';
 
@@ -266,6 +270,7 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
       <PageHeader
         title={data.share.title}
         description={data.share.description}
+        help="workspace-settings-public-share-detail"
         actions={
           <Button
             type="button"
@@ -279,6 +284,8 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
           </Button>
         }
       />
+
+      <ExpirySection workspaceId={workspaceId} share={data.share} />
 
       <div>
         <h2 className={styles.eventsHeading}>{t('workspace.public_shares.detail.events_title')}</h2>
@@ -337,6 +344,7 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
                       allDayLabel={allDayLabel}
                       undatedLabel={t('workspace.public_shares.detail.event_undated')}
                       detachLabel={t('workspace.public_shares.detail.detach')}
+                      detachHint={t('workspace.public_shares.detail.detach_hint')}
                       handleLabel={dragHandleLabel}
                       disabled={reordering}
                       attaching={attach.isPending}
@@ -351,7 +359,21 @@ export default function ShareDetail({ workspaceId, shareId }: ShareDetailProps):
           </DndContext>
         </div>
       ) : (
-        <p className={styles.empty}>{t('workspace.public_shares.detail.empty_events')}</p>
+        <EmptyState
+          titleAs="p"
+          title={t('workspace.public_shares.detail.empty_events')}
+          className={ui.empty}
+          action={
+            <Button
+              type="button"
+              onClick={() => {
+                setPickerOpen(true);
+              }}
+            >
+              {t('workspace.public_shares.detail.add_events')}
+            </Button>
+          }
+        />
       )}
 
       <Suspense
@@ -384,6 +406,7 @@ interface SortableRowProps {
   allDayLabel: string;
   undatedLabel: string;
   detachLabel: string;
+  detachHint: string;
   handleLabel: string;
   disabled: boolean;
   attaching: boolean;
@@ -410,6 +433,7 @@ function SortableRow({
   allDayLabel,
   undatedLabel,
   detachLabel,
+  detachHint,
   handleLabel,
   disabled,
   attaching,
@@ -475,16 +499,18 @@ function SortableRow({
         </td>
         <td className={styles.cell}>{event.calendarName}</td>
         <td className={styles.cellActions}>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={detaching}
-            onClick={() => {
-              void onDetach(event);
-            }}
-          >
-            {detachLabel}
-          </Button>
+          <Tooltip content={detachHint}>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={detaching}
+              onClick={() => {
+                void onDetach(event);
+              }}
+            >
+              {detachLabel}
+            </Button>
+          </Tooltip>
         </td>
       </tr>
       {present && warnings.length > 0 ? (

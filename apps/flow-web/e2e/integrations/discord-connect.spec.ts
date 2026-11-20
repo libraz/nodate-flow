@@ -56,6 +56,7 @@ const copy = {
   disconnect: integrationsCopy.disconnect,
   disconnected: integrationsCopy.disconnected,
   notConfigured: integrationsCopy.not_configured,
+  notConfiguredBadge: integrationsCopy.not_configured_badge,
   discordName: integrationsCopy.provider.discord.name,
   discordDescription: integrationsCopy.provider.discord.description,
 } as const;
@@ -185,15 +186,16 @@ test.describe('integrations panel — Discord', () => {
     await expect(page.getByText(copy.discordDescription, { exact: true })).toBeVisible();
 
     // The Discord row's "not configured" hint is visible because the
-    // stub returned configured=false. The Connect button is rendered
-    // for the discord row but disabled.
+    // stub returned configured=false. The row shows the "not set up"
+    // badge instead of a Connect button.
     const discordRow = page
       .getByRole('listitem')
       .filter({ has: page.getByText(copy.discordName, { exact: true }) });
     await expect(discordRow.getByText(copy.notConfigured)).toBeVisible();
-    await expect(
-      discordRow.getByRole('button', { name: copy.connect, exact: true }),
-    ).toBeDisabled();
+    await expect(discordRow.getByText(copy.notConfiguredBadge, { exact: true })).toBeVisible();
+    await expect(discordRow.getByRole('button', { name: copy.connect, exact: true })).toHaveCount(
+      0,
+    );
 
     expect(noise, `console noise during render: ${noise.join('\n')}`).toEqual([]);
   });

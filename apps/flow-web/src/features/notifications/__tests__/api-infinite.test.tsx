@@ -49,6 +49,7 @@ function aNotification(id: string, overrides: Partial<NotificationItem> = {}): N
     resourceType: 'task',
     resourceId: 'task-1',
     title: `Notification ${id}`,
+    resourceTitle: null,
     body: null,
     severity: 'normal',
     channel: 'in_app',

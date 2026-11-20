@@ -89,9 +89,7 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
   if (visible.length === 0) return null;
   return (
     <div className={styles.section}>
-      <div className={styles.sectionLabel} title={t('nav.workspaceProjects')}>
-        {t('nav.workspaceProjects')}
-      </div>
+      <div className={styles.sectionLabel}>{t('nav.workspaceProjects')}</div>
       {visible.map((p) => (
         <Link
           key={p.id}
@@ -165,17 +163,19 @@ function WorkspaceActivityLink({ workspaceId }: { workspaceId: string }): ReactE
 function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <Link
-      to="/workspaces/$id/insights/priority"
-      params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-      activeProps={{
-        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-      }}
-    >
-      <Icon icon={ListOrdered} decorative />
-      <span className={styles.label}>{t('nav.insightsPriority')}</span>
-    </Link>
+    <Tooltip content={t('nav.insightsPriorityHint')} placement="right">
+      <Link
+        to="/workspaces/$id/insights/priority"
+        params={{ id: workspaceId }}
+        className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+        activeProps={{
+          className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+        }}
+      >
+        <Icon icon={ListOrdered} decorative />
+        <span className={styles.label}>{t('nav.insightsPriority')}</span>
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -189,17 +189,19 @@ function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string })
 function WorkspaceArchiveLink({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('common');
   return (
-    <Link
-      to="/workspaces/$id/tasks/archived"
-      params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-      activeProps={{
-        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-      }}
-    >
-      <Icon icon={Archive} decorative />
-      <span className={styles.label}>{t('nav.archive')}</span>
-    </Link>
+    <Tooltip content={t('nav.archiveHint')} placement="right">
+      <Link
+        to="/workspaces/$id/tasks/archived"
+        params={{ id: workspaceId }}
+        className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
+        activeProps={{
+          className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
+        }}
+      >
+        <Icon icon={Archive} decorative />
+        <span className={styles.label}>{t('nav.archive')}</span>
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -258,10 +260,12 @@ function FavoriteRow({
   favorite: Favorite;
   workspaceId: string;
 }): ReactElement | null {
+  const { t } = useTranslation('labels');
   const icon = favoriteIconFor(favorite.targetType);
   const className = cx(styles.item, styles.subItem, 'nf-focus-ring');
   const activeClassName = cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring');
   if (favorite.targetType === 'task') {
+    const fallback = t('favorites.untitled_task');
     return (
       <Link
         to="/tasks/$taskId"
@@ -270,7 +274,7 @@ function FavoriteRow({
         activeProps={{ className: activeClassName }}
       >
         <Icon icon={icon} decorative />
-        <span className={styles.label}>{favorite.targetId}</span>
+        <span className={styles.label}>{favorite.title ?? fallback}</span>
       </Link>
     );
   }
@@ -283,7 +287,7 @@ function FavoriteRow({
         activeProps={{ className: activeClassName }}
       >
         <Icon icon={icon} decorative />
-        <span className={styles.label}>{favorite.targetId}</span>
+        <span className={styles.label}>{favorite.title ?? t('favorites.untitled_project')}</span>
       </Link>
     );
   }
@@ -294,22 +298,37 @@ function FavoriteRow({
  * FavoritesSection — renders the user's favorite tasks / projects as
  * Sidebar entries scoped to the current workspace. Suspends on first
  * load; the outer Sidebar wraps this in a Suspense with a null
- * fallback so the rest of the nav renders immediately.
+ * fallback so the rest of the nav renders immediately. With no
+ * favorites it says where the star is, so the section is discoverable.
  */
-function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement | null {
+function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElement {
   const { t } = useTranslation('labels');
   const { data: favorites } = useFavoritesQuery(workspaceId);
-  if (favorites.length === 0) return null;
   return (
     <div className={styles.section}>
       <div className={styles.sectionLabel} title={t('favorites.sidebar_title')}>
         {t('favorites.sidebar_title')}
       </div>
-      {favorites.map((f) => (
-        <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} />
-      ))}
+      {favorites.length === 0 ? (
+        <p className={styles.sectionEmpty}>{t('favorites.empty')}</p>
+      ) : (
+        favorites.map((f) => <FavoriteRow key={f.id} favorite={f} workspaceId={workspaceId} />)
+      )}
     </div>
   );
+}
+
+/**
+ * True on a workspace route that has its own sidebar sub-item, where the
+ * Workspaces parent is shown as expanded rather than as a second active item.
+ */
+function isWorkspaceSubItemRoute(pathname: string): boolean {
+  const [, root, , section, child] = pathname.split('/');
+  if (root !== 'workspaces' || section === undefined) return false;
+  if (section === 'activity' || section === 'timeboxes' || section === 'insights') return true;
+  if (section === 'tasks') return child === 'drafts' || child === 'archived';
+  if (section === 'projects') return Boolean(child);
+  return false;
 }
 
 function useIsMobile(): boolean {
@@ -474,16 +493,28 @@ export default function Sidebar(): ReactElement {
             // /workspaces/$id/projects), but the Settings link targets
             // /settings/profile specifically so the default exact match
             // fails on siblings. Fall back to a pathname-prefix check.
+            // On a route with its own sub-item, the sub-item is the
+            // active one and Workspaces only reads as expanded.
+            const workspaceExpanded =
+              item.key === 'workspaces' && isWorkspaceSubItemRoute(pathname);
             const sectionActive =
               (item.key === 'settings' && pathname.startsWith('/settings')) ||
-              (item.key === 'workspaces' && pathname.startsWith('/workspaces'));
+              (item.key === 'workspaces' &&
+                pathname.startsWith('/workspaces') &&
+                !workspaceExpanded);
             const linkEl = (
               <Link
                 key={item.key}
                 to={item.to}
                 aria-label={label}
                 title={label}
-                className={cx(styles.item, sectionActive && styles.itemActive, 'nf-focus-ring')}
+                className={cx(
+                  styles.item,
+                  sectionActive && styles.itemActive,
+                  workspaceExpanded && styles.itemExpanded,
+                  'nf-focus-ring',
+                )}
+                activeOptions={{ exact: item.key === 'workspaces' }}
                 activeProps={{ className: cx(styles.item, styles.itemActive, 'nf-focus-ring') }}
               >
                 <Icon icon={item.icon} decorative />
@@ -508,9 +539,12 @@ export default function Sidebar(): ReactElement {
                   ) : (
                     linkEl
                   )}
-                  <Collapse open={!railCollapsed && Boolean(currentWorkspaceId)}>
+                  <Collapse
+                    open={!railCollapsed && Boolean(currentWorkspaceId)}
+                    className={styles.subCollapse}
+                  >
                     {shownWorkspaceId ? (
-                      <>
+                      <div className={styles.subNav}>
                         <WorkspaceActivityLink workspaceId={shownWorkspaceId} />
                         <WorkspaceTimeboxesLink workspaceId={shownWorkspaceId} />
                         <WorkspaceInsightsPriorityLink workspaceId={shownWorkspaceId} />
@@ -522,7 +556,7 @@ export default function Sidebar(): ReactElement {
                         <Suspense fallback={null}>
                           <FavoritesSection workspaceId={shownWorkspaceId} />
                         </Suspense>
-                      </>
+                      </div>
                     ) : null}
                   </Collapse>
                 </div>

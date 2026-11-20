@@ -79,6 +79,8 @@
   align-items: center;
   justify-content: center;
   inline-size: 100%;
+  /* A 24px hit area even when the cell padding leaves less. */
+  min-inline-size: var(--nf-space-6);
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 1.5rem;
   border-radius: var(--nf-radius-sm);
@@ -154,6 +156,13 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.editTriggerText {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editTrigger:hover {

@@ -3,11 +3,11 @@
  * notification count and toggles the notification dropdown.
  */
 
-import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Popover from '@nodate-flow/ui/primitives/popover';
 import { Bell } from 'lucide-react';
-import { type MouseEvent, type ReactElement, Suspense, useId, useRef, useState } from 'react';
+import { type ReactElement, Suspense, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
@@ -21,37 +21,31 @@ function NotificationBellImpl(): ReactElement {
   const [open, setOpen] = useState(false);
   const { data: unreadCount } = useUnreadCountQuery();
   const count = unreadCount ?? 0;
-  const dropdownId = useId();
-  const presence = usePresence<HTMLDivElement>(open);
   const badgeText = count > 99 ? '99+' : String(count);
-
-  const handleToggle = (event: MouseEvent<HTMLButtonElement>): void => {
-    // Defensive stopPropagation: the dropdown's backdrop is a fixed
-    // full-viewport <div> that calls onClose on click. If the backdrop
-    // mounts during the same click cycle, the synthetic event could
-    // bubble to it and immediately close the panel we just opened.
-    event.stopPropagation();
-    setOpen((prev) => !prev);
-  };
-
-  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const handleClose = (): void => {
     setOpen(false);
-    triggerRef.current?.focus();
   };
 
+  // Portalled through Popover: the top bar's backdrop-filter makes it a
+  // stacking context, so an in-place panel painted under the page below.
   return (
-    <div className={styles.bellWrapper}>
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      placement="bottom-end"
+      className={styles.dropdownPanel}
+      ariaLabel={t('view.title')}
+      content={
+        <Suspense fallback={null}>
+          <NotificationDropdown onClose={handleClose} />
+        </Suspense>
+      }
+    >
       <button
-        ref={triggerRef}
         type="button"
-        className={cx(topBarStyles.iconButton, 'nf-focus-ring')}
-        onClick={handleToggle}
+        className={cx(topBarStyles.iconButton, styles.bellButton, 'nf-focus-ring')}
         aria-label={count > 0 ? t('badge.unread', { count }) : t('view.title')}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={dropdownId}
       >
         <Icon icon={Bell} decorative />
         {/* Keyed on the shown text so a count change replays the pop-in. */}
@@ -61,19 +55,7 @@ function NotificationBellImpl(): ReactElement {
           </span>
         )}
       </button>
-      {presence.mounted && (
-        <div
-          ref={presence.ref}
-          data-state={presence.state}
-          inert={!open}
-          className={styles.dropdownPresence}
-        >
-          <Suspense fallback={null}>
-            <NotificationDropdown id={dropdownId} onClose={handleClose} />
-          </Suspense>
-        </div>
-      )}
-    </div>
+    </Popover>
   );
 }
 

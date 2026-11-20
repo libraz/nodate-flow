@@ -12,13 +12,14 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import Select from '@nodate-flow/ui/primitives/select';
+import Radio from '@nodate-flow/ui/primitives/radio';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { type FormEvent, type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { type AiProviderKind, useCreateAiProvider } from './api';
+import styles from './provider-add-dialog.module.css';
 
 const KINDS: readonly AiProviderKind[] = [
   'anthropic',
@@ -27,6 +28,22 @@ const KINDS: readonly AiProviderKind[] = [
   'ollama',
   'openai_compat',
 ] as const;
+
+/** One-line description of what each kind connects to. */
+function kindHintKey(kind: AiProviderKind): string {
+  switch (kind) {
+    case 'anthropic':
+      return 'providers.kind_hint.anthropic';
+    case 'openai':
+      return 'providers.kind_hint.openai';
+    case 'google':
+      return 'providers.kind_hint.google';
+    case 'ollama':
+      return 'providers.kind_hint.ollama';
+    case 'openai_compat':
+      return 'providers.kind_hint.openai_compat';
+  }
+}
 
 function kindLabelKey(kind: AiProviderKind): string {
   switch (kind) {
@@ -63,6 +80,9 @@ export default function ProviderAddDialog({
   const [baseUrl, setBaseUrl] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const kindGroupId = useId();
+  // Local Ollama is unauthenticated; every other kind needs a key.
+  const needsKey = kind !== 'ollama';
 
   const reset = (): void => {
     setKind('anthropic');
@@ -81,13 +101,13 @@ export default function ProviderAddDialog({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (name.trim() === '' || apiKey.length < 8) return;
+    if (name.trim() === '' || (needsKey && apiKey.length < 8)) return;
     setSubmitting(true);
     try {
       await create.mutateAsync({
         kind,
         name: name.trim(),
-        apiKey,
+        ...(needsKey ? { apiKey } : {}),
         ...(baseUrl.trim() !== '' ? { baseUrl: baseUrl.trim() } : {}),
         ...(defaultModel.trim() !== '' ? { defaultModel: defaultModel.trim() } : {}),
       });
@@ -109,35 +129,56 @@ export default function ProviderAddDialog({
         onSubmit={(e) => {
           void handleSubmit(e);
         }}
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
+        className={styles.form}
       >
-        <p style={{ margin: 0, color: 'var(--nf-color-fg-muted)', fontSize: 'var(--nf-text-sm)' }}>
-          {t('providers.write_only_notice')}
-        </p>
+        <p className={styles.notice}>{t('providers.write_only_notice')}</p>
 
-        <FormField label={t('providers.field.kind')} required>
-          {(control) => (
-            <Select
-              {...control}
-              value={kind}
-              onChange={(e) => {
-                const next = e.target.value as AiProviderKind;
-                setKind(next);
-                // The field is hidden for openai, so a value typed under
-                // another kind would otherwise be submitted invisibly.
-                if (next === 'openai') setBaseUrl('');
-              }}
-            >
-              {KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {t(kindLabelKey(k))}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+        {/* Each kind names what it connects to, so the choice is made before picking. */}
+        <fieldset className={styles.kindGroup} aria-describedby={`${kindGroupId}-help`}>
+          <legend className={styles.kindLegend}>{t('providers.field.kind')}</legend>
+          <p id={`${kindGroupId}-help`} className={styles.kindHelp}>
+            {t('providers.field.kind_help')}
+          </p>
+          <div className={styles.kindOptions}>
+            {KINDS.map((k) => {
+              const optionId = `${kindGroupId}-${k}`;
+              return (
+                <label key={k} htmlFor={optionId} className={styles.kindOption}>
+                  <Radio
+                    id={optionId}
+                    name={`${kindGroupId}-kind`}
+                    value={k}
+                    checked={kind === k}
+                    onChange={() => {
+                      setKind(k);
+                      // The field is hidden for openai, so a value typed under
+                      // another kind would otherwise be submitted invisibly.
+                      if (k === 'openai') setBaseUrl('');
+                      // Same for the key: it is hidden for ollama and must not ride along.
+                      if (k === 'ollama') setApiKey('');
+                    }}
+                    aria-labelledby={`${optionId}-label`}
+                    aria-describedby={`${optionId}-hint`}
+                  />
+                  <span className={styles.kindBody}>
+                    <span id={`${optionId}-label`} className={styles.kindLabel}>
+                      {t(kindLabelKey(k))}
+                    </span>
+                    <span id={`${optionId}-hint`} className={styles.kindHint}>
+                      {t(kindHintKey(k))}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
 
-        <FormField label={t('providers.field.name')} required>
+        <FormField
+          label={t('providers.field.name')}
+          description={t('providers.field.name_help')}
+          required
+        >
           {(control) => (
             <Input
               {...control}
@@ -149,21 +190,25 @@ export default function ProviderAddDialog({
           )}
         </FormField>
 
-        <FormField label={t('providers.field.api_key')} required>
-          {(control) => (
-            <Input
-              {...control}
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={t('providers.field.api_key_placeholder')}
-              value={apiKey}
-              onChange={(e) => {
-                setApiKey(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
+        {needsKey ? (
+          <FormField label={t('providers.field.api_key')} required>
+            {(control) => (
+              <Input
+                {...control}
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t('providers.field.api_key_placeholder')}
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                }}
+              />
+            )}
+          </FormField>
+        ) : (
+          <p className={styles.notice}>{t('providers.ollama_no_key_note')}</p>
+        )}
 
         {/*
           The openai kind is the official endpoint only; a custom base URL
@@ -191,7 +236,10 @@ export default function ProviderAddDialog({
           </FormField>
         )}
 
-        <FormField label={t('providers.field.default_model')}>
+        <FormField
+          label={t('providers.field.default_model')}
+          description={t('providers.field.default_model_help')}
+        >
           {(control) => (
             <Input
               {...control}
@@ -203,7 +251,7 @@ export default function ProviderAddDialog({
           )}
         </FormField>
 
-        <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
+        <div className={styles.actions}>
           <Button type="button" variant="ghost" onClick={handleClose}>
             {t('providers.action.cancel')}
           </Button>

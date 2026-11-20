@@ -16,6 +16,7 @@ import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpochDateTime } from '../../lib/format';
+import ColumnHelp from '../settings/column-help';
 import ui from '../settings/settings-ui.module.css';
 import TruncatedText from '../settings/truncated-text';
 import { type McpTokenSummary, useMcpTokensQuery, useRevokeMcpToken } from './api';
@@ -72,6 +73,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
       <PageHeader
         title={t('workspace.mcp_tokens.title')}
         description={t('workspace.mcp_tokens.description')}
+        help="workspace-settings-mcp-tokens"
         actions={
           <Button type="button" variant="primary" onClick={openCreate}>
             {t('workspace.mcp_tokens.create')}
@@ -95,7 +97,10 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
             <thead>
               <tr>
                 <th>{t('workspace.mcp_tokens.table.name')}</th>
-                <th>{t('workspace.mcp_tokens.table.prefix')}</th>
+                <th>
+                  {t('workspace.mcp_tokens.table.prefix')}
+                  <ColumnHelp text={t('workspace.mcp_tokens.table.prefix_help')} />
+                </th>
                 <th>{t('workspace.mcp_tokens.table.scopes')}</th>
                 <th>{t('workspace.mcp_tokens.table.created_at')}</th>
                 <th>{t('workspace.mcp_tokens.table.last_used_at')}</th>
@@ -141,6 +146,7 @@ export default function TokenList({ workspaceId }: TokenListProps): ReactElement
                     <Button
                       type="button"
                       size="sm"
+                      variant="danger"
                       disabled={revoke.isPending}
                       aria-busy={revokingId === token.id}
                       onClick={() => {

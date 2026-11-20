@@ -109,7 +109,7 @@ describe('EventCard actor avatar', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
-  it('keeps the system label and initials when there is no user actor', () => {
+  it('shows a labelled system glyph, not a "?" avatar, when there is no user actor', () => {
     const { container } = renderEventCard(
       event({
         actorUserId: undefined,
@@ -121,7 +121,8 @@ describe('EventCard actor avatar', () => {
     const avatar = container.querySelector<HTMLElement>('[role="img"]');
     if (!avatar) throw new Error('system avatar was not rendered');
     expect(avatar.getAttribute('aria-label')).toBe('System');
-    expect(avatar.textContent).toContain('?');
+    expect(avatar.textContent).not.toContain('?');
+    expect(avatar.querySelector('svg')).not.toBeNull();
     expect(container.querySelector('img')).toBeNull();
   });
 });

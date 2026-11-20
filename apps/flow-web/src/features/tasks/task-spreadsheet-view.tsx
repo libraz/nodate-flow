@@ -31,6 +31,7 @@ import {
   useTasksQuery,
   useUpdateTask,
 } from './api';
+import AssigneeSummary from './assignee-summary';
 import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
 import css from './task-spreadsheet-view.module.css';
 import { useTaskFilters } from './use-task-filters';
@@ -184,6 +185,11 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
   const weekStart = useWeekStart();
   const zone = useEffectiveZone();
   const filters = useTaskFilters(projectId);
+  const hasActiveFilter =
+    Boolean(filters.search) ||
+    (filters.states?.length ?? 0) > 0 ||
+    (filters.priority?.length ?? 0) > 0 ||
+    Boolean(filters.assigneeId);
   const { data: tasks } = useTasksQuery(projectId, filters);
   const locale = i18n.resolvedLanguage ?? 'en';
   const weekdayLabels = t('common.date.weekdays', { returnObjects: true }) as string[];
@@ -507,11 +513,9 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
     );
   };
 
-  const renderAssigneeCell = (task: TaskListItem): ReactElement => {
-    const count = task.assigneeCount;
-    if (count === 0) return <span className={css.mutedText}>—</span>;
-    return <span>{t('tasks.assignee.count', { count })}</span>;
-  };
+  const renderAssigneeCell = (task: TaskListItem): ReactElement => (
+    <AssigneeSummary task={task} emptyClassName={css.mutedText} />
+  );
 
   const renderDueCell = (task: TaskListItem, rowIdx: number): ReactElement => {
     const dueOn = task.dueOn;
@@ -743,7 +747,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
               color: 'var(--nf-color-fg-muted)',
             }}
           >
-            {t('tasks.empty')}
+            {hasActiveFilter ? t('tasks.empty_filtered') : t('tasks.empty')}
           </div>
         )}
       </div>

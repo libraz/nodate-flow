@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { useWorkspacesQuery } from '../workspaces/api';
-import { useSearchPages } from './api';
+import { type PageItem, useSearchPages } from './api';
 import PageDetail from './page-detail';
 import PageEditor from './page-editor';
 import PageTree from './page-tree';
@@ -65,16 +65,18 @@ type PageMode = 'view' | 'edit' | 'create';
 interface PageListProps {
   /** Currently selected page id from the route, if any. */
   activePageId: string | undefined;
+  /** Mode to start in, carried by the route's `?mode=edit` search param. */
+  initialMode?: 'edit' | undefined;
 }
 
-export default function PageList({ activePageId }: PageListProps): ReactElement {
+export default function PageList({ activePageId, initialMode }: PageListProps): ReactElement {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const routeWsId = useCurrentWorkspaceId();
   const { data: workspaces } = useWorkspacesQuery();
   // Fall back to the first workspace on cross-workspace pages (e.g. /pages).
   const workspaceId = routeWsId ?? (workspaces.length === 1 ? (workspaces[0]?.id ?? null) : null);
-  const [mode, setMode] = useState<PageMode>('view');
+  const [mode, setMode] = useState<PageMode>(initialMode ?? 'view');
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -94,6 +96,12 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
     if (savedPageId) {
       void navigate({ to: '/pages/$pageId', params: { pageId: savedPageId } });
     }
+  };
+
+  // Generation already created the page on the server; continue in edit mode
+  // on that page so later saves are updates rather than a duplicate create.
+  const handleGeneratedPage = (page: PageItem): void => {
+    void navigate({ to: '/pages/$pageId', params: { pageId: page.id }, search: { mode: 'edit' } });
   };
 
   if (!workspaceId) {
@@ -151,6 +159,7 @@ export default function PageList({ activePageId }: PageListProps): ReactElement 
                 workspaceId={workspaceId}
                 existingPage={undefined}
                 onDone={handleEditorDone}
+                onGeneratedPage={handleGeneratedPage}
               />
             </Suspense>
           )}

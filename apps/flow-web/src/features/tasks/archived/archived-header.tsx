@@ -38,6 +38,7 @@ export default function ArchivedHeader({
   return (
     <PageHeader
       titleId="archive-title"
+      help="task-archive"
       title={t('page.title')}
       description={t('page.subtitle')}
       actions={

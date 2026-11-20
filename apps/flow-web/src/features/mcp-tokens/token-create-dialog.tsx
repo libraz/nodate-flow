@@ -22,8 +22,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../../lib/api-error';
-import CopyButton from '../settings/copy-button';
-import ui from '../settings/settings-ui.module.css';
+import SecretCallout from '../settings/secret-callout';
 import { useCreateMcpToken } from './api';
 import { DEFAULT_MCP_TOKEN_SCOPES, MCP_TOKEN_SCOPE_OPTIONS, type McpTokenScope } from './scopes';
 
@@ -120,7 +119,11 @@ export default function TokenCreateDialog({
           }}
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
         >
-          <FormField label={t('workspace.mcp_tokens.dialog.field.name')} required>
+          <FormField
+            label={t('workspace.mcp_tokens.dialog.field.name')}
+            description={t('workspace.mcp_tokens.dialog.field.name_help')}
+            required
+          >
             {(control) => (
               <Input
                 {...control}
@@ -204,32 +207,15 @@ export default function TokenCreateDialog({
         </form>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
-          <div className={ui.secretPanel}>
-            <p className={ui.secretWarning}>{t('workspace.mcp_tokens.dialog.reveal_warning')}</p>
-            <FormField label={t('workspace.mcp_tokens.dialog.token_label')}>
-              {(control) => (
-                <div className={ui.secretRow}>
-                  <Input
-                    {...control}
-                    className={ui.secretValue}
-                    value={plaintext}
-                    readOnly
-                    spellCheck={false}
-                    autoComplete="off"
-                    onFocus={(e) => {
-                      e.currentTarget.select();
-                    }}
-                  />
-                  {/* A failed write is left silent: the field stays selectable for a manual copy. */}
-                  <CopyButton
-                    value={plaintext}
-                    label={t('workspace.mcp_tokens.dialog.copy')}
-                    copiedLabel={t('workspace.mcp_tokens.dialog.copied')}
-                  />
-                </div>
-              )}
-            </FormField>
-          </div>
+          {/* A failed copy is left silent: the field stays selectable for a manual copy. */}
+          <SecretCallout
+            kind="once"
+            message={t('workspace.mcp_tokens.dialog.reveal_warning')}
+            label={t('workspace.mcp_tokens.dialog.token_label')}
+            value={plaintext}
+            copyLabel={t('workspace.mcp_tokens.dialog.copy')}
+            copiedLabel={t('workspace.mcp_tokens.dialog.copied')}
+          />
           <div style={{ display: 'flex', gap: 'var(--nf-space-2)', justifyContent: 'flex-end' }}>
             <Button type="button" variant="primary" onClick={handleClose}>
               {t('workspace.mcp_tokens.dialog.done')}

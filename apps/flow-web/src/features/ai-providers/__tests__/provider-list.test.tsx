@@ -75,4 +75,20 @@ describe('ProviderList', () => {
     expect(screen.getByText('https://azure/v1')).toBeTruthy();
     expect(screen.queryByText('providers.invalid_base_url')).toBeNull();
   });
+
+  it('shows a no-key label and no Rotate action for a keyless ollama row', () => {
+    const { apiKeyMasked: _masked, ...keyless } = provider({
+      id: 'p-1',
+      name: 'local',
+      kind: 'ollama',
+    });
+    renderList([keyless as AiProvider]);
+    expect(screen.getByText('providers.no_key')).toBeTruthy();
+    expect(screen.queryByText('providers.action.rotate')).toBeNull();
+  });
+
+  it('keeps Rotate for a keyed provider', () => {
+    renderList([provider({ id: 'p-1', name: 'keyed' })]);
+    expect(screen.getByText('providers.action.rotate')).toBeTruthy();
+  });
 });

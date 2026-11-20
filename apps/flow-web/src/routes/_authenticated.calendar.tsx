@@ -37,6 +37,7 @@ import Drawer from '@nodate-flow/ui/primitives/drawer';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Zone } from '@nodate-flow/ui/time';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
@@ -1294,7 +1295,11 @@ function CalendarRoute(): ReactElement {
 
   return (
     <PageFrame width="full" className={styles.section}>
-      <PageHeader title={t('calendar.title')} description={t('calendar.subtitle')} />
+      <PageHeader
+        title={t('calendar.title')}
+        description={t('calendar.subtitle')}
+        help="calendar"
+      />
 
       <div className={styles.toolbar}>
         <div className={styles.monthNav}>
@@ -1328,52 +1333,57 @@ function CalendarRoute(): ReactElement {
           </Button>
         </div>
 
-        <ToggleChipGroup label={t('calendar.layers')}>
-          <ToggleChip
-            pressed={layers.tasksDue}
-            onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
-            color="var(--nf-cal-task-color)"
-          >
-            {t('calendar.layer.tasks_due')}
-          </ToggleChip>
-          <ToggleChip
-            pressed={layers.events}
-            onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
-            color="var(--nf-cal-event-color)"
-          >
-            {t('calendar.layer.events')}
-          </ToggleChip>
-          <ToggleChip
-            pressed={layers.blocks}
-            onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
-            color="var(--nf-cal-block-color)"
-          >
-            {t('calendar.layer.blocks')}
-          </ToggleChip>
-          <ToggleChip
-            pressed={layers.free}
-            onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
-            color="var(--nf-cal-free-color)"
-          >
-            {t('calendar.layer.free')}
-          </ToggleChip>
-          <ToggleChip
-            pressed={layers.milestone}
-            onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
-            color="var(--nf-cal-milestone-color)"
-          >
-            {t('calendar.layer.milestone')}
-          </ToggleChip>
-          {country ? (
-            <ToggleChip
-              pressed={layers.holidays}
-              onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
-              color="var(--nf-color-danger)"
-            >
-              {t('calendar.layer.holidays')}
-            </ToggleChip>
-          ) : null}
-        </ToggleChipGroup>
+        {/* The wrapper takes the tooltip: the group does not forward handlers. */}
+        <Tooltip content={t('calendar.layerHint')}>
+          <div className={styles.layers}>
+            <ToggleChipGroup label={t('calendar.layers')}>
+              <ToggleChip
+                pressed={layers.tasksDue}
+                onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
+                color="var(--nf-cal-task-color)"
+              >
+                {t('calendar.layer.tasks_due')}
+              </ToggleChip>
+              <ToggleChip
+                pressed={layers.events}
+                onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
+                color="var(--nf-cal-event-color)"
+              >
+                {t('calendar.layer.events')}
+              </ToggleChip>
+              <ToggleChip
+                pressed={layers.blocks}
+                onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
+                color="var(--nf-cal-block-color)"
+              >
+                {t('calendar.layer.blocks')}
+              </ToggleChip>
+              <ToggleChip
+                pressed={layers.free}
+                onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
+                color="var(--nf-cal-free-color)"
+              >
+                {t('calendar.layer.free')}
+              </ToggleChip>
+              <ToggleChip
+                pressed={layers.milestone}
+                onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
+                color="var(--nf-cal-milestone-color)"
+              >
+                {t('calendar.layer.milestone')}
+              </ToggleChip>
+              {country ? (
+                <ToggleChip
+                  pressed={layers.holidays}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
+                  color="var(--nf-color-danger)"
+                >
+                  {t('calendar.layer.holidays')}
+                </ToggleChip>
+              ) : null}
+            </ToggleChipGroup>
+          </div>
+        </Tooltip>
       </div>
 
       {/* Mobile-only trigger to open the calendars rail as a drawer. */}
@@ -1788,7 +1798,7 @@ function DayPillList({
       <Link
         to="/tasks/$taskId"
         params={{ taskId: task.id }}
-        title={`${task.title} · ${task.workspaceName}`}
+        title={`${task.title} · ${task.workspaceName}\n${t('calendar.drag_to_reschedule')}`}
         // The browser drags a link's URL of its own
         // accord, which would run alongside this
         // gesture and drop a hyperlink somewhere.
@@ -1828,7 +1838,7 @@ function DayPillList({
     return (
       <button
         type="button"
-        title={`${ev.title} · ${ev.workspaceName}`}
+        title={`${ev.title} · ${ev.workspaceName}\n${t('calendar.drag_to_reschedule')}`}
         aria-label={t('calendar.event_detail.open_label', {
           title: ev.title,
           workspace: ev.workspaceName,

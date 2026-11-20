@@ -1,22 +1,23 @@
 {
   "view": {
     "title": "动态",
-    "description": "本工作区中审计、AI 与 MCP 动态的统一信息流。",
+    "description": "此工作区发生之事的记录：成员的变更、AI 运行以及已连接工具的调用。",
     "list_label": "工作区动态",
     "loading": "正在加载动态…",
     "loading_more": "加载中…",
     "load_more": "加载更多",
-    "empty": "暂无动态。",
+    "empty": "暂无动态。创建任务、编辑页面、运行 AI 和使用已连接工具都会记录在这里。",
     "empty_filtered": "该来源暂无动态。",
     "error": "无法加载动态，请重试。",
     "retry": "重试"
   },
   "filter": {
     "source_label": "来源",
-    "all_sources": "全部"
+    "all_sources": "全部",
+    "source_hint": "变更：成员的操作。AI：AI 运行。MCP：来自已连接工具的调用。"
   },
   "source": {
-    "audit": "审计",
+    "audit": "变更",
     "ai": "AI",
     "mcp": "MCP"
   },
@@ -111,5 +112,26 @@
     "workspace_create": "创建了工作区",
     "workspace_delete": "删除了工作区",
     "workspace_update": "更新了工作区"
+  },
+  "resource": {
+    "task": "任务",
+    "page": "页面",
+    "project": "项目",
+    "comment": "评论",
+    "timebox": "时间盒",
+    "calendar": "日历",
+    "calendar_event": "日程",
+    "label": "标签",
+    "lens": "已保存视图",
+    "attachment": "附件",
+    "ai_agent": "AI 代理",
+    "ai_provider": "AI 提供方",
+    "ai_invocation": "AI 运行",
+    "mcp_invocation": "工具调用（MCP）",
+    "mcp_token": "MCP 令牌",
+    "intake_item": "收件项",
+    "membership": "成员资格",
+    "notification": "通知",
+    "webhook_subscription": "Webhook"
   }
 }

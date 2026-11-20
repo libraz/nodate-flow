@@ -11,6 +11,7 @@ import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import ToggleChip from '@nodate-flow/ui/primitives/toggle-chip';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWorkspaceUsersQuery } from '../workspaces/api';
@@ -120,15 +121,17 @@ export default function TaskFiltersBar({
       {/* Controls row */}
       <div role="search" aria-label={t('tasks.title')} className={styles.controlsRow}>
         <div className={styles.searchInput}>
-          <Input
-            type="search"
-            value={filters.search ?? ''}
-            onChange={(e) => {
-              setTaskFilterSearch(projectId, e.target.value);
-            }}
-            placeholder={t('tasks.filters.search_placeholder')}
-            aria-label={t('tasks.filters.search_placeholder')}
-          />
+          <Tooltip content={t('tasks.filters.search_hint')}>
+            <Input
+              type="search"
+              value={filters.search ?? ''}
+              onChange={(e) => {
+                setTaskFilterSearch(projectId, e.target.value);
+              }}
+              placeholder={t('tasks.filters.search_placeholder')}
+              aria-label={t('tasks.filters.search_placeholder')}
+            />
+          </Tooltip>
         </div>
         <div role="group" aria-label={t('tasks.filters.status')} className={styles.filterGroup}>
           <span aria-hidden className={styles.groupLabel}>
@@ -151,7 +154,6 @@ export default function TaskFiltersBar({
             })}
           </div>
         </div>
-        <span aria-hidden className={styles.divider} />
         <div role="group" aria-label={t('tasks.filters.priority')} className={styles.filterGroup}>
           <span aria-hidden className={styles.groupLabel}>
             {t('tasks.filters.priority')}
@@ -197,7 +199,6 @@ export default function TaskFiltersBar({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
             onClick={() => {
               resetTaskFilters(projectId);
             }}

@@ -27,12 +27,14 @@
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { type ToastOptions, toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motionStyles from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useQueryClient } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
@@ -278,19 +280,25 @@ function PriorityImpl(): ReactElement {
       <PageHeader
         title={t('page.title')}
         description={t('page.subtitle', { shown, total: totalEvaluated })}
+        help="priority-suggestions"
         actions={
           <div className={styles.kpiRow}>
-            <span className={styles.kpi}>
-              <span className={styles.kpiValue}>{shown}</span>
-              <span className={styles.kpiLabel}>{t('kpi.suggestions')}</span>
-            </span>
-            <span className={styles.kpiSeparator} aria-hidden>
-              /
-            </span>
-            <span className={styles.kpi}>
-              <span className={styles.kpiValue}>{totalEvaluated}</span>
-              <span className={styles.kpiLabel}>{t('kpi.evaluated')}</span>
-            </span>
+            <Tooltip content={t('kpi.evaluatedHint')}>
+              {/* Focusable so keyboard users reach the tooltip explaining the counts. */}
+              <span className={cx(styles.kpiGroup, 'nf-focus-ring')} tabIndex={0}>
+                <span className={styles.kpi}>
+                  <span className={styles.kpiValue}>{shown}</span>
+                  <span className={styles.kpiLabel}>{t('kpi.suggestions')}</span>
+                </span>
+                <span className={styles.kpiSeparator} aria-hidden>
+                  /
+                </span>
+                <span className={styles.kpi}>
+                  <span className={styles.kpiValue}>{totalEvaluated}</span>
+                  <span className={styles.kpiLabel}>{t('kpi.evaluated')}</span>
+                </span>
+              </span>
+            </Tooltip>
             <Button
               type="button"
               variant="ghost"

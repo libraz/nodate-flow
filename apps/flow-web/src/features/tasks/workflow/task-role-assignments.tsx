@@ -1,6 +1,7 @@
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
+import { Plus } from 'lucide-react';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../../lib/api-error';
@@ -146,20 +147,20 @@ export default function TaskRoleAssignments({
         <div className={css.addRow}>
           <Button
             type="button"
-            variant="ghost"
             size="sm"
             disabled={addActor.isPending}
             onClick={() => startPicking('reviewer')}
           >
+            <Plus size={14} aria-hidden />
             {t('taskWorkflow.addReviewer')}
           </Button>
           <Button
             type="button"
-            variant="ghost"
             size="sm"
             disabled={addActor.isPending}
             onClick={() => startPicking('approver')}
           >
+            <Plus size={14} aria-hidden />
             {t('taskWorkflow.addApprover')}
           </Button>
         </div>

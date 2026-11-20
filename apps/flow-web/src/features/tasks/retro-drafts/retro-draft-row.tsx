@@ -16,6 +16,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link } from '@tanstack/react-router';
 import { memo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -84,28 +85,32 @@ function RetroDraftRowImpl({
       <p className={styles.rowMeta}>{metaText}</p>
 
       <div className={styles.rowActions}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => {
-            onDiscard(draft.taskPublicId);
-          }}
-        >
-          {t('tasks.retro.queue.discard')}
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={busy}
-          onClick={() => {
-            onAccept(draft.taskPublicId);
-          }}
-        >
-          {t('tasks.retro.queue.accept')}
-        </Button>
+        <Tooltip content={t('tasks.retro.queue.discard_hint')}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              onDiscard(draft.taskPublicId);
+            }}
+          >
+            {t('tasks.retro.queue.discard')}
+          </Button>
+        </Tooltip>
+        <Tooltip content={t('tasks.retro.queue.accept_hint')}>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              onAccept(draft.taskPublicId);
+            }}
+          >
+            {t('tasks.retro.queue.accept')}
+          </Button>
+        </Tooltip>
       </div>
     </Card>
   );

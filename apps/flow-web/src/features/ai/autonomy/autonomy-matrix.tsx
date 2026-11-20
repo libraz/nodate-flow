@@ -43,6 +43,7 @@ import { useTranslation } from 'react-i18next';
 
 import { apiRequest } from '../../../lib/api';
 import { formatApiError } from '../../../lib/api-error';
+import { AiSparkle } from '../../ai-suggestions/ai-consequence';
 import ui from '../../settings/settings-ui.module.css';
 import {
   type AutoActionRule,
@@ -300,6 +301,31 @@ export default function AutonomyMatrix({ workspaceId }: AutonomyMatrixProps): Re
         <p className={ui.sectionDescription}>{t('ai:autonomy.matrix.description')}</p>
       </header>
 
+      {/* What each level does, read before choosing; Auto is the one that writes. */}
+      <dl style={styles.legend}>
+        <div style={styles.legendItem}>
+          <dt style={styles.legendTerm}>
+            <AiSparkle kind="suggests" />
+            {t('ai:autonomy.mode.suggest')}
+          </dt>
+          <dd style={styles.legendDesc}>{t('ai:autonomy.help.suggest')}</dd>
+        </div>
+        <div style={styles.legendItem}>
+          <dt style={styles.legendTerm}>
+            <AiSparkle kind="suggests" />
+            {t('ai:autonomy.mode.draft')}
+          </dt>
+          <dd style={styles.legendDesc}>{t('ai:autonomy.help.draft')}</dd>
+        </div>
+        <div style={styles.legendItem}>
+          <dt style={styles.legendTerm}>
+            <AiSparkle kind="applies" />
+            {t('ai:autonomy.mode.auto')}
+          </dt>
+          <dd style={styles.legendDesc}>{t('ai:autonomy.help.auto')}</dd>
+        </div>
+      </dl>
+
       <div style={styles.scrollRegion}>
         <table aria-label={t('ai:autonomy.matrix.title')} style={styles.table}>
           <thead style={styles.thead}>
@@ -404,7 +430,11 @@ function MatrixRow({ def, rules, draft, onChange }: MatrixRowProps): ReactElemen
     <tr style={rowStyle}>
       <th scope="row" style={styles.tdKind}>
         <div style={styles.kindCell}>
-          <span style={styles.kindName}>{kindLabel}</span>
+          <span style={styles.kindName}>
+            {kindLabel}
+            {/* The edge stripe marks the edit; the word says it without colour. */}
+            {isDirty ? <span style={styles.unsaved}>{t('ai:autonomy.matrix.unsaved')}</span> : null}
+          </span>
           <span style={styles.kindDesc}>{kindDesc}</span>
         </div>
       </th>
@@ -537,7 +567,7 @@ const styles = {
   } satisfies CSSProperties,
   kindDesc: {
     fontSize: 'var(--nf-text-xs)',
-    color: 'var(--nf-color-fg-subtle)',
+    color: 'var(--nf-color-fg-muted)',
     lineHeight: 'var(--nf-leading-normal)',
   } satisfies CSSProperties,
   modeCell: {
@@ -547,8 +577,38 @@ const styles = {
   } satisfies CSSProperties,
   defaultHint: {
     fontSize: 'var(--nf-text-xs)',
-    color: 'var(--nf-color-fg-subtle)',
+    color: 'var(--nf-color-fg-muted)',
     fontStyle: 'italic',
+  } satisfies CSSProperties,
+  legend: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(12rem, 100%), 1fr))',
+    gap: 'var(--nf-space-3)',
+    margin: 0,
+  } satisfies CSSProperties,
+  legendItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--nf-space-0-5)',
+  } satisfies CSSProperties,
+  legendTerm: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--nf-space-1)',
+    fontSize: 'var(--nf-text-sm)',
+    fontWeight: 'var(--nf-weight-medium)',
+    color: 'var(--nf-color-fg)',
+  } satisfies CSSProperties,
+  legendDesc: {
+    margin: 0,
+    fontSize: 'var(--nf-text-xs)',
+    color: 'var(--nf-color-fg-muted)',
+  } satisfies CSSProperties,
+  unsaved: {
+    marginInlineStart: 'var(--nf-space-2)',
+    fontSize: 'var(--nf-text-xs)',
+    fontWeight: 'var(--nf-weight-medium)',
+    color: 'var(--nf-color-warning-fg)',
   } satisfies CSSProperties,
   footer: {
     display: 'flex',

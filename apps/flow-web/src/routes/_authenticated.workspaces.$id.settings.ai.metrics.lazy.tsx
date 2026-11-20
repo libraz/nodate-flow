@@ -61,7 +61,11 @@ function AiMetricsRoute(): ReactElement {
 
   return (
     <section className={styles.root}>
-      <PageHeader title={t('page.title')} description={t('page.description')} />
+      <PageHeader
+        title={t('page.title')}
+        description={t('page.description')}
+        help="workspace-settings-ai-metrics"
+      />
       <WindowSelector value={windowDays} onChange={handleWindowChange} />
       <ErrorBoundary FallbackComponent={MetricsErrorFallback} resetKeys={[windowDays]}>
         <Suspense fallback={<MetricsSkeleton />}>

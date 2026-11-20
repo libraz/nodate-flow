@@ -72,6 +72,7 @@ export default function EditSuggestionDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t('edit.title')}>
       <form onSubmit={handleSubmit} className={styles.form}>
+        <p className={styles.hint}>{t('edit.hint')}</p>
         <FormField label={t('edit.action_label')}>
           {(control) => (
             <Select

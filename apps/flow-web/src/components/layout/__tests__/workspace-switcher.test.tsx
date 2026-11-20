@@ -11,16 +11,31 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   pathname: '/calendar',
+  workspaces: [] as { id: string; name: string }[],
   sdkGet: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    to,
+    params,
+    children,
+    ...rest
+  }: {
+    to: string;
+    params: { id: string };
+    children: ReactNode;
+  } & Record<string, unknown>) => (
+    <a href={to.replace('$id', params.id)} {...rest}>
+      {children}
+    </a>
+  ),
   useNavigate: () => mocks.navigate,
   // Both the switcher and useCurrentWorkspaceId read the pathname
   // through a selector, so the fake state only needs `location`.
@@ -36,17 +51,16 @@ vi.mock('../../../lib/sdk', () => ({
 
 vi.mock('../../../features/workspaces/api', () => ({
   useWorkspacesQuery: () => ({
-    data: [
-      { id: 'ws-1', name: 'Acme' },
-      { id: 'ws-2', name: 'Globex' },
-    ],
+    data: mocks.workspaces,
     response: new Response(null, { status: 200 }),
   }),
   response: new Response(null, { status: 200 }),
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, opts?: { name?: string }) => (opts?.name ? `${key}:${opts.name}` : key),
+  }),
 }));
 
 import { clearActiveWorkspaceId } from '../../../lib/use-current-workspace';
@@ -63,7 +77,13 @@ function renderSwitcher(client: QueryClient): ReactElement {
   return <WorkspaceSwitcher />;
 }
 
+const TWO = [
+  { id: 'ws-1', name: 'Acme' },
+  { id: 'ws-2', name: 'Globex' },
+];
+
 beforeEach(() => {
+  mocks.workspaces = TWO;
   mocks.navigate.mockReset();
   // `useCurrentWorkspaceId` purges a stored id that is no longer in the
   // member list, so this has to agree with the switcher's options.
@@ -138,5 +158,36 @@ describe('WorkspaceSwitcher on a workspace-scoped route', () => {
       to: '/workspaces/$id',
       params: { id: 'ws-2' },
     });
+  });
+});
+
+describe('WorkspaceSwitcher by workspace count', () => {
+  const client = (): QueryClient =>
+    new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  it('renders nothing when there are no workspaces', () => {
+    mocks.workspaces = [];
+    renderSwitcher(client());
+
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('renders a link with the name and no combobox for a single workspace', () => {
+    mocks.workspaces = [{ id: 'ws-1', name: 'acme' }];
+    renderSwitcher(client());
+
+    expect(screen.queryByRole('combobox')).toBeNull();
+    const link = screen.getByRole('link', { name: 'topbar.workspace.current:acme' });
+    expect(link.getAttribute('href')).toBe('/workspaces/ws-1');
+    expect(link.textContent).toContain('acme');
+    expect(link.textContent).toContain('A');
+  });
+
+  it('renders the combobox for two or more workspaces', () => {
+    renderSwitcher(client());
+
+    expect(screen.getByRole('combobox')).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

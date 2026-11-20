@@ -355,6 +355,7 @@ export default function WorkspaceSettingsForm({
       <PageHeader
         title={t('workspace.general.title')}
         description={t('workspace.general.description')}
+        help="workspace-settings-general"
       />
 
       <form

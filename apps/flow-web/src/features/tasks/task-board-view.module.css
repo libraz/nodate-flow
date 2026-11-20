@@ -67,9 +67,62 @@
 }
 
 .dndHint {
-  margin: var(--nf-space-2) 0 0;
-  font-size: var(--nf-text-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+  margin: 0 0 var(--nf-space-3);
+  font-size: var(--nf-text-supporting);
   color: var(--nf-color-fg-muted);
+}
+
+/*
+ * Edge fade while the board scrolls sideways: the end fades until the last
+ * column is reached, the start fades once scrolled. A board that fits never
+ * gets a scroll timeline, so it never fades.
+ */
+@property --board-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --board-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes board-edge-fade {
+  from {
+    --board-fade-start: 0px;
+    --board-fade-end: var(--nf-space-8);
+  }
+
+  10%,
+  90% {
+    --board-fade-start: var(--nf-space-8);
+    --board-fade-end: var(--nf-space-8);
+  }
+
+  to {
+    --board-fade-start: var(--nf-space-8);
+    --board-fade-end: 0px;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .board {
+    /* Only alpha matters in a mask; the colour is any opaque token. */
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      var(--nf-color-fg) var(--board-fade-start),
+      var(--nf-color-fg) calc(100% - var(--board-fade-end)),
+      transparent
+    );
+    animation: board-edge-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
 }
 
 .limitNotice {

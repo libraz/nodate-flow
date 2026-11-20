@@ -23,8 +23,16 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
-import { type ChangeEvent, type FormEvent, type ReactElement, Suspense, useState } from 'react';
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type ReactElement,
+  Suspense,
+  useId,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../../lib/api-error';
@@ -53,23 +61,26 @@ export default function IntakeList(): ReactElement {
 
   return (
     <div className={styles.body}>
-      <div className={styles.toolbar}>
-        <label className={styles.workspaceField} htmlFor="intake-workspace-select">
-          {t('filter.workspace_label')}
-          <Select
-            id="intake-workspace-select"
-            value={workspaceId}
-            onChange={handleWorkspaceChange}
-            aria-label={t('filter.workspace_label')}
-          >
-            {workspaces.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </Select>
-        </label>
-      </div>
+      <p className={styles.description}>{t('intake.description')}</p>
+      {workspaces.length > 1 && (
+        <div className={styles.toolbar}>
+          <label className={styles.workspaceField} htmlFor="intake-workspace-select">
+            {t('filter.workspace_label')}
+            <Select
+              id="intake-workspace-select"
+              value={workspaceId}
+              onChange={handleWorkspaceChange}
+              aria-label={t('filter.workspace_label')}
+            >
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
+      )}
       <Suspense
         fallback={
           <div className={styles.fallback} aria-busy="true">
@@ -98,6 +109,7 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
   const stagger = useFirstLoadStagger();
   const [title, setTitle] = useState('');
   const [convertItem, setConvertItem] = useState<IntakeItem | null>(null);
+  const quickAddHintId = useId();
 
   const handleQuickAdd = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -142,19 +154,23 @@ function IntakeBody({ workspaceId }: IntakeBodyProps): ReactElement {
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('intake.quick_add.placeholder')}
           aria-label={t('intake.quick_add.placeholder')}
+          aria-describedby={quickAddHintId}
           disabled={create.isPending}
           maxLength={500}
         />
         <Button
           type="submit"
           variant="primary"
-          size="sm"
+          className={styles.quickAddSubmit}
           disabled={create.isPending || title.trim().length === 0}
           aria-busy={create.isPending || undefined}
         >
           {t('intake.quick_add.submit')}
         </Button>
       </form>
+      <p id={quickAddHintId} className={styles.hint}>
+        {t('intake.quick_add.hint')}
+      </p>
 
       {presence.entries.length === 0 ? (
         <p className={styles.empty}>{t('intake.empty')}</p>
@@ -206,15 +222,17 @@ function IntakeRow({ item, pending, onDismiss, onConvert }: IntakeRowProps): Rea
         {item.body ? <p className={styles.rowBody}>{item.body}</p> : null}
       </div>
       <div className={styles.rowActions}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onDismiss(item)}
-          disabled={pending}
-        >
-          {t('intake.dismiss.action')}
-        </Button>
+        <Tooltip content={t('intake.dismiss.hint')}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onDismiss(item)}
+            disabled={pending}
+          >
+            {t('intake.dismiss.action')}
+          </Button>
+        </Tooltip>
         <Button type="button" variant="primary" size="sm" onClick={() => onConvert(item)}>
           {t('intake.convert.action')}
         </Button>

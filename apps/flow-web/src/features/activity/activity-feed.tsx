@@ -50,13 +50,16 @@ function SourceFilter({
 }): ReactElement {
   const { t } = useTranslation('activity');
   return (
-    <ToggleChipGroup label={t('filter.source_label')}>
-      {FILTER_VALUES.map((v) => (
-        <ToggleChip key={v} pressed={v === value} onPressedChange={() => onChange(v)}>
-          {v === 'all' ? t('filter.all_sources') : sourceLabel(v, t)}
-        </ToggleChip>
-      ))}
-    </ToggleChipGroup>
+    <div className={styles.filter}>
+      <ToggleChipGroup label={t('filter.source_label')}>
+        {FILTER_VALUES.map((v) => (
+          <ToggleChip key={v} pressed={v === value} onPressedChange={() => onChange(v)}>
+            {v === 'all' ? t('filter.all_sources') : sourceLabel(v, t)}
+          </ToggleChip>
+        ))}
+      </ToggleChipGroup>
+      <p className={styles.filterHint}>{t('filter.source_hint')}</p>
+    </div>
   );
 }
 
@@ -85,7 +88,7 @@ function FeedWithActors({
 }): ReactElement {
   const { t } = useTranslation('activity');
   const { data: users } = useWorkspaceUsersQuery(workspaceId);
-  const nameById = new Map(users.map((u) => [u.id, u.displayName]));
+  const userById = new Map(users.map((u) => [u.id, u]));
 
   const query = useActivityFeedQuery(workspaceId, { source });
   const stagger = useFirstLoadStagger();
@@ -160,14 +163,18 @@ function FeedWithActors({
   return (
     <>
       <ul aria-label={t('view.list_label')} className={styles.list}>
-        {entries.map((entry, index) => (
-          <ActivityRow
-            key={entry.publicId}
-            entry={entry}
-            enterStyle={stagger(index)}
-            actorName={entry.actorUserPublicId ? nameById.get(entry.actorUserPublicId) : undefined}
-          />
-        ))}
+        {entries.map((entry, index) => {
+          const actor = entry.actorUserPublicId ? userById.get(entry.actorUserPublicId) : undefined;
+          return (
+            <ActivityRow
+              key={entry.publicId}
+              entry={entry}
+              enterStyle={stagger(index)}
+              actorName={actor?.displayName}
+              actorAvatarUrl={actor?.avatarUrl}
+            />
+          );
+        })}
         <li ref={sentinelRef} aria-hidden="true" className={styles.sentinel} />
       </ul>
 

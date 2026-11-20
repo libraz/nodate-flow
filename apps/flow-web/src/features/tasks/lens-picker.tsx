@@ -20,7 +20,7 @@ import Popover from '@nodate-flow/ui/primitives/popover';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { Share2 } from 'lucide-react';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
@@ -167,6 +167,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const saveHintId = useId();
   const [descriptionInput, setDescriptionInput] = useState('');
   const [shareLensId, setShareLensId] = useState<string | null>(null);
   /**
@@ -304,6 +305,9 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
         </ul>
       )}
 
+      <p id={saveHintId} className={styles.saveHint}>
+        {t('tasks.lens.save_hint')}
+      </p>
       <div className={styles.saveRow}>
         <input
           data-1p-ignore
@@ -314,6 +318,7 @@ export default function LensPicker({ workspaceId, projectId }: LensPickerProps):
           }}
           placeholder={t('tasks.lens.name_placeholder')}
           aria-label={t('tasks.lens.name_placeholder')}
+          aria-describedby={saveHintId}
           className={styles.saveInput}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void handleSave();

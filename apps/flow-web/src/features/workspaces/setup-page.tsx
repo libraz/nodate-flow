@@ -18,6 +18,7 @@ import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import PageHelp from '../../components/page-help';
 import { createSlugField, slugify } from '../../lib/validation/identifier';
 import { useCreateWorkspace } from './api';
 
@@ -107,18 +108,21 @@ export default function SetupPage(): ReactElement {
         }}
       >
         <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-2)' }}>
-          <h1
-            style={{
-              margin: 0,
-              fontWeight: 'var(--nf-weight-semibold)',
-              fontSize: 'var(--nf-text-section-title)',
-              lineHeight: 1.15,
-              letterSpacing: '-0.01em',
-              color: 'var(--nf-color-fg)',
-            }}
-          >
-            {t('workspaces.setup.title')}
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--nf-space-2)' }}>
+            <h1
+              style={{
+                margin: 0,
+                fontWeight: 'var(--nf-weight-semibold)',
+                fontSize: 'var(--nf-text-section-title)',
+                lineHeight: 1.15,
+                letterSpacing: '-0.01em',
+                color: 'var(--nf-color-fg)',
+              }}
+            >
+              {t('workspaces.setup.title')}
+            </h1>
+            <PageHelp topic="setup" />
+          </div>
           <p
             style={{
               margin: 0,

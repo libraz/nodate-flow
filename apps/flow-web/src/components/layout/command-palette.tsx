@@ -53,6 +53,7 @@ import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { apiRequest } from '../../lib/api';
 import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import PageHelp from '../page-help';
 import css from './command-palette.module.css';
 
 interface CommandItem {
@@ -84,6 +85,54 @@ function stripCommandPrefix(raw: string): string {
 // NL command mode sub-component
 // ---------------------------------------------------------------------------
 
+/** Human labels for the tools the palette can dispatch (see nl-command/dispatch.ts). */
+const TOOL_LABEL_KEY = new Map<string, string>([
+  ['create_task', 'dock.command_palette.tool.create_task'],
+  ['update_task', 'dock.command_palette.tool.update_task'],
+  ['transition_task', 'dock.command_palette.tool.transition_task'],
+  ['add_comment', 'dock.command_palette.tool.add_comment'],
+  ['search_tasks', 'dock.command_palette.tool.search_tasks'],
+  ['list_tasks', 'dock.command_palette.tool.list_tasks'],
+  ['list_projects', 'dock.command_palette.tool.list_projects'],
+]);
+
+/** The tool's human label, or its raw name when the palette has none for it. */
+function toolLabel(tool: string, t: ReturnType<typeof useTranslation<'common'>>['t']): string {
+  const key = TOOL_LABEL_KEY.get(tool);
+  return key ? t(key) : tool;
+}
+
+type CommandStep = 'interpret' | 'confirm' | 'run';
+
+const COMMAND_STEPS: ReadonlyArray<{ id: CommandStep; key: string }> = [
+  { id: 'interpret', key: 'dock.command_palette.step.interpret' },
+  { id: 'confirm', key: 'dock.command_palette.step.confirm' },
+  { id: 'run', key: 'dock.command_palette.step.run' },
+];
+
+/** Interpret, confirm, run: the second Enter is the only one that changes anything. */
+function CommandSteps({ current }: { current: CommandStep }): ReactElement {
+  const { t } = useTranslation('common');
+  const currentIndex = COMMAND_STEPS.findIndex((step) => step.id === current);
+  return (
+    <ol className={css.steps}>
+      {COMMAND_STEPS.map((step, index) => (
+        <li
+          key={step.id}
+          className={css.step}
+          data-state={index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'next'}
+          aria-current={index === currentIndex ? 'step' : undefined}
+        >
+          <span className={css.stepNumber} aria-hidden="true">
+            {index + 1}
+          </span>
+          {t(step.key)}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 interface CommandModeBodyProps {
   prompt: string;
   wsId: string | null;
@@ -109,7 +158,7 @@ function outcomeMessage(
 ): string {
   switch (outcome.kind) {
     case 'unsupported':
-      return t('dock.command_palette.unsupported', { tool: outcome.tool });
+      return t('dock.command_palette.unsupported', { tool: toolLabel(outcome.tool, t) });
     case 'unresolved':
       switch (outcome.reason) {
         case 'missing':
@@ -184,9 +233,13 @@ function CommandModeBody({
     return <p className={css.emptyText}>{t('dock.command_palette.no_workspace')}</p>;
   }
 
+  const resultLabel = result ? toolLabel(result.tool, t) : '';
+  const step: CommandStep = executing ? 'run' : result ? 'confirm' : 'interpret';
+
   return (
     <div className={css.commandModeBody}>
       <div className={css.groupLabel}>{t('dock.command_palette.group_command')}</div>
+      <CommandSteps current={step} />
 
       {resolveCommand.isPending && (
         <p className={cx(css.emptyText, css.commandStatus)} aria-live="polite">
@@ -203,7 +256,7 @@ function CommandModeBody({
       {!resolveCommand.isPending && !result && !resolveCommand.isError && (
         <p className={cx(css.emptyText, css.commandStatus)}>
           {prompt.length > 0
-            ? t('dock.command_palette.hint_select')
+            ? t('dock.command_palette.command_ready')
             : t('dock.command_palette.placeholder_command')}
         </p>
       )}
@@ -211,7 +264,7 @@ function CommandModeBody({
       {result && (
         <div className={css.commandResult}>
           <div className={css.commandToolRow}>
-            <span className={css.commandToolName}>{result.tool}</span>
+            <span className={css.commandToolName}>{resultLabel}</span>
             <span
               className={cx(
                 css.confidenceBadge,
@@ -224,7 +277,14 @@ function CommandModeBody({
             </span>
           </div>
 
-          <pre className={css.commandArgs}>{JSON.stringify(result.args, null, 2)}</pre>
+          <p className={css.commandHint}>{t('dock.command_palette.confidence_hint')}</p>
+
+          <details className={css.commandDetails}>
+            <summary className={css.commandDetailsSummary}>
+              {t('dock.command_palette.details')}
+            </summary>
+            <pre className={css.commandArgs}>{JSON.stringify(result.args, null, 2)}</pre>
+          </details>
 
           {/* A tool with no handler says so before Enter is pressed, so
               the palette never offers to run something it cannot run. */}
@@ -234,7 +294,7 @@ function CommandModeBody({
               className={cx(css.emptyText, css.statusDanger)}
               aria-live="assertive"
             >
-              {t('dock.command_palette.unsupported', { tool: result.tool })}
+              {t('dock.command_palette.unsupported', { tool: resultLabel })}
             </p>
           ) : executing ? (
             <p key="executing" className={cx(css.emptyText, css.statusStrong)} aria-live="polite">
@@ -248,7 +308,7 @@ function CommandModeBody({
             <p key="confirm" className={cx(css.emptyText, css.statusStrong)} aria-live="polite">
               {result.confidence >= 0.8
                 ? t('dock.command_palette.confirm_execute')
-                : t('dock.command_palette.confirm_low', { tool: result.tool })}
+                : t('dock.command_palette.confirm_low')}
             </p>
           )}
         </div>
@@ -602,10 +662,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           {t('dock.command_palette.hint_close')}
         </span>
         {mode === 'search' && (
-          <span className={css.hintGroupEnd}>
-            <kbd className={css.kbd}>&gt;</kbd>
-            {t('dock.command_palette.command_hint')}
-          </span>
+          <span className={css.hintGroupEnd}>{t('dock.command_palette.command_hint')}</span>
         )}
       </div>
     </div>
@@ -653,7 +710,16 @@ export default function CommandPalette({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title={t('dock.command_palette.title')}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={
+        <span className={css.titleRow}>
+          {t('dock.command_palette.title')}
+          <PageHelp topic="command-palette" />
+        </span>
+      }
+    >
       <Suspense fallback={<PaletteSkeleton />}>
         <PaletteBody onSelect={handleSelect} initialCommandMode={initialCommandMode} />
       </Suspense>

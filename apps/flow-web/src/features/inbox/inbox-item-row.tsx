@@ -8,6 +8,7 @@ import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { Link } from '@tanstack/react-router';
 import {
   GitPullRequest,
@@ -18,7 +19,7 @@ import {
   Pencil,
   Webhook,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useState } from 'react';
+import { type ButtonHTMLAttributes, type ReactElement, type Ref, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InboxItem } from './api';
@@ -50,6 +51,34 @@ const SOURCE_LABEL_KEY: Record<SourceKey, string> = {
   webhook: 'source.webhook',
 };
 
+/** Item kinds with a translated label; any other kind is shown as sent. */
+const KIND_LABEL_KEY: Record<string, string> = {
+  'agent.task.handoff_to_user': 'kind.agent_task_handoff_to_user',
+};
+
+type SnoozeTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLElement>;
+  hint: string;
+  label: string;
+};
+
+/**
+ * The popover clones its child with a ref and interaction props; the tooltip
+ * needs the button's own ref, so the popover anchors on a span and its
+ * interaction props go to the button.
+ */
+function SnoozeTrigger({ ref, hint, label, ...buttonProps }: SnoozeTriggerProps): ReactElement {
+  return (
+    <span ref={ref} className={styles.popoverAnchor}>
+      <Tooltip content={hint}>
+        <Button type="button" variant="ghost" size="sm" {...buttonProps}>
+          {label}
+        </Button>
+      </Tooltip>
+    </span>
+  );
+}
+
 function isKnownSource(source: string): source is SourceKey {
   return source in SOURCE_LABEL_KEY;
 }
@@ -76,6 +105,8 @@ export default function InboxItemRow({
   const locale = i18n.resolvedLanguage ?? 'en';
   const icon = SOURCE_ICON[item.source] ?? InboxIcon;
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
+  const kindKey = KIND_LABEL_KEY[item.kind];
+  const kindLabel = kindKey ? t(kindKey) : item.kind;
 
   const handleArchive = (): void => {
     onArchive(item.id);
@@ -94,7 +125,7 @@ export default function InboxItemRow({
         <div className={styles.content}>
           <div className={styles.meta}>
             <Badge tone="neutral">{sourceLabel}</Badge>
-            <span className={styles.kind}>{item.kind}</span>
+            <span className={kindKey ? styles.kindLabel : styles.kind}>{kindLabel}</span>
           </div>
           {item.taskId ? (
             <Link
@@ -122,18 +153,20 @@ export default function InboxItemRow({
         </div>
         <div className={styles.actions}>
           {item.sourceDetail?.title && !item.taskId ? (
-            <Button type="button" size="sm" onClick={() => setSourceDialogOpen(true)}>
-              {t('sourceIntake.review')}
-            </Button>
+            <Tooltip content={t('sourceIntake.review_hint')}>
+              <Button type="button" size="sm" onClick={() => setSourceDialogOpen(true)}>
+                {t('sourceIntake.review')}
+              </Button>
+            </Tooltip>
           ) : null}
           <SnoozePopover onSnooze={handleSnooze}>
-            <Button type="button" variant="ghost" size="sm">
-              {t('action.snooze')}
-            </Button>
+            <SnoozeTrigger hint={t('action.snooze_hint')} label={t('action.snooze')} />
           </SnoozePopover>
-          <Button type="button" variant="ghost" size="sm" onClick={handleArchive}>
-            {t('action.archive')}
-          </Button>
+          <Tooltip content={t('action.archive_hint')}>
+            <Button type="button" variant="ghost" size="sm" onClick={handleArchive}>
+              {t('action.archive')}
+            </Button>
+          </Tooltip>
         </div>
       </div>
       {sourceDialogOpen ? (

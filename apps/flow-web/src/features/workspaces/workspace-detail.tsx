@@ -1,5 +1,5 @@
 /**
- * WorkspaceDetail — header + tabs (Overview / Members / Settings).
+ * WorkspaceDetail — workspace header and project overview.
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
@@ -7,7 +7,6 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Card from '@nodate-flow/ui/primitives/card';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import Tabs, { type TabItem } from '@nodate-flow/ui/primitives/tabs';
 import motionStyles from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Link } from '@tanstack/react-router';
 import { ChevronRight } from 'lucide-react';
@@ -17,18 +16,10 @@ import PageHeader from '../../components/page-header';
 import { useProjectsQuery } from '../projects/api';
 import ProjectCreateDialog from '../projects/project-create-dialog';
 import { useWorkspaceQuery } from './api';
-import WorkspaceMembersTable from './workspace-members-table';
 import styles from './workspaces.module.css';
-
-/** Identifiers for the workspace-detail tab panels. */
-export type WorkspaceDetailTab = 'overview' | 'members';
 
 export interface WorkspaceDetailProps {
   id: string;
-  /** Controlled active tab, typically driven by the `?tab=` search param. */
-  tab: WorkspaceDetailTab;
-  /** Called when the user activates a different tab. Consumers persist the value. */
-  onTabChange: (tab: WorkspaceDetailTab) => void;
 }
 
 /** The overview lists this many projects; the Projects section holds the rest. */
@@ -110,53 +101,17 @@ function OverviewPanel({ workspaceId }: { workspaceId: string }): ReactElement {
   );
 }
 
-export default function WorkspaceDetail({
-  id,
-  tab,
-  onTabChange,
-}: WorkspaceDetailProps): ReactElement {
-  const { t } = useTranslation('common');
+export default function WorkspaceDetail({ id }: WorkspaceDetailProps): ReactElement {
   const { data: workspace } = useWorkspaceQuery(id);
-
-  // Settings is reachable via the workspace-level sub-nav route
-  // (/workspaces/$id/settings). Keeping it as a tab here too would
-  // duplicate the route and confuse deep-linking, so the overview
-  // shows Overview + Members only.
-  const items: TabItem[] = [
-    {
-      value: 'overview',
-      label: t('workspaces.detail.tabs.overview'),
-      content: (
-        <Suspense fallback={<Skeleton className={styles.panelSkeleton} />}>
-          <OverviewPanel workspaceId={id} />
-        </Suspense>
-      ),
-    },
-    {
-      value: 'members',
-      label: t('workspaces.detail.tabs.members'),
-      content: (
-        <Suspense fallback={<Skeleton className={styles.panelSkeleton} />}>
-          <WorkspaceMembersTable workspaceId={id} />
-        </Suspense>
-      ),
-    },
-  ];
-
   const headingId = useId();
 
   return (
     <article aria-labelledby={headingId} className={styles.detail}>
       <PageHeader titleId={headingId} title={workspace.name} description={workspace.description} />
 
-      <Tabs
-        items={items}
-        value={tab}
-        onValueChange={(next) => {
-          onTabChange(next as WorkspaceDetailTab);
-        }}
-        aria-label={t('workspaces.detail.tabs.label')}
-      />
+      <Suspense fallback={<Skeleton className={styles.panelSkeleton} />}>
+        <OverviewPanel workspaceId={id} />
+      </Suspense>
     </article>
   );
 }

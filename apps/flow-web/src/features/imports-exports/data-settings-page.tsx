@@ -65,6 +65,9 @@ const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/data');
 
 const IMPORT_SOURCES: readonly ImportSource[] = ['github', 'jira', 'linear', 'csv'];
 
+/** The server accepts every source, but only CSV has a runner; the rest end as failed. */
+const RUNNABLE_SOURCES: ReadonlySet<ImportSource> = new Set(['csv']);
+
 /** Map raw ImportJob.status to a Badge tone. Unknown statuses fall back to neutral. */
 function statusTone(status: string): BadgeTone {
   switch (status) {
@@ -357,14 +360,25 @@ function ImportCreateForm({ workspaceId }: ImportCreateFormProps): ReactElement 
   return (
     <form className={styles.createForm} onSubmit={handleSubmit}>
       <div className={styles.createGrid}>
-        <FormField label={t('settings.data.imports.create.source')}>
+        <FormField
+          label={t('settings.data.imports.create.source')}
+          description={t('settings.data.imports.create.source_help')}
+        >
           {(control) => (
             <Select {...control} value={source} onChange={handleSourceChange}>
-              {IMPORT_SOURCES.map((s) => (
-                <option key={s} value={s}>
-                  {t(sourceLabelKey(s))}
-                </option>
-              ))}
+              {IMPORT_SOURCES.map((s) =>
+                RUNNABLE_SOURCES.has(s) ? (
+                  <option key={s} value={s}>
+                    {t(sourceLabelKey(s))}
+                  </option>
+                ) : (
+                  <option key={s} value={s} disabled>
+                    {t('settings.data.imports.source.coming_soon', {
+                      source: t(sourceLabelKey(s)),
+                    })}
+                  </option>
+                ),
+              )}
             </Select>
           )}
         </FormField>
@@ -529,7 +543,12 @@ function ImportsCard({ workspaceId }: ImportsCardProps): ReactElement {
           }
         />
       ) : jobs.length === 0 ? (
-        <EmptyState titleAs="p" title={t('settings.data.imports.empty')} className={ui.empty} />
+        <EmptyState
+          titleAs="p"
+          title={t('settings.data.imports.empty')}
+          description={t('settings.data.imports.empty_hint')}
+          className={ui.empty}
+        />
       ) : (
         <div className={ui.tableWrap}>
           <table className={ui.table}>
@@ -653,7 +672,11 @@ export default function DataSettingsPage(): ReactElement {
 
   return (
     <div className={ui.page}>
-      <PageHeader title={t('settings.data.title')} description={t('settings.data.description')} />
+      <PageHeader
+        title={t('settings.data.title')}
+        description={t('settings.data.description')}
+        help="workspace-settings-data"
+      />
       <ExportsCard workspaceId={id} />
       <ImportsCard workspaceId={id} />
     </div>

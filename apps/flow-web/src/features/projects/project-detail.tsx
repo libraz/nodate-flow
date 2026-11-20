@@ -78,7 +78,12 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
   };
 
   const handleDisable = async (): Promise<void> => {
-    if (!(await confirmAction({ message: t('projects.settings.disable_confirm') }))) return;
+    const confirmed = await confirmAction({
+      message: t('projects.settings.disable_confirm'),
+      confirmLabel: t('projects.settings.disable'),
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await disable.mutateAsync(id);
       void navigate({ to: '/workspaces' });

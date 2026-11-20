@@ -136,6 +136,35 @@ export function sourceLabel(source: string, t: TFunction): string {
   return isKnownSource(source) ? t(SOURCE_KEY[source]) : humanizeAction(source);
 }
 
+const RESOURCE_KEY: ReadonlyMap<string, string> = new Map([
+  ['task', 'resource.task'],
+  ['page', 'resource.page'],
+  ['project', 'resource.project'],
+  ['comment', 'resource.comment'],
+  ['timebox', 'resource.timebox'],
+  ['calendar', 'resource.calendar'],
+  ['calendar_event', 'resource.calendar_event'],
+  ['event', 'resource.calendar_event'],
+  ['label', 'resource.label'],
+  ['lens', 'resource.lens'],
+  ['attachment', 'resource.attachment'],
+  ['ai_agent', 'resource.ai_agent'],
+  ['ai_provider', 'resource.ai_provider'],
+  ['ai_invocation', 'resource.ai_invocation'],
+  ['mcp_invocation', 'resource.mcp_invocation'],
+  ['mcp_token', 'resource.mcp_token'],
+  ['intake_item', 'resource.intake_item'],
+  ['membership', 'resource.membership'],
+  ['notification', 'resource.notification'],
+  ['webhook_subscription', 'resource.webhook_subscription'],
+]);
+
+/** Localized label for a `resourceType`; unknown types are humanized. */
+export function resourceTypeLabel(resourceType: string, t: TFunction): string {
+  const key = RESOURCE_KEY.get(resourceType);
+  return key === undefined ? humanizeAction(resourceType) : t(key);
+}
+
 const ACTOR_KIND_KEY: Readonly<Record<ActivityActorKind, string>> = {
   user: 'actor_kind.user',
   agent: 'actor_kind.agent',

@@ -2,9 +2,9 @@
  * /workspaces/$id/settings/ai-agents — workspace AI agent management (lazy).
  *
  * The page lists every ai_agents row for the workspace and exposes
- * four inline controls per agent:
+ * inline controls per agent:
  *   - schedule_kind dropdown (PATCH /ai/agents/{id}/schedule)
- *   - paused kill switch   (POST  /ai/agents/{id}/pause)
+ *   - pause / resume         (POST  /ai/agents/{id}/pause)
  *   - manual trigger       (POST  /ai/agents/{id}/trigger)
  *
  * Creation goes through an inline form that reads the workspace model
@@ -18,12 +18,14 @@ import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
+import Radio from '@nodate-flow/ui/primitives/radio';
 import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { createLazyFileRoute, getRouteApi, Link } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, Suspense, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../components/page-header';
 import {
@@ -43,6 +45,20 @@ import { formatApiError } from '../lib/api-error';
 import styles from './_authenticated.workspaces.$id.settings.ai-agents.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings/ai-agents');
+
+/** One-line description of when an agent with this trigger runs. */
+function scheduleHintKey(kind: AgentScheduleKind): string {
+  switch (kind) {
+    case 'disabled':
+      return 'agents.scheduleKind.descriptions.disabled';
+    case 'interval':
+      return 'agents.scheduleKind.descriptions.interval';
+    case 'on_event':
+      return 'agents.scheduleKind.descriptions.on_event';
+    case 'manual':
+      return 'agents.scheduleKind.descriptions.manual';
+  }
+}
 
 function AgentsList({
   workspaceId,
@@ -155,6 +171,7 @@ function AgentsList({
                   </label>
                   <Select
                     id={scheduleId}
+                    aria-describedby={`${scheduleId}-hint`}
                     value={agent.scheduleKind}
                     onChange={(e) => {
                       void handleScheduleChange(e.target.value as AgentScheduleKind);
@@ -168,32 +185,42 @@ function AgentsList({
                       </option>
                     ))}
                   </Select>
+                  <span id={`${scheduleId}-hint`} className={styles.inlineHint}>
+                    {t(scheduleHintKey(agent.scheduleKind))}
+                  </span>
                 </div>
                 <div className={styles.controlActions}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      void handleTogglePause();
-                    }}
-                    disabled={pausingId === agent.id}
-                    aria-busy={pausingId === agent.id}
-                    aria-pressed={agent.paused}
-                  >
-                    {agent.paused ? t('agents.resume') : t('agents.pause')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primary"
-                    onClick={() => {
-                      void handleTrigger();
-                    }}
-                    disabled={triggeringId === agent.id || agent.paused}
-                    aria-busy={triggeringId === agent.id}
-                  >
-                    {t('agents.trigger.label')}
-                  </Button>
+                  <Tooltip content={t('agents.pause_help')}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        void handleTogglePause();
+                      }}
+                      disabled={pausingId === agent.id}
+                      aria-busy={pausingId === agent.id}
+                      aria-pressed={agent.paused}
+                    >
+                      {agent.paused ? t('agents.resume') : t('agents.pause')}
+                    </Button>
+                  </Tooltip>
+                  {/* A disabled button gets no hover, so the tooltip anchors on a wrapper. */}
+                  <Tooltip content={t('agents.trigger.help')}>
+                    <span className={styles.tooltipAnchor}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          void handleTrigger();
+                        }}
+                        disabled={triggeringId === agent.id || agent.paused}
+                        aria-busy={triggeringId === agent.id}
+                      >
+                        {t('agents.trigger.label')}
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </div>
               </div>
               {agent.scheduleKind === 'on_event' ? (
@@ -253,6 +280,7 @@ function EventTriggersEditor({
   const dirty = value !== baseline;
   const saveStatus = useSaveStatus(dirty);
   const inputId = `agent-events-${agentId}`;
+  const helpId = `${inputId}-help`;
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -278,6 +306,7 @@ function EventTriggersEditor({
       </label>
       <Input
         id={inputId}
+        aria-describedby={helpId}
         value={value}
         placeholder={t('agents.eventTriggers.placeholder')}
         autoComplete="off"
@@ -291,13 +320,16 @@ function EventTriggersEditor({
       <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
         {t('agents.eventTriggers.save')}
       </Button>
+      <p id={helpId} className={styles.eventsHelp}>
+        {t('agents.eventTriggers.help')}
+      </p>
     </form>
   );
 }
 
 /**
  * CreateAgentForm is the inline form rendered when the operator
- * clicks "+ Agent". It reads the workspace model inventory via
+ * clicks "New agent". It reads the workspace model inventory via
  * useModelsQuery so the Select only offers models that exist. A
  * zero-model workspace gets a helpful empty state that links to the
  * ai-providers settings page instead of an unusable form.
@@ -318,6 +350,7 @@ function CreateAgentForm({
   const [scheduleKind, setScheduleKind] = useState<AgentScheduleKind>('disabled');
   const [eventTriggers, setEventTriggers] = useState('');
   const [missing, setMissing] = useState(false);
+  const scheduleGroupId = useId();
 
   if (models.models.length === 0) {
     return (
@@ -392,7 +425,11 @@ function CreateAgentForm({
           />
         )}
       </FormField>
-      <FormField label={t('agents.create.model')} required>
+      <FormField
+        label={t('agents.create.model')}
+        description={t('agents.create.model_help')}
+        required
+      >
         {(control) => (
           <Select
             {...control}
@@ -411,6 +448,7 @@ function CreateAgentForm({
       </FormField>
       <FormField
         label={t('agents.create.systemPrompt')}
+        description={t('agents.create.systemPrompt_help')}
         required
         {...(promptMissing ? { error: t('agents.create.missingFields') } : {})}
       >
@@ -425,25 +463,46 @@ function CreateAgentForm({
           />
         )}
       </FormField>
-      <FormField label={t('agents.scheduleKind.label')}>
-        {(control) => (
-          <Select
-            {...control}
-            value={scheduleKind}
-            onChange={(e) => {
-              setScheduleKind(e.target.value as AgentScheduleKind);
-            }}
-          >
-            {AGENT_SCHEDULE_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {t(`agents.scheduleKind.options.${kind}`)}
-              </option>
-            ))}
-          </Select>
-        )}
-      </FormField>
+      {/* Each trigger states when it runs, so the choice is made before picking. */}
+      <fieldset className={styles.optionGroup} aria-describedby={`${scheduleGroupId}-help`}>
+        <legend className={styles.optionLegend}>{t('agents.scheduleKind.label')}</legend>
+        <p id={`${scheduleGroupId}-help`} className={styles.optionGroupHelp}>
+          {t('agents.scheduleKind.help')}
+        </p>
+        <div className={styles.options}>
+          {AGENT_SCHEDULE_KINDS.map((kind) => {
+            const optionId = `${scheduleGroupId}-${kind}`;
+            return (
+              <label key={kind} htmlFor={optionId} className={styles.option}>
+                <Radio
+                  id={optionId}
+                  name={`${scheduleGroupId}-kind`}
+                  value={kind}
+                  checked={scheduleKind === kind}
+                  onChange={() => {
+                    setScheduleKind(kind);
+                  }}
+                  aria-labelledby={`${optionId}-label`}
+                  aria-describedby={`${optionId}-hint`}
+                />
+                <span className={styles.optionBody}>
+                  <span id={`${optionId}-label`} className={styles.optionLabel}>
+                    {t(`agents.scheduleKind.options.${kind}`)}
+                  </span>
+                  <span id={`${optionId}-hint`} className={styles.optionHint}>
+                    {t(scheduleHintKey(kind))}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
       {scheduleKind === 'on_event' ? (
-        <FormField label={t('agents.eventTriggers.label')}>
+        <FormField
+          label={t('agents.eventTriggers.label')}
+          description={t('agents.eventTriggers.help')}
+        >
           {(control) => (
             <Input
               {...control}
@@ -487,6 +546,7 @@ function AiAgentsRoute(): ReactElement {
       <PageHeader
         title={t('agents.title')}
         description={t('agents.subtitle')}
+        help="workspace-settings-ai-agents"
         actions={
           creating ? null : (
             <Button type="button" variant="primary" onClick={openCreate}>

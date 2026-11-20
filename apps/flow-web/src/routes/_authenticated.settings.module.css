@@ -37,7 +37,7 @@
   padding-block-end: var(--nf-space-1);
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-medium);
-  color: var(--nf-color-fg-subtle);
+  color: var(--nf-color-fg-muted);
 }
 
 .link {

@@ -168,7 +168,10 @@ function ProjectAddMemberDialogBody({
         )}
       </FormField>
 
-      <FormField label={t('projects.members.role')}>
+      <FormField
+        label={t('projects.members.role')}
+        description={t('projects.members.role_description')}
+      >
         {(control) => (
           <Select
             {...control}

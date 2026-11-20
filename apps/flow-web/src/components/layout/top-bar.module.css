@@ -6,7 +6,7 @@
  * Breakpoints (measured on .topBarShell inline-size):
  *  - >= 768px (full):    workspace / search(label) / notifications / avatar
  *  -  480-767px (compact): workspace / search(icon)  / notifications / avatar
- *  - <  480px (ultra):    workspace / search(icon)  / avatar
+ *  - <  480px (ultra):    workspace / search(icon)  / notifications / avatar
  *
  * The avatar trigger opens a dropdown menu carrying settings / notifications /
  * sign-out. Theme and language are configured from /settings/profile and are
@@ -64,6 +64,52 @@
   max-inline-size: 14rem;
 }
 
+/*
+ * Single-workspace identity: quiet context rather than a control. Matches
+ * the Select's block-size so the topbar does not jump between 1 and 2+.
+ */
+.workspaceCurrent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 14rem;
+  min-block-size: var(--nf-control-height);
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  text-decoration: none;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.workspaceCurrent:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.workspaceMonogram {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-6);
+  block-size: var(--nf-space-6);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.workspaceCurrentName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
 .center {
@@ -92,6 +138,17 @@
   max-inline-size: 100%;
   min-inline-size: 0;
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/*
+ * The switcher in the left slot already names the workspace at full width;
+ * repeating it as the first crumb read as a duplicate.
+ */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@container header (min-width: 768px) {
+  .breadcrumbWorkspace {
+    display: none;
+  }
 }
 
 /*
@@ -228,6 +285,11 @@
 }
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
+
+/* Wrapper for the AI cost chip so the ultra breakpoint can drop it. */
+.costSlot {
+  display: contents;
+}
 
 .avatarTrigger {
   display: inline-flex;
@@ -489,19 +551,20 @@
    * names would otherwise push the native <select> toward its 14rem max
    * and squeeze the action cluster in the right grid track.
    */
-  .workspaceSelect {
+  .workspaceSelect,
+  .workspaceCurrent {
     /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 10rem;
   }
 }
 
 /*
- * Ultra (<480px): additionally hide the inline notification bell; it is
- * still accessible from the avatar dropdown.
+ * Ultra (<480px): drop the AI cost chip, the lowest-priority item, so the
+ * bell keeps showing the unread count.
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 479px) {
-  .inlineNotificationBell {
+  .costSlot {
     display: none;
   }
 
@@ -523,7 +586,8 @@
    * <select> still renders an ellipsis for the selected option when the
    * element is narrower than the label.
    */
-  .workspaceSelect {
+  .workspaceSelect,
+  .workspaceCurrent {
     /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 7rem;
   }
@@ -553,4 +617,8 @@
   .topBar {
     padding-inline-start: var(--nf-space-16);
   }
+}
+
+.avatarAnchor {
+  display: inline-flex;
 }

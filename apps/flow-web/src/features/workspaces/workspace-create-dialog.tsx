@@ -139,6 +139,7 @@ export default function WorkspaceCreateDialog({
 
         <FormField
           label={t('workspaces.form.slug')}
+          description={t('workspaces.form.slug_hint')}
           required
           {...(errors.slug ? { error: t(errors.slug) } : {})}
         >

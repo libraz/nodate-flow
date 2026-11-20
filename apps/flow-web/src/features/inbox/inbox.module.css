@@ -12,15 +12,15 @@
 
 .toolbar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--nf-space-3);
   flex-wrap: wrap;
 }
 
 .workspaceField {
   display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1-5);
+  align-items: center;
+  gap: var(--nf-space-2);
   min-inline-size: 0;
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
@@ -33,6 +33,25 @@
 
 .toolbarEnd {
   margin-inline-start: auto;
+}
+
+/* Which workspace triage runs on, or why it cannot run. */
+.triageStatus {
+  margin: calc(var(--nf-space-2) * -1) 0 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+}
+
+.sectionHint {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
 }
 
 .suggestions {
@@ -127,6 +146,16 @@
   font-family: var(--nf-font-mono);
   font-size: var(--nf-text-supporting);
   color: var(--nf-color-fg-muted);
+}
+
+.kindLabel {
+  min-inline-size: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+.popoverAnchor {
+  display: inline-flex;
 }
 
 .time {

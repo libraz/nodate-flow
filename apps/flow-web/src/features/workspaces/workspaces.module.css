@@ -21,7 +21,8 @@
   min-block-size: var(--nf-control-height);
 }
 
-.grid {
+/* Room for the empty state only; a populated grid sizes to its rows. */
+.gridEmpty {
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 20rem;
 }
@@ -93,6 +94,78 @@
   background: var(--nf-color-accent-subtle);
   color: var(--nf-color-accent-fg);
   font-weight: var(--nf-weight-medium);
+}
+
+/*
+ * A row wider than the viewport scrolls sideways, never wraps: the end fades
+ * until the last item is reached and the start fades once scrolled, so a
+ * cut-off item reads as "more this way". A row that fits gets no scroll
+ * timeline and never fades.
+ */
+@property --sub-nav-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --sub-nav-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes sub-nav-edge-fade {
+  from {
+    --sub-nav-fade-start: 0px;
+    --sub-nav-fade-end: var(--nf-space-8);
+  }
+
+  10%,
+  90% {
+    --sub-nav-fade-start: var(--nf-space-8);
+    --sub-nav-fade-end: var(--nf-space-8);
+  }
+
+  to {
+    --sub-nav-fade-start: var(--nf-space-8);
+    --sub-nav-fade-end: 0px;
+  }
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .subNav {
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: var(--nf-space-2);
+    overscroll-behavior-inline: contain;
+  }
+
+  .subNavLink {
+    scroll-snap-align: start;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    /* The fade is the overflow cue here, so the scrollbar can go. */
+    .subNav {
+      scrollbar-width: none;
+      --sub-nav-fade-direction: to right;
+      /* Only alpha matters in a mask; the colour is any opaque token. */
+      mask-image: linear-gradient(
+        var(--sub-nav-fade-direction),
+        transparent,
+        var(--nf-color-fg) var(--sub-nav-fade-start),
+        var(--nf-color-fg) calc(100% - var(--sub-nav-fade-end)),
+        transparent
+      );
+      animation: sub-nav-edge-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
+
+    /* Scroll progress runs from the inline start, which is the right edge in RTL. */
+    .subNav:dir(rtl) {
+      --sub-nav-fade-direction: to left;
+    }
+  }
 }
 
 /* --- Workspace overview: project cards --- */
@@ -293,4 +366,136 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-6);
+}
+
+/* --- Members tab --- */
+
+.membersSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+}
+
+.membersHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-3);
+}
+
+.membersTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.membersTitle {
+  margin: 0;
+  font-size: var(--nf-text-xl);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.membersActions {
+  display: flex;
+  gap: var(--nf-space-2);
+}
+
+/* Destructive but quiet: danger text on a ghost button, confirmed on click. */
+.membersSection .removeButton {
+  color: var(--nf-color-danger-fg);
+}
+
+/* --- Role choice (radio cards) --- */
+
+.roleFieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.roleLegend {
+  padding: 0;
+  margin-block-end: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.roleOptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.roleOption {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-3);
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.roleOption:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.roleOptionOn {
+  border-color: var(--nf-color-accent);
+  background: var(--nf-color-accent-subtle);
+}
+
+.roleOptionOn:hover {
+  background: var(--nf-color-accent-subtle);
+}
+
+.roleRadio {
+  flex: none;
+  margin-block-start: var(--nf-space-0-5);
+}
+
+.roleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  min-inline-size: 0;
+}
+
+.roleName {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.roleDesc {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+/* --- One-time link callout --- */
+
+.onceCallout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+  margin: 0;
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-warning-subtle);
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+}
+
+.onceIcon {
+  flex: none;
+  margin-block-start: var(--nf-space-0-5);
+  color: var(--nf-color-warning-fg);
 }

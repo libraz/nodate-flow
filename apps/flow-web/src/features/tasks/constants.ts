@@ -21,20 +21,26 @@ export const PRIORITY_KEY: Record<TaskPriority, string> = {
   4: 'tasks.priority.urgent',
 };
 
+/*
+ * One priority palette for every view: low neutral, medium info, high
+ * warning, urgent danger. "None" sits below low in a fainter neutral. The
+ * colour and the badge tone below must move together.
+ */
+
 /** CSS color string for each priority level. */
 export const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  0: 'var(--nf-color-fg-muted)',
-  1: 'var(--nf-color-info)',
-  2: 'var(--nf-color-warning)',
-  3: 'var(--nf-color-danger)',
+  0: 'var(--nf-color-border-strong)',
+  1: 'var(--nf-color-fg-muted)',
+  2: 'var(--nf-color-info)',
+  3: 'var(--nf-color-warning)',
   4: 'var(--nf-color-danger)',
 };
 
 /** Badge tone for each priority level. */
 export const PRIORITY_TONE: Record<TaskPriority, BadgeTone> = {
   0: 'neutral',
-  1: 'info',
-  2: 'accent',
+  1: 'neutral',
+  2: 'info',
   3: 'warning',
   4: 'danger',
 };
@@ -58,7 +64,8 @@ export const STATE_KEY: Record<TaskDerivedState, string> = {
 export const STATE_COLOR: Record<TaskDerivedState, string> = {
   open: 'var(--nf-color-info)',
   waiting: 'var(--nf-color-warning)',
-  review: 'var(--nf-color-accent)',
+  // Violet, so review never reads as open (info and accent share a hue).
+  review: 'var(--nf-color-state-review-fg)',
   done: 'var(--nf-color-success)',
   cancelled: 'var(--nf-color-fg-muted)',
 };
@@ -67,15 +74,13 @@ export const STATE_COLOR: Record<TaskDerivedState, string> = {
  * Text colour for each derived state. The fills above sit between 1.9:1
  * and 4.0:1 against the page background, so a label painted with one is
  * somewhere between hard and impossible to read; the `-fg` counterparts
- * are 7.3:1 or better in every theme.
- *
- * `review` is the exception: there is no `--nf-color-accent-fg`, so it
- * keeps the accent and stays at the accent's own contrast.
+ * are 7.3:1 or better in every theme. `review` uses the state token,
+ * which is already a text-strength violet.
  */
 export const STATE_TEXT_COLOR: Record<TaskDerivedState, string> = {
   open: 'var(--nf-color-info-fg)',
   waiting: 'var(--nf-color-warning-fg)',
-  review: 'var(--nf-color-accent)',
+  review: 'var(--nf-color-state-review-fg)',
   done: 'var(--nf-color-success-fg)',
   cancelled: 'var(--nf-color-fg-muted)',
 };

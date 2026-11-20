@@ -113,18 +113,20 @@ export default function EventFromTaskDialog({
         onSubmit={handleSubmit}
         style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
       >
-        <FormField label={t('tasks.actions.create_event.workspace_label')}>
-          {(control) => (
-            <Combobox
-              {...control}
-              value={workspaceId}
-              onChange={(v) => setWorkspaceId(v)}
-              options={workspaceOptions}
-              placeholder={t('tasks.actions.create_event.workspace_placeholder')}
-              aria-label={t('tasks.actions.create_event.workspace_label')}
-            />
-          )}
-        </FormField>
+        {workspaces.length > 1 && (
+          <FormField label={t('tasks.actions.create_event.workspace_label')}>
+            {(control) => (
+              <Combobox
+                {...control}
+                value={workspaceId}
+                onChange={(v) => setWorkspaceId(v)}
+                options={workspaceOptions}
+                placeholder={t('tasks.actions.create_event.workspace_placeholder')}
+                aria-label={t('tasks.actions.create_event.workspace_label')}
+              />
+            )}
+          </FormField>
+        )}
         <FormField
           label={t('tasks.actions.create_event.calendar_label')}
           error={calendarError}

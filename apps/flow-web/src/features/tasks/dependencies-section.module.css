@@ -104,6 +104,7 @@
 
 .pickerControls {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--nf-space-2);
   align-items: center;
 }
@@ -114,7 +115,8 @@
 }
 
 .pickerSearch {
-  flex: 1;
+  /* nf-token-override: wrap below this width instead of squeezing the search box */
+  flex: 1 1 12rem;
 }
 
 .pickerHint {

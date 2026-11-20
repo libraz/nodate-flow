@@ -3,13 +3,13 @@
  * supported provider showing connect/disconnect state. Suspense mode.
  */
 
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
-import { APP_NAME } from '../../lib/brand';
 import { confirmAction } from '../../lib/confirm-action';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
 import {
@@ -88,7 +88,6 @@ export default function IntegrationsPanel(): ReactElement {
 
   return (
     <div className={styles.section}>
-      <p className={styles.description}>{t('integrations.description', { appName: APP_NAME })}</p>
       <ul className={styles.list}>
         {PROVIDER_ORDER.map((name) => {
           const p = byName.get(name);
@@ -126,11 +125,15 @@ export default function IntegrationsPanel(): ReactElement {
                   >
                     {t('integrations.disconnect')}
                   </Button>
+                ) : !configured ? (
+                  // Connect cannot work until OAuth is set up, so show the
+                  // state instead of a dead button.
+                  <Badge>{t('integrations.not_configured_badge')}</Badge>
                 ) : (
                   <Button
                     type="button"
-                    variant={configured ? 'primary' : 'default'}
-                    disabled={!configured || connect.isPending}
+                    variant="primary"
+                    disabled={connect.isPending}
                     aria-busy={connectingProvider === name}
                     onClick={() => {
                       void handleConnect(name);

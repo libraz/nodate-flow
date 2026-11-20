@@ -57,10 +57,9 @@
   inset-block-start: 0;
   z-index: 1;
   background: var(--nf-color-bg-elevated);
-  font-size: var(--nf-text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--nf-color-fg-subtle);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
   padding: var(--nf-space-1) var(--nf-space-2);
 }
 
@@ -87,14 +86,23 @@
   transition: background-color var(--nf-duration-fast) var(--nf-ease-out);
 }
 
-.resultItem:hover,
-.resultItemActive {
+.resultItem:hover {
   background: var(--nf-color-surface-hover);
   transition-duration: var(--nf-duration-instant);
 }
 
-.resultItemActive {
-  color: var(--nf-color-fg);
+/* The keyboard position must read at a glance: accent fill, accent text, start bar. */
+.resultItemActive,
+.resultItemActive:hover {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+  box-shadow: inset var(--nf-space-0-5) 0 0 var(--nf-color-accent);
+  transition-duration: var(--nf-duration-instant);
+}
+
+/* Logical side for the start bar under RTL. */
+:dir(rtl) .resultItemActive {
+  box-shadow: inset calc(var(--nf-space-0-5) * -1) 0 0 var(--nf-color-accent);
 }
 
 .resultIcon {
@@ -141,12 +149,13 @@
 
 .hintBar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--nf-space-3);
   padding-block-start: var(--nf-space-2);
   border-block-start: 1px solid var(--nf-color-border);
-  font-size: var(--nf-text-micro);
-  color: var(--nf-color-fg-subtle);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
 }
 
 .hintGroup {
@@ -232,4 +241,78 @@
   .body {
     min-inline-size: 0;
   }
+}
+
+.titleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+/* Interpret → confirm → run, so the two-Enter flow is visible before anything runs. */
+.steps {
+  display: flex;
+  gap: var(--nf-space-3);
+  margin: 0;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  list-style: none;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-subtle);
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.step[data-state="done"] {
+  color: var(--nf-color-fg-muted);
+}
+
+.step[data-state="current"] {
+  color: var(--nf-color-accent-fg);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  border-radius: var(--nf-radius-pill);
+  border: var(--nf-space-px) solid currentColor;
+  font-size: var(--nf-text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
+.step[data-state="current"] .stepNumber {
+  background: var(--nf-color-accent-subtle);
+}
+
+.commandHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.commandDetails {
+  font-size: var(--nf-text-xs);
+}
+
+.commandDetailsSummary {
+  cursor: pointer;
+  color: var(--nf-color-fg-muted);
+}
+
+.commandDetailsSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+  border-radius: var(--nf-radius-sm);
+}
+
+.commandDetails[open] .commandDetailsSummary {
+  margin-block-end: var(--nf-space-1);
 }

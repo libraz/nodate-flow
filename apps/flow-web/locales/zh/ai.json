@@ -2,7 +2,7 @@
   "autonomy": {
     "matrix": {
       "title": "按信号类型设置自主级别",
-      "description": "为每种信号类型选择动作的自主程度。未设置覆盖时将应用工作区默认值。",
+      "description": "对每一类信号（Slack 在线状态、日历日期到达等外部或定时事件），选择系统可以做到什么程度：「建议」只显示建议，「草稿」生成待你审核的草稿，「自动」直接应用更改。未覆盖的类型沿用工作区默认值。",
       "header": {
         "kind": "信号类型",
         "mode": "自主级别"
@@ -15,7 +15,8 @@
       "empty": "尚未配置任何信号类型",
       "row_aria": "{kind} 的自主级别",
       "changed_announce": "已将 {kind} 设置为 {mode}",
-      "default_hint": "默认: {mode}"
+      "default_hint": "默认: {mode}",
+      "unsaved": "未保存"
     },
     "mode": {
       "suggest": "建议",
@@ -45,7 +46,10 @@
       "api_key_placeholder": "sk-...",
       "base_url": "基础 URL（可选）",
       "default_model": "默认模型（可选）",
-      "base_url_description": "仅用于连接自定义端点的类型。openai 始终连接官方 OpenAI 端点；如需使用 Azure、代理或网关，请选择 OpenAI 兼容。"
+      "base_url_description": "仅用于连接自定义端点的类型。openai 始终连接官方 OpenAI 端点；如需使用 Azure、代理或网关，请选择 OpenAI 兼容。",
+      "kind_help": "要调用的服务类型。Azure、代理、网关或本地服务请选「OpenAI 兼容」。Ollama 连接本地 Ollama 服务器（未设置 Base URL 时为 http://localhost:11434）。",
+      "name_help": "此服务商在列表中的名称，例如「生产环境 Anthropic」。不会发送给该服务。",
+      "default_model_help": "要调用的模型名，以服务商文档中列出的为准。留空则使用该类型当前的默认模型。"
     },
     "kind": {
       "anthropic": "Anthropic",
@@ -58,8 +62,9 @@
       "save": "保存",
       "cancel": "取消",
       "delete": "删除",
-      "confirm_delete": "确定删除此提供商吗？",
-      "rotate": "轮换密钥"
+      "confirm_delete": "删除此服务商？依赖它的 AI 功能在有其他服务商可用之前将无法使用。已保存的密钥会被清除且无法恢复。",
+      "rotate": "轮换密钥",
+      "rotate_hint": "用新密钥替换已保存的密钥，旧密钥立即作废。"
     },
     "rotate_dialog": {
       "title": "轮换 API 密钥",
@@ -102,6 +107,19 @@
         "retry": "重试",
         "update_failed": "无法更新嵌入设置，请重试。"
       }
-    }
+    },
+    "description": "登记此工作区 AI 功能所使用的 LLM 服务。API 密钥只写不读：保存后只显示掩码，只能轮换或删除。",
+    "empty_hint": "添加服务商及其 API 密钥即可启用此工作区的 AI 功能。添加多个时，默认使用最近添加的那个。",
+    "kind_hint": {
+      "anthropic": "Claude 模型",
+      "openai": "仅限 OpenAI 官方端点",
+      "google": "Gemini 模型",
+      "ollama": "本地 Ollama 服务器",
+      "openai_compat": "Azure、代理、网关和本地服务器"
+    },
+    "default_badge": "默认",
+    "default_note": "AI 功能使用标记为「默认」的服务商，即最近添加的那个。代理使用其所选模型对应的服务商。",
+    "no_key": "无密钥",
+    "ollama_no_key_note": "本地 Ollama 无需 API 密钥。"
   }
 }

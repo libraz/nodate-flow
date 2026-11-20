@@ -1,12 +1,15 @@
 {
   "view": {
     "title": "收件箱",
-    "subtitle": "来自已连接来源的信号将在此汇集，等待分类。",
-    "empty": "收件箱为空"
+    "subtitle": "来自已连接来源和智能体、发给你的事项（涵盖所有工作区）。“受理”是各工作区独立的队列，存放尚无人接手的工作。",
+    "empty": "收件箱为空",
+    "empty_description": "来自 GitHub、Slack、邮件、Webhook 或手动记录的新事项会出现在这里。可稍后提醒、归档，或通过“查看来源”把事项转为任务。"
   },
   "action": {
     "archive": "归档",
-    "snooze": "稍后提醒"
+    "archive_hint": "把此事项从你的收件箱中清走。",
+    "snooze": "稍后提醒",
+    "snooze_hint": "暂时隐藏此事项。它会在 1 小时后、明天 9:00 或一周后的 9:00（按你的时区）重新出现。"
   },
   "snooze": {
     "one_hour": "1 小时后",
@@ -23,7 +26,8 @@
   "filter": {
     "workspace_label": "工作区",
     "workspace_all": "所有工作区",
-    "handoff": "智能体停滞"
+    "handoff": "智能体交还",
+    "handoff_hint": "只显示 AI 智能体停下并把任务交还给你的事项。"
   },
   "toast": {
     "archived": "已归档",
@@ -62,7 +66,9 @@
     "close": "关闭",
     "searching": "正在搜索…",
     "task_sources": "来源资料",
-    "error": "无法完成来源操作"
+    "error": "无法完成来源操作",
+    "review_hint": "查看原始消息，然后据此新建任务，或将其关联到已有任务。",
+    "destination_hint": "可根据此来源新建任务，也可将其关联到已有任务。无论哪种方式，来源都会作为参考资料附在任务上。"
   },
   "tab": {
     "inbox": "收件箱",
@@ -70,11 +76,12 @@
   },
   "intake": {
     "no_workspace": "加入工作区后才能处理受理项。",
-    "empty": "暂无待处理的受理项。",
+    "empty": "暂无待处理的受理项。可在上方添加，或等待发送到该工作区的事项出现在这里。",
     "quick_add": {
       "placeholder": "记录新的受理项…",
       "submit": "添加",
-      "error": "添加受理项失败"
+      "error": "添加受理项失败",
+      "hint": "把一条待处理事项加入所选工作区的队列。转为任务之前，它只是一条事项。"
     },
     "convert": {
       "action": "转为任务",
@@ -91,7 +98,18 @@
     "dismiss": {
       "action": "忽略",
       "success": "已忽略受理项",
-      "error": "忽略失败"
-    }
+      "error": "忽略失败",
+      "hint": "不创建任务，直接把此事项移出队列。"
+    },
+    "description": "存放尚未决定如何处理的工作的队列。可把事项转为项目中的任务，或将其忽略。"
+  },
+  "kind": {
+    "agent_task_handoff_to_user": "智能体交还了任务"
+  },
+  "triage_status": {
+    "one": "AI 分类将在“{workspace}”中运行。",
+    "all": "选择“所有工作区”时，AI 分类将在“{workspace}”中运行。如需分类其他工作区，请先选择该工作区。",
+    "nothing": "“{workspace}”中没有收件箱事项，因此无法使用 AI 分类。",
+    "no_workspace": "加入工作区后即可使用 AI 分类。"
   }
 }

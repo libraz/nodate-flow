@@ -27,6 +27,7 @@ export interface CopyButtonProps {
   variant?: ButtonProps['variant'];
   size?: ButtonProps['size'];
   disabled?: boolean;
+  testId?: string;
 }
 
 export default function CopyButton({
@@ -38,6 +39,7 @@ export default function CopyButton({
   variant = 'default',
   size = 'md',
   disabled = false,
+  testId,
 }: CopyButtonProps): ReactElement {
   const [copied, setCopied] = useState(false);
 
@@ -66,6 +68,7 @@ export default function CopyButton({
         size={size}
         disabled={disabled}
         data-copied={copied || undefined}
+        data-testid={testId}
         className={styles.root}
         onClick={() => {
           void handleClick();

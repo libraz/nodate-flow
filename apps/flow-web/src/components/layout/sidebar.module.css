@@ -66,10 +66,8 @@
 
 /*
  * Workspace switcher slot — rendered between the brand and the nav so
- * the drawer on mobile (and the expanded sidebar on desktop) carries a
- * reachable switcher. The topbar hides its own copy at mobile widths
- * (see `top-bar.module.css` `@container header (max-width: 767px)`),
- * so this mount is the only reachable switcher in that viewport.
+ * the sidebar carries a switcher only while the topbar copy is hidden
+ * (see `top-bar.module.css` `@container header (max-width: 767px)`).
  * The child `<select>` stretches to fill the slot via its shared
  * `.workspaceSelect` rule (see `top-bar.module.css`).
  */
@@ -79,7 +77,16 @@
   padding-inline: var(--nf-space-3);
 }
 
-.workspaceSwitcherSlot > select {
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+/* Header container breakpoint (768px) plus the expanded sidebar width (16rem). */
+@media (min-width: calc(768px + 16rem)) {
+  .workspaceSwitcherSlot {
+    display: none;
+  }
+}
+
+.workspaceSwitcherSlot > select,
+.workspaceSwitcherSlot > a {
   inline-size: 100%;
   max-inline-size: none;
 }
@@ -138,6 +145,12 @@
 
 .itemActive > svg {
   color: var(--nf-color-accent-fg);
+}
+
+/* Parent of the active sub-item: expanded, not a second active fill. */
+.itemExpanded {
+  color: var(--nf-color-fg);
+  font-weight: var(--nf-weight-medium);
 }
 
 .itemDisabled {
@@ -214,27 +227,57 @@
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-1);
-  padding-block-start: var(--nf-space-1);
-  padding-inline-start: var(--nf-space-4);
+  padding-block-start: var(--nf-space-2);
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
 }
 
+/* Starts on the sub-items' label column: item padding + 24px icon + gap. */
 .sectionLabel {
   padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-3);
+  padding-inline-start: calc(var(--nf-space-3) + var(--nf-space-6) + var(--nf-space-3));
+  padding-inline-end: var(--nf-space-3);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-xs);
   font-weight: var(--nf-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--nf-color-fg-subtle);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .subItem {
   font-size: var(--nf-text-xs);
+}
+
+/*
+ * The grid track would otherwise size to a nowrap label's full width and
+ * push sub-items past the sidebar edge.
+ */
+.nav .subCollapse {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/*
+ * Workspace sub-items hang off a rule under the parent icon's centre, so
+ * their icons start on the parent label column (24 + 1 + 11 + 12 = 48px).
+ */
+.subNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  margin-block-start: var(--nf-space-1);
+  margin-inline-start: var(--nf-space-6);
+  padding-inline-start: calc(var(--nf-space-3) - var(--nf-space-px));
+  border-inline-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.sectionEmpty {
+  margin: 0;
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+  white-space: normal;
 }
 
 .footer {

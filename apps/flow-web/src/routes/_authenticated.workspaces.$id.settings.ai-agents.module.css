@@ -65,6 +65,7 @@
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
+  flex-wrap: wrap;
   font-size: var(--nf-text-sm);
 }
 
@@ -74,9 +75,101 @@
   white-space: nowrap;
 }
 
+.inlineHint {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
 .controlActions {
   display: flex;
   gap: var(--nf-space-2);
+}
+
+.tooltipAnchor {
+  display: inline-flex;
+}
+
+.eventsHelp {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+/* Trigger choice in the create form: name above when it runs. */
+.optionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.optionLegend {
+  padding: 0;
+  margin-block-end: var(--nf-space-1);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.optionGroupHelp {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(14rem, 100%), 1fr));
+  gap: var(--nf-space-2);
+}
+
+.option {
+  display: flex;
+  align-items: start;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.option:hover,
+.option:has(:focus-visible) {
+  background: var(--nf-color-bg-sunken);
+}
+
+/* The chosen trigger reads as chosen without relying on the radio dot alone. */
+.option:has(:checked) {
+  background: var(--nf-color-accent-subtle);
+  border-color: var(--nf-color-accent);
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-0-5);
+  min-inline-size: 0;
+}
+
+.optionLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.optionHint {
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
 }
 
 .eventsForm {

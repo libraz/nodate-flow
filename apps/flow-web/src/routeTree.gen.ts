@@ -40,6 +40,7 @@ import { Route as AuthenticatedProjectsProjectIdGanttRouteImport } from './route
 import { Route as AuthenticatedProjectsProjectIdTasksRouteImport } from './routes/_authenticated.projects.$projectId.tasks';
 import { Route as AuthenticatedProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.projects.$projectId.timeline';
 import { Route as AuthenticatedWorkspacesIdActivityRouteImport } from './routes/_authenticated.workspaces.$id.activity';
+import { Route as AuthenticatedWorkspacesIdMembersRouteImport } from './routes/_authenticated.workspaces.$id.members';
 import { Route as AuthenticatedWorkspacesIdProjectsRouteImport } from './routes/_authenticated.workspaces.$id.projects';
 import { Route as AuthenticatedWorkspacesIdRemindersRouteImport } from './routes/_authenticated.workspaces.$id.reminders';
 import { Route as AuthenticatedWorkspacesIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.settings';
@@ -267,6 +268,16 @@ const AuthenticatedWorkspacesIdActivityRoute =
     getParentRoute: () => AuthenticatedWorkspacesIdRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated.workspaces.$id.activity.lazy').then(
+      (d) => d.Route,
+    ),
+  );
+const AuthenticatedWorkspacesIdMembersRoute =
+  AuthenticatedWorkspacesIdMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => AuthenticatedWorkspacesIdRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.workspaces.$id.members.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -603,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/tasks': typeof AuthenticatedProjectsProjectIdTasksRouteWithChildren;
   '/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
   '/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
+  '/workspaces/$id/members': typeof AuthenticatedWorkspacesIdMembersRoute;
   '/workspaces/$id/projects': typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   '/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -664,6 +676,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/gantt': typeof AuthenticatedProjectsProjectIdGanttRoute;
   '/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
   '/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
+  '/workspaces/$id/members': typeof AuthenticatedWorkspacesIdMembersRoute;
   '/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/workspaces/$id/timeboxes': typeof AuthenticatedWorkspacesIdTimeboxesRoute;
   '/workspaces/$id/timeline': typeof AuthenticatedWorkspacesIdTimelineRoute;
@@ -726,6 +739,7 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId/tasks': typeof AuthenticatedProjectsProjectIdTasksRouteWithChildren;
   '/_authenticated/projects/$projectId/timeline': typeof AuthenticatedProjectsProjectIdTimelineRoute;
   '/_authenticated/workspaces/$id/activity': typeof AuthenticatedWorkspacesIdActivityRoute;
+  '/_authenticated/workspaces/$id/members': typeof AuthenticatedWorkspacesIdMembersRoute;
   '/_authenticated/workspaces/$id/projects': typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   '/_authenticated/workspaces/$id/reminders': typeof AuthenticatedWorkspacesIdRemindersRoute;
   '/_authenticated/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -793,6 +807,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/tasks'
     | '/projects/$projectId/timeline'
     | '/workspaces/$id/activity'
+    | '/workspaces/$id/members'
     | '/workspaces/$id/projects'
     | '/workspaces/$id/reminders'
     | '/workspaces/$id/settings'
@@ -854,6 +869,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/gantt'
     | '/projects/$projectId/timeline'
     | '/workspaces/$id/activity'
+    | '/workspaces/$id/members'
     | '/workspaces/$id/reminders'
     | '/workspaces/$id/timeboxes'
     | '/workspaces/$id/timeline'
@@ -915,6 +931,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId/tasks'
     | '/_authenticated/projects/$projectId/timeline'
     | '/_authenticated/workspaces/$id/activity'
+    | '/_authenticated/workspaces/$id/members'
     | '/_authenticated/workspaces/$id/projects'
     | '/_authenticated/workspaces/$id/reminders'
     | '/_authenticated/workspaces/$id/settings'
@@ -1179,6 +1196,13 @@ declare module '@tanstack/react-router' {
       path: '/activity';
       fullPath: '/workspaces/$id/activity';
       preLoaderRoute: typeof AuthenticatedWorkspacesIdActivityRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdRoute;
+    };
+    '/_authenticated/workspaces/$id/members': {
+      id: '/_authenticated/workspaces/$id/members';
+      path: '/members';
+      fullPath: '/workspaces/$id/members';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdMembersRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdRoute;
     };
     '/_authenticated/workspaces/$id/projects': {
@@ -1580,6 +1604,7 @@ const AuthenticatedWorkspacesIdSettingsRouteWithChildren =
 
 interface AuthenticatedWorkspacesIdRouteChildren {
   AuthenticatedWorkspacesIdActivityRoute: typeof AuthenticatedWorkspacesIdActivityRoute;
+  AuthenticatedWorkspacesIdMembersRoute: typeof AuthenticatedWorkspacesIdMembersRoute;
   AuthenticatedWorkspacesIdProjectsRoute: typeof AuthenticatedWorkspacesIdProjectsRouteWithChildren;
   AuthenticatedWorkspacesIdRemindersRoute: typeof AuthenticatedWorkspacesIdRemindersRoute;
   AuthenticatedWorkspacesIdSettingsRoute: typeof AuthenticatedWorkspacesIdSettingsRouteWithChildren;
@@ -1595,6 +1620,8 @@ const AuthenticatedWorkspacesIdRouteChildren: AuthenticatedWorkspacesIdRouteChil
   {
     AuthenticatedWorkspacesIdActivityRoute:
       AuthenticatedWorkspacesIdActivityRoute,
+    AuthenticatedWorkspacesIdMembersRoute:
+      AuthenticatedWorkspacesIdMembersRoute,
     AuthenticatedWorkspacesIdProjectsRoute:
       AuthenticatedWorkspacesIdProjectsRouteWithChildren,
     AuthenticatedWorkspacesIdRemindersRoute:

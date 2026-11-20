@@ -1,5 +1,5 @@
 /**
- * ConstraintEditor — 3.WEB-1 minimal constraint editor panel.
+ * ConstraintEditor — minimal constraint editor panel.
  *
  * Lets the user author a JSON-DSL expression, save it as a new
  * task_constraints row, and run the engine on demand to see which
@@ -12,10 +12,13 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Select from '@nodate-flow/ui/primitives/select';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHelp from '../../components/page-help';
 import { confirmAction } from '../../lib/confirm-action';
+import { AiSparkle } from '../ai-suggestions/ai-consequence';
 
 import {
   type ConstraintKind,
@@ -29,6 +32,14 @@ import {
 import styles from './constraints.module.css';
 
 const KINDS: ConstraintKind[] = ['deadline', 'dependency', 'approval', 'signal', 'custom'];
+
+export const KIND_LABEL_KEY: Record<ConstraintKind, string> = {
+  deadline: 'editor.kinds.deadline',
+  dependency: 'editor.kinds.dependency',
+  approval: 'editor.kinds.approval',
+  signal: 'editor.kinds.signal',
+  custom: 'editor.kinds.custom',
+};
 
 export interface ConstraintEditorProps {
   taskId: string;
@@ -61,6 +72,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
       title: t('editor.removeConfirmTitle'),
       message: t('editor.removeConfirm'),
       confirmLabel: t('editor.remove'),
+      tone: 'danger',
     });
     if (!confirmed) return;
     setRemovingId(constraintId);
@@ -128,10 +140,13 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
   };
 
   return (
-    <section aria-label={t('editor.title')}>
-      <h3>{t('editor.title')}</h3>
-      <div>
-        <FormField label={t('editor.nlPrompt')}>
+    <section aria-label={t('editor.title')} className={styles.editor}>
+      <div className={styles.editorHead}>
+        <h3 className={styles.editorTitle}>{t('editor.title')}</h3>
+        <PageHelp topic="task-constraints" />
+      </div>
+      <div className={styles.nlRow}>
+        <FormField label={t('editor.nlPrompt')} description={t('editor.nlHint')}>
           {(control) => (
             <Input
               {...control}
@@ -146,7 +161,9 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
           onClick={handleCompile}
           disabled={compileMut.isPending || !nlPrompt.trim()}
           aria-busy={compileMut.isPending || undefined}
+          className={styles.nlGenerate}
         >
+          <AiSparkle kind="suggests" />
           {t('editor.generate')}
         </Button>
       </div>
@@ -166,7 +183,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
               >
                 {KINDS.map((k) => (
                   <option key={k} value={k}>
-                    {t(`editor.kinds.${k}`)}
+                    {t(KIND_LABEL_KEY[k])}
                   </option>
                 ))}
               </Select>
@@ -185,7 +202,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             )}
           </FormField>
         </details>
-        <div>
+        <div className={styles.editorActions}>
           <Button type="submit" disabled={addMut.isPending || !expression.trim()}>
             {t('editor.add')}
           </Button>
@@ -203,6 +220,7 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             disabled={explainMut.isPending || !expression.trim()}
             aria-busy={explainMut.isPending || undefined}
           >
+            <AiSparkle kind="suggests" />
             {t('editor.explain')}
           </Button>
         </div>
@@ -210,8 +228,8 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
 
       {explanation ? (
         <div>
-          <h4>{t('editor.explanation')}</h4>
-          <p>{explanation}</p>
+          <h4 className={styles.subheading}>{t('editor.explanation')}</h4>
+          <p className={styles.explanation}>{explanation}</p>
         </div>
       ) : null}
 
@@ -219,18 +237,37 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
 
       {outcomes ? (
         <div role="group" aria-label={t('editor.outcomes')}>
-          <h4>{t('editor.outcomes')}</h4>
-          <ul>
+          <h4 className={styles.subheading}>{t('editor.outcomes')}</h4>
+          <ul className={styles.outcomes}>
             {outcomes.map((o) => (
-              <li key={o.id}>
-                <code>{o.id}</code>:{' '}
-                {o.parseError
-                  ? `${t('editor.parseError')}: ${o.parseError}`
-                  : o.satisfied
-                    ? t('editor.satisfied')
-                    : t('editor.failed')}{' '}
+              <li key={o.id} className={styles.outcome}>
+                <span className={styles.outcomeStatus} data-status={outcomeStatus(o)}>
+                  {o.parseError ? (
+                    <AlertTriangle size={14} aria-hidden="true" />
+                  ) : o.satisfied ? (
+                    <CheckCircle2 size={14} aria-hidden="true" />
+                  ) : (
+                    <XCircle size={14} aria-hidden="true" />
+                  )}
+                  {o.parseError
+                    ? t('editor.parseError')
+                    : o.satisfied
+                      ? t('editor.satisfied')
+                      : t('editor.failed')}
+                </span>
+                <span className={styles.outcomeBody}>
+                  <span className={styles.outcomeKind}>{t(KIND_LABEL_KEY[o.kind])}</span>
+                  <code className={styles.outcomeExpr} title={o.expression}>
+                    {o.expression}
+                  </code>
+                  {o.parseError ? (
+                    <span className={styles.outcomeUnknown}>{o.parseError}</span>
+                  ) : null}
+                </span>
                 <Button
                   type="button"
+                  variant="danger"
+                  size="sm"
                   onClick={() => void onRemove(o.id)}
                   disabled={removeMut.isPending}
                   aria-busy={removingId === o.id || undefined}
@@ -241,7 +278,14 @@ export default function ConstraintEditor({ taskId }: ConstraintEditorProps): Rea
             ))}
           </ul>
         </div>
-      ) : null}
+      ) : (
+        <p className={styles.evaluateHint}>{t('editor.evaluateHint')}</p>
+      )}
     </section>
   );
+}
+
+function outcomeStatus(o: ConstraintOutcome): 'parse' | 'satisfied' | 'failed' {
+  if (o.parseError) return 'parse';
+  return o.satisfied ? 'satisfied' : 'failed';
 }

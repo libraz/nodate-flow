@@ -17,6 +17,7 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
+import { MoreVertical } from 'lucide-react';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
@@ -174,13 +175,18 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
       {mayBeTruncated ? (
         <p className={css.limitNotice}>{t('tasks.limit_notice', { count: TASKS_QUERY_LIMIT })}</p>
       ) : null}
+      {/* One line above the board, so every column header keeps the same height. */}
+      <p className={css.dndHint}>
+        <MoreVertical size={14} aria-hidden="true" />
+        {t('tasks.board.dnd_disabled_hint')}
+      </p>
       <div
         role="region"
         aria-label={t('tasks.views.board')}
         className={css.board}
         style={{ '--col-count': TASK_STATES.length } as React.CSSProperties}
       >
-        {TASK_STATES.map((state, index) => {
+        {TASK_STATES.map((state) => {
           const items = groups[state];
           return (
             <section key={state} aria-label={t(STATE_KEY[state])} className={css.column}>
@@ -189,11 +195,6 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
                   <span className={css.columnHeaderLabel}>{t(STATE_KEY[state])}</span>
                   <span className={css.columnHeaderCount}>{items.length}</span>
                 </header>
-                {/* Show the D&D-disabled hint once, on the first column,
-                    so it isn't repeated five times across the board. */}
-                {index === 0 ? (
-                  <p className={css.dndHint}>{t('tasks.board.dnd_disabled_hint')}</p>
-                ) : null}
               </Card>
               <BoardColumnList
                 state={state}

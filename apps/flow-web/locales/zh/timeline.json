@@ -5,7 +5,8 @@
     "loading": "正在加载时间线…",
     "load_more": "加载更多",
     "today": "今天",
-    "yesterday": "昨天"
+    "yesterday": "昨天",
+    "description": "按时间顺序记录发生的事情：任务变更、评论、评审、信号，以及 AI 和智能体的活动。可按事件类型或操作人筛选。"
   },
   "filter": {
     "kind_all": "所有事件类型",
@@ -417,5 +418,20 @@
       "target_not_found": "操作已不存在",
       "fetch_error": "未能撤销该操作,请重试。"
     }
+  },
+  "source": {
+    "github": "GitHub",
+    "slack": "Slack",
+    "google": "Google",
+    "signal": "信号",
+    "ai": "AI",
+    "task": "任务",
+    "comment": "评论",
+    "page": "页面",
+    "workspace": "工作区",
+    "project": "项目",
+    "calendar": "日历",
+    "share": "共享",
+    "system": "系统"
   }
 }

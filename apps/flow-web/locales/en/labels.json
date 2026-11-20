@@ -26,7 +26,7 @@
     "title": "Labels",
     "search_placeholder": "Search labels…",
     "empty": "No labels found.",
-    "no_labels": "No labels available.",
+    "no_labels": "No labels yet. Type a name and choose “Create” to add one.",
     "create_new": "Create \"{name}\"",
     "apply": "Apply"
   },
@@ -102,14 +102,16 @@
   },
   "favorites": {
     "title": "Favorites",
-    "add": "Add to favorites",
+    "add": "Add to favorites (shows in the sidebar)",
     "remove": "Remove from favorites",
     "added": "Added to favorites",
     "removed": "Removed from favorites",
-    "empty": "No favorites yet. Star items to find them quickly.",
+    "empty": "No favorites yet. Select the star on a project or task to pin it to the sidebar.",
     "error_add": "Could not add to favorites. Please try again.",
     "error_remove": "Could not remove from favorites. Please try again.",
-    "sidebar_title": "Favorites"
+    "sidebar_title": "Favorites",
+    "untitled_task": "Task",
+    "untitled_project": "Project"
   },
   "reactions": {
     "add": "Add reaction",

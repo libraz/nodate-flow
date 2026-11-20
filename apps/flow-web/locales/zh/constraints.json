@@ -31,7 +31,9 @@
       "custom": "自定义"
     },
     "removeConfirmTitle": "移除约束？",
-    "removeConfirm": "引擎将不再因该约束而阻塞，且无法在此处恢复。"
+    "removeConfirm": "引擎将不再因该约束而阻塞，且无法在此处恢复。",
+    "nlHint": "AI 会把你的描述转换成规则并填入“高级”。检查无误后，点击“添加约束”保存。",
+    "evaluateHint": "点击“立即评估”可查看此任务的约束，以及每个约束是否已满足。"
   },
   "replay": {
     "title": "重放",
@@ -41,7 +43,8 @@
     "drift": "检测到偏差",
     "refresh": "刷新",
     "loading": "加载中…",
-    "error": "重放任务失败"
+    "error": "重放任务失败",
+    "description": "根据事件历史重建此任务的状态，并与已存储的状态比较。“检测到偏差”表示两者不一致。"
   },
   "stateGraph": {
     "title": "状态图",
@@ -53,6 +56,7 @@
       "github": "GitHub",
       "slack": "Slack",
       "google": "Google"
-    }
+    },
+    "description": "展示任务可经过的状态，并高亮此任务当前所处的状态。当来自 GitHub、Slack、Google 的信号到达此任务时，对应图标会亮起。"
   }
 }

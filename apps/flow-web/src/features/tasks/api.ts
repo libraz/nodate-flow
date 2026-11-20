@@ -203,6 +203,39 @@ export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionN
 };
 
 /**
+ * State a task lands in after `transition` from `from`, or `null` when the
+ * state machine refuses it. Mirrors `NextState` in
+ * apps/flow-api/internal/taskstate/state.go case for case; note that `block`
+ * lands in waiting, `unblock` in open, and `reopen` depends on the source.
+ */
+export function landingStateFor(
+  from: TaskDerivedState,
+  transition: TransitionName,
+): TaskDerivedState | null {
+  switch (from) {
+    case 'open':
+      if (transition === 'start' || transition === 'block') return 'waiting';
+      if (transition === 'cancel') return 'cancelled';
+      if (transition === 'complete') return 'done';
+      return null;
+    case 'waiting':
+      if (transition === 'submit') return 'review';
+      if (transition === 'unblock') return 'open';
+      if (transition === 'cancel') return 'cancelled';
+      return null;
+    case 'review':
+      if (transition === 'block' || transition === 'reopen') return 'waiting';
+      if (transition === 'complete') return 'done';
+      if (transition === 'cancel') return 'cancelled';
+      return null;
+    case 'done':
+      return transition === 'reopen' ? 'waiting' : null;
+    case 'cancelled':
+      return transition === 'reopen' ? 'open' : null;
+  }
+}
+
+/**
  * Resolution of a board drag-and-drop drop onto a target column.
  *
  * `transition` is the single state-machine verb the API will accept and

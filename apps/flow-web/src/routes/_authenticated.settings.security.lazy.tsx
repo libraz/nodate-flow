@@ -29,7 +29,11 @@ function SecurityRoute(): ReactElement {
   const totpManagement = capabilities.data?.totp === true && hasPassword;
   return (
     <div className={ui.page}>
-      <PageHeader title={t('security.title')} />
+      <PageHeader
+        title={t('security.title')}
+        description={t('security.description')}
+        help="settings-security"
+      />
 
       {capabilities.isError && (
         <ErrorFallback

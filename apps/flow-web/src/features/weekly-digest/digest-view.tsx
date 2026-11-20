@@ -28,14 +28,19 @@ function CountsRow({ counts }: { counts: WeeklyDigestCounts }): ReactElement {
     { key: 'cancelled', label: t('weekly_digest.counts.cancelled') },
   ];
   return (
-    <dl className={styles.counts}>
-      {items.map((item) => (
-        <div key={item.key} className={styles.count}>
-          <dt className={styles.countLabel}>{item.label}</dt>
-          <dd className={styles.countValue}>{counts[item.key]}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className={styles.countsBlock}>
+      <dl className={styles.counts} aria-describedby="digest-counts-hint">
+        {items.map((item) => (
+          <div key={item.key} className={styles.count}>
+            <dt className={styles.countLabel}>{item.label}</dt>
+            <dd className={styles.countValue}>{counts[item.key]}</dd>
+          </div>
+        ))}
+      </dl>
+      <p id="digest-counts-hint" className={styles.countsHint}>
+        {t('weekly_digest.countsHint')}
+      </p>
+    </div>
   );
 }
 
@@ -68,7 +73,11 @@ export default function DigestView({ workspaceId }: { workspaceId: string }): Re
   const overdue = data.overdueOpen ?? [];
   return (
     <div className={ui.page}>
-      <PageHeader title={t('weekly_digest.title')} description={t('weekly_digest.description')} />
+      <PageHeader
+        title={t('weekly_digest.title')}
+        description={t('weekly_digest.description')}
+        help="workspace-settings-weekly-digest"
+      />
 
       <CountsRow counts={data.counts} />
 

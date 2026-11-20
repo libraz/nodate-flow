@@ -25,9 +25,9 @@ function renderDialog() {
   );
 }
 
-/** The kind select, addressed by its already-rendered label. */
-function kindSelect(): HTMLSelectElement {
-  return screen.getByLabelText(/providers\.field\.kind/) as HTMLSelectElement;
+/** The radio for one kind, addressed by its already-rendered label. */
+function kindRadio(kind: string): HTMLElement {
+  return screen.getByRole('radio', { name: `providers.kind.${kind}` });
 }
 
 function baseUrlInput(): HTMLElement | null {
@@ -42,10 +42,10 @@ describe('ProviderAddDialog', () => {
     // anthropic is the initial kind and accepts a base URL.
     expect(baseUrlInput()).not.toBeNull();
 
-    await user.selectOptions(kindSelect(), 'openai_compat');
+    await user.click(kindRadio('openai_compat'));
     expect(baseUrlInput()).not.toBeNull();
 
-    await user.selectOptions(kindSelect(), 'ollama');
+    await user.click(kindRadio('ollama'));
     expect(baseUrlInput()).not.toBeNull();
   });
 
@@ -53,7 +53,7 @@ describe('ProviderAddDialog', () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.selectOptions(kindSelect(), 'openai');
+    await user.click(kindRadio('openai'));
     expect(baseUrlInput()).toBeNull();
   });
 
@@ -61,20 +61,33 @@ describe('ProviderAddDialog', () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.selectOptions(kindSelect(), 'openai_compat');
+    await user.click(kindRadio('openai_compat'));
     const field = baseUrlInput();
     if (!field) throw new Error('base URL field missing for openai_compat');
     await user.type(field, 'https://proxy.internal/v1');
     expect((field as HTMLInputElement).value).toBe('https://proxy.internal/v1');
 
-    await user.selectOptions(kindSelect(), 'openai');
+    await user.click(kindRadio('openai'));
     expect(baseUrlInput()).toBeNull();
 
     // Back to a kind that shows the field: it must be empty, not carrying
     // the value that was hidden a moment ago.
-    await user.selectOptions(kindSelect(), 'openai_compat');
+    await user.click(kindRadio('openai_compat'));
     const again = baseUrlInput();
     if (!again) throw new Error('base URL field missing after switching back');
     expect((again as HTMLInputElement).value).toBe('');
+  });
+
+  it('hides the API key field for ollama and says no key is needed', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    expect(screen.queryByLabelText(/providers\.field\.api_key/)).not.toBeNull();
+    await user.click(kindRadio('ollama'));
+    expect(screen.queryByLabelText(/providers\.field\.api_key/)).toBeNull();
+    expect(screen.getByText('providers.ollama_no_key_note')).toBeTruthy();
+
+    await user.click(kindRadio('openai'));
+    expect(screen.queryByLabelText(/providers\.field\.api_key/)).not.toBeNull();
   });
 });

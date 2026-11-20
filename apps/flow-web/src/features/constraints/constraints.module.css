@@ -39,7 +39,7 @@
 
 .graph[data-hovering] .edge[data-active] {
   opacity: 1;
-  stroke: var(--nf-color-fg-muted);
+  stroke: var(--nf-color-fg);
 }
 
 .figure {
@@ -76,4 +76,144 @@
 
 .advancedSummary:hover {
   color: var(--nf-color-fg);
+}
+
+/* ── Constraint editor ─────────────────────────── */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.editorHead {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1-5);
+}
+
+.editorTitle {
+  margin: 0;
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.nlRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nf-space-2);
+}
+
+.nlRow > :first-child {
+  align-self: stretch;
+}
+
+.nlGenerate {
+  white-space: nowrap;
+}
+
+.editorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.subheading {
+  margin: 0 0 var(--nf-space-1-5);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.explanation {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+}
+
+.evaluateHint {
+  margin: 0;
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+.outcomes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.outcome {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nf-space-2);
+  font-size: var(--nf-text-sm);
+}
+
+.outcomeStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  font-weight: var(--nf-weight-medium);
+  white-space: nowrap;
+}
+
+.outcomeStatus[data-status="satisfied"] {
+  color: var(--nf-color-success-fg);
+}
+
+.outcomeStatus[data-status="failed"] {
+  color: var(--nf-color-danger-fg);
+}
+
+.outcomeStatus[data-status="parse"] {
+  color: var(--nf-color-warning-fg);
+}
+
+.outcomeBody {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.outcomeKind {
+  font-weight: var(--nf-weight-medium);
+}
+
+.outcomeExpr {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.outcomeUnknown {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
+}
+
+/* ── Task state graph ──────────────────────────── */
+
+.stateFigure {
+  margin: 0;
+}
+
+.stateCaption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  margin-block-end: var(--nf-space-2);
+}
+
+.stateCaptionTitle {
+  font-weight: var(--nf-weight-semibold);
+}
+
+.stateCaptionNote {
+  font-size: var(--nf-text-supporting);
+  color: var(--nf-color-fg-muted);
 }

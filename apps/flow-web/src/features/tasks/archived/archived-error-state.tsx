@@ -1,7 +1,7 @@
 /**
  * ArchivedErrorState — fallback shown when the archived-tasks query
  * fails. Delegates to the shared {@link ErrorFallback} primitive so the
- * surface degrades per-section (commit 5bf9eca: compact intent), the
+ * surface degrades per-section (compact intent), the
  * same way every other section-level error uses the primitive.
  *
  * The bespoke centred SVG illustration that lived here previously was

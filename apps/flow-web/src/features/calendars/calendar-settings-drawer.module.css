@@ -103,14 +103,6 @@
   font-size: var(--nf-text-sm);
 }
 
-.placeholder {
-  margin: 0;
-  padding: var(--nf-space-4);
-  text-align: center;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-}
-
 .fallback {
   display: flex;
   flex-direction: column;

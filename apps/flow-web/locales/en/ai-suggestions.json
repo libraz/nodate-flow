@@ -1,12 +1,13 @@
 {
   "action": {
     "apply": "Apply",
+    "apply_hint": "Carries out the recommended action now: opens the task, or snoozes or archives the inbox item. There is no further confirmation.",
     "dismiss": "Dismiss",
     "edit": "Edit"
   },
   "agents": {
     "title": "AI agents",
-    "subtitle": "Manage trigger mode and kill switch for workspace agents.",
+    "subtitle": "Create agents that work on tasks, choose when each one runs, and pause any of them instantly.",
     "empty": "No AI agents yet. Create an AI provider and set a default model first.",
     "pause": "Pause",
     "resume": "Resume",
@@ -15,20 +16,28 @@
       "paused": "Paused"
     },
     "scheduleKind": {
+      "help": "When this agent runs: never, on the server's recurring schedule, when a listed event happens, or only when you press Run now.",
       "label": "Trigger",
       "options": {
         "disabled": "Disabled",
-        "interval": "Every tick",
+        "interval": "On a schedule",
         "on_event": "On event",
         "manual": "Manual only"
+      },
+      "descriptions": {
+        "disabled": "Does not run on its own. Run now still works.",
+        "interval": "Runs on the server's recurring schedule.",
+        "on_event": "Runs when one of the listed events happens.",
+        "manual": "Runs only when you press Run now."
       }
     },
     "errors": {
       "scheduleFailed": "Failed to update trigger",
-      "pauseFailed": "Failed to toggle kill switch",
+      "pauseFailed": "Could not pause or resume the agent",
       "triggerFailed": "Failed to trigger agent"
     },
     "trigger": {
+      "help": "Queues one run right now. Disabled while the agent is paused.",
       "label": "Run now",
       "queued": "Run queued"
     },
@@ -37,10 +46,11 @@
       "placeholder": "task.updated, signal.attached",
       "save": "Save triggers",
       "saved": "Triggers saved",
-      "failed": "Failed to update event triggers"
+      "failed": "Failed to update event triggers",
+      "help": "Exact event names separated by commas, such as task.updated, signal.attached. The agent runs when one of them occurs."
     },
     "create": {
-      "open": "+ Agent",
+      "open": "New agent",
       "title": "New agent",
       "name": "Name",
       "model": "Model",
@@ -50,8 +60,11 @@
       "success": "Agent created",
       "failed": "Failed to create agent",
       "missingFields": "Fill in name, model and system prompt",
-      "noModels": "No models registered. Add an AI provider and model first."
-    }
+      "noModels": "No models registered. Add an AI provider and model first.",
+      "systemPrompt_help": "Standing instructions the agent follows on every run, such as its role and the rules it must respect. It cannot be edited on this page after creation.",
+      "model_help": "The model this agent runs on. The list comes from the AI providers added to this workspace."
+    },
+    "pause_help": "Pause stops this agent from running on any trigger, including Run now. Resume turns it back on."
   },
   "empty": "No suggestions yet",
   "loading": "Thinking...",
@@ -69,7 +82,9 @@
     "already_resolved": "This suggestion was already resolved. Refresh the suggestions before continuing.",
     "opened": "Task opened. The suggestion remains pending until you choose an action.",
     "success": "{count, plural, one {# AI suggestion ready} other {# AI suggestions ready}}",
-    "success_empty": "Triage complete — no suggestions"
+    "success_empty": "Triage complete — no suggestions",
+    "hint": "AI reviews up to 20 items in one workspace (the one selected in the filter, or your first workspace when All workspaces is selected) and suggests Open, Snooze or Archive. Nothing changes until you press Apply.",
+    "score_hint": "The AI's score for this item, from 0 to 1. Higher means it likely needs attention sooner."
   },
   "edit": {
     "title": "Edit suggestion",
@@ -83,7 +98,8 @@
       "open": "Open",
       "snooze": "Snooze",
       "archive": "Archive"
-    }
+    },
+    "hint": "Change the recommended action or the reasoning, then save. Applying the suggestion later uses what you saved here."
   },
   "glass_dock": {
     "title": "AI suggestions",
@@ -95,7 +111,8 @@
       "dismiss_failed": "Could not dismiss the suggestion",
       "edit_failed": "Could not save the suggestion",
       "identity_changed": "Your account or workspace changed. Reopen the suggestion before trying again."
-    }
+    },
+    "description": "Describe tasks in plain language to filter them, and review what AI proposes for this workspace. Nothing changes until you apply a suggestion."
   },
   "state_suggestions": {
     "title": "Suggested next steps"
@@ -108,23 +125,23 @@
       "due_soon": "Due soon"
     },
     "page_title": "Reminders",
-    "page_subtitle": "Tasks the engine flagged based on your due dates and progress.",
+    "page_subtitle": "Open tasks due within three days or already overdue, based on their due dates.",
     "view_all": "View all",
-    "empty": "No reminders right now.",
+    "empty": "No reminders right now. Tasks with a due date appear here within three days of it, or when overdue.",
     "error": "Failed to load reminders",
     "retry": "Retry",
     "count": "{count, plural, one {# reminder} other {# reminders}}",
     "bucket": {
       "overdue": "Overdue",
       "today": "Today",
-      "soon": "Soon",
+      "soon": "Within 3 days",
       "later": "Later"
     },
     "due": "Due {date}",
     "days": {
-      "overdue": "{count} days overdue",
+      "overdue": "{count, plural, one {# day overdue} other {# days overdue}}",
       "today": "Due today",
-      "future": "{count} days left"
+      "future": "{count, plural, one {# day left} other {# days left}}"
     }
   },
   "auto_actions": {
@@ -134,7 +151,8 @@
       "assign_owner": "Assign owner",
       "nudge_assignee": "Nudge",
       "close_stale_review": "Close review"
-    }
+    },
+    "hint": "Actions the workspace's auto-action rules think are worth taking. Click one to open its task and decide."
   },
   "transition_label": {
     "start": "Start",
@@ -168,14 +186,21 @@
   },
   "nl_query": {
     "label": "Ask in plain language",
-    "placeholder": "show me everything blocked this week",
+    "placeholder": "high priority tasks that are in progress",
     "submit": "Submit",
     "compiling": "Processing...",
     "unparseable": "Couldn't understand that — try rephrasing.",
     "error": "Failed to process query",
     "apply": "Apply filter",
-    "applied": "Filter applied",
+    "applied": "Priority and status are applied when you are viewing a project. Other conditions are shown for reference only.",
     "sort_label": "Sort",
-    "group_label": "Group by"
+    "group_label": "Group by",
+    "hint": "Priority and status are applied as filters to the project you are viewing, replacing its current filters. Other conditions are shown but not applied.",
+    "applied_group": "Applied",
+    "reference_group": "Not applied"
+  },
+  "consequence": {
+    "applies_now": "Applies now",
+    "suggestion": "Suggestion"
   }
 }

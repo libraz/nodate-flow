@@ -2,10 +2,18 @@ import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Popover from '@nodate-flow/ui/primitives/popover';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { useNavigate } from '@tanstack/react-router';
 
 import { Bell, LogOut, Search, Settings } from 'lucide-react';
-import { type ReactElement, Suspense, useState } from 'react';
+import {
+  type ButtonHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  Suspense,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
@@ -27,6 +35,42 @@ function initialsFrom(name: string | undefined): string {
   const first = parts[0]?.[0] ?? '';
   const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
   return (first + last).toUpperCase() || '?';
+}
+
+type AvatarTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLElement>;
+  label: string;
+  expanded: boolean;
+  children: ReactNode;
+};
+
+/**
+ * The popover clones its child with a ref and interaction props, and the
+ * tooltip needs the button's own ref, so the popover anchors on a span.
+ */
+function AvatarTrigger({
+  ref,
+  label,
+  expanded,
+  children,
+  ...buttonProps
+}: AvatarTriggerProps): ReactElement {
+  return (
+    <span ref={ref} className={styles.avatarAnchor}>
+      <Tooltip content={label} placement="bottom">
+        <button
+          type="button"
+          className={cx(styles.avatarTrigger, 'nf-focus-ring')}
+          aria-label={label}
+          {...buttonProps}
+          aria-haspopup="menu"
+          aria-expanded={expanded}
+        >
+          {children}
+        </button>
+      </Tooltip>
+    </span>
+  );
 }
 
 export default function TopBar(): ReactElement {
@@ -148,7 +192,9 @@ export default function TopBar(): ReactElement {
             </div>
           </div>
           <div className={styles.right}>
-            <AiCostMeter />
+            <div className={styles.costSlot}>
+              <AiCostMeter />
+            </div>
             <div className={styles.inlineNotificationBell}>
               <Suspense fallback={null}>
                 <NotificationBell />
@@ -160,21 +206,14 @@ export default function TopBar(): ReactElement {
               placement="bottom-end"
               content={userMenuContent}
             >
-              <button
-                type="button"
-                className={cx(styles.avatarTrigger, 'nf-focus-ring')}
-                aria-label={t('topbar.user_menu.open')}
-                aria-haspopup="menu"
-                aria-expanded={userMenuOpen}
-                title={user?.displayName ?? ''}
-              >
+              <AvatarTrigger label={t('topbar.user_menu.open')} expanded={userMenuOpen}>
                 <Avatar
                   alt={avatarLabel}
                   initials={initials}
                   size="md"
                   {...(avatarUrl ? { src: avatarUrl } : {})}
                 />
-              </button>
+              </AvatarTrigger>
             </Popover>
           </div>
         </header>

@@ -8,21 +8,22 @@
  * actor/avatar treatment so the feed feels native to both surfaces.
  */
 
-import { buildAvatarUrl } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
+import { Link } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Bot, Cog } from 'lucide-react';
 import type { CSSProperties, ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { authApiBaseUrl } from '../../lib/sdk';
+import { resolveAvatarUrl } from '../../lib/avatar-url';
 
 import styles from './activity.module.css';
 import type { ActivityEntry } from './api';
 import {
   actionLabel,
   actorKindLabel,
+  resourceTypeLabel,
   severityAccentVar,
   severityLabel,
   sourceAccentVar,
@@ -34,6 +35,8 @@ export interface ActivityRowProps {
   entry: ActivityEntry;
   /** Resolved display name for `actorUserPublicId`, when known. */
   actorName?: string | undefined;
+  /** Server-supplied avatar URL for `actorUserPublicId`; absent when none is uploaded. */
+  actorAvatarUrl?: string | undefined;
   /** First-load stagger style from the list (`--stagger-index`). */
   enterStyle?: CSSProperties | undefined;
 }
@@ -52,10 +55,12 @@ function initialsOf(name: string): string {
 function ActorGlyph({
   entry,
   actorName,
+  actorAvatarUrl,
   actorLabel,
 }: {
   entry: ActivityEntry;
   actorName: string | undefined;
+  actorAvatarUrl: string | undefined;
   actorLabel: string;
 }): ReactElement {
   if (entry.actorKind === 'agent') {
@@ -74,8 +79,32 @@ function ActorGlyph({
   }
   const name = actorName ?? '';
   const initials = name.length > 0 ? initialsOf(name) : '?';
-  const src = buildAvatarUrl(entry.actorUserPublicId, authApiBaseUrl);
-  return <Avatar alt={actorLabel} initials={initials} size="sm" src={src} />;
+  const src = resolveAvatarUrl(actorAvatarUrl);
+  return <Avatar alt={actorLabel} initials={initials} size="sm" {...(src ? { src } : {})} />;
+}
+
+/**
+ * The affected resource by its translated type. Tasks and pages that still
+ * exist link to their page; the raw public id is never shown.
+ */
+function ResourceRef({ entry, label }: { entry: ActivityEntry; label: string }): ReactElement {
+  const id = entry.resourcePublicId ?? '';
+  const deleted = entry.action.endsWith('delete');
+  if (id.length > 0 && !deleted && entry.resourceType === 'task') {
+    return (
+      <Link to="/tasks/$taskId" params={{ taskId: id }} className={styles.resourceLink}>
+        {label}
+      </Link>
+    );
+  }
+  if (id.length > 0 && !deleted && entry.resourceType === 'page') {
+    return (
+      <Link to="/pages/$pageId" params={{ pageId: id }} className={styles.resourceLink}>
+        {label}
+      </Link>
+    );
+  }
+  return <span className={styles.resource}>{label}</span>;
 }
 
 function resolveActorLabel(
@@ -92,6 +121,7 @@ function resolveActorLabel(
 export default function ActivityRow({
   entry,
   actorName,
+  actorAvatarUrl,
   enterStyle,
 }: ActivityRowProps): ReactElement {
   const { t, i18n } = useTranslation('activity');
@@ -107,10 +137,7 @@ export default function ActivityRow({
   const relative = formatRelative(entry.occurredAt, locale);
   const absolute = formatAbsolute(entry.occurredAt, locale);
 
-  const resourceText =
-    entry.resourcePublicId && entry.resourcePublicId.length > 0
-      ? t('row.resource_with_id', { type: entry.resourceType, id: entry.resourcePublicId })
-      : entry.resourceType;
+  const resourceText = resourceTypeLabel(entry.resourceType, t);
 
   return (
     <li
@@ -123,7 +150,12 @@ export default function ActivityRow({
         } as CSSProperties
       }
     >
-      <ActorGlyph entry={entry} actorName={actorName} actorLabel={actorLabel} />
+      <ActorGlyph
+        entry={entry}
+        actorName={actorName}
+        actorAvatarUrl={actorAvatarUrl}
+        actorLabel={actorLabel}
+      />
 
       <div className={styles.body}>
         <div className={styles.headline}>
@@ -139,7 +171,7 @@ export default function ActivityRow({
           </time>
         </div>
         <div className={styles.meta}>
-          <span className={styles.resource}>{resourceText}</span>
+          <ResourceRef entry={entry} label={resourceText} />
           <span aria-hidden="true">·</span>
           <span>{kind}</span>
           <span aria-hidden="true">·</span>

@@ -9,11 +9,12 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Sparkles } from 'lucide-react';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
+import AiConsequence, { AiSparkle } from '../ai-suggestions/ai-consequence';
 import MarkdownEditor from '../tasks/markdown-editor';
 import {
   type CreatePageInput,
@@ -36,6 +37,11 @@ interface PageEditorProps {
   existingPage: PageItem | undefined;
   /** Called after successful save or cancel. */
   onDone: (savedPageId: string | undefined) => void;
+  /**
+   * Called when AI generation has created a page on the server. Only create
+   * mode offers generation; the caller moves to that page in edit mode.
+   */
+  onGeneratedPage?: ((page: PageItem) => void) | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,6 +52,7 @@ export default function PageEditor({
   workspaceId,
   existingPage,
   onDone,
+  onGeneratedPage,
 }: PageEditorProps): ReactElement {
   const { t } = useTranslation('pages');
   const isEditing = existingPage !== undefined;
@@ -122,6 +129,7 @@ export default function PageEditor({
 
   const handleGenerated = (generated: PageItem): void => {
     setBody(generated.body ?? '');
+    onGeneratedPage?.(generated);
   };
 
   const handleCancel = (): void => {
@@ -165,6 +173,7 @@ export default function PageEditor({
               value={parentPageId}
               onChange={handleParentChange}
               className={styles.select}
+              aria-describedby="page-parent-hint"
             >
               <option value="">{t('parent_none')}</option>
               {parentCandidates.map((p) => (
@@ -173,6 +182,9 @@ export default function PageEditor({
                 </option>
               ))}
             </select>
+            <p id="page-parent-hint" className={styles.formHint}>
+              {t('parent_hint')}
+            </p>
           </div>
           <div className={styles.formField}>
             <label className={styles.formLabel} htmlFor="page-project">
@@ -209,16 +221,26 @@ export default function PageEditor({
 
         {/* Actions */}
         <div className={styles.formActions}>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={handleOpenGenerate}
-            disabled={title.trim().length === 0}
-          >
-            <Sparkles size={14} aria-hidden />
-            {t('ai_generate')}
-          </Button>
+          {!isEditing && (
+            <>
+              <Tooltip content={t('ai_generate_hint')}>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={handleOpenGenerate}
+                  disabled={title.trim().length === 0}
+                  aria-describedby="page-ai-generate-effect"
+                >
+                  <AiSparkle kind="applies" />
+                  {t('ai_generate')}
+                </Button>
+              </Tooltip>
+              <span id="page-ai-generate-effect" className={styles.aiEffect}>
+                <AiConsequence kind="applies" />
+              </span>
+            </>
+          )}
           <span className={styles.formActionsSpacer} />
           <Button
             type="button"
@@ -241,14 +263,16 @@ export default function PageEditor({
         </div>
       </form>
 
-      <PageGenerateDialog
-        open={generateDialogOpen}
-        workspaceId={workspaceId}
-        title={title}
-        projectId={projectId.length > 0 ? projectId : undefined}
-        onClose={handleCloseGenerate}
-        onGenerated={handleGenerated}
-      />
+      {!isEditing && (
+        <PageGenerateDialog
+          open={generateDialogOpen}
+          workspaceId={workspaceId}
+          title={title}
+          projectId={projectId.length > 0 ? projectId : undefined}
+          onClose={handleCloseGenerate}
+          onGenerated={handleGenerated}
+        />
+      )}
     </div>
   );
 }

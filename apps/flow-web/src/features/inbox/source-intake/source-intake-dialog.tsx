@@ -266,6 +266,7 @@ export default function SourceIntakeDialog({
               fullWidth
               disabled={Boolean(completedTaskId)}
             />
+            <p className={styles.destinationHint}>{t('sourceIntake.destination_hint')}</p>
           </fieldset>
 
           <fieldset className={styles.fieldset} disabled={Boolean(completedTaskId)}>

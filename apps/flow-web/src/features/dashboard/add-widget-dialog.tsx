@@ -10,15 +10,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  type LucideIcon,
-  Radio,
-  Sparkles,
-  SquareKanban,
-} from 'lucide-react';
+import { AlertTriangle, Bell, type LucideIcon, Radio, Sparkles, SquareKanban } from 'lucide-react';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -37,9 +29,9 @@ interface WidgetTypeMeta {
   defaultHeight: number;
 }
 
+/** Burndown has no data source yet, so it is not offered here. */
 const widgetTypes: WidgetTypeMeta[] = [
   { type: 'task_summary', icon: SquareKanban, defaultWidth: 4, defaultHeight: 2 },
-  { type: 'burndown', icon: BarChart3, defaultWidth: 6, defaultHeight: 3 },
   { type: 'signals_feed', icon: Radio, defaultWidth: 4, defaultHeight: 3 },
   { type: 'ai_suggestions', icon: Sparkles, defaultWidth: 4, defaultHeight: 2 },
   { type: 'overdue_tasks', icon: AlertTriangle, defaultWidth: 4, defaultHeight: 2 },

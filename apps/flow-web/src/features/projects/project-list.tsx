@@ -79,6 +79,8 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
     <section className={styles.section}>
       <PageHeader
         title={t('projects.title')}
+        description={t('projects.description')}
+        help="projects"
         actions={
           <Button variant="primary" onClick={handleCreate}>
             {t('projects.new')}

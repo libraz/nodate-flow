@@ -24,6 +24,16 @@ function toneForStatus(status: string): 'accent' | 'warning' | 'danger' {
   return 'danger';
 }
 
+function useStatusLabel(): (status: string) => string {
+  const { t } = useTranslation('settings');
+  return (status) => {
+    if (status === 'ok') return t('ai_activity.status.ok');
+    if (status === 'blocked') return t('ai_activity.status.blocked');
+    if (status === 'error') return t('ai_activity.status.error');
+    return status;
+  };
+}
+
 function InvocationRow({
   row,
   style,
@@ -33,10 +43,11 @@ function InvocationRow({
 }): ReactElement {
   const { t, i18n } = useTranslation('settings');
   const locale = i18n.resolvedLanguage ?? 'en';
+  const statusLabel = useStatusLabel();
   return (
     <li className={`${styles.row} ${motion.enter}`} style={style}>
       <div className={styles.headline}>
-        <Badge tone={toneForStatus(row.status)}>{row.status}</Badge>
+        <Badge tone={toneForStatus(row.status)}>{statusLabel(row.status)}</Badge>
         <strong className={styles.purpose}>{row.purpose}</strong>
         <span className={styles.model}>{row.model}</span>
         <span className={styles.time}>{formatEpochDateTime(row.invokedAt, locale)}</span>
@@ -55,7 +66,11 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
   const staggerFor = useFirstLoadStagger();
   return (
     <div className={ui.page}>
-      <PageHeader title={t('ai_activity.title')} description={t('ai_activity.description')} />
+      <PageHeader
+        title={t('ai_activity.title')}
+        description={t('ai_activity.description')}
+        help="workspace-settings-ai-activity"
+      />
       {data.length === 0 ? (
         <EmptyState titleAs="p" title={t('ai_activity.empty')} className={ui.empty} />
       ) : (

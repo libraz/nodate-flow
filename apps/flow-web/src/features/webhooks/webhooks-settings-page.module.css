@@ -59,6 +59,10 @@
   color: var(--nf-color-danger-fg);
 }
 
+.menuAnchor {
+  display: inline-flex;
+}
+
 .menuTrigger {
   all: unset;
   display: inline-flex;
@@ -90,6 +94,20 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--nf-space-2);
+}
+
+.signingHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.deliveriesNote {
+  margin: 0 0 var(--nf-space-3);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
 }
 
 .deliveriesList {

@@ -22,6 +22,7 @@ import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { ToggleChip } from '@nodate-flow/ui/primitives/toggle-chip';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createLazyFileRoute, getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
@@ -29,6 +30,7 @@ import { type ReactElement, Suspense, useCallback, useMemo, useState } from 'rea
 import { useTranslation } from 'react-i18next';
 
 import { useProjectDependenciesQuery } from '../features/projects/api';
+import ProjectSectionHeader from '../features/projects/project-section-header';
 import type { TaskDerivedState } from '../features/tasks/api';
 import { STATE_COLOR } from '../features/tasks/constants';
 import { apiRequest } from '../lib/api';
@@ -42,6 +44,8 @@ const ROW_HEIGHT = 28;
 const ROW_GAP = 4;
 const BAR_HEIGHT = 14;
 const HEADER_HEIGHT = 36;
+/** Room a month label needs at 12px, e.g. "2026年12月" or "December 2026". */
+const MONTH_LABEL_ROOM = 104;
 const LABEL_WIDTH = 220;
 
 /**
@@ -422,86 +426,96 @@ function GanttView(): ReactElement {
 
   return (
     <section className={styles.root}>
-      <header className={styles.toolbar}>
-        <h2 className={styles.title}>{t('gantt.title')}</h2>
-        <div className={styles.controls}>
-          <div className={styles.group}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={t('gantt.prev')}
-              onClick={goPrev}
-              disabled={offsetDays === 0}
-            >
-              <ChevronLeft size={16} aria-hidden />
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={goToday}>
-              {t('gantt.today')}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={t('gantt.next')}
-              onClick={goNext}
-              disabled={offsetDays >= Math.max(0, totalDays - visibleDays)}
-            >
-              <ChevronRight size={16} aria-hidden />
-            </Button>
-          </div>
+      <ProjectSectionHeader
+        title={t('gantt.title')}
+        help="project-gantt"
+        description={t('gantt.description')}
+        actions={
+          <div className={styles.controls}>
+            <div className={styles.group}>
+              <Tooltip content={t('gantt.prev')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={t('gantt.prev')}
+                  onClick={goPrev}
+                  disabled={offsetDays === 0}
+                >
+                  <ChevronLeft size={16} aria-hidden />
+                </Button>
+              </Tooltip>
+              <Button type="button" variant="ghost" onClick={goToday}>
+                {t('gantt.today')}
+              </Button>
+              <Tooltip content={t('gantt.next')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={t('gantt.next')}
+                  onClick={goNext}
+                  disabled={offsetDays >= Math.max(0, totalDays - visibleDays)}
+                >
+                  <ChevronRight size={16} aria-hidden />
+                </Button>
+              </Tooltip>
+            </div>
 
-          <div className={styles.group}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={t('gantt.zoom_out')}
-              onClick={zoomOut}
-              disabled={zoomIdx === 0}
-            >
-              <Minus size={14} aria-hidden />
-            </Button>
-            {/*
-             * View selector: Month / Week / Day as a segmented control
-             * (WAI-ARIA radiogroup). After a step zoom no segment is
-             * selected, so every preset stays clickable.
-             */}
-            <SegmentedControl<ZoomPreset>
-              ariaLabel={t('gantt.zoom_preset_aria')}
-              size="sm"
-              value={zoomPresetFromIndex(zoomIdx) ?? null}
-              onChange={(next) => setZoomIdx(ZOOM_PRESET_INDEX[next])}
-              options={[
-                { value: 'month', label: t('gantt.zoom_month') },
-                { value: 'week', label: t('gantt.zoom_week') },
-                { value: 'day', label: t('gantt.zoom_day') },
-              ]}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={t('gantt.zoom_in')}
-              onClick={zoomIn}
-              disabled={zoomIdx === ZOOM_LEVELS.length - 1}
-            >
-              <Plus size={14} aria-hidden />
-            </Button>
-          </div>
+            <div className={styles.group}>
+              <Tooltip content={t('gantt.zoom_out')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={t('gantt.zoom_out')}
+                  onClick={zoomOut}
+                  disabled={zoomIdx === 0}
+                >
+                  <Minus size={14} aria-hidden />
+                </Button>
+              </Tooltip>
+              {/*
+               * View selector: Month / Week / Day as a segmented control
+               * (WAI-ARIA radiogroup). After a step zoom no segment is
+               * selected, so every preset stays clickable.
+               */}
+              <SegmentedControl<ZoomPreset>
+                ariaLabel={t('gantt.zoom_preset_aria')}
+                size="sm"
+                value={zoomPresetFromIndex(zoomIdx) ?? null}
+                onChange={(next) => setZoomIdx(ZOOM_PRESET_INDEX[next])}
+                options={[
+                  { value: 'month', label: t('gantt.zoom_month') },
+                  { value: 'week', label: t('gantt.zoom_week') },
+                  { value: 'day', label: t('gantt.zoom_day') },
+                ]}
+              />
+              <Tooltip content={t('gantt.zoom_in')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={t('gantt.zoom_in')}
+                  onClick={zoomIn}
+                  disabled={zoomIdx === ZOOM_LEVELS.length - 1}
+                >
+                  <Plus size={14} aria-hidden />
+                </Button>
+              </Tooltip>
+            </div>
 
-          {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
-          <div className={styles.group}>
-            <ToggleChip
-              pressed={showCriticalPath}
-              onPressedChange={setShowCriticalPath}
-              color={CRITICAL_PATH_COLOR}
-            >
-              {t('gantt.critical_path')}
-            </ToggleChip>
+            {/* Critical path toggle (doubles as a legend: accent matches bar stroke). */}
+            <div className={styles.group}>
+              <Tooltip content={t('gantt.critical_path_hint')}>
+                <ToggleChip
+                  pressed={showCriticalPath}
+                  onPressedChange={setShowCriticalPath}
+                  color={CRITICAL_PATH_COLOR}
+                >
+                  {t('gantt.critical_path')}
+                </ToggleChip>
+              </Tooltip>
+            </div>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {scheduled.length === 0 ? (
         <EmptyState titleAs="p" title={t('gantt.empty')} />
@@ -529,21 +543,34 @@ function GanttView(): ReactElement {
                         x={c.x + dayWidth / 2}
                         y={HEADER_HEIGHT - 6}
                         textAnchor="middle"
-                        fontSize="10"
+                        fontSize="12"
                         className={styles.axisText}
                       >
                         {c.date.getDate()}
                       </text>
                     ) : null}
                     {c.isMonthStart ? (
-                      <text x={c.x + 4} y={14} fontSize="10" className={styles.axisMonth}>
-                        {monthFormat.format(c.date)}
-                      </text>
+                      // A month starting near the end of the range is pinned to the edge so it is not clipped.
+                      c.x > chartWidth - MONTH_LABEL_ROOM ? (
+                        <text
+                          x={chartWidth - 4}
+                          y={14}
+                          textAnchor="end"
+                          fontSize="12"
+                          className={styles.axisMonth}
+                        >
+                          {monthFormat.format(c.date)}
+                        </text>
+                      ) : (
+                        <text x={c.x + 4} y={14} fontSize="12" className={styles.axisMonth}>
+                          {monthFormat.format(c.date)}
+                        </text>
+                      )
                     ) : null}
                   </g>
                 ))}
                 {!hasMonthBoundary ? (
-                  <text x={4} y={14} fontSize="10" className={styles.axisMonth}>
+                  <text x={4} y={14} fontSize="12" className={styles.axisMonth}>
                     {monthFormat.format(firstDayDate)}
                   </text>
                 ) : null}
@@ -563,7 +590,7 @@ function GanttView(): ReactElement {
                         x={todayX}
                         y={HEADER_HEIGHT - 6}
                         textAnchor="middle"
-                        fontSize="10"
+                        fontSize="12"
                         className={styles.todayText}
                       >
                         {today.getDate()}

@@ -65,27 +65,11 @@ describe('CONSTRAINT_STATE_COLORS', () => {
 });
 
 describe('INTEGRATION_SOURCE_COLORS', () => {
-  it('is non-empty', () => {
-    expect(Object.keys(INTEGRATION_SOURCE_COLORS).length).toBeGreaterThan(0);
-  });
-
-  it('exposes well-formed 6-digit hex values', () => {
-    for (const value of Object.values(INTEGRATION_SOURCE_COLORS)) {
-      expect(value).toMatch(HEX_PATTERN);
-    }
-  });
-
-  it('covers every category used by event-card.tsx', () => {
+  it('maps every category used by event-card.tsx to a text-strength colour token', () => {
     const required = ['github', 'slack', 'google', 'signal', 'ai', 'task'] as const;
     for (const key of required) {
-      expect(INTEGRATION_SOURCE_COLORS[key]).toMatch(HEX_PATTERN);
+      expect(INTEGRATION_SOURCE_COLORS[key]).toMatch(/^var\(--nf-color-[a-z-]+-fg\)$/);
     }
-  });
-
-  it('agrees with CONSTRAINT_STATE_COLORS on overlapping brand keys', () => {
-    expect(INTEGRATION_SOURCE_COLORS.github).toBe(CONSTRAINT_STATE_COLORS.github);
-    expect(INTEGRATION_SOURCE_COLORS.slack).toBe(CONSTRAINT_STATE_COLORS.slack);
-    expect(INTEGRATION_SOURCE_COLORS.google).toBe(CONSTRAINT_STATE_COLORS.google);
   });
 });
 
@@ -114,16 +98,6 @@ describe('feature re-exports', () => {
         "github": "#6e5494",
         "google": "#4285f4",
         "slack": "#4a154b",
-      }
-    `);
-    expect(INTEGRATION_SOURCE_COLORS).toMatchInlineSnapshot(`
-      {
-        "ai": "#10b981",
-        "github": "#6e5494",
-        "google": "#4285f4",
-        "signal": "#0ea5e9",
-        "slack": "#4a154b",
-        "task": "#f59e0b",
       }
     `);
   });

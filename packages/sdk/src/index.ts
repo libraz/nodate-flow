@@ -24,8 +24,6 @@ export {
   selectUser,
   useAuth,
 } from './auth-store.js';
-// Avatar URL helpers (auth-api proxy)
-export { buildAvatarUrl } from './avatar.js';
 export { type CreateClientOptions, createClient, type NodateFlowClient } from './client.js';
 // Hand-authored lookup over the generated catalog; kept outside ./errors so
 // the codegen barrel never clobbers it.

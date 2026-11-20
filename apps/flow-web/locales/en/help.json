@@ -1,0 +1,476 @@
+{
+  "activity": {
+    "title": "Activity",
+    "summary": "A chronological record of what happened in this workspace: changes by people, runs by AI, and calls from connected tools.",
+    "tips": {
+      "t1": "Filter by source: Audit lists actions people take, AI lists AI runs, and MCP lists calls made by connected tools through an MCP token.",
+      "t2": "Each row shows who did it (a person, an agent or the system), what they did and when. Use it to find out why something changed.",
+      "t3": "Older entries load with “Load more”. The feed is a record only; nothing here can be undone from this page."
+    }
+  },
+  "ai-suggestions-panel": {
+    "title": "AI suggestions",
+    "summary": "A panel for filtering tasks in plain language and reviewing what AI proposes for the current workspace. Nothing changes until you apply a suggestion.",
+    "tips": {
+      "t1": "Describe tasks in the box at the top, for example high priority tasks that are in progress. Priority and status filters are applied to the project you are viewing.",
+      "t2": "Suggested actions, Reminders and Suggested next steps list tasks worth a look. Click one to open the task and decide.",
+      "t3": "Suggestions come from Triage with AI in the Inbox. Apply opens the task, or snoozes or archives the inbox item, right away.",
+      "t4": "Edit changes the action or the reasoning before you apply. Dismiss removes the suggestion.",
+      "t5": "The number on the pill is how many suggestions are waiting. Esc closes the panel."
+    }
+  },
+  "calendar": {
+    "title": "Calendar",
+    "summary": "Your assigned tasks and calendar events from every workspace, on one monthly grid.",
+    "tips": {
+      "t1": "Click a day to add something. Shift+click starts a block instead of an event. You can switch the type in the dialog.",
+      "t2": "Drag a task or event to another day to move it. A task gets a new due date, an event moves to the new day. The change is saved as soon as you drop; release outside any day to cancel.",
+      "t3": "Use the layer chips to show or hide tasks, events, blocks, free time and milestones. Holidays appear only when a country is set for your workspace.",
+      "t4": "Click a task to open it. Click an event to edit it, or open its detail page for attendees, comments, checklist and attachments.",
+      "t5": "The Calendars panel on the left chooses which calendars are shown, adds teammates' calendars, and holds per-calendar memos. Pending invitations to events appear beside the grid."
+    }
+  },
+  "calendar-event-detail": {
+    "title": "Event details",
+    "summary": "A single event with its attendees, invite links, comments, checklist and attachments.",
+    "tips": {
+      "t1": "Attendees lists workspace members you add and their responses. People with “Can edit” turned on can change the event.",
+      "t2": "To invite someone outside the workspace, use “Send invite link” on their row. The link is copied to your clipboard, and the Invites tab tracks whether it was accepted, expired or revoked.",
+      "t3": "“Shift event” moves the event and previews which linked tasks can move with it. Nothing changes until you press Apply.",
+      "t4": "Comments, the checklist and attachments are shared with everyone who can see the event."
+    }
+  },
+  "command-palette": {
+    "title": "Command palette",
+    "summary": "Search tasks, projects and pages from one box, or type a request in plain language and let AI carry it out.",
+    "tips": {
+      "t1": "Open it with ⌘K (Ctrl+K on Windows), the search bar at the top, or the AI command button in the dock.",
+      "t2": "Type two or more characters to search tasks across all your workspaces. Projects, pages and workspaces match by name. Use the arrow keys and Enter to pick.",
+      "t3": "Start with > to switch to AI commands. Press Enter once to have AI interpret your request, check the action and details it shows, then press Enter again to run it.",
+      "t4": "Commands can create or update a task, change its state or add a comment. Search and list commands only take you to the result.",
+      "t5": "If a name matches nothing or several items, the palette says so and changes nothing. Each interpretation uses AI and counts toward your AI cost."
+    }
+  },
+  "home": {
+    "title": "Home",
+    "summary": "A snapshot of the work assigned to you across all workspaces, with shortcuts and your dashboard.",
+    "tips": {
+      "t1": "The four counts cover tasks where you hold a role (assignee, reviewer or approver) in any workspace. Overdue and Due today follow your time zone.",
+      "t2": "Your tasks lists up to five open tasks. View all tasks opens My tasks, grouped by due date.",
+      "t3": "Press ⌘K (Ctrl+K on Windows) anywhere to search or run an AI command, and C to start a new task.",
+      "t4": "Pick a workspace under Workspaces to open its projects and settings.",
+      "t5": "The dashboard at the bottom belongs to your first workspace. Use Edit layout to add, reorder or remove widgets."
+    }
+  },
+  "inbox": {
+    "title": "Inbox",
+    "summary": "Items sent to you from connected sources and agents, waiting for you to decide what to do with them.",
+    "tips": {
+      "t1": "Inbox shows your own items from every workspace. Intake is a separate queue per workspace for work nobody has taken on yet.",
+      "t2": "Snooze hides an item until an hour from now, tomorrow 9:00 or 9:00 a week from now (your time zone). Archive clears it from the inbox.",
+      "t3": "Review source, on items not yet linked to a task, creates a task from the item or links it to an existing one. You can also copy a draft acknowledgment.",
+      "t4": "Triage with AI scores your items for one workspace and shows suggestions above the list. Nothing changes until you press Apply, which opens the task, snoozes or archives the item. Edit adjusts a suggestion first; Dismiss drops it.",
+      "t5": "Handed back by agent shows only items where an AI agent stopped and needs you.",
+      "t6": "In Intake, Convert turns an item into a task in the project you choose. Dismiss removes it without creating a task."
+    }
+  },
+  "my-tasks": {
+    "title": "My tasks",
+    "summary": "Every open task where you hold a role, across all workspaces, grouped by when it is due.",
+    "tips": {
+      "t1": "Sections run Overdue, Today, Tomorrow, This week, Later and No due date. Done and cancelled tasks are hidden.",
+      "t2": "Tasks show up when you are added as assignee, reviewer or approver. Rows are sorted by due date, then priority.",
+      "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task.",
+      "t4": "Up to 200 tasks are loaded. Press G then T from anywhere to come back to this page."
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "summary": "A list of things that need your attention, such as mentions, assignments, comments and schedule changes.",
+    "tips": {
+      "t1": "Click a notification to open the task or item it is about. It is marked as read at the same time.",
+      "t2": "The check button marks one notification as read. The archive button removes it from this list. “Mark all as read” applies to the workspace you are in.",
+      "t3": "Which events notify you is set in Settings, Notifications."
+    }
+  },
+  "pages": {
+    "title": "Pages",
+    "summary": "A workspace wiki for notes, specs and project documents, organised as a tree of pages.",
+    "tips": {
+      "t1": "Pages nest: choose a parent page when you create or edit one, and sub-pages show under their parent in the tree.",
+      "t2": "A page can belong to a project or to the whole workspace. Search at the top looks through page titles and content.",
+      "t3": "“Generate with AI” writes a body from the page title and your prompt. It creates a new page with that title right away, marked AI, and fills the editor with the draft. Review and edit the text afterwards.",
+      "t4": "If more than one workspace is available, open Pages from inside a workspace so the list shows the one you mean."
+    }
+  },
+  "priority-suggestions": {
+    "title": "Priority suggestions",
+    "summary": "Proposed priority changes for open tasks, each with the reason behind it. Nothing changes until you press Apply.",
+    "tips": {
+      "t1": "Suggestions come from fixed rules over each task's due date, last update and assignment, not from a language model. The counts show how many open tasks were checked and how many got a suggestion. Up to 200 tasks are checked at a time.",
+      "t2": "Apply changes the task's priority immediately and shows an Undo button in the toast, which restores the previous priority.",
+      "t3": "Dismiss only hides the suggestion in this browser. It does not tell anyone else and does not change the task. It can be undone from the toast.",
+      "t4": "Confidence shows how strongly the rules support a suggestion. Use Refresh after editing tasks to recalculate."
+    }
+  },
+  "project": {
+    "title": "Project",
+    "summary": "One project's overview, tasks, schedule and activity. The star adds it to your favorites.",
+    "tips": {
+      "t1": "Overview shows how many tasks are active and a bar split by state. Progress is the share of tasks that are done.",
+      "t2": "Members and Settings are tabs inside Overview. Members sets each person's role: Viewer, Commenter, Editor or Lead.",
+      "t3": "Settings lets you rename the project or disable it. Disabling cannot be undone from the app.",
+      "t4": "Tasks has board, list, graph and spreadsheet views. Gantt and Timeline are read-only views of the same project."
+    }
+  },
+  "project-gantt": {
+    "title": "Gantt",
+    "summary": "A read-only schedule of this project. Each bar runs from a task's start date to its due date.",
+    "tips": {
+      "t1": "Arrows show blocking dependencies. Click a bar or a task name to open the task.",
+      "t2": "Tasks with no start or due date are not drawn. They are counted as unscheduled instead.",
+      "t3": "Switch between Day, Week and Month, or use the zoom buttons. Earlier, Later and Today move the visible range.",
+      "t4": "Critical path highlights in red the longest chain of tasks that block one another. A delay anywhere on it delays the end.",
+      "t5": "To place a task here, give it a start date or a due date on its page."
+    }
+  },
+  "project-tasks": {
+    "title": "Tasks",
+    "summary": "All tasks in this project, shown as a board, list, dependency graph or spreadsheet.",
+    "tips": {
+      "t1": "Your choice of view is remembered on this device. Board groups tasks by state, List and Spreadsheet give one row per task, and Graph draws which tasks block which.",
+      "t2": "Board cards cannot be dragged. Use the Move task menu on a card to change its state or archive it.",
+      "t3": "A task changes state through transitions such as Start, Block, Submit, Complete, Reopen and Cancel. Only moves allowed from the current state are offered.",
+      "t4": "Search, state, priority and assignee filters apply to every view. Save a filter set as a Saved View to reuse it or share it with a public link.",
+      "t5": "In List and Spreadsheet, tick rows to set priority in bulk or delete them. Delete is permanent; archiving keeps the task.",
+      "t6": "Spreadsheet: click a cell to edit it. Tab and Shift+Tab move across cells, Enter saves and moves down, Esc cancels."
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "summary": "A project groups the related tasks of one workspace. Open one to work on its tasks, schedule and members.",
+    "tips": {
+      "t1": "Click a project name to open it. Inside, the tabs are Overview, Tasks, Gantt and Timeline.",
+      "t2": "New project asks for a name, a slug and a short identifier. The identifier prefixes task references such as NF-42.",
+      "t3": "The slug uses lowercase letters, numbers and hyphens and must be unique in the workspace. It is filled in from the name until you edit it.",
+      "t4": "Status shows whether a project is Active or Archived."
+    }
+  },
+  "public-share-pages": {
+    "title": "Public share pages",
+    "summary": "Read-only web pages that show a chosen set of calendar events to anyone who has the link.",
+    "tips": {
+      "t1": "Anyone with the URL can view the page without signing in. Share it only with people who should see these events.",
+      "t2": "The full URL is shown only once, when you create the page. If it is lost or leaked, use Rotate to issue a new URL; the old one stops working immediately.",
+      "t3": "Open a share page to choose which events it publishes and in what order. Events marked confidential cannot be published.",
+      "t4": "Deleting a share page makes its URL invalid. The events themselves are not deleted."
+    }
+  },
+  "reminders": {
+    "title": "Reminders",
+    "summary": "Open tasks in this workspace that are overdue, due today or due within three days.",
+    "tips": {
+      "t1": "Reminders are generated from task due dates and state by fixed rules, not by AI. Tasks that are done or cancelled, or that have no due date, never appear.",
+      "t2": "Rows are grouped by urgency: Overdue, Today, Soon and Later. Click a task title to open it.",
+      "t3": "This page is read-only. To make a reminder go away, change the task's due date or finish the task."
+    }
+  },
+  "retro-drafts": {
+    "title": "Retrospective drafts",
+    "summary": "Retrospectives that AI drafted from completed tasks and calendar events, waiting for your decision.",
+    "tips": {
+      "t1": "Each draft links to the original it came from and shows which agent drafted it and when.",
+      "t2": "Accept turns the draft into a regular open task.",
+      "t3": "Discard archives the draft. You can restore it from the Archive page."
+    }
+  },
+  "settings-integrations": {
+    "title": "Integrations",
+    "summary": "Connect your own GitHub, Slack, Google Calendar and Discord accounts so the app can read from or act as you on those services.",
+    "tips": {
+      "t1": "These connections are personal to you. Other workspace members cannot use them.",
+      "t2": "Connect opens the service's own sign-in and consent screen. Access tokens are stored encrypted.",
+      "t3": "Disconnect removes the connection from this app; you must authorise again to reconnect. To be sure access is gone, also remove the app in the service's own authorized-apps settings.",
+      "t4": "A provider marked as not configured needs OAuth credentials set by the server administrator first."
+    }
+  },
+  "settings-notifications": {
+    "title": "Notifications",
+    "summary": "Choose which kinds of activity reach your in-app notification bell, separately for each workspace.",
+    "tips": {
+      "t1": "Preferences are saved per workspace. Pick the workspace first, then switch categories on or off and Save.",
+      "t2": "Only the in-app bell is controlled here. Email and push delivery are not available yet.",
+      "t3": "Turning a category off hides those notifications; the activity itself still happens and stays visible in the activity feed and task history.",
+      "t4": "Agents is the category for AI agents picking up, handing back or being attached to tasks."
+    }
+  },
+  "settings-profile": {
+    "title": "Profile",
+    "summary": "Your name, language, timezone and look. These belong to your account and apply in every workspace.",
+    "tips": {
+      "t1": "Display name is what other members see on tasks, comments and assignments.",
+      "t2": "Timezone and country decide how dates are shown and which public holidays appear on your calendar. Leave country empty to hide holidays.",
+      "t3": "Theme and color mode apply immediately and are not part of Save. Display name, language, week start, timezone and country need Save.",
+      "t4": "The profile picture is limited to JPEG, PNG, WebP or GIF up to 5 MB."
+    }
+  },
+  "settings-security": {
+    "title": "Security",
+    "summary": "Protect your account: change your password, add two-factor authentication and review signed-in devices.",
+    "tips": {
+      "t1": "Changing your password signs out every other device. This browser stays signed in.",
+      "t2": "Two-factor authentication asks for a 6-digit code from an authenticator app at sign-in. Turning it off needs your password.",
+      "t3": "Recovery codes work once each and are shown only when generated. Save them before closing; regenerating invalidates the old set.",
+      "t4": "Under Active sessions, revoke any device you do not recognise. Accounts that sign in through an external identity provider change their password there instead."
+    }
+  },
+  "setup": {
+    "title": "Create your workspace",
+    "summary": "A workspace is the shared space for your team's projects, tasks, events and pages. Create the first one to get started.",
+    "tips": {
+      "t1": "You become the workspace owner, and you can invite other people afterwards.",
+      "t2": "The slug is filled in from the name. Edit it if you want a different identifier; it must be unique on this server.",
+      "t3": "Name and slug can be changed later under Settings, General.",
+      "t4": "You can belong to several workspaces; this screen only appears while you have none."
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "summary": "Shortcuts that work anywhere in the app once you are signed in, except while typing in a field.",
+    "tips": {
+      "t1": "Two-key shortcuts such as G then C are pressed one after the other: press G, release, then press C within half a second.",
+      "t2": "Open the command palette with ⌘K (Ctrl+K on Windows and Linux) to search tasks and jump to any page. Start with > to give an AI command in plain language.",
+      "t3": "On the calendar, Shift+click on a day starts a block instead of an event."
+    }
+  },
+  "task-archive": {
+    "title": "Archive",
+    "summary": "Archived tasks are stored here, not deleted. Restore them any time.",
+    "tips": {
+      "t1": "Search by title, narrow by 7, 30 or 90 days, or pick a project or the person who archived the task.",
+      "t2": "Tasks are grouped by when they were archived, from this week back to older.",
+      "t3": "Unarchive restores a single task. Tick several rows to restore them together.",
+      "t4": "To archive a task, use the Move task menu on its board card. A toast offers Undo right away."
+    }
+  },
+  "task-constraints": {
+    "title": "Constraints",
+    "summary": "Constraints are rules the engine checks for this task, such as a deadline, a dependency, an approval or a signal.",
+    "tips": {
+      "t1": "Describe a rule in plain language and press Generate. AI fills in the rule under Advanced. Nothing is saved until you press Add constraint.",
+      "t2": "Explain puts a rule back into plain language so you can check what it does.",
+      "t3": "Evaluate now runs the engine and lists each constraint as satisfied or failed. Existing constraints only appear after you evaluate.",
+      "t4": "Remove stops the engine from blocking on that constraint. It cannot be restored from here.",
+      "t5": "To make a constraint hold up completion, mark it as a required check under Review & handoff."
+    }
+  },
+  "task-detail": {
+    "title": "Task",
+    "summary": "Everything about one task: edit it, move it between states, hand it to reviewers or agents, and link it to other work.",
+    "tips": {
+      "t1": "Edit the title with Edit title. Click the empty description to start writing in Markdown. History lists earlier versions you can restore.",
+      "t2": "The right column holds state, priority, dates, Transitions and assignees. Transitions offers only the moves allowed from the current state.",
+      "t3": "Dependencies record what blocks this task or what it blocks, its parent and subtasks, and related or duplicate tasks. Blocked tasks show a lock in lists and boards.",
+      "t4": "Review & handoff lets you require a reviewer's approval before the task can be completed, and hand a role to someone else.",
+      "t5": "Step decomposition, Suggested next step and Related tasks only propose; you decide what to apply. Agents assigned to the task work on their own and hand it back when they get stuck.",
+      "t6": "You can link calendar events to a task, or create an event from its due date."
+    }
+  },
+  "task-review-handoff": {
+    "title": "Review and handoff",
+    "summary": "Decide whether a task needs sign-off before it can be completed, send work for review, and pass a role to someone else.",
+    "tips": {
+      "t1": "Open Review & handoff and choose Manual completion or Review required.",
+      "t2": "With Review required, submit your work with acceptance criteria and evidence links. Submitting moves the task to review.",
+      "t3": "Reviewers approve or request changes. A reason is required when requesting changes. Fix the work, then resubmit.",
+      "t4": "The revision number counts changes to the work. An approval given for an older revision no longer applies.",
+      "t5": "Required checks are the constraints that must be satisfied before the task can be completed. Tick the ones you want to require.",
+      "t6": "Role handoff asks someone to take over a role. The current holder stays responsible until the recipient accepts, and you can withdraw the request while it is pending."
+    }
+  },
+  "timeboxes": {
+    "title": "Timeboxes",
+    "summary": "A named period, such as a sprint or a focus week, that you fill with tasks and move from planned to active to completed.",
+    "tips": {
+      "t1": "A timebox covers a start date and an end date. It tracks days, not hours, and is not a stopwatch.",
+      "t2": "Start activates a planned timebox. Stop marks an active one as completed. Cancel ends it without completing. Completed and cancelled timeboxes move to the collapsed section at the bottom.",
+      "t3": "Link tasks from a timebox's card to see progress as done/total. Removing a task or deleting the timebox does not delete the tasks.",
+      "t4": "While a timebox is active, a bar showing it stays visible across the app with shortcuts to open or stop it."
+    }
+  },
+  "timeline": {
+    "title": "Timeline",
+    "summary": "A chronological record of what happened: task changes, comments, reviews, signals, and AI and agent activity.",
+    "tips": {
+      "t1": "Filter by event type or by person, and use Reset filters to start over. Events are grouped by day.",
+      "t2": "An entry caused by an AI judgment shows the signal behind it and the AI's reasoning.",
+      "t3": "Reverse undoes what the AI did for a signal. Only AI-made actions can be reversed, and a reversal cannot itself be reversed.",
+      "t4": "The workspace timeline covers everything; a project's Timeline tab and a task's Activity list show the same events for just that project or task."
+    }
+  },
+  "weekly-digest": {
+    "title": "Weekly digest",
+    "summary": "A snapshot of this workspace: task counts by state, what was finished in the last seven days, and what is overdue.",
+    "tips": {
+      "t1": "The digest is calculated on demand from current task data. It is not sent anywhere and no email is involved.",
+      "t2": "“Overdue” lists open tasks whose due date has passed. A task due today is not overdue until the day ends.",
+      "t3": "Copy the Markdown section to paste the same summary into a status report, chat or page."
+    }
+  },
+  "workspace-members": {
+    "title": "Members",
+    "summary": "Everyone who can access this workspace, with their role. Admins and owners can add people, change roles and remove members.",
+    "tips": {
+      "t1": "Roles from most to least access: Owner, Admin, Member, Guest. Owners and admins can see and manage everything in the workspace. Members work on tasks. Guests can look but cannot make changes.",
+      "t2": "“Add member” adds a person by email. “Create invite link” makes a link that anyone can use to join with a chosen role, until it expires or reaches its use limit.",
+      "t3": "Revoking an invite link stops new people from joining with it. Those who already joined stay.",
+      "t4": "You cannot change your own role, and an owner's role cannot be changed here."
+    }
+  },
+  "workspace-settings-ai-activity": {
+    "title": "AI activity",
+    "summary": "A read-only list of the most recent LLM calls made for this workspace, with sensitive text redacted.",
+    "tips": {
+      "t1": "Each row shows the outcome, what the call was for, the model and the time. Failed calls show an error code.",
+      "t2": "Prompts are redacted when they are written, so the original text cannot be recovered from this page.",
+      "t3": "Only the latest 50 calls are shown. Use it to check that agents and suggestions are really calling the model you set up.",
+      "t4": "Only workspace admins can open this page. For totals and acceptance, see AI metrics."
+    }
+  },
+  "workspace-settings-ai-agents": {
+    "title": "AI agents",
+    "summary": "Create agents that work on tasks for you, decide when they run, and stop them with one switch.",
+    "tips": {
+      "t1": "An agent is a model plus a system prompt. Assign it to a task from the task's AI agents panel; it can hand the task back to you when it is unsure or hits a limit.",
+      "t2": "Trigger decides when it runs: Disabled never, On a schedule on the server's recurring cycle, On event when a listed event occurs, Manual only just when you press Run now.",
+      "t3": "Pause is the kill switch: a paused agent does not run on any trigger and Run now is disabled. Resume turns it back on.",
+      "t4": "Agents spend money through your provider. A per-agent monthly cost cap, when set, stops further calls once reached.",
+      "t5": "You need an AI provider with a model first; the New agent form links to that page if none exists."
+    }
+  },
+  "workspace-settings-ai-metrics": {
+    "title": "AI metrics",
+    "summary": "See how many AI proposals people accepted, and how provider rate limits are behaving.",
+    "tips": {
+      "t1": "Proposed counts AI suggestions shown, Applied those a person accepted, Dismissed those rejected. Acceptance rate is applied out of decided ones, so pending proposals are not counted.",
+      "t2": "A low acceptance rate means people mostly reject what the AI proposes; a high one means its proposals fit how you work.",
+      "t3": "Provider rate limits count calls per provider: sent right away, delayed by the limiter, or refused. Many delayed or refused calls mean the provider quota is too tight.",
+      "t4": "Switch the window between 7, 30 and 90 days. Only workspace admins can open this page."
+    }
+  },
+  "workspace-settings-ai-providers": {
+    "title": "AI providers",
+    "summary": "Register the LLM services and API keys this workspace's AI features run on.",
+    "tips": {
+      "t1": "Without a provider the AI features that call a model do not work: agents, AI suggestions and natural-language commands. Only workspace admins can manage providers.",
+      "t2": "When several providers exist, the most recently added one is used by default. Agents can run on a specific model you choose when creating them.",
+      "t3": "API keys are write-only. After saving they are shown masked and cannot be read back; replace one with Rotate key, which discards the old key at once.",
+      "t4": "Choose OpenAI-compatible for Azure, a proxy, a gateway or a local server. The plain OpenAI kind always uses the official endpoint and ignores any base URL.",
+      "t5": "Prompts and task text are sent to the provider you register. Task embeddings (similar-task search) are configured at the bottom of this page."
+    }
+  },
+  "workspace-settings-audit-log": {
+    "title": "Audit log",
+    "summary": "A read-only record of who did what in this workspace and when, for accountability and investigation.",
+    "tips": {
+      "t1": "Filter by action, resource type, person and date range. Entries without a person are done by the system.",
+      "t2": "Metadata is redacted when it is written, so secrets and similar values are not kept in the log. Entries cannot be edited or deleted here.",
+      "t3": "Export CSV saves only the rows on the current page (50 at most) with your filters applied. Narrow the date range and export page by page for more.",
+      "t4": "Only workspace admins can open this page."
+    }
+  },
+  "workspace-settings-auto-actions": {
+    "title": "Auto-actions",
+    "summary": "Let the system periodically check tasks and act on clear cases such as overdue work or stale reviews.",
+    "tips": {
+      "t1": "Everything here is off until you enable it. The evaluation interval sets how often tasks are checked; 0 minutes turns checking off.",
+      "t2": "Escalate overdue and Close stale review change tasks automatically (a priority bump, a state change). Assign owner and Nudge assignee only record a suggestion and never change anything.",
+      "t3": "The confidence threshold is the minimum score an action needs to be applied on its own. Lower means more actions and more mistakes; higher is more cautious.",
+      "t4": "Every applied action is recorded as an event, so you can review it later in the task history.",
+      "t5": "Only workspace admins can open this page. Start with a high threshold and check what was applied in the task history."
+    }
+  },
+  "workspace-settings-data": {
+    "title": "Imports & Exports",
+    "summary": "Download the workspace's tasks as CSV or JSON, or load tasks in from a CSV.",
+    "tips": {
+      "t1": "Export is a snapshot of tasks only, up to 10,000 rows per file. If the workspace holds more, you are told the file is incomplete, so it is not a full backup.",
+      "t2": "Only CSV imports can be created today. GitHub, Jira and Linear are shown as Coming soon and are disabled.",
+      "t3": "A CSV import takes the CSV text inside the Configuration JSON (up to 1 MiB and 5,000 rows). Columns: title, description, priority, dueOn, startedOn. A file exported from here can be imported back as is.",
+      "t4": "Imported tasks always start in the default state; a state column in the file is ignored because state is derived from events.",
+      "t5": "Never put tokens, API keys or passwords in the configuration. The field is not encrypted and the server rejects them."
+    }
+  },
+  "workspace-settings-general": {
+    "title": "General",
+    "summary": "The workspace name, slug and description, plus the option to delete the whole workspace.",
+    "tips": {
+      "t1": "The slug is a short unique identifier made of lowercase letters, numbers and hyphens. No other workspace on the server can share it.",
+      "t2": "The settings menu on the left groups everything else: data, public pages, MCP, webhooks, AI and reports.",
+      "t3": "Members and invites are managed from the workspace page, not from settings.",
+      "t4": "Deleting the workspace permanently removes every project, task, comment, attachment and uploaded file. You must type the slug to confirm, and it cannot be undone."
+    }
+  },
+  "workspace-settings-mcp-tokens": {
+    "title": "MCP tokens",
+    "summary": "Create tokens that let an MCP client such as an AI assistant read, and optionally change, this workspace.",
+    "tips": {
+      "t1": "A token works only for this workspace. It acts as you, so the client can reach only what you can reach. The list shows your own tokens.",
+      "t2": "Read lets the client list and fetch projects, tasks, pages and calendars. Write also lets it create, update and change task state. Pick Read unless the client needs to change things.",
+      "t3": "The token is shown only once, at creation. Copy it into your MCP client right away; if you lose it, revoke it and create a new one.",
+      "t4": "In your MCP client, use the server's /mcp address and send the token as a Bearer token.",
+      "t5": "Revoking a token stops every client using it immediately. Last used helps you spot tokens that are no longer needed."
+    }
+  },
+  "workspace-settings-public-share-detail": {
+    "title": "Public share page",
+    "summary": "Choose which events appear on this public page and in what order.",
+    "tips": {
+      "t1": "Add events picks from a date range of this workspace's events. Events already published or marked confidential are skipped.",
+      "t2": "Removing an event only takes it off this page; the event itself stays in the calendar.",
+      "t3": "Events appear in the order shown. Drag the handle to reorder, or use the keyboard.",
+      "t4": "If a recurring event's occurrence was moved, the page may still show the old time. A notice appears with a button to publish the updated event."
+    }
+  },
+  "workspace-settings-public-shares": {
+    "title": "Public share pages",
+    "summary": "Publish chosen calendar events on a read-only web page that anyone with the link can open, no sign-in needed.",
+    "tips": {
+      "t1": "The link itself is the access control. Anyone who has it can read the page, so share it only with people who should see these events.",
+      "t2": "The full URL is shown only once, when the page is created or rotated. It is stored hashed and cannot be recovered; lose it and you must rotate.",
+      "t3": "Rotate issues a new URL and breaks the old one immediately. Use it if a link leaked. Delete takes the page offline for good.",
+      "t4": "The public page shows each event's title, time, place and notes. Private events show their time only, and confidential events cannot be added.",
+      "t5": "Open a page to add or remove events and to drag them into the order they appear in."
+    }
+  },
+  "workspace-settings-webhooks": {
+    "title": "Webhooks",
+    "summary": "Send an HTTP POST to your own server whenever selected events happen in this workspace.",
+    "tips": {
+      "t1": "Event types are exact event names such as task.created or task.transition.complete, separated by commas. Use * to receive every event. Patterns like task.* are not supported.",
+      "t2": "Each request is signed. Verify the X-Nodate-Signature header (v0= plus an HMAC-SHA256 of v0:timestamp:body, keyed with the signing secret) and check X-Nodate-Timestamp against your clock before trusting a request. Keep the signing secret private; you can view it again with Show secret. If it leaks, delete the webhook and create a new one.",
+      "t3": "The destination must be a public HTTPS address. Local and private-network addresses are refused.",
+      "t4": "Failed deliveries are retried several times with growing delays (the last gap is about an hour), then marked Gave up. Open View deliveries to see status, HTTP code and attempts.",
+      "t5": "A webhook cannot be edited. To change the URL, description or events, delete it and create a new one. Switching it off drops events that happen meanwhile; they are not sent later."
+    }
+  },
+  "workspace-settings-weekly-digest": {
+    "title": "Weekly digest",
+    "summary": "A snapshot of the workspace: how many tasks are in each state, what was finished this week and what is overdue.",
+    "tips": {
+      "t1": "The numbers are computed directly from your tasks. No AI model is involved, so the same data always gives the same result.",
+      "t2": "Completed this week covers the last seven days; Overdue lists open tasks past their due date.",
+      "t3": "Copy the Markdown block to paste the summary into a chat or a status report.",
+      "t4": "This page is read-only. Only workspace admins can open it."
+    }
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "summary": "A workspace is the shared space for a team: its projects, tasks, calendars, pages and members all live inside one.",
+    "tips": {
+      "t1": "Create a separate workspace for each team or purpose. People see only the workspaces they belong to.",
+      "t2": "Open a workspace to see its projects and members. Settings in the workspace sidebar cover AI, integrations, sharing and more.",
+      "t3": "The slug is the workspace's short unique name: lowercase letters, numbers and hyphens."
+    }
+  }
+}

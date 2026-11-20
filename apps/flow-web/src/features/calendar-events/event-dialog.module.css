@@ -55,13 +55,16 @@
 }
 
 .kindBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
   animation: global(nf-slide-in-from-block-start) var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .timeRow {
   display: grid;
-  /* start | arrow | end | all-day */
-  grid-template-columns: 1fr auto 1fr auto;
+  /* start | arrow | end; all-day takes the next row */
+  grid-template-columns: 1fr auto 1fr;
   align-items: end;
   column-gap: var(--nf-space-3);
   row-gap: var(--nf-space-2);
@@ -71,16 +74,30 @@
 }
 
 .timeRowAllDay {
+  grid-column: 1 / -1;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: var(--nf-space-2);
-  align-self: end;
-  padding-block-end: var(--nf-space-2);
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg-muted);
-  white-space: nowrap;
   cursor: pointer;
   user-select: none;
+}
+
+.kindOption {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+/* One line under the kind picker saying what the chosen kind is. */
+.kindDescription {
+  margin: 0;
+  margin-block-start: calc(var(--nf-space-2) * -1);
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-relaxed);
+  color: var(--nf-color-fg-muted);
 }
 
 .arrow {
@@ -164,9 +181,5 @@
   }
   .arrow {
     display: none;
-  }
-  .timeRowAllDay {
-    justify-self: start;
-    padding-block-end: 0;
   }
 }

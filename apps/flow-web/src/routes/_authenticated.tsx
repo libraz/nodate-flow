@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import AppShell from '../components/layout/app-shell';
 import { OPEN_CREATE_TASK_EVENT, OPEN_QUICK_CAPTURE_EVENT } from '../components/layout/glass-dock';
 import NotFound from '../components/not-found';
+import { OPEN_SHORTCUTS_HELP_EVENT } from '../components/page-help';
 import ShortcutsHelpDialog from '../components/shortcuts-help-dialog';
 import { selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
 import { useAuthBootstrap } from '../features/auth/use-auth-bootstrap';
@@ -85,11 +86,13 @@ function AuthenticatedLayout(): ReactElement | null {
     };
     window.addEventListener(OPEN_CREATE_TASK_EVENT, createListener);
     window.addEventListener(OPEN_QUICK_CAPTURE_EVENT, quickListener);
+    window.addEventListener(OPEN_SHORTCUTS_HELP_EVENT, handleShowHelp);
     return () => {
       window.removeEventListener(OPEN_CREATE_TASK_EVENT, createListener);
       window.removeEventListener(OPEN_QUICK_CAPTURE_EVENT, quickListener);
+      window.removeEventListener(OPEN_SHORTCUTS_HELP_EVENT, handleShowHelp);
     };
-  }, [handleCreateTask, handleQuickCapture]);
+  }, [handleCreateTask, handleQuickCapture, handleShowHelp]);
 
   useEffect(() => {
     if (status === 'unauthenticated' && !isAuthenticated) {

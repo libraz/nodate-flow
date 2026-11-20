@@ -26,6 +26,7 @@ function makeTask(id: string, title: string): TaskListItem {
     derivedState: 'open',
     priority: 0,
     assigneeCount: 0,
+    assignees: [],
     updatedAt: 0,
   } as unknown as TaskListItem;
 }

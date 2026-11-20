@@ -12,7 +12,9 @@
       "weekdays": ["一", "二", "三", "四", "五", "六", "日"]
     },
     "undo": "撤销",
-    "cancel": "取消"
+    "cancel": "取消",
+    "confirm_title": "确定吗？",
+    "confirm": "确认"
   },
   "landing": {
     "hello": "你好。",
@@ -28,7 +30,9 @@
     "stat_due_today": "今日截止",
     "stat_done": "已完成",
     "recent_tasks": "你的任务",
-    "view_all_tasks": "查看全部任务 →"
+    "view_all_tasks": "查看全部任务 →",
+    "description": "你在所有工作区中负责的工作概况，下方是第一个工作区的仪表盘。",
+    "stat_hint": "统计你在任意工作区中担任负责人、评审人或审批人的任务数量。逾期和今天到期按你的时区计算。"
   },
   "nav": {
     "theme": "主题",
@@ -49,18 +53,21 @@
     "retroDrafts": "回顾草稿",
     "archive": "归档",
     "collapse": "收起侧边栏",
-    "expand": "展开侧边栏"
+    "expand": "展开侧边栏",
+    "insightsPriorityHint": "未完成任务的优先级变更建议。应用之前任务不会改变。",
+    "archiveHint": "你归档的任务，可以恢复。"
   },
   "topbar": {
     "workspace": {
       "switcher": "切换工作区",
-      "none": "请选择工作区"
+      "none": "请选择工作区",
+      "current": "当前工作区：{name}"
     },
     "search": {
-      "placeholder": "搜索任务、项目、人员…"
+      "placeholder": "搜索任务或跳转到页面…（输入 > 使用 AI 命令）"
     },
     "user_menu": {
-      "open": "打开账户菜单",
+      "open": "账户菜单",
       "settings": "设置",
       "avatar_alt": "{name} 的头像"
     },
@@ -78,10 +85,10 @@
     "quick_actions": "快速操作",
     "new_task": "新建任务",
     "quick_capture": "快速记录",
-    "ai_assist": "AI 协助",
+    "ai_assist": "AI 命令",
     "command_palette": {
       "title": "命令面板",
-      "placeholder": "输入命令或搜索…",
+      "placeholder": "搜索任务和项目，或输入 > 使用 AI 命令",
       "empty": "无结果。",
       "searching": "搜索中…",
       "group_navigation": "导航",
@@ -99,7 +106,7 @@
       "resolving": "正在解析命令…",
       "confidence": "置信度：{score}%",
       "confirm_execute": "按 Enter 执行",
-      "confirm_low": "确认执行：{tool}？",
+      "confirm_low": "我不太确定是否理解正确。请先核对上方的详情，再按 Enter 执行。",
       "command_hint": "输入 > 进入 AI 命令",
       "no_workspace": "请先选择工作区以使用 AI 命令。",
       "error": "无法解析该命令，请重试。",
@@ -109,8 +116,27 @@
       "unresolved_missing": "命令缺少 {argument}。未做任何更改。",
       "unresolved_not_found": "没有与“{term}”匹配的项。未做任何更改。",
       "unresolved_ambiguous": "“{term}”匹配到多个项，请描述得更具体一些。",
-      "execute_failed": "命令执行失败。未做任何更改。"
-    }
+      "execute_failed": "命令执行失败。未做任何更改。",
+      "command_ready": "按 Enter 让 AI 解读你的请求，此时还不会执行任何操作。",
+      "confidence_hint": "AI 对自己是否理解你的请求的把握程度。低于 80% 时，会提示你先核对详情。",
+      "tool": {
+        "create_task": "创建任务",
+        "update_task": "更新任务",
+        "transition_task": "更改任务状态",
+        "add_comment": "添加评论",
+        "search_tasks": "搜索任务",
+        "list_tasks": "显示任务",
+        "list_projects": "显示项目"
+      },
+      "step": {
+        "interpret": "解读",
+        "confirm": "确认",
+        "run": "执行"
+      },
+      "details": "详情"
+    },
+    "quick_capture_hint": "只填标题即可创建任务，放入你正在查看的项目，否则放入第一个项目。优先级会设为“中”。",
+    "ai_assist_hint": "用自然语言写下请求，例如“完成登录 bug”。AI 会提出一个操作，只有你再按一次 Enter 才会执行。"
   },
   "glass_dock": {
     "unavailable": "AI 建议暂不可用"
@@ -153,7 +179,7 @@
   "today": {
     "title": "我的任务",
     "subtitle": "你在所有工作区中负责的任务，按截止日期分组。",
-    "empty": "暂无指派给你的任务。",
+    "empty": "你还没有被指派任务。当你被添加为负责人、评审人或审批人时，任务会出现在这里。",
     "loading": "正在加载你的任务…",
     "error": "加载任务失败。",
     "sections": {
@@ -172,7 +198,7 @@
     "prev": "更早",
     "next": "更晚",
     "today": "今天",
-    "empty": "此项目暂无已排期任务。",
+    "empty": "还没有已排期的任务。为任务设置开始日期或截止日期后，它就会出现在这里。",
     "unscheduled": "{count, plural, other {# 个未排期任务}}",
     "zoom_in": "放大",
     "zoom_out": "缩小",
@@ -181,11 +207,13 @@
     "zoom_month": "月",
     "zoom_preset_aria": "缩放预设",
     "critical_path": "关键路径",
-    "critical_path_none": "未发现关键路径。"
+    "critical_path_none": "未发现关键路径。",
+    "description": "只读日程图。条形从各任务的开始日期延伸到截止日期，箭头表示阻塞依赖。点击条形即可打开任务。",
+    "critical_path_hint": "高亮相互阻塞的最长任务链。链上任何一环延误，都会推迟项目的结束时间。"
   },
   "calendar": {
     "title": "日历",
-    "subtitle": "汇总所有工作区的任务和事件，以月视图呈现。",
+    "subtitle": "按月显示分配给你的任务和所有工作区的日程。点击某一天可添加，拖动可改期。",
     "prev": "上一个月",
     "next": "下一个月",
     "today": "今天",
@@ -196,8 +224,8 @@
     "empty": "本月暂无已排期任务。",
     "noDue": "无截止日期",
     "more": "+{count} 更多",
-    "click_to_add": "点击新建",
-    "drag_to_reschedule": "拖动以改期",
+    "click_to_add": "点击添加。Shift+点击添加时段。",
+    "drag_to_reschedule": "拖到另一天即可移动。重复日程会询问要更改哪些次。",
     "reschedule_success": "已更新截止日期",
     "reschedule_error": "更新截止日期失败",
     "event_move_success": "已移动事件",
@@ -222,7 +250,7 @@
       "tasks_due": "任务（截止）",
       "events": "事件",
       "blocks": "时间块",
-      "free": "空闲",
+      "free": "空闲时间",
       "milestone": "里程碑",
       "holidays": "节假日"
     },
@@ -256,8 +284,7 @@
       "title": "日历设置",
       "tab": {
         "general": "常规",
-        "members": "成员",
-        "sync": "同步"
+        "members": "成员"
       },
       "general": {
         "name_label": "名称",
@@ -292,9 +319,6 @@
         "success": "已删除日历",
         "error": "无法删除日历"
       },
-      "sync": {
-        "placeholder": "同步设置将于后续版本提供。"
-      },
       "members": {
         "empty": "暂无成员。",
         "add": "添加",
@@ -323,8 +347,8 @@
     },
     "memos": {
       "title": "备忘",
-      "menu_item": "备忘",
-      "empty": "暂无备忘",
+      "menu_item": "备忘（此日历的待办）",
+      "empty": "还没有备忘。在下方为此日历添加小待办，完成后勾选。",
       "add_placeholder": "添加备忘…",
       "add": "添加",
       "add_error": "添加备忘失败",
@@ -342,27 +366,29 @@
       "body_add": "添加备注",
       "body_show": "显示备注",
       "body_collapse": "隐藏备注"
-    }
+    },
+    "layerHint": "时段：预留的时间。空闲：标记为可安排的时间。里程碑：日期标记。"
   },
   "calendars_rail": {
     "title": "日历",
-    "add_teammate": "添加同事日历…",
+    "add_teammate": "添加同事的日历…",
     "actions": {
       "show": "显示",
       "hide": "隐藏",
       "leave": "退出日历",
       "settings": "设置…",
-      "menu": "日历操作",
-      "toggle_visibility": "切换显示"
+      "menu": "日历操作：备忘、设置、退出",
+      "toggle_visibility": "在网格中显示或隐藏此日历"
     },
     "discover": {
       "title": "添加同事日历",
       "search_placeholder": "按姓名搜索…",
-      "empty": "暂无可订阅的同事日历",
+      "empty": "没有可添加的同事日历。此工作区成员的个人日历中，你尚未订阅的会显示在这里。",
       "subscribe": "订阅",
       "subscribed_toast": "已订阅 {name}",
       "load_error": "无法加载同事日历，请重试。",
-      "subscribe_error": "无法订阅，请重试。"
+      "subscribe_error": "无法订阅，请重试。",
+      "hint": "订阅后，该日历的日程会显示在你的视图中，你可以随时退出。"
     },
     "errors": {
       "visibility_failed": "无法切换日历的显示状态",
@@ -394,10 +420,10 @@
   "workspaces": {
     "title": "工作区",
     "new": "新建工作区",
-    "empty": "暂无工作区，创建你的第一个工作区开始使用吧。",
+    "empty": "你还没有加入任何工作区。可以为团队创建一个，或向所有者索取邀请链接。",
     "columns": {
       "name": "名称",
-      "slug": "标识",
+      "slug": "简称",
       "members": "成员",
       "created": "创建时间",
       "actions": "操作"
@@ -408,24 +434,20 @@
       "description": "描述",
       "submit": "保存",
       "cancel": "取消",
-      "close": "关闭"
+      "close": "关闭",
+      "slug_hint": "工作区唯一的简短名称，仅限小写字母、数字和连字符。"
     },
     "detail": {
-      "tabs": {
-        "label": "工作区详情标签",
-        "overview": "概览",
-        "members": "成员",
-        "settings": "设置"
-      },
       "projects_nav_label": "工作区子板块",
-      "overview_empty": "本工作区尚无项目。"
+      "overview_empty": "还没有项目。项目用于存放一项工作的任务。创建第一个吧。"
     },
     "nav": {
       "overview": "概览",
       "projects": "项目",
       "timeline": "时间线",
       "settings": "设置",
-      "label": "工作区分区"
+      "label": "工作区分区",
+      "members": "成员"
     },
     "not_found": {
       "title": "未找到工作区",
@@ -438,14 +460,15 @@
       "email": "邮箱",
       "role": "角色",
       "added_at": "添加时间",
-      "pending": "待确认",
+      "pending": "尚未加入",
       "change_role": "更改角色",
       "remove": "移除",
       "remove_confirm": "将 {name} 从此工作区移除？",
       "removed": "已移除成员",
       "remove_failed": "移除成员失败",
       "role_updated": "已更新角色",
-      "role_update_failed": "修改角色失败"
+      "role_update_failed": "修改角色失败",
+      "role_hint": "所有者和管理员可管理一切，成员可处理任务，访客只能查看。"
     },
     "invites": {
       "create": "创建邀请链接",
@@ -504,7 +527,10 @@
       "error_title": "邀请不可用",
       "error_network": "无法检查此邀请。请检查网络连接后重试。",
       "error_back": "返回首页",
-      "revoke_confirm": "要撤销此邀请链接吗？尚未使用的人将无法再通过该链接加入。"
+      "revoke_confirm": "要撤销此邀请链接吗？尚未使用的人将无法再通过该链接加入。",
+      "max_usesHint": "在过期或达到使用上限之前，任何拿到此链接的人都能加入。每有一人加入计一次使用。",
+      "labelHint": "仅用于你在邀请列表中区分链接，加入者看不到。",
+      "link_once": "请立即复制链接。它只在这里显示；如果丢失，请创建新的链接。"
     },
     "roles": {
       "owner": "所有者",
@@ -533,11 +559,18 @@
     },
     "setup": {
       "title": "创建你的工作区",
-      "description": "创建第一个工作区，开始记录任务、事件和文档。",
+      "description": "工作区是团队项目、任务、事件和页面的共享空间。你将成为所有者，之后可以邀请其他人。",
       "name_placeholder": "Acme、个人、Team Nova…",
       "slug_placeholder": "acme",
-      "slug_hint": "仅可使用小写字母、数字和连字符。",
+      "slug_hint": "根据名称自动填入。仅限小写字母、数字和连字符，在本服务器上必须唯一，之后可在设置中修改。",
       "submit": "创建工作区"
+    },
+    "description": "工作区是团队的共享空间，包含项目、任务、日历、页面和成员。",
+    "role_desc": {
+      "owner": "可管理一切，包括删除工作区和将他人设为所有者。",
+      "admin": "可管理成员、设置和所有工作，但不能删除工作区。",
+      "member": "可创建并处理任务、页面和日程。",
+      "guest": "可查看所有内容，但不能做任何更改。"
     }
   },
   "projects": {
@@ -575,7 +608,8 @@
       "description": "描述",
       "visibility": "可见性",
       "submit": "保存",
-      "cancel": "取消"
+      "cancel": "取消",
+      "key_description": "可使用小写字母、数字和连字符，在工作区内不能重复。在你手动修改前，会根据名称自动填写。"
     },
     "visibility": {
       "private": "私有",
@@ -584,7 +618,7 @@
     },
     "detail": {
       "description_empty": "此项目尚无描述。",
-      "overview_empty": "此项目尚无任务。",
+      "overview_empty": "此项目还没有任务。请在“任务”标签页中创建第一个。",
       "active_tasks": "进行中任务",
       "progress": "进度 {pct}%",
       "view_all_tasks": "查看全部任务",
@@ -598,14 +632,15 @@
       "title": "成员",
       "add": "添加成员",
       "email": "邮箱",
-      "user_id": "用户 ID",
+      "user_id": "成员",
       "role": "角色",
       "added_at": "添加时间",
-      "empty": "暂无成员。",
+      "empty": "暂无成员。添加成员即可为他们分配此项目中的角色。工作区所有者和管理员无需添加即可访问。",
       "remove": "移除",
       "removed": "已移除成员",
       "remove_failed": "移除成员失败",
-      "remove_confirm": "将 {name} 从此项目移除？"
+      "remove_confirm": "将 {name} 从此项目移除？",
+      "role_description": "查看者只能阅读；评论者还可评论；编辑者还可创建和编辑任务；负责人还可管理其他成员的访问权限。"
     },
     "roles": {
       "lead": "负责人",
@@ -630,7 +665,8 @@
       "update_failed": "更新项目失败，请重试。",
       "disable_failed": "停用项目失败，请重试。",
       "add_member_failed": "添加成员失败，请重试。"
-    }
+    },
+    "description": "项目用来归集该工作区内相关的任务。打开后可查看它的任务、甘特图、时间线和成员。"
   },
   "tasks": {
     "title": "任务",
@@ -644,7 +680,7 @@
     "views": {
       "board": "看板",
       "list": "列表",
-      "graph": "图谱",
+      "graph": "依赖图",
       "spreadsheet": "表格"
     },
     "list": {
@@ -656,7 +692,7 @@
     "columns": {
       "title": "标题",
       "status": "状态",
-      "deps": "依赖",
+      "deps": "被阻塞",
       "assignee": "负责人",
       "due": "截止",
       "priority": "优先级",
@@ -709,7 +745,8 @@
       "chip_status": "状态：{value}",
       "chip_assignee": "负责人：{value}",
       "chip_search": "搜索：{value}",
-      "chip_priority": "优先级：{value}"
+      "chip_priority": "优先级：{value}",
+      "search_hint": "在此项目中搜索任务标题，可与状态、优先级、负责人筛选组合使用。"
     },
     "validation": {
       "title_required": "请填写标题。",
@@ -729,7 +766,7 @@
       "moved_to": "已移至 {state}",
       "move_menu": "移动任务",
       "move_to": "移至 {state}",
-      "dnd_disabled_hint": "请使用状态下拉菜单更改任务状态。"
+      "dnd_disabled_hint": "暂不支持拖动。请用卡片上的“移动任务”菜单更改状态。"
     },
     "assignee": {
       "plus_n": "+{n, plural, other {# 人}}",
@@ -794,13 +831,14 @@
       "listbox_label": "可提及的成员",
       "loading": "正在加载成员…",
       "load_failed": "无法加载此工作区的成员",
-      "results": "{count, plural, =0 {没有匹配的成员} other {匹配 # 位成员}}"
+      "results": "{count, plural, =0 {没有匹配的成员} other {匹配 # 位成员}}",
+      "hint": "输入 @ 可提及工作区成员，对方会收到通知。"
     },
     "detail": {
       "title_edit": "编辑标题",
       "title_edit_named": "编辑标题：{title}",
       "description_edit": "编辑描述",
-      "description_empty": "暂无描述。",
+      "description_empty": "还没有说明。点击即可添加，支持 Markdown。",
       "save": "保存",
       "cancel": "取消",
       "priority_label": "优先级",
@@ -821,7 +859,8 @@
         "title": "相关任务",
         "empty": "未找到相关任务。",
         "duplicate": "可能的重复",
-        "related": "相关"
+        "related": "相关",
+        "hint": "通过比较标题和说明找出的相似任务。数字是 0 到 1 的相似度分数。"
       },
       "dependencies": {
         "title": "依赖",
@@ -832,7 +871,7 @@
         "subtasks": "子任务",
         "duplicateOf": "重复于",
         "duplicatedBy": "被…重复",
-        "empty": "暂无依赖。",
+        "empty": "还没有依赖关系。添加后可表示阻塞此任务的任务、被此任务阻塞的任务，以及父任务、子任务或重复任务。",
         "add": "添加依赖",
         "addCancel": "取消",
         "remove": "移除",
@@ -850,12 +889,14 @@
         "searchHint": "输入以搜索本工作区的任务。",
         "addError": "添加依赖失败。",
         "removeError": "移除依赖失败。",
-        "removed": "已移除与“{title}”的依赖关系。"
+        "removed": "已移除与“{title}”的依赖关系。",
+        "kindHint": "请这样理解：此任务 [阻塞／关联／是其子任务／与其重复] 你所选的任务。"
       },
       "infer_state": {
         "title": "建议的下一步",
         "empty": "暂无建议。",
-        "reason_label": "原因（英文）："
+        "reason_label": "原因：",
+        "hint": "AI 会读取此任务最近的活动并建议状态变更。这只是建议，如需采用，请自己点击“流转”按钮。"
       },
       "ai_activity": {
         "title": "AI 推理",
@@ -866,10 +907,11 @@
         "start": "开始",
         "block": "阻塞",
         "unblock": "解除阻塞",
-        "submit": "提交",
+        "submit": "提交审核",
         "complete": "完成",
         "reopen": "重新打开",
-        "cancel": "取消"
+        "cancel": "取消",
+        "hint": "只显示当前状态下允许的操作。已完成和已取消的任务只能重新打开。"
       }
     },
     "history": {
@@ -931,7 +973,9 @@
       "granularity_label": "细分粒度",
       "granularity_coarse": "粗略",
       "granularity_standard": "标准",
-      "granularity_fine": "精细"
+      "granularity_fine": "精细",
+      "granularity_hint": "粗略会生成更少、更大的步骤；精细会生成更多、更小的步骤。",
+      "description": "AI 会把此任务拆分成步骤。可编辑或取消勾选不需要的步骤，再将其余的创建为子任务。确认之前不会创建任何内容。"
     },
     "smart_create": {
       "assist_button": "AI 协助",
@@ -945,7 +989,8 @@
       "error": "无法生成建议，你仍可手动创建任务。",
       "no_provider": "此工作区未配置 AI 服务商。",
       "priority_urgent": "紧急",
-      "priority_unknown": "{value}"
+      "priority_unknown": "{value}",
+      "assist_hint": "会把标题和说明发送给工作区的 AI 服务商，参考相似的历史任务，建议负责人和子任务。点击“应用建议并创建”之前不会创建任何内容。"
     },
     "attachments": {
       "title": "附件",
@@ -988,14 +1033,15 @@
       "creating": "保存中…",
       "delete": "删除",
       "delete_confirm": "删除此已保存的视图？",
-      "empty": "暂无已保存的视图",
+      "empty": "还没有已保存的视图。设置好筛选条件，在下方命名并保存，之后即可复用。",
       "default_badge": "默认",
       "public_badge": "公开",
       "apply": "应用",
       "share": "分享视图",
       "load_failed": "加载已保存视图失败",
       "save_failed": "保存视图失败",
-      "delete_failed": "删除视图失败"
+      "delete_failed": "删除视图失败",
+      "save_hint": "把你当前设置的筛选条件（搜索、状态、优先级、负责人）以此名称保存。"
     },
     "retro": {
       "queue": {
@@ -1020,9 +1066,16 @@
           "cancel": "取消"
         },
         "prev_page": "上一页",
-        "next_page": "下一页"
+        "next_page": "下一页",
+        "empty_description": "当 AI 发现值得回顾的已完成工作时，会在这里起草一个回顾任务，由你决定接受或丢弃。",
+        "accept_hint": "把此草稿变成一个普通的未开始任务。",
+        "discard_hint": "把草稿归档，之后可在“归档”页面恢复。"
       }
-    }
+    },
+    "description": "该项目的所有任务。可在看板、列表、依赖关系和表格视图之间切换，你的选择会记在这台设备上。",
+    "views_hint": "看板按状态分组。列表和表格每个任务占一行，表格适合用键盘快速编辑。依赖图则画出任务之间的阻塞关系。",
+    "empty_filtered": "没有任务符合当前筛选条件。清除筛选后可查看所有任务。",
+    "views_label": "任务视图"
   },
   "auth": {
     "login": {
@@ -1120,8 +1173,8 @@
     "inbox": {
       "title": "待处理邀请",
       "count_badge": "{count}",
-      "empty": "暂无待处理邀请。",
-      "rsvp_hint": "如需回复，请点击邀请邮件中的链接。",
+      "empty": "没有待处理的邀请。有人用你的邮箱邀请你参加日程时，会显示在这里。",
+      "rsvp_hint": "请打开邀请邮件中的链接来回复。",
       "load_error": "加载邀请失败。",
       "calendar_workspace": "{calendar} · {workspace}",
       "undated": "日期待定",
@@ -1164,11 +1217,13 @@
     "go_pages": "前往文档",
     "go_workspaces": "前往工作区",
     "go_settings": "前往设置",
-    "show_help": "显示快捷键"
+    "show_help": "显示快捷键",
+    "chord_hint": "按键需依次按下：先按 G，再按第二个键。",
+    "command_palette": "打开命令面板"
   },
   "timeboxes": {
     "title": "时间盒",
-    "description": "将任务整理为专注工作会话。",
+    "description": "把任务归入冲刺等时间段，并跟踪从计划中到已完成的进度。",
     "new": "新建时间盒",
     "empty": "暂无时间盒",
     "section": {
@@ -1184,10 +1239,15 @@
     },
     "action": {
       "start": "开始",
-      "stop": "停止",
+      "stop": "标为完成",
       "cancel": "取消",
       "edit": "编辑",
-      "delete": "删除"
+      "delete": "删除",
+      "stopHint": "“停止”表示已完成，“取消”表示不完成直接结束。",
+      "end_incomplete": "未完成即结束",
+      "completeHint": "结束此时间盒并记为已完成。",
+      "cancelPlanHint": "不开始而取消此计划，它会移到“已取消”。",
+      "endIncompleteHint": "结束此时间盒但不记为完成，它会移到“已取消”。"
     },
     "delete": {
       "confirm": "删除此时间盒？关联任务将保留在工作区中。",
@@ -1206,7 +1266,8 @@
     },
     "add_task_id": {
       "label": "任务 ID",
-      "hint": "请粘贴任务 UUID。任务选择器即将推出。"
+      "hint": "打开任务，从地址栏复制 /tasks/ 之后的 ID，再粘贴到这里。",
+      "placeholder": "粘贴任务 ID"
     },
     "remove_task": {
       "label": "移除",
@@ -1237,9 +1298,17 @@
       "starts_on": "开始日期",
       "ends_on": "结束日期",
       "project": {
+        "hint": "限定为某个项目，或留空以覆盖整个工作区。",
         "label": "项目（可选）",
         "placeholder": "整个工作区"
       }
+    },
+    "empty_description": "为一次冲刺或专注周创建时间盒，再关联想在其中完成的任务。",
+    "add_task_search": {
+      "label": "要关联的任务",
+      "placeholder": "按标题搜索任务…",
+      "empty": "此工作区中没有匹配的任务。",
+      "hint": "输入任务标题的一部分，从列表中选择，然后点击“添加任务”。"
     }
   },
   "taskWorkflow": {
@@ -1255,12 +1324,12 @@
     "configure": "评审与交接",
     "collapse": "收起工作流",
     "completionPolicy": "完成策略",
-    "policyHelp": "评审为可选项。只有明确选为必需的任务检查会阻止完成。",
+    "policyHelp": "“手动完成”表示可直接完成任务；“需要评审”表示须先提交工作并经评审人批准。只有下方勾选的检查项会阻止任务完成，其他约束不会。",
     "requiredChecks": "必需检查",
     "noRequiredChecks": "没有会阻止完成的检查。",
-    "loadChecks": "加载可用任务检查",
+    "loadChecks": "选择必选检查项",
     "loadingChecks": "正在加载检查…",
-    "requiredCheckNamed": "要求检查 {id}",
+    "requiredCheckNamed": "必需检查：{kind} {expression}",
     "unsupportedCheck": "无法设为必需",
     "checkSatisfied": "已满足",
     "checkOpen": "未满足",
@@ -1349,7 +1418,12 @@
     "reasonRequired": "请简要说明需要修改的原因。",
     "evidenceUrlPlaceholder": "https://…",
     "unknownMember": "成员已不可用",
-    "handoffDueSuffix": "· 截止 {due}"
+    "handoffDueSuffix": "· 截止 {due}",
+    "description": "选择此任务完成前是否需要评审人批准，提交工作供评审，并把角色交给他人。",
+    "revision_hint": "工作内容每变更一次就会加一。针对旧修订的批准或提交将不再有效。",
+    "handoffs_hint": "请他人接手你在此任务中的某个角色。对方接受之前由你负责，请求未被处理时可以撤回。",
+    "rolesDescription": "评审人和审批人可以对提交评审的工作做出决定。请在提交前先指定。",
+    "expand": "展开工作流"
   },
   "active_timebox_bar": {
     "label": "进行中的时间盒",
@@ -1358,5 +1432,10 @@
     "stop": "停止",
     "stop_confirm": "停止此时间盒？将标记为已完成。",
     "stop_success": "已停止时间盒"
+  },
+  "help": {
+    "trigger": "本页使用说明",
+    "eyebrow": "指南",
+    "shortcuts": "键盘快捷键"
   }
 }

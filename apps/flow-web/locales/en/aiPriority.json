@@ -1,11 +1,12 @@
 {
   "page": {
     "title": "Priority suggestions",
-    "subtitle": "{shown, plural, =0 {No suggestions} one {# suggestion} other {# suggestions}} across {total, plural, =0 {no open tasks} one {# open task} other {# open tasks}}."
+    "subtitle": "{shown, plural, =0 {No suggestions} one {# suggestion} other {# suggestions}} across {total, plural, =0 {no open tasks} one {# open task} other {# open tasks}}. Apply changes a task's priority; Dismiss only hides the suggestion."
   },
   "kpi": {
     "suggestions": "Suggested",
-    "evaluated": "Evaluated"
+    "evaluated": "Evaluated",
+    "evaluatedHint": "Evaluated: open tasks checked. Suggested: how many of them got a new priority proposal."
   },
   "action": {
     "refresh": "Refresh"
@@ -24,7 +25,10 @@
     "apply": "Apply",
     "dismiss": "Dismiss",
     "applyAria": "Apply suggested priority for {title}",
-    "dismissAria": "Dismiss suggestion for {title}"
+    "dismissAria": "Dismiss suggestion for {title}",
+    "dismissHint": "Hide this suggestion on this device. The task is not changed.",
+    "confidenceHint": "How strongly the rules back this suggestion",
+    "applyHint": "Changes the task's priority now. Undo is offered in the notice that follows."
   },
   "priority": {
     "p0": "P0 — None",
@@ -34,8 +38,8 @@
     "p4": "P4 — Critical"
   },
   "empty": {
-    "noTasks": "No open tasks to evaluate.",
-    "allOptimised": "All open tasks already match their suggested priority."
+    "noTasks": "There are no open tasks to evaluate. Suggestions appear once this workspace has tasks that are not done or cancelled.",
+    "allOptimised": "Nothing to change: every open task already has the priority the rules would suggest. Check again after due dates or assignments change."
   },
   "toast": {
     "applied": "Updated to {priority}.",
@@ -46,5 +50,15 @@
   "error": {
     "fetchFailed": "Failed to load priority suggestions.",
     "retry": "Retry"
+  },
+  "reason_code": {
+    "overdue": "Overdue",
+    "due_by_tomorrow": "Due by tomorrow",
+    "due_this_week": "Due this week",
+    "due_this_fortnight": "Due within two weeks",
+    "in_review": "In review",
+    "many_dependents": "{count, plural, one {# task waiting on this} other {# tasks waiting on this}}",
+    "unassigned": "No assignee",
+    "steady": "Steady; no urgent signals"
   }
 }

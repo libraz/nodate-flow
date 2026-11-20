@@ -58,7 +58,7 @@
         "stuck": "Stuck — needs you"
       },
       "last_run_ago": "last run {time} ago",
-      "attempts": "tries: {current}/{max}",
+      "attempts": "tries: {current}",
       "cost_today": "cost today: ${amount}",
       "hand_back": "Hand back to me",
       "run_history": "Open run history",
@@ -71,8 +71,10 @@
         "remove": "Unassign {name}",
         "failed": "Failed to assign the agent",
         "remove_failed": "Failed to unassign the agent",
-        "removed": "Removed {name} from this task."
-      }
+        "removed": "Removed {name} from this task.",
+        "description": "An assigned agent works on this task according to its trigger setting, and hands it back to you when it is unsure, hits its cost cap, hits an error or finds conflicting constraints."
+      },
+      "hand_back_hint": "Take this task over from the agent."
     }
   },
   "handoff_reason": {

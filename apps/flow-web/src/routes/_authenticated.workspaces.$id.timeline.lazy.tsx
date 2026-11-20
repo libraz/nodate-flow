@@ -17,7 +17,7 @@ function WorkspaceTimelineRoute(): ReactElement {
   const { t: tTimeline } = useTranslation('timeline');
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <PageHeader title={tTimeline('view.title')} />
+      <PageHeader title={tTimeline('view.title')} help="timeline" />
       <Suspense fallback={<TimelineSkeleton />}>
         <TimelineView scope={{ kind: 'workspace', id }} />
       </Suspense>

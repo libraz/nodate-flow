@@ -10,21 +10,9 @@
   gap: var(--nf-space-4);
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nf-space-3);
-  flex-wrap: wrap;
-}
-
-.title {
-  margin: 0;
-  font-size: var(--nf-text-2xl);
-  font-weight: var(--nf-weight-semibold);
-}
-
 .controls {
+  /* One 32px height for every button, segment and chip in the toolbar. */
+  --nf-control-height: var(--nf-space-8);
   display: flex;
   gap: var(--nf-space-2);
   align-items: center;

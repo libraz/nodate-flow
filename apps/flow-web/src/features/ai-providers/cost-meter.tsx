@@ -2,9 +2,9 @@
  * AiCostMeter — minimal topbar widget showing today's AI spend for the
  * currently-active workspace.
  *
- * Renders nothing when:
- *   - no workspace is resolvable from the current route matches, or
- *   - the cost-today query is loading / errored / empty.
+ * Renders an inert placeholder of the chip's size while no workspace is
+ * resolvable or the cost-today query is loading, and nothing when the
+ * query errored / came back empty.
  *
  * The query is non-suspense so AI-not-configured tenants degrade silently.
  *
@@ -31,8 +31,10 @@ function AiCostMeterImpl(): ReactElement | null {
   const workspaceId = useActiveWorkspaceId();
   const { data, isError, isLoading } = useAiCostTodayQuery(workspaceId ?? undefined);
 
-  if (!workspaceId) return null;
-  if (isLoading || isError) return null;
+  // Reserve the chip's box while the workspace or the spend is still
+  // resolving, so the search box does not shift when the chip arrives.
+  if (!workspaceId || isLoading) return <span className={styles.placeholder} aria-hidden="true" />;
+  if (isError) return null;
   if (!data) return null;
 
   const formatted = formatCurrency(data.costUsd, 'USD', locale);

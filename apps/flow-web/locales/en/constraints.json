@@ -31,7 +31,9 @@
       "custom": "Custom"
     },
     "removeConfirmTitle": "Remove constraint?",
-    "removeConfirm": "The engine will stop blocking on this constraint. It cannot be restored from here."
+    "removeConfirm": "The engine will stop blocking on this constraint. It cannot be restored from here.",
+    "nlHint": "AI turns your description into a rule and fills it in under Advanced. Review it, then press Add constraint to save.",
+    "evaluateHint": "Press Evaluate now to see this task's constraints and whether each one is satisfied."
   },
   "replay": {
     "title": "Replay",
@@ -41,7 +43,8 @@
     "drift": "Drift detected",
     "refresh": "Refresh",
     "loading": "Loading…",
-    "error": "Failed to replay task"
+    "error": "Failed to replay task",
+    "description": "Rebuilds this task's state from its event history and compares it with the stored state. Drift detected means the two disagree."
   },
   "stateGraph": {
     "title": "State graph",
@@ -53,6 +56,7 @@
       "github": "GitHub",
       "slack": "Slack",
       "google": "Google"
-    }
+    },
+    "description": "The states a task can pass through, with this task's current state highlighted. GitHub, Slack and Google light up when signals from them have reached this task."
   }
 }

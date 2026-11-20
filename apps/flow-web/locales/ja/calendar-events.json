@@ -24,7 +24,8 @@
       }
     },
     "discard_unsaved": "未保存の変更を破棄しますか？",
-    "discard_confirm": "破棄"
+    "discard_confirm": "破棄",
+    "blockShortcutHint": "ヒント: カレンダーで日付を Shift+クリックすると、ブロックを直接作成できます。"
   },
   "field": {
     "title": "タイトル",
@@ -33,11 +34,11 @@
     "end": "終了",
     "startTime": "開始時刻",
     "endTime": "終了時刻",
-    "allDay": "終日",
+    "allDay": "終日（開始・終了の時刻なし）",
     "location": "場所",
     "memo": "メモ",
     "blockLabel": "ブロックの種別",
-    "showAs": "表示",
+    "showAs": "他の人に見える状態",
     "recurrence": "繰り返し",
     "notification": "通知",
     "project": "プロジェクト",
@@ -45,7 +46,14 @@
     "description": "説明",
     "date": "日付",
     "flexibility": "動かせるか",
-    "flexibilityHint": "「表示」とは別の軸です。「表示」は外部のカレンダーが読む値です。"
+    "flexibilityHint": "必要になったときに、この時間を動かせるかどうかです。他の人には見えません。他の人に見えるのは、上の「他の人に見える状態」だけです。",
+    "showAsHint": "あなたの空き状況を見る人に、この時間がどう見えるかを決めます。",
+    "blockLabelHint": "カレンダー上のブロックの名前です。「外出中」を選ぶと不在として扱われ、それ以外は予定あり（busy）として扱われます。",
+    "projectHint": "タスクはこのプロジェクトに作成され、期限日のカレンダーに表示されます。",
+    "taskDatesHint": "終了日がタスクの期限日になります。",
+    "calendarHint": "この項目を誰が見られるかは、選んだカレンダーによって決まります。",
+    "recurrenceHint": "繰り返しの予定を編集・削除するときは、その回だけか、以降すべてか、全件かを選びます。",
+    "notificationHint": "開始の前にあなたへ通知します。"
   },
   "placeholder": {
     "title": {
@@ -55,7 +63,7 @@
       "free": "対応可能な時間",
       "milestone": "リリース、締切など"
     },
-    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+    "recurrenceCustom": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR（毎週月・水・金）"
   },
   "showAs": {
     "busy": "予定あり",
@@ -146,7 +154,8 @@
     "cancel": "キャンセル",
     "delete": "削除",
     "deleteConfirm": "この{kind}を削除しますか？",
-    "moreOptions": "詳細オプション"
+    "moreOptions": "詳細オプション",
+    "moreOptionsHint": "繰り返し・通知・メモ"
   },
   "toast": {
     "created": {
@@ -205,7 +214,9 @@
         "remove_failed": "参加者を除外できませんでした"
       },
       "removed_toast": "{name} を削除しました",
-      "leave_confirm": "このイベントから自分を削除しますか？"
+      "leave_confirm": "このイベントから自分を削除しますか？",
+      "can_editHint": "この人が予定の内容を変更できるようにします",
+      "send_inviteHint": "招待リンクを作成してクリップボードにコピーします。メッセージなどに貼り付けて、ご自身で送ってください。"
     },
     "creator": {
       "label": "作成者",
@@ -282,7 +293,7 @@
       "revoke_success": "招待を取り消しました",
       "revoke_error": "招待の取り消しに失敗しました",
       "expires_at": "{date} に期限切れ",
-      "create_hint": "招待は「参加者」タブから発行できます。",
+      "create_hint": "招待リンクはまだありません。「参加者」タブの「招待リンクを送る」から作成できます。",
       "status": {
         "pending": "未送信",
         "sent": "送信済み",
@@ -323,7 +334,15 @@
         "delta_days": "{days}日",
         "delta_negative": "{value} 早く",
         "delta_positive": "{value} 後ろに"
-      }
+      },
+      "triggerHint": "予定を動かし、関連するタスクも一緒に動かせるか事前に確認します"
     }
+  },
+  "kind_desc": {
+    "task": "やるべき作業です。プロジェクトに保存され、期限日に表示されます。",
+    "event": "会議や約束など、時間の決まった予定です。",
+    "block": "作業や集中のために確保する時間です。他の人には予定あり（「不在」なら不在）と表示されます。",
+    "free": "対応できる時間として示します。他の人が声をかけやすい時間がわかります。",
+    "milestone": "リリースや締め切りなど、時刻を持たない日付の目印です。"
   }
 }

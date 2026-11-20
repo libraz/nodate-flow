@@ -1,19 +1,23 @@
 /*
  * AI suggestions dock — the collapsed pill and the expanded panel share
  * the same inline-end/block-end anchor, so the panel grows out of the
- * spot the pill occupied.
+ * spot the pill occupied. Height and bottom offset come from the app
+ * shell's `--nf-dock-*` properties, so the pill shares the glass dock's
+ * baseline (or rides a row above it on narrow screens) and `<main>`
+ * reserves room for both.
  */
 
 .pill {
   position: fixed;
-  inset-block-end: var(--nf-space-4);
+  inset-block-end: calc(var(--nf-dock-offset) + var(--nf-dock-pill-lift));
   inset-inline-end: var(--nf-space-4);
+  box-sizing: border-box;
+  block-size: var(--nf-dock-block-size);
   z-index: var(--nf-z-sticky);
   display: flex;
   align-items: center;
   gap: var(--nf-space-2);
-  min-block-size: var(--nf-control-height);
-  padding-block: var(--nf-space-2);
+  padding-block: 0;
   padding-inline: var(--nf-space-3-5);
   border-radius: var(--nf-radius-pill);
   border: var(--nf-space-px) solid var(--nf-color-border);
@@ -39,6 +43,7 @@
 }
 
 .pillLabel {
+  white-space: nowrap;
   font-size: var(--nf-text-supporting);
   font-weight: var(--nf-weight-semibold);
 }
@@ -52,7 +57,7 @@
 
 .panel {
   position: fixed;
-  inset-block-end: var(--nf-space-4);
+  inset-block-end: calc(var(--nf-dock-offset) + var(--nf-dock-pill-lift));
   inset-inline-end: var(--nf-space-4);
   z-index: var(--nf-z-sticky);
   /* nf-token-override: component dimension, not a spacing step */
@@ -165,4 +170,61 @@
   text-align: center;
   /* Keyed in JSX, so each status/empty swap replays the fade. */
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.description {
+  margin: 0;
+  padding: var(--nf-space-3);
+  padding-block-end: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+}
+
+.fieldHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-normal);
+  color: var(--nf-color-fg-muted);
+}
+
+.conditionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.conditionGroupLabel {
+  font-size: var(--nf-text-micro);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg-muted);
+}
+
+.conditionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nf-space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conditionApplied,
+.conditionReference {
+  padding-block: var(--nf-space-0-5);
+  padding-inline: var(--nf-space-2);
+  border-radius: var(--nf-radius-pill);
+  font-size: var(--nf-text-micro);
+  line-height: var(--nf-leading-normal);
+}
+
+.conditionApplied {
+  background: var(--nf-color-accent-subtle);
+  color: var(--nf-color-accent-fg);
+}
+
+/* Shown for reference only: outlined, no fill, so it never reads as an active filter. */
+.conditionReference {
+  border: var(--nf-space-px) dashed var(--nf-color-border-strong);
+  color: var(--nf-color-fg-muted);
 }

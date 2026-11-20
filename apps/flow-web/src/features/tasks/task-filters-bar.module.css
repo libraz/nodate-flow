@@ -4,6 +4,8 @@
  */
 
 .bar {
+  /* One control height for every input, chip, button and trigger in the bar. */
+  --nf-control-height: var(--nf-space-8);
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-2);
@@ -11,9 +13,14 @@
 
 .controlsRow {
   display: flex;
-  gap: var(--nf-space-3);
+  gap: var(--nf-space-3) var(--nf-space-5);
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* Text inputs carry more block padding than the 32px row allows. */
+.controlsRow input {
+  padding-block: var(--nf-space-1);
 }
 
 .searchInput {
@@ -34,7 +41,7 @@
 
 .groupLabel {
   color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-xs);
+  font-size: var(--nf-text-supporting);
   font-weight: var(--nf-weight-medium);
   white-space: nowrap;
 }
@@ -50,15 +57,6 @@
   display: inline-flex;
   gap: var(--nf-space-2);
   flex-wrap: wrap;
-}
-
-.divider {
-  display: block;
-  inline-size: 1px;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.25rem;
-  background: var(--nf-color-border);
-  flex-shrink: 0;
 }
 
 .clearButton {

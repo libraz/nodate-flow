@@ -4,9 +4,9 @@
   "edit": "Edit page",
   "delete": "Delete page",
   "empty": "No pages yet",
-  "empty_description": "Create a page to document your project.",
+  "empty_description": "Pages hold notes, specs and project documents. Create one, or let AI draft it from a title and a prompt.",
   "no_selection": "Select a page",
-  "no_selection_description": "Choose a page from the list, or create a new one to get started.",
+  "no_selection_description": "Pick a page from the tree on the left, or press “New page” to start one.",
   "page_title_label": "Title",
   "page_body_label": "Content",
   "parent_label": "Parent page",
@@ -15,16 +15,17 @@
   "project_none": "Workspace-wide",
   "confirm_delete": "Delete this page?",
   "ai_generate": "Generate with AI",
-  "ai_badge": "AI",
+  "ai_badge": "Drafted with AI",
   "generate": {
     "dialog_title": "Generate page with AI",
     "context_label": "Page title",
     "prompt_label": "Prompt",
     "prompt_placeholder": "Describe what this page should cover, the audience, key sections, tone, and anything else the AI should know.",
-    "prompt_help": "The AI uses the page title above as context and your prompt as the instruction.",
+    "prompt_help": "The page title is used as context and your prompt as the instruction. A new page with this title is created when generation succeeds; titles must be unique.",
     "submit": "Generate",
     "cancel": "Cancel",
-    "error": "Failed to generate page. Please try again."
+    "error": "Failed to generate page. Please try again.",
+    "submit_creates": "Generate and create page"
   },
   "children": "Sub-pages",
   "breadcrumb_label": "Breadcrumb",
@@ -40,5 +41,9 @@
     "save_failed": "Could not save the page",
     "create_failed": "Could not create the page",
     "delete_failed": "Could not delete the page"
-  }
+  },
+  "description": "Write notes, specs and project documents, and organise them in a tree.",
+  "parent_hint": "Places this page under another page in the tree.",
+  "project_hint": "Link the page to a project, or keep it for the whole workspace.",
+  "ai_generate_hint": "Creates a new AI-drafted page from the title and your prompt. Review the text before relying on it."
 }

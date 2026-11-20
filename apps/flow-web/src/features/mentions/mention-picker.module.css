@@ -94,3 +94,11 @@
 .statusSkeletonRow {
   block-size: var(--nf-space-4);
 }
+
+/* "Type @ to mention" hint under the text area. */
+.hint {
+  margin: 0;
+  margin-block-start: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}

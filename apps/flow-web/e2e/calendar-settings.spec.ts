@@ -174,6 +174,29 @@ test.describe('calendar settings drawer — general tab', () => {
     await expect(activeSwatch).toHaveAttribute('data-color', initialColor);
   });
 
+  test('A2: the drawer offers General and Members tabs only, with no Sync tab', async ({
+    page,
+  }) => {
+    tenant = await createTestTenant();
+    const cal = await seedPersonalCalendar(
+      tenant,
+      `Settings A2 ${Date.now().toString(36)}`,
+      '#16a34a',
+      'Tab strip check.',
+    );
+
+    await injectAuth(page.context(), tenant);
+    await openCalendarWithRail(page);
+    await openGeneralTab(page, cal.name);
+
+    const drawer = page.getByRole('dialog', { name: copy.drawerTitle });
+    await expect(drawer.getByRole('tab')).toHaveText([
+      enCommon.calendar.settings.tab.general,
+      enCommon.calendar.settings.tab.members,
+    ]);
+    await expect(drawer.getByRole('tab', { name: /sync/i })).toHaveCount(0);
+  });
+
   test('B: renames calendar and the rail reflects the new name', async ({ page }) => {
     tenant = await createTestTenant();
     const initialName = `Rename target ${Date.now().toString(36)}`;

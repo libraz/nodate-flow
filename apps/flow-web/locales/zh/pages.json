@@ -4,9 +4,9 @@
   "edit": "编辑页面",
   "delete": "删除页面",
   "empty": "暂无页面",
-  "empty_description": "创建页面以记录你的项目文档。",
+  "empty_description": "页面用于记录笔记、规格和项目文档。可以新建，也可以让 AI 根据标题和提示起草。",
   "no_selection": "请选择页面",
-  "no_selection_description": "从列表中选择一个页面，或创建一个新的页面开始使用。",
+  "no_selection_description": "从左侧树中选择页面，或点击“新建页面”开始。",
   "page_title_label": "标题",
   "page_body_label": "内容",
   "parent_label": "父页面",
@@ -15,16 +15,17 @@
   "project_none": "整个工作区",
   "confirm_delete": "删除此页面？",
   "ai_generate": "用 AI 生成",
-  "ai_badge": "AI",
+  "ai_badge": "由 AI 起草",
   "generate": {
     "dialog_title": "用 AI 生成页面",
     "context_label": "页面标题",
     "prompt_label": "指令",
     "prompt_placeholder": "请描述这个页面要涵盖的内容、目标读者、主要章节、语气，以及其他希望 AI 知道的信息。",
-    "prompt_help": "AI 会将上方的页面标题作为上下文，并按照你输入的指令生成内容。",
+    "prompt_help": "页面标题作为上下文，你的提示作为指令。生成成功后会以该标题创建新页面，标题不可重复。",
     "submit": "生成",
     "cancel": "取消",
-    "error": "生成页面失败，请重试。"
+    "error": "生成页面失败，请重试。",
+    "submit_creates": "生成并创建页面"
   },
   "children": "子页面",
   "breadcrumb_label": "面包屑导航",
@@ -40,5 +41,9 @@
     "save_failed": "无法保存页面",
     "create_failed": "无法创建页面",
     "delete_failed": "无法删除页面"
-  }
+  },
+  "description": "撰写笔记、规格和项目文档，并用树状结构整理。",
+  "parent_hint": "把此页面放在树中另一个页面之下。",
+  "project_hint": "可关联到某个项目，或作为整个工作区的页面。",
+  "ai_generate_hint": "根据标题和提示，用 AI 起草并创建一个新页面。使用前请检查内容。"
 }

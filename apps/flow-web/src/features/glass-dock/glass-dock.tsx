@@ -20,9 +20,10 @@ import { Day, type Zone } from '@nodate-flow/ui/time';
 import { Link, useMatches, useNavigate } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Sparkles, X } from 'lucide-react';
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import PageHelp from '../../components/page-help';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 
@@ -45,16 +46,6 @@ import { setTaskFilters } from '../tasks/use-task-filters';
 import styles from './glass-dock.module.css';
 
 const NL_UNPARSEABLE = 'AI.NL_QUERY.UNPARSEABLE';
-
-const BADGE_STYLE: React.CSSProperties = {
-  display: 'inline-block',
-  padding: 'var(--nf-space-0-5) var(--nf-space-2)',
-  borderRadius: 'var(--nf-radius-pill)',
-  background: 'var(--nf-color-accent-subtle)',
-  color: 'var(--nf-color-fg)',
-  fontSize: 'var(--nf-text-micro)',
-  lineHeight: 1.6,
-};
 
 /** Map a 0-1 confidence score to a qualitative i18n key. */
 function confidenceLabel(score: number, t: (key: string) => string): string {
@@ -106,6 +97,11 @@ function formatFilterCondition(
   return `${field} ${operator} ${display}`;
 }
 
+/** The only lens fields `applyLensFilter` maps onto the project task filters. */
+function isAppliedCondition(field: string, operator: string): boolean {
+  return (field === 'priority' || field === 'status') && (operator === 'eq' || operator === 'in');
+}
+
 function useActiveProjectId(): string | undefined {
   const matches = useMatches();
   for (let i = matches.length - 1; i >= 0; i -= 1) {
@@ -125,6 +121,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
   const [result, setResult] = useState<CompileLensResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const mutation = useCompileLens();
+  const hintId = useId();
 
   const disabled = !workspaceId || prompt.trim().length === 0 || mutation.isPending;
 
@@ -185,7 +182,9 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
   };
 
   // Derive badge data from result.lens
-  const filterBadges: Array<{ key: string; label: string }> = [];
+  const filterBadges: Array<{ key: string; label: string; applied: boolean }> = [];
+  // Filters land only when a project is open; see applyLensFilter.
+  const canApply = Boolean(projectId && workspaceId);
   if (result?.lens) {
     const lens = result.lens as {
       filter?: Record<string, Record<string, unknown>>;
@@ -198,6 +197,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
           filterBadges.push({
             key: `${field}-${op}`,
             label: formatFilterCondition(field, op, value, t),
+            applied: canApply && isAppliedCondition(field, op),
           });
         }
       }
@@ -207,15 +207,20 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
       filterBadges.push({
         key: '_sort',
         label: `${t('nl_query.sort_label')}: ${sortText}`,
+        applied: false,
       });
     }
     if (lens.groupBy) {
       filterBadges.push({
         key: '_group',
         label: `${t('nl_query.group_label')}: ${lens.groupBy}`,
+        applied: false,
       });
     }
   }
+
+  const appliedBadges = filterBadges.filter((badge) => badge.applied);
+  const referenceBadges = filterBadges.filter((badge) => !badge.applied);
 
   return (
     <form
@@ -234,6 +239,9 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
       >
         {t('nl_query.label')}
       </label>
+      <p id={hintId} className={styles.fieldHint}>
+        {t('nl_query.hint')}
+      </p>
       <input
         data-1p-ignore
         id="nl-query-input"
@@ -242,6 +250,7 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         placeholder={t('nl_query.placeholder')}
+        aria-describedby={hintId}
         maxLength={500}
         style={{
           padding: 'var(--nf-space-2) var(--nf-space-2-5)',
@@ -284,19 +293,30 @@ function NlQueryPanel({ workspaceId }: { workspaceId: string | undefined }): Rea
             gap: 'var(--nf-space-2)',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 'var(--nf-space-1-5)',
-            }}
-          >
-            {filterBadges.map((badge) => (
-              <span key={badge.key} style={BADGE_STYLE}>
-                {badge.label}
-              </span>
-            ))}
-          </div>
+          {appliedBadges.length > 0 ? (
+            <div className={styles.conditionGroup}>
+              <span className={styles.conditionGroupLabel}>{t('nl_query.applied_group')}</span>
+              <ul className={styles.conditionList}>
+                {appliedBadges.map((badge) => (
+                  <li key={badge.key} className={styles.conditionApplied}>
+                    {badge.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {referenceBadges.length > 0 ? (
+            <div className={styles.conditionGroup}>
+              <span className={styles.conditionGroupLabel}>{t('nl_query.reference_group')}</span>
+              <ul className={styles.conditionList}>
+                {referenceBadges.map((badge) => (
+                  <li key={badge.key} className={styles.conditionReference}>
+                    {badge.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <p
             style={{
               margin: 0,
@@ -537,6 +557,7 @@ function AutoActionsPanel({
       <strong style={{ fontSize: 'var(--nf-text-xs)', color: 'var(--nf-color-fg-muted)' }}>
         {t('auto_actions.title')}
       </strong>
+      <p className={styles.fieldHint}>{t('auto_actions.hint')}</p>
       <ul
         style={{
           listStyle: 'none',
@@ -556,8 +577,9 @@ function AutoActionsPanel({
                 : 'accent';
           return (
             <li key={`${a.taskId}-${a.kind}`}>
-              <a
-                href={`/tasks/${a.taskId}`}
+              <Link
+                to="/tasks/$taskId"
+                params={{ taskId: a.taskId }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -578,7 +600,7 @@ function AutoActionsPanel({
                 >
                   {confidenceLabel(a.confidence, t)}
                 </Badge>
-              </a>
+              </Link>
             </li>
           );
         })}
@@ -701,6 +723,7 @@ function GlassDockImpl(): ReactElement {
           <Icon icon={Sparkles} decorative />
           <strong>{t('glass_dock.title')}</strong>
           {countBadge}
+          <PageHelp topic="ai-suggestions-panel" />
         </div>
         <button
           type="button"
@@ -713,6 +736,7 @@ function GlassDockImpl(): ReactElement {
         </button>
       </div>
       <div className={styles.body}>
+        <p className={styles.description}>{t('glass_dock.description')}</p>
         <NlQueryPanel workspaceId={workspaceId} />
         <AutoActionsPanel workspaceId={workspaceId} />
         <RemindersPanel workspaceId={workspaceId} />

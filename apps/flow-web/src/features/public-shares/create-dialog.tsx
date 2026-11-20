@@ -2,7 +2,7 @@
  * PublicShareCreateDialog — two-state dialog for creating a public share page.
  *
  * State machine:
- *   form    — collect title, description, optional holidays country/timezone.
+ *   form    — collect title, description, optional holidays country, optional expiry.
  *   reveal  — show the plaintext URL exactly once with a copy button.
  *
  * Security: the plaintext token is kept only in this component's local
@@ -16,14 +16,17 @@ import Button from '@nodate-flow/ui/primitives/button';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { getPublicBaseUrl } from '../../lib/public-base-url';
+import SecretCallout from '../settings/secret-callout';
 import { type CreatePublicShareInput, useCreatePublicShare } from './api';
 import styles from './create-dialog.module.css';
+import ExpiryField, { draftToEpoch, emptyExpiryDraft } from './expiry-field';
 
 export interface PublicShareCreateDialogProps {
   workspaceId: string;
@@ -45,9 +48,10 @@ export default function PublicShareCreateDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [holidaysCountry, setHolidaysCountry] = useState('');
+  const [expiry, setExpiry] = useState(() => emptyExpiryDraft());
+  const [expiryError, setExpiryError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [plaintext, setPlaintext] = useState('');
-  const [copied, setCopied] = useState(false);
 
   const shareUrl = plaintext === '' ? '' : `${getPublicBaseUrl()}/share/cal/${plaintext}`;
 
@@ -56,8 +60,9 @@ export default function PublicShareCreateDialog({
     setTitle('');
     setDescription('');
     setHolidaysCountry('');
+    setExpiry(emptyExpiryDraft());
+    setExpiryError('');
     setSubmitting(false);
-    setCopied(false);
   };
 
   const handleClose = (): void => {
@@ -69,10 +74,17 @@ export default function PublicShareCreateDialog({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (title.trim() === '') return;
+    const expiresAt = draftToEpoch(expiry);
+    if (expiresAt !== undefined && !(expiresAt > Math.floor(Date.now() / 1000))) {
+      setExpiryError(t('workspace.public_shares.expiry.error_past'));
+      return;
+    }
+    setExpiryError('');
     setSubmitting(true);
     const body: CreatePublicShareInput = { title: title.trim() };
     if (description.trim() !== '') body.description = description.trim();
     if (holidaysCountry !== '') body.showHolidaysCountry = holidaysCountry;
+    if (expiresAt !== undefined) body.expiresAt = expiresAt;
     try {
       const result = await create.mutateAsync(body);
       if (typeof result.token === 'string' && result.token !== '') {
@@ -94,16 +106,6 @@ export default function PublicShareCreateDialog({
     }
   };
 
-  const handleCopy = async (): Promise<void> => {
-    if (shareUrl === '') return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-    } catch {
-      // Clipboard may be unavailable; user can still select manually.
-    }
-  };
-
   const dialogTitle =
     stage === 'form'
       ? t('workspace.public_shares.dialog.create_title')
@@ -118,7 +120,11 @@ export default function PublicShareCreateDialog({
           }}
           className={styles.form}
         >
-          <FormField label={t('workspace.public_shares.dialog.field.title')} required>
+          <FormField
+            label={t('workspace.public_shares.dialog.field.title')}
+            description={t('workspace.public_shares.dialog.field.title_help')}
+            required
+          >
             {(control) => (
               <Input
                 {...control}
@@ -151,13 +157,12 @@ export default function PublicShareCreateDialog({
             description={t('workspace.public_shares.dialog.field.holidays_country_help')}
           >
             {(control) => (
-              <select
+              <Select
                 {...control}
                 value={holidaysCountry}
                 onChange={(e) => {
                   setHolidaysCountry(e.target.value);
                 }}
-                className={styles.select}
               >
                 <option value="">
                   {t('workspace.public_shares.dialog.field.holidays_country_unset')}
@@ -169,9 +174,18 @@ export default function PublicShareCreateDialog({
                       {code} — {name}
                     </option>
                   ))}
-              </select>
+              </Select>
             )}
           </FormField>
+
+          <ExpiryField
+            draft={expiry}
+            onChange={(next) => {
+              setExpiry(next);
+              setExpiryError('');
+            }}
+            error={expiryError === '' ? undefined : expiryError}
+          />
 
           <div className={styles.endActions}>
             <Button type="button" variant="ghost" onClick={handleClose}>
@@ -190,34 +204,17 @@ export default function PublicShareCreateDialog({
         </form>
       ) : (
         <div className={styles.reveal}>
-          <p className={styles.warning}>{t('workspace.public_shares.dialog.reveal_warning')}</p>
-          <FormField label={t('workspace.public_shares.dialog.url_label')}>
-            {(control) => (
-              <Input
-                {...control}
-                value={shareUrl}
-                readOnly
-                spellCheck={false}
-                onFocus={(e) => {
-                  e.currentTarget.select();
-                }}
-                className={styles.urlInput}
-              />
-            )}
-          </FormField>
+          {/* A failed copy is left silent: the field stays selectable for a manual copy. */}
+          <SecretCallout
+            kind="once"
+            message={t('workspace.public_shares.dialog.reveal_warning')}
+            label={t('workspace.public_shares.dialog.url_label')}
+            value={shareUrl}
+            copyLabel={t('workspace.public_shares.dialog.copy')}
+            copiedLabel={t('workspace.public_shares.dialog.copied')}
+            copyTestId="public-share-create-copy"
+          />
           <div className={styles.endActions}>
-            <Button
-              type="button"
-              variant="ghost"
-              data-testid="public-share-create-copy"
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied
-                ? t('workspace.public_shares.dialog.copied')
-                : t('workspace.public_shares.dialog.copy')}
-            </Button>
             <Button
               type="button"
               variant="primary"

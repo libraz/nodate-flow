@@ -14,7 +14,6 @@ import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
-import Select from '@nodate-flow/ui/primitives/select';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -25,8 +24,9 @@ import { formatApiError } from '../../lib/api-error';
 import { formatDate } from '../../lib/format';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { useWeekStart } from '../../lib/use-week-start';
-import { TASK_PRIORITIES, type TaskPriority, useCreateTask } from './api';
-import { PRIORITY_KEY } from './constants';
+import { AiSparkle } from '../ai-suggestions/ai-consequence';
+import { type TaskPriority, useCreateTask } from './api';
+import PriorityControl from './priority-control';
 import {
   type AssigneeSuggestion,
   type SmartProposal,
@@ -60,10 +60,12 @@ const schema = z.object({
     .optional(),
 });
 
+/** AI subtask priorities arrive as words; tones follow `PRIORITY_TONE` in constants. */
 const PRIORITY_TONE: Record<string, BadgeTone> = {
-  low: 'info',
-  medium: 'warning',
-  high: 'danger',
+  low: 'neutral',
+  medium: 'info',
+  high: 'warning',
+  urgent: 'danger',
 };
 
 function priorityTone(label: string): BadgeTone {
@@ -91,6 +93,7 @@ export default function TaskCreateDialog({
   const [dueOn, setDueOn] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const { guard, submitting, end } = useSubmitGuard();
+  const priorityLabelId = useId();
 
   // AI Assist state
   const [proposal, setProposal] = useState<SmartProposal | null>(null);
@@ -296,24 +299,14 @@ export default function TaskCreateDialog({
           )}
         </FormField>
 
-        <FormField label={t('tasks.form.priority')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={String(priority)}
-              onChange={(e) => {
-                const next = Number.parseInt(e.target.value, 10) as TaskPriority;
-                setPriority(next);
-              }}
-            >
-              {TASK_PRIORITIES.map((p) => (
-                <option key={p} value={String(p)}>
-                  {t(PRIORITY_KEY[p])}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
+        <div className={styles.priorityField}>
+          <span id={priorityLabelId} className={styles.priorityLabel}>
+            {t('tasks.form.priority')}
+          </span>
+          <div role="group" aria-labelledby={priorityLabelId}>
+            <PriorityControl value={priority} onChange={setPriority} />
+          </div>
+        </div>
 
         <div className={styles.fieldWithError}>
           <FormField
@@ -322,6 +315,7 @@ export default function TaskCreateDialog({
           >
             {() => (
               <DatePicker
+                variant="field"
                 value={dueOn}
                 onChange={(value) => {
                   setDueOn(value);
@@ -413,6 +407,7 @@ function SmartCreateSection({
   onApply,
 }: SmartCreateSectionProps): ReactElement {
   const { t } = useTranslation('common');
+  const hintId = useId();
   const proposalErrorText =
     proposalError === 'AI.EMBEDDING.DISABLED'
       ? t('AI.EMBEDDING.DISABLED', {
@@ -436,9 +431,21 @@ function SmartCreateSection({
       <div key={proposing ? 'loading' : proposal ? 'result' : 'idle'} className={styles.smartStage}>
         {/* Propose button / loading */}
         {!proposal && !proposing && (
-          <Button type="button" variant="ghost" disabled={disabled} onClick={onPropose}>
-            {t('tasks.smart_create.assist_button')}
-          </Button>
+          <div className={styles.smartIntro}>
+            <Button
+              type="button"
+              disabled={disabled}
+              onClick={onPropose}
+              aria-describedby={hintId}
+              className={styles.smartTrigger}
+            >
+              <AiSparkle kind="suggests" />
+              {t('tasks.smart_create.assist_button')}
+            </Button>
+            <p id={hintId} className={styles.smartHint}>
+              {t('tasks.smart_create.assist_hint')}
+            </p>
+          </div>
         )}
 
         {proposing && (
@@ -511,6 +518,7 @@ function SmartCreateSection({
             {(proposal.suggestedAssignees.length > 0 || proposal.subtasks.length > 0) && (
               <div className={styles.smartApplyRow}>
                 <Button type="button" variant="primary" disabled={applying} onClick={onApply}>
+                  <AiSparkle kind="applies" />
                   {t('tasks.smart_create.apply')}
                 </Button>
               </div>

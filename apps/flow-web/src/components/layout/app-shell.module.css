@@ -1,8 +1,26 @@
+:global(:root):has(.shell) {
+  /*
+   * Floating bottom layer: the glass dock and the AI suggestions pill both
+   * size and anchor from these, and main scrolls its last content clear of them.
+   */
+  --nf-dock-control-size: 2.5rem;
+  /* Dock padding plus its border, on each block side. */
+  --nf-dock-inset: calc(var(--nf-space-2) + var(--nf-space-px));
+  --nf-dock-block-size: calc(var(--nf-dock-control-size) + var(--nf-dock-inset) * 2);
+  --nf-dock-offset: var(--nf-space-6);
+  /* Extra rise for the AI pill; non-zero only where it stacks above the dock. */
+  --nf-dock-pill-lift: 0px;
+  --nf-dock-clearance: calc(
+    var(--nf-dock-offset) +
+    var(--nf-dock-block-size) +
+    var(--nf-dock-pill-lift) +
+    var(--nf-space-4)
+  );
+}
+
 .shell {
   /* nf-token-override: sidebar rail widths, mirrored by sidebar.module.css */
   --nf-shell-sidebar-inline-size: 16rem;
-  /* Height of the floating dock plus its offset: main scrolls clear of it. */
-  --nf-shell-dock-clearance: calc(var(--nf-space-24) + var(--nf-space-6));
   display: grid;
   grid-template-columns: var(--nf-shell-sidebar-inline-size) minmax(0, 1fr);
   /*
@@ -64,8 +82,8 @@
    * The fixed glass dock and AI pill float over the viewport; this end
    * clearance lets the last content (and focus targets) scroll clear of them.
    */
-  padding-block-end: var(--nf-shell-dock-clearance);
-  scroll-padding-block-end: var(--nf-shell-dock-clearance);
+  padding-block-end: var(--nf-dock-clearance);
+  scroll-padding-block-end: var(--nf-dock-clearance);
 }
 
 /*
@@ -109,5 +127,13 @@
 
   .main {
     grid-column: 1;
+  }
+}
+
+/* Below sm the centred dock reaches the inline end, so the AI pill rides a row above it. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  :global(:root):has(.shell) {
+    --nf-dock-pill-lift: calc(var(--nf-dock-block-size) + var(--nf-space-2));
   }
 }

@@ -43,14 +43,23 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { getRouteApi } from '@tanstack/react-router';
 import { MoreHorizontal } from 'lucide-react';
-import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
+import {
+  type ButtonHTMLAttributes,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactElement,
+  type Ref,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { ApiError, formatApiError, isNetworkError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import CopyButton from '../settings/copy-button';
+import ColumnHelp from '../settings/column-help';
+import SecretCallout from '../settings/secret-callout';
 import ui from '../settings/settings-ui.module.css';
 import TruncatedText from '../settings/truncated-text';
 import {
@@ -80,6 +89,26 @@ function normaliseEventTypes(value: unknown): string[] {
     if (typeof item === 'string' && item.length > 0) out.push(item);
   }
   return out;
+}
+
+/** The server's wildcard: subscribe to every event kind. */
+const EVENT_TYPE_WILDCARD = '*';
+
+/**
+ * Client-side mirror of the server rule: at least one entry, each either
+ * `*` alone or an exact event name. A pattern such as `task.*` is refused.
+ */
+function eventTypesError(
+  entries: readonly string[],
+):
+  | 'settings.webhooks.create.event_types.required'
+  | 'settings.webhooks.create.event_types.no_patterns'
+  | null {
+  if (entries.length === 0) return 'settings.webhooks.create.event_types.required';
+  if (entries.some((e) => e !== EVENT_TYPE_WILDCARD && e.includes(EVENT_TYPE_WILDCARD))) {
+    return 'settings.webhooks.create.event_types.no_patterns';
+  }
+  return null;
 }
 
 /** Map a delivery `status` string to a Badge tone. */
@@ -129,6 +158,33 @@ function formatTimestamp(epochSec: number | undefined | null, locale: string): s
   } catch {
     return String(epochSec);
   }
+}
+
+type MenuTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLElement>;
+  label: string;
+};
+
+/**
+ * The popover clones its child with a ref and interaction props; the tooltip
+ * needs the button's own ref, so the popover anchors on a wrapping span.
+ */
+function MenuTrigger({ ref, label, ...buttonProps }: MenuTriggerProps): ReactElement {
+  return (
+    <span ref={ref} className={styles.menuAnchor}>
+      <Tooltip content={label}>
+        <button
+          type="button"
+          aria-label={label}
+          aria-haspopup="menu"
+          className={styles.menuTrigger}
+          {...buttonProps}
+        >
+          <MoreHorizontal size={16} aria-hidden />
+        </button>
+      </Tooltip>
+    </span>
+  );
 }
 
 interface WebhookRowProps {
@@ -269,15 +325,7 @@ function WebhookRow({
             </div>
           }
         >
-          <button
-            type="button"
-            aria-label={t('settings.webhooks.action.menu_label')}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            className={styles.menuTrigger}
-          >
-            <MoreHorizontal size={16} aria-hidden />
-          </button>
+          <MenuTrigger label={t('settings.webhooks.action.menu_label')} aria-expanded={menuOpen} />
         </Popover>
       </td>
     </PresenceRow>
@@ -309,6 +357,8 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
   const [eventTypesText, setEventTypesText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [secret, setSecret] = useState('');
+  const [eventTypesInvalid, setEventTypesInvalid] =
+    useState<ReturnType<typeof eventTypesError>>(null);
 
   const reset = (): void => {
     setStage('form');
@@ -317,6 +367,7 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
     setEventTypesText('');
     setSubmitting(false);
     setSecret('');
+    setEventTypesInvalid(null);
   };
 
   const handleClose = (): void => {
@@ -332,6 +383,12 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
+    // The server refuses these anyway; saying so on the field beats a toast.
+    const invalid = eventTypesError(eventTypes);
+    if (invalid !== null) {
+      setEventTypesInvalid(invalid);
+      return;
+    }
 
     setSubmitting(true);
     create.mutate(
@@ -375,7 +432,11 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
     <Dialog open={open} onClose={handleClose} title={title}>
       {stage === 'form' ? (
         <form className={styles.dialogForm} onSubmit={handleSubmit}>
-          <FormField label={t('settings.webhooks.create.url.label')} required>
+          <FormField
+            label={t('settings.webhooks.create.url.label')}
+            description={t('settings.webhooks.create.url.hint')}
+            required
+          >
             {(control) => (
               <Input
                 {...control}
@@ -407,14 +468,18 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
           <FormField
             label={t('settings.webhooks.create.event_types.label')}
             description={t('settings.webhooks.create.event_types.hint')}
+            required
+            {...(eventTypesInvalid ? { error: t(eventTypesInvalid) } : {})}
           >
             {(control) => (
               <Textarea
                 {...control}
                 value={eventTypesText}
                 rows={2}
+                spellCheck={false}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
                   setEventTypesText(e.target.value);
+                  setEventTypesInvalid(null);
                 }}
               />
             )}
@@ -435,10 +500,8 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
         </form>
       ) : (
         <div className={styles.dialogForm}>
-          <div className={ui.secretPanel}>
-            <p className={ui.secretWarning}>{t('settings.webhooks.create.secret.warning')}</p>
-            <SecretField secret={secret} />
-          </div>
+          <SecretField secret={secret} message={t('settings.webhooks.create.secret.warning')} />
+          <p className={styles.signingHint}>{t('settings.webhooks.create.secret.hint')}</p>
           <div className={styles.dialogActions}>
             <Button type="button" variant="primary" onClick={handleClose}>
               {t('settings.webhooks.create.done')}
@@ -450,41 +513,31 @@ function CreateWebhookDialog({ workspaceId, open, onClose }: CreateDialogProps):
   );
 }
 
-/** Read-only secret with an inline copy action; selecting the field selects it whole. */
-function SecretField({ secret }: { secret: string }): ReactElement {
+/**
+ * The signing secret in the shared secret callout. It stays retrievable
+ * through Show secret, so the callout asks to keep it private rather than
+ * claiming it is shown once.
+ */
+function SecretField({ secret, message }: { secret: string; message: string }): ReactElement {
   const { t } = useTranslation('settings');
   return (
-    <FormField label={t('settings.webhooks.create.secret.label')}>
-      {(control) => (
-        <div className={ui.secretRow}>
-          <Input
-            {...control}
-            className={ui.secretValue}
-            value={secret}
-            readOnly
-            spellCheck={false}
-            autoComplete="off"
-            onFocus={(e) => {
-              e.currentTarget.select();
-            }}
-          />
-          <CopyButton
-            value={secret}
-            label={t('settings.webhooks.create.secret.copy')}
-            copiedLabel={t('settings.webhooks.create.secret.copied')}
-            onError={() => {
-              // error-toast-exempt: the clipboard write never reaches the API. What it
-              // rejects with is a browser DOMException whose message is untranslated UA
-              // text, so surfacing it would be worse than the localized fallback.
-              toaster.show({
-                tone: 'danger',
-                message: t('settings.webhooks.create.secret.copy_failed'),
-              });
-            }}
-          />
-        </div>
-      )}
-    </FormField>
+    <SecretCallout
+      kind="keep"
+      message={message}
+      label={t('settings.webhooks.create.secret.label')}
+      value={secret}
+      copyLabel={t('settings.webhooks.create.secret.copy')}
+      copiedLabel={t('settings.webhooks.create.secret.copied')}
+      onCopyError={() => {
+        // error-toast-exempt: the clipboard write never reaches the API. What it
+        // rejects with is a browser DOMException whose message is untranslated UA
+        // text, so surfacing it would be worse than the localized fallback.
+        toaster.show({
+          tone: 'danger',
+          message: t('settings.webhooks.create.secret.copy_failed'),
+        });
+      }}
+    />
   );
 }
 
@@ -519,7 +572,10 @@ function ShowSecretDialog({
         {detailQuery.isLoading || !detailQuery.data ? (
           <Skeleton className={styles.skeletonSecret} aria-hidden="true" />
         ) : (
-          <SecretField secret={detailQuery.data.secret} />
+          <SecretField
+            secret={detailQuery.data.secret}
+            message={t('settings.webhooks.create.secret.hint')}
+          />
         )}
         <div className={styles.dialogActions}>
           <Button type="button" variant="primary" onClick={handleClose}>
@@ -593,6 +649,7 @@ function DeliveriesDrawer({
       title={t('settings.webhooks.deliveries.title')}
       side="inline-end"
     >
+      <p className={styles.deliveriesNote}>{t('settings.webhooks.deliveries.status_note')}</p>
       {deliveriesQuery.isLoading ? (
         <div className={ui.skeletonStack} aria-hidden="true">
           <Skeleton className={styles.skeletonDelivery} />
@@ -743,6 +800,7 @@ export default function WebhooksSettingsPage(): ReactElement {
       <PageHeader
         title={t('settings.webhooks.title')}
         description={t('settings.webhooks.description')}
+        help="workspace-settings-webhooks"
         actions={
           <Button type="button" variant="primary" onClick={openCreate}>
             {t('settings.webhooks.new')}
@@ -777,6 +835,7 @@ export default function WebhooksSettingsPage(): ReactElement {
       ) : webhooks.length === 0 ? (
         <EmptyState
           title={t('settings.webhooks.empty')}
+          description={t('settings.webhooks.empty_hint')}
           className={ui.empty}
           action={
             <Button type="button" onClick={openCreate}>
@@ -792,7 +851,10 @@ export default function WebhooksSettingsPage(): ReactElement {
                 <th>{t('settings.webhooks.col.url')}</th>
                 <th>{t('settings.webhooks.col.description')}</th>
                 <th>{t('settings.webhooks.col.event_types')}</th>
-                <th>{t('settings.webhooks.col.active')}</th>
+                <th>
+                  {t('settings.webhooks.col.active')}
+                  <ColumnHelp text={t('settings.webhooks.col.active_help')} />
+                </th>
                 <th className={ui.alignEnd}>{t('settings.webhooks.col.actions')}</th>
               </tr>
             </thead>

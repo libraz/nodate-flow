@@ -1,0 +1,24 @@
+/* Priority picker segment: colour dot plus label, so priority is never colour-only. */
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.dot {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.text {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -26,6 +26,7 @@ import SegmentedControl, {
 } from '@nodate-flow/ui/primitives/segmented-control';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ReactElement, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -308,28 +309,32 @@ export default function AttendeesSection({
                   <Badge tone={rsvpTone(a.rsvp)}>{t(rsvpLabelKey(a.rsvp))}</Badge>
                   <div className={styles.controls}>
                     {isOwner && !isSelf ? (
-                      <span className={styles.canEdit}>
-                        <Switch
-                          checked={a.canEdit}
-                          onCheckedChange={(next) => handleToggleCanEdit(a.userId, next)}
-                          disabled={toggleCanEdit.isPending}
-                          aria-label={t('event.attendees.can_edit')}
-                        />
-                        <span aria-hidden>{t('event.attendees.can_edit')}</span>
-                      </span>
+                      <Tooltip content={t('event.attendees.can_editHint')}>
+                        <span className={styles.canEdit}>
+                          <Switch
+                            checked={a.canEdit}
+                            onCheckedChange={(next) => handleToggleCanEdit(a.userId, next)}
+                            disabled={toggleCanEdit.isPending}
+                            aria-label={t('event.attendees.can_edit')}
+                          />
+                          <span aria-hidden>{t('event.attendees.can_edit')}</span>
+                        </span>
+                      </Tooltip>
                     ) : null}
                     {isOwner ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          void handleInvite(a.id);
-                        }}
-                        disabled={createInvite.isPending}
-                      >
-                        {t('event.attendees.send_invite')}
-                      </Button>
+                      <Tooltip content={t('event.attendees.send_inviteHint')}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            void handleInvite(a.id);
+                          }}
+                          disabled={createInvite.isPending}
+                        >
+                          {t('event.attendees.send_invite')}
+                        </Button>
+                      </Tooltip>
                     ) : null}
                     {canRemove ? (
                       <Button

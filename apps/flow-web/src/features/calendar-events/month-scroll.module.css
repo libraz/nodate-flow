@@ -186,7 +186,7 @@
 }
 
 .holidayLabel {
-  font-size: var(--nf-cal-text-cell);
+  font-size: var(--nf-text-xs);
   color: var(--nf-color-danger-fg);
   line-height: var(--nf-leading-tight);
   overflow: hidden;

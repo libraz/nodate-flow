@@ -434,3 +434,15 @@
     min-block-size: var(--nf-space-8);
   }
 }
+
+/* One line under the discover title on what subscribing does. */
+.discoverHint {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+/* Anchor for the row menu: the Popover ref sits here, the tooltip on the button. */
+.menuAnchor {
+  display: inline-flex;
+}

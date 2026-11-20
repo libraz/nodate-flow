@@ -1,11 +1,12 @@
 {
   "page": {
     "title": "優先度の提案",
-    "subtitle": "{total, plural, =0 {評価対象のタスクはありません} other {# 件のタスクのうち}}{shown, plural, =0 { 提案はありません} other { # 件の提案があります}}。"
+    "subtitle": "{shown, plural, =0 {提案はありません} other {提案 #件}}（確認した未完了タスク: {total, plural, =0 {0件} other {#件}}）。「適用」でタスクの優先度が変わり、「却下」は提案を隠すだけです。"
   },
   "kpi": {
     "suggestions": "提案",
-    "evaluated": "評価済み"
+    "evaluated": "評価済み",
+    "evaluatedHint": "確認済み: チェックした未完了タスクの数。提案: そのうち優先度の変更案が出た数。"
   },
   "action": {
     "refresh": "再読み込み"
@@ -24,7 +25,10 @@
     "apply": "適用",
     "dismiss": "却下",
     "applyAria": "{title} に提案を適用",
-    "dismissAria": "{title} の提案を却下"
+    "dismissAria": "{title} の提案を却下",
+    "dismissHint": "この端末で、この提案を隠します。タスクは変わりません。",
+    "confidenceHint": "このルールがどれだけ強くこの提案を支持しているか",
+    "applyHint": "タスクの優先度をすぐに変更します。直後の通知から元に戻せます。"
   },
   "priority": {
     "p0": "P0 — なし",
@@ -34,8 +38,8 @@
     "p4": "P4 — 緊急"
   },
   "empty": {
-    "noTasks": "評価対象のタスクがありません。",
-    "allOptimised": "オープンなタスクはすべて推奨の優先度と一致しています。"
+    "noTasks": "評価できる未完了タスクがありません。完了・キャンセルされていないタスクがあると、提案が出ます。",
+    "allOptimised": "変更の必要はありません。未完了のタスクはすべて、ルールが示す優先度になっています。期限や担当が変わったら、もう一度確認してください。"
   },
   "toast": {
     "applied": "{priority} に更新しました。",
@@ -46,5 +50,15 @@
   "error": {
     "fetchFailed": "優先度の提案を取得できませんでした。",
     "retry": "再試行"
+  },
+  "reason_code": {
+    "overdue": "期限を過ぎています",
+    "due_by_tomorrow": "明日までが期限です",
+    "due_this_week": "今週が期限です",
+    "due_this_fortnight": "2 週間以内が期限です",
+    "in_review": "レビュー中です",
+    "many_dependents": "{count, plural, other {#件のタスクがこのタスクを待っています}}",
+    "unassigned": "担当者がいません",
+    "steady": "急ぐ要因はありません"
   }
 }
