@@ -113,6 +113,9 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		// EncryptedKey is a stand-in: the real sealed blob does not exist
 		// yet at this point and Validate only checks that a key is present
 		// for the kinds that require one.
+		if in.Body.Kind != string(providers.KindOllama) && in.Body.APIKey == "" {
+			return nil, httpErr(apierrors.ValidationBodyFieldMissing)
+		}
 		defaultModel := resolveDefaultModel(in.Body.Kind, in.Body.DefaultModel)
 		if err := providers.Validate(providers.Config{
 			Kind:         providers.Kind(in.Body.Kind),
@@ -145,11 +148,13 @@ func CreateProvider(deps Deps) func(context.Context, *CreateProviderInput) (*Cre
 		// other than this stack frame. The slog call below records only the
 		// masked prefix/suffix.
 		var (
-			sealed []byte
+			// NOT NULL column: an ollama provider without a key stores an
+			// empty blob, not nil.
+			sealed = []byte{}
 			prefix string
 			suffix string
 		)
-		{
+		if in.Body.APIKey != "" {
 			plain := in.Body.APIKey
 			prefix = crypto.APIKeyPrefix(plain)
 			suffix = crypto.APIKeySuffix(plain)

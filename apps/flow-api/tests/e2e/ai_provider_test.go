@@ -253,3 +253,40 @@ func TestAIProviderRotateDeleteNotFound(t *testing.T) {
 	require.Equal(t, deleteBefore, countProviderAudit(t, wsID, "ai_provider.delete"),
 		"failed deletion must not append an audit row")
 }
+
+// TestAIProviderKeyOptionalOnlyForOllama pins that a key-less create is
+// accepted for ollama (no apiKeyMasked in the response, nothing stored to
+// mask) and refused for a hosted kind with a missing-field error.
+func TestAIProviderKeyOptionalOnlyForOllama(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+
+	tt := newTenant(t)
+	url := testServerURL + "/workspaces/" + tt.WorkspacePublicID + "/ai/providers"
+
+	t.Run("ollama without key", func(t *testing.T) {
+		t.Parallel()
+		status, body := doJSONStatus(t, http.MethodPost, url, tt.AccessToken, map[string]any{
+			"kind": "ollama",
+			"name": "Local Ollama",
+		})
+		require.GreaterOrEqual(t, status, 200, string(body))
+		require.Less(t, status, 300, string(body))
+
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(body, &raw))
+		require.Equal(t, "ollama", raw["kind"])
+		require.NotEmpty(t, raw["id"])
+		require.NotContains(t, raw, "apiKeyMasked", "a provider without a key has nothing to mask")
+	})
+
+	t.Run("anthropic without key", func(t *testing.T) {
+		t.Parallel()
+		status, body := doJSONStatus(t, http.MethodPost, url, tt.AccessToken, map[string]any{
+			"kind": "anthropic",
+			"name": "Keyless Anthropic",
+		})
+		require.Equal(t, http.StatusUnprocessableEntity, status, string(body))
+		require.Equal(t, "VALIDATION.BODY.FIELD_MISSING", problemType(t, body))
+	})
+}

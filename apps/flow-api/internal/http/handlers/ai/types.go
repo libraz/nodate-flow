@@ -53,7 +53,7 @@ type Provider struct {
 	Name         string `json:"name"`
 	BaseURL      string `json:"baseUrl,omitempty"`
 	DefaultModel string `json:"defaultModel,omitempty"`
-	APIKeyMasked string `json:"apiKeyMasked"`
+	APIKeyMasked string `json:"apiKeyMasked,omitempty" doc:"Masked key; absent when no key is stored"`
 	UpdatedAt    *int64 `json:"updatedAt,omitempty"`
 	CreatedAt    int64  `json:"createdAt"`
 }
@@ -97,7 +97,12 @@ type CreateProviderInput struct {
 		// 16-byte GCM tag, so the stored blob is the plaintext plus 28
 		// bytes. Under the pattern one character is one byte, so the cap
 		// is exact.
-		APIKey string `json:"apiKey" writeOnly:"true" minLength:"8" maxLength:"484" pattern:"^[\\x21-\\x7E]+$" doc:"Plaintext provider API key (write-only). Printable ASCII, no spaces."`
+		//
+		// The key is optional in the schema because ollama needs none; the
+		// handler enforces presence for every other kind. The empty
+		// alternative in the pattern keeps an explicit "" equivalent to
+		// omitting the field.
+		APIKey string `json:"apiKey,omitempty" writeOnly:"true" maxLength:"484" pattern:"^$|^[\\x21-\\x7E]{8,}$" doc:"Plaintext provider API key (write-only). Required for every kind except ollama (enforced by the handler). Printable ASCII, no spaces, at least 8 characters."`
 	}
 }
 

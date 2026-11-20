@@ -12,13 +12,17 @@ func nullableString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: s != ""}
 }
 
-// maskKey renders a provider key as "***<suffix>" for safe display.
+// maskKey renders a provider key as "***<suffix>" for safe display. It
+// returns "" when no key is stored (empty suffix).
 //
 // The provider prefix is intentionally NOT echoed: the secret-leak probe
 // rejects any response containing a known provider prefix (e.g. "sk-ant-"),
 // so we mask with a fixed "***" placeholder and only reveal the suffix.
 // The prefix argument is accepted for call-site symmetry but ignored.
 func maskKey(_, suffix string) string {
+	if suffix == "" {
+		return ""
+	}
 	return "***" + suffix
 }
 
