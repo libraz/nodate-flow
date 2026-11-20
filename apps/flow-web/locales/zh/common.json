@@ -457,7 +457,7 @@
     },
     "form": {
       "name": "名称",
-      "slug": "标识",
+      "slug": "URL 名称",
       "description": "描述",
       "submit": "保存",
       "cancel": "取消",
@@ -621,7 +621,7 @@
     "empty": "暂无项目，创建你的第一个项目开始使用吧。",
     "columns": {
       "name": "名称",
-      "key": "标识",
+      "key": "URL 名称",
       "visibility": "状态",
       "created": "创建时间",
       "actions": "操作"
@@ -636,6 +636,7 @@
       "description": "描述",
       "visibility": "可见性",
       "submit": "保存",
+      "create": "创建",
       "cancel": "取消",
       "key_description": "可使用小写字母、数字和连字符，在工作区内不能重复。在你手动修改前，会根据名称自动填写。",
       "advanced": "高级设置（可选）"

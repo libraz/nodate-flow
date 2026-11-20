@@ -457,7 +457,7 @@
     },
     "form": {
       "name": "Name",
-      "slug": "Slug",
+      "slug": "URL name",
       "description": "Description",
       "submit": "Save",
       "cancel": "Cancel",
@@ -621,7 +621,7 @@
     "empty": "No projects yet. Create your first one to get started.",
     "columns": {
       "name": "Name",
-      "key": "Slug",
+      "key": "URL name",
       "visibility": "Status",
       "created": "Created",
       "actions": "Actions"
@@ -636,6 +636,7 @@
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
+      "create": "Create",
       "cancel": "Cancel",
       "key_description": "Lowercase letters, numbers and hyphens. Must be unique in the workspace. Filled in from the name until you edit it.",
       "advanced": "Advanced (optional)"
