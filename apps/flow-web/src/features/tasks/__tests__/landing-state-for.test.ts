@@ -5,7 +5,7 @@ import { landingStateFor, TRANSITIONS_BY_STATE } from '../api';
 // Truth table of NextState in apps/flow-api/internal/taskstate/state.go.
 const SERVER_TABLE = {
   open: { start: 'waiting', block: 'waiting', cancel: 'cancelled', complete: 'done' },
-  waiting: { submit: 'review', unblock: 'open', cancel: 'cancelled' },
+  waiting: { submit: 'review', unblock: 'open', complete: 'done', cancel: 'cancelled' },
   review: { block: 'waiting', complete: 'done', reopen: 'waiting', cancel: 'cancelled' },
   done: { reopen: 'waiting' },
   cancelled: { reopen: 'open' },

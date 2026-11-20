@@ -57,28 +57,6 @@
   cursor: not-allowed;
 }
 
-.button[aria-disabled="true"]:not([data-pending]) .circle {
-  border-style: dashed;
-  opacity: 0.5;
-}
-
-.button[aria-disabled="true"]:not([data-pending]) .check {
-  opacity: 0;
-}
-
-/* Visually hidden; read through aria-describedby. */
-.reason {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  clip: rect(0 0 0 0);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .circle,
   .check {

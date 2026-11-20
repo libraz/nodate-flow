@@ -197,7 +197,7 @@ export const TRANSITIONS_BY_STATE: Record<TaskDerivedState, readonly TransitionN
   // Must stay in lockstep with apps/flow-api/internal/taskstate/state.go
   // and apps/flow-api/internal/constraint/engine/replay.go.
   open: ['start', 'block', 'complete', 'cancel'],
-  waiting: ['unblock', 'submit', 'cancel'],
+  waiting: ['unblock', 'submit', 'complete', 'cancel'],
   review: ['block', 'complete', 'reopen', 'cancel'],
   done: ['reopen'],
   cancelled: ['reopen'],
@@ -222,6 +222,7 @@ export function landingStateFor(
     case 'waiting':
       if (transition === 'submit') return 'review';
       if (transition === 'unblock') return 'open';
+      if (transition === 'complete') return 'done';
       if (transition === 'cancel') return 'cancelled';
       return null;
     case 'review':
@@ -256,7 +257,7 @@ export interface DropResolution {
  * Map a board column drop onto a state machine transition, or `null` if the
  * drop is illegal. See task spec F7.
  *
- * Mirrors apps/flow-api/internal/http/handlers/tasks/transitions.go#nextState as
+ * Mirrors apps/flow-api/internal/taskstate/state.go#NextState as
  * the canonical truth table. Adjacent legal steps resolve exactly. "Go back"
  * drops that don't have a direct verb (done/cancelled/review onto an earlier
  * column) are leniently resolved to the closest legal `reopen` so the user
@@ -282,6 +283,7 @@ export function transitionForDrop(
     case 'done':
       if (from === 'open') return { transition: 'complete', landingState: 'done' };
       if (from === 'review') return { transition: 'complete', landingState: 'done' };
+      if (from === 'waiting') return { transition: 'complete', landingState: 'done' };
       return null;
     case 'open':
       if (from === 'waiting') return { transition: 'unblock', landingState: 'open' };

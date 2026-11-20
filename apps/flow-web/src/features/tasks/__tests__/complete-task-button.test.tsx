@@ -1,6 +1,6 @@
 /**
- * CompleteTaskButton: which states can be completed in place, how an
- * unavailable state is explained, and that the outcome toasts survive the
+ * CompleteTaskButton: which states can be completed in place, how undo
+ * restores the starting state, and that the outcome toasts survive the
  * row unmounting under the click.
  */
 
@@ -95,33 +95,31 @@ describe('<CompleteTaskButton> availability', () => {
     expect(transitions()).toEqual(['complete']);
   });
 
-  it.each(['waiting', 'done', 'cancelled'] as const)(
-    'keeps a %s task focusable, explained and inert',
-    (state) => {
-      renderWithProviders(<CompleteTaskButton task={task(state)} />);
+  it('enables the button on a waiting task and completes it', async () => {
+    mocks.post.mockImplementation(() => ok());
+    renderWithProviders(<CompleteTaskButton task={task('waiting')} />);
 
-      const button = screen.getByRole('button', { name: 'today.complete_task' });
-      expect(button.getAttribute('aria-disabled')).toBe('true');
-      expect((button as HTMLButtonElement).disabled).toBe(false);
+    const button = screen.getByRole('button', { name: 'today.complete_task' });
+    expect(button.getAttribute('aria-disabled')).toBeNull();
+    fireEvent.click(button);
 
-      button.focus();
-      expect(document.activeElement).toBe(button);
+    await waitFor(() => {
+      expect(transitions()).toEqual(['complete']);
+    });
+  });
 
-      const reasonId = button.getAttribute('aria-describedby');
-      expect(reasonId).toBeTruthy();
-      expect(document.getElementById(reasonId as string)?.textContent).toBe(
-        'today.complete_unavailable',
-      );
+  it.each(['done', 'cancelled'] as const)('does nothing when a %s task is clicked', (state) => {
+    renderWithProviders(<CompleteTaskButton task={task(state)} />);
 
-      fireEvent.click(button);
-      expect(mocks.post).not.toHaveBeenCalled();
-    },
-  );
+    fireEvent.click(screen.getByRole('button', { name: 'today.complete_task' }));
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
 
-  it('does not point an available button at a reason', () => {
+  it('carries no reason or description on the button', () => {
     renderWithProviders(<CompleteTaskButton task={task('open')} />);
     const button = screen.getByRole('button', { name: 'today.complete_task' });
     expect(button.getAttribute('aria-describedby')).toBeNull();
+    expect(button.getAttribute('title')).toBeNull();
   });
 
   it('is aria-disabled while the request is pending and ignores a second click', async () => {
@@ -217,6 +215,14 @@ describe('<CompleteTaskButton> undo', () => {
     await completeThenUndo('open');
     await waitFor(() => {
       expect(transitions()).toEqual(['complete', 'reopen', 'unblock']);
+    });
+    expect(mocks.show).toHaveBeenCalledTimes(1);
+  });
+
+  it('issues exactly one reopen for a task that was waiting', async () => {
+    await completeThenUndo('waiting');
+    await waitFor(() => {
+      expect(transitions()).toEqual(['complete', 'reopen']);
     });
     expect(mocks.show).toHaveBeenCalledTimes(1);
   });

@@ -77,13 +77,13 @@ describe('/today rows', () => {
     expect(button.closest('a')).toBeNull();
   });
 
-  it('shows a disabled, explained button on an in-progress assigned row', () => {
+  it('shows an enabled complete button on an in-progress assigned row', () => {
     renderToday([row({ id: 'a', title: 'Busy task', derivedState: 'waiting' })]);
 
     const button = within(itemFor('Busy task')).getByRole('button', {
       name: 'today.complete_task',
     });
-    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-disabled')).toBeNull();
   });
 
   it.each(['reviewer', 'approver', 'watcher'])(

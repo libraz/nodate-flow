@@ -16,6 +16,7 @@ describe('transitionForDrop', () => {
     ['open', 'cancelled', 'cancel', 'cancelled'],
     ['waiting', 'review', 'submit', 'review'],
     ['waiting', 'open', 'unblock', 'open'],
+    ['waiting', 'done', 'complete', 'done'],
     ['waiting', 'cancelled', 'cancel', 'cancelled'],
     ['review', 'waiting', 'block', 'waiting'],
     ['review', 'done', 'complete', 'done'],
