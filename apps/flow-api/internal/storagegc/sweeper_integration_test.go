@@ -370,3 +370,50 @@ func TestSweeperFinishesInFlightReclaimWhenStopped(t *testing.T) {
 	require.False(t, objectExists(t, db, inFlight), "the object whose blob was removed must be committed away")
 	require.True(t, objectExists(t, db, later), "no object may be reclaimed after the pass was cancelled")
 }
+
+func plantQueuedRemoval(t *testing.T, db *sql.DB, key string) {
+	t.Helper()
+	_, err := db.ExecContext(context.Background(),
+		`INSERT INTO storage_blob_removals (storage_key) VALUES (?)`, key)
+	require.NoError(t, err)
+}
+
+func queuedRemovalCount(t *testing.T, db *sql.DB, key string) int {
+	t.Helper()
+	var n int
+	require.NoError(t, db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM storage_blob_removals WHERE storage_key = ?`, key).Scan(&n))
+	return n
+}
+
+// TestSweeperQueuedRemovalSkipsHeldKeys: a queued key that a
+// storage_objects row still holds, confirmed or reserved, is a live claim.
+// The drainer drops the queue record and leaves the blob to that row; a
+// key nothing holds is removed as before.
+func TestSweeperQueuedRemovalSkipsHeldKeys(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	ctx := context.Background()
+	wsID, _ := seedWorkspace(t, db)
+
+	// Fresh and referenced, so the object sweeps leave both rows alone.
+	_, confirmedKey := plantObject(t, db, wsID, object{confirmed: true, refCount: 1})
+	_, reservedKey := plantObject(t, db, wsID, object{refCount: 1})
+	freeKey := "sweep-test/" + uuid.NewString()
+	for _, key := range []string{confirmedKey, reservedKey, freeKey} {
+		plantQueuedRemoval(t, db, key)
+	}
+
+	store := &recordingRemover{}
+	res, err := newTestSweeper(db, store).RunOnce(ctx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, res.QueuedBlobs, 1)
+
+	require.False(t, store.removed(confirmedKey), "a confirmed object's blob must stay")
+	require.False(t, store.removed(reservedKey), "a reservation's blob must stay")
+	require.Zero(t, queuedRemovalCount(t, db, confirmedKey), "the queue record of a held key is dropped")
+	require.Zero(t, queuedRemovalCount(t, db, reservedKey), "the queue record of a held key is dropped")
+
+	require.True(t, store.removed(freeKey), "an unheld key is removed")
+	require.Zero(t, queuedRemovalCount(t, db, freeKey))
+}

@@ -184,6 +184,10 @@ type Querier interface {
 	// single-tenant deployment, and the moment a second workspace exists it
 	// would start delivering one tenant's events to another.
 	CountEnabledWorkspaces(ctx context.Context) (int64, error)
+	// How many storage_objects rows hold a key, confirmed or reserved. A
+	// reservation is a live claim on the key, so a drainer that finds any row
+	// leaves the blob to that row's lifecycle.
+	CountStorageObjectsByKey(ctx context.Context, storageKey string) (int64, error)
 	// Count of v_workspace_activity rows matching the same filters as
 	// ListWorkspaceActivity (no cursor).
 	CountWorkspaceActivity(ctx context.Context, arg CountWorkspaceActivityParams) (int64, error)

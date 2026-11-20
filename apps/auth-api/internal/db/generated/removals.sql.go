@@ -10,6 +10,22 @@ import (
 	"strings"
 )
 
+const countStorageObjectsByKey = `-- name: CountStorageObjectsByKey :one
+SELECT COUNT(*) AS held
+FROM storage_objects
+WHERE storage_key = ?
+`
+
+// How many storage_objects rows hold a key, confirmed or reserved. A
+// reservation is a live claim on the key, so a drainer that finds any row
+// leaves the blob to that row's lifecycle.
+func (q *Queries) CountStorageObjectsByKey(ctx context.Context, storageKey string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countStorageObjectsByKey, storageKey)
+	var held int64
+	err := row.Scan(&held)
+	return held, err
+}
+
 const deleteStorageBlobRemoval = `-- name: DeleteStorageBlobRemoval :execrows
 DELETE FROM storage_blob_removals
 WHERE id = ?

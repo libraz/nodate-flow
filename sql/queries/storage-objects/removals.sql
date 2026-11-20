@@ -26,3 +26,11 @@ WHERE id = ?;
 -- object storage itself.
 DELETE FROM storage_blob_removals
 WHERE storage_key IN (sqlc.slice('storage_keys'));
+
+-- name: CountStorageObjectsByKey :one
+-- How many storage_objects rows hold a key, confirmed or reserved. A
+-- reservation is a live claim on the key, so a drainer that finds any row
+-- leaves the blob to that row's lifecycle.
+SELECT COUNT(*) AS held
+FROM storage_objects
+WHERE storage_key = ?;
