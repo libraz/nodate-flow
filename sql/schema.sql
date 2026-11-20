@@ -37,10 +37,16 @@ DROP TABLE IF EXISTS `workspace_members`;
 DROP TABLE IF EXISTS `workspaces`;
 DROP TABLE IF EXISTS `album_photos`;
 DROP TABLE IF EXISTS `avatar_uploads`;
+DROP TABLE IF EXISTS `calendar_cover_images`;
 DROP TABLE IF EXISTS `calendar_invites`;
+DROP TABLE IF EXISTS `calendar_schedule_poll_answers`;
+DROP TABLE IF EXISTS `calendar_schedule_poll_members`;
+DROP TABLE IF EXISTS `calendar_schedule_poll_slots`;
+DROP TABLE IF EXISTS `calendar_schedule_polls`;
 DROP TABLE IF EXISTS `email_verifications`;
 DROP TABLE IF EXISTS `oauth_provider_configs`;
 DROP TABLE IF EXISTS `password_resets`;
+DROP TABLE IF EXISTS `schedule_availability_calendars`;
 DROP TABLE IF EXISTS `signin_states`;
 DROP TABLE IF EXISTS `agent_runs`;
 DROP TABLE IF EXISTS `ai_agents`;
@@ -1577,6 +1583,17 @@ CREATE TABLE avatar_uploads (
   CONSTRAINT fk_avatar_uploads_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='In-flight avatar upload reservations';
 
+-- >>> calendar_cover_images.sql
+-- The active uploaded cover for a shared calendar.
+CREATE TABLE calendar_cover_images (
+  calendar_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  storage_object_id INT UNSIGNED NOT NULL,
+  CONSTRAINT fk_calendar_cover_images_calendar
+    FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_cover_images_object
+    FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Uploaded cover images for shared calendars';
+
 -- >>> calendar_invites.sql
 -- ====================================
 -- calendar_invites
@@ -1616,6 +1633,81 @@ CREATE TABLE calendar_invites (
 
   CONSTRAINT chk_calendar_invites_uses CHECK (max_uses IS NULL OR use_count <= max_uses)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Join-by-link calendar invitations';
+
+-- >>> calendar_schedule_poll_answers.sql
+CREATE TABLE calendar_schedule_poll_answers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  poll_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_schedule_polls.id',
+  slot_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to a slot in the same poll',
+  member_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to a recipient in the same poll',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to the answering user; must match member_id',
+  value ENUM('yes','maybe','no') NOT NULL,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_calendar_schedule_poll_answers_poll_slot_member (poll_id, slot_id, member_id),
+  KEY idx_calendar_schedule_poll_answers_member (poll_id, member_id, slot_id),
+  KEY idx_calendar_schedule_poll_answers_user (user_id, poll_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Private yes/maybe/no responses for each recipient and candidate';
+
+-- >>> calendar_schedule_poll_members.sql
+CREATE TABLE calendar_schedule_poll_members (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  poll_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_schedule_polls.id',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id; public responses use the user public ID',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'FALSE when removed from this poll; re-adding requires fresh answers',
+  answer_version INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Per-recipient optimistic revision for stale ballot tabs',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_calendar_schedule_poll_members_poll_user (poll_id, user_id),
+  UNIQUE KEY uniq_calendar_schedule_poll_members_poll_id_id_user (poll_id, id, user_id),
+  KEY idx_calendar_schedule_poll_members_user (user_id, poll_id, enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Snapshot of recipients chosen when a private schedule poll is sent';
+
+-- >>> calendar_schedule_poll_slots.sql
+CREATE TABLE calendar_schedule_poll_slots (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible candidate ID',
+  poll_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_schedule_polls.id',
+  start_at DATETIME(3) NOT NULL COMMENT 'Candidate start instant stored as UTC',
+  end_at DATETIME(3) NOT NULL COMMENT 'Candidate end instant stored as UTC',
+  availability ENUM('open','soft','hard') NOT NULL COMMENT 'Latest aggregate availability; no event details are stored here',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Hard conflicts are kept for the manager to see but removed from response requirements',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_calendar_schedule_poll_slots_public_id (public_id),
+  UNIQUE KEY uniq_calendar_schedule_poll_slots_poll_public_id (poll_id, public_id),
+  UNIQUE KEY uniq_calendar_schedule_poll_slots_poll_id_id (poll_id, id),
+  KEY idx_calendar_schedule_poll_slots_poll_enabled (poll_id, enabled, start_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Private schedule poll candidate instants';
+
+-- >>> calendar_schedule_polls.sql
+-- Private, time-only request state. Poll answers are intentionally not
+-- written to the shared events log; finalizing the poll writes one ordinary
+-- calendar event through the existing event creation path.
+CREATE TABLE calendar_schedule_polls (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible poll ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id',
+  created_by_user_id INT UNSIGNED NULL COMMENT 'Creator; nullable so account removal preserves private history',
+  manager_user_id INT UNSIGNED NULL COMMENT 'Current manager; owner/manager may explicitly take over when absent or inactive',
+  title VARCHAR(500) NOT NULL,
+  timezone VARCHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL,
+  status ENUM('open','finalized','cancelled') NOT NULL DEFAULT 'open',
+  version INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Lifecycle and organizer-edit revision',
+  response_version INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'Roster/candidate revision used to reject stale answers',
+  selected_slot_public_id BINARY(16) NULL COMMENT 'Chosen candidate UUID after finalization',
+  confirmed_event_public_id BINARY(16) NULL COMMENT 'Public ID of the ordinary event created at finalization; retained if that event is deleted',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_calendar_schedule_polls_public_id (public_id),
+  UNIQUE KEY uniq_calendar_schedule_polls_workspace_public_id (workspace_id, public_id),
+  KEY idx_calendar_schedule_polls_calendar_status (workspace_id, calendar_id, status, created_at),
+  KEY idx_calendar_schedule_polls_manager (workspace_id, manager_user_id, status),
+  KEY idx_calendar_schedule_polls_calendar_id_id (calendar_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Private schedule poll lifecycle; only finalized events enter shared history';
 
 -- >>> email_verifications.sql
 -- ====================================
@@ -1723,6 +1815,19 @@ CREATE TABLE password_resets (
 
   CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Single-use password reset tokens';
+
+-- >>> schedule_availability_calendars.sql
+-- A calendar's managers can contribute aggregate busy time to other
+-- schedule polls in the same workspace. No row means no sharing.
+CREATE TABLE schedule_availability_calendars (
+  calendar_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  CONSTRAINT fk_schedule_availability_calendars_calendar
+    FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Source calendar consent to workspace schedule availability checks';
 
 -- >>> signin_states.sql
 -- ====================================
@@ -3843,10 +3948,40 @@ BEGIN
   END IF;
 END$$
 DELIMITER ;
+CALL nf_drop_fk_if_exists('calendar_schedule_polls', 'fk_calendar_schedule_polls_workspace');
+CALL nf_drop_fk_if_exists('calendar_schedule_polls', 'fk_calendar_schedule_polls_calendar');
+CALL nf_drop_fk_if_exists('calendar_schedule_polls', 'fk_calendar_schedule_polls_creator');
+CALL nf_drop_fk_if_exists('calendar_schedule_polls', 'fk_calendar_schedule_polls_manager');
+CALL nf_drop_fk_if_exists('calendar_schedule_poll_slots', 'fk_calendar_schedule_poll_slots_poll');
+CALL nf_drop_fk_if_exists('calendar_schedule_poll_members', 'fk_calendar_schedule_poll_members_poll');
+CALL nf_drop_fk_if_exists('calendar_schedule_poll_members', 'fk_calendar_schedule_poll_members_user');
+CALL nf_drop_fk_if_exists('calendar_schedule_poll_answers', 'fk_calendar_schedule_poll_answers_slot');
 CALL nf_drop_fk_if_exists('calendar_events', 'fk_calendar_events_task');
 CALL nf_drop_fk_if_exists('events', 'fk_events_actor_agent');
 CALL nf_drop_fk_if_exists('events', 'fk_events_task');
 CALL nf_drop_fk_if_exists('events', 'fk_events_triggered_by_signal');
+
+-- >>> schedule_polls.sql
+ALTER TABLE calendar_schedule_polls
+  ADD CONSTRAINT fk_calendar_schedule_polls_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE ON UPDATE RESTRICT;
+ALTER TABLE calendar_schedule_polls
+  ADD CONSTRAINT fk_calendar_schedule_polls_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE ON UPDATE RESTRICT;
+ALTER TABLE calendar_schedule_polls
+  ADD CONSTRAINT fk_calendar_schedule_polls_creator FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL ON UPDATE RESTRICT;
+ALTER TABLE calendar_schedule_polls
+  ADD CONSTRAINT fk_calendar_schedule_polls_manager FOREIGN KEY (manager_user_id) REFERENCES users(id) ON DELETE SET NULL ON UPDATE RESTRICT;
+
+ALTER TABLE calendar_schedule_poll_slots
+  ADD CONSTRAINT fk_calendar_schedule_poll_slots_poll FOREIGN KEY (poll_id) REFERENCES calendar_schedule_polls(id) ON DELETE CASCADE ON UPDATE RESTRICT;
+
+ALTER TABLE calendar_schedule_poll_members
+  ADD CONSTRAINT fk_calendar_schedule_poll_members_poll FOREIGN KEY (poll_id) REFERENCES calendar_schedule_polls(id) ON DELETE CASCADE ON UPDATE RESTRICT;
+ALTER TABLE calendar_schedule_poll_members
+  ADD CONSTRAINT fk_calendar_schedule_poll_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE RESTRICT;
+
+ALTER TABLE calendar_schedule_poll_answers
+  ADD CONSTRAINT fk_calendar_schedule_poll_answers_slot FOREIGN KEY (poll_id, slot_id) REFERENCES calendar_schedule_poll_slots(poll_id, id) ON DELETE CASCADE ON UPDATE RESTRICT,
+  ADD CONSTRAINT fk_calendar_schedule_poll_answers_member FOREIGN KEY (poll_id, member_id, user_id) REFERENCES calendar_schedule_poll_members(poll_id, id, user_id) ON DELETE CASCADE ON UPDATE RESTRICT;
 
 -- >>> fk_calendar_events_task.sql
 -- Cross-layer foreign key: calendar_events.task_id -> tasks.id
@@ -3890,6 +4025,7 @@ ALTER TABLE events
 DROP PROCEDURE IF EXISTS nf_drop_fk_if_exists;
 
 DROP VIEW IF EXISTS `storage_objects_unreferenced`;
+DROP VIEW IF EXISTS `v_calendar_cover_images`;
 
 -- >>> storage_objects_unreferenced.sql
 -- ====================================
@@ -3925,8 +4061,20 @@ WHERE so.ref_count = 0
     SELECT 1 FROM album_photos ap WHERE ap.thumbnail_object_id = so.id
   )
   AND NOT EXISTS (
+    SELECT 1 FROM calendar_cover_images ci WHERE ci.storage_object_id = so.id
+  )
+  AND NOT EXISTS (
     SELECT 1 FROM users u WHERE u.avatar_storage_object_id = so.id
   );
+
+-- >>> v_calendar_cover_images.sql
+-- Only verified objects in the calendar's own workspace can be displayed.
+CREATE VIEW v_calendar_cover_images AS
+SELECT c.workspace_id, c.id AS calendar_id, so.storage_key
+FROM calendar_cover_images ci
+JOIN calendars c ON c.id = ci.calendar_id AND c.enabled = TRUE
+JOIN storage_objects so ON so.id = ci.storage_object_id AND so.workspace_id = c.workspace_id
+WHERE so.enabled = TRUE AND so.uploaded_at IS NOT NULL;
 
 DROP VIEW IF EXISTS `v_admin_users`;
 DROP VIEW IF EXISTS `v_ai_suggestion_readable_batches`;
@@ -4904,10 +5052,225 @@ END$$
 
 DELIMITER ;
 
-DROP TRIGGER IF EXISTS `trg_attachments_work_revision`;
+DROP TRIGGER IF EXISTS `calendar_album_photo_disable`;
+DROP TRIGGER IF EXISTS `calendar_cover_image_disable`;
+DROP TRIGGER IF EXISTS `user_album_photo_teardown`;
+DROP TRIGGER IF EXISTS `workspace_album_photo_teardown`;
+DROP TRIGGER IF EXISTS `workspace_calendar_cover_teardown`;
+
+-- >>> calendar_album_photo_disable.sql
+-- Both applications can disable a shared calendar. Retire its album photos
+-- with it; their references stay held until the cleanup sweep releases them.
+-- The UPDATE already holds the calendar row, so the photos lock after it, the
+-- same order as confirming a photo.
+DELIMITER $$
+CREATE TRIGGER calendar_album_photo_disable
+BEFORE UPDATE ON calendars FOR EACH ROW
+BEGIN
+  IF OLD.enabled AND NOT NEW.enabled THEN
+    UPDATE album_photos SET enabled = FALSE, retired_at = CURRENT_TIMESTAMP(3)
+    WHERE calendar_id = OLD.id AND enabled = TRUE;
+  END IF;
+END$$
+DELIMITER ;
+
+-- >>> calendar_cover_image_disable.sql
+-- Both applications can disable a shared calendar. Release its uploaded
+-- cover when that happens, using the same calendar-before-object lock order
+-- as the cover API. The normal storage sweep reclaims the unreferenced blob.
+DELIMITER $$
+CREATE TRIGGER calendar_cover_image_disable
+BEFORE UPDATE ON calendars FOR EACH ROW
+BEGIN
+  IF OLD.enabled AND NOT NEW.enabled THEN
+    UPDATE storage_objects so
+    INNER JOIN calendar_cover_images ci ON ci.storage_object_id = so.id
+    SET so.ref_count = GREATEST(so.ref_count, 1) - 1
+    WHERE ci.calendar_id = OLD.id;
+
+    DELETE FROM calendar_cover_images WHERE calendar_id = OLD.id;
+  END IF;
+END$$
+DELIMITER ;
+
+-- >>> user_album_photo_teardown.sql
+-- Either application can hard-delete a user. Their uploads and every photo
+-- and cover on the calendars they own would cascade (owned calendars fire no
+-- trigger) past the RESTRICT on storage_objects, so release and remove them
+-- here. Objects are workspace-scoped and survive: only photo keys no
+-- storage_objects row holds are queued, and the unreferenced sweep reclaims
+-- the rest. Lock order is owned calendars, photos, objects, queue, covers,
+-- matching the calendar-first request paths. The photo set is two indexed
+-- lookups joined by UNION; an OR plans as a full scan. STRAIGHT_JOIN keeps
+-- each read driven from the user's rows, so no unrelated row is locked.
+DELIMITER $$
+CREATE TRIGGER user_album_photo_teardown
+BEFORE DELETE ON users FOR EACH ROW
+BEGIN
+  DECLARE locked_rows INT;
+
+  SELECT COUNT(*) INTO locked_rows FROM calendars
+  WHERE owner_user_id = OLD.id FOR UPDATE;
+
+  SELECT COUNT(*) INTO locked_rows FROM album_photos
+  WHERE uploaded_by_user_id = OLD.id FOR UPDATE;
+
+  SELECT COUNT(*) INTO locked_rows
+  FROM calendars c STRAIGHT_JOIN album_photos ap ON ap.calendar_id = c.id
+  WHERE c.owner_user_id = OLD.id
+  FOR UPDATE;
+
+  -- A multi-table UPDATE changes a row once, so photos sharing an object are
+  -- counted first and released together.
+  WITH p AS (
+    SELECT id FROM album_photos WHERE uploaded_by_user_id = OLD.id
+    UNION
+    SELECT ap.id
+    FROM calendars c STRAIGHT_JOIN album_photos ap ON ap.calendar_id = c.id
+    WHERE c.owner_user_id = OLD.id
+  )
+  UPDATE storage_objects so
+  INNER JOIN (
+    SELECT x.object_id, COUNT(*) AS n
+    FROM (
+      SELECT ap.storage_object_id AS object_id
+      FROM p STRAIGHT_JOIN album_photos ap ON ap.id = p.id
+      UNION ALL
+      SELECT ap.thumbnail_object_id
+      FROM p STRAIGHT_JOIN album_photos ap ON ap.id = p.id
+    ) x
+    WHERE x.object_id IS NOT NULL
+    GROUP BY x.object_id
+  ) r ON r.object_id = so.id
+  SET so.ref_count = GREATEST(so.ref_count, r.n) - r.n;
+
+  -- The photo and .thumb keys are tested independently. A key over 255
+  -- characters, '.thumb' included, cannot exist in storage_objects or the queue.
+  INSERT INTO storage_blob_removals (storage_key)
+  WITH p AS (
+    SELECT id FROM album_photos WHERE uploaded_by_user_id = OLD.id
+    UNION
+    SELECT ap.id
+    FROM calendars c STRAIGHT_JOIN album_photos ap ON ap.calendar_id = c.id
+    WHERE c.owner_user_id = OLD.id
+  )
+  SELECT k.storage_key FROM (
+    SELECT CONVERT(ap.storage_key USING latin1) AS storage_key
+    FROM p STRAIGHT_JOIN album_photos ap ON ap.id = p.id
+    WHERE ap.storage_key <> '' AND CHAR_LENGTH(ap.storage_key) <= 255
+    UNION
+    SELECT CONVERT(CONCAT(ap.storage_key, '.thumb') USING latin1)
+    FROM p STRAIGHT_JOIN album_photos ap ON ap.id = p.id
+    WHERE ap.storage_key <> '' AND CHAR_LENGTH(ap.storage_key) <= 249
+  ) k
+  WHERE NOT EXISTS (
+    SELECT 1 FROM storage_objects so
+    WHERE so.storage_key = k.storage_key
+      AND BINARY so.storage_key = BINARY k.storage_key
+  )
+  ON DUPLICATE KEY UPDATE storage_key = VALUES(storage_key);
+
+  WITH p AS (
+    SELECT id FROM album_photos WHERE uploaded_by_user_id = OLD.id
+    UNION
+    SELECT ap.id
+    FROM calendars c STRAIGHT_JOIN album_photos ap ON ap.calendar_id = c.id
+    WHERE c.owner_user_id = OLD.id
+  )
+  DELETE ap FROM p STRAIGHT_JOIN album_photos ap ON ap.id = p.id;
+
+  SELECT COUNT(*) INTO locked_rows
+  FROM calendars c STRAIGHT_JOIN calendar_cover_images ci ON ci.calendar_id = c.id
+  WHERE c.owner_user_id = OLD.id
+  FOR UPDATE;
+
+  -- Two owned calendars may share one cover object.
+  UPDATE storage_objects so
+  INNER JOIN (
+    SELECT ci.storage_object_id AS object_id, COUNT(*) AS n
+    FROM calendars c STRAIGHT_JOIN calendar_cover_images ci ON ci.calendar_id = c.id
+    WHERE c.owner_user_id = OLD.id
+    GROUP BY ci.storage_object_id
+  ) r ON r.object_id = so.id
+  SET so.ref_count = GREATEST(so.ref_count, r.n) - r.n;
+
+  DELETE ci FROM calendars c STRAIGHT_JOIN calendar_cover_images ci ON ci.calendar_id = c.id
+  WHERE c.owner_user_id = OLD.id;
+END$$
+DELIMITER ;
+
+-- >>> workspace_album_photo_teardown.sql
+-- Flow deletes a workspace without naming album_photos, whose RESTRICT on
+-- storage_objects would refuse the cascade. Queue every photo key, its
+-- .thumb, and every object key the photos point at, then delete the photos.
+-- No held filter: the objects holding these keys cascade right after, and a
+-- photo confirmed after Flow listed the workspace keys is queued only here.
+-- No reference is released, because the objects go with the workspace.
+DELIMITER $$
+CREATE TRIGGER workspace_album_photo_teardown
+BEFORE DELETE ON workspaces FOR EACH ROW
+BEGIN
+  DECLARE locked_rows INT;
+
+  SELECT COUNT(*) INTO locked_rows FROM album_photos
+  WHERE workspace_id = OLD.id FOR UPDATE;
+
+  -- A key (or key plus '.thumb') over 255 characters cannot exist in
+  -- storage_objects or the queue.
+  INSERT INTO storage_blob_removals (storage_key)
+  SELECT k.storage_key FROM (
+    SELECT CONVERT(ap.storage_key USING latin1) AS storage_key
+    FROM album_photos ap
+    WHERE ap.workspace_id = OLD.id AND ap.storage_key <> '' AND CHAR_LENGTH(ap.storage_key) <= 255
+    UNION
+    SELECT CONVERT(CONCAT(ap.storage_key, '.thumb') USING latin1)
+    FROM album_photos ap
+    WHERE ap.workspace_id = OLD.id AND ap.storage_key <> '' AND CHAR_LENGTH(ap.storage_key) <= 249
+    UNION
+    SELECT so.storage_key
+    FROM album_photos ap INNER JOIN storage_objects so ON so.id = ap.storage_object_id
+    WHERE ap.workspace_id = OLD.id
+    UNION
+    SELECT so.storage_key
+    FROM album_photos ap INNER JOIN storage_objects so ON so.id = ap.thumbnail_object_id
+    WHERE ap.workspace_id = OLD.id
+  ) k
+  ON DUPLICATE KEY UPDATE storage_key = VALUES(storage_key);
+
+  DELETE FROM album_photos WHERE workspace_id = OLD.id;
+END$$
+DELIMITER ;
+
+-- >>> workspace_calendar_cover_teardown.sql
+-- A cover upload may commit after Flow lists workspace storage keys. Queue
+-- cover keys again under the workspace delete lock before their rows cascade.
+-- The unique queue key makes this safe when the caller already queued one.
+DELIMITER $$
+CREATE TRIGGER workspace_calendar_cover_teardown
+BEFORE DELETE ON workspaces FOR EACH ROW
+BEGIN
+  INSERT INTO storage_blob_removals (storage_key)
+  SELECT so.storage_key
+  FROM storage_objects so
+  WHERE so.workspace_id = OLD.id AND so.storage_key LIKE 'calendar-covers/%'
+  ON DUPLICATE KEY UPDATE storage_key = VALUES(storage_key);
+
+  DELETE ci FROM calendar_cover_images ci
+  INNER JOIN calendars c ON c.id = ci.calendar_id
+  WHERE c.workspace_id = OLD.id;
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `trg_attachments_work_revision_insert`;
+DROP TRIGGER IF EXISTS `trg_attachments_work_revision_update`;
+DROP TRIGGER IF EXISTS `trg_attachments_work_revision_delete`;
+DROP TRIGGER IF EXISTS `trg_storage_objects_attachment_work_revision`;
 DROP TRIGGER IF EXISTS `trg_task_handoffs_immutable`;
+DROP TRIGGER IF EXISTS `trg_task_handoffs_immutable_delete`;
 DROP TRIGGER IF EXISTS `trg_task_review_decisions_immutable`;
+DROP TRIGGER IF EXISTS `trg_task_review_decisions_immutable_delete`;
 DROP TRIGGER IF EXISTS `trg_task_submissions_immutable`;
+DROP TRIGGER IF EXISTS `trg_task_submissions_immutable_delete`;
 DROP TRIGGER IF EXISTS `trg_tasks_derived_state_guard`;
 DROP TRIGGER IF EXISTS `trg_tasks_work_revision`;
 

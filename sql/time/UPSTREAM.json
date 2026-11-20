@@ -1,8 +1,12 @@
 {
   "repository": "git@github.com:libraz/nodate-time.git",
   "sourcePath": "sql/time",
-  "ref": "5278c4fc68a617eb61266d43adcfdcbaa82331ed",
+  "ref": "94192641559a22e6204c57c76650f80c0ebcb80f",
   "files": [
+    {
+      "path": "constraints/schedule_polls.sql",
+      "sha256": "faa5ef16385add8c8adcb50beb55e89ca316152f0eea2225c82bede45e9528b4"
+    },
     {
       "path": "event-kinds.yaml",
       "sha256": "1e36afcb53f8b6cbceba559cae3d9857d089b8b87cf90f5fdd1817433480216f"
@@ -16,8 +20,28 @@
       "sha256": "4f011f2f14509f8b549d10e6fb7fc2a7750ffa51b82c8182480f3209cbe48a86"
     },
     {
+      "path": "tables/calendar_cover_images.sql",
+      "sha256": "1abc6df4de5dbc43f5796eb3708f72a723464f1c3d2d873e3da40ae0d5f56f96"
+    },
+    {
       "path": "tables/calendar_invites.sql",
       "sha256": "80bd370b0996635cf09ec09d64eb531343e48bee68786db6f9115f1614ccab86"
+    },
+    {
+      "path": "tables/calendar_schedule_poll_answers.sql",
+      "sha256": "78096938d812f787f914db74f831c1fa1ddd604822b49fef784f62465c8ebf17"
+    },
+    {
+      "path": "tables/calendar_schedule_poll_members.sql",
+      "sha256": "02acd172258f71a3afe4db0ebe9e60d5ed1e75767b03d4ed4db5de29b5aa39cb"
+    },
+    {
+      "path": "tables/calendar_schedule_poll_slots.sql",
+      "sha256": "251a39ced66a673a473b7ac0c63bbd69da3088409d6ef470bd15f3da25059772"
+    },
+    {
+      "path": "tables/calendar_schedule_polls.sql",
+      "sha256": "5551341a6371cb7d94c3da9d8d07d79dc0d6f3f00ffa38b502a83863855098cf"
     },
     {
       "path": "tables/email_verifications.sql",
@@ -32,16 +56,56 @@
       "sha256": "ed152fc02d4b08332591c1139915894043ee4391aa850dda05f0047d79bf6221"
     },
     {
+      "path": "tables/schedule_availability_calendars.sql",
+      "sha256": "0fe8132f274648418d9098191ed3824badf4e99fe6c4406e8b18d03d62ea095a"
+    },
+    {
       "path": "tables/signin_states.sql",
       "sha256": "a1acf4efbe75650c57b8d7f24fd6ff2109a98f0bae1881da19012ee2782100fd"
     },
     {
+      "path": "triggers/calendar_album_photo_disable.sql",
+      "sha256": "03d71966823bfd27b9cf86e38b8954af97daec47a8feaa4dc13edf73b2eef004"
+    },
+    {
+      "path": "triggers/calendar_cover_image_disable.sql",
+      "sha256": "c70cacbe525f16a407ef423ab4144f7aadac42bf6c16b97d5f1db0636aa9716a"
+    },
+    {
+      "path": "triggers/user_album_photo_teardown.sql",
+      "sha256": "eb56d20b4a7c2dcc71b7502d450716eb875cba61049684646def37c41619b48b"
+    },
+    {
+      "path": "triggers/workspace_album_photo_teardown.sql",
+      "sha256": "7555c8df8dc45e522f8969e5812c8b2105bdd47f7a548fe91c3e61a0e00e3a0f"
+    },
+    {
+      "path": "triggers/workspace_calendar_cover_teardown.sql",
+      "sha256": "338531aa0606f3c83b3df904a06ebced944e80b1271ed0a013784cf744262237"
+    },
+    {
+      "path": "upgrades/calendar-covers.sql",
+      "sha256": "276fc2bb7cd6e5703993f2e2a95f4a67bbb9a9512cea6605581ced6fe582e9db"
+    },
+    {
       "path": "upgrades/from-v0.1.0.sql",
-      "sha256": "f02ed5f3b9cb6b702165a8308c11be6c91508d90c54567c3ea9d38982f692e75"
+      "sha256": "fcc85351edc7e96a767c3bad87bbf44a7d42b67d36f2894f19548866d577b216"
+    },
+    {
+      "path": "upgrades/schedule-polls.sql",
+      "sha256": "910349a11e6d3eaaac6b05b661a9e3313645fbe1e39856c5cdd78b8475a0d4b1"
+    },
+    {
+      "path": "upgrades/triggers.sql",
+      "sha256": "698f5e2eed552774b6aef54d0617554b25708f2bfb9d44442f1c6efedbedbcb6"
     },
     {
       "path": "views/storage_objects_unreferenced.sql",
-      "sha256": "d93f756ff16a0c41c96e930d948e89efdefd45f098edf246b47b21f79bd92857"
+      "sha256": "75ac6b2b7342d45919a5eaa36c06b4f902825ac73b58eb97fc6829044b0063a0"
+    },
+    {
+      "path": "views/v_calendar_cover_images.sql",
+      "sha256": "f598946fb16302ed40133fb6d98ff7cd19796c515a3f28aa3dffd7d5a7eee4e5"
     }
   ]
 }
