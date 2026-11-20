@@ -10,6 +10,7 @@
 import Badge, { type BadgeTone } from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -17,7 +18,7 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { type FormEvent, type ReactElement, useId, useState } from 'react';
+import { type FormEvent, type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { formatApiError } from '../../lib/api-error';
@@ -25,6 +26,8 @@ import { formatDate } from '../../lib/format';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
 import { useWeekStart } from '../../lib/use-week-start';
 import { AiSparkle } from '../ai-suggestions/ai-consequence';
+import { selectUser, useAuth } from '../auth/auth-store';
+import { useWorkspaceMembersQuery } from '../workspaces/api';
 import { type TaskPriority, useCreateTask } from './api';
 import PriorityControl from './priority-control';
 import {
@@ -95,6 +98,13 @@ export default function TaskCreateDialog({
   const { guard, submitting, end } = useSubmitGuard();
   const priorityLabelId = useId();
 
+  // The assignee defaults to the caller, who is already known synchronously,
+  // so the member list loading never holds up typing or submitting.
+  const self = useAuth(selectUser);
+  const selfId = self?.id;
+  const [pickedAssignee, setPickedAssignee] = useState<string | null>(null);
+  const assigneeId = pickedAssignee ?? selfId;
+
   // AI Assist state
   const [proposal, setProposal] = useState<SmartProposal | null>(null);
   const [selectedAssignees, setSelectedAssignees] = useState<Set<string>>(new Set());
@@ -105,6 +115,7 @@ export default function TaskCreateDialog({
     resetCore();
     setPriority(2);
     setDueOn('');
+    setPickedAssignee(null);
     setErrors({});
     setProposal(null);
     setSelectedAssignees(new Set());
@@ -191,7 +202,8 @@ export default function TaskCreateDialog({
         description: description.trim(),
         priority,
         ...(dueOn ? { dueOn } : {}),
-        assigneeUserIds: [...selectedAssignees],
+        // apply-smart never self-assigns, so the field value always goes in.
+        assigneeUserIds: [...new Set([...selectedAssignees, ...(assigneeId ? [assigneeId] : [])])],
         subtasks,
       });
       reset();
@@ -228,6 +240,9 @@ export default function TaskCreateDialog({
     }
     setErrors({});
     if (guard()) return;
+    // Omitting `actors` makes the server assign the caller, so only another
+    // member needs to be spelled out.
+    const otherAssignee = workspaceId && assigneeId && assigneeId !== selfId ? assigneeId : null;
     try {
       await create.mutateAsync({
         projectId,
@@ -236,6 +251,9 @@ export default function TaskCreateDialog({
         priority: parsed.data.priority as TaskPriority,
         ...(parsed.data.dueOn ? { dueOn: parsed.data.dueOn } : {}),
         visibility: 'public' as const,
+        ...(otherAssignee
+          ? { actors: [{ role: 'assignee' as const, userId: otherAssignee }] }
+          : {}),
       });
       reset();
       onClose();
@@ -308,6 +326,23 @@ export default function TaskCreateDialog({
           </div>
         </div>
 
+        {workspaceId && assigneeId ? (
+          <FormField label={t('tasks.form.assignee')} description={t('tasks.form.assignee_hint')}>
+            {(control) => (
+              <Suspense fallback={<Skeleton style={{ blockSize: 'var(--nf-control-height)' }} />}>
+                <AssigneeCombobox
+                  id={control.id}
+                  workspaceId={workspaceId}
+                  selfId={selfId}
+                  selfName={self?.displayName ?? ''}
+                  value={assigneeId}
+                  onChange={setPickedAssignee}
+                />
+              </Suspense>
+            )}
+          </FormField>
+        ) : null}
+
         <div className={styles.fieldWithError}>
           <FormField
             label={t('tasks.form.due')}
@@ -378,6 +413,38 @@ export default function TaskCreateDialog({
 }
 
 /* ── Internal presentational components ──────────────────────── */
+
+interface AssigneeComboboxProps {
+  id: string;
+  workspaceId: string;
+  selfId: string | undefined;
+  selfName: string;
+  value: string;
+  onChange: (userId: string) => void;
+}
+
+/** Joined members only; the caller comes first under their own label. */
+function AssigneeCombobox({
+  id,
+  workspaceId,
+  selfId,
+  selfName,
+  value,
+  onChange,
+}: AssigneeComboboxProps): ReactElement {
+  const { t } = useTranslation('common');
+  const { data: members } = useWorkspaceMembersQuery(workspaceId);
+  const options = [
+    ...(selfId
+      ? [{ value: selfId, label: t('tasks.form.assignee_self', { name: selfName }) }]
+      : []),
+    ...members
+      .filter((m) => m.joinedAt && m.userId !== selfId)
+      .map((m) => ({ value: m.userId, label: m.displayName })),
+  ];
+
+  return <Combobox id={id} options={options} value={value} onChange={onChange} />;
+}
 
 interface SmartCreateSectionProps {
   proposing: boolean;
