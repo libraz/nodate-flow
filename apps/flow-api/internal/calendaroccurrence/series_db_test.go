@@ -145,3 +145,74 @@ func TestRealignSeriesWithdrawsOverridesWhenTheRuleIsCleared(t *testing.T) {
 		`SELECT enabled FROM calendar_events WHERE id = ?`, fx.overrideID).Scan(&enabled))
 	require.False(t, enabled, "clearing the rule must withdraw the series' overrides")
 }
+
+// TestSplitSeriesCarriesOnlyCalendarMemberAttendees: the continuing master
+// copies the attendees that still qualify, so a user whose calendar
+// membership has been revoked does not reappear on the new series.
+func TestSplitSeriesCarriesOnlyCalendarMemberAttendees(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	ctx := context.Background()
+	fx := seedRealignFixture(t, db)
+	cq := calendar.New(db)
+	master := fx.read(t, cq)
+
+	member := func(label string, calendarMember bool) uint32 {
+		suffix := uuid.New().String()[:8]
+		res, err := db.ExecContext(ctx, `INSERT INTO users (public_id, email, display_name, locale) VALUES (?, ?, ?, 'en')`,
+			types.New(), label+"-"+suffix+"@example.test", label)
+		require.NoError(t, err)
+		id, err := res.LastInsertId()
+		require.NoError(t, err)
+		uid := uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
+		_, err = db.ExecContext(ctx, `INSERT INTO workspace_members (public_id, workspace_id, user_id) VALUES (?, ?, ?)`,
+			types.New(), fx.wsID, uid)
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx,
+			`INSERT INTO calendar_members (public_id, workspace_id, calendar_id, user_id, enabled) VALUES (?, ?, ?, ?, ?)`,
+			types.New(), fx.wsID, fx.calendarID, uid, calendarMember)
+		require.NoError(t, err)
+		_, err = cq.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
+			PublicID:    types.New(),
+			WorkspaceID: fx.wsID,
+			EventID:     sql.NullInt32{Int32: int32(fx.masterID), Valid: true}, //#nosec G115 -- test row id
+			UserID:      uid,
+			Rsvp:        calendar.CalendarEventAttendeesRsvpPending,
+		})
+		require.NoError(t, err)
+		return uid
+	}
+	stays := member("stays", true)
+	departed := member("departed", false)
+
+	tx, err := db.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	written, refusal, err := calendaroccurrence.SplitSeries(ctx, calendaroccurrence.Queries{
+		Calendar: calendar.New(db).WithTx(tx),
+		Core:     generated.New(db).WithTx(tx),
+	}, calendaroccurrence.Split{
+		WorkspaceID: fx.wsID,
+		ActorID:     master.OwnerUserID,
+		CalendarID:  fx.calendarID,
+		Master:      master,
+		SplitStart:  realignAnchor.AddDate(0, 0, 2),
+	})
+	if err != nil || refusal != nil {
+		_ = tx.Rollback()
+		t.Fatalf("split: err=%v refusal=%v", err, refusal)
+	}
+	require.NoError(t, tx.Commit())
+
+	rows, err := db.QueryContext(ctx, `SELECT user_id FROM calendar_event_attendees WHERE event_id = ? AND enabled = TRUE`, written.ID)
+	require.NoError(t, err)
+	defer rows.Close()
+	var carried []uint32
+	for rows.Next() {
+		var uid uint32
+		require.NoError(t, rows.Scan(&uid))
+		carried = append(carried, uid)
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, []uint32{stays}, carried, "only the attendee who still holds the calendar is copied (departed=%d)", departed)
+}

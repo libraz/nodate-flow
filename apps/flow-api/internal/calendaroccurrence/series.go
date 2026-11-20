@@ -355,7 +355,7 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 		return Written{}, nil, err
 	}
 
-	if err := carrySeriesChildren(ctx, q, in.WorkspaceID, in.Master.ID, newID); err != nil {
+	if err := carrySeriesChildren(ctx, q, in.WorkspaceID, in.Master.CalendarID, in.Master.ID, newID); err != nil {
 		return Written{}, nil, err
 	}
 	// Only occurrences still to come can be reminded, so the claims worth
@@ -927,7 +927,7 @@ func disableOverride(ctx context.Context, q Queries, workspaceID uint32, r calen
 // Invites move, because an invite is a single token-bound grant per
 // attendee and the link its recipient holds should answer for the
 // occurrences still to come.
-func carrySeriesChildren(ctx context.Context, q Queries, workspaceID, oldID, newID uint32) error {
+func carrySeriesChildren(ctx context.Context, q Queries, workspaceID, calendarID, oldID, newID uint32) error {
 	attendees, err := q.Calendar.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
 		EventID:     nullID(oldID),
 		WorkspaceID: workspaceID,
@@ -937,6 +937,26 @@ func carrySeriesChildren(ctx context.Context, q Queries, workspaceID, oldID, new
 	}
 	attendeeOf := make(map[uint32]uint32, len(attendees))
 	for _, a := range attendees {
+		// Only an attendee who still qualifies is copied; a filtered one's
+		// invite stays with the truncated master.
+		if _, err := q.Core.FindWorkspaceMemberUserInternalIdByPublicId(ctx, generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+			WorkspaceID: workspaceID,
+			PublicID:    a.UserPublicID,
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return err
+		}
+		if _, err := q.Calendar.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+			CalendarID: calendarID,
+			UserID:     a.UserID,
+		}); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return err
+		}
 		lastID, err := q.Calendar.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
 			PublicID:    types.New(),
 			WorkspaceID: workspaceID,

@@ -297,6 +297,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("ensure sample event: %w", err)
 	}
+	if err := ensureCalendarMember(ctx, db, uint32(wsID), ownerCalID, uint32(secondID), "editor", logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
+		return fmt.Errorf("ensure second user on owner calendar: %w", err)
+	}
 	if err := ensureAttendee(ctx, db, cq, uint32(wsID), sampleEventID, uint32(secondID), logger); err != nil { //#nosec G115 -- LastInsertIds for workspaces.id and users.id fit uint32 in dev seed
 		return fmt.Errorf("ensure attendee: %w", err)
 	}

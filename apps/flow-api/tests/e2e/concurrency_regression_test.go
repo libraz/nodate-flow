@@ -64,6 +64,7 @@ func TestConcurrentCalendarInviteCreateConvergesToSingleActiveInvite(t *testing.
 	host := newTenant(t)
 	member := inviteAndJoinWorkspace(t, host)
 	calID := createCalendarMut(t, host, "Concurrent Invite Cal")
+	addCalendarMemberByEmail(t, host, calID, member.Email, "viewer")
 	evtID := createEventMut(t, host, calID, "Concurrent Invite Event")
 	attendeeID := addAttendeeMut(t, host, calID, evtID, member.UserPublicID)
 

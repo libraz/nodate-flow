@@ -295,6 +295,12 @@ carrying a `shared` label _and_ an owner still vanishes when that one person
 is removed. A calendar a group shares leaves `owner_user_id` NULL; that is
 the whole difference, and it is the difference that has teeth.
 
+An attendee row is written only for a user who, at the time of the write,
+holds an enabled `calendar_members` row on the event's calendar, an enabled
+`workspace_members` row and an enabled `users` row. Readers hide rows whose
+user no longer qualifies, and a participant-list replacement may disable
+them.
+
 Resolve the calendar id and check the grant in the same function. Splitting
 them is how an authorization check goes missing — not because someone
 decides to skip it, but because the two steps can be performed apart.

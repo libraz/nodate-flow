@@ -179,6 +179,7 @@ func TestCalendarInviteCreateAndAccept(t *testing.T) {
 	host := newTenant(t)
 	member := inviteAndJoinWorkspace(t, host)
 	calID := createCalendarMut(t, host, "Invite Mut Cal")
+	addCalendarMemberByEmail(t, host, calID, member.Email, "viewer")
 	evtID := createEventMut(t, host, calID, "Invite Mut Event")
 	attendeeID := addAttendeeMut(t, host, calID, evtID, member.UserPublicID)
 
@@ -262,6 +263,7 @@ func TestCalendarInviteAcceptIsTokenScoped(t *testing.T) {
 	outsider := newTenant(t) // entirely separate workspace
 
 	calID := createCalendarMut(t, host, "Token Scope Cal")
+	addCalendarMemberByEmail(t, host, calID, member.Email, "viewer")
 	evtID := createEventMut(t, host, calID, "Token Scope Event")
 	attendeeID := addAttendeeMut(t, host, calID, evtID, member.UserPublicID)
 

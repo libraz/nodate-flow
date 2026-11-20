@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -184,13 +186,27 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			present[row.UserID] = row
 		}
 
+		var addedIDs, addedNames []string
 		for _, uidStr := range input.Body.UserIDs {
 			uid, parseErr := uuid.Parse(uidStr)
 			if parseErr != nil {
 				continue
 			}
-			userID, findErr := deps.Queries.FindUserInternalIdByPublicId(ctx, types.FromUUID(uid))
+			// An attendee is a calendar member: the row is written only for
+			// a user who holds the calendar, and a listed attendee who has
+			// since left is omitted rather than echoed.
+			userID, findErr := deps.Queries.FindWorkspaceMemberUserInternalIdByPublicId(ctx,
+				generated.FindWorkspaceMemberUserInternalIdByPublicIdParams{
+					WorkspaceID: wsID,
+					PublicID:    types.FromUUID(uid),
+				})
 			if findErr != nil {
+				continue
+			}
+			if _, memberErr := deps.CalendarQueries.FindCalendarMember(ctx, calendar.FindCalendarMemberParams{
+				CalendarID: cal.ID,
+				UserID:     userID,
+			}); memberErr != nil {
 				continue
 			}
 			if row, already := present[userID]; already {
@@ -235,6 +251,12 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			}
 			resp.AvatarURL = handlerutil.AvatarURLPtr(profile.AvatarUrl, profile.AvatarStorageObjectID, types.FromUUID(uid))
 			out.Body.Attendees = append(out.Body.Attendees, resp)
+			addedIDs = append(addedIDs, uidStr)
+			addedNames = append(addedNames, profile.DisplayName)
+		}
+
+		if len(addedIDs) == 0 {
+			return out, nil
 		}
 
 		// The attendee list is part of the event, and one call adds
@@ -248,7 +270,9 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			Payload: map[string]any{
 				"eventId":    input.EvtID,
 				"calendarId": input.CalID,
-				"count":      len(out.Body.Attendees),
+				"count":      len(addedIDs),
+				"userIds":    addedIDs,
+				"summary":    strings.Join(addedNames, ", "),
 			},
 			CallSite: "calendars.AddAttendees",
 		})

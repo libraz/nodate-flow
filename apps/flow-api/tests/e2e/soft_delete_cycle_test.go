@@ -245,6 +245,7 @@ func TestEventInviteRevokeAndReinvite(t *testing.T) {
 	host := newTenant(t)
 	member := inviteAndJoinWorkspace(t, host)
 	calID := createCalendarMut(t, host, "Invite Cycle Cal")
+	addCalendarMemberByEmail(t, host, calID, member.Email, "viewer")
 	evtID := createEventMut(t, host, calID, "Invite Cycle Event")
 	attendeeID := addAttendeeMut(t, host, calID, evtID, member.UserPublicID)
 
