@@ -60,6 +60,7 @@ func runListFavorites(ctx context.Context, deps Deps, s *session, raw json.RawMe
 		ID         string `json:"id"`
 		TargetType string `json:"targetType"`
 		TargetID   string `json:"targetId"`
+		Title      string `json:"title,omitempty"`
 		CreatedAt  int64  `json:"createdAt"`
 	}
 	out := make([]favOut, 0, len(rows))
@@ -68,6 +69,7 @@ func runListFavorites(ctx context.Context, deps Deps, s *session, raw json.RawMe
 			ID:         r.PublicID.String(),
 			TargetType: string(r.TargetType),
 			TargetID:   r.TargetPublicID.String(),
+			Title:      r.Title,
 			CreatedAt:  r.CreatedAt.Unix(),
 		})
 	}

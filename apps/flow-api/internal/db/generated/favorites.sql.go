@@ -181,8 +181,54 @@ SELECT
   uf.folder_name,
   uf.sort_weight,
   uf.created_at,
+  COALESCE(fpr.name, ft.title, fpg.title, fl.name, ftb.name, '') AS title,
   COUNT(*) OVER() AS total
 FROM user_favorites uf
+LEFT JOIN projects fpr
+  ON uf.target_type = 'project'
+ AND fpr.workspace_id = uf.workspace_id
+ AND fpr.public_id = uf.target_public_id
+ AND fpr.enabled = TRUE
+LEFT JOIN tasks ft
+  ON uf.target_type = 'task'
+ AND ft.workspace_id = uf.workspace_id
+ AND ft.public_id = uf.target_public_id
+ AND ft.enabled = TRUE
+ AND (
+   CAST(? AS SIGNED) = 1
+   OR ft.visibility = 'public'
+   OR (ft.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = ft.project_id
+       AND pm_vis.user_id = CAST(? AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (ft.visibility = 'private' AND (
+     ft.created_by_user_id = CAST(? AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = ft.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(? AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
+LEFT JOIN pages fpg
+  ON uf.target_type = 'page'
+ AND fpg.workspace_id = uf.workspace_id
+ AND fpg.public_id = uf.target_public_id
+ AND fpg.id IN (SELECT id FROM enabled_pages)
+LEFT JOIN lenses fl
+  ON uf.target_type = 'lens'
+ AND fl.workspace_id = uf.workspace_id
+ AND fl.public_id = uf.target_public_id
+ AND fl.enabled = TRUE
+LEFT JOIN timeboxes ftb
+  ON uf.target_type = 'timebox'
+ AND ftb.workspace_id = uf.workspace_id
+ AND ftb.public_id = uf.target_public_id
+ AND ftb.enabled = TRUE
 WHERE uf.workspace_id = ?
   AND uf.user_id = ?
   AND uf.enabled = TRUE
@@ -244,9 +290,9 @@ LIMIT ? OFFSET ?
 
 type ListFavoritesForUserParams struct {
 	WorkspaceID uint32 `json:"-"`
-	UserID      uint32 `json:"-"`
 	IsElevated  int64  `json:"isElevated"`
 	ActorUserID int64  `json:"actorUserId"`
+	UserID      uint32 `json:"-"`
 	Limit       int32  `json:"limit"`
 	Offset      int32  `json:"offset"`
 }
@@ -258,6 +304,7 @@ type ListFavoritesForUserRow struct {
 	FolderName     sql.NullString          `json:"folderName"`
 	SortWeight     int32                   `json:"sortWeight"`
 	CreatedAt      time.Time               `json:"createdAt"`
+	Title          string                  `json:"title"`
 	Total          interface{}             `json:"total"`
 }
 
@@ -271,6 +318,10 @@ func (q *Queries) ListFavoritesForUser(ctx context.Context, arg ListFavoritesFor
 	rows, err := q.db.QueryContext(ctx, listFavoritesForUser,
 		arg.WorkspaceID,
 		arg.WorkspaceID,
+		arg.IsElevated,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.UserID,
 		arg.IsElevated,
@@ -294,6 +345,7 @@ func (q *Queries) ListFavoritesForUser(ctx context.Context, arg ListFavoritesFor
 			&i.FolderName,
 			&i.SortWeight,
 			&i.CreatedAt,
+			&i.Title,
 			&i.Total,
 		); err != nil {
 			return nil, err

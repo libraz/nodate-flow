@@ -427,12 +427,12 @@ func TestBellListsAndCountsOneRowPerNotification(t *testing.T) {
 
 	q := generated.New(db)
 	wsRows, err := q.ListNotificationsForWorkspace(ctx, generated.ListNotificationsForWorkspaceParams{
-		WorkspaceID: fx.wsID, RecipientUserID: fx.recipientUserID, Limit: 50,
+		WorkspaceID: fx.wsID, RecipientUserID: fx.recipientUserID, ActorUserID: int64(fx.recipientUserID), Limit: 50,
 	})
 	require.NoError(t, err)
 	require.Len(t, wsRows, 1, "workspace bell list")
 	userRows, err := q.ListNotificationsForUser(ctx, generated.ListNotificationsForUserParams{
-		RecipientUserID: fx.recipientUserID, Limit: 50,
+		RecipientUserID: fx.recipientUserID, ActorUserID: int64(fx.recipientUserID), Limit: 50,
 	})
 	require.NoError(t, err)
 	require.Len(t, userRows, 1, "cross-workspace bell list")

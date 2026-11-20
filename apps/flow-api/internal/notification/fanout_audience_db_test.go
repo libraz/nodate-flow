@@ -153,7 +153,7 @@ func TestNotificationReadsFollowMembership(t *testing.T) {
 	}
 	list := func() int {
 		rows, err := q.ListNotificationsForUser(ctx, generated.ListNotificationsForUserParams{
-			RecipientUserID: fx.recipientUserID, Limit: 50, Offset: 0,
+			RecipientUserID: fx.recipientUserID, ActorUserID: int64(fx.recipientUserID), Limit: 50, Offset: 0,
 		})
 		require.NoError(t, err)
 		return len(rows)

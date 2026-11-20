@@ -47,6 +47,7 @@ func List(deps Deps) func(context.Context, *ListNotificationsInput) (*ListNotifi
 					return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
 				}
 				rows, qerr := deps.Queries.ListNotificationsForWorkspaceKeyset(ctx, generated.ListNotificationsForWorkspaceKeysetParams{
+					ActorUserID:     int64(actorID),
 					WorkspaceID:     wsID,
 					RecipientUserID: actorID,
 					ReadFilter:      "all",
@@ -72,6 +73,7 @@ func List(deps Deps) func(context.Context, *ListNotificationsInput) (*ListNotifi
 				return out, nil
 			}
 			rows, err := deps.Queries.ListNotificationsForWorkspace(ctx, generated.ListNotificationsForWorkspaceParams{
+				ActorUserID:     int64(actorID),
 				WorkspaceID:     wsID,
 				RecipientUserID: actorID,
 				Limit:           limit,
@@ -100,6 +102,7 @@ func List(deps Deps) func(context.Context, *ListNotificationsInput) (*ListNotifi
 				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
 			}
 			rows, qerr := deps.Queries.ListNotificationsForUserKeyset(ctx, generated.ListNotificationsForUserKeysetParams{
+				ActorUserID:     int64(actorID),
 				RecipientUserID: actorID,
 				ReadFilter:      "all",
 				CursorCreatedAt: sql.NullTime{Time: cursorAt, Valid: !cursorAt.IsZero()},
@@ -125,6 +128,7 @@ func List(deps Deps) func(context.Context, *ListNotificationsInput) (*ListNotifi
 		}
 
 		rows, err := deps.Queries.ListNotificationsForUser(ctx, generated.ListNotificationsForUserParams{
+			ActorUserID:     int64(actorID),
 			RecipientUserID: actorID,
 			Limit:           limit,
 			Offset:          in.Offset,
@@ -297,6 +301,7 @@ var publicIDOrEmpty = handlerutil.PublicIDOrEmpty
 // mapUserRow converts a ListNotificationsForUserRow to a NotificationDTO.
 func mapUserRow(r generated.ListNotificationsForUserRow) NotificationDTO {
 	return NotificationDTO{
+		ResourceTitle:    nullStr(r.ResourceTitle),
 		ID:               r.PublicID.String(),
 		WorkspaceID:      r.WorkspacePublicID.String(),
 		ActorID:          publicIDOrEmpty(r.ActorPublicID),
@@ -317,6 +322,7 @@ func mapUserRow(r generated.ListNotificationsForUserRow) NotificationDTO {
 // mapWorkspaceRow converts a ListNotificationsForWorkspaceRow to a NotificationDTO.
 func mapWorkspaceRow(r generated.ListNotificationsForWorkspaceRow) NotificationDTO {
 	return NotificationDTO{
+		ResourceTitle:    nullStr(r.ResourceTitle),
 		ID:               r.PublicID.String(),
 		WorkspaceID:      r.WorkspacePublicID.String(),
 		ActorID:          publicIDOrEmpty(r.ActorPublicID),
@@ -340,6 +346,7 @@ func mapWorkspaceRow(r generated.ListNotificationsForWorkspaceRow) NotificationD
 // distinct (sqlc generates a fresh type per query).
 func mapUserKeysetRow(r generated.ListNotificationsForUserKeysetRow) NotificationDTO {
 	return NotificationDTO{
+		ResourceTitle:    nullStr(r.ResourceTitle),
 		ID:               r.PublicID.String(),
 		WorkspaceID:      r.WorkspacePublicID.String(),
 		ActorID:          publicIDOrEmpty(r.ActorPublicID),
@@ -360,6 +367,7 @@ func mapUserKeysetRow(r generated.ListNotificationsForUserKeysetRow) Notificatio
 // mapWorkspaceKeysetRow is the keyset twin of mapWorkspaceRow.
 func mapWorkspaceKeysetRow(r generated.ListNotificationsForWorkspaceKeysetRow) NotificationDTO {
 	return NotificationDTO{
+		ResourceTitle:    nullStr(r.ResourceTitle),
 		ID:               r.PublicID.String(),
 		WorkspaceID:      r.WorkspacePublicID.String(),
 		ActorID:          publicIDOrEmpty(r.ActorPublicID),

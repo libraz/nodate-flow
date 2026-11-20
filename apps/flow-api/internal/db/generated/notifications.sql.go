@@ -296,6 +296,7 @@ SELECT
   n.read_at,
   n.delivered_at,
   n.created_at,
+  rt.title AS resource_title,
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
@@ -304,6 +305,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(? AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(? AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(? AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
@@ -313,6 +339,7 @@ LIMIT ? OFFSET ?
 `
 
 type ListNotificationsForUserParams struct {
+	ActorUserID     int64  `json:"actorUserId"`
 	RecipientUserID uint32 `json:"-"`
 	Limit           int32  `json:"limit"`
 	Offset          int32  `json:"offset"`
@@ -335,6 +362,7 @@ type ListNotificationsForUserRow struct {
 	ReadAt            sql.NullTime          `json:"readAt"`
 	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
 	CreatedAt         time.Time             `json:"createdAt"`
+	ResourceTitle     sql.NullString        `json:"resourceTitle"`
 	Total             interface{}           `json:"total"`
 }
 
@@ -346,7 +374,14 @@ type ListNotificationsForUserRow struct {
 // alone: a row written for another channel is the same notification and
 // must not be listed or counted a second time.
 func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]ListNotificationsForUserRow, error) {
-	rows, err := q.db.QueryContext(ctx, listNotificationsForUser, arg.RecipientUserID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listNotificationsForUser,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.RecipientUserID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -371,6 +406,7 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 			&i.ReadAt,
 			&i.DeliveredAt,
 			&i.CreatedAt,
+			&i.ResourceTitle,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -403,7 +439,8 @@ SELECT
   n.channel,
   n.read_at,
   n.delivered_at,
-  n.created_at
+  n.created_at,
+  rt.title AS resource_title
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
 INNER JOIN workspace_members wm
@@ -411,6 +448,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(? AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(? AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(? AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
@@ -427,6 +489,7 @@ LIMIT ?
 `
 
 type ListNotificationsForUserKeysetParams struct {
+	ActorUserID     int64          `json:"actorUserId"`
 	RecipientUserID uint32         `json:"-"`
 	ReadFilter      interface{}    `json:"readFilter"`
 	CursorCreatedAt sql.NullTime   `json:"cursorCreatedAt"`
@@ -451,6 +514,7 @@ type ListNotificationsForUserKeysetRow struct {
 	ReadAt            sql.NullTime          `json:"readAt"`
 	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
 	CreatedAt         time.Time             `json:"createdAt"`
+	ResourceTitle     sql.NullString        `json:"resourceTitle"`
 }
 
 // Keyset-paginated variant of ListNotificationsForUser.
@@ -470,6 +534,9 @@ type ListNotificationsForUserKeysetRow struct {
 // (recipient_user_id, created_at, public_id).
 func (q *Queries) ListNotificationsForUserKeyset(ctx context.Context, arg ListNotificationsForUserKeysetParams) ([]ListNotificationsForUserKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNotificationsForUserKeyset,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.RecipientUserID,
 		arg.ReadFilter,
 		arg.ReadFilter,
@@ -504,6 +571,7 @@ func (q *Queries) ListNotificationsForUserKeyset(ctx context.Context, arg ListNo
 			&i.ReadAt,
 			&i.DeliveredAt,
 			&i.CreatedAt,
+			&i.ResourceTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -536,6 +604,7 @@ SELECT
   n.read_at,
   n.delivered_at,
   n.created_at,
+  rt.title AS resource_title,
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
@@ -544,6 +613,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(? AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(? AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(? AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -554,6 +648,7 @@ LIMIT ? OFFSET ?
 `
 
 type ListNotificationsForWorkspaceParams struct {
+	ActorUserID     int64  `json:"actorUserId"`
 	WorkspaceID     uint32 `json:"-"`
 	RecipientUserID uint32 `json:"-"`
 	Limit           int32  `json:"limit"`
@@ -577,12 +672,16 @@ type ListNotificationsForWorkspaceRow struct {
 	ReadAt            sql.NullTime          `json:"readAt"`
 	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
 	CreatedAt         time.Time             `json:"createdAt"`
+	ResourceTitle     sql.NullString        `json:"resourceTitle"`
 	Total             interface{}           `json:"total"`
 }
 
 // List notifications for a user within a specific workspace.
 func (q *Queries) ListNotificationsForWorkspace(ctx context.Context, arg ListNotificationsForWorkspaceParams) ([]ListNotificationsForWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNotificationsForWorkspace,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.RecipientUserID,
 		arg.Limit,
@@ -612,6 +711,7 @@ func (q *Queries) ListNotificationsForWorkspace(ctx context.Context, arg ListNot
 			&i.ReadAt,
 			&i.DeliveredAt,
 			&i.CreatedAt,
+			&i.ResourceTitle,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -644,7 +744,8 @@ SELECT
   n.channel,
   n.read_at,
   n.delivered_at,
-  n.created_at
+  n.created_at,
+  rt.title AS resource_title
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
 INNER JOIN workspace_members wm
@@ -652,6 +753,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(? AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(? AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(? AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -669,6 +795,7 @@ LIMIT ?
 `
 
 type ListNotificationsForWorkspaceKeysetParams struct {
+	ActorUserID     int64          `json:"actorUserId"`
 	WorkspaceID     uint32         `json:"-"`
 	RecipientUserID uint32         `json:"-"`
 	ReadFilter      interface{}    `json:"readFilter"`
@@ -694,6 +821,7 @@ type ListNotificationsForWorkspaceKeysetRow struct {
 	ReadAt            sql.NullTime          `json:"readAt"`
 	DeliveredAt       sql.NullTime          `json:"deliveredAt"`
 	CreatedAt         time.Time             `json:"createdAt"`
+	ResourceTitle     sql.NullString        `json:"resourceTitle"`
 }
 
 // Keyset-paginated variant of ListNotificationsForWorkspace.
@@ -710,6 +838,9 @@ type ListNotificationsForWorkspaceKeysetRow struct {
 // (workspace_id, recipient_user_id, read_at, created_at DESC).
 func (q *Queries) ListNotificationsForWorkspaceKeyset(ctx context.Context, arg ListNotificationsForWorkspaceKeysetParams) ([]ListNotificationsForWorkspaceKeysetRow, error) {
 	rows, err := q.db.QueryContext(ctx, listNotificationsForWorkspaceKeyset,
+		arg.ActorUserID,
+		arg.ActorUserID,
+		arg.ActorUserID,
 		arg.WorkspaceID,
 		arg.RecipientUserID,
 		arg.ReadFilter,
@@ -745,6 +876,7 @@ func (q *Queries) ListNotificationsForWorkspaceKeyset(ctx context.Context, arg L
 			&i.ReadAt,
 			&i.DeliveredAt,
 			&i.CreatedAt,
+			&i.ResourceTitle,
 		); err != nil {
 			return nil, err
 		}

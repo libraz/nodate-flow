@@ -8,6 +8,7 @@ func mapListRow(r generated.ListFavoritesForUserRow) Favorite {
 		ID:         r.PublicID.String(),
 		TargetType: string(r.TargetType),
 		TargetID:   r.TargetPublicID.String(),
+		Title:      r.Title,
 		FolderName: nullStr(r.FolderName),
 		SortWeight: r.SortWeight,
 		CreatedAt:  r.CreatedAt.Unix(),

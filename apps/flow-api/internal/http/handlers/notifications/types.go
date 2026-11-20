@@ -39,6 +39,7 @@ type NotificationDTO struct {
 	EventType        string `json:"eventType"`
 	ResourceType     string `json:"resourceType"`
 	ResourceID       string `json:"resourceId,omitempty"`
+	ResourceTitle    string `json:"resourceTitle,omitempty" doc:"Title of the referenced task while the recipient can read it"`
 	Title            string `json:"title"`
 	Body             string `json:"body,omitempty"`
 	Severity         string `json:"severity"`

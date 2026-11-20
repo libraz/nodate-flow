@@ -35,6 +35,7 @@ type Favorite struct {
 	ID         string `json:"id" doc:"Favorite public id (UUID v7)"`
 	TargetType string `json:"targetType"`
 	TargetID   string `json:"targetId"`
+	Title      string `json:"title,omitempty" doc:"Target display title; present on list responses"`
 	FolderName string `json:"folderName,omitempty"`
 	SortWeight int32  `json:"sortWeight"`
 	CreatedAt  int64  `json:"createdAt"`

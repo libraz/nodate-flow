@@ -44,6 +44,7 @@ SELECT
   n.read_at,
   n.delivered_at,
   n.created_at,
+  rt.title AS resource_title,
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
@@ -52,6 +53,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
@@ -91,7 +117,8 @@ SELECT
   n.channel,
   n.read_at,
   n.delivered_at,
-  n.created_at
+  n.created_at,
+  rt.title AS resource_title
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
 INNER JOIN workspace_members wm
@@ -99,6 +126,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.recipient_user_id = ?
   AND n.archived_at IS NULL
   AND n.enabled = TRUE
@@ -132,6 +184,7 @@ SELECT
   n.read_at,
   n.delivered_at,
   n.created_at,
+  rt.title AS resource_title,
   COUNT(*) OVER() AS total
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
@@ -140,6 +193,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
@@ -177,7 +255,8 @@ SELECT
   n.channel,
   n.read_at,
   n.delivered_at,
-  n.created_at
+  n.created_at,
+  rt.title AS resource_title
 FROM notifications n
 INNER JOIN workspaces w ON w.id = n.workspace_id
 INNER JOIN workspace_members wm
@@ -185,6 +264,31 @@ INNER JOIN workspace_members wm
  AND wm.user_id = n.recipient_user_id
  AND wm.enabled = TRUE
 LEFT JOIN users au ON au.id = n.actor_user_id
+LEFT JOIN tasks rt
+  ON n.resource_type = 'task'
+ AND rt.workspace_id = n.workspace_id
+ AND rt.public_id = n.resource_public_id
+ AND rt.enabled = TRUE
+ AND (
+   wm.role IN ('owner', 'admin')
+   OR rt.visibility = 'public'
+   OR (rt.visibility = 'project' AND EXISTS (
+     SELECT 1 FROM project_members pm_vis
+     WHERE pm_vis.project_id = rt.project_id
+       AND pm_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+       AND pm_vis.enabled = TRUE
+   ))
+   OR (rt.visibility = 'private' AND (
+     rt.created_by_user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+     OR EXISTS (
+       SELECT 1 FROM task_actors ta_vis
+       WHERE ta_vis.task_id = rt.id
+         AND ta_vis.kind = 'user'
+         AND ta_vis.user_id = CAST(sqlc.arg('actor_user_id') AS UNSIGNED)
+         AND ta_vis.enabled = TRUE
+     )
+   ))
+ )
 WHERE n.workspace_id = ?
   AND n.recipient_user_id = ?
   AND n.archived_at IS NULL
