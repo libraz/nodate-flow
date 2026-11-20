@@ -113,6 +113,23 @@ func Unarchive(deps Deps) func(context.Context, *UnarchiveTaskInput) (*Unarchive
 // not (created_at, public_id) — archived rows are sorted newest-
 // archived-first, so the cursor naturally tracks archived_at.
 func ListArchived(deps Deps) func(context.Context, *ListArchivedTasksInput) (*ListArchivedTasksOutput, error) {
+	page := listArchivedPage(deps)
+	return func(ctx context.Context, in *ListArchivedTasksInput) (*ListArchivedTasksOutput, error) {
+		out, err := page(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		ws, _ := middleware.WorkspaceFromContext(ctx)
+		if err := attachAssignees(ctx, deps.Queries, ws.ID, out.Body.Tasks); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		return out, nil
+	}
+}
+
+// listArchivedPage runs the archived list query for both pagination
+// paths; ListArchived decorates its result with assignees.
+func listArchivedPage(deps Deps) func(context.Context, *ListArchivedTasksInput) (*ListArchivedTasksOutput, error) {
 	return func(ctx context.Context, in *ListArchivedTasksInput) (*ListArchivedTasksOutput, error) {
 		ws, ok := middleware.WorkspaceFromContext(ctx)
 		if !ok {

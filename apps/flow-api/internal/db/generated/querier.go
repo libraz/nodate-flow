@@ -775,8 +775,8 @@ type Querier interface {
 	// stays a plain column reference and the generated types keep the
 	// nullability a LEFT JOIN implies.
 	ExportTasksForWorkspace(ctx context.Context, arg ExportTasksForWorkspaceParams) ([]ExportTasksForWorkspaceRow, error)
-	// Mark a constraint as currently failing. Clears satisfied_at so the
-	// transition is visible in v_task_constraint_satisfaction; failed_at keeps
+	// Mark a constraint as currently failing. Clears satisfied_at so a
+	// constraint that stops holding no longer reads as satisfied; failed_at keeps
 	// the time the failure began across re-evaluations.
 	FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error)
 	// Fail agent runs that stranded once too often. Without this the rows
@@ -1985,6 +1985,12 @@ type Querier interface {
 	// Distinct role names currently attached to the task via
 	// task_actors. Used to populate Facts.ActorRoles.
 	ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskActorRolesForEngineParams) ([]TaskActorsRole, error)
+	// Human assignees for a page of tasks, in display order. Humans only,
+	// matching assignee_count in _v_task_list_all: the INNER JOIN on users drops
+	// agent actors (user_id IS NULL) and disabled users. The caller passes the
+	// public ids of the page it is already returning, so the slice is bounded
+	// by the page size.
+	ListTaskAssigneesForTasks(ctx context.Context, arg ListTaskAssigneesForTasksParams) ([]ListTaskAssigneesForTasksRow, error)
 	// Enabled constraint rows for a task in evaluation order.
 	ListTaskConstraintsForEngine(ctx context.Context, arg ListTaskConstraintsForEngineParams) ([]ListTaskConstraintsForEngineRow, error)
 	ListTaskHumanActorsForRole(ctx context.Context, arg ListTaskHumanActorsForRoleParams) ([]ListTaskHumanActorsForRoleRow, error)

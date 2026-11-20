@@ -282,17 +282,33 @@ func parseTaskDueRange(from, through string) (sql.NullTime, sql.NullTime, error)
 // other case the historical OFFSET path runs and `nextCursor` stays nil,
 // matching the additive contract from the keyset rollout plan.
 func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, error) {
+	page := listPage(deps)
 	return func(ctx context.Context, in *ListTasksInput) (*ListTasksOutput, error) {
+		out, wsID, err := page(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		if err := attachAssignees(ctx, deps.Queries, wsID, out.Body.Tasks); err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		return out, nil
+	}
+}
+
+// listPage runs the list query for every pagination path; List decorates
+// its result with assignees.
+func listPage(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, uint32, error) {
+	return func(ctx context.Context, in *ListTasksInput) (*ListTasksOutput, uint32, error) {
 		actorID, ok := middleware.ActorFromContext(ctx)
 		if !ok {
-			return nil, httpErr(apierrors.WsTaskAccessDenied)
+			return nil, 0, httpErr(apierrors.WsTaskAccessDenied)
 		}
 		dueFrom, dueThrough, err := parseTaskDueRange(in.DueFrom, in.DueThrough)
 		if err != nil {
-			return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			return nil, 0, httpErr(apierrors.ValidationQueryFieldInvalid)
 		}
 		if in.Cursor != "" && (in.DueFrom != "" || in.DueThrough != "") {
-			return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			return nil, 0, httpErr(apierrors.ValidationQueryFieldInvalid)
 		}
 		limit := in.Limit
 		if limit <= 0 {
@@ -304,15 +320,15 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		if in.ProjectID != "" {
 			prjPub, err := types.Parse(in.ProjectID)
 			if err != nil {
-				return nil, httpErr(apierrors.WsProjectNotFound)
+				return nil, 0, httpErr(apierrors.WsProjectNotFound)
 			}
 			prj, err := deps.Queries.FindProjectByPublicIdGlobal(ctx, prjPub)
 			if err != nil {
-				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
+				return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectNotFound, apierrors.InternalUnexpected))
 			}
 			wsRoleStr, err := handlerutil.WorkspaceMemberRole(ctx, deps.DB, prj.WorkspaceID, actorID)
 			if err != nil {
-				return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
+				return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsProjectAccessDenied, apierrors.InternalUnexpected))
 			}
 			wsRole := middleware.WorkspaceRole(wsRoleStr)
 			prjVis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole))
@@ -322,15 +338,15 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				frows, total, ferr := listTasksFiltered(ctx, deps.DB, prj.WorkspaceID, pubBytes[:], actorID, wsRole, in, dueFrom, dueThrough)
 				if ferr != nil {
 					if errors.Is(ferr, errInvalidAssignee) {
-						return out, nil
+						return out, prj.WorkspaceID, nil
 					}
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return nil, 0, httpErr(apierrors.InternalUnexpected)
 				}
 				for _, r := range frows {
 					out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromWorkspace(r))
 				}
 				out.Body.Total = total
-				return out, nil
+				return out, prj.WorkspaceID, nil
 			}
 			// Keyset path — only when caller opted in via ?cursor=...
 			// (an empty string conflicts with the OFFSET-default
@@ -341,7 +357,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			if in.Cursor != "" {
 				cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
 				if derr != nil {
-					return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+					return nil, 0, httpErr(apierrors.ValidationQueryFieldInvalid)
 				}
 				rows, qerr := deps.Queries.ListTasksForProjectKeyset(ctx, generated.ListTasksForProjectKeysetParams{
 					WorkspaceID:     prj.WorkspaceID,
@@ -353,7 +369,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					Limit:           limit + 1,
 				})
 				if qerr != nil {
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return nil, 0, httpErr(apierrors.InternalUnexpected)
 				}
 				hasMore := int32(len(rows)) > limit //#nosec G115 -- rows length capped at limit+1 with limit validated to maximum:200
 				if hasMore {
@@ -367,7 +383,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
 					out.Body.NextCursor = &nc
 				}
-				return out, nil
+				return out, prj.WorkspaceID, nil
 			}
 			rows, err := deps.Queries.ListTasksForProject(ctx, generated.ListTasksForProjectParams{
 				WorkspaceID:     prj.WorkspaceID,
@@ -378,7 +394,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				Offset:          in.Offset,
 			})
 			if err != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, 0, httpErr(apierrors.InternalUnexpected)
 			}
 			for _, r := range rows {
 				out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromProject(r))
@@ -393,7 +409,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					})
 				})
 				if terr != nil {
-					return nil, httpErr(apierrors.InternalUnexpected)
+					return nil, 0, httpErr(apierrors.InternalUnexpected)
 				}
 				out.Body.Total = total
 				// Bridge for first-page callers: the OFFSET path also
@@ -406,23 +422,23 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 					out.Body.NextCursor = &nc
 				}
 			}
-			return out, nil
+			return out, prj.WorkspaceID, nil
 		}
 
 		if in.WorkspaceID == "" {
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, 0, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 		wsPub, err := types.Parse(in.WorkspaceID)
 		if err != nil {
-			return nil, httpErr(apierrors.WsWorkspaceNotFound)
+			return nil, 0, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 		wsInternal, err := deps.Queries.GetWorkspaceIdByPublicId(ctx, wsPub)
 		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
+			return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceNotFound, apierrors.InternalUnexpected))
 		}
 		wsRoleStr2, err := handlerutil.WorkspaceMemberRole(ctx, deps.DB, wsInternal, actorID)
 		if err != nil {
-			return nil, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceAccessDenied, apierrors.InternalUnexpected))
+			return nil, 0, httpErr(apierr.SpecForErrNoRows(err, apierrors.WsWorkspaceAccessDenied, apierrors.InternalUnexpected))
 		}
 		wsRole2 := middleware.WorkspaceRole(wsRoleStr2)
 		vis := acl.ListVisibilityArgs(actorID, acl.WorkspaceRole(wsRole2))
@@ -431,15 +447,15 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			frows, total, ferr := listTasksFiltered(ctx, deps.DB, wsInternal, nil, actorID, wsRole2, in, dueFrom, dueThrough)
 			if ferr != nil {
 				if errors.Is(ferr, errInvalidAssignee) {
-					return out, nil
+					return out, wsInternal, nil
 				}
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, 0, httpErr(apierrors.InternalUnexpected)
 			}
 			for _, r := range frows {
 				out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromWorkspace(r))
 			}
 			out.Body.Total = total
-			return out, nil
+			return out, wsInternal, nil
 		}
 		// Keyset path — workspace scope, opted in via non-empty cursor.
 		// limit+1 fetch lets us emit a nil nextCursor on the terminal
@@ -448,7 +464,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 		if in.Cursor != "" {
 			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
 			if derr != nil {
-				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+				return nil, 0, httpErr(apierrors.ValidationQueryFieldInvalid)
 			}
 			rows, qerr := deps.Queries.ListTasksForWorkspaceKeyset(ctx, generated.ListTasksForWorkspaceKeysetParams{
 				WorkspaceID:     wsInternal,
@@ -460,7 +476,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				Limit:           limit + 1,
 			})
 			if qerr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, 0, httpErr(apierrors.InternalUnexpected)
 			}
 			hasMore := int32(len(rows)) > limit //#nosec G115 -- rows length capped at limit+1 with limit validated to maximum:200
 			if hasMore {
@@ -474,7 +490,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
 				out.Body.NextCursor = &nc
 			}
-			return out, nil
+			return out, wsInternal, nil
 		}
 
 		rows, err := deps.Queries.ListTasksForWorkspace(ctx, generated.ListTasksForWorkspaceParams{
@@ -485,7 +501,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 			Offset:      in.Offset,
 		})
 		if err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
+			return nil, 0, httpErr(apierrors.InternalUnexpected)
 		}
 		for _, r := range rows {
 			out.Body.Tasks = append(out.Body.Tasks, rowToTaskListItemFromWorkspace(r))
@@ -499,7 +515,7 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				})
 			})
 			if terr != nil {
-				return nil, httpErr(apierrors.InternalUnexpected)
+				return nil, 0, httpErr(apierrors.InternalUnexpected)
 			}
 			out.Body.Total = total
 			if int64(in.Offset+limit) < out.Body.Total {
@@ -508,6 +524,6 @@ func List(deps Deps) func(context.Context, *ListTasksInput) (*ListTasksOutput, e
 				out.Body.NextCursor = &nc
 			}
 		}
-		return out, nil
+		return out, wsInternal, nil
 	}
 }
