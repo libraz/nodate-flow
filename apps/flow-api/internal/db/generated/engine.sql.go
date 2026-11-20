@@ -167,6 +167,7 @@ func (q *Queries) ListTaskActorRolesForEngine(ctx context.Context, arg ListTaskA
 const listTaskConstraintsForEngine = `-- name: ListTaskConstraintsForEngine :many
 SELECT
   public_id,
+  kind,
   expression
 FROM task_constraints
 WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE
@@ -179,8 +180,9 @@ type ListTaskConstraintsForEngineParams struct {
 }
 
 type ListTaskConstraintsForEngineRow struct {
-	PublicID   types.PublicID `json:"publicId"`
-	Expression string         `json:"expression"`
+	PublicID   types.PublicID      `json:"publicId"`
+	Kind       TaskConstraintsKind `json:"kind"`
+	Expression string              `json:"expression"`
 }
 
 // Enabled constraint rows for a task in evaluation order.
@@ -193,7 +195,7 @@ func (q *Queries) ListTaskConstraintsForEngine(ctx context.Context, arg ListTask
 	items := []ListTaskConstraintsForEngineRow{}
 	for rows.Next() {
 		var i ListTaskConstraintsForEngineRow
-		if err := rows.Scan(&i.PublicID, &i.Expression); err != nil {
+		if err := rows.Scan(&i.PublicID, &i.Kind, &i.Expression); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

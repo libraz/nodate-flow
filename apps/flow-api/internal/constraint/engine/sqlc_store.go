@@ -113,6 +113,7 @@ func (s *SqlcStore) LoadTask(ctx context.Context, taskID uint32) (constraint.Fac
 	for _, r := range rows {
 		out = append(out, Row{
 			PublicID:   r.PublicID.String(),
+			Kind:       string(r.Kind),
 			Expression: []byte(r.Expression),
 		})
 	}

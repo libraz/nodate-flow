@@ -39,8 +39,8 @@ WHERE workspace_id = ?
   AND enabled = TRUE;
 
 -- name: FailConstraint :execrows
--- Mark a constraint as currently failing. Clears satisfied_at so the
--- transition is visible in v_task_constraint_satisfaction; failed_at keeps
+-- Mark a constraint as currently failing. Clears satisfied_at so a
+-- constraint that stops holding no longer reads as satisfied; failed_at keeps
 -- the time the failure began across re-evaluations.
 UPDATE task_constraints
 SET failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP),

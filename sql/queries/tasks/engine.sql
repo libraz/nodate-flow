@@ -48,6 +48,7 @@ WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE;
 -- Enabled constraint rows for a task in evaluation order.
 SELECT
   public_id,
+  kind,
   expression
 FROM task_constraints
 WHERE task_id = ? AND workspace_id = ? AND enabled = TRUE

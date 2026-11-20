@@ -22,6 +22,7 @@ import (
 // Expression is the raw JSON bytes from task_constraints.expression.
 type Row struct {
 	PublicID   string
+	Kind       string
 	Expression []byte
 }
 
@@ -42,8 +43,10 @@ type Store interface {
 // event payloads). It is intentionally small — the engine never
 // exposes the raw AST.
 type Outcome struct {
-	PublicID  string
-	Satisfied bool
+	PublicID   string
+	Kind       string
+	Expression string
+	Satisfied  bool
 	// ParseError is populated when the stored expression could not
 	// be decoded. The row is left alone in that case: operator has
 	// to fix the bad DSL before the engine will touch it again.
@@ -81,15 +84,15 @@ func (e *Engine) EvaluateTask(ctx context.Context, taskID uint32) ([]Outcome, er
 	for _, r := range rows {
 		parsed, perr := constraint.Parse(r.Expression)
 		if perr != nil {
-			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, ParseError: perr})
+			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), ParseError: perr})
 			continue
 		}
 		ok, eerr := constraint.Evaluate(parsed, facts)
 		if eerr != nil {
-			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, ParseError: eerr})
+			outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), ParseError: eerr})
 			continue
 		}
-		outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Satisfied: ok})
+		outcomes = append(outcomes, Outcome{PublicID: r.PublicID, Kind: r.Kind, Expression: string(r.Expression), Satisfied: ok})
 		if ok {
 			if err := e.Store.MarkSatisfied(ctx, r.PublicID, now); err != nil {
 				return outcomes, err

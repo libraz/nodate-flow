@@ -17,6 +17,8 @@ type EvaluateConstraintsInput struct {
 // EvaluateConstraintsOutcome mirrors engine.Outcome on the wire.
 type EvaluateConstraintsOutcome struct {
 	ID         string `json:"id"`
+	Kind       string `json:"kind" enum:"deadline,dependency,approval,signal,custom"`
+	Expression string `json:"expression"`
 	Satisfied  bool   `json:"satisfied"`
 	ParseError string `json:"parseError,omitempty"`
 }
@@ -52,7 +54,7 @@ func EvaluateConstraints(deps Deps) func(context.Context, *EvaluateConstraintsIn
 		out := &EvaluateConstraintsOutput{}
 		out.Body.Outcomes = make([]EvaluateConstraintsOutcome, 0, len(outs))
 		for _, o := range outs {
-			item := EvaluateConstraintsOutcome{ID: o.PublicID, Satisfied: o.Satisfied}
+			item := EvaluateConstraintsOutcome{ID: o.PublicID, Kind: o.Kind, Expression: o.Expression, Satisfied: o.Satisfied}
 			if o.ParseError != nil {
 				item.ParseError = o.ParseError.Error()
 			}

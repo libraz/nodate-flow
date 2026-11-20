@@ -32,7 +32,7 @@ const (
 
 // Transition mirrors the state machine transitions exposed by
 // POST /tasks/{id}/transitions (see TRANSITIONS_BY_STATE on the
-// frontend and apps/flow-api/internal/domain/tasks/transitions.go).
+// frontend and apps/flow-api/internal/taskstate/state.go).
 type Transition string
 
 // Known transitions. Only a subset is ever suggested by Infer.

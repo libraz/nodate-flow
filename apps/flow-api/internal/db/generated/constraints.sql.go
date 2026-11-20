@@ -86,8 +86,8 @@ type FailConstraintParams struct {
 	PublicID    types.PublicID `json:"publicId"`
 }
 
-// Mark a constraint as currently failing. Clears satisfied_at so the
-// transition is visible in v_task_constraint_satisfaction; failed_at keeps
+// Mark a constraint as currently failing. Clears satisfied_at so a
+// constraint that stops holding no longer reads as satisfied; failed_at keeps
 // the time the failure began across re-evaluations.
 func (q *Queries) FailConstraint(ctx context.Context, arg FailConstraintParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, failConstraint, arg.WorkspaceID, arg.PublicID)

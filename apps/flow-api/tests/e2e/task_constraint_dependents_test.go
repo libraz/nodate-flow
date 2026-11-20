@@ -140,3 +140,46 @@ func TestUnknownStateFilterMatchesNothing(t *testing.T) {
 	require.Empty(t, page.Tasks)
 	require.Zero(t, page.Total)
 }
+
+// TestEvaluateConstraintsReportsKindAndExpression pins that each outcome
+// names the constraint's kind and echoes its expression, for two kinds
+// at once so a hard-coded kind cannot pass.
+func TestEvaluateConstraintsReportsKindAndExpression(t *testing.T) {
+	bootstrap(t)
+	t.Parallel()
+	tt := newTenant(t)
+
+	task := createTask(t, tt.AccessToken, tt.ProjectPublicID, "Kind and expression")
+	blocker := createTask(t, tt.AccessToken, tt.ProjectPublicID, "Kind blocker")
+	depID := addAllDoneConstraint(t, tt.AccessToken, task, blocker)
+
+	const deadlineExpr = `{"op":"time.due_after","arg":"1990-01-01"}`
+	var deadline struct {
+		ID string `json:"id"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task+"/constraints", tt.AccessToken,
+		map[string]any{"kind": "deadline", "expression": deadlineExpr}, &deadline)
+	require.NotEmpty(t, deadline.ID)
+
+	var out struct {
+		Outcomes []struct {
+			ID         string `json:"id"`
+			Kind       string `json:"kind"`
+			Expression string `json:"expression"`
+			Satisfied  bool   `json:"satisfied"`
+		} `json:"outcomes"`
+	}
+	doJSON(t, http.MethodPost, testServerURL+"/tasks/"+task+"/constraints/evaluate", tt.AccessToken, nil, &out)
+	require.Len(t, out.Outcomes, 2)
+
+	byID := map[string]struct{ kind, expr string }{}
+	for _, o := range out.Outcomes {
+		byID[o.ID] = struct{ kind, expr string }{o.Kind, o.Expression}
+	}
+	require.Contains(t, byID, depID)
+	require.Contains(t, byID, deadline.ID)
+	require.Equal(t, "dependency", byID[depID].kind)
+	require.JSONEq(t, `{"op":"dependency.all_done","taskIds":["`+blocker+`"]}`, byID[depID].expr)
+	require.Equal(t, "deadline", byID[deadline.ID].kind)
+	require.JSONEq(t, deadlineExpr, byID[deadline.ID].expr)
+}
