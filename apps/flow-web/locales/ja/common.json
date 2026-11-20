@@ -29,10 +29,11 @@
     "stat_overdue": "期限超過",
     "stat_due_today": "今日が期日",
     "stat_done": "完了済み",
-    "recent_tasks": "担当タスク",
+    "recent_tasks": "マイタスク",
     "view_all_tasks": "すべてのタスクを表示 →",
-    "description": "全ワークスペースで自分に割り当てられた仕事の状況と、最初のワークスペースのダッシュボードです。",
-    "stat_hint": "いずれかのワークスペースで、担当・レビュー・承認の役割を持つタスクの数です。期限超過と今日が期限は、自分のタイムゾーンで判定されます。"
+    "description": "担当しているタスクの状況と、いま選択中のワークスペースのダッシュボードです。",
+    "stat_hint": "いずれかのワークスペースで、担当・レビュー・承認の役割を持つタスクの数です。期限超過と今日が期限は、自分のタイムゾーンで判定されます。",
+    "recent_tasks_empty": "担当しているタスクはまだありません。"
   },
   "nav": {
     "theme": "テーマ",
@@ -40,22 +41,46 @@
     "language": "言語",
     "primary": "メインナビゲーション",
     "inbox": "受信トレイ",
-    "today": "今日のタスク",
+    "today": "マイタスク",
     "calendar": "カレンダー",
     "projects": "プロジェクト",
     "workspaces": "ワークスペース",
     "workspaceProjects": "このワークスペースのプロジェクト",
     "pages": "ページ",
-    "settings": "設定",
-    "timeboxes": "タイムボックス",
-    "activity": "アクティビティ",
-    "insightsPriority": "優先度の提案",
-    "retroDrafts": "振り返りドラフト",
+    "settings": "個人設定",
+    "timeboxes": "スプリント",
+    "activity": "操作履歴",
+    "insightsPriority": "AI の優先度提案",
+    "retroDrafts": "振り返り下書き",
     "archive": "アーカイブ",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開する",
     "insightsPriorityHint": "未完了タスクの優先度の変更案です。適用するまでタスクは変わりません。",
-    "archiveHint": "アーカイブしたタスクです。元に戻せます。"
+    "archiveHint": "アーカイブしたタスクです。元に戻せます。",
+    "home": "ホーム",
+    "reminders": "期限切れ・間近",
+    "timeline": "タイムライン",
+    "members": "メンバーと招待",
+    "more": "その他",
+    "workspaceSettings": "ワークスペース設定",
+    "shortcuts": "キーボードショートカット",
+    "allWorkspaces": "すべてのワークスペース",
+    "newWorkspace": "新しいワークスペース",
+    "switchWorkspace": "ワークスペースを切り替え",
+    "noWorkspace": {
+      "title": "ワークスペースがまだありません",
+      "body": "チームのプロジェクト・タスク・予定をまとめる場所です。",
+      "cta": "ワークスペースを作成"
+    },
+    "hint": {
+      "reminders": "期限を過ぎたタスクと、3 日以内に期限が来るタスクです。",
+      "archive": "アーカイブしたタスクです。元に戻せます。",
+      "timeboxes": "スプリントなど、期間を区切ってタスクをまとめます。",
+      "insightsPriority": "未完了タスクの優先度の変更案です。適用するまでタスクは変わりません。",
+      "retroDrafts": "最近の作業から AI が起こした振り返りタスクです。採用か却下を選びます。",
+      "timeline": "このワークスペースのタスクが、いつどう変わったかの流れです。",
+      "activity": "人・AI・連携が、いつ何をしたかの記録です。"
+    }
   },
   "topbar": {
     "workspace": {
@@ -68,8 +93,10 @@
     },
     "user_menu": {
       "open": "アカウントメニュー",
-      "settings": "設定",
-      "avatar_alt": "{name} のプロフィール画像"
+      "settings": "個人設定",
+      "avatar_alt": "{name} のプロフィール画像",
+      "notification_settings": "通知設定",
+      "shortcuts": "キーボードショートカット"
     },
     "notifications": {
       "label": "通知"
@@ -177,7 +204,7 @@
     "skipToContent": "本文へスキップ"
   },
   "today": {
-    "title": "自分のタスク",
+    "title": "マイタスク",
     "subtitle": "あなたが担当しているタスクを期日で横断表示します。",
     "empty": "担当しているタスクはまだありません。担当・レビュー・承認として追加されたタスクがここに表示されます。",
     "loading": "担当タスクを読み込み中…",
@@ -604,12 +631,13 @@
     },
     "form": {
       "name": "名前",
-      "key": "スラッグ",
+      "key": "URL 用の名前",
       "description": "説明",
       "visibility": "公開範囲",
       "submit": "保存",
       "cancel": "キャンセル",
-      "key_description": "小文字、数字、ハイフンが使えます。ワークスペース内で重複できません。編集するまでは名前から自動で入ります。"
+      "key_description": "小文字、数字、ハイフンが使えます。ワークスペース内で重複できません。編集するまでは名前から自動で入ります。",
+      "advanced": "詳細設定（任意）"
     },
     "visibility": {
       "private": "プライベート",
@@ -718,7 +746,11 @@
     "quick_create": {
       "no_projects": {
         "title": "まずプロジェクトを作成してください",
-        "cta": "プロジェクト一覧へ"
+        "cta": "プロジェクトを作成",
+        "member_body": "このワークスペースにはまだプロジェクトがありません。管理者にプロジェクトの作成を依頼してください。"
+      },
+      "no_workspace": {
+        "title": "タスクを追加する前に、ワークスペースを作成してください。"
       }
     },
     "status": {
@@ -1045,7 +1077,7 @@
     },
     "retro": {
       "queue": {
-        "title": "振り返りドラフト",
+        "title": "振り返り下書き",
         "description": "完了したタスクやカレンダーイベントから AI が下書きした振り返りです。承認すると通常のタスクとして起こされ、破棄すると削除されます。",
         "empty": "現在、振り返りのドラフトはありません",
         "linked_original": "元: {sourceTitle}",
@@ -1222,7 +1254,7 @@
     "command_palette": "コマンドパレットを開く"
   },
   "timeboxes": {
-    "title": "タイムボックス",
+    "title": "スプリント",
     "description": "スプリントなどの期間にタスクをまとめ、計画中から完了まで進捗を追います。",
     "new": "新規タイムボックス",
     "empty": "タイムボックスはまだありません",
@@ -1437,5 +1469,29 @@
     "trigger": "このページの使い方",
     "eyebrow": "ガイド",
     "shortcuts": "キーボードショートカット"
+  },
+  "onboarding": {
+    "title": "はじめに",
+    "progress": "{done} / {total} 完了",
+    "dismiss": "閉じる",
+    "steps": {
+      "done": "完了",
+      "workspace": {
+        "title": "ワークスペースを作成",
+        "body": "チームのプロジェクトや予定をまとめる場所です。"
+      },
+      "project": {
+        "title": "プロジェクトを作成",
+        "body": "顧客や施策ごとなど、関連するタスクをまとめます。"
+      },
+      "task": {
+        "title": "タスクを追加",
+        "body": "担当者と期日を決めて、抜け漏れを防ぎます。"
+      },
+      "invite": {
+        "title": "メンバーを招待",
+        "body": "招待リンクを共有し、権限を選びます。"
+      }
+    }
   }
 }

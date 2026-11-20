@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "優先度の提案",
+    "title": "AI の優先度提案",
     "subtitle": "{shown, plural, =0 {提案はありません} other {提案 #件}}（確認した未完了タスク: {total, plural, =0 {0件} other {#件}}）。「適用」でタスクの優先度が変わり、「却下」は提案を隠すだけです。"
   },
   "kpi": {

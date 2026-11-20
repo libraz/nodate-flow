@@ -1,6 +1,6 @@
 {
   "activity": {
-    "title": "Activity",
+    "title": "Activity log",
     "summary": "A chronological record of what happened in this workspace: changes by people, runs by AI, and calls from connected tools.",
     "tips": {
       "t1": "Filter by source: Audit lists actions people take, AI lists AI runs, and MCP lists calls made by connected tools through an MCP token.",
@@ -53,13 +53,13 @@
   },
   "home": {
     "title": "Home",
-    "summary": "A snapshot of the work assigned to you across all workspaces, with shortcuts and your dashboard.",
+    "summary": "Check your assigned work and move to the selected workspace's dashboard and projects.",
     "tips": {
       "t1": "The four counts cover tasks where you hold a role (assignee, reviewer or approver) in any workspace. Overdue and Due today follow your time zone.",
       "t2": "Your tasks lists up to five open tasks. View all tasks opens My tasks, grouped by due date.",
       "t3": "Press ⌘K (Ctrl+K on Windows) anywhere to search or run an AI command, and C to start a new task.",
-      "t4": "Pick a workspace under Workspaces to open its projects and settings.",
-      "t5": "The dashboard at the bottom belongs to your first workspace. Use Edit layout to add, reorder or remove widgets."
+      "t4": "Click the workspace name at the top left to switch to another workspace.",
+      "t5": "The dashboard at the bottom belongs to the selected workspace. Use Edit layout to add, reorder or remove widgets."
     }
   },
   "inbox": {
@@ -90,7 +90,7 @@
     "tips": {
       "t1": "Click a notification to open the task or item it is about. It is marked as read at the same time.",
       "t2": "The check button marks one notification as read. The archive button removes it from this list. “Mark all as read” applies to the workspace you are in.",
-      "t3": "Which events notify you is set in Settings, Notifications."
+      "t3": "Which events notify you is set in Personal settings, Notifications."
     }
   },
   "pages": {
@@ -104,7 +104,7 @@
     }
   },
   "priority-suggestions": {
-    "title": "Priority suggestions",
+    "title": "AI priority suggestions",
     "summary": "Proposed priority changes for open tasks, each with the reason behind it. Nothing changes until you press Apply.",
     "tips": {
       "t1": "Suggestions come from fixed rules over each task's due date, last update and assignment, not from a language model. The counts show how many open tasks were checked and how many got a suggestion. Up to 200 tasks are checked at a time.",
@@ -167,7 +167,7 @@
     }
   },
   "reminders": {
-    "title": "Reminders",
+    "title": "Overdue & due soon",
     "summary": "Open tasks in this workspace that are overdue, due today or due within three days.",
     "tips": {
       "t1": "Reminders are generated from task due dates and state by fixed rules, not by AI. Tasks that are done or cancelled, or that have no due date, never appear.",
@@ -230,7 +230,7 @@
     "tips": {
       "t1": "You become the workspace owner, and you can invite other people afterwards.",
       "t2": "The slug is filled in from the name. Edit it if you want a different identifier; it must be unique on this server.",
-      "t3": "Name and slug can be changed later under Settings, General.",
+      "t3": "Name and URL name can be changed later under Workspace settings, General.",
       "t4": "You can belong to several workspaces; this screen only appears while you have none."
     }
   },
@@ -289,13 +289,13 @@
     }
   },
   "timeboxes": {
-    "title": "Timeboxes",
+    "title": "Sprints",
     "summary": "A named period, such as a sprint or a focus week, that you fill with tasks and move from planned to active to completed.",
     "tips": {
-      "t1": "A timebox covers a start date and an end date. It tracks days, not hours, and is not a stopwatch.",
-      "t2": "Start activates a planned timebox. Stop marks an active one as completed. Cancel ends it without completing. Completed and cancelled timeboxes move to the collapsed section at the bottom.",
-      "t3": "Link tasks from a timebox's card to see progress as done/total. Removing a task or deleting the timebox does not delete the tasks.",
-      "t4": "While a timebox is active, a bar showing it stays visible across the app with shortcuts to open or stop it."
+      "t1": "A sprint covers a start date and an end date. It tracks days, not hours, and is not a stopwatch.",
+      "t2": "Start activates a planned sprint. Stop marks an active one as completed. Cancel ends it without completing. Completed and cancelled sprints move to the collapsed section at the bottom.",
+      "t3": "Link tasks from a sprint's card to see progress as done/total. Removing a task or deleting the sprint does not delete the tasks.",
+      "t4": "While a sprint is active, a bar showing it stays visible across the app with shortcuts to open or stop it."
     }
   },
   "timeline": {
@@ -469,7 +469,7 @@
     "summary": "A workspace is the shared space for a team: its projects, tasks, calendars, pages and members all live inside one.",
     "tips": {
       "t1": "Create a separate workspace for each team or purpose. People see only the workspaces they belong to.",
-      "t2": "Open a workspace to see its projects and members. Settings in the workspace sidebar cover AI, integrations, sharing and more.",
+      "t2": "Open a workspace to see its projects and members. Workspace settings in the workspace sidebar cover AI, integrations, sharing and more.",
       "t3": "The slug is the workspace's short unique name: lowercase letters, numbers and hyphens."
     }
   }

@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "Priority suggestions",
+    "title": "AI priority suggestions",
     "subtitle": "{shown, plural, =0 {No suggestions} one {# suggestion} other {# suggestions}} across {total, plural, =0 {no open tasks} one {# open task} other {# open tasks}}. Apply changes a task's priority; Dismiss only hides the suggestion."
   },
   "kpi": {

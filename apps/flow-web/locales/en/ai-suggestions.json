@@ -118,13 +118,13 @@
     "title": "Suggested next steps"
   },
   "reminders": {
-    "title": "Reminders",
+    "title": "Overdue & due soon",
     "kind": {
       "overdue": "Overdue",
       "due_today": "Due today",
       "due_soon": "Due soon"
     },
-    "page_title": "Reminders",
+    "page_title": "Overdue & due soon",
     "page_subtitle": "Open tasks due within three days or already overdue, based on their due dates.",
     "view_all": "View all",
     "empty": "No reminders right now. Tasks with a due date appear here within three days of it, or when overdue.",

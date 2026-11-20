@@ -1,6 +1,6 @@
 {
   "view": {
-    "title": "Activity",
+    "title": "Activity log",
     "description": "A record of what happened in this workspace: changes by people, AI runs and calls from connected tools.",
     "list_label": "Workspace activity",
     "loading": "Loading activity…",

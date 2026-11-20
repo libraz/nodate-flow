@@ -118,13 +118,13 @@
     "title": "下一步建议"
   },
   "reminders": {
-    "title": "提醒",
+    "title": "逾期与即将到期",
     "kind": {
       "overdue": "已逾期",
       "due_today": "今日截止",
       "due_soon": "即将截止"
     },
-    "page_title": "提醒",
+    "page_title": "逾期与即将到期",
     "page_subtitle": "3 天内到期或已逾期的未完成任务，依据截止日期自动列出。",
     "view_all": "查看全部",
     "empty": "目前没有提醒。设有截止日期的任务会在到期前 3 天内或逾期后显示在这里。",

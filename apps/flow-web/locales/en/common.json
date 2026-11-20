@@ -29,10 +29,11 @@
     "stat_overdue": "Overdue",
     "stat_due_today": "Due today",
     "stat_done": "Completed",
-    "recent_tasks": "Your tasks",
+    "recent_tasks": "My tasks",
     "view_all_tasks": "View all tasks →",
-    "description": "Your assigned work across all workspaces, with the dashboard of your first workspace below.",
-    "stat_hint": "Counts tasks where you are assignee, reviewer or approver in any workspace. Overdue and Due today follow your time zone."
+    "description": "Your assigned work across workspaces, and the dashboard of the workspace you have selected.",
+    "stat_hint": "Counts tasks where you are assignee, reviewer or approver in any workspace. Overdue and Due today follow your time zone.",
+    "recent_tasks_empty": "You have no assigned tasks yet."
   },
   "nav": {
     "theme": "Theme",
@@ -46,16 +47,40 @@
     "workspaces": "Workspaces",
     "workspaceProjects": "Projects in this workspace",
     "pages": "Pages",
-    "settings": "Settings",
-    "timeboxes": "Timeboxes",
-    "activity": "Activity",
-    "insightsPriority": "Priority suggestions",
+    "settings": "Personal settings",
+    "timeboxes": "Sprints",
+    "activity": "Activity log",
+    "insightsPriority": "AI priority suggestions",
     "retroDrafts": "Retrospective drafts",
     "archive": "Archive",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "insightsPriorityHint": "Proposed priority changes for open tasks. Nothing changes until you apply one.",
-    "archiveHint": "Tasks you archived. You can restore them."
+    "archiveHint": "Tasks you archived. You can restore them.",
+    "home": "Home",
+    "reminders": "Overdue & due soon",
+    "timeline": "Timeline",
+    "members": "Members & invites",
+    "more": "More",
+    "workspaceSettings": "Workspace settings",
+    "shortcuts": "Keyboard shortcuts",
+    "allWorkspaces": "All workspaces",
+    "newWorkspace": "New workspace",
+    "switchWorkspace": "Switch workspace",
+    "noWorkspace": {
+      "title": "No workspace yet",
+      "body": "A workspace holds your team's projects, tasks and schedule.",
+      "cta": "Create a workspace"
+    },
+    "hint": {
+      "reminders": "Tasks that are overdue or due within 3 days.",
+      "archive": "Tasks you archived. You can restore them.",
+      "timeboxes": "Group tasks into a fixed period such as a sprint.",
+      "insightsPriority": "Proposed priority changes for open tasks. Nothing changes until you apply one.",
+      "retroDrafts": "Retrospective tasks drafted by AI from recent work. Approve or discard them.",
+      "timeline": "How tasks in this workspace changed over time.",
+      "activity": "Who did what and when — people, AI and integrations."
+    }
   },
   "topbar": {
     "workspace": {
@@ -68,8 +93,10 @@
     },
     "user_menu": {
       "open": "Account menu",
-      "settings": "Settings",
-      "avatar_alt": "{name}'s profile picture"
+      "settings": "Personal settings",
+      "avatar_alt": "{name}'s profile picture",
+      "notification_settings": "Notification settings",
+      "shortcuts": "Keyboard shortcuts"
     },
     "notifications": {
       "label": "Notifications"
@@ -604,12 +631,13 @@
     },
     "form": {
       "name": "Name",
-      "key": "Slug",
+      "key": "URL name",
       "description": "Description",
       "visibility": "Visibility",
       "submit": "Save",
       "cancel": "Cancel",
-      "key_description": "Lowercase letters, numbers and hyphens. Must be unique in the workspace. Filled in from the name until you edit it."
+      "key_description": "Lowercase letters, numbers and hyphens. Must be unique in the workspace. Filled in from the name until you edit it.",
+      "advanced": "Advanced (optional)"
     },
     "visibility": {
       "private": "Private",
@@ -718,7 +746,11 @@
     "quick_create": {
       "no_projects": {
         "title": "Create a project first",
-        "cta": "Go to projects"
+        "cta": "Create project",
+        "member_body": "This workspace has no projects yet. Ask an admin to create one."
+      },
+      "no_workspace": {
+        "title": "Create a workspace before adding tasks."
       }
     },
     "status": {
@@ -1222,7 +1254,7 @@
     "command_palette": "Open the command palette"
   },
   "timeboxes": {
-    "title": "Timeboxes",
+    "title": "Sprints",
     "description": "Group tasks into a period such as a sprint, and track them from planned to completed.",
     "new": "New timebox",
     "empty": "No timeboxes yet",
@@ -1437,5 +1469,29 @@
     "trigger": "How this page works",
     "eyebrow": "Guide",
     "shortcuts": "Keyboard shortcuts"
+  },
+  "onboarding": {
+    "title": "Getting started",
+    "progress": "{done} / {total} done",
+    "dismiss": "Hide",
+    "steps": {
+      "done": "Done",
+      "workspace": {
+        "title": "Create a workspace",
+        "body": "A shared place for your team's projects and schedule."
+      },
+      "project": {
+        "title": "Create a project",
+        "body": "Group related tasks, for example per client or initiative."
+      },
+      "task": {
+        "title": "Add a task",
+        "body": "Set an owner and a due date so nothing slips."
+      },
+      "invite": {
+        "title": "Invite teammates",
+        "body": "Share an invite link and choose each person's role."
+      }
+    }
   }
 }

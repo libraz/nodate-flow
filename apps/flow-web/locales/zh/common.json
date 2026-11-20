@@ -29,10 +29,11 @@
     "stat_overdue": "已逾期",
     "stat_due_today": "今日截止",
     "stat_done": "已完成",
-    "recent_tasks": "你的任务",
+    "recent_tasks": "我的任务",
     "view_all_tasks": "查看全部任务 →",
-    "description": "你在所有工作区中负责的工作概况，下方是第一个工作区的仪表盘。",
-    "stat_hint": "统计你在任意工作区中担任负责人、评审人或审批人的任务数量。逾期和今天到期按你的时区计算。"
+    "description": "你在各工作区中被分配的任务，以及当前所选工作区的仪表板。",
+    "stat_hint": "统计你在任意工作区中担任负责人、评审人或审批人的任务数量。逾期和今天到期按你的时区计算。",
+    "recent_tasks_empty": "你还没有被分配的任务。"
   },
   "nav": {
     "theme": "主题",
@@ -46,16 +47,40 @@
     "workspaces": "工作区",
     "workspaceProjects": "本工作区的项目",
     "pages": "文档",
-    "settings": "设置",
-    "timeboxes": "时间盒",
-    "activity": "动态",
-    "insightsPriority": "优先级建议",
+    "settings": "个人设置",
+    "timeboxes": "冲刺",
+    "activity": "操作记录",
+    "insightsPriority": "AI 优先级建议",
     "retroDrafts": "回顾草稿",
     "archive": "归档",
     "collapse": "收起侧边栏",
     "expand": "展开侧边栏",
     "insightsPriorityHint": "未完成任务的优先级变更建议。应用之前任务不会改变。",
-    "archiveHint": "你归档的任务，可以恢复。"
+    "archiveHint": "你归档的任务，可以恢复。",
+    "home": "首页",
+    "reminders": "逾期与即将到期",
+    "timeline": "时间线",
+    "members": "成员与邀请",
+    "more": "更多",
+    "workspaceSettings": "工作区设置",
+    "shortcuts": "键盘快捷键",
+    "allWorkspaces": "所有工作区",
+    "newWorkspace": "新建工作区",
+    "switchWorkspace": "切换工作区",
+    "noWorkspace": {
+      "title": "还没有工作区",
+      "body": "工作区用于汇集团队的项目、任务和日程。",
+      "cta": "创建工作区"
+    },
+    "hint": {
+      "reminders": "已逾期或 3 天内到期的任务。",
+      "archive": "已归档的任务，可以恢复。",
+      "timeboxes": "按冲刺等固定周期归集任务。",
+      "insightsPriority": "针对未完成任务的优先级调整建议。应用前任务不会改变。",
+      "retroDrafts": "AI 根据近期工作起草的回顾任务。可采纳或放弃。",
+      "timeline": "本工作区任务随时间的变化。",
+      "activity": "人员、AI 和集成在何时做了什么的记录。"
+    }
   },
   "topbar": {
     "workspace": {
@@ -68,8 +93,10 @@
     },
     "user_menu": {
       "open": "账户菜单",
-      "settings": "设置",
-      "avatar_alt": "{name} 的头像"
+      "settings": "个人设置",
+      "avatar_alt": "{name} 的头像",
+      "notification_settings": "通知设置",
+      "shortcuts": "键盘快捷键"
     },
     "notifications": {
       "label": "通知"
@@ -604,12 +631,13 @@
     },
     "form": {
       "name": "名称",
-      "key": "标识",
+      "key": "URL 名称",
       "description": "描述",
       "visibility": "可见性",
       "submit": "保存",
       "cancel": "取消",
-      "key_description": "可使用小写字母、数字和连字符，在工作区内不能重复。在你手动修改前，会根据名称自动填写。"
+      "key_description": "可使用小写字母、数字和连字符，在工作区内不能重复。在你手动修改前，会根据名称自动填写。",
+      "advanced": "高级设置（可选）"
     },
     "visibility": {
       "private": "私有",
@@ -718,7 +746,11 @@
     "quick_create": {
       "no_projects": {
         "title": "请先创建项目",
-        "cta": "前往项目"
+        "cta": "创建项目",
+        "member_body": "此工作区还没有项目。请联系管理员创建。"
+      },
+      "no_workspace": {
+        "title": "添加任务前请先创建工作区。"
       }
     },
     "status": {
@@ -1222,7 +1254,7 @@
     "command_palette": "打开命令面板"
   },
   "timeboxes": {
-    "title": "时间盒",
+    "title": "冲刺",
     "description": "把任务归入冲刺等时间段，并跟踪从计划中到已完成的进度。",
     "new": "新建时间盒",
     "empty": "暂无时间盒",
@@ -1437,5 +1469,29 @@
     "trigger": "本页使用说明",
     "eyebrow": "指南",
     "shortcuts": "键盘快捷键"
+  },
+  "onboarding": {
+    "title": "入门",
+    "progress": "已完成 {done} / {total}",
+    "dismiss": "隐藏",
+    "steps": {
+      "done": "已完成",
+      "workspace": {
+        "title": "创建工作区",
+        "body": "汇集团队项目和日程的共享空间。"
+      },
+      "project": {
+        "title": "创建项目",
+        "body": "按客户或项目等归集相关任务。"
+      },
+      "task": {
+        "title": "添加任务",
+        "body": "设置负责人和截止日期，避免遗漏。"
+      },
+      "invite": {
+        "title": "邀请成员",
+        "body": "分享邀请链接并选择权限。"
+      }
+    }
   }
 }

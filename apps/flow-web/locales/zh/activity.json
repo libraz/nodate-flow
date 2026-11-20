@@ -1,6 +1,6 @@
 {
   "view": {
-    "title": "动态",
+    "title": "操作记录",
     "description": "此工作区发生之事的记录：成员的变更、AI 运行以及已连接工具的调用。",
     "list_label": "工作区动态",
     "loading": "正在加载动态…",

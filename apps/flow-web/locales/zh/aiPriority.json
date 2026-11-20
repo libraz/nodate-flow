@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "优先级建议",
+    "title": "AI 优先级建议",
     "subtitle": "{shown, plural, =0 {没有建议} other {# 条建议}}（已检查未完成任务：{total, plural, =0 {0 个} other {# 个}}）。“应用”会修改任务优先级，“忽略”只隐藏建议。"
   },
   "kpi": {
