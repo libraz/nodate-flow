@@ -33,6 +33,7 @@ const copy = {
   namePlaceholder: enCommon.workspaces.setup.name_placeholder,
   slugPlaceholder: enCommon.workspaces.setup.slug_placeholder,
   submit: enCommon.workspaces.setup.submit,
+  advanced: enCommon.workspaces.form.advanced,
 } as const;
 
 interface FreshUser {
@@ -114,6 +115,9 @@ test.describe('setup first-run', () => {
     const nameInput = page.getByPlaceholder(copy.namePlaceholder, { exact: true });
     const slugInput = page.getByPlaceholder(copy.slugPlaceholder, { exact: true });
     await expect(nameInput).toBeVisible();
+
+    // The slug field lives inside a collapsed <details>.
+    await page.getByText(copy.advanced, { exact: true }).click();
     await expect(slugInput).toBeVisible();
 
     // Auto-slug: filling the name updates slug until the slug field is
@@ -134,6 +138,27 @@ test.describe('setup first-run', () => {
       timeout: 15_000,
     });
     await expect(page.getByRole('heading', { name: wsName, level: 2 })).toBeVisible();
+  });
+
+  test('creates a workspace from a Japanese name alone without opening advanced', async ({
+    page,
+  }) => {
+    const fresh = await registerWorkspaceless();
+    await loginInContext(page.context(), fresh.email, fresh.password);
+
+    await page.goto('/setup');
+    await expect(page.getByRole('heading', { name: copy.title, level: 1 })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    const wsName = `営業チーム ${Date.now().toString(36)}`;
+    await page.getByPlaceholder(copy.namePlaceholder, { exact: true }).fill(wsName);
+    await page.getByRole('button', { name: copy.submit, exact: true }).click();
+
+    await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: wsName, level: 2 })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('redirects users who already have a workspace away from /setup', async ({ page }) => {
