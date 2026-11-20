@@ -92,7 +92,7 @@ func TestAvatarProjectionAcrossUserEndpoints(t *testing.T) {
 	_, objectID := userInternalIDAndAvatar(t, testDB, owner.UserPublicID)
 	require.True(t, objectID.Valid, "upload must set avatar_storage_object_id")
 	require.Positive(t, objectID.Int32)
-	wantTag := avatarutil.OpaqueTag(uint64(objectID.Int32))
+	wantTag := avatarutil.OpaqueTag(uint64(objectID.Int32)) //#nosec G115 -- asserted positive above
 	wantPath := "/avatars/" + owner.UserPublicID
 
 	rangeQ := "?start=2027-07-01&end=2027-09-01"

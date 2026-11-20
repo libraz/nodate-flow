@@ -1,10 +1,10 @@
 package workspace
 
 import (
-	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 	"strconv"
 
 	"github.com/libraz/nodate-flow/apps/auth-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/packages/go-shared/avatarutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 )
 

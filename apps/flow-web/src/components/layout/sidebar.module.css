@@ -77,9 +77,9 @@
   padding-inline: var(--nf-space-3);
 }
 
+/* lg = header container breakpoint (768px) plus the expanded sidebar width (16rem). */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-/* Header container breakpoint (768px) plus the expanded sidebar width (16rem). */
-@media (min-width: calc(768px + 16rem)) {
+@media (min-width: 1024px) {
   .workspaceSwitcherSlot {
     display: none;
   }

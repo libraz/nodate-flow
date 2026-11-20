@@ -12,6 +12,7 @@
   min-inline-size: 12rem;
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 24rem;
+  /* nf-token-override: component dimension, not a spacing step */
   max-block-size: min(70vh, 40rem);
   overflow-y: auto;
   overscroll-behavior: contain;
