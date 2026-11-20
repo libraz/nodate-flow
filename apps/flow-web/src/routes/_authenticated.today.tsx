@@ -182,7 +182,7 @@ function TodayRoute(): ReactElement {
                     <Link
                       to="/tasks/$taskId"
                       params={{ taskId: task.id }}
-                      className={cx(styles.row, isOverdue && styles.rowOverdue, 'nf-focus-ring')}
+                      className={cx(styles.row, 'nf-focus-ring')}
                     >
                       <span className={styles.taskTitle}>{task.title}</span>
                       {pri > 0 ? (

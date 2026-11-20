@@ -168,12 +168,16 @@
   grid-template-columns: var(--nf-space-8) 1fr;
   align-items: center;
   border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid transparent;
   background: var(--nf-color-surface);
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .taskItem:hover {
   background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
 }
 
 .taskRow {
@@ -183,19 +187,9 @@
   min-block-size: var(--nf-control-height);
   padding-block: var(--nf-space-2-5);
   padding-inline: var(--nf-space-3);
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid transparent;
-  background: var(--nf-color-surface);
+  border-radius: inherit;
   color: var(--nf-color-fg);
   text-decoration: none;
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.taskRow:hover {
-  background: var(--nf-color-surface-hover);
-  border-color: var(--nf-color-border);
 }
 
 .taskTitle {
