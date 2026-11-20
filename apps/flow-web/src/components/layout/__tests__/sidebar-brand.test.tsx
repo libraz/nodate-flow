@@ -17,6 +17,11 @@ vi.mock('@tanstack/react-router', () => ({
     select({ location: { pathname: '/today' } }),
 }));
 
+vi.mock('../../../lib/use-current-workspace-role', () => ({
+  useCurrentWorkspaceRole: () => null,
+  isWorkspaceAdmin: () => false,
+}));
+
 vi.mock('../../../lib/sdk', () => ({
   sdk: { GET: vi.fn(async () => ({ data: { data: [] } })) },
   authSdk: { GET: vi.fn(async () => ({ data: { data: [] } })) },

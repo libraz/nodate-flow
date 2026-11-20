@@ -5,7 +5,7 @@ import Popover from '@nodate-flow/ui/primitives/popover';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { useNavigate } from '@tanstack/react-router';
 
-import { Bell, LogOut, Search, Settings } from 'lucide-react';
+import { Bell, Keyboard, LogOut, Search, Settings } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,
   type ReactElement,
@@ -21,11 +21,12 @@ import NotificationBell from '../../features/notifications/notification-bell';
 import { authApiRequest } from '../../lib/api';
 import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
+import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
+import { OPEN_SHORTCUTS_HELP_EVENT } from '../page-help';
 import CommandPalette from './command-palette';
 import { paletteShortcutLabel } from './palette-shortcut';
 import styles from './top-bar.module.css';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
-import WorkspaceSwitcher from './workspace-switcher';
 
 /** Two-letter initials from a display name (falls back to "?"). */
 function initialsFrom(name: string | undefined): string {
@@ -78,6 +79,7 @@ export default function TopBar(): ReactElement {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const showCostMeter = isWorkspaceAdmin(useCurrentWorkspaceRole());
   const user = useAuth(selectUser);
   const initials = initialsFrom(user?.displayName);
   const avatarUrl = resolveAvatarUrl(user?.avatarUrl);
@@ -135,7 +137,21 @@ export default function TopBar(): ReactElement {
             }}
           >
             <Icon icon={Bell} decorative />
-            <span>{t('topbar.notifications.label')}</span>
+            <span>{t('topbar.user_menu.notification_settings')}</span>
+          </button>
+        </li>
+        <li role="presentation">
+          <button
+            role="menuitem"
+            type="button"
+            className={cx(styles.userMenuItem, 'nf-focus-ring-inset')}
+            onClick={() => {
+              setUserMenuOpen(false);
+              window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_HELP_EVENT));
+            }}
+          >
+            <Icon icon={Keyboard} decorative />
+            <span>{t('topbar.user_menu.shortcuts')}</span>
           </button>
         </li>
         <li aria-hidden="true" className={styles.userMenuDivider} />
@@ -161,13 +177,6 @@ export default function TopBar(): ReactElement {
     <>
       <div className={styles.topBarShell}>
         <header className={styles.topBar}>
-          <div className={styles.left}>
-            {/* Brand is rendered in the sidebar; the top bar only carries
-                the workspace switcher to avoid a duplicate wordmark. */}
-            <Suspense fallback={null}>
-              <WorkspaceSwitcher />
-            </Suspense>
-          </div>
           <div className={styles.center}>
             <div className={styles.breadcrumbSlot}>
               <Suspense fallback={null}>
@@ -192,9 +201,11 @@ export default function TopBar(): ReactElement {
             </div>
           </div>
           <div className={styles.right}>
-            <div className={styles.costSlot}>
-              <AiCostMeter />
-            </div>
+            {showCostMeter ? (
+              <div className={styles.costSlot}>
+                <AiCostMeter />
+              </div>
+            ) : null}
             <div className={styles.inlineNotificationBell}>
               <Suspense fallback={null}>
                 <NotificationBell />

@@ -9,54 +9,37 @@ import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
-  Activity,
-  Archive,
-  Briefcase,
-  CalendarDays,
-  CalendarRange,
   CheckSquare,
+  ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Eye,
-  FileText,
   FolderKanban,
-  Inbox,
-  ListOrdered,
+  Keyboard,
   type LucideIcon,
   Menu,
-  NotebookPen,
-  Settings,
-  Timer,
+  Plus,
   X,
 } from 'lucide-react';
-import { type ReactElement, Suspense, useCallback, useEffect, useState } from 'react';
+import { type ReactElement, Suspense, useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
 import { useProjectsQuery } from '../../features/projects/api';
+import ProjectCreateDialog from '../../features/projects/project-create-dialog';
+import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { APP_ICON, APP_LOGO, APP_NAME } from '../../lib/brand';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
+import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
+import { OPEN_SHORTCUTS_HELP_EVENT } from '../page-help';
+import { type NavEntry, navEntriesIn, navEntry, navHref } from './nav-model';
 import styles from './sidebar.module.css';
 import WorkspaceSwitcher from './workspace-switcher';
 
 const STORAGE_KEY = 'nf.sidebar-collapsed';
 const LEGACY_STORAGE_KEY = 'nf:sidebar-collapsed';
 
-interface NavItem {
-  key: 'inbox' | 'today' | 'calendar' | 'pages' | 'workspaces' | 'settings';
-  icon: LucideIcon;
-  /** Destination route (TanStack Router path). */
-  to: '/workspaces' | '/inbox' | '/today' | '/calendar' | '/pages' | '/settings/profile';
-}
-
-const NAV_ITEMS: readonly NavItem[] = [
-  { key: 'inbox', icon: Inbox, to: '/inbox' },
-  { key: 'today', icon: CalendarDays, to: '/today' },
-  { key: 'calendar', icon: CalendarRange, to: '/calendar' },
-  { key: 'pages', icon: FileText, to: '/pages' },
-  { key: 'workspaces', icon: Briefcase, to: '/workspaces' },
-  { key: 'settings', icon: Settings, to: '/settings/profile' },
-];
+const MORE_STORAGE_KEY = 'nf.sidebar-more-open';
 
 function readInitialCollapsed(): boolean {
   if (typeof window === 'undefined') return false;
@@ -77,19 +60,71 @@ function readInitialCollapsed(): boolean {
 }
 
 /**
- * WorkspaceProjectsSection — renders a list of projects under the
- * currently-active workspace as Sidebar entries. Suspends on first
- * load; the outer Sidebar wraps this in a Suspense with a null
- * fallback so the rest of the nav renders immediately.
+ * One navigation destination from `NAV_ENTRIES`. `forcedActive` overrides the
+ * router's own active state for the entries whose section spans more than
+ * their own path (personal and workspace settings).
+ */
+function NavLinkItem({
+  entry,
+  workspaceId,
+  railCollapsed,
+  exact = false,
+  forcedActive,
+  sub = false,
+}: {
+  entry: NavEntry;
+  workspaceId: string | null;
+  railCollapsed: boolean;
+  exact?: boolean;
+  forcedActive?: boolean;
+  sub?: boolean;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const label = t(entry.labelKey);
+  const hint = entry.hintKey ? t(entry.hintKey) : null;
+  const tooltip = railCollapsed ? label : hint;
+  const baseClass = cx(styles.item, sub && styles.subItem);
+  const link = (
+    <Link
+      to={entry.route}
+      {...(entry.needsWorkspace && workspaceId ? { params: { id: workspaceId } } : {})}
+      aria-label={label}
+      title={tooltip === null ? label : undefined}
+      className={cx(baseClass, forcedActive && styles.itemActive, 'nf-focus-ring')}
+      activeOptions={{ exact }}
+      activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring') }}
+    >
+      <Icon icon={entry.icon} decorative />
+      <span className={styles.label}>{label}</span>
+    </Link>
+  );
+  if (tooltip === null) return link;
+  return (
+    <Tooltip content={tooltip} placement="right">
+      {link}
+    </Tooltip>
+  );
+}
+
+/** Non-workspace-scoped entries are looked up once; the model is static. */
+const PERSONAL_ENTRIES = navEntriesIn('personal');
+const WORKSPACE_ENTRIES = navEntriesIn('workspace');
+const MORE_ENTRIES = navEntriesIn('more');
+const PROJECTS_ENTRY = navEntry('projects');
+const WORKSPACE_SETTINGS_ENTRY = navEntry('workspaceSettings');
+const SETTINGS_ENTRY = navEntry('settings');
+
+/**
+ * Non-archived projects of the current workspace, hanging off the Projects
+ * entry. Suspends on first load; the caller wraps it in a null-fallback
+ * Suspense so the rest of the nav renders immediately.
  */
 function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): ReactElement | null {
-  const { t } = useTranslation('common');
   const { data: projects } = useProjectsQuery(workspaceId);
   const visible = projects.filter((p) => !p.isArchived);
   if (visible.length === 0) return null;
   return (
-    <div className={styles.section}>
-      <div className={styles.sectionLabel}>{t('nav.workspaceProjects')}</div>
+    <div className={styles.subNav}>
       {visible.map((p) => (
         <Link
           key={p.id}
@@ -105,126 +140,6 @@ function WorkspaceProjectsSection({ workspaceId }: { workspaceId: string }): Rea
         </Link>
       ))}
     </div>
-  );
-}
-
-/**
- * WorkspaceTimeboxesLink — single sidebar entry that points at
- * `/workspaces/{id}/timeboxes`. Rendered inline beneath the
- * workspaces nav root so the route is reachable without opening the
- * top-bar workspace switcher first. Static label, no data fetch.
- */
-function WorkspaceTimeboxesLink({ workspaceId }: { workspaceId: string }): ReactElement {
-  const { t } = useTranslation('common');
-  return (
-    <Link
-      to="/workspaces/$id/timeboxes"
-      params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-      activeProps={{
-        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-      }}
-    >
-      <Icon icon={Timer} decorative />
-      <span className={styles.label}>{t('nav.timeboxes')}</span>
-    </Link>
-  );
-}
-
-/**
- * WorkspaceActivityLink — single sidebar entry that points at
- * `/workspaces/{id}/activity`. Sits beside the Timeboxes link so the
- * unified activity feed (audit + ai + mcp) is reachable directly from the
- * workspace nav. Static label, no data fetch.
- */
-function WorkspaceActivityLink({ workspaceId }: { workspaceId: string }): ReactElement {
-  const { t } = useTranslation('common');
-  return (
-    <Link
-      to="/workspaces/$id/activity"
-      params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-      activeProps={{
-        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-      }}
-    >
-      <Icon icon={Activity} decorative />
-      <span className={styles.label}>{t('nav.activity')}</span>
-    </Link>
-  );
-}
-
-/**
- * WorkspaceInsightsPriorityLink — single sidebar entry that points at
- * `/workspaces/{id}/insights/priority`. Renders alongside the workspace
- * sub-section so the AI priority suggestions surface is reachable
- * without a dedicated Insights hub. Static label, no data fetch.
- */
-function WorkspaceInsightsPriorityLink({ workspaceId }: { workspaceId: string }): ReactElement {
-  const { t } = useTranslation('common');
-  return (
-    <Tooltip content={t('nav.insightsPriorityHint')} placement="right">
-      <Link
-        to="/workspaces/$id/insights/priority"
-        params={{ id: workspaceId }}
-        className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-        activeProps={{
-          className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-        }}
-      >
-        <Icon icon={ListOrdered} decorative />
-        <span className={styles.label}>{t('nav.insightsPriority')}</span>
-      </Link>
-    </Tooltip>
-  );
-}
-
-/**
- * WorkspaceArchiveLink — single sidebar entry that points at
- * `/workspaces/{id}/tasks/archived`. Archiving a task is reversible
- * only if the archive is reachable; without an entry point the room is
- * addressable but not findable, which makes archiving a one-way door in
- * practice. Static label, no data fetch.
- */
-function WorkspaceArchiveLink({ workspaceId }: { workspaceId: string }): ReactElement {
-  const { t } = useTranslation('common');
-  return (
-    <Tooltip content={t('nav.archiveHint')} placement="right">
-      <Link
-        to="/workspaces/$id/tasks/archived"
-        params={{ id: workspaceId }}
-        className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-        activeProps={{
-          className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-        }}
-      >
-        <Icon icon={Archive} decorative />
-        <span className={styles.label}>{t('nav.archive')}</span>
-      </Link>
-    </Tooltip>
-  );
-}
-
-/**
- * WorkspaceRetroDraftsLink — single sidebar entry that points at
- * `/workspaces/{id}/tasks/drafts`. The queue fills itself from AI
- * activity, so with no entry point the drafts accumulate unseen and
- * every one of them expires unread. Static label, no data fetch.
- */
-function WorkspaceRetroDraftsLink({ workspaceId }: { workspaceId: string }): ReactElement {
-  const { t } = useTranslation('common');
-  return (
-    <Link
-      to="/workspaces/$id/tasks/drafts"
-      params={{ id: workspaceId }}
-      className={cx(styles.item, styles.subItem, 'nf-focus-ring')}
-      activeProps={{
-        className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-      }}
-    >
-      <Icon icon={NotebookPen} decorative />
-      <span className={styles.label}>{t('nav.retroDrafts')}</span>
-    </Link>
   );
 }
 
@@ -318,17 +233,207 @@ function FavoritesSection({ workspaceId }: { workspaceId: string }): ReactElemen
   );
 }
 
+function readMoreOpen(pathname: string, workspaceId: string | null): boolean {
+  try {
+    if (window.localStorage.getItem(MORE_STORAGE_KEY) === '1') return true;
+  } catch {
+    /* ignore */
+  }
+  return MORE_ENTRIES.some((e) => {
+    const href = navHref(e, workspaceId);
+    return href !== null && pathname.startsWith(href);
+  });
+}
+
 /**
- * True on a workspace route that has its own sidebar sub-item, where the
- * Workspaces parent is shown as expanded rather than as a second active item.
+ * Workspace section: the heading (workspace name), its destinations, the
+ * "More" disclosure — or, with no workspace at all, the create call-to-action.
+ * Suspends on the workspace list.
  */
-function isWorkspaceSubItemRoute(pathname: string): boolean {
-  const [, root, , section, child] = pathname.split('/');
-  if (root !== 'workspaces' || section === undefined) return false;
-  if (section === 'activity' || section === 'timeboxes' || section === 'insights') return true;
-  if (section === 'tasks') return child === 'drafts' || child === 'archived';
-  if (section === 'projects') return Boolean(child);
-  return false;
+function WorkspaceArea({
+  workspaceId,
+  pathname,
+  railCollapsed,
+}: {
+  workspaceId: string | null;
+  pathname: string;
+  railCollapsed: boolean;
+}): ReactElement {
+  const { t } = useTranslation('common');
+  const { data: workspaces } = useWorkspacesQuery();
+  const role = useCurrentWorkspaceRole();
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  // Initial state only: after mount the user alone opens and closes it.
+  const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname, workspaceId));
+  const headingId = useId();
+  const moreId = useId();
+
+  if (workspaces.length === 0) {
+    if (railCollapsed) {
+      return (
+        <Tooltip content={t('nav.noWorkspace.cta')} placement="right">
+          <Link
+            to="/setup"
+            aria-label={t('nav.noWorkspace.cta')}
+            className={cx(styles.item, 'nf-focus-ring')}
+          >
+            <Icon icon={Plus} decorative />
+          </Link>
+        </Tooltip>
+      );
+    }
+    return (
+      <section className={styles.noWorkspace}>
+        <p className={styles.noWorkspaceTitle}>{t('nav.noWorkspace.title')}</p>
+        <p className={styles.noWorkspaceBody}>{t('nav.noWorkspace.body')}</p>
+        <Link to="/setup" className={cx(styles.cta, 'nf-focus-ring')}>
+          {t('nav.noWorkspace.cta')}
+        </Link>
+      </section>
+    );
+  }
+
+  const workspace = workspaces.find((w) => w.id === workspaceId);
+  if (!workspaceId || !workspace) {
+    return <div className={styles.headingSkeleton} aria-hidden="true" />;
+  }
+
+  const canCreateProject = isWorkspaceAdmin(role);
+  const handleToggleMore = (): void => {
+    const next = !moreOpen;
+    setMoreOpen(next);
+    try {
+      window.localStorage.setItem(MORE_STORAGE_KEY, next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <section
+      className={styles.workspaceSection}
+      {...(railCollapsed ? { 'aria-label': workspace.name } : { 'aria-labelledby': headingId })}
+    >
+      {railCollapsed ? null : (
+        <h2 id={headingId} className={styles.wsHeading}>
+          <span className={styles.monogram} aria-hidden="true">
+            {(Array.from(workspace.name.trim())[0] ?? '').toUpperCase()}
+          </span>
+          <span className={styles.wsHeadingName} title={workspace.name}>
+            {workspace.name}
+          </span>
+        </h2>
+      )}
+      {WORKSPACE_ENTRIES.map((entry) => {
+        if (entry.key !== 'projects') {
+          return (
+            <NavLinkItem
+              key={entry.key}
+              entry={entry}
+              workspaceId={workspaceId}
+              railCollapsed={railCollapsed}
+            />
+          );
+        }
+        return (
+          <div key={entry.key} className={styles.projectsGroup}>
+            <div className={styles.projectsRow}>
+              <NavLinkItem
+                entry={PROJECTS_ENTRY}
+                workspaceId={workspaceId}
+                railCollapsed={railCollapsed}
+                exact
+              />
+              {canCreateProject && !railCollapsed ? (
+                <Tooltip content={t('projects.new')} placement="right">
+                  <button
+                    type="button"
+                    className={cx(styles.addButton, 'nf-focus-ring')}
+                    aria-label={t('projects.new')}
+                    onClick={() => {
+                      setProjectDialogOpen(true);
+                    }}
+                  >
+                    <Icon icon={Plus} decorative />
+                  </button>
+                </Tooltip>
+              ) : null}
+            </div>
+            {railCollapsed ? null : (
+              <Suspense fallback={null}>
+                <WorkspaceProjectsSection workspaceId={workspaceId} />
+              </Suspense>
+            )}
+          </div>
+        );
+      })}
+      {railCollapsed ? null : (
+        <>
+          <Suspense fallback={null}>
+            <FavoritesSection workspaceId={workspaceId} />
+          </Suspense>
+          <button
+            type="button"
+            className={cx(styles.item, styles.moreToggle, 'nf-focus-ring')}
+            aria-expanded={moreOpen}
+            aria-controls={moreId}
+            onClick={handleToggleMore}
+          >
+            <span className={cx(styles.chevron, moreOpen && styles.chevronOpen)}>
+              <Icon icon={ChevronRight} decorative />
+            </span>
+            <span className={styles.label}>{t('nav.more')}</span>
+          </button>
+          <Collapse open={moreOpen} id={moreId} className={styles.subCollapse}>
+            <div className={styles.subNav}>
+              {MORE_ENTRIES.map((entry) => (
+                <NavLinkItem
+                  key={entry.key}
+                  entry={entry}
+                  workspaceId={workspaceId}
+                  railCollapsed={false}
+                  sub
+                />
+              ))}
+            </div>
+          </Collapse>
+        </>
+      )}
+      {canCreateProject ? (
+        <ProjectCreateDialog
+          workspaceId={workspaceId}
+          open={projectDialogOpen}
+          onClose={() => {
+            setProjectDialogOpen(false);
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function ShortcutsButton({ railCollapsed }: { railCollapsed: boolean }): ReactElement {
+  const { t } = useTranslation('common');
+  const label = t('nav.shortcuts');
+  const button = (
+    <button
+      type="button"
+      className={cx(styles.item, 'nf-focus-ring')}
+      aria-label={label}
+      onClick={() => {
+        window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_HELP_EVENT));
+      }}
+    >
+      <Icon icon={Keyboard} decorative />
+      <span className={styles.label}>{label}</span>
+    </button>
+  );
+  if (!railCollapsed) return button;
+  return (
+    <Tooltip content={label} placement="right">
+      {button}
+    </Tooltip>
+  );
 }
 
 function useIsMobile(): boolean {
@@ -356,11 +461,6 @@ export default function Sidebar(): ReactElement {
   const drawerOpen = isMobile && mobileOpen;
   const backdropPresence = usePresence<HTMLDivElement>(drawerOpen);
   const menuBtnPresence = usePresence<HTMLButtonElement>(isMobile && !mobileOpen);
-  // The workspace sub-tree keeps its last id so it can collapse after the route leaves it.
-  const [shownWorkspaceId, setShownWorkspaceId] = useState(currentWorkspaceId);
-  if (currentWorkspaceId && currentWorkspaceId !== shownWorkspaceId) {
-    setShownWorkspaceId(currentWorkspaceId);
-  }
 
   useEffect(() => {
     try {
@@ -383,31 +483,6 @@ export default function Sidebar(): ReactElement {
       setCollapsed((prev) => !prev);
     }
   }, [isMobile]);
-
-  const labelKeyFor = (
-    key: NavItem['key'],
-  ):
-    | 'nav.inbox'
-    | 'nav.today'
-    | 'nav.calendar'
-    | 'nav.pages'
-    | 'nav.workspaces'
-    | 'nav.settings' => {
-    switch (key) {
-      case 'inbox':
-        return 'nav.inbox';
-      case 'today':
-        return 'nav.today';
-      case 'calendar':
-        return 'nav.calendar';
-      case 'pages':
-        return 'nav.pages';
-      case 'workspaces':
-        return 'nav.workspaces';
-      case 'settings':
-        return 'nav.settings';
-    }
-  };
 
   return (
     <>
@@ -478,99 +553,50 @@ export default function Sidebar(): ReactElement {
             </>
           )}
         </div>
-        <Collapse open={!railCollapsed}>
-          <div className={styles.workspaceSwitcherSlot}>
-            <Suspense fallback={null}>
-              <WorkspaceSwitcher />
+        <div className={styles.workspaceSwitcherSlot}>
+          <Suspense fallback={null}>
+            <WorkspaceSwitcher railCollapsed={railCollapsed} />
+          </Suspense>
+        </div>
+        <nav className={styles.nav} aria-label={t('nav.primary')}>
+          <div className={styles.navScroll}>
+            <div className={styles.group}>
+              {PERSONAL_ENTRIES.map((entry) => (
+                <NavLinkItem
+                  key={entry.key}
+                  entry={entry}
+                  workspaceId={null}
+                  railCollapsed={railCollapsed}
+                  exact={entry.key === 'home'}
+                />
+              ))}
+            </div>
+            <div className={styles.divider} aria-hidden="true" />
+            <Suspense fallback={<div className={styles.headingSkeleton} aria-hidden="true" />}>
+              <WorkspaceArea
+                workspaceId={currentWorkspaceId}
+                pathname={pathname}
+                railCollapsed={railCollapsed}
+              />
             </Suspense>
           </div>
-        </Collapse>
-        <nav className={styles.nav} aria-label={t('nav.primary')}>
-          {NAV_ITEMS.map((item) => {
-            const label = t(labelKeyFor(item.key));
-            // Settings and Workspaces should stay highlighted on any
-            // nested child route (e.g. /settings/security,
-            // /workspaces/$id/projects), but the Settings link targets
-            // /settings/profile specifically so the default exact match
-            // fails on siblings. Fall back to a pathname-prefix check.
-            // On a route with its own sub-item, the sub-item is the
-            // active one and Workspaces only reads as expanded.
-            const workspaceExpanded =
-              item.key === 'workspaces' && isWorkspaceSubItemRoute(pathname);
-            const sectionActive =
-              (item.key === 'settings' && pathname.startsWith('/settings')) ||
-              (item.key === 'workspaces' &&
-                pathname.startsWith('/workspaces') &&
-                !workspaceExpanded);
-            const linkEl = (
-              <Link
-                key={item.key}
-                to={item.to}
-                aria-label={label}
-                title={label}
-                className={cx(
-                  styles.item,
-                  sectionActive && styles.itemActive,
-                  workspaceExpanded && styles.itemExpanded,
-                  'nf-focus-ring',
-                )}
-                activeOptions={{ exact: item.key === 'workspaces' }}
-                activeProps={{ className: cx(styles.item, styles.itemActive, 'nf-focus-ring') }}
-              >
-                <Icon icon={item.icon} decorative />
-                <span className={styles.label}>{label}</span>
-              </Link>
-            );
-            // Render the project tree directly beneath the Workspaces
-            // nav entry when we are inside a workspace-scoped route.
-            // The Favorites section is mounted alongside so starred
-            // tasks / projects sit under the same workspace header.
-            // The Timeboxes link is hand-coded so it is always visible
-            // even when the workspace has zero projects and the
-            // suspense-driven `WorkspaceProjectsSection` returns
-            // nothing.
-            if (item.key === 'workspaces') {
-              return (
-                <div key={item.key}>
-                  {railCollapsed ? (
-                    <Tooltip content={label} placement="right">
-                      {linkEl}
-                    </Tooltip>
-                  ) : (
-                    linkEl
-                  )}
-                  <Collapse
-                    open={!railCollapsed && Boolean(currentWorkspaceId)}
-                    className={styles.subCollapse}
-                  >
-                    {shownWorkspaceId ? (
-                      <div className={styles.subNav}>
-                        <WorkspaceActivityLink workspaceId={shownWorkspaceId} />
-                        <WorkspaceTimeboxesLink workspaceId={shownWorkspaceId} />
-                        <WorkspaceInsightsPriorityLink workspaceId={shownWorkspaceId} />
-                        <WorkspaceRetroDraftsLink workspaceId={shownWorkspaceId} />
-                        <WorkspaceArchiveLink workspaceId={shownWorkspaceId} />
-                        <Suspense fallback={null}>
-                          <WorkspaceProjectsSection workspaceId={shownWorkspaceId} />
-                        </Suspense>
-                        <Suspense fallback={null}>
-                          <FavoritesSection workspaceId={shownWorkspaceId} />
-                        </Suspense>
-                      </div>
-                    ) : null}
-                  </Collapse>
-                </div>
-              );
-            }
-            if (railCollapsed) {
-              return (
-                <Tooltip key={item.key} content={label} placement="right">
-                  {linkEl}
-                </Tooltip>
-              );
-            }
-            return linkEl;
-          })}
+          <div className={styles.navFooter}>
+            {currentWorkspaceId ? (
+              <NavLinkItem
+                entry={WORKSPACE_SETTINGS_ENTRY}
+                workspaceId={currentWorkspaceId}
+                railCollapsed={railCollapsed}
+                forcedActive={pathname.startsWith(`/workspaces/${currentWorkspaceId}/settings`)}
+              />
+            ) : null}
+            <NavLinkItem
+              entry={SETTINGS_ENTRY}
+              workspaceId={null}
+              railCollapsed={railCollapsed}
+              forcedActive={pathname.startsWith('/settings')}
+            />
+            <ShortcutsButton railCollapsed={railCollapsed} />
+          </div>
         </nav>
         <div className={styles.footer}>
           <button

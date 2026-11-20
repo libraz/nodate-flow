@@ -11,6 +11,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,12 +59,17 @@ vi.mock('../../../features/favorites/api', () => ({
   response: new Response(null, { status: 200 }),
 }));
 
-vi.mock('../../../features/workspaces/api', () => ({
+vi.mock('../../../features/workspaces/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/workspaces/api')>()),
   useWorkspacesQuery: () => ({
     data: mocks.workspaces,
     response: new Response(null, { status: 200 }),
   }),
-  response: new Response(null, { status: 200 }),
+}));
+
+vi.mock('../../../lib/use-current-workspace-role', () => ({
+  useCurrentWorkspaceRole: () => null,
+  isWorkspaceAdmin: () => false,
 }));
 
 vi.mock('../../../features/nl-command/api', () => ({
@@ -100,7 +106,7 @@ beforeEach(() => {
 });
 
 describe('sidebar workspace navigation', () => {
-  it('links to the Archive Room', () => {
+  it('links to the Archive Room without opening anything', () => {
     renderSidebar();
 
     const link = screen.getByText('nav.archive').closest('a');
@@ -108,21 +114,29 @@ describe('sidebar workspace navigation', () => {
     expect(link?.getAttribute('href')).toBe('/workspaces/ws-1/tasks/archived');
   });
 
-  it('links to the retrospective-draft queue', () => {
+  it('links to the reminders page without opening anything', () => {
     renderSidebar();
+
+    const link = screen.getByText('nav.reminders').closest('a');
+    expect(link?.getAttribute('href')).toBe('/workspaces/ws-1/reminders');
+  });
+
+  it('keeps the retrospective-draft queue behind the More disclosure', async () => {
+    renderSidebar();
+    expect(screen.queryByText('nav.retroDrafts')).toBeNull();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'nav.more' }));
 
     const link = screen.getByText('nav.retroDrafts').closest('a');
     expect(link).not.toBeNull();
     expect(link?.getAttribute('href')).toBe('/workspaces/ws-1/tasks/drafts');
   });
 
-  it('keeps them beside the other workspace destinations', () => {
+  it('keeps the other low-frequency destinations beside the drafts once opened', async () => {
     renderSidebar();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'nav.more' }));
 
-    // They belong to the same workspace sub-nav as the surfaces that
-    // were already wired up; a link nobody expects to find there is
-    // barely better than no link.
-    for (const key of ['nav.activity', 'nav.timeboxes', 'nav.insightsPriority']) {
+    for (const key of ['nav.activity', 'nav.timeboxes', 'nav.insightsPriority', 'nav.timeline']) {
       expect(screen.getByText(key)).toBeDefined();
     }
   });

@@ -64,41 +64,323 @@
   min-inline-size: 0;
 }
 
-/*
- * Workspace switcher slot — rendered between the brand and the nav so
- * the sidebar carries a switcher only while the topbar copy is hidden
- * (see `top-bar.module.css` `@container header (max-width: 767px)`).
- * The child `<select>` stretches to fill the slot via its shared
- * `.workspaceSelect` rule (see `top-bar.module.css`).
- */
+/* Workspace switcher: sits directly under the brand row. */
 .workspaceSwitcherSlot {
   display: flex;
   padding-block-end: var(--nf-space-2);
-  padding-inline: var(--nf-space-3);
+  padding-inline: var(--nf-space-2);
 }
 
-/* lg = header container breakpoint (768px) plus the expanded sidebar width (16rem). */
-/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
-@media (min-width: 1024px) {
-  .workspaceSwitcherSlot {
-    display: none;
-  }
+.collapsed .workspaceSwitcherSlot {
+  justify-content: center;
 }
 
-.workspaceSwitcherSlot > select,
-.workspaceSwitcherSlot > a {
+.switcherAnchor {
+  display: flex;
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+.collapsed .switcherAnchor {
+  flex: 0 0 auto;
+}
+
+.switcherButton {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
   inline-size: 100%;
-  max-inline-size: none;
+  min-inline-size: 0;
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-2);
+  background: transparent;
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.collapsed .switcherButton {
+  inline-size: auto;
+  padding: var(--nf-space-1);
+  border-color: transparent;
+}
+
+.switcherButton:hover,
+.switcherButton[aria-expanded="true"] {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border-strong);
+}
+
+.switcherButton > svg {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.switcherName {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small rounded square holding the workspace's first letter. */
+.monogram {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--nf-space-6);
+  block-size: var(--nf-space-6);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-semibold);
+}
+
+.switcherPopover {
+  max-inline-size: 100%;
+}
+
+.switcherMenu {
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 14rem;
+  max-inline-size: 100%;
+}
+
+.switcherList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.switcherItem {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  inline-size: 100%;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.switcherItem:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+.switcherItem > svg {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+}
+
+.switcherItemName {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcherDivider {
+  block-size: 0;
+  margin-block: var(--nf-space-1);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  list-style: none;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  padding-inline: var(--nf-space-2);
+}
+
+.navScroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+  flex: 1 1 auto;
+  min-block-size: 0;
+  padding-block: var(--nf-space-2);
+  overflow-y: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.divider {
+  block-size: 0;
+  margin-block: var(--nf-space-2);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.workspaceSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.wsHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+  margin: 0;
+  padding-block: var(--nf-space-1);
+  padding-inline: var(--nf-space-3);
+  font-family: var(--nf-font-sans);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.wsHeadingName {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headingSkeleton {
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 2.25rem;
+  margin-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-surface-hover);
+}
+
+.projectsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.projectsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.projectsRow > :first-child {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.addButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nf-space-1);
+  background: transparent;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.addButton:hover {
+  background: var(--nf-color-surface-hover);
+  color: var(--nf-color-fg);
+}
+
+.moreToggle {
+  inline-size: 100%;
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  transition: rotate var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.chevronOpen {
+  rotate: 90deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.noWorkspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  white-space: normal;
+}
+
+.noWorkspaceTitle {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.noWorkspaceBody {
+  margin: 0;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: var(--nf-space-2);
+  padding-inline: var(--nf-space-3);
+  border-radius: var(--nf-radius-sm);
+  background: var(--nf-color-accent);
+  color: var(--nf-color-fg-on-accent);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.cta:hover {
+  background: var(--nf-color-accent-hover);
+}
+
+/* Footer destinations: separated from the scrolling nav, quieter than it. */
+.navFooter {
+  display: flex;
+  flex-direction: column;
   gap: var(--nf-space-1);
   padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-2);
-  flex: 1 1 auto;
-  overflow-y: auto;
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+  color: var(--nf-color-fg-muted);
 }
 
 .item {
@@ -145,12 +427,6 @@
 
 .itemActive > svg {
   color: var(--nf-color-accent-fg);
-}
-
-/* Parent of the active sub-item: expanded, not a second active fill. */
-.itemExpanded {
-  color: var(--nf-color-fg);
-  font-weight: var(--nf-weight-medium);
 }
 
 .itemDisabled {

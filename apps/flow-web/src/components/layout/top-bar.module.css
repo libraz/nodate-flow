@@ -22,12 +22,7 @@
 
 /*
  * Grid tracks:
- *  - left : `minmax(0, auto)` so the workspace switcher can shrink below its
- *    max-content. Native <select> has an intrinsic max-content driven by
- *    its widest <option> label which (in Chromium) ignores `max-inline-size`
- *    under grid track sizing — without the explicit 0 lower bound the left
- *    track swallowed the row and pushed the right track off-screen.
- *  - center: `minmax(0, 1fr)` flexes the search / breadcrumb slot and
+ *  - center: `minmax(0, 1fr)` flexes the breadcrumb / search slot and
  *    collapses to zero under pressure.
  *  - right: `max-content` pins the action cluster at the sum of its
  *    children so the avatar trigger is always fully visible. Shrinking
@@ -36,7 +31,7 @@
  */
 .topBar {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--nf-space-3);
   padding-block: var(--nf-space-3);
@@ -51,67 +46,6 @@
   min-inline-size: 0;
 }
 
-.left {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-3);
-  min-inline-size: 0;
-}
-
-.workspaceSelect {
-  min-inline-size: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 14rem;
-}
-
-/*
- * Single-workspace identity: quiet context rather than a control. Matches
- * the Select's block-size so the topbar does not jump between 1 and 2+.
- */
-.workspaceCurrent {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-2);
-  min-inline-size: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 14rem;
-  min-block-size: var(--nf-control-height);
-  padding-inline: var(--nf-space-2);
-  border-radius: var(--nf-radius-md);
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-medium);
-  text-decoration: none;
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.workspaceCurrent:hover {
-  background: var(--nf-color-surface-hover);
-}
-
-.workspaceMonogram {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--nf-space-6);
-  block-size: var(--nf-space-6);
-  border-radius: var(--nf-radius-sm);
-  background: var(--nf-color-accent-subtle);
-  color: var(--nf-color-accent-fg);
-  font-size: var(--nf-text-xs);
-  font-weight: var(--nf-weight-semibold);
-}
-
-.workspaceCurrentName {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
-
 .center {
   display: flex;
   align-items: center;
@@ -122,7 +56,7 @@
 
 /*
  * Breadcrumb sits at the inline-start of the center column so the eye
- * naturally scans workspace-switcher -> breadcrumb -> search. The slot
+ * naturally scans breadcrumb -> search. The slot
  * owns `min-inline-size: 0` + `overflow: hidden` so long project names
  * can be truncated with `text-overflow: ellipsis` on the inner link.
  */
@@ -141,7 +75,7 @@
 }
 
 /*
- * The switcher in the left slot already names the workspace at full width;
+ * The sidebar heading already names the workspace at full width;
  * repeating it as the first crumb read as a duplicate.
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
@@ -429,34 +363,19 @@
 }
 
 /*
- * Compact (480-767px): collapse search to an icon-only button and hide the
- * workspace switcher from the top bar (still reachable via the sidebar
- * drawer). The avatar dropdown keeps settings / notifications / sign-out
- * one tap away.
+ * Compact (480-767px): collapse search to an icon-only button. The avatar
+ * dropdown keeps settings / notifications / sign-out one tap away.
  *
  * The breadcrumb also compacts: its list hides every item except the
  * last two (project link + current view) so the trail stays useful
  * without pushing the search button off-screen. The workspace crumb is
- * still reachable via the workspace-switcher in the left column, so
- * hiding it in the breadcrumb at this width is not a loss of affordance.
+ * still reachable via the sidebar drawer, so hiding it in the breadcrumb
+ * at this width is not a loss of affordance.
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 767px) {
   .topBar {
     grid-template-columns: minmax(0, 1fr) max-content;
-  }
-
-  /*
-   * Hide the topbar left slot (workspace switcher) at mobile widths.
-   * The switcher is rendered inside the sidebar drawer header so it
-   * remains reachable via the hamburger menu — preserving the
-   * Linear / Notion / Asana mobile pattern where secondary identity
-   * controls live in the drawer, not the topbar. The leading hamburger
-   * button is rendered by the Sidebar component (fixed-positioned) and
-   * is not affected by this display toggle.
-   */
-  .left {
-    display: none;
   }
 
   /*
@@ -545,17 +464,6 @@
     /* nf-token-override: component dimension, not a spacing step */
     max-inline-size: 10rem;
   }
-
-  /*
-   * Cap the workspace switcher at the compact breakpoint. Long workspace
-   * names would otherwise push the native <select> toward its 14rem max
-   * and squeeze the action cluster in the right grid track.
-   */
-  .workspaceSelect,
-  .workspaceCurrent {
-    /* nf-token-override: component dimension, not a spacing step */
-    max-inline-size: 10rem;
-  }
 }
 
 /*
@@ -578,18 +486,6 @@
      */
     padding-inline-end: var(--nf-space-3);
     gap: var(--nf-space-2);
-  }
-
-  /*
-   * At ultra widths the workspace switcher must shrink aggressively to
-   * leave room for the search button and the avatar trigger. Native
-   * <select> still renders an ellipsis for the selected option when the
-   * element is narrower than the label.
-   */
-  .workspaceSelect,
-  .workspaceCurrent {
-    /* nf-token-override: component dimension, not a spacing step */
-    max-inline-size: 7rem;
   }
 }
 

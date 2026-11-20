@@ -16,21 +16,7 @@ import Dialog from '@nodate-flow/ui/primitives/dialog';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { useQueries } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import {
-  Archive,
-  Building2,
-  CalendarDays,
-  CalendarRange,
-  FileText,
-  FolderKanban,
-  Home,
-  Inbox,
-  type LucideIcon,
-  NotebookPen,
-  Plus,
-  Settings,
-  SquareCheckBig,
-} from 'lucide-react';
+import { Building2, FolderKanban, type LucideIcon, Plus, SquareCheckBig } from 'lucide-react';
 import {
   type KeyboardEvent,
   type MutableRefObject,
@@ -55,6 +41,7 @@ import { formatApiError } from '../../lib/api-error';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import PageHelp from '../page-help';
 import css from './command-palette.module.css';
+import { NAV_ENTRIES, navHref } from './nav-model';
 
 interface CommandItem {
   id: string;
@@ -428,72 +415,19 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       search: { new: true },
       icon: Plus,
     }));
-    const nav: CommandItem[] = [
-      {
-        id: 'nav:home',
-        label: t('dock.command_palette.home'),
-        group: navGroup,
-        href: '/',
-        icon: Home,
-      },
-      {
-        id: 'nav:today',
-        label: t('nav.today'),
-        group: navGroup,
-        href: '/today',
-        icon: CalendarDays,
-      },
-      { id: 'nav:inbox', label: t('nav.inbox'), group: navGroup, href: '/inbox', icon: Inbox },
-      {
-        id: 'nav:calendar',
-        label: t('nav.calendar'),
-        group: navGroup,
-        href: '/calendar',
-        icon: CalendarRange,
-      },
-      {
-        id: 'nav:pages',
-        label: t('nav.pages'),
-        group: navGroup,
-        href: '/pages',
-        icon: FileText,
-      },
-      {
-        id: 'nav:workspaces',
-        label: t('nav.workspaces'),
-        group: navGroup,
-        href: '/workspaces',
-        icon: Building2,
-      },
-      {
-        id: 'nav:settings',
-        label: t('nav.settings'),
-        group: navGroup,
-        href: '/settings',
-        icon: Settings,
-      },
-    ];
-    // Workspace-scoped destinations, which only resolve once a workspace
-    // is in context. The archive and the retro-draft queue have no fixed
-    // path, so the palette is the one place they can be reached by name.
-    const workspaceNav: CommandItem[] = wsId
-      ? [
-          {
-            id: 'nav:retro-drafts',
-            label: t('nav.retroDrafts'),
-            group: navGroup,
-            href: `/workspaces/${wsId}/tasks/drafts`,
-            icon: NotebookPen,
-          },
-          {
-            id: 'nav:archive',
-            label: t('nav.archive'),
-            group: navGroup,
-            href: `/workspaces/${wsId}/tasks/archived`,
-            icon: Archive,
-          },
-        ]
-      : [];
+    const nav: CommandItem[] = NAV_ENTRIES.flatMap((entry) => {
+      const href = navHref(entry, wsId);
+      if (href === null) return [];
+      return [
+        {
+          id: `nav:${entry.key}`,
+          label: t(entry.labelKey),
+          group: navGroup,
+          href,
+          icon: entry.icon,
+        },
+      ];
+    });
     const ws: CommandItem[] = workspaces.map((w) => ({
       id: `ws:${w.id}`,
       label: w.name,
@@ -515,7 +449,7 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
       href: `/workspaces/${p.workspaceId}/projects/${p.id}`,
       icon: FolderKanban,
     }));
-    return [...actions, ...tasks, ...projects, ...nav, ...workspaceNav, ...ws];
+    return [...actions, ...tasks, ...projects, ...nav, ...ws];
   }, [t, wsId, workspaces, taskResults, projectResults]);
 
   const filtered = useMemo<CommandItem[]>(() => {
