@@ -13,12 +13,13 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { createIdentifierField, createSlugField, slugify } from '../../lib/validation/identifier';
-import { useCreateProject } from './api';
+import { type Project, useCreateProject } from './api';
 
 export interface ProjectCreateDialogProps {
   workspaceId: string;
   open: boolean;
   onClose: () => void;
+  onCreated?: (project: Project) => void;
 }
 
 interface FieldErrors {
@@ -26,6 +27,34 @@ interface FieldErrors {
   slug?: string;
   identifier?: string;
   description?: string;
+}
+
+/** Random fallbacks for when the name yields nothing slug-safe (e.g. Japanese-only). */
+function randomChars(alphabet: string, length: number): string {
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+  return out;
+}
+
+// A name with non-ASCII characters (e.g. Japanese) would derive a lossy
+// fragment like "q4"; a random value is the honest fallback there.
+const NON_ASCII = /\P{ASCII}/u;
+
+function deriveSlug(name: string): string {
+  const derived = NON_ASCII.test(name) ? '' : slugify(name);
+  return derived || `project-${randomChars('abcdefghijklmnopqrstuvwxyz0123456789', 6)}`;
+}
+
+function deriveIdentifier(name: string): string {
+  const derived = NON_ASCII.test(name)
+    ? ''
+    : name
+        .replace(/[^a-zA-Z]/g, '')
+        .slice(0, 3)
+        .toUpperCase();
+  return derived || `P${randomChars('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 3)}`;
 }
 
 const schema = z.object({
@@ -42,6 +71,7 @@ export default function ProjectCreateDialog({
   workspaceId,
   open,
   onClose,
+  onCreated,
 }: ProjectCreateDialogProps): ReactElement {
   const { t } = useTranslation('common');
   const { t: tLabels } = useTranslation('labels');
@@ -55,6 +85,7 @@ export default function ProjectCreateDialog({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const reset = (): void => {
     setName('');
@@ -64,6 +95,7 @@ export default function ProjectCreateDialog({
     setIdentifierTouched(false);
     setDescription('');
     setErrors({});
+    setAdvancedOpen(false);
   };
 
   const handleClose = (): void => {
@@ -74,10 +106,14 @@ export default function ProjectCreateDialog({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
+    // Derived values are filled on submit as well, so a form submitted
+    // before any keystroke handler ran still carries valid fallbacks.
+    const slugValue = slug || deriveSlug(name);
+    const identifierValue = identifier || deriveIdentifier(name);
     const parsed = schema.safeParse({
       name,
-      slug,
-      identifier,
+      slug: slugValue,
+      identifier: identifierValue,
       description: description.trim() === '' ? undefined : description,
     });
     if (!parsed.success) {
@@ -90,12 +126,13 @@ export default function ProjectCreateDialog({
         if (field === 'description') next.description ??= issue.message;
       }
       setErrors(next);
+      if (next.slug || next.identifier) setAdvancedOpen(true);
       return;
     }
     setErrors({});
     setSubmitting(true);
     try {
-      await create.mutateAsync({
+      const project = await create.mutateAsync({
         workspaceId,
         input: {
           name: parsed.data.name,
@@ -106,6 +143,7 @@ export default function ProjectCreateDialog({
       });
       reset();
       onClose();
+      onCreated?.(project);
     } catch (err) {
       const code =
         err && typeof err === 'object' && 'code' in err
@@ -113,8 +151,10 @@ export default function ProjectCreateDialog({
           : undefined;
       if (code === 'WS.PROJECT.SLUG_ALREADY_TAKEN') {
         setErrors((prev) => ({ ...prev, slug: 'projects.validation.slug_taken' }));
+        setAdvancedOpen(true);
       } else if (code === 'WS.PROJECT.IDENTIFIER_ALREADY_TAKEN') {
         setErrors((prev) => ({ ...prev, identifier: 'identifier.validation.taken' }));
+        setAdvancedOpen(true);
       } else {
         toaster.show({ tone: 'danger', message: t('projects.errors.create_failed') });
       }
@@ -144,55 +184,10 @@ export default function ProjectCreateDialog({
               onChange={(e) => {
                 const nextName = e.target.value;
                 setName(nextName);
-                if (!slugTouched) setSlug(slugify(nextName));
-                if (!identifierTouched) {
-                  setIdentifier(
-                    nextName
-                      .replace(/[^a-zA-Z]/g, '')
-                      .slice(0, 3)
-                      .toUpperCase(),
-                  );
-                }
+                if (!slugTouched) setSlug(deriveSlug(nextName));
+                if (!identifierTouched) setIdentifier(deriveIdentifier(nextName));
               }}
               autoFocus
-            />
-          )}
-        </FormField>
-
-        <FormField
-          label={t('projects.form.key')}
-          description={t('projects.form.key_description')}
-          required
-          {...(errors.slug ? { error: t(errors.slug) } : {})}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              value={slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setSlug(e.target.value);
-              }}
-            />
-          )}
-        </FormField>
-
-        <FormField
-          label={tLabels('identifier.label')}
-          required
-          description={tLabels('identifier.hint')}
-          {...(errors.identifier ? { error: tLabels(errors.identifier) } : {})}
-        >
-          {(control) => (
-            <Input
-              {...control}
-              value={identifier}
-              onChange={(e) => {
-                setIdentifierTouched(true);
-                setIdentifier(e.target.value.toUpperCase().slice(0, 5));
-              }}
-              placeholder={tLabels('identifier.placeholder')}
-              maxLength={5}
             />
           )}
         </FormField>
@@ -212,6 +207,61 @@ export default function ProjectCreateDialog({
             />
           )}
         </FormField>
+
+        <details
+          open={advancedOpen}
+          onToggle={(e) => {
+            setAdvancedOpen(e.currentTarget.open);
+          }}
+        >
+          <summary
+            style={{
+              cursor: 'pointer',
+              color: 'var(--nf-color-fg-muted)',
+              fontSize: 'var(--nf-text-sm)',
+              marginBlockEnd: 'var(--nf-space-3)',
+            }}
+          >
+            {t('projects.form.advanced')}
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-5)' }}>
+            <FormField
+              label={t('projects.form.key')}
+              description={t('projects.form.key_description')}
+              {...(errors.slug ? { error: t(errors.slug) } : {})}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  value={slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    setSlug(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+
+            <FormField
+              label={tLabels('identifier.label')}
+              description={tLabels('identifier.hint')}
+              {...(errors.identifier ? { error: tLabels(errors.identifier) } : {})}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  value={identifier}
+                  onChange={(e) => {
+                    setIdentifierTouched(true);
+                    setIdentifier(e.target.value.toUpperCase().slice(0, 5));
+                  }}
+                  placeholder={tLabels('identifier.placeholder')}
+                  maxLength={5}
+                />
+              )}
+            </FormField>
+          </div>
+        </details>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--nf-space-3)' }}>
           <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>

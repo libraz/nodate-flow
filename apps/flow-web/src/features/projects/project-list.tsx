@@ -14,6 +14,7 @@ import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { formatEpoch } from '../../lib/format';
+import { useWorkspaceQuery } from '../workspaces/api';
 import styles from '../workspaces/workspaces.module.css';
 import { type Project, useProjectsQuery } from './api';
 import ProjectCreateDialog from './project-create-dialog';
@@ -25,6 +26,7 @@ export interface ProjectListProps {
 export default function ProjectList({ workspaceId }: ProjectListProps): ReactElement {
   const { t, i18n } = useTranslation('common');
   const { data: projects } = useProjectsQuery(workspaceId);
+  const { data: workspace } = useWorkspaceQuery(workspaceId);
   const [createOpen, setCreateOpen] = useState(false);
 
   const locale = i18n.resolvedLanguage ?? 'en';
@@ -79,7 +81,7 @@ export default function ProjectList({ workspaceId }: ProjectListProps): ReactEle
     <section className={styles.section}>
       <PageHeader
         title={t('projects.title')}
-        description={t('projects.description')}
+        description={workspace.description || t('projects.description')}
         help="projects"
         actions={
           <Button variant="primary" onClick={handleCreate}>

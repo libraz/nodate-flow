@@ -8,6 +8,7 @@ import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -41,6 +42,7 @@ export default function WorkspaceCreateDialog({
 }: WorkspaceCreateDialogProps): ReactElement {
   const { t } = useTranslation('common');
   const create = useCreateWorkspace();
+  const navigate = useNavigate();
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -91,6 +93,7 @@ export default function WorkspaceCreateDialog({
       });
       reset();
       onClose();
+      await navigate({ to: '/' });
     } catch (err) {
       const code =
         err && typeof err === 'object' && 'code' in err

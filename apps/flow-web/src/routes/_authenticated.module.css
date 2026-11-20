@@ -8,25 +8,6 @@
   animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out) 200ms backwards;
 }
 
-.hint {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-4);
-  /* nf-token-override: component dimension, not a spacing step */
-  min-inline-size: 20rem;
-}
-
-.hintText {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-}
-
-.hintActions {
-  display: flex;
-  gap: var(--nf-space-2);
-  justify-content: flex-end;
-}
-
 .offline {
   min-block-size: 100vh;
   display: flex;

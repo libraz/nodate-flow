@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-query';
 
 import { authApiRequest } from '../../lib/api';
+import { setActiveWorkspaceId } from '../../lib/use-current-workspace';
 
 export type Workspace = components['schemas']['Workspace'];
 export type WorkspaceMember = components['schemas']['WorkspaceMember'];
@@ -57,19 +58,25 @@ export function useWorkspacesQuery(): UseSuspenseQueryResult<Workspace[]> {
   });
 }
 
+/**
+ * Fetch one workspace. Shared by the suspense hook below and by
+ * `useCurrentWorkspaceRole`, which reads the same cache entry without
+ * suspending.
+ */
+export async function fetchWorkspace(id: string): Promise<Workspace> {
+  return authApiRequest(
+    (client) =>
+      client.GET('/workspaces/{wsId}', {
+        params: { path: { wsId: id } },
+      }),
+    'Failed to load workspace',
+  );
+}
+
 export function useWorkspaceQuery(id: string): UseSuspenseQueryResult<Workspace> {
   return useSuspenseQuery({
     queryKey: workspacesKeys.detail(id),
-    queryFn: async (): Promise<Workspace> => {
-      const data = await authApiRequest(
-        (client) =>
-          client.GET('/workspaces/{wsId}', {
-            params: { path: { wsId: id } },
-          }),
-        'Failed to load workspace',
-      );
-      return data;
-    },
+    queryFn: () => fetchWorkspace(id),
   });
 }
 
@@ -133,8 +140,11 @@ export function useCreateWorkspace(): UseMutationResult<Workspace, ApiError, Cre
       );
       return data;
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: workspacesKeys.list() });
+    // Wait for the list and member-ids refetch before activating, so the
+    // current-workspace hook does not discard the new id as unknown.
+    onSuccess: async (ws) => {
+      await qc.invalidateQueries({ queryKey: workspacesKeys.all });
+      setActiveWorkspaceId(ws.id);
     },
   });
 }

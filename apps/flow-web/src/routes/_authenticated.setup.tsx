@@ -1,7 +1,7 @@
 /**
  * /setup -- first-run onboarding for an authenticated user who does not
- * yet belong to a workspace. Creating a workspace drops the user into
- * /calendar. If the user already has a workspace we redirect here before
+ * yet belong to a workspace. Creating a workspace drops the user on
+ * the home page. If the user already has a workspace we redirect here before
  * any component renders, so returning to /setup never shows the form
  * twice.
  *
@@ -50,7 +50,7 @@ export const Route = createFileRoute('/_authenticated/setup')({
       queryFn: fetchWorkspaceList,
     });
     if (list.length > 0) {
-      throw redirect({ to: '/calendar', replace: true });
+      throw redirect({ to: '/', replace: true });
     }
   },
   component: SetupRoute,

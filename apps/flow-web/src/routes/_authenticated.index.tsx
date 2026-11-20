@@ -34,6 +34,7 @@ import PageFrame from '../components/page-frame';
 import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
+import OnboardingChecklist from '../features/onboarding/onboarding-checklist';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { apiRequest } from '../lib/api';
 import { todayKey } from '../lib/date-utils';
@@ -113,6 +114,11 @@ function TaskSummary(): ReactElement {
     },
   });
 
+  // The authenticated layout listens for this event.
+  const handleCreateTask = (): void => {
+    window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
+  };
+
   const counts = useMemo(() => {
     const today = todayKey(zone);
     let open = 0;
@@ -168,7 +174,22 @@ function TaskSummary(): ReactElement {
       </div>
       <p className={styles.statHint}>{t('home.stat_hint')}</p>
 
-      {recentTasks.length > 0 && (
+      {recentTasks.length === 0 ? (
+        <section>
+          <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
+          <div className={styles.emptyTasks}>
+            <p className={styles.mutedText}>{t('home.recent_tasks_empty')}</p>
+            <button
+              type="button"
+              onClick={handleCreateTask}
+              className={cx(styles.action, 'nf-focus-ring')}
+            >
+              <Icon icon={Plus} decorative />
+              {t('home.quick_create')}
+            </button>
+          </div>
+        </section>
+      ) : (
         <section>
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
           <ul className={styles.taskList}>
@@ -198,36 +219,30 @@ function TaskSummary(): ReactElement {
 
 /* ── Workspace quick links ─────────────────────────────────── */
 
-function WorkspaceLinks(): ReactElement {
+function WorkspaceLinks(): ReactElement | null {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
 
-  if (workspaces.length === 0) {
-    return (
-      <div className={styles.workspacesEmpty}>
-        <p className={styles.mutedText}>{t('workspaces.empty')}</p>
-        <Link to="/setup" className={cx(styles.action, styles.actionPrimary, 'nf-focus-ring')}>
-          <Icon icon={Plus} decorative />
-          {t('workspaces.setup.submit')}
-        </Link>
-      </div>
-    );
-  }
+  // With no workspace the checklist and the sidebar already point at /setup.
+  if (workspaces.length === 0) return null;
 
   return (
-    <div className={styles.workspaces}>
-      {workspaces.map((ws) => (
-        <Link
-          key={ws.id}
-          to="/workspaces/$id"
-          params={{ id: ws.id }}
-          className={cx(styles.workspaceLink, 'nf-focus-ring')}
-        >
-          <Icon icon={FolderKanban} decorative />
-          <span className={styles.workspaceName}>{ws.name}</span>
-        </Link>
-      ))}
-    </div>
+    <section>
+      <h2 className={styles.sectionTitle}>{t('nav.workspaces')}</h2>
+      <div className={styles.workspaces}>
+        {workspaces.map((ws) => (
+          <Link
+            key={ws.id}
+            to="/workspaces/$id"
+            params={{ id: ws.id }}
+            className={cx(styles.workspaceLink, 'nf-focus-ring')}
+          >
+            <Icon icon={FolderKanban} decorative />
+            <span className={styles.workspaceName}>{ws.name}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -273,6 +288,10 @@ function HomePage(): ReactElement {
     <PageFrame>
       <PageHeader title={greeting} description={t('home.description')} help="home" />
 
+      <Suspense fallback={null}>
+        <OnboardingChecklist />
+      </Suspense>
+
       <div className={styles.quickActions}>
         <button
           type="button"
@@ -296,12 +315,9 @@ function HomePage(): ReactElement {
         <TaskSummary />
       </Suspense>
 
-      <section>
-        <h2 className={styles.sectionTitle}>{t('nav.workspaces')}</h2>
-        <Suspense fallback={<WorkspaceLinksSkeleton />}>
-          <WorkspaceLinks />
-        </Suspense>
-      </section>
+      <Suspense fallback={<WorkspaceLinksSkeleton />}>
+        <WorkspaceLinks />
+      </Suspense>
 
       <Suspense fallback={<Skeleton className={styles.dashboardSkeleton} />}>
         <HomeDashboard />

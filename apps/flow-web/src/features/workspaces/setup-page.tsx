@@ -4,9 +4,9 @@
  * (name + slug) that drives the shared `useCreateWorkspace` mutation.
  *
  * Route guard lives in `_authenticated.setup.tsx`: if the user already
- * belongs to at least one workspace the loader redirects to /calendar
+ * belongs to at least one workspace the loader redirects to /
  * before this component is mounted. On successful creation we navigate
- * to /calendar so the new user lands on an immediately useful surface.
+ * to / so the new user lands on the getting-started checklist.
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
@@ -66,7 +66,7 @@ export default function SetupPage(): ReactElement {
         name: parsed.data.name,
         slug: parsed.data.slug,
       });
-      await navigate({ to: '/calendar', replace: true });
+      await navigate({ to: '/', replace: true });
     } catch (err) {
       const code =
         err && typeof err === 'object' && 'code' in err

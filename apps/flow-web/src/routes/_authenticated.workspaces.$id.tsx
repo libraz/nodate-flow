@@ -1,17 +1,14 @@
 /**
  * /workspaces/$id — workspace detail layout.
  *
- * Renders a horizontal sub-nav (Overview / Projects / Timeline /
- * Members / Settings) so the nested routes are reachable from the UI without
- * typing URLs. When no child route is matched, the workspace overview
- * is rendered inline.
+ * Navigation between workspace sections lives in the sidebar; this layout
+ * only hosts the active child. With no child route matched it redirects
+ * to the projects list.
  *
  * When the active child route is under `projects/$projectId/*`, the
- * workspace-level header and tab strip are suppressed entirely. The
- * nested project route already renders its own h1 + tab strip, and the
- * top-bar breadcrumb carries the "Workspace › Project" context, so
- * repeating the workspace chrome would stack three nav layers above
- * page content and generate multiple h1 elements on the same document.
+ * workspace-level header is suppressed entirely: the nested project route
+ * renders its own h1 + tab strip, and the top-bar breadcrumb carries the
+ * "Workspace › Project" context.
  *
  * Loader + errorComponent intercept WS.WORKSPACE.NOT_FOUND so
  * fabricated or stale workspace UUIDs land on a branded "Workspace not
@@ -20,58 +17,14 @@
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { createFileRoute, Link, Outlet, useChildMatches } from '@tanstack/react-router';
+import { createFileRoute, Link, Navigate, Outlet, useChildMatches } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PageFrame from '../components/page-frame';
-import { useWorkspaceQuery } from '../features/workspaces/api';
-import WorkspaceDetail from '../features/workspaces/workspace-detail';
 import styles from '../features/workspaces/workspaces.module.css';
 import { authApiProbe } from '../lib/api';
 import { ApiError } from '../lib/api-error';
-
-type SubNavKey = 'overview' | 'projects' | 'timeline' | 'members' | 'settings';
-
-interface SubNavItem {
-  key: SubNavKey;
-  to:
-    | '/workspaces/$id'
-    | '/workspaces/$id/projects'
-    | '/workspaces/$id/timeline'
-    | '/workspaces/$id/members'
-    | '/workspaces/$id/settings';
-}
-
-const SUB_NAV: readonly SubNavItem[] = [
-  { key: 'overview', to: '/workspaces/$id' },
-  { key: 'projects', to: '/workspaces/$id/projects' },
-  { key: 'timeline', to: '/workspaces/$id/timeline' },
-  { key: 'members', to: '/workspaces/$id/members' },
-  { key: 'settings', to: '/workspaces/$id/settings' },
-];
-
-function labelKeyFor(
-  key: SubNavKey,
-):
-  | 'workspaces.nav.overview'
-  | 'workspaces.nav.projects'
-  | 'workspaces.nav.timeline'
-  | 'workspaces.nav.members'
-  | 'workspaces.nav.settings' {
-  switch (key) {
-    case 'overview':
-      return 'workspaces.nav.overview';
-    case 'projects':
-      return 'workspaces.nav.projects';
-    case 'timeline':
-      return 'workspaces.nav.timeline';
-    case 'members':
-      return 'workspaces.nav.members';
-    case 'settings':
-      return 'workspaces.nav.settings';
-  }
-}
 
 /**
  * True when any child match is the project-detail subtree
@@ -88,20 +41,10 @@ function useInsideProjectRoute(): boolean {
 }
 
 function WorkspaceDetailRoute(): ReactElement {
-  const { t } = useTranslation('common');
   const { id } = Route.useParams();
   const childMatches = useChildMatches();
   const hasChildRoute = childMatches.length > 0;
   const insideProject = useInsideProjectRoute();
-  // WorkspaceDetail renders its own <h1> on the overview. On child
-  // routes (projects / timeline / settings) the active child owns the
-  // page <h1> (section title), so the workspace name here is rendered
-  // as a non-heading <p> styled like a breadcrumb — keeping the
-  // document outline at a single top-level heading without inverting
-  // heading order (h2 before h1). Project-detail routes render their
-  // own chrome, so the layout bails out entirely (see `insideProject`
-  // branch below).
-  const { data: workspace } = useWorkspaceQuery(id);
 
   if (insideProject) {
     return (
@@ -122,22 +65,6 @@ function WorkspaceDetailRoute(): ReactElement {
 
   return (
     <PageFrame>
-      {hasChildRoute ? <p className={styles.workspaceContext}>{workspace.name}</p> : null}
-      <nav aria-label={t('workspaces.nav.label')} className={styles.subNav}>
-        {SUB_NAV.map((item) => (
-          <Link
-            key={item.key}
-            to={item.to}
-            params={{ id }}
-            activeOptions={{ exact: item.key === 'overview' }}
-            activeProps={{ 'aria-current': 'page', 'data-active': 'true' }}
-            className={styles.subNavLink}
-          >
-            {t(labelKeyFor(item.key))}
-          </Link>
-        ))}
-      </nav>
-
       <Suspense
         fallback={
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}>
@@ -148,7 +75,11 @@ function WorkspaceDetailRoute(): ReactElement {
           </div>
         }
       >
-        {hasChildRoute ? <Outlet /> : <WorkspaceDetail id={id} />}
+        {hasChildRoute ? (
+          <Outlet />
+        ) : (
+          <Navigate to="/workspaces/$id/projects" params={{ id }} replace />
+        )}
       </Suspense>
     </PageFrame>
   );
