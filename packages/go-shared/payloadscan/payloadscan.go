@@ -235,7 +235,7 @@ func scanPayloadValue(fset *token.FileSet, expr ast.Expr, info *types.Info, loca
 			out = append(out, Finding{Pos: fset.Position(kv.Value.Pos()).String(), Key: key, Type: "unresolved"})
 			continue
 		}
-		if isStringType(tv.Type) {
+		if isStringType(tv.Type) || isStringListType(tv.Type) {
 			continue
 		}
 		out = append(out, Finding{
@@ -279,6 +279,18 @@ func IsIDKey(key string) bool {
 func isStringType(t types.Type) bool {
 	basic, ok := t.Underlying().(*types.Basic)
 	return ok && basic.Info()&types.IsString != 0
+}
+
+// isStringListType reports whether t is a slice or array of strings, the
+// shape an id-list key such as "userIds" carries.
+func isStringListType(t types.Type) bool {
+	switch u := t.Underlying().(type) {
+	case *types.Slice:
+		return isStringType(u.Elem())
+	case *types.Array:
+		return isStringType(u.Elem())
+	}
+	return false
 }
 
 // ExportCache remembers where `go list` put each package's export data.

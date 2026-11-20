@@ -35,6 +35,16 @@ func CleanPassThrough(taskID string) Event {
 	}
 }
 
+// CleanIDList names several identifiers with a list of strings.
+func CleanIDList(pubs []string) Event {
+	return Event{Payload: map[string]any{"userIds": pubs}}
+}
+
+// LeakIDList writes a list of internal keys.
+func LeakIDList(internal []uint32) Event {
+	return Event{Payload: map[string]any{"memberIds": internal}}
+}
+
 // LeakInline writes an internal key straight into the literal.
 func LeakInline(internal uint32) Event {
 	return Event{

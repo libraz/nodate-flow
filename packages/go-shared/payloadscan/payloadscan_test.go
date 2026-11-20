@@ -29,16 +29,21 @@ func TestScanSeparatesLeaksFromLookalikes(t *testing.T) {
 	}
 
 	wantKeys := []string{
-		"userId",  // written inline
-		"eventId", // hoisted into a local variable
-		"labelId", // hidden behind an any-typed variable
-		"agentId", // in ExtraPayload rather than Payload
-		"taskId",  // the commented-out fix
+		"userId",    // written inline
+		"eventId",   // hoisted into a local variable
+		"labelId",   // hidden behind an any-typed variable
+		"agentId",   // in ExtraPayload rather than Payload
+		"taskId",    // the commented-out fix
+		"memberIds", // a list of internal keys
 	}
 	for _, key := range wantKeys {
 		if _, ok := got[key]; !ok {
 			t.Errorf("scan missed the leak under %q; found %v", key, keys(got))
 		}
+	}
+
+	if _, ok := got["userIds"]; ok {
+		t.Errorf("a list of strings was reported as a leak: %v", got["userIds"])
 	}
 
 	// CleanInline and CleanPassThrough both write strings, so the only
