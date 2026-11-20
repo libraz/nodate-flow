@@ -19,7 +19,7 @@ describe('resolveBrand name', () => {
   });
 
   it('counts code points: 64 passes (astral included), 65 fails', () => {
-    expect(name('a'.repeat(63) + '😀')).toHaveLength(65);
+    expect(name(`${'a'.repeat(63)}😀`)).toHaveLength(65);
     expect(() => name('a'.repeat(65))).toThrow(/VITE_APP_NAME/);
     expect(name('😀'.repeat(64))).toBe('😀'.repeat(64));
     expect(() => name('😀'.repeat(65))).toThrow(/VITE_APP_NAME/);

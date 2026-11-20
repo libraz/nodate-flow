@@ -95,7 +95,24 @@
   },
   "overrides": [
     {
-      "includes": ["**/scripts/**", "**/e2e/**", "**/tests/**", "**/*.test.ts", "**/*.test.tsx"],
+      "includes": ["**/e2e/**"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "useDomNodeTextContent": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/scripts/**",
+        "**/infra/**/*.mjs",
+        "**/e2e/**",
+        "**/tests/**",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
       "linter": {
         "rules": {
           "suspicious": {

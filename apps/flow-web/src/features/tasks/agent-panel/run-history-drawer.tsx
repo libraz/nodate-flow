@@ -66,7 +66,7 @@ function formatRelative(unixSec: number, locale: string): string {
   try {
     const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'short' });
     const rawDiff = unixSec - Math.floor(Date.now() / 1000);
-    const diff = rawDiff > 0 ? 0 : rawDiff;
+    const diff = Math.min(rawDiff, 0);
     const abs = Math.abs(diff);
     if (abs < 60) return rtf.format(Math.round(diff), 'second');
     if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');

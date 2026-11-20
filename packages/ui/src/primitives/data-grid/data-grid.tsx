@@ -444,7 +444,6 @@ function DataGridInner<TData>(
                       onMouseDown={header.getResizeHandler()}
                       onTouchStart={header.getResizeHandler()}
                       onDoubleClick={() => header.column.resetSize()}
-                      // biome-ignore lint/a11y/useAriaPropsForRole: pointer-only column-resize affordance; exposed as a vertical separator without value attributes since it is not a focusable window-splitter widget
                       role="separator"
                       aria-orientation="vertical"
                     />

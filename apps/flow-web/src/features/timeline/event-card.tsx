@@ -141,7 +141,7 @@ function formatRelative(occurredAt: number, locale: string): string {
     // Server timestamps should never be in the future; clamp minor clock skew to "now"
     // so we never render "in 1 second" for an event that just happened.
     const rawDiff = occurredAt - Math.floor(Date.now() / 1000);
-    const diffSec = rawDiff > 0 ? 0 : rawDiff;
+    const diffSec = Math.min(rawDiff, 0);
     const abs = Math.abs(diffSec);
     if (abs < 60) return rtf.format(Math.round(diffSec), 'second');
     if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute');

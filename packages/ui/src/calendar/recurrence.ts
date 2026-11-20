@@ -298,7 +298,8 @@ export function expandRecurrence(
   const seriesEnd = event.recurrenceEnd ? parseInZone(event.recurrenceEnd, zone) : null;
   const until =
     ruleUntil && seriesEnd
-      ? ruleUntil < seriesEnd
+      ? // biome-ignore lint/complexity/useMathMinMax: both are DateTime values; Math.min would return a number
+        ruleUntil < seriesEnd
         ? ruleUntil
         : seriesEnd
       : (ruleUntil ?? (seriesEnd?.isValid ? seriesEnd : null));

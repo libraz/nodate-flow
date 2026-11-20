@@ -15,7 +15,7 @@ export function formatRelative(occurredAt: number, locale: string): string {
   try {
     const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
     const rawDiff = occurredAt - Math.floor(Date.now() / 1000);
-    const diffSec = rawDiff > 0 ? 0 : rawDiff;
+    const diffSec = Math.min(rawDiff, 0);
     const abs = Math.abs(diffSec);
     if (abs < 60) return rtf.format(Math.round(diffSec), 'second');
     if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute');

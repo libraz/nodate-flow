@@ -69,7 +69,7 @@ function suggestionErrorMessage(
  */
 export function useSuggestionActionExecutor(
   workspaceId: string | undefined,
-  openTask: (taskId: string) => void | Promise<unknown>,
+  openTask: (taskId: string) => undefined | Promise<unknown>,
 ): SuggestionActionExecutor {
   const { t } = useTranslation('ai-suggestions');
   const user = useAuth(selectUser);
