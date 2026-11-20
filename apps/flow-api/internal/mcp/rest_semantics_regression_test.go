@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	stderrors "errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -425,7 +424,7 @@ func TestMCPAIToolsMatchREST(t *testing.T) {
 	t.Run("propose_priority/the result is the scale update_task takes", func(t *testing.T) {
 		t.Parallel()
 		fx := seedMCPProjectRoleFixture(t, db)
-		deps := mcp.Deps{DB: db, Queries: generated.New(db), AI: cannedOrchestrator(`{"priority":"high"}`)}
+		deps := mcp.Deps{DB: db, Queries: generated.New(db), AI: cannedOrchestrator(`{"priority":"high","reason":"Blocks the release."}`)}
 		editor := mcp.NewTestSession(fx.editorID, fx.wsID, scopes)
 		out, err := mcp.RunProposePriority(ctx, deps, editor, mcpVisJSON(t, map[string]any{"taskId": fx.taskPub.String()}))
 		require.NoError(t, err)
@@ -447,8 +446,11 @@ func TestMCPAIToolsMatchREST(t *testing.T) {
 			child[:], fx.wsID, rsProjectID(t, db, fx.projectPub), parentID, fx.editorID)
 		require.NoError(t, err)
 
-		prov := &capturingProvider{text: `[{"title":"Write the plan","description":"Outline it","priority":"high"},{"title":"Review","description":"","priority":"low"}]`}
-		deps := mcp.Deps{DB: db, Queries: generated.New(db), AI: capturingOrchestrator(prov)}
+		prov := &capturingProvider{text: `[{"title":"Write the plan","description":"Outline it","priority":"high"},{"title":"Review","description":"Check it","priority":"low"},{"title":"Revise","description":"Apply the review","priority":"medium"},{"title":"Sign off","description":"Get approval","priority":"medium"},{"title":"Publish","description":"Ship it","priority":"low"}]`}
+		orch := capturingOrchestrator(prov)
+		// Production wires the queries the step proposal reads its cache inputs through.
+		orch.Queries = generated.New(db)
+		deps := mcp.Deps{DB: db, Queries: generated.New(db), AI: orch}
 		editor := mcp.NewTestSession(fx.editorID, fx.wsID, scopes)
 		out, err := mcp.RunProposeSteps(ctx, deps, editor, mcpVisJSON(t, map[string]any{"taskId": fx.taskPub.String()}))
 		require.NoError(t, err)
@@ -473,12 +475,12 @@ func TestMCPAIToolsMatchREST(t *testing.T) {
 		deps := mcp.Deps{
 			DB:       db,
 			Queries:  generated.New(db),
-			AI:       cannedOrchestrator(`{"suggestedAssignees":[],"subtasks":[{"title":"First"},{"title":"   "},{"title":"Third"}]}`),
+			AI:       cannedOrchestrator(`{"suggestedAssignees":[],"subtasks":[{"title":"First","description":"One","priority":"low"},{"title":"Second","description":"Two","priority":"medium"},{"title":"Third","description":"Three","priority":"high"}]}`),
 			Embedder: embed.New(embed.NewMockProvider(), generated.New(db)),
 		}
-		out, err := mcp.RunSmartCreateTask(ctx, deps, mcp.NewTestSession(fx.editorID, fx.wsID, scopes), mcpVisJSON(t, map[string]any{
-			"projectId": fx.projectPub.String(), "title": "Parent",
-		}))
+		sess := mcp.NewTestSession(fx.editorID, fx.wsID, scopes)
+		args := mcpVisJSON(t, map[string]any{"projectId": fx.projectPub.String(), "title": "Parent"})
+		out, err := mcp.RunSmartCreateTask(ctx, deps, sess, args)
 		require.NoError(t, err)
 		subtasks, ok := rsResult(t, out)["subtasks"].([]any)
 		require.True(t, ok)
@@ -491,11 +493,21 @@ func TestMCPAIToolsMatchREST(t *testing.T) {
 			return title
 		}
 		first := subtasks[0].(map[string]any)
-		blank := subtasks[1].(map[string]any)
+		second := subtasks[1].(map[string]any)
 		third := subtasks[2].(map[string]any)
 		require.Equal(t, "First", titleOf(first["id"].(string)))
-		require.NotContains(t, blank, "id", "a dropped subtask names no task")
+		require.Equal(t, "Second", titleOf(second["id"].(string)))
 		require.Equal(t, "Third", titleOf(third["id"].(string)), "a later subtask must not take a shifted id")
+
+		// A blank subtask title violates the output contract, so the whole
+		// proposal is refused before anything is written.
+		blankDeps := deps
+		blankDeps.AI = cannedOrchestrator(`{"suggestedAssignees":[],"subtasks":[{"title":"First","description":"","priority":"low"},{"title":"   ","description":"","priority":"low"}]}`)
+		_, err = mcp.RunSmartCreateTask(ctx, blankDeps, sess, args)
+		requireSpec(t, err, apierrors.AiResponseSchemaMismatch)
+		require.Equal(t, 1, rsCount(t, db,
+			`SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND title = 'Parent'`, fx.wsID),
+			"a refused proposal creates no parent")
 	})
 
 	t.Run("propose_lens/budget and unparseable answers carry REST's codes", func(t *testing.T) {
@@ -568,24 +580,32 @@ func TestMCPClaimedWritesMatchREST(t *testing.T) {
 		arg := mcpVisJSON(t, map[string]any{"intakeItemId": item.String(), "projectId": fx.projectPub.String()})
 
 		var wg sync.WaitGroup
-		var ok, refused atomic.Int32
+		var mu sync.Mutex
+		var ids []string
+		var failures atomic.Int32
 		for range 4 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := mcp.RunConvertIntakeToTask(ctx, deps, sess, arg)
-				var ae *apierrors.APIError
-				switch {
-				case err == nil:
-					ok.Add(1)
-				case stderrors.As(err, &ae) && ae.Spec == apierrors.WsIntakeAlreadyConverted:
-					refused.Add(1)
+				out, err := mcp.RunConvertIntakeToTask(ctx, deps, sess, arg)
+				if err != nil {
+					failures.Add(1)
+					return
 				}
+				res, _ := out.(map[string]any)
+				id, _ := res["taskId"].(string)
+				mu.Lock()
+				ids = append(ids, id)
+				mu.Unlock()
 			}()
 		}
 		wg.Wait()
-		require.EqualValues(t, 1, ok.Load(), "exactly one conversion wins")
-		require.EqualValues(t, 3, refused.Load(), "every loser is told the item was already converted")
+		require.Zero(t, failures.Load(), "a replayed conversion returns the task rather than failing")
+		require.Len(t, ids, 4)
+		require.NotEmpty(t, ids[0])
+		for _, id := range ids {
+			require.Equal(t, ids[0], id, "every caller gets the one converted task")
+		}
 		require.Equal(t, 1, rsCount(t, db,
 			`SELECT COUNT(*) FROM tasks WHERE workspace_id = ? AND title = 'Inbox entry'`, fx.wsID))
 	})

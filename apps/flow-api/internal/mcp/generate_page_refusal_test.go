@@ -96,13 +96,13 @@ func TestGeneratePageRefusesAGenerationThatDidNotHappen(t *testing.T) {
 		{
 			name: "the provider answered with nothing",
 			ai:   cannedOrchestrator(""),
-			want: apierrors.AiResponseInvalidJson,
-			why:  "an empty answer is a response with no page in it, and REST page generation refuses it with the same code",
+			want: apierrors.AiResponseSchemaMismatch,
+			why:  "an empty completion is refused at the provider boundary, and REST page generation answers it with the same code",
 		},
 		{
 			name: "the provider answered with whitespace only",
 			ai:   cannedOrchestrator(" \n\t "),
-			want: apierrors.AiResponseInvalidJson,
+			want: apierrors.AiResponseSchemaMismatch,
 			why:  "a body of blanks is no more a draft than an empty one",
 		},
 	}
