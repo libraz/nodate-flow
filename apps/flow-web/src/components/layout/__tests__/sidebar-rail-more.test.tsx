@@ -110,12 +110,12 @@ describe('collapsed rail More', () => {
     const user = userEvent.setup();
     renderSidebar();
     const trigger = await screen.findByRole('button', { name: 'nav.more' });
-    expect(screen.queryByRole('link', { name: 'nav.timeline' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'nav.history' })).toBeNull();
 
     await user.click(trigger);
 
     const dialog = await screen.findByRole('dialog', { name: 'nav.more' });
-    expect(MORE_LABELS).toHaveLength(5);
+    expect(MORE_LABELS).toHaveLength(4);
     for (const name of MORE_LABELS) {
       expect(dialog.querySelector(`a[aria-label="${name}"]`)).not.toBeNull();
     }
@@ -127,7 +127,7 @@ describe('collapsed rail More', () => {
     await user.click(await screen.findByRole('button', { name: 'nav.more' }));
     const dialog = await screen.findByRole('dialog', { name: 'nav.more' });
 
-    await user.click(dialog.querySelector('a[aria-label="nav.timeline"]') as HTMLElement);
+    await user.click(dialog.querySelector('a[aria-label="nav.history"]') as HTMLElement);
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'nav.more' })).toBeNull();

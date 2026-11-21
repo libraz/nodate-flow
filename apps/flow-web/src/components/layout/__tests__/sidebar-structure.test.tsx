@@ -233,12 +233,12 @@ describe('More disclosure', () => {
     renderSidebar();
     const toggle = await screen.findByRole('button', { name: 'nav.more' });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByText('nav.timeline')).toBeNull();
+    expect(screen.queryByText('nav.history')).toBeNull();
 
     await user.click(toggle);
 
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByText('nav.timeline')).toBeTruthy();
+    expect(screen.getByText('nav.history')).toBeTruthy();
     expect(window.localStorage.getItem('nf.sidebar-more-open')).toBe('1');
   });
 
@@ -310,6 +310,29 @@ describe('More disclosure', () => {
 
       expect(scrollIntoView).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('history entry', () => {
+  it.each(['/workspaces/ws-1/timeline', '/workspaces/ws-1/activity'])(
+    'is the current page on %s',
+    async (path) => {
+      mocks.pathname = path;
+      window.localStorage.setItem('nf.sidebar-more-open', '1');
+      renderSidebar();
+
+      const link = await screen.findByRole('link', { name: 'nav.history' });
+      expect(link.getAttribute('aria-current')).toBe('page');
+    },
+  );
+
+  it('is not current elsewhere', async () => {
+    mocks.pathname = '/workspaces/ws-1/members';
+    window.localStorage.setItem('nf.sidebar-more-open', '1');
+    renderSidebar();
+
+    const link = await screen.findByRole('link', { name: 'nav.history' });
+    expect(link.getAttribute('aria-current')).toBeNull();
   });
 });
 

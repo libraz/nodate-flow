@@ -7,6 +7,7 @@ import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PageHeader from '../components/page-header';
+import HistoryTabs from '../features/history/history-tabs';
 import TimelineSkeleton from '../features/timeline/timeline-skeleton';
 import TimelineView from '../features/timeline/timeline-view';
 
@@ -18,6 +19,7 @@ function WorkspaceTimelineRoute(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <PageHeader title={tTimeline('view.title')} help="timeline" />
+      <HistoryTabs workspaceId={id} />
       <Suspense fallback={<TimelineSkeleton />}>
         <TimelineView scope={{ kind: 'workspace', id }} />
       </Suspense>

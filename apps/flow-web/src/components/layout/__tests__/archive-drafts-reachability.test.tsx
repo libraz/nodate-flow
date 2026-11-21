@@ -136,7 +136,7 @@ describe('sidebar workspace navigation', () => {
     renderSidebar();
     await userEvent.setup().click(screen.getByRole('button', { name: 'nav.more' }));
 
-    for (const key of ['nav.activity', 'nav.timeboxes', 'nav.insightsPriority', 'nav.timeline']) {
+    for (const key of ['nav.history', 'nav.timeboxes', 'nav.insightsPriority']) {
       expect(screen.getByText(key)).toBeDefined();
     }
   });

@@ -6,14 +6,13 @@
  */
 
 import {
-  Activity,
   Archive,
   BellRing,
   Building2,
   CalendarRange,
   FileText,
   FolderKanban,
-  GitCommitHorizontal,
+  History,
   Home,
   Inbox,
   ListChecks,
@@ -42,8 +41,7 @@ export interface NavEntry {
     | 'timeboxes'
     | 'insightsPriority'
     | 'retroDrafts'
-    | 'timeline'
-    | 'activity'
+    | 'history'
     | 'workspaceSettings'
     | 'settings'
     | 'allWorkspaces';
@@ -53,27 +51,31 @@ export interface NavEntry {
   labelKey: `nav.${string}`;
   hintKey?: `nav.hint.${string}`;
   /** TanStack route template; `$id` is the only param. */
-  route:
-    | '/'
-    | '/today'
-    | '/inbox'
-    | '/calendar'
-    | '/pages'
-    | '/settings/profile'
-    | '/workspaces'
-    | '/workspaces/$id/projects'
-    | '/workspaces/$id/members'
-    | '/workspaces/$id/reminders'
-    | '/workspaces/$id/tasks/archived'
-    | '/workspaces/$id/timeboxes'
-    | '/workspaces/$id/insights/priority'
-    | '/workspaces/$id/tasks/drafts'
-    | '/workspaces/$id/timeline'
-    | '/workspaces/$id/activity'
-    | '/workspaces/$id/settings';
+  route: NavRoute;
+  /** Further routes that also mark this entry active. */
+  activePrefixes?: readonly NavRoute[];
   /** True exactly when `route` contains `$id`. */
   needsWorkspace: boolean;
 }
+
+type NavRoute =
+  | '/'
+  | '/today'
+  | '/inbox'
+  | '/calendar'
+  | '/pages'
+  | '/settings/profile'
+  | '/workspaces'
+  | '/workspaces/$id/projects'
+  | '/workspaces/$id/members'
+  | '/workspaces/$id/reminders'
+  | '/workspaces/$id/tasks/archived'
+  | '/workspaces/$id/timeboxes'
+  | '/workspaces/$id/insights/priority'
+  | '/workspaces/$id/tasks/drafts'
+  | '/workspaces/$id/timeline'
+  | '/workspaces/$id/activity'
+  | '/workspaces/$id/settings';
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   {
@@ -178,21 +180,13 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     needsWorkspace: true,
   },
   {
-    key: 'timeline',
+    key: 'history',
     group: 'more',
-    icon: GitCommitHorizontal,
-    labelKey: 'nav.timeline',
-    hintKey: 'nav.hint.timeline',
+    icon: History,
+    labelKey: 'nav.history',
+    hintKey: 'nav.hint.history',
     route: '/workspaces/$id/timeline',
-    needsWorkspace: true,
-  },
-  {
-    key: 'activity',
-    group: 'more',
-    icon: Activity,
-    labelKey: 'nav.activity',
-    hintKey: 'nav.hint.activity',
-    route: '/workspaces/$id/activity',
+    activePrefixes: ['/workspaces/$id/activity'],
     needsWorkspace: true,
   },
   {
@@ -236,4 +230,14 @@ export function navEntry(key: NavEntry['key']): NavEntry {
   const found = NAV_ENTRIES.find((e) => e.key === key);
   if (!found) throw new Error(`Unknown nav entry: ${key}`);
   return found;
+}
+
+/** Every concrete path that marks the entry active: its own route first, then `activePrefixes`. */
+export function navActiveHrefs(entry: NavEntry, wsId: string | null): string[] {
+  const hrefs: string[] = [];
+  for (const route of [entry.route, ...(entry.activePrefixes ?? [])]) {
+    if (!entry.needsWorkspace) hrefs.push(route);
+    else if (wsId !== null) hrefs.push(route.replace('$id', wsId));
+  }
+  return hrefs;
 }

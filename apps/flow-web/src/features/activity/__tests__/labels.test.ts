@@ -126,3 +126,15 @@ describe('sourceAccentVar', () => {
     }
   });
 });
+
+describe('project archive actions', () => {
+  const t = makeT({
+    'action.project_archive': 'archived',
+    'action.project_unarchive': 'restored',
+  });
+
+  it('maps the dotted codes to their catalog entries', () => {
+    expect(actionLabel('project.archive', t)).toBe('archived');
+    expect(actionLabel('project.unarchive', t)).toBe('restored');
+  });
+});

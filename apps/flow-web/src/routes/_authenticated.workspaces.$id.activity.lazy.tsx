@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../components/page-header';
 import ActivityFeed from '../features/activity/activity-feed';
 import type { ActivitySourceFilter } from '../features/activity/api';
+import HistoryTabs from '../features/history/history-tabs';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/activity');
 
@@ -24,6 +25,7 @@ function WorkspaceActivityRoute(): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
       <PageHeader title={t('view.title')} description={t('view.description')} help="activity" />
+      <HistoryTabs workspaceId={id} />
       <ActivityFeed workspaceId={id} source={source} onSourceChange={setSource} />
     </div>
   );

@@ -42,7 +42,7 @@ import { APP_ICON, APP_LOGO, APP_NAME } from '../../lib/brand';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
 import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
 import { OPEN_SHORTCUTS_HELP_EVENT } from '../page-help';
-import { type NavEntry, navEntriesIn, navEntry, navHref } from './nav-model';
+import { type NavEntry, navActiveHrefs, navEntriesIn, navEntry } from './nav-model';
 import styles from './sidebar.module.css';
 import WorkspaceSwitcher from './workspace-switcher';
 
@@ -96,6 +96,10 @@ function NavLinkItem({
   const hint = entry.hintKey ? t(entry.hintKey) : null;
   const tooltip = railCollapsed ? label : hint;
   const baseClass = cx(styles.item, sub && styles.subItem);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const prefixActive =
+    entry.activePrefixes !== undefined &&
+    navActiveHrefs(entry, workspaceId).some((href) => pathname.startsWith(href));
   const link = (
     <Link
       to={entry.route}
@@ -103,7 +107,12 @@ function NavLinkItem({
       aria-label={label}
       title={tooltip === null ? label : undefined}
       {...(onClick ? { onClick } : {})}
-      className={cx(baseClass, forcedActive && styles.itemActive, 'nf-focus-ring')}
+      className={cx(
+        baseClass,
+        (forcedActive || prefixActive) && styles.itemActive,
+        'nf-focus-ring',
+      )}
+      {...(prefixActive ? { 'aria-current': 'page' as const } : {})}
       activeOptions={{ exact }}
       activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring') }}
     >
@@ -277,8 +286,7 @@ function FavoritesSection({
 
 function isUnderMore(pathname: string, workspaceId: string | null): boolean {
   return MORE_ENTRIES.some((e) => {
-    const href = navHref(e, workspaceId);
-    return href !== null && pathname.startsWith(href);
+    return navActiveHrefs(e, workspaceId).some((href) => pathname.startsWith(href));
   });
 }
 
