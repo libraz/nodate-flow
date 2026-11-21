@@ -880,17 +880,11 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 		return nil, aiFailure(err)
 	}
 
-	// Bound every title the model produced before any of them reaches a
-	// column. Nothing constrains what a model returns, and tasks.title is
-	// finite, so an overlong subtask title failed the insert and took the
-	// whole batch — parent included — down with it. The caller's own title
-	// is bounded by the tool's input schema; this is the same bound applied
-	// to the half of the payload no schema covers. The cut is rune-aware:
-	// a byte-indexed cut can sever a multi-byte character and hand the
-	// utf8mb4 column a fragment it rejects under STRICT_TRANS_TABLES.
+	// Subtask titles need no bound here: the smart-create output contract
+	// refuses one wider than tasks.title before a proposal is returned.
 	//
-	// The priority word each subtask carries is resolved here too, through
-	// the mapping every transport applies to a model-proposed priority, so
+	// The priority word each subtask carries is resolved through the
+	// mapping every transport applies to a model-proposed priority, so
 	// a word means the same number whether the proposal arrived over REST
 	// or through a tool. It is resolved before the transaction opens
 	// because the resolution reports a model answering outside the
@@ -898,7 +892,6 @@ func runSmartCreateTask(ctx context.Context, deps Deps, s *session, raw json.Raw
 	// same drift again.
 	subtaskPriorities := make([]int32, len(proposal.Subtasks))
 	for i := range proposal.Subtasks {
-		proposal.Subtasks[i].Title = stringutil.TruncateRunes(proposal.Subtasks[i].Title, taskTitleLimit)
 		subtaskPriorities[i] = proposedPriority(ctx, proposal.Subtasks[i].Priority, "mcp.smart_create_task")
 	}
 

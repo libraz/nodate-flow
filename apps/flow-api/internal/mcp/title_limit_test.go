@@ -7,18 +7,13 @@ import (
 )
 
 // TestTitleLimitsComeFromOneDeclaration holds the title widths to a single
-// declaration: the tool schemas read them from the constants, and the cut
-// applied to model-produced subtask titles counts characters at the same
-// width the schema accepts.
+// declaration: the tool schemas read them from the constants.
 func TestTitleLimitsComeFromOneDeclaration(t *testing.T) {
 	t.Parallel()
 
 	src := readMCPToolSources(t)
 	if m := regexp.MustCompile(`(?m)^\s*\w*TitleMaxLen\s*=`).FindString(src); m != "" {
 		t.Errorf("a local title width is back in the MCP tool sources (%q); use the shared title limit constants", strings.TrimSpace(m))
-	}
-	if !strings.Contains(src, "stringutil.TruncateRunes(proposal.Subtasks[i].Title, taskTitleLimit)") {
-		t.Error("model-produced subtask titles must be cut by character at taskTitleLimit, so a title the schema accepts is never shortened")
 	}
 
 	h := NewHandler(Deps{})
