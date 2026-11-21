@@ -7,12 +7,18 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Input from '@nodate-flow/ui/primitives/input';
-import { type ChangeEvent, type ReactElement, Suspense } from 'react';
+import Popover from '@nodate-flow/ui/primitives/popover';
+import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-chip';
+import { ChevronDown } from 'lucide-react';
+import { type ReactElement, Suspense, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWorkspaceUsersQuery } from '../workspaces/api';
 import type { TimelineFilters } from './api';
+import styles from './event-filter-bar.module.css';
 
 /**
  * One filter chip. `kinds` lists every event kind the chip selects — more
@@ -268,39 +274,54 @@ interface ActorPickerProps {
   label: string;
 }
 
+/**
+ * Workspace membership can be large, so actors are picked from a checkbox
+ * list in a popover rather than a row of chips.
+ */
 function ActorPicker({ workspaceId, selected, onSelect, label }: ActorPickerProps): ReactElement {
   const { data: users } = useWorkspaceUsersQuery(workspaceId);
+  const idPrefix = useId();
 
-  const handleChange = (e: ChangeEvent<HTMLSelectElement>): void => {
-    const ids = Array.from(e.target.selectedOptions, (o) => o.value);
-    onSelect(ids);
+  const handleToggle = (id: string, checked: boolean): void => {
+    onSelect(checked ? [...selected, id] : selected.filter((v) => v !== id));
   };
 
   return (
-    <select
-      multiple
-      value={[...selected]}
-      onChange={handleChange}
-      aria-label={label}
-      style={{
-        // nf-token-override: component dimension, not a spacing step
-        minInlineSize: '14rem',
-        // nf-token-override: component dimension, not a spacing step
-        minBlockSize: '6rem',
-        padding: 'var(--nf-space-1)',
-        borderRadius: 'var(--nf-radius-xs)',
-        border: '1px solid var(--nf-color-border)',
-        background: 'var(--nf-color-bg)',
-        color: 'var(--nf-color-fg)',
-      }}
+    <Popover
+      ariaLabel={label}
+      content={
+        <div className={styles.actorList}>
+          {users.map((u) => (
+            <label key={u.id} htmlFor={`${idPrefix}-${u.id}`} className={styles.actorOption}>
+              <Checkbox
+                id={`${idPrefix}-${u.id}`}
+                checked={selected.includes(u.id)}
+                onChange={(e) => {
+                  handleToggle(u.id, e.target.checked);
+                }}
+              />
+              <span>{u.displayName}</span>
+            </label>
+          ))}
+        </div>
+      }
     >
-      {users.map((u) => (
-        <option key={u.id} value={u.id}>
-          {u.displayName}
-        </option>
-      ))}
-    </select>
+      <Button type="button" variant="default" size="sm" aria-haspopup="dialog">
+        <span className={styles.toggleLabel}>
+          {label}
+          {selected.length > 0 ? <span className={styles.badge}>{selected.length}</span> : null}
+        </span>
+      </Button>
+    </Popover>
   );
+}
+
+/** Filters with the kind and actor selections cleared; paging settings stay. */
+export function resetFilters(filters: TimelineFilters): TimelineFilters {
+  const next: TimelineFilters = {};
+  if (filters.limit !== undefined) next.limit = filters.limit;
+  if (filters.offset !== undefined) next.offset = filters.offset;
+  return next;
 }
 
 export default function EventFilterBar({
@@ -309,6 +330,8 @@ export default function EventFilterBar({
   workspaceId,
 }: EventFilterBarProps): ReactElement {
   const { t } = useTranslation('timeline');
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
 
   const selectedKinds = new Set(filters.kind ?? []);
   const isChipActive = (c: KindChip): boolean => c.kinds.every((k) => selectedKinds.has(k));
@@ -330,10 +353,7 @@ export default function EventFilterBar({
   };
 
   const handleReset = (): void => {
-    const next: TimelineFilters = {};
-    if (filters.limit !== undefined) next.limit = filters.limit;
-    if (filters.offset !== undefined) next.offset = filters.offset;
-    onChange(next);
+    onChange(resetFilters(filters));
   };
 
   const actorLabel = t('filter.actor_label', { defaultValue: t('filter.actor_all') });
@@ -350,150 +370,89 @@ export default function EventFilterBar({
   const looseKindCount = [...selectedKinds].filter((k) => !chipKinds.has(k)).length;
   const activeFilterCount = activeChipCount + looseKindCount + (filters.actor?.length ?? 0);
 
-  const renderChip = (c: KindChip): ReactElement => {
-    const active = isChipActive(c);
-    return (
-      <button
-        key={c.key}
-        type="button"
-        aria-pressed={active}
-        onClick={() => {
-          toggleChip(c);
-        }}
-        style={{
-          padding: 'var(--nf-space-1) var(--nf-space-2-5)',
-          borderRadius: 'var(--nf-radius-pill)',
-          border: `1px solid ${active ? 'var(--nf-color-accent)' : 'var(--nf-color-border)'}`,
-          background: active ? 'var(--nf-color-accent-subtle)' : 'var(--nf-color-surface)',
-          color: active ? 'var(--nf-color-accent-fg)' : 'var(--nf-color-fg)',
-          fontSize: 'var(--nf-text-supporting)',
-          cursor: 'pointer',
-        }}
-      >
-        {labelFor(c.key)}
-      </button>
-    );
-  };
-
-  return (
-    <details
-      style={{
-        border: '1px solid var(--nf-color-border)',
-        borderRadius: 'var(--nf-radius-md)',
-        padding: 'var(--nf-space-2) var(--nf-space-3)',
-        background: 'var(--nf-color-surface)',
+  const renderChip = (c: KindChip): ReactElement => (
+    <ToggleChip
+      key={c.key}
+      pressed={isChipActive(c)}
+      onPressedChange={() => {
+        toggleChip(c);
       }}
     >
-      <summary
-        style={{
-          cursor: 'pointer',
-          fontSize: 'var(--nf-text-supporting)',
-          color: 'var(--nf-color-fg-muted)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
-        {t('filter.kind_label')}
-        {activeFilterCount > 0 ? (
-          <span
-            style={{
-              padding: '0 var(--nf-space-2)',
-              borderRadius: 'var(--nf-radius-pill)',
-              background: 'var(--nf-color-accent-subtle)',
-              color: 'var(--nf-color-accent-fg)',
-              fontSize: 'var(--nf-text-micro)',
-            }}
-          >
-            {activeFilterCount}
-          </span>
-        ) : null}
-      </summary>
+      {labelFor(c.key)}
+    </ToggleChip>
+  );
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2-5)',
-          paddingBlockStart: 'var(--nf-space-3)',
+  return (
+    <div className={styles.panel}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => {
+          setOpen(!open);
         }}
       >
-        {KIND_GROUPS.map((group) => (
+        <span className={styles.toggleLabel}>
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={styles.caret}
+            data-open={open ? 'true' : 'false'}
+          />
+          {t('filter.kind_label')}
+          {activeFilterCount > 0 ? <span className={styles.badge}>{activeFilterCount}</span> : null}
+        </span>
+      </Button>
+
+      <Collapse open={open} id={bodyId}>
+        <div className={styles.body}>
+          {KIND_GROUPS.map((group) => {
+            const groupLabel = t(`filter.kind_group.${group.key}`, { defaultValue: group.key });
+            return (
+              <div key={group.key} className={styles.group}>
+                <span className={styles.groupLabel} aria-hidden="true">
+                  {groupLabel}
+                </span>
+                <ToggleChipGroup label={groupLabel}>
+                  {group.chips.map((c) => renderChip(c))}
+                </ToggleChipGroup>
+              </div>
+            );
+          })}
+
           <div
-            key={group.key}
             role="group"
-            aria-label={t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '7rem 1fr',
-              alignItems: 'center',
-              columnGap: 'var(--nf-space-3)',
-              rowGap: 'var(--nf-space-1)',
-            }}
+            aria-label={actorLabel}
+            className={`${styles.group} ${styles.actorGroup}`}
           >
-            <span
-              style={{
-                fontSize: 'var(--nf-text-micro)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                color: 'var(--nf-color-fg-muted)',
-              }}
-            >
-              {t(`filter.kind_group.${group.key}`, { defaultValue: group.key })}
-            </span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-1-5)' }}>
-              {group.chips.map((c) => renderChip(c))}
-            </div>
+            <span className={styles.groupLabel}>{actorLabel}</span>
+            {workspaceId !== undefined ? (
+              <Suspense
+                fallback={
+                  <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+                }
+              >
+                <ActorPicker
+                  workspaceId={workspaceId}
+                  selected={filters.actor ?? []}
+                  onSelect={handleActorChange}
+                  label={actorLabel}
+                />
+              </Suspense>
+            ) : (
+              <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
+            )}
           </div>
-        ))}
 
-        <div
-          role="group"
-          aria-label={actorLabel}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '7rem 1fr',
-            alignItems: 'center',
-            columnGap: 'var(--nf-space-3)',
-            marginBlockStart: 'var(--nf-space-1)',
-            paddingBlockStart: 'var(--nf-space-2-5)',
-            borderBlockStart: '1px solid var(--nf-color-border)',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 'var(--nf-text-micro)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--nf-color-fg-muted)',
-            }}
-          >
-            {actorLabel}
-          </span>
-          {workspaceId !== undefined ? (
-            <Suspense
-              fallback={
-                <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
-              }
-            >
-              <ActorPicker
-                workspaceId={workspaceId}
-                selected={filters.actor ?? []}
-                onSelect={handleActorChange}
-                label={actorLabel}
-              />
-            </Suspense>
-          ) : (
-            <Input disabled placeholder={t('filter.actor_all')} aria-label={actorLabel} />
-          )}
+          <div className={styles.actions}>
+            <Button type="button" variant="ghost" onClick={handleReset}>
+              {t('filter.reset')}
+            </Button>
+          </div>
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="button" variant="ghost" onClick={handleReset}>
-            {t('filter.reset')}
-          </Button>
-        </div>
-      </div>
-    </details>
+      </Collapse>
+    </div>
   );
 }

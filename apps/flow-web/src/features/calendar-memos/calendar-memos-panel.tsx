@@ -49,6 +49,7 @@
 
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
+import Checkbox from '@nodate-flow/ui/primitives/checkbox';
 import Collapse from '@nodate-flow/ui/primitives/collapse';
 import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -57,6 +58,7 @@ import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import Textarea from '@nodate-flow/ui/primitives/textarea';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
+import { ChevronDown, Plus } from 'lucide-react';
 import {
   type FormEvent,
   type ReactElement,
@@ -422,8 +424,7 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
 
   return (
     <div className={styles.row}>
-      <input
-        type="checkbox"
+      <Checkbox
         className={styles.checkbox}
         checked={memo.done}
         onChange={handleToggleDone}
@@ -466,7 +467,7 @@ function MemoRow({ memo, onUpdate, onDelete }: MemoRowProps): ReactElement {
             }
           >
             <span aria-hidden="true" className={styles.expandIcon}>
-              {showBody ? '−' : '+'}
+              {showBody ? <ChevronDown size={16} /> : <Plus size={16} />}
             </span>
             {hasBody && !showBody ? <span aria-hidden="true" className={styles.bodyDot} /> : null}
           </button>

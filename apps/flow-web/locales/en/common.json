@@ -257,7 +257,6 @@
     "empty": "No scheduled tasks this month.",
     "noDue": "No due date",
     "more": "+{count} more",
-    "click_to_add": "Click to add. Shift+click to add a block.",
     "drag_to_reschedule": "Drag to another day to move it. Repeating events ask which occurrences to change.",
     "reschedule_success": "Due date updated",
     "reschedule_error": "Failed to update due date",
@@ -815,8 +814,7 @@
       "drop_hint": "Drop here to move",
       "moved_to": "Moved to {state}",
       "move_menu": "Move task",
-      "move_to": "Move to {state}",
-      "dnd_disabled_hint": "Dragging is off. Use the Move task menu on a card to change its state."
+      "move_to": "Move to {state}"
     },
     "assignee": {
       "plus_n": "+{n, plural, one {# more} other {# more}}",
@@ -1479,9 +1477,8 @@
     "label": "Active timebox",
     "workspace": "in {workspace}",
     "open": "Open",
-    "stop": "Stop",
-    "stop_confirm": "Stop this timebox? It will be marked as completed.",
-    "stop_success": "Timebox stopped"
+    "complete_confirm": "Complete this timebox? It will be marked as completed.",
+    "complete_success": "Timebox completed"
   },
   "help": {
     "trigger": "How this page works",

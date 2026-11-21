@@ -83,9 +83,9 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
   // omits a progress chip rather than triggering N+1 fetches across
   // every active timebox.
 
-  const handleStop = async (): Promise<void> => {
+  const handleComplete = async (): Promise<void> => {
     const ok = await confirmAction({
-      message: t('active_timebox_bar.stop_confirm'),
+      message: t('active_timebox_bar.complete_confirm'),
       tone: 'danger',
     });
     if (!ok) return;
@@ -95,7 +95,7 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
         timeboxId: shown.timebox.id,
         status: 'completed',
       });
-      toaster.show({ tone: 'success', message: t('active_timebox_bar.stop_success') });
+      toaster.show({ tone: 'success', message: t('active_timebox_bar.complete_success') });
     } catch (err) {
       toaster.show({
         tone: 'danger',
@@ -130,7 +130,7 @@ function ActiveTimeboxBarInner({ workspaces }: { workspaces: Workspace[] }): Rea
               size="sm"
               variant="primary"
               onClick={() => {
-                void handleStop();
+                void handleComplete();
               }}
               disabled={updateStatus.isPending}
               aria-busy={updateStatus.isPending || undefined}

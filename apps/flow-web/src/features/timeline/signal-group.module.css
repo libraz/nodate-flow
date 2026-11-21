@@ -1,0 +1,104 @@
+.root {
+  container-type: inline-size;
+  margin: var(--nf-space-2) 0;
+  padding: var(--nf-space-3);
+  background: var(--nf-color-bg-sunken);
+  border: 1px solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.root[data-reversed] {
+  opacity: 0.7;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.cause {
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+}
+
+.timestamp {
+  margin-inline-start: auto;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.reasoning {
+  background: var(--nf-color-surface);
+  border: 1px solid var(--nf-color-hairline);
+  border-radius: var(--nf-radius-sm);
+  padding: var(--nf-space-2) var(--nf-space-2-5);
+}
+
+.reasoningSummary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  list-style: revert;
+  border-radius: var(--nf-radius-xs);
+}
+
+.reasoningSummary:hover {
+  color: var(--nf-color-fg);
+}
+
+.reasoningSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.reasoningText {
+  margin-block: var(--nf-space-2) 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+  line-height: var(--nf-leading-normal);
+  white-space: pre-wrap;
+}
+
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.event {
+  margin: 0;
+}
+
+.reverseDesktop {
+  display: inline-flex;
+}
+
+.footer {
+  display: none;
+  justify-content: flex-end;
+}
+
+/* The reverse action sits in the header from 768px up and in the footer below. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .reverseDesktop {
+    display: none;
+  }
+
+  .footer {
+    display: flex;
+  }
+}

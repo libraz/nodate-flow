@@ -8,6 +8,7 @@
  */
 
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type ChangeEvent, type ReactElement, Suspense, useState } from 'react';
@@ -118,7 +119,7 @@ export default function PageList({ activePageId, initialMode }: PageListProps): 
         {/* Left sidebar: search + tree */}
         <div className={styles.sidebarColumn}>
           <div className={styles.searchBar}>
-            <input
+            <Input
               data-1p-ignore
               type="search"
               className={styles.searchInput}

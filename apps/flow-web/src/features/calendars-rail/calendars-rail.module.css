@@ -144,8 +144,12 @@
 }
 
 .iconButton:hover:not(:disabled) {
-  background: var(--nf-color-surface);
+  background-image: linear-gradient(var(--nf-overlay-hover), var(--nf-overlay-hover));
   color: var(--nf-color-fg);
+}
+
+.iconButton:active:not(:disabled) {
+  background-image: linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
 }
 
 .iconButton:focus-visible {
@@ -256,8 +260,12 @@
 }
 
 .backButton:hover {
-  background: var(--nf-color-surface);
+  background-image: linear-gradient(var(--nf-overlay-hover), var(--nf-overlay-hover));
   color: var(--nf-color-fg);
+}
+
+.backButton:active {
+  background-image: linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
 }
 
 .backButton:focus-visible {

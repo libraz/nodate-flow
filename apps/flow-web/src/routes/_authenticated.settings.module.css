@@ -21,6 +21,7 @@
 }
 
 .nav {
+  composes: edgeFade from "../features/settings/scroll-edge-fade.module.css";
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-1);

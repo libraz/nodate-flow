@@ -54,14 +54,6 @@
   white-space: nowrap;
 }
 
-.progress {
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
 .actions {
   display: flex;
   gap: var(--nf-space-2);
@@ -69,10 +61,9 @@
 }
 
 /*
- * Compact: collapse the workspace caption first; on very narrow
- * viewports drop the progress chip too. The bar always keeps the name
- * and the two actions visible so the user can stop the timebox from
- * any device width.
+ * Compact: collapse the workspace caption first, then the label. The bar
+ * always keeps the name and the two actions visible so the user can
+ * complete the timebox from any device width.
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
@@ -83,10 +74,6 @@
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 479px) {
-  .progress {
-    display: none;
-  }
-
   .label {
     display: none;
   }

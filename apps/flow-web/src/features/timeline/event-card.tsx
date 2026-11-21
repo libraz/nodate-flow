@@ -4,10 +4,11 @@
  * `<details>` block when non-empty.
  */
 
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import type { TFunction } from 'i18next';
 import { Bot, Cog } from 'lucide-react';
-import type { ReactElement, ReactNode } from 'react';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveAvatarUrl } from '../../lib/avatar-url';
@@ -262,20 +263,7 @@ function formatFieldValue(
 /** Shared raw-JSON fallback block. Used both for unknown event types
  * and for `task.updated` payloads that don't declare a `field`. */
 function renderRawPayload(payload: unknown): ReactNode {
-  return (
-    <pre
-      style={{
-        marginBlockStart: 'var(--nf-space-1)',
-        padding: 'var(--nf-space-2)',
-        background: 'var(--nf-color-surface)',
-        borderRadius: 'var(--nf-radius-xs)',
-        fontSize: 'var(--nf-text-micro)',
-        overflowX: 'auto',
-      }}
-    >
-      {JSON.stringify(payload, null, 2)}
-    </pre>
-  );
+  return <pre className={styles.payloadRaw}>{JSON.stringify(payload, null, 2)}</pre>;
 }
 
 /** Normalize a free-form reason string into a slug that can be looked up
@@ -342,26 +330,15 @@ function humanizePayload(type: string, payload: unknown, t: TFunction, locale: s
       : null;
 
   return (
-    <div
-      style={{
-        marginBlockStart: 'var(--nf-space-1)',
-        padding: 'var(--nf-space-2)',
-        background: 'var(--nf-color-surface)',
-        borderRadius: 'var(--nf-radius-xs)',
-        fontSize: 'var(--nf-text-xs)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-0-5)',
-      }}
-    >
-      <div style={{ color: 'var(--nf-color-fg)' }}>
+    <div className={styles.payloadSummary}>
+      <div className={styles.payloadLine}>
         {label}: {fromStr} → {toStr}
       </div>
       {reasonTranslated !== null ? (
-        <div style={{ color: 'var(--nf-color-fg-muted)' }}>{reasonTranslated}</div>
+        <div className={styles.payloadMuted}>{reasonTranslated}</div>
       ) : null}
       {autoActionTranslated !== null ? (
-        <div style={{ color: 'var(--nf-color-fg-muted)', fontStyle: 'italic' }}>
+        <div className={styles.payloadAuto}>
           {autoActionLabel}: {autoActionTranslated}
         </div>
       ) : null}
@@ -431,66 +408,19 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
       ? resolveAvatarUrl(event.actorAvatarUrl)
       : undefined;
 
+  const tagStyle = { ['--tag-color' as string]: tag.color } as CSSProperties;
+
   return (
-    <div
-      style={{
-        position: 'relative',
-        display: 'grid',
-        gridTemplateColumns: 'auto 1fr',
-        columnGap: 'var(--nf-space-3-5)',
-        paddingInlineStart: 'var(--nf-space-1)',
-        paddingBlock: 'var(--nf-space-2-5)',
-      }}
-    >
+    <div className={styles.row} style={tagStyle}>
       {/* rail dot */}
-      <div
-        aria-hidden
-        style={{
-          gridColumn: '1 / 2',
-          gridRow: '1 / span 2',
-          position: 'relative',
-          // nf-token-override: component dimension, not a spacing step
-          inlineSize: '1.75rem',
-          display: 'flex',
-          justifyContent: 'center',
-        }}
-      >
-        <div
-          style={{
-            // nf-token-override: component dimension, not a spacing step
-            inlineSize: '1.75rem',
-            // nf-token-override: component dimension, not a spacing step
-            blockSize: '1.75rem',
-            borderRadius: 'var(--nf-radius-pill)',
-            background: 'var(--nf-color-bg)',
-            border: `2px solid ${tag.color}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1,
-          }}
-        >
+      <div aria-hidden className={styles.dotColumn}>
+        <div className={styles.dot}>
           {isSystem ? (
             <span role="img" aria-label={actorLabel} className={styles.systemActor}>
               <Cog size={12} strokeWidth={1.75} aria-hidden="true" />
             </span>
           ) : isAgent ? (
-            <span
-              role="img"
-              aria-label={actorLabel}
-              style={{
-                // nf-token-override: component dimension, not a spacing step
-                inlineSize: '1.25rem',
-                // nf-token-override: component dimension, not a spacing step
-                blockSize: '1.25rem',
-                borderRadius: 'var(--nf-radius-pill)',
-                background: 'color-mix(in oklab, var(--nf-color-accent) 14%, transparent)',
-                color: 'var(--nf-color-accent-fg)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <span role="img" aria-label={actorLabel} className={styles.agentActor}>
               <Bot size={12} strokeWidth={1.75} aria-hidden="true" />
             </span>
           ) : (
@@ -504,57 +434,15 @@ export default function EventCard({ event }: EventCardProps): ReactElement {
         </div>
       </div>
 
-      <div
-        style={{
-          gridColumn: '2 / 3',
-          minInlineSize: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-1)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 'var(--nf-space-2)',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span style={{ color: 'var(--nf-color-fg)', lineHeight: 1.4, wordBreak: 'break-word' }}>
-            {translated}
-          </span>
-          <span
-            className={styles.sourceTag}
-            style={{
-              color: tag.color,
-              background: `color-mix(in oklab, ${tag.color} 10%, transparent)`,
-            }}
-          >
-            {tagLabel}
-          </span>
-          <span
-            style={{
-              marginInlineStart: 'auto',
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-xs)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {formatRelative(event.occurredAt, locale)}
-          </span>
+      <div className={styles.body}>
+        <div className={styles.headline}>
+          <span className={styles.message}>{translated}</span>
+          <span className={cx(styles.sourceTag, styles.sourceTagColor)}>{tagLabel}</span>
+          <span className={styles.time}>{formatRelative(event.occurredAt, locale)}</span>
         </div>
         {payloadVisible ? (
           <details>
-            <summary
-              style={{
-                cursor: 'pointer',
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-xs)',
-              }}
-            >
-              {kindLabel}
-            </summary>
+            <summary className={styles.summary}>{kindLabel}</summary>
             {humanizePayload(event.type, event.payload, t, locale)}
           </details>
         ) : null}

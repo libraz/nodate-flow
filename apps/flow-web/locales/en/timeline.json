@@ -2,6 +2,7 @@
   "view": {
     "title": "Timeline",
     "empty": "No events yet.",
+    "empty_filtered": "No events match these filters.",
     "loading": "Loading timeline…",
     "load_more": "Load more",
     "today": "Today",

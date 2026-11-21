@@ -310,24 +310,6 @@
   gap: var(--nf-space-5);
 }
 
-.formField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1-5);
-}
-
-.formLabel {
-  font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-medium);
-  color: var(--nf-color-fg);
-}
-
-.formHint {
-  margin: 0;
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-}
-
 /* Consequence marker beside an AI action that writes data immediately. */
 .aiEffect {
   display: inline-flex;
@@ -348,31 +330,6 @@
 
 .formActionsSpacer {
   flex: 1;
-}
-
-.select {
-  min-block-size: var(--nf-control-height);
-  padding: var(--nf-space-2) var(--nf-space-3);
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-sm);
-  transition: border-color var(--nf-duration-fast) var(--nf-ease-out);
-}
-
-.select:hover:not(:disabled) {
-  border-color: var(--nf-color-border-strong);
-}
-
-.select:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
-
-.select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* ---------------------------------------------------------------------------
@@ -436,22 +393,6 @@
 
 .searchInput {
   flex: 1;
-  padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-3);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-sm);
-}
-
-.searchInput::placeholder {
-  color: var(--nf-color-fg-muted);
-}
-
-.searchInput:focus {
-  outline: var(--nf-focus-ring-width) solid var(--nf-color-focus-ring);
-  outline-offset: var(--nf-focus-ring-offset);
 }
 
 /* ---------------------------------------------------------------------------

@@ -1,0 +1,70 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  min-block-size: 0;
+}
+
+.scroller {
+  /* nf-token-override: component dimension, not a spacing step */
+  max-block-size: 40rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-5);
+  padding-inline-end: var(--nf-space-2);
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* The previous result stays readable, dimmed, while the next one loads. */
+.scroller[data-busy="true"] {
+  opacity: 0.6;
+}
+
+.dayHeading {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 3;
+  margin: 0;
+  padding: var(--nf-space-1-5) var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nf-color-fg-muted);
+  background: var(--nf-color-bg);
+  border-block-end: 1px solid var(--nf-color-border);
+}
+
+.dayCount {
+  font-variant-numeric: tabular-nums;
+}
+
+.rows {
+  /* Dot diameter shared with event-card.module.css. */
+  --tl-dot-size: 1.75rem;
+
+  position: relative;
+  padding-inline-start: var(--nf-space-2);
+  padding-block-start: var(--nf-space-1);
+}
+
+/* Vertical rail: passes through the centres of the row dots. */
+.rail {
+  position: absolute;
+  inset-inline-start: calc(
+    var(--nf-space-2) +
+    var(--nf-space-1) +
+    var(--tl-dot-size) /
+    2 -
+    var(--nf-space-px)
+  );
+  inset-block: 0;
+  inline-size: 2px;
+  background: var(--nf-color-border);
+  z-index: 1;
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+}

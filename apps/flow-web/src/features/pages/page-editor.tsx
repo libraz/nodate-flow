@@ -7,7 +7,9 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
@@ -155,69 +157,58 @@ export default function PageEditor({
     <div className={styles.editorContainer}>
       <form className={styles.form} onSubmit={handleSubmit}>
         {/* Title */}
-        <div className={styles.formField}>
-          <label className={styles.formLabel} htmlFor="page-title">
-            {t('page_title_label')}
-          </label>
-          <Input id="page-title" value={title} onChange={handleTitleChange} required autoFocus />
-        </div>
+        <FormField label={t('page_title_label')}>
+          {(control) => (
+            <Input {...control} value={title} onChange={handleTitleChange} required autoFocus />
+          )}
+        </FormField>
 
         {/* Parent + Project selectors */}
         <div className={styles.formRow}>
-          <div className={styles.formField}>
-            <label className={styles.formLabel} htmlFor="page-parent">
-              {t('parent_label')}
-            </label>
-            <select
-              id="page-parent"
-              value={parentPageId}
-              onChange={handleParentChange}
-              className={styles.select}
-              aria-describedby="page-parent-hint"
-            >
-              <option value="">{t('parent_none')}</option>
-              {parentCandidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-            <p id="page-parent-hint" className={styles.formHint}>
-              {t('parent_hint')}
-            </p>
-          </div>
-          <div className={styles.formField}>
-            <label className={styles.formLabel} htmlFor="page-project">
-              {t('project_label')}
-            </label>
-            <select
-              id="page-project"
-              value={projectId}
-              onChange={handleProjectChange}
-              disabled={isEditing}
-              className={styles.select}
-            >
-              <option value="">{t('project_none')}</option>
-            </select>
-          </div>
+          <FormField label={t('parent_label')} description={t('parent_hint')}>
+            {(control) => (
+              <Select {...control} value={parentPageId} onChange={handleParentChange}>
+                <option value="">{t('parent_none')}</option>
+                {parentCandidates.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          <FormField label={t('project_label')}>
+            {(control) => (
+              <Select
+                {...control}
+                value={projectId}
+                onChange={handleProjectChange}
+                disabled={isEditing}
+              >
+                <option value="">{t('project_none')}</option>
+              </Select>
+            )}
+          </FormField>
         </div>
 
         {/* Body (Markdown editor) */}
-        <div className={styles.formField}>
-          <span className={styles.formLabel}>{t('page_body_label')}</span>
-          {/*
-           * No `workspaceId`, so no mention picker. Only a task
-           * description and a task comment are scanned for mentions on
-           * save; offering the affordance on a page body would write a
-           * chip for a notification nobody receives.
-           */}
-          <MarkdownEditor
-            value={body}
-            onChange={setBody}
-            rows={12}
-            aria-label={t('page_body_label')}
-          />
-        </div>
+        <FormField label={t('page_body_label')}>
+          {(control) => (
+            /*
+             * No `workspaceId`, so no mention picker. Only a task
+             * description and a task comment are scanned for mentions on
+             * save; offering the affordance on a page body would write a
+             * chip for a notification nobody receives.
+             */
+            <MarkdownEditor
+              id={control.id}
+              value={body}
+              onChange={setBody}
+              rows={12}
+              aria-label={t('page_body_label')}
+            />
+          )}
+        </FormField>
 
         {/* Actions */}
         <div className={styles.formActions}>

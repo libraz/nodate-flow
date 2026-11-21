@@ -38,15 +38,8 @@
   border-color: var(--nf-color-border-strong);
 }
 
-.checkbox {
+.row .checkbox {
   margin-block-start: var(--nf-space-0-5);
-  flex-shrink: 0;
-  cursor: pointer;
-  accent-color: var(--nf-color-accent);
-}
-
-.checkbox:disabled {
-  cursor: not-allowed;
 }
 
 .bodyText {
@@ -112,8 +105,7 @@
 }
 
 .expandIcon {
-  font-size: var(--nf-text-base);
-  line-height: 1;
+  display: inline-flex;
 }
 
 .bodyDot {
@@ -133,6 +125,11 @@
 .bodyTextarea {
   font-size: var(--nf-text-sm);
   min-block-size: var(--nf-space-16);
+}
+
+.titleInput:hover:not(:disabled) {
+  background: var(--nf-color-surface-hover);
+  border-radius: var(--nf-radius-sm);
 }
 
 .titleInput:focus-visible {

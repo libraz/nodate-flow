@@ -257,7 +257,6 @@
     "empty": "本月暂无已排期任务。",
     "noDue": "无截止日期",
     "more": "+{count} 更多",
-    "click_to_add": "点击添加。Shift+点击添加时段。",
     "drag_to_reschedule": "拖到另一天即可移动。重复日程会询问要更改哪些次。",
     "reschedule_success": "已更新截止日期",
     "reschedule_error": "更新截止日期失败",
@@ -815,8 +814,7 @@
       "drop_hint": "拖放到此处以移动",
       "moved_to": "已移至 {state}",
       "move_menu": "移动任务",
-      "move_to": "移至 {state}",
-      "dnd_disabled_hint": "暂不支持拖动。请用卡片上的“移动任务”菜单更改状态。"
+      "move_to": "移至 {state}"
     },
     "assignee": {
       "plus_n": "+{n, plural, other {# 人}}",
@@ -1479,9 +1477,8 @@
     "label": "进行中的时间盒",
     "workspace": "在 {workspace} 中",
     "open": "打开",
-    "stop": "停止",
-    "stop_confirm": "停止此时间盒？将标记为已完成。",
-    "stop_success": "已停止时间盒"
+    "complete_confirm": "将此时间盒标为完成？将记录为已完成。",
+    "complete_success": "时间盒已完成"
   },
   "help": {
     "trigger": "本页使用说明",

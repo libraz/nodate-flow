@@ -1,15 +1,13 @@
 /**
  * Notification preference toggles for /settings/notifications: one
- * bordered list with hairline dividers, label and description on the
- * inline-start side and the switch aligned to the first line.
+ * bordered list of SettingRow rows with hairline dividers.
  */
 
 .panel {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-5);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 40rem;
+  max-inline-size: var(--nf-measure-content);
 }
 
 .workspacePicker {
@@ -41,21 +39,21 @@
   overflow: hidden;
 }
 
+.item + .item {
+  border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
+}
+
+/* Skeleton row: same padding as a settings list row. */
 .row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: var(--nf-space-4);
   align-items: start;
   padding: var(--nf-space-3-5) var(--nf-space-4);
-  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
 .row + .row {
   border-block-start: var(--nf-space-px) solid var(--nf-color-hairline);
-}
-
-.row:hover {
-  background: var(--nf-color-surface-hover);
 }
 
 .identity {
@@ -63,18 +61,6 @@
   flex-direction: column;
   gap: var(--nf-space-0-5);
   min-inline-size: 0;
-}
-
-.label {
-  font-size: var(--nf-text-sm);
-  font-weight: var(--nf-weight-medium);
-  color: var(--nf-color-fg);
-  cursor: pointer;
-}
-
-.helpText {
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg-muted);
 }
 
 .skeletonLabel {

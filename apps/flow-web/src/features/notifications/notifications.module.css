@@ -290,11 +290,12 @@
 }
 
 .actionButton:hover:not(:disabled) {
-  background: var(--nf-color-bg-elevated);
+  background-image: linear-gradient(var(--nf-overlay-hover), var(--nf-overlay-hover));
   color: var(--nf-color-fg);
 }
 
 .actionButton:active:not(:disabled) {
+  background-image: linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
   scale: var(--nf-motion-press-scale);
 }
 

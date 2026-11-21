@@ -257,7 +257,6 @@
     "empty": "今月に予定されているタスクはありません。",
     "noDue": "期日なし",
     "more": "+{count} 件",
-    "click_to_add": "クリックで追加。Shift+クリックでブロックを追加。",
     "drag_to_reschedule": "別の日へドラッグして移動できます。繰り返しの予定は、変更する範囲を確認されます。",
     "reschedule_success": "期日を更新しました",
     "reschedule_error": "期日の更新に失敗しました",
@@ -815,8 +814,7 @@
       "drop_hint": "ここにドロップして移動",
       "moved_to": "{state} に移動しました",
       "move_menu": "タスクを移動",
-      "move_to": "{state} に移動",
-      "dnd_disabled_hint": "ドラッグでの移動はできません。カードの「タスクを移動」メニューから状態を変更します。"
+      "move_to": "{state} に移動"
     },
     "assignee": {
       "plus_n": "+他{n}件",
@@ -1479,9 +1477,8 @@
     "label": "進行中のタイムボックス",
     "workspace": "{workspace} 内",
     "open": "開く",
-    "stop": "停止",
-    "stop_confirm": "このタイムボックスを停止しますか？ 完了として記録されます。",
-    "stop_success": "タイムボックスを停止しました"
+    "complete_confirm": "このタイムボックスを完了にしますか？ 完了として記録されます。",
+    "complete_success": "タイムボックスを完了しました"
   },
   "help": {
     "trigger": "このページの使い方",

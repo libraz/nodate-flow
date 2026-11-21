@@ -1,0 +1,59 @@
+/*
+ * A row wider than the viewport scrolls sideways, never wraps: the end fades
+ * until the last item is reached and the start fades once scrolled, so a
+ * cut-off item reads as "more this way". A row that fits gets no scroll
+ * timeline and never fades. Compose `edgeFade` onto the scrolling element.
+ */
+@property --sub-nav-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --sub-nav-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes sub-nav-edge-fade {
+  from {
+    --sub-nav-fade-start: 0px;
+    --sub-nav-fade-end: var(--nf-space-8);
+  }
+
+  10%,
+  90% {
+    --sub-nav-fade-start: var(--nf-space-8);
+    --sub-nav-fade-end: var(--nf-space-8);
+  }
+
+  to {
+    --sub-nav-fade-start: var(--nf-space-8);
+    --sub-nav-fade-end: 0px;
+  }
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  @supports (animation-timeline: scroll()) {
+    .edgeFade {
+      --sub-nav-fade-direction: to right;
+      /* Only alpha matters in a mask; the colour is any opaque token. */
+      mask-image: linear-gradient(
+        var(--sub-nav-fade-direction),
+        transparent,
+        var(--nf-color-fg) var(--sub-nav-fade-start),
+        var(--nf-color-fg) calc(100% - var(--sub-nav-fade-end)),
+        transparent
+      );
+      animation: sub-nav-edge-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
+
+    /* Scroll progress runs from the inline start, which is the right edge in RTL. */
+    .edgeFade:dir(rtl) {
+      --sub-nav-fade-direction: to left;
+    }
+  }
+}

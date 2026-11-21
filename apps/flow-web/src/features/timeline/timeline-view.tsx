@@ -19,8 +19,9 @@ import {
   useWorkspaceTimelineInfiniteQuery,
 } from './api';
 import EventCard from './event-card';
-import EventFilterBar from './event-filter-bar';
+import EventFilterBar, { resetFilters } from './event-filter-bar';
 import SignalGroup from './signal-group';
+import styles from './timeline-view.module.css';
 
 export type TimelineScopeArg =
   | { kind: 'task'; id: string }
@@ -161,16 +162,10 @@ function TimelineInner({
     return out;
   }, [allEvents, locale, t, zone]);
 
+  const filtersActive = (filters.kind?.length ?? 0) > 0 || (filters.actor?.length ?? 0) > 0;
+
   return (
-    <div
-      aria-busy={pending || fetchingMore || undefined}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-3)',
-        minBlockSize: 0,
-      }}
-    >
+    <div aria-busy={pending || fetchingMore || undefined} className={styles.root}>
       <EventFilterBar
         filters={filters}
         onChange={onChange}
@@ -178,61 +173,33 @@ function TimelineInner({
       />
 
       {allEvents.length === 0 ? (
-        <EmptyState titleAs="p" title={t('view.empty')} />
+        filtersActive ? (
+          <EmptyState
+            titleAs="p"
+            title={t('view.empty_filtered')}
+            action={
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => onChange(resetFilters(filters))}
+              >
+                {t('filter.reset')}
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState titleAs="p" title={t('view.empty')} />
+        )
       ) : (
-        <div
-          style={{
-            // nf-token-override: component dimension, not a spacing step
-            maxBlockSize: '40rem',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--nf-space-5)',
-            paddingInlineEnd: 'var(--nf-space-2)',
-            // The previous result stays readable, dimmed, while the next one loads.
-            opacity: pending || fetchingMore ? 0.6 : 1,
-            transition: 'opacity var(--nf-duration-fast) var(--nf-ease-out)',
-          }}
-        >
+        <div className={styles.scroller} data-busy={pending || fetchingMore ? 'true' : 'false'}>
           {groups.map((g) => (
             <section key={g.key} aria-label={g.label}>
-              <h3
-                style={{
-                  position: 'sticky',
-                  insetBlockStart: 0,
-                  zIndex: 2,
-                  margin: 0,
-                  padding: 'var(--nf-space-1-5) var(--nf-space-3)',
-                  fontSize: 'var(--nf-text-xs)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: 'var(--nf-color-fg-muted)',
-                  background: 'var(--nf-color-bg)',
-                  borderBlockEnd: '1px solid var(--nf-color-border)',
-                }}
-              >
-                {g.label} ·{' '}
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{g.items.length}</span>
+              <h3 className={styles.dayHeading}>
+                {g.label} · <span className={styles.dayCount}>{g.items.length}</span>
               </h3>
-              <div
-                style={{
-                  position: 'relative',
-                  paddingInlineStart: 'var(--nf-space-2)',
-                  paddingBlockStart: 'var(--nf-space-1)',
-                }}
-              >
+              <div className={styles.rows}>
                 {/* vertical rail */}
-                <div
-                  aria-hidden
-                  style={{
-                    position: 'absolute',
-                    insetInlineStart: 'calc(var(--nf-space-2) + var(--nf-space-3-5) - 1px)',
-                    insetBlockStart: 0,
-                    insetBlockEnd: 0,
-                    inlineSize: '2px',
-                    background: 'var(--nf-color-border)',
-                  }}
-                />
+                <div aria-hidden className={styles.rail} />
                 {clusterBySignal(g.items).map((cluster) =>
                   cluster.kind === 'signal' && workspaceId !== undefined ? (
                     <SignalGroup
@@ -255,7 +222,7 @@ function TimelineInner({
       )}
 
       {hasMore ? (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className={styles.loadMore}>
           <Button
             type="button"
             variant="default"

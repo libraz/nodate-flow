@@ -34,6 +34,7 @@ import { apiRequest } from '../../lib/api';
 import { ApiError } from '../../lib/api-error';
 import { type TimelineEvent, timelineKeys } from './api';
 import EventCard from './event-card';
+import styles from './signal-group.module.css';
 
 export interface SignalGroupProps {
   /** Public id (UUID v7) of the common signal. */
@@ -238,51 +239,17 @@ export default function SignalGroup({
       aria-labelledby={headerId}
       data-signal-id={signalId}
       data-reversed={isFullyReversed || undefined}
-      style={{
-        containerType: 'inline-size',
-        margin: 'var(--nf-space-2) 0',
-        padding: 'var(--nf-space-3)',
-        background: 'var(--nf-color-bg-sunken)',
-        border: '1px solid var(--nf-color-border)',
-        borderRadius: 'var(--nf-radius-md)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-        opacity: isFullyReversed ? 0.7 : 1,
-      }}
+      className={styles.root}
     >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--nf-space-2)',
-          flexWrap: 'wrap',
-        }}
-      >
-        <span
-          id={headerId}
-          style={{
-            color: 'var(--nf-color-fg)',
-            fontSize: 'var(--nf-text-sm)',
-            fontWeight: 500,
-          }}
-        >
+      <header className={styles.header}>
+        <span id={headerId} className={styles.cause}>
           {causedByLabel}
         </span>
         {summary.kind !== undefined ? <Badge tone="info">{summary.kind}</Badge> : null}
         {isFullyReversed ? <Badge tone="neutral">{t('signal.reversed_label')}</Badge> : null}
-        <span
-          style={{
-            marginInlineStart: 'auto',
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {timestamp}
-        </span>
+        <span className={styles.timestamp}>{timestamp}</span>
         {showReverse ? (
-          <span data-slot="reverse-desktop" className="nf-signal-reverse-desktop">
+          <span data-slot="reverse-desktop" className={styles.reverseDesktop}>
             <Button
               type="button"
               variant="ghost"
@@ -298,25 +265,8 @@ export default function SignalGroup({
       </header>
 
       {summary.reasoning !== undefined ? (
-        <details
-          style={{
-            background: 'var(--nf-color-surface)',
-            border: '1px solid var(--nf-color-hairline)',
-            borderRadius: 'var(--nf-radius-sm)',
-            padding: 'var(--nf-space-2) var(--nf-space-2-5)',
-          }}
-        >
-          <summary
-            style={{
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-2)',
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm)',
-              listStyle: 'revert',
-            }}
-          >
+        <details className={styles.reasoning}>
+          <summary className={styles.reasoningSummary}>
             <span>{t('signal.reasoning')}</span>
             {summary.confidence !== undefined ? (
               <Badge tone={confidenceTone(summary.confidence)}>
@@ -326,46 +276,24 @@ export default function SignalGroup({
               </Badge>
             ) : null}
           </summary>
-          <p
-            style={{
-              marginBlockStart: 'var(--nf-space-2)',
-              marginBlockEnd: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm)',
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {summary.reasoning}
-          </p>
+          <p className={styles.reasoningText}>{summary.reasoning}</p>
         </details>
       ) : null}
 
       <ol
         // biome-ignore lint/a11y/noRedundantRoles: implicit role="list" gets stripped by some screen readers when ol has list-style:none, hence explicit role
         role="list"
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-1)',
-        }}
+        className={styles.events}
       >
         {events.map((ev) => (
-          <li key={ev.id} style={{ margin: 0 }}>
+          <li key={ev.id} className={styles.event}>
             <EventCard event={ev} />
           </li>
         ))}
       </ol>
 
       {showReverse ? (
-        <footer
-          data-slot="reverse-mobile"
-          className="nf-signal-reverse-mobile"
-          style={{ display: 'flex', justifyContent: 'flex-end' }}
-        >
+        <footer data-slot="reverse-mobile" className={styles.footer}>
           <Button
             type="button"
             variant="ghost"

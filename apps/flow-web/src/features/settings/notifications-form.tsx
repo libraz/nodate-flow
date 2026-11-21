@@ -32,6 +32,7 @@ import {
 } from './notifications-api';
 import styles from './notifications-form.module.css';
 import SaveStatus, { useSaveStatus } from './save-status';
+import SettingRow from './setting-row';
 import ui from './settings-ui.module.css';
 
 /** The channel the form edits; see the module comment. */
@@ -144,30 +145,21 @@ function WorkspacePreferences({ workspaceId }: { workspaceId: string }): ReactEl
       className={styles.form}
     >
       <ul className={styles.list} aria-describedby="notif-channel-note">
-        {CATEGORIES.map((row) => {
-          const id = `notif-${row.category}`;
-          return (
-            <li key={row.category} className={styles.row}>
-              <div className={styles.identity}>
-                <label htmlFor={id} className={styles.label}>
-                  {t(row.labelKey)}
-                </label>
-                <span id={`${id}-help`} className={styles.helpText}>
-                  {t(row.descriptionKey)}
-                </span>
-              </div>
-              <Switch
-                id={id}
-                aria-describedby={`${id}-help`}
-                checked={!(muted[row.category] ?? false)}
-                onCheckedChange={(next) => {
-                  setMuted((prev) => ({ ...prev, [row.category]: !next }));
-                }}
-                aria-label={t(row.labelKey)}
-              />
-            </li>
-          );
-        })}
+        {CATEGORIES.map((row) => (
+          <li key={row.category} className={styles.item}>
+            <SettingRow variant="list" label={t(row.labelKey)} description={t(row.descriptionKey)}>
+              {(control) => (
+                <Switch
+                  {...control}
+                  checked={!(muted[row.category] ?? false)}
+                  onCheckedChange={(next) => {
+                    setMuted((prev) => ({ ...prev, [row.category]: !next }));
+                  }}
+                />
+              )}
+            </SettingRow>
+          </li>
+        ))}
       </ul>
 
       <p id="notif-channel-note" className={styles.channelNote}>

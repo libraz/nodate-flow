@@ -2,6 +2,7 @@
   "view": {
     "title": "时间线",
     "empty": "暂无事件。",
+    "empty_filtered": "没有符合筛选条件的事件。",
     "loading": "正在加载时间线…",
     "load_more": "加载更多",
     "today": "今天",
