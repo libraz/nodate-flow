@@ -44,7 +44,12 @@ vi.mock('../../../lib/sdk', () => ({
 }));
 
 vi.mock('../../../providers/theme-provider', () => ({
-  useTheme: () => ({ setPreference: vi.fn() }),
+  useTheme: () => ({
+    family: 'glass',
+    colorMode: 'system',
+    setFamily: vi.fn(),
+    setColorMode: vi.fn(),
+  }),
 }));
 
 import { ProfilePage } from '../profile';

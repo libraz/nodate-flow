@@ -29,13 +29,14 @@ import SectionCard, { SectionActions } from '../../components/section-card';
 import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import { userFromMe } from '../../features/auth/user-from-me';
+import AvatarUpload from '../../features/profile/avatar-upload';
+import ThemeAppearance from '../../features/profile/theme-appearance';
 import { type SupportedLanguage, setLanguage } from '../../i18n';
 import { apiRequest } from '../../lib/api';
 import { mapAuthThrown } from '../../lib/auth-errors';
 import { APP_NAME } from '../../lib/brand';
 import { flowWebUrl } from '../../lib/flow-web-url';
 import { useSubmitGuard } from '../../lib/use-submit-guard';
-import { type ThemePreference, useTheme } from '../../providers/theme-provider';
 
 // Sensible default country per UI language. Used to gently cascade the
 // country field when the user switches language and the country is empty.
@@ -138,7 +139,6 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
 export function ProfilePage(): ReactElement {
   const { t, i18n } = useTranslation('auth');
   const user = useAuth(selectUser);
-  const { setPreference } = useTheme();
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const submitGuard = useSubmitGuard();
@@ -232,7 +232,6 @@ export function ProfilePage(): ReactElement {
       locale: (user?.locale as ProfileFormValues['locale']) ?? 'en',
       timezone: user?.timezone || detectTimezone(),
       country: user?.country ?? '',
-      themePreference: (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
       weekStart: persistedWeekStart ?? fallbackWeekStart,
     },
     {
@@ -241,8 +240,6 @@ export function ProfilePage(): ReactElement {
         locale: (user?.locale as ProfileFormValues['locale']) ?? 'en',
         timezone: user?.timezone || detectTimezone(),
         country: user?.country ?? '',
-        themePreference:
-          (user?.themePreference as ProfileFormValues['themePreference']) ?? 'system',
         weekStart: persistedWeekStart ?? fallbackWeekStart,
       },
     },
@@ -307,7 +304,6 @@ export function ProfilePage(): ReactElement {
                 locale: values.locale,
                 timezone: values.timezone,
                 country: values.country,
-                themePreference: values.themePreference,
                 weekStart: values.weekStart,
               },
             }),
@@ -324,7 +320,6 @@ export function ProfilePage(): ReactElement {
       // any part of the profile erased them from the session, and the
       // next save wrote the erased value back to the server.
       authStore.getState().setSession(authStore.getState().accessToken ?? '', userFromMe(me));
-      setPreference(values.themePreference as ThemePreference);
       setLanguage(values.locale as SupportedLanguage);
       setSuccess(true);
     } catch {
@@ -393,6 +388,7 @@ export function ProfilePage(): ReactElement {
             title={t('profile.sections.personal_title')}
             description={t('profile.sections.personal_description')}
           >
+            <AvatarUpload avatarUrl={user?.avatarUrl} displayName={user?.displayName} />
             <FormField
               label={t('profile.display_name')}
               required
@@ -495,26 +491,7 @@ export function ProfilePage(): ReactElement {
             title={t('profile.sections.appearance_title')}
             description={t('profile.sections.appearance_description')}
           >
-            <FormField label={t('profile.theme')}>
-              {(control) => {
-                const { ref, ...field } = register('themePreference');
-                return (
-                  <select {...control} {...field} ref={ref} className="aw-select">
-                    <option value="system">{t('profile.theme_system')}</option>
-                    <option value="glass-light">{t('profile.theme_glass_light')}</option>
-                    <option value="glass-dark">{t('profile.theme_glass_dark')}</option>
-                    <option value="modern-light">{t('profile.theme_modern_light')}</option>
-                    <option value="modern-dark">{t('profile.theme_modern_dark')}</option>
-                    <option value="washi-light">{t('profile.theme_washi_light')}</option>
-                    <option value="washi-dark">{t('profile.theme_washi_dark')}</option>
-                    <option value="classic-light">{t('profile.theme_classic_light')}</option>
-                    <option value="classic-dark">{t('profile.theme_classic_dark')}</option>
-                    <option value="nothing-light">{t('profile.theme_nothing_light')}</option>
-                    <option value="nothing-dark">{t('profile.theme_nothing_dark')}</option>
-                  </select>
-                );
-              }}
-            </FormField>
+            <ThemeAppearance />
           </SectionCard>
 
           <SectionActions

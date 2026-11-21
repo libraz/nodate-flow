@@ -8,6 +8,7 @@ import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagge
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
+import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
@@ -37,6 +38,7 @@ export { RecoveryCodesView } from '../../features/auth/totp-section';
 /** SDK-derived response bodies. Local interfaces caused silent shape drift. */
 type SessionSummary = components['schemas']['SessionSummary'];
 type ListSessionsOutputBody = components['schemas']['ListSessionsOutputBody'];
+type RevokeAllOtherSessionsOutputBody = components['schemas']['RevokeAllOtherSessionsOutputBody'];
 
 /**
  * @brief Identifier returned by parseUserAgent when a token is recognized.
@@ -210,7 +212,10 @@ export function SecurityPage(): ReactElement {
   const sessionPresence = usePresenceList(sessions, (session) => session.id);
   const stagger = useFirstLoadStagger();
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+  const [sessionsReload, setSessionsReload] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionsReload re-runs the fetch
   useEffect(() => {
     let cancelled = false;
     void apiRequest((client) => client.GET('/me/sessions'), 'Failed to load sessions')
@@ -230,7 +235,40 @@ export function SecurityPage(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sessionsReload]);
+
+  const hasOtherSessions = sessions.some((s) => !s.current);
+
+  const handleRevokeAllOthers = async (): Promise<void> => {
+    const confirmed = await confirmAction({
+      message: t('security.session_revoke_all_confirm'),
+      confirmLabel: t('security.session_revoke_all'),
+    });
+    if (!confirmed) return;
+    setRevokingAll(true);
+    try {
+      const res = await apiRequest(
+        (client) => client.DELETE('/me/sessions'),
+        'Failed to revoke the other sessions',
+      );
+      const revoked = (res as RevokeAllOtherSessionsOutputBody | undefined)?.revoked ?? 0;
+      toaster.show({
+        tone: 'success',
+        message: t('security.session_revoked_all', { count: revoked }),
+      });
+      setSessionsReload((n) => n + 1);
+    } catch (err) {
+      const code = refusalCode(err);
+      toaster.show({
+        message: code
+          ? `${t('security.session_revoke_all_failed')} (${code})`
+          : t('security.session_revoke_all_failed'),
+        tone: 'danger',
+      });
+    } finally {
+      setRevokingAll(false);
+    }
+  };
 
   const handleRevokeSession = async (sessionId: string): Promise<void> => {
     setRevokingId(sessionId);
@@ -416,6 +454,21 @@ export function SecurityPage(): ReactElement {
               ))}
             </ul>
           )}
+          {hasOtherSessions ? (
+            <div>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-busy={revokingAll || undefined}
+                disabled={revokingAll}
+                onClick={() => {
+                  void handleRevokeAllOthers();
+                }}
+              >
+                {t('security.session_revoke_all')}
+              </Button>
+            </div>
+          ) : null}
         </SectionCard>
       </div>
     </>

@@ -20,6 +20,7 @@ type TotpStatusOutputBody = components['schemas']['TotpStatusOutputBody'];
 type TotpStatus = TotpStatusOutputBody['status'];
 type TotpEnrollOutputBody = components['schemas']['TotpEnrollOutputBody'];
 type TotpConfirmOutputBody = components['schemas']['TotpConfirmOutputBody'];
+type TotpRecoveryCodesStatusOutputBody = components['schemas']['TotpRecoveryCodesStatusOutputBody'];
 type TotpRegenerateRecoveryCodesOutputBody =
   components['schemas']['TotpRegenerateRecoveryCodesOutputBody'];
 
@@ -582,7 +583,26 @@ function EnabledPanel({
   const [password, setPassword] = useState('');
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+
+  // Remounts after a regenerate, so the count is re-read then.
+  useEffect(() => {
+    let cancelled = false;
+    void apiRequest(
+      (client) => client.GET('/me/totp/recovery-codes'),
+      'Failed to load the recovery code count',
+    )
+      .then((res) => {
+        if (!cancelled) setRemaining((res as TotpRecoveryCodesStatusOutputBody).remaining);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) logError('Failed to fetch recovery code count', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!errorKey) return;
@@ -645,6 +665,11 @@ function EnabledPanel({
     return (
       <div className="aw-stack aw-stack-3">
         <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.enabled_description')}</p>
+        {remaining !== null ? (
+          <p className="aw-flush aw-text-sm" data-testid="recovery-remaining">
+            {t('security.totp.recovery.remaining', { count: remaining })}
+          </p>
+        ) : null}
         <div className="aw-actions">
           <Button
             type="button"
