@@ -514,23 +514,24 @@ function WeekRow({
                 onDayOpen(key);
               }}
             >
-              <span className={cx(styles.dayHead, isToday && styles['dayHead--today'])}>
-                <span
-                  className={cx(
-                    styles.dayNumber,
-                    dateNumberClass(day, dayHolidays.length > 0),
-                    isToday && styles['dayNumber--today'],
-                  )}
-                >
-                  {day.getDate()}
+              <div className={styles.dayHeadRow}>
+                <span className={cx(styles.dayHead, isToday && styles['dayHead--today'])}>
+                  <span
+                    className={cx(
+                      styles.dayNumber,
+                      dateNumberClass(day, dayHolidays.length > 0),
+                      isToday && styles['dayNumber--today'],
+                    )}
+                  >
+                    {day.getDate()}
+                  </span>
                 </span>
-              </span>
-
-              {primaryHoliday ? (
-                <span className={styles.holidayLabel} title={primaryHoliday.name}>
-                  {primaryHoliday.name}
-                </span>
-              ) : null}
+                {primaryHoliday ? (
+                  <span className={styles.holidayLabel} title={primaryHoliday.name}>
+                    {primaryHoliday.name}
+                  </span>
+                ) : null}
+              </div>
 
               {/* Reserve vertical space so single-day chips line up under bars. */}
               <div

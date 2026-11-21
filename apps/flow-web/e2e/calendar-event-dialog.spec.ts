@@ -93,29 +93,18 @@ async function openCalendar(page: Page): Promise<void> {
 }
 
 /**
- * Locates today's grid cell. Uses the cell's date-number span — the
- * cell itself is a div[role=button] and there's exactly one cell per
- * in-month date. We pin via the `click_to_add` title attribute which
- * is only set on in-month cells, then narrow to the one whose visible
- * digit matches today's day-of-month.
+ * Locates today's grid cell. Each day cell is a div[role=button] carrying
+ * `data-cell-key="YYYY-MM-DD"` (local date), so one key addresses exactly
+ * one cell regardless of locale or how many months are mounted.
  */
 async function findTodayCell(page: Page): Promise<Locator> {
   const today = new Date();
-  const day = today.getDate();
-  // All in-month cells have role=button + title="Click to add". Filter
-  // by the exact day-of-month text inside. Using exact to avoid "1"
-  // matching "15".
-  const cells = page.locator('[role="button"][title]').filter({
-    has: page.getByText(String(day), { exact: true }),
-  });
-  // There can be up to 6 such cells across adjacent months if the
-  // grid's leading/trailing days happen to share the day number. We
-  // want the one that is actually clickable (full opacity). All
-  // in-month cells have opacity=1, leading/trailing ones 0.4. Playwright
-  // sees the first visible one; narrow explicitly to the in-month cell
-  // by matching the title attribute "Click to add" / "クリックして追加".
-  // (Both the rendered title comes from common.calendar.click_to_add.)
-  const cell = cells.first();
+  const key = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+  const cell = page.locator(`[role="button"][data-cell-key="${key}"]`);
   await expect(cell).toBeVisible({ timeout: 10_000 });
   return cell;
 }

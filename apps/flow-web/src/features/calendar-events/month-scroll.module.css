@@ -96,6 +96,9 @@
 /* ───── week row ───── */
 
 .weekRow {
+  /* nf-token-override: component dimension, not a spacing step */
+  --day-head-block-size: 1.5rem;
+
   position: relative;
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
 }
@@ -153,12 +156,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
+  flex-shrink: 0;
   /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 1.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.5rem;
+  block-size: var(--day-head-block-size);
   border-radius: var(--nf-radius-pill);
+}
+
+/* Number and holiday name share one row of the head's height, so the
+   name never takes lane height from the chips below. */
+.dayHeadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  block-size: var(--day-head-block-size);
 }
 
 .dayHead--today {
@@ -189,6 +201,7 @@
   font-size: var(--nf-text-xs);
   color: var(--nf-color-danger-fg);
   line-height: var(--nf-leading-tight);
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -255,8 +268,8 @@
 .barOverlay {
   position: absolute;
   inset-inline: 0;
-  /* nf-token-override: sits below the date numbers — 1.5rem head plus a tiny gap, so it tracks the header's height, not the spacing scale */
-  inset-block-start: 1.875rem;
+  /* Column padding + date head + the chip's block margin, so a bar sits on the same lane as a chip. */
+  inset-block-start: calc(var(--nf-space-px) * 2 + var(--day-head-block-size));
   z-index: 1;
   pointer-events: none;
 }
@@ -391,13 +404,22 @@
  */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
-  .dayHead {
-    min-inline-size: var(--nf-space-8);
-    block-size: var(--nf-space-8);
+  .weekRow {
+    --day-head-block-size: var(--nf-space-8);
   }
 
-  .barOverlay {
-    /* nf-token-override: tracks the head's height plus the gap under it, not the spacing scale */
-    inset-block-start: 2.375rem;
+  .dayHead {
+    min-inline-size: var(--nf-space-8);
+  }
+
+  /* Too narrow to read: the date number is already tinted, and the cell and
+     the title keep the name. Kept for assistive tech, not removed. */
+  .holidayLabel {
+    position: absolute;
+    inline-size: var(--nf-space-px);
+    block-size: var(--nf-space-px);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

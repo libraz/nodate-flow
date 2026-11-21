@@ -36,6 +36,7 @@ import { ToggleChip, ToggleChipGroup } from '@nodate-flow/ui/primitives/toggle-c
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import type { Zone } from '@nodate-flow/ui/time';
 import {
+  ArrowRight,
   CalendarCheck,
   CalendarDays,
   CheckSquare,
@@ -941,6 +942,7 @@ export default function EventDialog({
   const slow = useSlowPending(isPending);
   const noticePresence = usePresence<HTMLParagraphElement>(slow && scopePrompt === null);
   const disclosureId = useId();
+  const taskDatesHintId = useId();
   const refreshCalendar = useRefreshCalendar();
 
   /**
@@ -1381,8 +1383,10 @@ export default function EventDialog({
               {showTaskFields ? (
                 <>
                   <FormField label={t('field.start')}>
-                    {() => (
+                    {(control) => (
                       <DatePicker
+                        aria-describedby={control['aria-describedby']}
+                        aria-invalid={control['aria-invalid']}
                         variant="field"
                         value={startDate}
                         onChange={editing('startDate', setStartDate)}
@@ -1400,11 +1404,15 @@ export default function EventDialog({
                     )}
                   </FormField>
                   <span className={styles.arrow} aria-hidden>
-                    →
+                    <ArrowRight className={styles.arrowIcon} size={16} />
                   </span>
-                  <FormField label={t('field.end')} description={t('field.taskDatesHint')}>
-                    {() => (
+                  <FormField label={t('field.end')}>
+                    {(control) => (
                       <DatePicker
+                        aria-invalid={control['aria-invalid']}
+                        aria-describedby={[control['aria-describedby'], taskDatesHintId]
+                          .filter(Boolean)
+                          .join(' ')}
                         variant="field"
                         value={endDate}
                         onChange={editing('endDate', setEndDate)}
@@ -1420,11 +1428,16 @@ export default function EventDialog({
                       />
                     )}
                   </FormField>
+                  <p id={taskDatesHintId} className={styles.timeRowHint}>
+                    {t('field.taskDatesHint')}
+                  </p>
                 </>
               ) : showMilestone ? (
                 <FormField label={t('field.date')}>
-                  {() => (
+                  {(control) => (
                     <DatePicker
+                      aria-describedby={control['aria-describedby']}
+                      aria-invalid={control['aria-invalid']}
                       variant="field"
                       value={startDate}
                       onChange={(v) => {
@@ -1449,10 +1462,12 @@ export default function EventDialog({
               ) : (
                 <>
                   <FormField label={t('field.start')} error={timeError ?? undefined}>
-                    {() => (
+                    {(control) => (
                       <div className={styles.inlineRow}>
                         <div className={styles.inlineGrow}>
                           <DatePicker
+                            aria-describedby={control['aria-describedby']}
+                            aria-invalid={control['aria-invalid']}
                             variant="field"
                             value={startDate}
                             onChange={editing('startDate', setStartDate)}
@@ -1470,6 +1485,8 @@ export default function EventDialog({
                         </div>
                         {allDay ? null : (
                           <TimePicker
+                            aria-describedby={control['aria-describedby']}
+                            aria-invalid={control['aria-invalid']}
                             variant="field"
                             value={startTime}
                             listLabel={t('field.startTime')}
@@ -1481,13 +1498,15 @@ export default function EventDialog({
                     )}
                   </FormField>
                   <span className={styles.arrow} aria-hidden>
-                    →
+                    <ArrowRight className={styles.arrowIcon} size={16} />
                   </span>
                   <FormField label={t('field.end')}>
-                    {() => (
+                    {(control) => (
                       <div className={styles.inlineRow}>
                         <div className={styles.inlineGrow}>
                           <DatePicker
+                            aria-describedby={control['aria-describedby']}
+                            aria-invalid={control['aria-invalid']}
                             variant="field"
                             value={endDate}
                             onChange={editing('endDate', setEndDate)}
@@ -1506,6 +1525,8 @@ export default function EventDialog({
                         </div>
                         {allDay ? null : (
                           <TimePicker
+                            aria-describedby={control['aria-describedby']}
+                            aria-invalid={control['aria-invalid']}
                             variant="field"
                             value={endTime}
                             listLabel={t('field.endTime')}

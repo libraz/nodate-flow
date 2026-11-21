@@ -84,14 +84,25 @@
   animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
 }
 
+/* Paging slides the chart in from the side it moved toward, like the calendar's month nav. */
+.layer.slide--fromPrev {
+  animation: global(nf-slide-in-from-inline-start) var(--nf-duration-base) var(--nf-ease-out);
+}
+
+.layer.slide--fromNext {
+  animation: global(nf-slide-in-from-inline-end) var(--nf-duration-base) var(--nf-ease-out);
+}
+
 /* --- Timescale --- */
 
 .axisText {
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   fill: var(--nf-color-fg-muted);
 }
 
 .axisMonth {
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   fill: var(--nf-color-fg);
   font-weight: var(--nf-weight-semibold);
@@ -102,6 +113,7 @@
 }
 
 .todayText {
+  font-size: var(--nf-text-xs);
   font-variant-numeric: tabular-nums;
   fill: var(--nf-color-fg-on-accent);
   font-weight: var(--nf-weight-semibold);

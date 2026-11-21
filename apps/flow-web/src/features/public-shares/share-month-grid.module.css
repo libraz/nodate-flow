@@ -42,58 +42,6 @@
   gap: var(--nf-space-1);
 }
 
-.navButton {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 2rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 2rem;
-  border-radius: var(--nf-radius-md);
-  color: var(--nf-color-fg-muted);
-  cursor: pointer;
-  transition:
-    background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.navButton:hover {
-  background: var(--nf-color-bg-sunken);
-  color: var(--nf-color-fg);
-}
-
-.navButton:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
-
-.todayButton {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  padding-inline: var(--nf-space-3);
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 2rem;
-  border-radius: var(--nf-radius-md);
-  font-size: var(--nf-text-sm);
-  color: var(--nf-color-fg);
-  cursor: pointer;
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.todayButton:hover {
-  background: var(--nf-color-bg-sunken);
-}
-
-.todayButton:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
-}
-
 /* ───── month navigation motion ───── */
 
 .slide--fromPrev {
@@ -148,6 +96,9 @@
 /* ───── week row ───── */
 
 .weekRow {
+  /* nf-token-override: component dimension, not a spacing step */
+  --day-head-block-size: 1.5rem;
+
   position: relative;
   border-block-end: var(--nf-space-px) solid var(--nf-color-border);
 }
@@ -198,12 +149,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
+  flex-shrink: 0;
   /* nf-token-override: component dimension, not a spacing step */
   min-inline-size: 1.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.5rem;
+  block-size: var(--day-head-block-size);
   border-radius: var(--nf-radius-pill);
+}
+
+/* Number and holiday name share one row of the head's height, so the
+   name never takes lane height from the chips below. */
+.dayHeadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  block-size: var(--day-head-block-size);
 }
 
 .dayHead--today {
@@ -231,6 +191,7 @@
   font-size: var(--nf-cal-text-cell);
   color: var(--nf-color-danger-fg);
   line-height: var(--nf-leading-tight);
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -293,8 +254,8 @@
 .barOverlay {
   position: absolute;
   inset-inline: 0;
-  /* nf-token-override: sits below the date numbers — 1.5rem head plus a small gap, so it tracks the header's height, not the spacing scale */
-  inset-block-start: 1.875rem;
+  /* Column padding + date head + the chip's block margin, so a bar sits on the same lane as a chip. */
+  inset-block-start: calc(var(--nf-space-px) * 2 + var(--day-head-block-size));
   z-index: 1;
   pointer-events: none;
 }
@@ -356,67 +317,10 @@
 
 /* ───── read-only event popover ───── */
 
-/* Centred by the modal dialog's own `margin: auto`; settles in rather
-   than appearing, over a backdrop that fades. */
-.popover {
-  margin: auto;
-  animation: global(nf-scale-in) var(--nf-duration-base) var(--nf-ease-out);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-  box-shadow: var(--nf-shadow-lg);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  padding: var(--nf-space-4);
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: min(20rem, 90vw);
-}
-
-.popover::backdrop {
-  background: color-mix(in oklch, var(--nf-color-fg) 30%, transparent);
-  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
-}
-
-.popoverHeader {
+.popoverFooter {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--nf-space-2);
-}
-
-.popoverTitle {
-  font-size: var(--nf-text-base);
-  font-weight: var(--nf-weight-semibold);
-  margin: 0;
-  color: var(--nf-color-fg);
-}
-
-.popoverClose {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 1.75rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 1.75rem;
-  flex-shrink: 0;
-  border-radius: var(--nf-radius-md);
-  color: var(--nf-color-fg-muted);
-  cursor: pointer;
-  transition:
-    background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.popoverClose:hover {
-  background: var(--nf-color-bg-sunken);
-  color: var(--nf-color-fg);
-}
-
-.popoverClose:focus-visible {
-  outline: none;
-  box-shadow: var(--nf-shadow-focus);
+  justify-content: flex-end;
+  margin-block-start: var(--nf-space-3);
 }
 
 .popoverRow {
@@ -440,4 +344,18 @@
   padding-block: var(--nf-space-12);
   text-align: center;
   color: var(--nf-color-fg-muted);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  /* Too narrow to read: the date number is already tinted, and the cell and
+     the title keep the name. Kept for assistive tech, not removed. */
+  .holidayLabel {
+    position: absolute;
+    inline-size: var(--nf-space-px);
+    block-size: var(--nf-space-px);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

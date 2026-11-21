@@ -380,6 +380,18 @@ describe('<EventDialog>', () => {
     expect(mocks.createEvent).not.toHaveBeenCalled();
   });
 
+  it('describes the task end date trigger by the dates hint', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog());
+
+    await user.click(screen.getByRole('radio', { name: 'kind.task' }));
+
+    const hint = screen.getByText('field.taskDatesHint');
+    expect(hint.id).not.toBe('');
+    const endTrigger = screen.getAllByRole('button', { name: /common\.date\.placeholder|\d/ })[1];
+    expect(endTrigger?.getAttribute('aria-describedby')?.split(' ')).toContain(hint.id);
+  });
+
   it('all-day toggle hides time pickers and restores last time on revert', async () => {
     const user = userEvent.setup();
     renderWithProviders(renderDialog());

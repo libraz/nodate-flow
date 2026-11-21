@@ -7,7 +7,7 @@
  * The grid reuses the authenticated calendar's multi-day track-packing
  * algorithm via the self-contained `lib/share-month-grid.ts` port (so no
  * authenticated-only fields leak into the public bundle). Events are
- * non-interactive beyond a lightweight read-only popover (`<dialog>`)
+ * non-interactive beyond a lightweight read-only popover (`Dialog`)
  * that shows title / time / location / memo — there is no edit affordance.
  *
  * All visual values resolve from design tokens; see the sibling CSS
@@ -18,8 +18,10 @@
 import { getOrCreateProvider } from '@nodate-flow/holidays';
 import type { components } from '@nodate-flow/sdk';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Button from '@nodate-flow/ui/primitives/button';
+import Dialog from '@nodate-flow/ui/primitives/dialog';
 import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
-import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatAllDayRange } from '../../lib/date-utils';
@@ -140,7 +142,10 @@ export default function ShareMonthGrid({
   const locale = i18n.language || 'en';
 
   const [monthAnchor, setMonthAnchor] = useState(() => initialMonthAnchor(events, timezone));
+  // The selection outlives the popover's `open` flag so the event stays
+  // drawn while the dialog animates out.
   const [selected, setSelected] = useState<ShareEvent | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   // Null until the first navigation, so the month a visitor lands on
   // does not slide in; afterwards the grid enters from the side it came from.
   const [navDirection, setNavDirection] = useState<'prev' | 'next' | null>(null);
@@ -176,29 +181,29 @@ export default function ShareMonthGrid({
           {monthLabel}
         </p>
         <div className={styles.navGroup}>
-          <button
-            type="button"
-            className={styles.todayButton}
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => goToMonth(`${monthKeyOf(todayKey(timezone))}-01`)}
           >
             {t('share.grid.today')}
-          </button>
-          <button
-            type="button"
-            className={styles.navButton}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label={t('share.grid.prev_month')}
             onClick={() => goToMonth(shiftMonthAnchor(monthAnchor, -1))}
           >
             <ChevronLeft size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={styles.navButton}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label={t('share.grid.next_month')}
             onClick={() => goToMonth(shiftMonthAnchor(monthAnchor, 1))}
           >
             <ChevronRight size={18} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -239,7 +244,10 @@ export default function ShareMonthGrid({
               events={visibleEvents}
               timezone={timezone}
               holidayNames={holidayNames}
-              onEventOpen={setSelected}
+              onEventOpen={(event) => {
+                setSelected(event);
+                setPopoverOpen(true);
+              }}
             />
           ))}
         </div>
@@ -247,10 +255,11 @@ export default function ShareMonthGrid({
 
       {selected ? (
         <EventPopover
+          open={popoverOpen}
           event={selected}
           timezone={timezone}
           locale={locale}
-          onClose={() => setSelected(null)}
+          onClose={() => setPopoverOpen(false)}
         />
       ) : null}
     </div>
@@ -374,24 +383,26 @@ function ShareWeekRow({
               className={cx(styles.dayCol, !cell.inMonth && styles['dayCol--outside'])}
               data-cell-key={cell.key}
             >
-              <span className={cx(styles.dayHead, cell.isToday && styles['dayHead--today'])}>
-                <span
-                  className={cx(
-                    styles.dayNumber,
-                    cell.dow === 0 && styles['dayNumber--sun'],
-                    cell.dow === 6 && styles['dayNumber--sat'],
-                    holidayNames.has(cell.key) && styles['dayNumber--holiday'],
-                    cell.isToday && styles['dayNumber--today'],
-                  )}
-                >
-                  {cell.dayNumber}
+              <div className={styles.dayHeadRow}>
+                <span className={cx(styles.dayHead, cell.isToday && styles['dayHead--today'])}>
+                  <span
+                    className={cx(
+                      styles.dayNumber,
+                      cell.dow === 0 && styles['dayNumber--sun'],
+                      cell.dow === 6 && styles['dayNumber--sat'],
+                      holidayNames.has(cell.key) && styles['dayNumber--holiday'],
+                      cell.isToday && styles['dayNumber--today'],
+                    )}
+                  >
+                    {cell.dayNumber}
+                  </span>
                 </span>
-              </span>
-              {holidayNames.has(cell.key) ? (
-                <span className={styles.holidayLabel} title={holidayNames.get(cell.key)}>
-                  {holidayNames.get(cell.key)}
-                </span>
-              ) : null}
+                {holidayNames.has(cell.key) ? (
+                  <span className={styles.holidayLabel} title={holidayNames.get(cell.key)}>
+                    {holidayNames.get(cell.key)}
+                  </span>
+                ) : null}
+              </div>
 
               <div
                 className={styles.trackArea}
@@ -430,6 +441,7 @@ function ShareWeekRow({
 }
 
 interface EventPopoverProps {
+  open: boolean;
   event: ShareEvent;
   timezone: string;
   locale: string;
@@ -437,47 +449,20 @@ interface EventPopoverProps {
 }
 
 /**
- * EventPopover — read-only `<dialog>` showing an event's title, time,
- * location and memo. Opened modally so the browser provides focus
- * trapping; ESC and backdrop click both close it. No edit affordance.
+ * EventPopover — read-only `Dialog` showing an event's title, time,
+ * location and memo. The primitive provides the focus trap, overlay and
+ * exit animation; ESC and overlay click both close it. No edit affordance.
  */
-function EventPopover({ event, timezone, locale, onClose }: EventPopoverProps): ReactElement {
+function EventPopover({ open, event, timezone, locale, onClose }: EventPopoverProps): ReactElement {
   const { t } = useTranslation();
-  const ref = useRef<HTMLDialogElement>(null);
   const zone = event.timezone || timezone;
-
-  useEffect(() => {
-    const dlg = ref.current;
-    if (dlg && !dlg.open) dlg.showModal();
-  }, []);
 
   const start = typeof event.startAt === 'number' ? new Date(event.startAt * 1000) : null;
   const end = typeof event.endAt === 'number' ? new Date(event.endAt * 1000) : null;
   const whenLabel = formatWhen({ start, end, allDay: event.allDay, zone, locale, t });
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: native <dialog> closes on Escape; backdrop click is a mouse-only convenience
-    <dialog
-      ref={ref}
-      className={styles.popover}
-      onClose={onClose}
-      onClick={(e) => {
-        // Close when the backdrop (the dialog element itself) is clicked.
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      aria-label={event.title}
-    >
-      <div className={styles.popoverHeader}>
-        <h2 className={styles.popoverTitle}>{event.title}</h2>
-        <button
-          type="button"
-          className={styles.popoverClose}
-          aria-label={t('share.grid.close')}
-          onClick={() => ref.current?.close()}
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
-      </div>
+    <Dialog open={open} onClose={onClose} title={event.title} size="sm">
       <p className={styles.popoverRow}>{whenLabel}</p>
       {event.location ? (
         <p className={styles.popoverRow}>
@@ -486,7 +471,12 @@ function EventPopover({ event, timezone, locale, onClose }: EventPopoverProps): 
         </p>
       ) : null}
       {event.memo ? <p className={styles.popoverMemo}>{event.memo}</p> : null}
-    </dialog>
+      <div className={styles.popoverFooter}>
+        <Button variant="ghost" size="sm" aria-label={t('share.grid.close')} onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </Button>
+      </div>
+    </Dialog>
   );
 }
 

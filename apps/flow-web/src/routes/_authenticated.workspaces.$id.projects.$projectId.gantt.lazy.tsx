@@ -17,6 +17,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
@@ -47,6 +48,12 @@ const HEADER_HEIGHT = 36;
 /** Room a month label needs at 12px, e.g. "2026年12月" or "December 2026". */
 const MONTH_LABEL_ROOM = 104;
 const LABEL_WIDTH = 220;
+/** Chart width assumed until the scroller has been measured. */
+const FALLBACK_CHART_WIDTH = 960;
+/** Fewest days a viewport shows, so a narrow pane still pages by whole weeks. */
+const MIN_VISIBLE_DAYS = 7;
+/** First zoom step wide enough to carry a day number. */
+const DAY_LABEL_MIN_WIDTH = 18;
 
 /**
  * Shared accent color for the critical-path bar stroke, dependency arrows
@@ -231,13 +238,21 @@ function GanttView(): ReactElement {
   const [zoomIdx, setZoomIdx] = useState(ZOOM_DEFAULT);
   const [showCriticalPath, setShowCriticalPath] = useState(true);
 
+  // Side the chart slides in from after a page; null (first paint, zoom) fades instead.
+  const [slideDir, setSlideDir] = useState<'prev' | 'next' | null>(null);
+  // Inner width of the scroller; null until measured.
+  const [scrollerWidth, setScrollerWidth] = useState<number | null>(null);
+
   const dayWidth = ZOOM_LEVELS[zoomIdx] ?? 24;
 
-  const zoomIn = useCallback(() => {
-    setZoomIdx((i) => Math.min(ZOOM_LEVELS.length - 1, i + 1));
-  }, []);
-  const zoomOut = useCallback(() => {
-    setZoomIdx((i) => Math.max(0, i - 1));
+  // Stable identity: React re-runs a ref callback (and its cleanup) whenever it changes.
+  const scrollerRef = useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    setScrollerWidth(node.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setScrollerWidth(node.clientWidth));
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
 
   const { data: tasks } = useSuspenseQuery({
@@ -309,7 +324,10 @@ function GanttView(): ReactElement {
   const totalDays = Math.max(7, diffDays(range.start, range.end) + 1);
   const viewStart = addDays(range.start, offsetDays);
   // Visible days: at least the data range, but cap to viewport-driven max
-  const viewportDays = Math.max(14, Math.round(960 / dayWidth));
+  const chartRoom = scrollerWidth === null ? FALLBACK_CHART_WIDTH : scrollerWidth - LABEL_WIDTH;
+  const viewportDaysAt = (width: number): number =>
+    Math.max(MIN_VISIBLE_DAYS, Math.floor(chartRoom / width));
+  const viewportDays = viewportDaysAt(dayWidth);
   const visibleDays = Math.min(totalDays - offsetDays, viewportDays);
   const chartWidth = visibleDays * dayWidth;
   const bodyHeight = scheduled.length * (ROW_HEIGHT + ROW_GAP);
@@ -398,7 +416,7 @@ function GanttView(): ReactElement {
   }
 
   // Show day number in header only when there's enough room
-  const showDayLabel = dayWidth >= 12;
+  const showDayLabel = dayWidth >= DAY_LABEL_MIN_WIDTH;
   // Always show the month/year of the first visible day when no month
   // boundary is in view, so users always have date context.
   const hasMonthBoundary = dayCells.some((c) => c.isMonthStart);
@@ -409,16 +427,40 @@ function GanttView(): ReactElement {
   });
   const todayX = todayOffset * dayWidth + dayWidth / 2;
 
+  const pageTo = (next: number): void => {
+    if (next === offsetDays) return;
+    setSlideDir(next < offsetDays ? 'prev' : 'next');
+    setOffsetDays(next);
+  };
   const goPrev = (): void => {
-    setOffsetDays((o) => Math.max(0, o - 7));
+    pageTo(Math.max(0, offsetDays - 7));
   };
   const goNext = (): void => {
-    setOffsetDays((o) => Math.min(Math.max(0, totalDays - visibleDays), o + 7));
+    pageTo(Math.min(Math.max(0, totalDays - visibleDays), offsetDays + 7));
   };
   const goToday = (): void => {
     const t0 = diffDays(range.start, today) - Math.floor(visibleDays / 2);
-    setOffsetDays(Math.max(0, Math.min(Math.max(0, totalDays - visibleDays), t0)));
+    pageTo(Math.max(0, Math.min(Math.max(0, totalDays - visibleDays), t0)));
   };
+
+  // Re-centre on the day that was in the middle, so zooming scales around it.
+  const zoomTo = (nextIdx: number): void => {
+    const clamped = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, nextIdx));
+    if (clamped === zoomIdx) return;
+    const nextVisible = Math.min(totalDays, viewportDaysAt(ZOOM_LEVELS[clamped] ?? dayWidth));
+    const centreDay = offsetDays + visibleDays / 2;
+    const solved = Math.round(centreDay - nextVisible / 2);
+    setSlideDir(null);
+    setZoomIdx(clamped);
+    setOffsetDays(Math.max(0, Math.min(Math.max(0, totalDays - nextVisible), solved)));
+  };
+  const slideClass =
+    slideDir === 'prev'
+      ? styles['slide--fromPrev']
+      : slideDir === 'next'
+        ? styles['slide--fromNext']
+        : undefined;
+  const layerKey = `${zoomIdx}:${offsetDays}`;
 
   const openTask = (taskId: string): void => {
     void navigate({ to: '/tasks/$taskId', params: { taskId } });
@@ -466,7 +508,7 @@ function GanttView(): ReactElement {
                   type="button"
                   variant="ghost"
                   aria-label={t('gantt.zoom_out')}
-                  onClick={zoomOut}
+                  onClick={() => zoomTo(zoomIdx - 1)}
                   disabled={zoomIdx === 0}
                 >
                   <Minus size={14} aria-hidden />
@@ -481,7 +523,7 @@ function GanttView(): ReactElement {
                 ariaLabel={t('gantt.zoom_preset_aria')}
                 size="sm"
                 value={zoomPresetFromIndex(zoomIdx) ?? null}
-                onChange={(next) => setZoomIdx(ZOOM_PRESET_INDEX[next])}
+                onChange={(next) => zoomTo(ZOOM_PRESET_INDEX[next])}
                 options={[
                   { value: 'month', label: t('gantt.zoom_month') },
                   { value: 'week', label: t('gantt.zoom_week') },
@@ -493,7 +535,7 @@ function GanttView(): ReactElement {
                   type="button"
                   variant="ghost"
                   aria-label={t('gantt.zoom_in')}
-                  onClick={zoomIn}
+                  onClick={() => zoomTo(zoomIdx + 1)}
                   disabled={zoomIdx === ZOOM_LEVELS.length - 1}
                 >
                   <Plus size={14} aria-hidden />
@@ -520,8 +562,13 @@ function GanttView(): ReactElement {
       {scheduled.length === 0 ? (
         <EmptyState titleAs="p" title={t('gantt.empty')} />
       ) : (
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll region must be keyboard-scrollable
-        <section className={styles.scroller} aria-label={t('gantt.title')} tabIndex={0}>
+        <section
+          ref={scrollerRef}
+          className={styles.scroller}
+          aria-label={t('gantt.title')}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll region must be keyboard-scrollable
+          tabIndex={0}
+        >
           <div
             className={styles.canvas}
             style={{ gridTemplateColumns: `${LABEL_WIDTH}px ${chartWidth}px` }}
@@ -530,9 +577,9 @@ function GanttView(): ReactElement {
 
             <div className={styles.timescale}>
               <svg
-                key={zoomIdx}
+                key={layerKey}
                 aria-hidden
-                className={styles.layer}
+                className={cx(styles.layer, slideClass)}
                 width={chartWidth}
                 height={HEADER_HEIGHT}
               >
@@ -543,7 +590,6 @@ function GanttView(): ReactElement {
                         x={c.x + dayWidth / 2}
                         y={HEADER_HEIGHT - 6}
                         textAnchor="middle"
-                        fontSize="12"
                         className={styles.axisText}
                       >
                         {c.date.getDate()}
@@ -556,13 +602,12 @@ function GanttView(): ReactElement {
                           x={chartWidth - 4}
                           y={14}
                           textAnchor="end"
-                          fontSize="12"
                           className={styles.axisMonth}
                         >
                           {monthFormat.format(c.date)}
                         </text>
                       ) : (
-                        <text x={c.x + 4} y={14} fontSize="12" className={styles.axisMonth}>
+                        <text x={c.x + 4} y={14} className={styles.axisMonth}>
                           {monthFormat.format(c.date)}
                         </text>
                       )
@@ -570,7 +615,7 @@ function GanttView(): ReactElement {
                   </g>
                 ))}
                 {!hasMonthBoundary ? (
-                  <text x={4} y={14} fontSize="12" className={styles.axisMonth}>
+                  <text x={4} y={14} className={styles.axisMonth}>
                     {monthFormat.format(firstDayDate)}
                   </text>
                 ) : null}
@@ -590,7 +635,6 @@ function GanttView(): ReactElement {
                         x={todayX}
                         y={HEADER_HEIGHT - 6}
                         textAnchor="middle"
-                        fontSize="12"
                         className={styles.todayText}
                       >
                         {today.getDate()}
@@ -636,10 +680,10 @@ function GanttView(): ReactElement {
             <div>
               {/* biome-ignore lint/a11y/useSemanticElements: an SVG cannot be a <fieldset>; the group labels the bar buttons it contains */}
               <svg
-                key={zoomIdx}
+                key={layerKey}
                 role="group"
                 aria-label={t('gantt.title')}
-                className={styles.layer}
+                className={cx(styles.layer, slideClass)}
                 width={chartWidth}
                 height={bodyHeight}
               >
@@ -667,28 +711,30 @@ function GanttView(): ReactElement {
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--nf-color-fg-muted)" />
                   </marker>
                 </defs>
-                {/* Day grid + weekend shading */}
-                {dayCells.map((c) => (
-                  <g key={c.date.toISOString()}>
-                    {c.isWeekend ? (
-                      <rect
-                        x={c.x}
-                        y={0}
-                        width={dayWidth}
-                        height={bodyHeight}
-                        fill="var(--nf-color-bg-sunken)"
+                {/* Day grid + weekend shading; crisp edges keep hairlines one device pixel wide. */}
+                <g shapeRendering="crispEdges">
+                  {dayCells.map((c) => (
+                    <g key={c.date.toISOString()}>
+                      {c.isWeekend ? (
+                        <rect
+                          x={c.x}
+                          y={0}
+                          width={dayWidth}
+                          height={bodyHeight}
+                          fill="var(--nf-color-bg-sunken)"
+                        />
+                      ) : null}
+                      <line
+                        x1={c.x}
+                        y1={0}
+                        x2={c.x}
+                        y2={bodyHeight}
+                        stroke="var(--nf-color-hairline)"
+                        strokeWidth={c.isMonthStart ? 2 : 1}
                       />
-                    ) : null}
-                    <line
-                      x1={c.x}
-                      y1={0}
-                      x2={c.x}
-                      y2={bodyHeight}
-                      stroke="var(--nf-color-hairline)"
-                      strokeWidth={c.isMonthStart ? 1.5 : 0.5}
-                    />
-                  </g>
-                ))}
+                    </g>
+                  ))}
+                </g>
 
                 {showTodayLine ? (
                   <line

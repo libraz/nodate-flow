@@ -210,36 +210,29 @@ describe('month-scroll day column touch target', () => {
   it('keeps the date square at the floor it was raised to', () => {
     // The square stopped being the press target when the whole column
     // became one, but it is still the mark a reader aims the press at,
-    // and shrinking it back would make the day hard to pick out.
-    for (const property of ['min-inline-size', 'block-size']) {
-      expect(
-        effectiveMobilePx(monthScrollCss, '\\.dayHead', property, scale),
-      ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
-    }
+    // and shrinking it back would make the day hard to pick out. Its
+    // height is the row's `--day-head-block-size`, which the phone block
+    // overrides.
+    expect(
+      effectiveMobilePx(monthScrollCss, '\\.dayHead', 'min-inline-size', scale),
+    ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+    expect(
+      effectiveMobilePx(monthScrollCss, '\\.weekRow', '--day-head-block-size', scale),
+    ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
   });
 
-  it('moves the bar overlay by the same amount the square grew', () => {
-    // Outside the media query: the wide-viewport pair, which sets the gap.
-    const baseHeadPx = remToPx(
-      declaration(ruleBody(monthScrollCss, '\\.dayHead'), 'block-size'),
-      '.dayHead block-size',
+  it('derives the bar overlay offset from the date square height', () => {
+    // One variable sizes the square and offsets the bars, so the phone
+    // block only has to override the variable for the bars to follow.
+    const variable = 'var(--day-head-block-size)';
+    expect(declaration(ruleBody(monthScrollCss, '\\.dayHead'), 'block-size')).toBe(variable);
+    expect(declaration(ruleBody(monthScrollCss, '\\.barOverlay'), 'inset-block-start')).toContain(
+      variable,
     );
-    const baseOverlayPx = remToPx(
-      declaration(ruleBody(monthScrollCss, '\\.barOverlay'), 'inset-block-start'),
-      '.barOverlay inset-block-start',
-    );
-    const gapPx = baseOverlayPx - baseHeadPx;
-    expect(gapPx, 'the bars would start inside the date square').toBeGreaterThan(0);
-
-    const mobileHeadPx = resolvePx(
-      declaration(ruleBody(mobile ?? '', '\\.dayHead'), 'block-size'),
-      scale,
-    );
-    const mobileOverlayPx = remToPx(
-      declaration(ruleBody(mobile ?? '', '\\.barOverlay'), 'inset-block-start'),
-      '.barOverlay inset-block-start below md',
-    );
-    expect(mobileOverlayPx).toBe(mobileHeadPx + gapPx);
+    expect(
+      findRuleBody(mobile ?? '', '\\.barOverlay'),
+      'the phone block overrides the overlay offset instead of the variable',
+    ).toBeNull();
   });
 });
 

@@ -127,7 +127,8 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--nf-color-fg-muted);
-  padding-inline: var(--nf-space-2);
+  /* Level with the date numbers: the cell's padding plus its 1px border. */
+  padding-inline: calc(var(--nf-space-2) + var(--nf-space-px));
 }
 
 .weekday--sun {

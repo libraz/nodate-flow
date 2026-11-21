@@ -1555,7 +1555,6 @@ function CalendarRoute(): ReactElement {
                         isToday && styles['cell--today'],
                         isDragOver && styles['cell--dragOver'],
                       )}
-                      title={cell.inMonth ? t('calendar.click_to_add') : undefined}
                     >
                       <div className={styles.cellHeader}>
                         <span
