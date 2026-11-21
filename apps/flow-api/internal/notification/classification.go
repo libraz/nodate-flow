@@ -225,6 +225,7 @@ var classifications = map[eventbus.Kind]classification{
 	eventbus.CalEventCreated:             silent,
 	eventbus.CalEventUpdated:             silent,
 	eventbus.CalEventDeleted:             silent,
+	eventbus.CalEventRestored:            silent,
 	eventbus.CalMemberAdded:              silent,
 	eventbus.CalMemberRemoved:            silent,
 	eventbus.CalMemberRoleChanged:        silent,

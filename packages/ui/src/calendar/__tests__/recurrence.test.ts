@@ -101,6 +101,7 @@ interface CoreRecurrenceFixture {
   rule: RecurrenceRule;
   dtstart: string;
   tz: string;
+  allDay?: boolean;
   expect: string[];
 }
 
@@ -140,6 +141,7 @@ describe('expandRecurrence — core contract fixtures', () => {
           startAt: fixture.dtstart,
           endAt: start.plus({ hours: 1 }).toISO() ?? '',
           timezone: fixture.tz,
+          allDay: fixture.allDay,
           recurrenceRule: fixture.rule,
         },
         start,

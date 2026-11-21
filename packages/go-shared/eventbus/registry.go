@@ -71,7 +71,7 @@ var declaredKinds = []Kind{
 
 	CalendarCreated, CalendarUpdated, CalendarDeleted,
 	CalendarSubscribed, CalendarSubscriptionUpdated,
-	CalEventCreated, CalEventUpdated, CalEventDeleted,
+	CalEventCreated, CalEventUpdated, CalEventDeleted, CalEventRestored,
 	CalMemberAdded, CalMemberRemoved, CalMemberRoleChanged,
 	CalMemoCreated, CalMemoUpdated, CalMemoCompleted, CalMemoDeleted,
 	CalendarReminder,
@@ -301,6 +301,7 @@ var coreKinds = map[string]KindInfo{
 	"calendar.event.created":            {FamilyCalendar, SubjectCalendarEvents},
 	"calendar.event.updated":            {FamilyCalendar, SubjectCalendarEvents},
 	"calendar.event.deleted":            {FamilyCalendar, SubjectCalendarEvents},
+	"calendar.event.restored":           {FamilyCalendar, SubjectCalendarEvents},
 	"calendar.event.comment.created":    {FamilyCalendar, SubjectCalendarEvents},
 	"calendar.event.comment.updated":    {FamilyCalendar, SubjectCalendarEvents},
 	"calendar.event.comment.deleted":    {FamilyCalendar, SubjectCalendarEvents},

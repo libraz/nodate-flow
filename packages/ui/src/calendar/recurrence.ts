@@ -7,6 +7,8 @@ interface RecurrenceEvent {
   startAt: string;
   endAt: string;
   timezone?: string | undefined;
+  /** A series of whole days expands in UTC whatever `timezone` says (PROTOCOL.md §Recurrence). */
+  allDay?: boolean | undefined;
   recurrenceRule: RecurrenceRule | null;
   recurrenceExceptions?: string[] | undefined;
   /**
@@ -288,7 +290,7 @@ export function expandRecurrence(
   // wants the reader's. The Go expander
   // (packages/go-shared/recurrence) has always read an absent zone as
   // UTC; testdata/recurrence_golden.json pins both to it.
-  const zone = Zone.resolve(event.timezone);
+  const zone = Zone.resolve(event.allDay ? 'UTC' : event.timezone);
   const eventStart = parseInZone(event.startAt, zone);
   const eventEnd = parseInZone(event.endAt, zone);
   const duration = eventEnd.diff(eventStart);

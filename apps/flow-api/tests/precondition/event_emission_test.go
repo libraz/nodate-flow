@@ -51,6 +51,10 @@ var reservedKinds = []ReservedKind{
 		Reason: "an agent's reasoning is persisted to tasks.agent_memo, which is a column write with no event beside it",
 	},
 	{
+		Name:   "CalEventRestored",
+		Reason: "flow-api deletes calendar events for good and has no restore; the kind is declared for a product that keeps deleted events restorable",
+	},
+	{
 		Name:   "CalMemoCompleted",
 		Reason: "the memo update statement sets calendar_memos.done and appends calendar.memo.updated for every field it touches",
 	},

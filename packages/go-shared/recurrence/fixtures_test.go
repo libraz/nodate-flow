@@ -19,6 +19,7 @@ type coreFixture struct {
 	Rule    json.RawMessage `json:"rule"`
 	DTStart string          `json:"dtstart"`
 	TZ      string          `json:"tz"`
+	AllDay  bool            `json:"allDay"`
 	Expect  []string        `json:"expect"`
 }
 
@@ -56,7 +57,7 @@ func TestFixturesExpandAsTheCoreContractStates(t *testing.T) {
 				t.Fatalf("ParseRule(%s) = %v, %v", fx.Rule, rule, err)
 			}
 			start := mustParseTime(t, "dtstart", fx.DTStart)
-			evt := Event{StartAt: start, EndAt: start.Add(time.Hour), Timezone: fx.TZ, Rule: rule}
+			evt := Event{StartAt: start, EndAt: start.Add(time.Hour), Timezone: fx.TZ, AllDay: fx.AllDay, Rule: rule}
 
 			bounded := rule.Count != nil || rule.Until != ""
 			n := len(fx.Expect)

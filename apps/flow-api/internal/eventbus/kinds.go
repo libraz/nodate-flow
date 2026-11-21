@@ -180,9 +180,10 @@ const (
 	CalendarUpdated = sharedbus.CalendarUpdated
 	CalendarDeleted = sharedbus.CalendarDeleted
 
-	CalEventCreated = sharedbus.CalEventCreated
-	CalEventUpdated = sharedbus.CalEventUpdated
-	CalEventDeleted = sharedbus.CalEventDeleted
+	CalEventCreated  = sharedbus.CalEventCreated
+	CalEventUpdated  = sharedbus.CalEventUpdated
+	CalEventDeleted  = sharedbus.CalEventDeleted
+	CalEventRestored = sharedbus.CalEventRestored
 
 	CalendarSubscribed          = sharedbus.CalendarSubscribed
 	CalendarSubscriptionUpdated = sharedbus.CalendarSubscriptionUpdated

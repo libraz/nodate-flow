@@ -261,9 +261,10 @@ const (
 	CalendarSubscribed          Kind = "calendar.subscribed"
 	CalendarSubscriptionUpdated Kind = "calendar.subscription.updated"
 
-	CalEventCreated Kind = "calendar.event.created"
-	CalEventUpdated Kind = "calendar.event.updated"
-	CalEventDeleted Kind = "calendar.event.deleted"
+	CalEventCreated  Kind = "calendar.event.created"
+	CalEventUpdated  Kind = "calendar.event.updated"
+	CalEventDeleted  Kind = "calendar.event.deleted"
+	CalEventRestored Kind = "calendar.event.restored"
 
 	// Calendar membership reuses the added / removed / role_changed
 	// vocabulary of workspace.member.*, so a reader of the log does not
