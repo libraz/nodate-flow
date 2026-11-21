@@ -54,7 +54,7 @@ func (s *fakeStmt) Exec(args []driver.Value) (driver.Result, error) {
 	return driver.RowsAffected(1), nil
 }
 
-func (s *fakeStmt) Query(args []driver.Value) (driver.Rows, error) {
+func (s *fakeStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	switch {
 	case strings.Contains(s.q, "-- name: FindCalendarEventRecurrenceLink"):
 		return &fakeRows{
