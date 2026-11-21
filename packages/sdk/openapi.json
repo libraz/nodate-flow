@@ -2230,9 +2230,14 @@
             "type": "string"
           },
           "endAt": {
-            "description": "End time as unix seconds (UTC); omit for a planning-stage (undated) event",
+            "description": "End time as unix seconds (UTC); omit for a planning-stage (undated) event. Not accepted with allDay.",
             "format": "int64",
             "type": "integer"
+          },
+          "endDate": {
+            "description": "Day after the last day of an all-day event (YYYY-MM-DD, exclusive); equal to startDate for a milestone. Only with allDay.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
           },
           "flexibility": {
             "description": "Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken",
@@ -2277,9 +2282,14 @@
             "type": "string"
           },
           "startAt": {
-            "description": "Start time as unix seconds (UTC); omit for a planning-stage (undated) event",
+            "description": "Start time as unix seconds (UTC); omit for a planning-stage (undated) event. Not accepted with allDay.",
             "format": "int64",
             "type": "integer"
+          },
+          "startDate": {
+            "description": "First day of an all-day event (YYYY-MM-DD). Only with allDay.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
           },
           "timezone": {
             "description": "IANA timezone",
@@ -8317,9 +8327,14 @@
             "type": ["array", "null"]
           },
           "endAt": {
-            "description": "End time as unix seconds (UTC)",
+            "description": "End time as unix seconds (UTC). Not accepted for an all-day event.",
             "format": "int64",
             "type": "integer"
+          },
+          "endDate": {
+            "description": "Day after the last day of an all-day event (YYYY-MM-DD, exclusive); equal to startDate for a milestone.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
           },
           "flexibility": {
             "description": "Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken",
@@ -8373,9 +8388,14 @@
             "type": "string"
           },
           "startAt": {
-            "description": "Start time as unix seconds (UTC)",
+            "description": "Start time as unix seconds (UTC). Not accepted for an all-day event.",
             "format": "int64",
             "type": "integer"
+          },
+          "startDate": {
+            "description": "First day of an all-day event (YYYY-MM-DD). Only for an all-day event; switching allDay needs both dates.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "type": "string"
           },
           "timezone": {
             "description": "IANA timezone",

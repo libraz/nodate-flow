@@ -6208,9 +6208,11 @@ export interface components {
             blockLabel?: string;
             /**
              * Format: int64
-             * @description End time as unix seconds (UTC); omit for a planning-stage (undated) event
+             * @description End time as unix seconds (UTC); omit for a planning-stage (undated) event. Not accepted with allDay.
              */
             endAt?: number;
+            /** @description Day after the last day of an all-day event (YYYY-MM-DD, exclusive); equal to startDate for a milestone. Only with allDay. */
+            endDate?: string;
             /**
              * @description Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken
              * @enum {string}
@@ -6246,9 +6248,11 @@ export interface components {
             showAs?: "busy" | "free" | "tentative" | "oof";
             /**
              * Format: int64
-             * @description Start time as unix seconds (UTC); omit for a planning-stage (undated) event
+             * @description Start time as unix seconds (UTC); omit for a planning-stage (undated) event. Not accepted with allDay.
              */
             startAt?: number;
+            /** @description First day of an all-day event (YYYY-MM-DD). Only with allDay. */
+            startDate?: string;
             /** @description IANA timezone */
             timezone: string;
             /** @description Event title */
@@ -8997,9 +9001,11 @@ export interface components {
             clear?: ("location" | "memo" | "url" | "blockLabel" | "recurrenceRule" | "recurrenceEnd" | "recurrenceExceptions" | "notificationOffset")[] | null;
             /**
              * Format: int64
-             * @description End time as unix seconds (UTC)
+             * @description End time as unix seconds (UTC). Not accepted for an all-day event.
              */
             endAt?: number;
+            /** @description Day after the last day of an all-day event (YYYY-MM-DD, exclusive); equal to startDate for a milestone. */
+            endDate?: string;
             /**
              * @description Whether the commitment can be moved; independent of showAs, which only says whether the time reads as taken
              * @enum {string}
@@ -9045,9 +9051,11 @@ export interface components {
             showAs?: "busy" | "free" | "tentative" | "oof";
             /**
              * Format: int64
-             * @description Start time as unix seconds (UTC)
+             * @description Start time as unix seconds (UTC). Not accepted for an all-day event.
              */
             startAt?: number;
+            /** @description First day of an all-day event (YYYY-MM-DD). Only for an all-day event; switching allDay needs both dates. */
+            startDate?: string;
             /** @description IANA timezone */
             timezone?: string;
             /** @description Event title */
