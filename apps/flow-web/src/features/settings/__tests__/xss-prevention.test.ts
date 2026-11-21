@@ -4,7 +4,6 @@
  * Bugs fixed:
  * - integrations-panel.tsx: authorizeUrl used in window.location.assign()
  *   without scheme validation (could execute javascript: URLs)
- * - totp-panel.tsx: otpauthUrl rendered in <a href> without scheme check
  */
 
 import { readFileSync } from 'node:fs';
@@ -27,24 +26,7 @@ describe('integrations-panel XSS prevention', () => {
   });
 });
 
-describe('totp-panel XSS prevention', () => {
-  const source = readFileSync(resolve(__dirname, '../totp-panel.tsx'), 'utf-8');
-
-  it('validates otpauthUrl scheme before rendering in href', () => {
-    // Must check that the URL starts with "otpauth:" before using it
-    expect(source).toContain("startsWith('otpauth:')");
-  });
-
-  it('clipboard writes go through CopyButton with a failure handler', () => {
-    // navigator.clipboard.writeText can reject if permission is denied.
-    // The panel delegates every write to CopyButton and hands it an
-    // onError that reports the failure.
-    expect(source).not.toMatch(/clipboard\.writeText/);
-    expect(source).toContain('<CopyButton');
-    expect(source).toContain('onError=');
-    expect(source).toContain('copy_failed');
-  });
-
+describe('CopyButton clipboard failure handling', () => {
   it('CopyButton catches a rejected clipboard write', () => {
     const button = readFileSync(resolve(__dirname, '../copy-button.tsx'), 'utf-8');
     expect(button).toContain('await navigator.clipboard.writeText(value)');

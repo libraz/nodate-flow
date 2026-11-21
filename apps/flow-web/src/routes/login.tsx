@@ -7,8 +7,7 @@ import { isSafeRedirect } from '@nodate-flow/sdk';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect } from 'react';
 
-const accountsUrl =
-  (import.meta.env.VITE_ACCOUNTS_WEB_URL as string | undefined) ?? 'http://localhost:5175/accounts';
+import { accountsWebUrl } from '../lib/accounts-web-url';
 
 export interface LoginSearch {
   returnTo?: string;
@@ -18,7 +17,7 @@ function LoginRedirect(): ReactElement | null {
   const { returnTo } = Route.useSearch();
   useEffect(() => {
     const redirectURL = new URL(returnTo ?? '/', window.location.origin).toString();
-    window.location.href = `${accountsUrl}/login?redirect=${encodeURIComponent(redirectURL)}`;
+    window.location.href = `${accountsWebUrl('/login')}?redirect=${encodeURIComponent(redirectURL)}`;
   }, [returnTo]);
   return null;
 }

@@ -2,10 +2,10 @@ import Icon from '@nodate-flow/ui/icon';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { useNavigate } from '@tanstack/react-router';
 import { type LucideIcon, Plus, Sparkles, Zap } from 'lucide-react';
-import { type ReactElement, useEffect, useState } from 'react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import CommandPalette from './command-palette';
+import { useCommandPaletteStore } from './command-palette-store';
 import styles from './glass-dock.module.css';
 import { paletteShortcutLabel } from './palette-shortcut';
 
@@ -21,9 +21,6 @@ interface DockAction {
   icon: LucideIcon;
   target: DockActionTarget;
 }
-
-/** Event name other components can dispatch to open the palette. */
-export const OPEN_COMMAND_PALETTE_EVENT = 'nf:open-command-palette';
 
 /**
  * Event name dispatched by the `new_task` dock button. The authenticated
@@ -82,85 +79,52 @@ function actionLabelKey(
 export default function GlassDock(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [paletteCommandMode, setPaletteCommandMode] = useState(false);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setPaletteOpen((prev) => !prev);
-      }
-    };
-    const openHandler = (): void => {
-      setPaletteOpen(true);
-    };
-    window.addEventListener('keydown', handler);
-    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
-    return () => {
-      window.removeEventListener('keydown', handler);
-      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
-    };
-  }, []);
-
-  const handleClose = (): void => {
-    setPaletteOpen(false);
-    setPaletteCommandMode(false);
-  };
+  const openPalette = useCommandPaletteStore((state) => state.openPalette);
 
   return (
-    <>
-      <div className={styles.dock} role="toolbar" aria-label={t('dock.quick_actions')}>
-        {ACTIONS.map((action) => {
-          const label = t(actionLabelKey(action.key));
-          const hintKey = actionHintKey(action.key);
-          const tip =
-            hintKey === null ? (
-              label
-            ) : (
-              <span className={styles.tip}>
-                <span className={styles.tipLabel}>{label}</span>
-                <span className={styles.tipHint}>{t(hintKey)}</span>
-              </span>
-            );
-          const handleClick = (): void => {
-            if (action.target.kind === 'palette_command') {
-              setPaletteCommandMode(true);
-              setPaletteOpen(true);
-              return;
-            }
-            if (action.target.kind === 'palette') {
-              setPaletteCommandMode(false);
-              setPaletteOpen(true);
-              return;
-            }
-            if (action.target.kind === 'event') {
-              window.dispatchEvent(new CustomEvent(action.target.name));
-              return;
-            }
-            void navigate({ to: action.target.href });
-          };
-          return (
-            <Tooltip key={action.key} content={tip}>
-              <button
-                type="button"
-                className={`${styles.button} nf-focus-ring`}
-                aria-label={label}
-                onClick={handleClick}
-              >
-                <Icon icon={action.icon} decorative />
-              </button>
-            </Tooltip>
+    <div className={styles.dock} role="toolbar" aria-label={t('dock.quick_actions')}>
+      {ACTIONS.map((action) => {
+        const label = t(actionLabelKey(action.key));
+        const hintKey = actionHintKey(action.key);
+        const tip =
+          hintKey === null ? (
+            label
+          ) : (
+            <span className={styles.tip}>
+              <span className={styles.tipLabel}>{label}</span>
+              <span className={styles.tipHint}>{t(hintKey)}</span>
+            </span>
           );
-        })}
-        <span className={styles.divider} aria-hidden="true" />
-        <kbd className={styles.shortcut}>{paletteShortcutLabel()}</kbd>
-      </div>
-      <CommandPalette
-        open={paletteOpen}
-        onClose={handleClose}
-        initialCommandMode={paletteCommandMode}
-      />
-    </>
+        const handleClick = (): void => {
+          if (action.target.kind === 'palette_command') {
+            openPalette({ commandMode: true });
+            return;
+          }
+          if (action.target.kind === 'palette') {
+            openPalette();
+            return;
+          }
+          if (action.target.kind === 'event') {
+            window.dispatchEvent(new CustomEvent(action.target.name));
+            return;
+          }
+          void navigate({ to: action.target.href });
+        };
+        return (
+          <Tooltip key={action.key} content={tip}>
+            <button
+              type="button"
+              className={`${styles.button} nf-focus-ring`}
+              aria-label={label}
+              onClick={handleClick}
+            >
+              <Icon icon={action.icon} decorative />
+            </button>
+          </Tooltip>
+        );
+      })}
+      <span className={styles.divider} aria-hidden="true" />
+      <kbd className={styles.shortcut}>{paletteShortcutLabel()}</kbd>
+    </div>
   );
 }

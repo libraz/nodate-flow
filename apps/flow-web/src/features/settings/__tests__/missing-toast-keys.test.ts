@@ -27,11 +27,6 @@ const REQUIRED: ReadonlyArray<{ source: string; ns: string; keys: readonly strin
     ns: 'common',
     keys: ['workspaces.members.role_update_failed', 'workspaces.members.remove_failed'],
   },
-  {
-    source: '../totp-panel.tsx',
-    ns: 'settings',
-    keys: ['security.totp.recovery.copy_failed', 'security.totp.secret_copy_failed'],
-  },
 ];
 
 function lookup(catalog: unknown, key: string): unknown {

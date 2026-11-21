@@ -64,7 +64,7 @@ type NavRoute =
   | '/inbox'
   | '/calendar'
   | '/pages'
-  | '/settings/profile'
+  | '/settings/notifications'
   | '/workspaces'
   | '/workspaces/$id/projects'
   | '/workspaces/$id/members'
@@ -202,7 +202,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     group: 'footer',
     icon: UserCog,
     labelKey: 'nav.settings',
-    route: '/settings/profile',
+    route: '/settings/notifications',
     needsWorkspace: false,
   },
   {

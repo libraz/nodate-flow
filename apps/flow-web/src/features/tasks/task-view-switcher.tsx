@@ -19,7 +19,7 @@ function SegmentLabel({ icon: IconCmp, text }: { icon: LucideIcon; text: string 
   return (
     <span className={styles.segment}>
       <IconCmp size={14} aria-hidden="true" />
-      <span>{text}</span>
+      <span className={styles.label}>{text}</span>
     </span>
   );
 }

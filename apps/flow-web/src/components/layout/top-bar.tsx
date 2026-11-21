@@ -18,12 +18,13 @@ import { useTranslation } from 'react-i18next';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
+import { accountsWebUrl } from '../../lib/accounts-web-url';
 import { authApiRequest } from '../../lib/api';
 import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
 import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
 import { OPEN_SHORTCUTS_HELP_EVENT } from '../page-help';
-import CommandPalette from './command-palette';
+import { useCommandPaletteStore } from './command-palette-store';
 import { paletteShortcutLabel } from './palette-shortcut';
 import styles from './top-bar.module.css';
 import TopBarBreadcrumb from './top-bar-breadcrumb';
@@ -77,7 +78,7 @@ function AvatarTrigger({
 export default function TopBar(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const openPalette = useCommandPaletteStore((state) => state.openPalette);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const showCostMeter = isWorkspaceAdmin(useCurrentWorkspaceRole());
   const user = useAuth(selectUser);
@@ -113,18 +114,14 @@ export default function TopBar(): ReactElement {
       {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: deliberate ARIA menu — the ul / li role="presentation" / button role="menuitem" structure is the standard menu pattern. */}
       <ul className={styles.userMenuList} role="menu">
         <li role="presentation">
-          <button
+          <a
             role="menuitem"
-            type="button"
+            href={accountsWebUrl('/profile')}
             className={cx(styles.userMenuItem, 'nf-focus-ring-inset')}
-            onClick={() => {
-              setUserMenuOpen(false);
-              void navigate({ to: '/settings/profile' });
-            }}
           >
             <Icon icon={Settings} decorative />
-            <span>{t('topbar.user_menu.settings')}</span>
-          </button>
+            <span>{t('topbar.user_menu.account')}</span>
+          </a>
         </li>
         <li role="presentation">
           <button
@@ -174,67 +171,59 @@ export default function TopBar(): ReactElement {
   );
 
   return (
-    <>
-      <div className={styles.topBarShell}>
-        <header className={styles.topBar}>
-          <div className={styles.center}>
-            <div className={styles.breadcrumbSlot}>
-              <Suspense fallback={null}>
-                <TopBarBreadcrumb />
-              </Suspense>
-            </div>
-            <div className={styles.search}>
-              <button
-                type="button"
-                className={cx(styles.searchButton, 'nf-focus-ring')}
-                aria-label={`${t('topbar.search.placeholder')} ${paletteShortcutLabel()}`}
-                data-search-trigger
-                aria-keyshortcuts="Meta+K Control+K"
-                onClick={() => {
-                  setPaletteOpen(true);
-                }}
-              >
-                <Icon icon={Search} decorative />
-                <span className={styles.searchLabel}>{t('topbar.search.placeholder')}</span>
-                <kbd className={styles.searchButtonShortcut}>{paletteShortcutLabel()}</kbd>
-              </button>
-            </div>
+    <div className={styles.topBarShell}>
+      <header className={styles.topBar}>
+        <div className={styles.center}>
+          <div className={styles.breadcrumbSlot}>
+            <Suspense fallback={null}>
+              <TopBarBreadcrumb />
+            </Suspense>
           </div>
-          <div className={styles.right}>
-            {showCostMeter ? (
-              <div className={styles.costSlot}>
-                <AiCostMeter />
-              </div>
-            ) : null}
-            <div className={styles.inlineNotificationBell}>
-              <Suspense fallback={null}>
-                <NotificationBell />
-              </Suspense>
-            </div>
-            <Popover
-              open={userMenuOpen}
-              onOpenChange={setUserMenuOpen}
-              placement="bottom-end"
-              content={userMenuContent}
+          <div className={styles.search}>
+            <button
+              type="button"
+              className={cx(styles.searchButton, 'nf-focus-ring')}
+              aria-label={`${t('topbar.search.placeholder')} ${paletteShortcutLabel()}`}
+              data-search-trigger
+              aria-keyshortcuts="Meta+K Control+K"
+              onClick={() => {
+                openPalette();
+              }}
             >
-              <AvatarTrigger label={t('topbar.user_menu.open')} expanded={userMenuOpen}>
-                <Avatar
-                  alt={avatarLabel}
-                  initials={initials}
-                  size="md"
-                  {...(avatarUrl ? { src: avatarUrl } : {})}
-                />
-              </AvatarTrigger>
-            </Popover>
+              <Icon icon={Search} decorative />
+              <span className={styles.searchLabel}>{t('topbar.search.placeholder')}</span>
+              <kbd className={styles.searchButtonShortcut}>{paletteShortcutLabel()}</kbd>
+            </button>
           </div>
-        </header>
-      </div>
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => {
-          setPaletteOpen(false);
-        }}
-      />
-    </>
+        </div>
+        <div className={styles.right}>
+          {showCostMeter ? (
+            <div className={styles.costSlot}>
+              <AiCostMeter />
+            </div>
+          ) : null}
+          <div className={styles.inlineNotificationBell}>
+            <Suspense fallback={null}>
+              <NotificationBell />
+            </Suspense>
+          </div>
+          <Popover
+            open={userMenuOpen}
+            onOpenChange={setUserMenuOpen}
+            placement="bottom-end"
+            content={userMenuContent}
+          >
+            <AvatarTrigger label={t('topbar.user_menu.open')} expanded={userMenuOpen}>
+              <Avatar
+                alt={avatarLabel}
+                initials={initials}
+                size="md"
+                {...(avatarUrl ? { src: avatarUrl } : {})}
+              />
+            </AvatarTrigger>
+          </Popover>
+        </div>
+      </header>
+    </div>
   );
 }

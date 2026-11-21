@@ -24,10 +24,8 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, type ReactElement, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  OPEN_COMMAND_PALETTE_EVENT,
-  OPEN_CREATE_TASK_EVENT,
-} from '../components/layout/glass-dock';
+import { OPEN_COMMAND_PALETTE_EVENT } from '../components/layout/command-palette-store';
+import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import PageFrame from '../components/page-frame';
 import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';

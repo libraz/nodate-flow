@@ -13,6 +13,12 @@
   gap: var(--nf-space-8);
 }
 
+.navColumn {
+  align-self: start;
+  position: sticky;
+  inset-block-start: var(--nf-space-4);
+}
+
 .nav {
   display: flex;
   flex-direction: column;
@@ -20,6 +26,25 @@
   align-self: start;
   position: sticky;
   inset-block-start: var(--nf-space-4);
+}
+
+/* Inside .navColumn the column is the sticky element, not the nav. */
+.navStatic {
+  position: static;
+}
+
+.externalLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+}
+
+.accountHint {
+  margin: 0;
+  margin-block-start: var(--nf-space-3);
+  padding-inline: var(--nf-space-3);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
 }
 
 .group {
@@ -102,6 +127,14 @@
 
   .nav {
     position: static;
+  }
+
+  .navColumn {
+    position: static;
+  }
+
+  .accountHint {
+    display: none;
   }
 
   .group {

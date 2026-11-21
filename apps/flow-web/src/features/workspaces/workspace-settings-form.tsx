@@ -29,7 +29,7 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
-import { selectUser, useAuth } from '../auth/auth-store';
+import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
 import SaveStatus, { useSaveStatus } from '../settings/save-status';
 import ui from '../settings/settings-ui.module.css';
 import {
@@ -247,13 +247,15 @@ export default function WorkspaceSettingsForm({
   const { t } = useTranslation('settings');
   const { data: workspace } = useWorkspaceQuery(workspaceId);
   const { data: members } = useWorkspaceMembersQuery(workspaceId);
-  const currentUser = useAuth(selectUser);
   const update = useUpdateWorkspace();
   const deleteWs = useDeleteWorkspace();
   const navigate = useNavigate();
 
-  const currentMember = members.find((m) => m.userId === currentUser?.id);
-  const isOwner = currentMember?.role === 'owner';
+  const role = useCurrentWorkspaceRole();
+  const isOwner = role === 'owner';
+  // The fields stay read-only until the role is known; the note only names a settled role.
+  const canEdit = isWorkspaceAdmin(role);
+  const showReadOnlyNote = role === 'member' || role === 'guest';
 
   // The values the server holds; the form is dirty while any field differs.
   const [baseline, setBaseline] = useState<GeneralValues>(() => valuesOf(workspace));
@@ -365,6 +367,9 @@ export default function WorkspaceSettingsForm({
         className={ui.section}
         noValidate
       >
+        {showReadOnlyNote ? (
+          <p className={ui.sectionDescription}>{t('workspace.general.read_only_note')}</p>
+        ) : null}
         <FormField
           label={t('workspace.general.field.name')}
           required
@@ -373,6 +378,7 @@ export default function WorkspaceSettingsForm({
           {(control) => (
             <Input
               {...control}
+              disabled={!canEdit}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -390,6 +396,7 @@ export default function WorkspaceSettingsForm({
           {(control) => (
             <Input
               {...control}
+              disabled={!canEdit}
               value={slug}
               autoComplete="off"
               spellCheck={false}
@@ -404,6 +411,7 @@ export default function WorkspaceSettingsForm({
           {(control) => (
             <Textarea
               {...control}
+              disabled={!canEdit}
               value={description}
               rows={4}
               onChange={(e) => {
@@ -421,6 +429,7 @@ export default function WorkspaceSettingsForm({
             <Input
               {...control}
               type="url"
+              disabled={!canEdit}
               value={iconUrl}
               autoComplete="off"
               spellCheck={false}
@@ -431,17 +440,19 @@ export default function WorkspaceSettingsForm({
           )}
         </FormField>
 
-        <div className={ui.actions}>
-          <SaveStatus saved={saveStatus.saved} dirty={dirty} />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={submitting}
-            aria-busy={submitting || undefined}
-          >
-            {t('workspace.general.save')}
-          </Button>
-        </div>
+        {canEdit ? (
+          <div className={ui.actions}>
+            <SaveStatus saved={saveStatus.saved} dirty={dirty} />
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={submitting}
+              aria-busy={submitting || undefined}
+            >
+              {t('workspace.general.save')}
+            </Button>
+          </div>
+        ) : null}
       </form>
 
       {isOwner ? (

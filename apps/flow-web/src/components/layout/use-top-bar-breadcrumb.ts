@@ -70,23 +70,18 @@ function readMatchChain(matches: ReturnType<typeof useMatches>): {
       }
     }
     const routeId = typeof m.routeId === 'string' ? m.routeId : '';
-    // The project layout route — overview sits on this id itself, but
-    // the index route hosts three tab panels (overview / members /
-    // settings) switched via the `?tab=` search param. Read the search
-    // param here so the breadcrumb tail reflects the active tab rather
-    // than staying hard-wired to "Overview".
     if (routeId.endsWith('/projects/$projectId') || routeId.endsWith('/projects/$projectId/')) {
       view = 'overview';
-      const search = m.search as { tab?: string } | undefined;
-      if (search?.tab === 'members' || search?.tab === 'settings') {
-        view = search.tab;
-      }
     } else if (routeId.endsWith('/projects/$projectId/tasks')) {
       view = 'tasks';
     } else if (routeId.endsWith('/projects/$projectId/gantt')) {
       view = 'gantt';
     } else if (routeId.endsWith('/projects/$projectId/timeline')) {
       view = 'timeline';
+    } else if (routeId.endsWith('/projects/$projectId/members')) {
+      view = 'members';
+    } else if (routeId.endsWith('/projects/$projectId/settings')) {
+      view = 'settings';
     }
   }
   return { workspaceId, projectId, view, onTaskRoute };

@@ -1,6 +1,6 @@
 /**
  * /workspaces/$id/projects/$projectId — project layout. Renders a
- * horizontal sub-nav (Overview / Tasks / Gantt / Timeline) + nested
+ * horizontal sub-nav (Tasks / Gantt / Timeline / Overview / Members / Settings) + nested
  * child routes via <Outlet />. The detail view itself lives in the
  * sibling `*.index.tsx`.
  *
@@ -38,7 +38,7 @@ class ForbiddenError extends Error {
   }
 }
 
-type ProjectSubNavKey = 'overview' | 'tasks' | 'gantt' | 'timeline';
+type ProjectSubNavKey = 'overview' | 'tasks' | 'gantt' | 'timeline' | 'members' | 'settings';
 
 interface ProjectSubNavItem {
   key: ProjectSubNavKey;
@@ -46,7 +46,9 @@ interface ProjectSubNavItem {
     | '/workspaces/$id/projects/$projectId'
     | '/workspaces/$id/projects/$projectId/tasks'
     | '/workspaces/$id/projects/$projectId/gantt'
-    | '/workspaces/$id/projects/$projectId/timeline';
+    | '/workspaces/$id/projects/$projectId/timeline'
+    | '/workspaces/$id/projects/$projectId/members'
+    | '/workspaces/$id/projects/$projectId/settings';
 }
 
 const PROJECT_SUB_NAV: readonly ProjectSubNavItem[] = [
@@ -54,11 +56,19 @@ const PROJECT_SUB_NAV: readonly ProjectSubNavItem[] = [
   { key: 'gantt', to: '/workspaces/$id/projects/$projectId/gantt' },
   { key: 'timeline', to: '/workspaces/$id/projects/$projectId/timeline' },
   { key: 'overview', to: '/workspaces/$id/projects/$projectId' },
+  { key: 'members', to: '/workspaces/$id/projects/$projectId/members' },
+  { key: 'settings', to: '/workspaces/$id/projects/$projectId/settings' },
 ];
 
 function labelKeyFor(
   key: ProjectSubNavKey,
-): 'projects.nav.overview' | 'projects.nav.tasks' | 'projects.nav.gantt' | 'projects.nav.timeline' {
+):
+  | 'projects.nav.overview'
+  | 'projects.nav.tasks'
+  | 'projects.nav.gantt'
+  | 'projects.nav.timeline'
+  | 'projects.nav.members'
+  | 'projects.nav.settings' {
   switch (key) {
     case 'overview':
       return 'projects.nav.overview';
@@ -68,6 +78,10 @@ function labelKeyFor(
       return 'projects.nav.gantt';
     case 'timeline':
       return 'projects.nav.timeline';
+    case 'members':
+      return 'projects.nav.members';
+    case 'settings':
+      return 'projects.nav.settings';
   }
 }
 

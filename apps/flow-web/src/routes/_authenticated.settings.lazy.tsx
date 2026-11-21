@@ -6,26 +6,24 @@
  * The outlet is keyed on the path so each sub-page fades in on arrival.
  */
 
+import Icon from '@nodate-flow/ui/icon';
+import { cx } from '@nodate-flow/ui/lib/cx';
 import { createLazyFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { ExternalLink } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PageFrame from '../components/page-frame';
+import { accountsWebUrl } from '../lib/accounts-web-url';
 import styles from './_authenticated.settings.module.css';
 
 interface SubNavItem {
-  key: 'profile' | 'notifications' | 'security' | 'integrations';
-  to:
-    | '/settings/profile'
-    | '/settings/notifications'
-    | '/settings/security'
-    | '/settings/integrations';
+  key: 'notifications' | 'integrations';
+  to: '/settings/notifications' | '/settings/integrations';
 }
 
 const SUB_NAV: readonly SubNavItem[] = [
-  { key: 'profile', to: '/settings/profile' },
   { key: 'notifications', to: '/settings/notifications' },
-  { key: 'security', to: '/settings/security' },
   { key: 'integrations', to: '/settings/integrations' },
 ];
 
@@ -33,16 +31,10 @@ function SettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
-  const labelKeyFor = (
-    key: SubNavItem['key'],
-  ): 'nav.profile' | 'nav.notifications' | 'nav.security' | 'nav.integrations' => {
+  const labelKeyFor = (key: SubNavItem['key']): 'nav.notifications' | 'nav.integrations' => {
     switch (key) {
-      case 'profile':
-        return 'nav.profile';
       case 'notifications':
         return 'nav.notifications';
-      case 'security':
-        return 'nav.security';
       case 'integrations':
         return 'nav.integrations';
     }
@@ -51,18 +43,30 @@ function SettingsLayout(): ReactElement {
   return (
     <PageFrame>
       <section className={styles.layout}>
-        <nav aria-label={t('settings_sections_label')} className={styles.nav}>
-          {SUB_NAV.map((item) => (
-            <Link
-              key={item.key}
-              to={item.to}
-              className={styles.link}
-              activeProps={{ 'aria-current': 'page' }}
-            >
-              {t(labelKeyFor(item.key))}
-            </Link>
-          ))}
-        </nav>
+        <div className={styles.navColumn}>
+          <nav
+            aria-label={t('settings_sections_label')}
+            className={cx(styles.nav, styles.navStatic)}
+          >
+            <a href={accountsWebUrl('/profile')} className={styles.link}>
+              <span className={styles.externalLabel}>
+                {t('nav.account')}
+                <Icon icon={ExternalLink} size={12} decorative />
+              </span>
+            </a>
+            {SUB_NAV.map((item) => (
+              <Link
+                key={item.key}
+                to={item.to}
+                className={styles.link}
+                activeProps={{ 'aria-current': 'page' }}
+              >
+                {t(labelKeyFor(item.key))}
+              </Link>
+            ))}
+          </nav>
+          <p className={styles.accountHint}>{t('nav.account_hint')}</p>
+        </div>
         <div key={pathname} className={styles.outlet}>
           <Outlet />
         </div>

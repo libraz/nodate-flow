@@ -2,11 +2,13 @@ import SkipLink from '@nodate-flow/ui/a11y/skip-link';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import PageSkeleton from '@nodate-flow/ui/primitives/page-skeleton';
 import { useRouterState } from '@tanstack/react-router';
-import { type ReactElement, type ReactNode, Suspense, useState } from 'react';
+import { type ReactElement, type ReactNode, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ActiveTimeboxBar from '../../features/timeboxes/active-timebox-bar';
 import styles from './app-shell.module.css';
+import CommandPalette from './command-palette';
+import { OPEN_COMMAND_PALETTE_EVENT, useCommandPaletteStore } from './command-palette-store';
 import GlassDock from './glass-dock';
 import Sidebar from './sidebar';
 import TopBar from './top-bar';
@@ -22,6 +24,30 @@ export default function AppShell({ children }: AppShellProps): ReactElement {
   // the enter animation replays without remounting the routed subtree.
   const [enter, setEnter] = useState({ pathname, alternate: false });
   if (enter.pathname !== pathname) setEnter({ pathname, alternate: !enter.alternate });
+  const paletteOpen = useCommandPaletteStore((state) => state.open);
+  const paletteCommandMode = useCommandPaletteStore((state) => state.commandMode);
+  const closePalette = useCommandPaletteStore((state) => state.closePalette);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const { open, openPalette, closePalette: close } = useCommandPaletteStore.getState();
+        if (open) close();
+        else openPalette();
+      }
+    };
+    const openHandler = (): void => {
+      useCommandPaletteStore.getState().openPalette();
+    };
+    window.addEventListener('keydown', handler);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openHandler);
+    };
+  }, []);
+
   return (
     <div className={styles.shell}>
       <SkipLink targetId="main-content">{t('a11y.skipToContent')}</SkipLink>
@@ -53,6 +79,11 @@ export default function AppShell({ children }: AppShellProps): ReactElement {
         <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
       </main>
       <GlassDock />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={closePalette}
+        initialCommandMode={paletteCommandMode}
+      />
     </div>
   );
 }

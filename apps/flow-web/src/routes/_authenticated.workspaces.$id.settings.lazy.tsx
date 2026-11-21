@@ -17,6 +17,7 @@ import {
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../lib/use-current-workspace-role';
 import styles from './_authenticated.settings.module.css';
 
 const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
@@ -37,6 +38,10 @@ type SubNavKey =
 
 interface SubNavItem {
   key: SubNavKey;
+  /** Shown to owner / admin only (the API floor); hidden while the role is unknown. */
+  adminOnly?: true;
+  /** Hidden from guests (and while the role is unknown). */
+  nonGuest?: true;
   to:
     | '/workspaces/$id/settings/general'
     | '/workspaces/$id/settings/data'
@@ -74,34 +79,40 @@ const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { key: 'general', to: '/workspaces/$id/settings/general' },
       { key: 'data', to: '/workspaces/$id/settings/data' },
-      { key: 'public_shares', to: '/workspaces/$id/settings/public-shares' },
+      { key: 'public_shares', to: '/workspaces/$id/settings/public-shares', nonGuest: true },
     ],
   },
   {
     key: 'integrations',
     items: [
       { key: 'mcp_tokens', to: '/workspaces/$id/settings/mcp-tokens' },
-      { key: 'webhooks', to: '/workspaces/$id/settings/webhooks' },
+      { key: 'webhooks', to: '/workspaces/$id/settings/webhooks', adminOnly: true },
     ],
   },
   {
     key: 'ai',
     items: [
-      { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers' },
+      { key: 'ai_providers', to: '/workspaces/$id/settings/ai-providers', adminOnly: true },
       { key: 'ai_agents', to: '/workspaces/$id/settings/ai-agents' },
-      { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions' },
-      { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
-      { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
+      { key: 'auto_actions', to: '/workspaces/$id/settings/auto-actions', adminOnly: true },
     ],
   },
   {
     key: 'reports',
-    items: AUDIT_LOG_ENABLED
-      ? [
-          { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
-          { key: 'audit_log', to: '/workspaces/$id/settings/audit-log' },
-        ]
-      : [{ key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' }],
+    items: [
+      { key: 'ai_activity', to: '/workspaces/$id/settings/ai-activity' },
+      { key: 'ai_metrics', to: '/workspaces/$id/settings/ai/metrics' },
+      { key: 'weekly_digest', to: '/workspaces/$id/settings/weekly-digest' },
+      ...(AUDIT_LOG_ENABLED
+        ? [
+            {
+              key: 'audit_log',
+              to: '/workspaces/$id/settings/audit-log',
+              adminOnly: true,
+            } as const,
+          ]
+        : []),
+    ],
   },
 ];
 
@@ -167,11 +178,21 @@ function WorkspaceSettingsLayout(): ReactElement {
   const { t } = useTranslation('settings');
   const { id } = routeApi.useParams();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const role = useCurrentWorkspaceRole();
+  const admin = isWorkspaceAdmin(role);
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    key: group.key,
+    items: group.items.filter(
+      (item) =>
+        (item.adminOnly !== true || admin) &&
+        (item.nonGuest !== true || (role !== null && role !== 'guest')),
+    ),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <section className={styles.layout}>
       <nav aria-label={t('sections_label')} className={styles.nav}>
-        {NAV_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.key} className={styles.group}>
             <span className={styles.groupLabel}>{t(groupLabelKeyFor(group.key))}</span>
             {group.items.map((item) => (

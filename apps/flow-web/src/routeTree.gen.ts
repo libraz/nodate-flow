@@ -27,8 +27,6 @@ import { Route as AuthenticatedPagesPageIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated.projects.$projectId';
 import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated.settings.integrations';
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated.settings.notifications';
-import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated.settings.profile';
-import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated.settings.security';
 import { Route as AuthenticatedTasksTaskIdRouteImport } from './routes/_authenticated.tasks.$taskId';
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated.workspaces.index';
 import { Route as AuthenticatedWorkspacesIdRouteImport } from './routes/_authenticated.workspaces.$id';
@@ -67,6 +65,7 @@ import { Route as AuthenticatedWorkspacesIdTasksDraftsRouteImport } from './rout
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdIndexRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.index';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdGanttRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.gantt';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.members';
+import { Route as AuthenticatedWorkspacesIdProjectsProjectIdSettingsRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.settings';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.tasks';
 import { Route as AuthenticatedWorkspacesIdProjectsProjectIdTimelineRouteImport } from './routes/_authenticated.workspaces.$id.projects.$projectId.timeline';
 import { Route as AuthenticatedWorkspacesIdSettingsAiMetricsRouteImport } from './routes/_authenticated.workspaces.$id.settings.ai.metrics';
@@ -179,26 +178,6 @@ const AuthenticatedSettingsNotificationsRoute =
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated.settings.notifications.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedSettingsProfileRoute =
-  AuthenticatedSettingsProfileRouteImport.update({
-    id: '/profile',
-    path: '/profile',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.settings.profile.lazy').then(
-      (d) => d.Route,
-    ),
-  );
-const AuthenticatedSettingsSecurityRoute =
-  AuthenticatedSettingsSecurityRouteImport.update({
-    id: '/security',
-    path: '/security',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.settings.security.lazy').then(
       (d) => d.Route,
     ),
   );
@@ -513,6 +492,12 @@ const AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute =
     path: '/members',
     getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
   } as any);
+const AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute =
+  AuthenticatedWorkspacesIdProjectsProjectIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedWorkspacesIdProjectsProjectIdRoute,
+  } as any);
 const AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute =
   AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteImport.update({
     id: '/tasks',
@@ -601,8 +586,6 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren;
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute;
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute;
-  '/settings/profile': typeof AuthenticatedSettingsProfileRoute;
-  '/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
   '/embed/cal/$token': typeof EmbedCalTokenRoute;
@@ -641,6 +624,7 @@ export interface FileRoutesByFullPath {
   '/workspaces/$id/settings/': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
   '/workspaces/$id/projects/$projectId/gantt': typeof AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute;
   '/workspaces/$id/projects/$projectId/members': typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute;
+  '/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/workspaces/$id/projects/$projectId/tasks': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren;
   '/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
   '/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
@@ -664,8 +648,6 @@ export interface FileRoutesByTo {
   '/pages/$pageId': typeof AuthenticatedPagesPageIdRoute;
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute;
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute;
-  '/settings/profile': typeof AuthenticatedSettingsProfileRoute;
-  '/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
   '/embed/cal/$token': typeof EmbedCalTokenRoute;
@@ -699,6 +681,7 @@ export interface FileRoutesByTo {
   '/workspaces/$id/settings': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
   '/workspaces/$id/projects/$projectId/gantt': typeof AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute;
   '/workspaces/$id/projects/$projectId/members': typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute;
+  '/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
   '/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
   '/workspaces/$id/settings/public-shares/$shareId': typeof AuthenticatedWorkspacesIdSettingsPublicSharesShareIdRoute;
@@ -726,8 +709,6 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren;
   '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute;
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute;
-  '/_authenticated/settings/profile': typeof AuthenticatedSettingsProfileRoute;
-  '/_authenticated/settings/security': typeof AuthenticatedSettingsSecurityRoute;
   '/_authenticated/tasks/$taskId': typeof AuthenticatedTasksTaskIdRoute;
   '/_authenticated/workspaces/$id': typeof AuthenticatedWorkspacesIdRouteWithChildren;
   '/embed/cal/$token': typeof EmbedCalTokenRoute;
@@ -766,6 +747,7 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/$id/settings/': typeof AuthenticatedWorkspacesIdSettingsIndexRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/gantt': typeof AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/members': typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute;
+  '/_authenticated/workspaces/$id/projects/$projectId/settings': typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   '/_authenticated/workspaces/$id/projects/$projectId/tasks': typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren;
   '/_authenticated/workspaces/$id/projects/$projectId/timeline': typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
   '/_authenticated/workspaces/$id/settings/ai/metrics': typeof AuthenticatedWorkspacesIdSettingsAiMetricsRoute;
@@ -794,8 +776,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/settings/integrations'
     | '/settings/notifications'
-    | '/settings/profile'
-    | '/settings/security'
     | '/tasks/$taskId'
     | '/workspaces/$id'
     | '/embed/cal/$token'
@@ -834,6 +814,7 @@ export interface FileRouteTypes {
     | '/workspaces/$id/settings/'
     | '/workspaces/$id/projects/$projectId/gantt'
     | '/workspaces/$id/projects/$projectId/members'
+    | '/workspaces/$id/projects/$projectId/settings'
     | '/workspaces/$id/projects/$projectId/tasks'
     | '/workspaces/$id/projects/$projectId/timeline'
     | '/workspaces/$id/settings/ai/metrics'
@@ -857,8 +838,6 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/settings/integrations'
     | '/settings/notifications'
-    | '/settings/profile'
-    | '/settings/security'
     | '/tasks/$taskId'
     | '/workspaces/$id'
     | '/embed/cal/$token'
@@ -892,6 +871,7 @@ export interface FileRouteTypes {
     | '/workspaces/$id/settings'
     | '/workspaces/$id/projects/$projectId/gantt'
     | '/workspaces/$id/projects/$projectId/members'
+    | '/workspaces/$id/projects/$projectId/settings'
     | '/workspaces/$id/projects/$projectId/timeline'
     | '/workspaces/$id/settings/ai/metrics'
     | '/workspaces/$id/settings/public-shares/$shareId'
@@ -918,8 +898,6 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/integrations'
     | '/_authenticated/settings/notifications'
-    | '/_authenticated/settings/profile'
-    | '/_authenticated/settings/security'
     | '/_authenticated/tasks/$taskId'
     | '/_authenticated/workspaces/$id'
     | '/embed/cal/$token'
@@ -958,6 +936,7 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/$id/settings/'
     | '/_authenticated/workspaces/$id/projects/$projectId/gantt'
     | '/_authenticated/workspaces/$id/projects/$projectId/members'
+    | '/_authenticated/workspaces/$id/projects/$projectId/settings'
     | '/_authenticated/workspaces/$id/projects/$projectId/tasks'
     | '/_authenticated/workspaces/$id/projects/$projectId/timeline'
     | '/_authenticated/workspaces/$id/settings/ai/metrics'
@@ -1105,20 +1084,6 @@ declare module '@tanstack/react-router' {
       path: '/notifications';
       fullPath: '/settings/notifications';
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport;
-      parentRoute: typeof AuthenticatedSettingsRoute;
-    };
-    '/_authenticated/settings/profile': {
-      id: '/_authenticated/settings/profile';
-      path: '/profile';
-      fullPath: '/settings/profile';
-      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport;
-      parentRoute: typeof AuthenticatedSettingsRoute;
-    };
-    '/_authenticated/settings/security': {
-      id: '/_authenticated/settings/security';
-      path: '/security';
-      fullPath: '/settings/security';
-      preLoaderRoute: typeof AuthenticatedSettingsSecurityRouteImport;
       parentRoute: typeof AuthenticatedSettingsRoute;
     };
     '/_authenticated/tasks/$taskId': {
@@ -1387,6 +1352,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRouteImport;
       parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
     };
+    '/_authenticated/workspaces/$id/projects/$projectId/settings': {
+      id: '/_authenticated/workspaces/$id/projects/$projectId/settings';
+      path: '/settings';
+      fullPath: '/workspaces/$id/projects/$projectId/settings';
+      preLoaderRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRouteImport;
+      parentRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdRoute;
+    };
     '/_authenticated/workspaces/$id/projects/$projectId/tasks': {
       id: '/_authenticated/workspaces/$id/projects/$projectId/tasks';
       path: '/tasks';
@@ -1455,8 +1427,6 @@ const AuthenticatedPagesRouteWithChildren =
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsIntegrationsRoute: typeof AuthenticatedSettingsIntegrationsRoute;
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute;
-  AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute;
-  AuthenticatedSettingsSecurityRoute: typeof AuthenticatedSettingsSecurityRoute;
 }
 
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
@@ -1464,8 +1434,6 @@ const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
     AuthenticatedSettingsIntegrationsRoute,
   AuthenticatedSettingsNotificationsRoute:
     AuthenticatedSettingsNotificationsRoute,
-  AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
-  AuthenticatedSettingsSecurityRoute: AuthenticatedSettingsSecurityRoute,
 };
 
 const AuthenticatedSettingsRouteWithChildren =
@@ -1491,6 +1459,7 @@ const AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren =
 interface AuthenticatedWorkspacesIdProjectsProjectIdRouteChildren {
   AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute;
   AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute;
+  AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute;
   AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren;
   AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute;
   AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute: typeof AuthenticatedWorkspacesIdProjectsProjectIdIndexRoute;
@@ -1502,6 +1471,8 @@ const AuthenticatedWorkspacesIdProjectsProjectIdRouteChildren: AuthenticatedWork
       AuthenticatedWorkspacesIdProjectsProjectIdGanttRoute,
     AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute:
       AuthenticatedWorkspacesIdProjectsProjectIdMembersRoute,
+    AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute:
+      AuthenticatedWorkspacesIdProjectsProjectIdSettingsRoute,
     AuthenticatedWorkspacesIdProjectsProjectIdTasksRoute:
       AuthenticatedWorkspacesIdProjectsProjectIdTasksRouteWithChildren,
     AuthenticatedWorkspacesIdProjectsProjectIdTimelineRoute:

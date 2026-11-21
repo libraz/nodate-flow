@@ -110,7 +110,7 @@ export function useKeyboardShortcuts({
             return;
           case 's':
             e.preventDefault();
-            void navigate({ to: '/settings/profile' });
+            void navigate({ to: '/settings' });
             return;
         }
         return;

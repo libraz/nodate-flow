@@ -165,7 +165,7 @@ describe('sidebar on a route without a workspace id', () => {
       '/workspaces/ws-1/settings',
     );
     expect(screen.getByRole('link', { name: 'nav.settings' }).getAttribute('href')).toBe(
-      '/settings/profile',
+      '/settings/notifications',
     );
 
     const received = vi.fn();

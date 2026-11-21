@@ -9,7 +9,7 @@
  *  - <  480px (ultra):    workspace / search(icon)  / notifications / avatar
  *
  * The avatar trigger opens a dropdown menu carrying settings / notifications /
- * sign-out. Theme and language are configured from /settings/profile and are
+ * sign-out. Theme and language are configured on the accounts-web profile page and are
  * not duplicated as top-bar shortcuts.
  */
 
@@ -332,6 +332,7 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   text-align: start;
+  text-decoration: none;
   transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
