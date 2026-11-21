@@ -10,12 +10,20 @@
 }
 
 .toast {
-  position: relative;
-  overflow: clip;
   pointer-events: auto;
-  background: var(--nf-color-bg-elevated);
   color: var(--nf-color-fg);
-  border: var(--nf-space-px) solid var(--nf-color-border);
+  border: var(--nf-space-px) solid;
+  /* Tone shows as a light tint and a tinted full border; without a tone both resolve to the base tokens. */
+  background: color-mix(
+    in oklab,
+    var(--toast-tone, var(--nf-color-bg-elevated)) 10%,
+    var(--nf-color-bg-elevated)
+  );
+  border-color: color-mix(
+    in oklab,
+    var(--toast-tone, var(--nf-color-border)) 28%,
+    var(--nf-color-border)
+  );
   border-radius: var(--nf-radius-md);
   box-shadow: var(--nf-shadow-md);
   padding-inline: var(--nf-space-4);
@@ -51,14 +59,4 @@
 
 .danger {
   --toast-tone: var(--nf-color-danger);
-}
-
-/* The tone stripe is clipped by the rounded corners instead of bending a border. */
-.toast::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  inline-size: var(--nf-space-0-5);
-  background: var(--toast-tone);
 }
