@@ -137,9 +137,8 @@ func TestAvatarDedup(t *testing.T) {
 	testStorage.MustExist(t, key1)
 
 	// Second upload: same bytes -> dedup hit. The DB row should NOT
-	// change id (ref_count goes 1 -> 2 -> 1 once the previous link is
-	// dropped, ending net 1 because the previous and the new are the
-	// same row and the handler skips the dec when prev == new).
+	// change id, and ref_count goes 1 -> 2 -> 1: the new link is counted
+	// and the replaced link, which pointed at the same row, is released.
 	body2, status2 := uploadAvatar(t, tt.AccessToken, "avatar-again.png", "image/png", payload)
 	require.Equal(t, http.StatusOK, status2)
 	require.NotNil(t, body2.AvatarURL)
@@ -150,6 +149,10 @@ func TestAvatarDedup(t *testing.T) {
 		"dedup must keep the same storage_objects row")
 	require.Equal(t, 1, countAvatarStorageObjectsForUser(t, testDB, uid),
 		"dedup must keep exactly one storage_objects row for the user")
+	rc, ok := storageObjectRefCount(t, testDB, key1)
+	require.True(t, ok)
+	require.Equal(t, uint32(1), rc,
+		"re-linking the same avatar must leave ref_count at the one users row referencing it")
 	testStorage.MustExist(t, key1)
 }
 

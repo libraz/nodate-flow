@@ -93,7 +93,7 @@ type AvatarUploadOutput struct {
 //     id and clear the externally-hosted users.avatar_url so the
 //     uploaded image becomes the source of truth.
 //  5. Decrement the ref_count on the previously linked storage_objects
-//     row (if different) and GC the underlying blob if no references
+//     row (even when it is the same row) and GC the blob if no references
 //     remain. The MinIO delete runs after commit on a best-effort basis.
 //
 // External OIDC-provider avatar URLs (https://...) live on the
@@ -288,8 +288,10 @@ func AvatarUpload(deps Deps) func(context.Context, *AvatarUploadInput) (*AvatarU
 			}
 
 			// Drop the ref_count on the previously linked storage_objects
-			// row (if any) and remember its key for post-commit GC.
-			if prevProfile.AvatarStorageObjectID.Valid && uint32(prevProfile.AvatarStorageObjectID.Int32) != storageObjectID { //#nosec G115 -- column is INT UNSIGNED, fits uint32
+			// row (if any) and remember its key for post-commit GC. This
+			// holds when it is the row just re-linked: the link it held is
+			// replaced, and the new one was counted above.
+			if prevProfile.AvatarStorageObjectID.Valid {
 				prevID := uint32(prevProfile.AvatarStorageObjectID.Int32) //#nosec G115 -- as above
 				decRes, err := qtx.DecrementStorageObjectRefCount(ctx, prevID)
 				if err != nil {
