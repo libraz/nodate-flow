@@ -1,0 +1,16 @@
+/* Spacing around the divider comes from the parent stack's gap. */
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.rule {
+  flex: 1;
+  margin: 0;
+  border: none;
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}

@@ -1,0 +1,9 @@
+/* The enrollment QR keeps its box while the data URL resolves, so the code field below does not move. */
+
+.qr {
+  align-self: center;
+  /* nf-token-override: component dimension, not a spacing step; matches the 200px QR render */
+  inline-size: 12.5rem;
+  /* nf-token-override: component dimension, not a spacing step; matches the 200px QR render */
+  block-size: 12.5rem;
+}

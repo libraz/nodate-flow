@@ -1,0 +1,13 @@
+/*
+ * The slot takes the parent stack's gap as its own top padding and pulls
+ * the stack's gap back out, so the stack is exactly as tall as before when
+ * the slot is closed and the height eases from there.
+ */
+
+.slot {
+  margin-block-start: calc(var(--status-gap, var(--nf-space-5)) * -1);
+}
+
+.body {
+  padding-block-start: var(--status-gap, var(--nf-space-5));
+}

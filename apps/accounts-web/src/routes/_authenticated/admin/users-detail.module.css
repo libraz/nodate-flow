@@ -43,43 +43,7 @@
   gap: var(--nf-space-3);
 }
 
-/* Placeholder for the page title while the user loads. */
-.titleSkeleton {
-  block-size: var(--nf-space-8);
-  inline-size: 40%;
-}
-
-.dangerZone {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-  margin-block-start: var(--nf-space-4);
-  padding: var(--nf-space-4);
-  border: var(--nf-space-px) solid var(--nf-color-danger);
-  border-radius: var(--nf-radius-md);
-  background: color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg));
-}
-
-.dangerHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.dangerTitle {
-  margin: 0;
-  font-family: var(--nf-font-sans);
-  font-size: var(--nf-text-lg);
-  color: var(--nf-color-danger-fg);
-}
-
-.dangerDescription {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-}
-
-.dangerActions {
-  display: flex;
-  justify-content: flex-end;
+/* Return link above the page header. */
+.back {
+  margin-block-end: var(--nf-space-4);
 }

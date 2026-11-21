@@ -22,8 +22,10 @@
 import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
+import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import SegmentedControl, {
@@ -35,6 +37,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../../components/page-header';
+import SectionCard from '../../../components/section-card';
 import { useArrivedRows } from '../../../hooks/use-arrived-rows';
 import { apiRequest } from '../../../lib/api';
 import { refusalCode } from '../../../lib/auth-errors';
@@ -244,14 +248,11 @@ export function SignInAllowlistPage(): ReactElement {
   ];
 
   const renderKind = (entryKind: EntryKind): ReactElement => (
-    <span
-      className={`aw-badge ${entryKind === 'domain' ? styles.kindDomain : styles.kindEmail}`}
-      data-kind={entryKind}
-    >
+    <Badge tone={entryKind === 'domain' ? 'accent' : 'info'} data-kind={entryKind}>
       {entryKind === 'domain'
         ? t('signin_allowlist.kind_domain')
         : t('signin_allowlist.kind_email')}
-    </span>
+    </Badge>
   );
 
   const renderValue = (entry: AllowlistEntry): string =>
@@ -276,9 +277,7 @@ export function SignInAllowlistPage(): ReactElement {
           {withdrawnRows ? (
             <>
               {' '}
-              <span className={`aw-badge ${styles.statusWithdrawn}`}>
-                {t('signin_allowlist.status_withdrawn')}
-              </span>
+              <Badge>{t('signin_allowlist.status_withdrawn')}</Badge>
             </>
           ) : null}
         </td>
@@ -334,94 +333,79 @@ export function SignInAllowlistPage(): ReactElement {
   );
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <header className="aw-stack aw-stack-2">
-        <h1 className="aw-page-title">{t('signin_allowlist.title')}</h1>
-        <p className="aw-flush aw-muted aw-text-sm">{t('signin_allowlist.description')}</p>
-      </header>
+    <>
+      <PageHeader
+        title={t('signin_allowlist.title')}
+        description={t('signin_allowlist.description')}
+      />
+      <div className="aw-stack aw-stack-6">
+        <aside className={styles.notice}>
+          <p className={styles.noticeTitle}>{t('signin_allowlist.env_notice_title')}</p>
+          <p className={styles.noticeBody}>{t('signin_allowlist.env_notice')}</p>
+        </aside>
 
-      <aside className={styles.notice}>
-        <p className={styles.noticeTitle}>{t('signin_allowlist.env_notice_title')}</p>
-        <p className={styles.noticeBody}>{t('signin_allowlist.env_notice')}</p>
-      </aside>
+        {error ? (
+          <p role="alert" className="aw-error">
+            {error}
+          </p>
+        ) : null}
 
-      {error ? (
-        <p role="alert" className="aw-error">
-          {error}
-        </p>
-      ) : null}
-
-      {loading ? (
-        <div className="aw-table-skeleton" aria-busy="true">
-          <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
-        </div>
-      ) : (
-        <>
-          <section className={styles.section} aria-labelledby="allowlist-active-heading">
-            <div className={styles.sectionHead}>
-              <h2 id="allowlist-active-heading" className="aw-section-title">
-                {t('signin_allowlist.active_title')}
-              </h2>
-              <p className="aw-flush aw-muted aw-text-xs">{t('signin_allowlist.kind_legend')}</p>
-            </div>
-            {activePresence.entries.length === 0 ? (
-              <aside className={`${styles.notice} ${styles.noticeOpen}`}>
-                <p className={styles.noticeTitle}>{t('signin_allowlist.open_title')}</p>
-                <p className={styles.noticeBody}>{t('signin_allowlist.open_body')}</p>
-              </aside>
-            ) : (
-              renderTable(activePresence, false)
-            )}
-          </section>
-
-          {withdrawnPresence.entries.length > 0 ? (
-            <section className={styles.section} aria-labelledby="allowlist-withdrawn-heading">
-              <div className={styles.sectionHead}>
-                <h2 id="allowlist-withdrawn-heading" className="aw-section-title">
-                  {t('signin_allowlist.withdrawn_title')}
-                </h2>
-                <p className="aw-flush aw-muted aw-text-xs">
-                  {t('signin_allowlist.withdrawn_description')}
-                </p>
-              </div>
-              {renderTable(withdrawnPresence, true)}
-            </section>
-          ) : null}
-
-          {total > entries.length ? (
-            <p className="aw-flush aw-muted aw-text-sm">
-              {t('signin_allowlist.truncated', { shown: entries.length, total })}
-            </p>
-          ) : null}
-        </>
-      )}
-
-      <section className={styles.panel} aria-labelledby="allowlist-add-heading">
-        <h2 id="allowlist-add-heading" className="aw-section-title">
-          {t('signin_allowlist.add_title')}
-        </h2>
-        <form className={styles.form} onSubmit={(e) => void handleAdd(e)}>
-          <div className={styles.field}>
-            {/*
-             * Not a `<label htmlFor>`: the control below is a radiogroup, and
-             * a radiogroup is not a labelable element. The group carries the
-             * same string as its own accessible name instead.
-             */}
-            <span className={styles.label} aria-hidden="true">
-              {t('signin_allowlist.add_kind_label')}
-            </span>
-            <SegmentedControl<EntryKind>
-              size="sm"
-              value={kind}
-              onChange={setKind}
-              options={kindOptions}
-              ariaLabel={t('signin_allowlist.add_kind_label')}
-            />
+        {loading ? (
+          <div className="aw-table-skeleton" aria-busy="true">
+            <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
           </div>
-          <div className={`${styles.field} ${styles.fieldGrow}`}>
+        ) : (
+          <>
+            <SectionCard
+              title={t('signin_allowlist.active_title')}
+              description={t('signin_allowlist.kind_legend')}
+            >
+              {activePresence.entries.length === 0 ? (
+                <aside className={`${styles.notice} ${styles.noticeOpen}`}>
+                  <p className={styles.noticeTitle}>{t('signin_allowlist.open_title')}</p>
+                  <p className={styles.noticeBody}>{t('signin_allowlist.open_body')}</p>
+                </aside>
+              ) : (
+                renderTable(activePresence, false)
+              )}
+            </SectionCard>
+
+            {withdrawnPresence.entries.length > 0 ? (
+              <SectionCard
+                title={t('signin_allowlist.withdrawn_title')}
+                description={t('signin_allowlist.withdrawn_description')}
+              >
+                {renderTable(withdrawnPresence, true)}
+              </SectionCard>
+            ) : null}
+
+            {total > entries.length ? (
+              <p className="aw-flush aw-muted aw-text-sm">
+                {t('signin_allowlist.truncated', { shown: entries.length, total })}
+              </p>
+            ) : null}
+          </>
+        )}
+
+        <SectionCard title={t('signin_allowlist.add_title')}>
+          <form className={styles.form} onSubmit={(e) => void handleAdd(e)}>
+            {/*
+             * The group is named by `ariaLabel`: a radiogroup is not a
+             * labelable element, so the field's <label> cannot point at it.
+             */}
+            <FormField label={t('signin_allowlist.add_kind_label')}>
+              {() => (
+                <SegmentedControl<EntryKind>
+                  value={kind}
+                  onChange={setKind}
+                  options={kindOptions}
+                  ariaLabel={t('signin_allowlist.add_kind_label')}
+                />
+              )}
+            </FormField>
             {/*
              * The label names the value, not the kind. A field called
              * "Domain" would carry the accessible name of the segment that
@@ -429,54 +413,59 @@ export function SignInAllowlistPage(): ReactElement {
              * leaving two controls a screen reader cannot tell apart, one of
              * which decides what the other means.
              */}
-            <label className={styles.label} htmlFor="allowlist-value">
-              {kind === 'domain'
-                ? t('signin_allowlist.add_domain_label')
-                : t('signin_allowlist.add_email_label')}
-            </label>
-            <Input
-              id="allowlist-value"
-              autoComplete="off"
-              spellCheck={false}
-              dir="ltr"
-              value={value}
-              placeholder={
+            <FormField
+              className={styles.fieldGrow}
+              label={
                 kind === 'domain'
-                  ? t('signin_allowlist.add_domain_placeholder')
-                  : t('signin_allowlist.add_email_placeholder')
+                  ? t('signin_allowlist.add_domain_label')
+                  : t('signin_allowlist.add_email_label')
               }
-              onChange={(e) => setValue(e.target.value)}
-            />
-          </div>
-          <div className={`${styles.field} ${styles.fieldGrow}`}>
-            <label className={styles.label} htmlFor="allowlist-notes">
-              {t('signin_allowlist.add_notes_label')}
-            </label>
-            <Input
-              id="allowlist-notes"
-              autoComplete="off"
-              value={notes}
-              placeholder={t('signin_allowlist.add_notes_placeholder')}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-          <Button
-            type="submit"
-            variant="primary"
-            aria-busy={addGuard.submitting || undefined}
-            disabled={addGuard.submitting || value.trim() === ''}
-          >
-            {t('signin_allowlist.add_submit')}
-          </Button>
-        </form>
-        <p className="aw-flush aw-muted aw-text-xs">{t('signin_allowlist.add_hint')}</p>
-        {addError ? (
-          <p role="alert" className="aw-error">
-            {addError}
-          </p>
-        ) : null}
-      </section>
-    </div>
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="off"
+                  spellCheck={false}
+                  dir="ltr"
+                  value={value}
+                  placeholder={
+                    kind === 'domain'
+                      ? t('signin_allowlist.add_domain_placeholder')
+                      : t('signin_allowlist.add_email_placeholder')
+                  }
+                  onChange={(e) => setValue(e.target.value)}
+                />
+              )}
+            </FormField>
+            <FormField className={styles.fieldGrow} label={t('signin_allowlist.add_notes_label')}>
+              {(control) => (
+                <Input
+                  {...control}
+                  autoComplete="off"
+                  value={notes}
+                  placeholder={t('signin_allowlist.add_notes_placeholder')}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              )}
+            </FormField>
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={addGuard.submitting || undefined}
+              disabled={addGuard.submitting || value.trim() === ''}
+            >
+              {t('signin_allowlist.add_submit')}
+            </Button>
+          </form>
+          <p className="aw-flush aw-muted aw-text-xs">{t('signin_allowlist.add_hint')}</p>
+          {addError ? (
+            <p role="alert" className="aw-error">
+              {addError}
+            </p>
+          ) : null}
+        </SectionCard>
+      </div>
+    </>
   );
 }
 

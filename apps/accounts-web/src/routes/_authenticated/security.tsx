@@ -10,7 +10,6 @@ import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
 import Button from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
-import FormField from '@nodate-flow/ui/primitives/form-field';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
@@ -20,13 +19,13 @@ import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PageHeader from '../../components/page-header';
-import SectionCard from '../../components/section-card';
+import SectionCard, { SectionActions } from '../../components/section-card';
 import {
   type ChangePasswordFormValues,
   changePasswordSchema,
 } from '../../features/auth/auth-schemas';
 import { selectUser, useAuth } from '../../features/auth/auth-store';
-import PasswordInput from '../../features/auth/password-input';
+import PasswordInput, { PasswordField } from '../../features/auth/password-input';
 import { TotpSection } from '../../features/auth/totp-section';
 import { capsOf, useCapabilities } from '../../features/auth/use-capabilities';
 import { apiRequest } from '../../lib/api';
@@ -326,7 +325,7 @@ export function SecurityPage(): ReactElement {
               noValidate
               className="aw-stack aw-stack-4"
             >
-              <FormField
+              <PasswordField
                 label={t('security.current_password')}
                 required
                 {...(errors.currentPassword?.message
@@ -344,9 +343,9 @@ export function SecurityPage(): ReactElement {
                     />
                   );
                 }}
-              </FormField>
+              </PasswordField>
 
-              <FormField
+              <PasswordField
                 label={t('security.new_password')}
                 required
                 {...(errors.newPassword?.message ? { error: t(errors.newPassword.message) } : {})}
@@ -357,19 +356,19 @@ export function SecurityPage(): ReactElement {
                     <PasswordInput {...control} {...field} ref={ref} autoComplete="new-password" />
                   );
                 }}
-              </FormField>
+              </PasswordField>
 
-              {passwordError ? (
-                <p role="alert" className="aw-error">
-                  {t(passwordError)}
-                </p>
-              ) : null}
-
-              {passwordSuccess ? (
-                <output className="aw-success">{t('security.password_changed')}</output>
-              ) : null}
-
-              <div>
+              <SectionActions
+                status={
+                  passwordError ? (
+                    <p role="alert" className="aw-error">
+                      {t(passwordError)}
+                    </p>
+                  ) : passwordSuccess ? (
+                    <output className="aw-success">{t('security.password_changed')}</output>
+                  ) : null
+                }
+              >
                 <Button
                   type="submit"
                   variant="primary"
@@ -378,7 +377,7 @@ export function SecurityPage(): ReactElement {
                 >
                   {t('security.password_change')}
                 </Button>
-              </div>
+              </SectionActions>
             </form>
           </SectionCard>
         )}

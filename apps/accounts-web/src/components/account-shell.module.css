@@ -6,7 +6,7 @@
 
 .shell {
   display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
+  grid-template-columns: 16rem minmax(0, 1fr);
   min-block-size: 100dvh;
 }
 
@@ -18,7 +18,6 @@
   gap: var(--nf-space-1);
   block-size: 100dvh;
   padding-block: var(--nf-space-4);
-  padding-inline: var(--nf-space-3);
   background: var(--nf-color-surface);
   backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
   -webkit-backdrop-filter: blur(var(--nf-surface-blur)) saturate(var(--nf-surface-saturation));
@@ -29,9 +28,9 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--nf-space-2);
+  gap: var(--nf-space-3);
   padding-block: var(--nf-space-1) var(--nf-space-5);
-  padding-inline: var(--nf-space-3);
+  padding-inline: var(--nf-space-4);
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-base);
   font-weight: var(--nf-weight-semibold);
@@ -61,10 +60,12 @@
   inline-size: 1.75rem;
 }
 
+/* The sidebar has no side padding: the brand row sets its own, and the rows below inset to match. */
 .nav {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-0-5);
+  margin-inline: var(--nf-space-1);
 }
 
 .item,
@@ -119,6 +120,7 @@
 
 .back {
   margin-block-start: auto;
+  margin-inline: var(--nf-space-1);
 }
 
 .user {
@@ -126,6 +128,7 @@
   align-items: center;
   gap: var(--nf-space-3);
   margin-block-start: var(--nf-space-2);
+  margin-inline: var(--nf-space-1);
   padding-block: var(--nf-space-3) var(--nf-space-1);
   padding-inline: var(--nf-space-3);
   border-block-start: var(--nf-space-px) solid var(--nf-color-border);
@@ -223,6 +226,7 @@
   .back {
     grid-area: back;
     margin-block-start: 0;
+    margin-inline: 0;
   }
 
   /* The top bar keeps the icon; the label stays for assistive technology. */
@@ -239,6 +243,7 @@
   .user {
     grid-area: user;
     margin-block-start: 0;
+    margin-inline: 0;
     padding: 0;
     padding-inline-start: var(--nf-space-1);
     border-block-start: none;

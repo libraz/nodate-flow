@@ -1,0 +1,12 @@
+/* The form field's flex gap is carried by the hint's own top padding, so the gap eases with the height. */
+
+.slot {
+  margin-block-start: calc(var(--nf-space-1) * -1);
+}
+
+.hint {
+  display: block;
+  padding-block-start: var(--nf-space-1);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-warning-fg);
+}

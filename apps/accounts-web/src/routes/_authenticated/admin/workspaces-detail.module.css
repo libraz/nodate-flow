@@ -1,0 +1,4 @@
+/* Return link above the page header. */
+.back {
+  margin-block-end: var(--nf-space-4);
+}

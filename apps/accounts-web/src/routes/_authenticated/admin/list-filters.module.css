@@ -1,0 +1,17 @@
+/* Search field plus a status filter above an admin list. */
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+}
+
+.search {
+  flex: 1;
+}
+
+.status {
+  flex: 0 0 auto;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 12rem;
+}

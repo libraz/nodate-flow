@@ -1,35 +1,13 @@
-/*
- * Read-only instance settings. One column, capped so the term, value and
- * helper text stay visually related at wide admin content widths.
- */
-
-.description {
-  margin: 0;
-  color: var(--nf-color-fg-muted);
-}
-
-.panel {
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 36rem;
-  margin: 0;
-  padding: var(--nf-space-4);
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-}
-
-.term {
-  font-weight: 600;
-}
+/* Read-only instance settings: the current value and its helper text. */
 
 .value {
   margin: 0;
-  margin-block-start: var(--nf-space-1);
 }
 
 .help {
   margin: 0;
-  margin-block-start: var(--nf-space-1);
   color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
 }
 
 .rowSkeleton {

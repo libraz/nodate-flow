@@ -16,9 +16,10 @@ import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
+import CollapsibleStatus from '../components/collapsible-status';
 import { type SignupFormValues, signupSchema } from '../features/auth/auth-schemas';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
-import PasswordInput from '../features/auth/password-input';
+import PasswordInput, { PasswordField } from '../features/auth/password-input';
 import { capsOf, useCapabilities } from '../features/auth/use-capabilities';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
 import OAuthButtonRow from '../features/oauth/oauth-button-row';
@@ -211,7 +212,7 @@ function SignupPage(): ReactElement | null {
           }}
         </FormField>
 
-        <FormField
+        <PasswordField
           label={t('login.password')}
           required
           {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
@@ -230,9 +231,9 @@ function SignupPage(): ReactElement | null {
               />
             );
           }}
-        </FormField>
+        </PasswordField>
 
-        <FormField
+        <PasswordField
           label={t('signup.password_confirm')}
           required
           {...(errors.newPasswordConfirm?.message
@@ -253,19 +254,21 @@ function SignupPage(): ReactElement | null {
               />
             );
           }}
-        </FormField>
+        </PasswordField>
 
-        {serverError ? (
-          <p
-            ref={alertRef}
-            role="alert"
-            tabIndex={-1}
-            className="aw-error"
-            data-testid="signup-server-error"
-          >
-            {t(serverError)}
-          </p>
-        ) : null}
+        <CollapsibleStatus value={serverError}>
+          {(key) => (
+            <p
+              ref={alertRef}
+              role="alert"
+              tabIndex={-1}
+              className="aw-error"
+              data-testid="signup-server-error"
+            >
+              {t(key)}
+            </p>
+          )}
+        </CollapsibleStatus>
 
         <Button
           type="submit"
@@ -280,7 +283,7 @@ function SignupPage(): ReactElement | null {
 
         <p className="aw-flush aw-muted aw-text-sm aw-text-center">
           {t('signup.have_account')}{' '}
-          <Link to="/login" className="aw-link">
+          <Link to="/login" className="aw-link nf-focus-ring">
             {t('signup.login_link')}
           </Link>
         </p>

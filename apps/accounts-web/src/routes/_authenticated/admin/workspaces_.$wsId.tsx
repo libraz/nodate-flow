@@ -9,7 +9,8 @@
  */
 
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
-import Button from '@nodate-flow/ui/primitives/button';
+import Badge from '@nodate-flow/ui/primitives/badge';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -20,10 +21,13 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../../components/page-header';
+import SectionCard, { SectionActions } from '../../../components/section-card';
 import { apiRequest } from '../../../lib/api';
 import { refusalCode } from '../../../lib/auth-errors';
 import { formatTimestamp } from '../../../lib/format-timestamp';
 import { useSubmitGuard } from '../../../lib/use-submit-guard';
+import styles from './workspaces-detail.module.css';
 
 interface WorkspaceDetail {
   id: string;
@@ -280,140 +284,117 @@ function WorkspaceDetailPage(): ReactElement {
     }
   };
 
+  const backLink = (
+    <Link
+      to="/admin/workspaces"
+      className={buttonClassName({ variant: 'ghost', size: 'sm', className: styles.back })}
+    >
+      {t('common.back_to_workspaces')}
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="aw-stack aw-stack-6" aria-busy="true">
-        <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
-        <Skeleton style={{ blockSize: 'var(--nf-space-8)', inlineSize: '40%' }} />
-        <div className="aw-panel aw-stack aw-stack-3">
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
+      <>
+        {backLink}
+        <PageHeader title={t('workspaces.detail')} />
+        <div className="aw-stack aw-stack-6" aria-busy="true">
+          <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+          <SectionCard>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </SectionCard>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !workspace) {
     return (
-      <div className="aw-stack aw-stack-4">
+      <>
+        {backLink}
+        <PageHeader title={t('workspaces.detail')} />
         <p role="alert" className="aw-error">
           {error ?? t('errors.generic')}
         </p>
-        <Link to="/admin/workspaces" className="aw-link aw-text-sm">
-          {t('common.back_to_workspaces')}
-        </Link>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <div>
-        <Link to="/admin/workspaces" className="aw-link aw-text-sm">
-          {t('common.back_to_workspaces')}
-        </Link>
-      </div>
+    <>
+      {backLink}
+      <PageHeader title={t('workspaces.detail')} description={workspace.name} />
+      <div className="aw-stack aw-stack-6">
+        <SectionCard>
+          <dl className="aw-dl">
+            <dt>{t('workspaces.name')}</dt>
+            <dd>{workspace.name}</dd>
 
-      <h1 className="aw-page-title">{t('workspaces.detail')}</h1>
+            <dt>{t('workspaces.slug')}</dt>
+            <dd>{workspace.slug}</dd>
 
-      <dl className="aw-panel aw-dl">
-        <dt>{t('workspaces.name')}</dt>
-        <dd>{workspace.name}</dd>
+            <dt>{t('workspaces.members')}</dt>
+            <dd>{workspace.memberCount}</dd>
 
-        <dt>{t('workspaces.slug')}</dt>
-        <dd>{workspace.slug}</dd>
+            <dt>{t('workspaces.projects')}</dt>
+            <dd>{workspace.projectCount}</dd>
 
-        <dt>{t('workspaces.members')}</dt>
-        <dd>{workspace.memberCount}</dd>
+            <dt>{t('workspaces.status')}</dt>
+            <dd>
+              <Badge tone={workspace.enabled ? 'success' : 'danger'}>
+                {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
+              </Badge>
+            </dd>
 
-        <dt>{t('workspaces.projects')}</dt>
-        <dd>{workspace.projectCount}</dd>
+            <dt>{t('workspaces.created_at')}</dt>
+            <dd>{formatTimestamp(workspace.createdAt, { locale, fallback: t('common.never') })}</dd>
+          </dl>
 
-        <dt>{t('workspaces.status')}</dt>
-        <dd>
-          <span
-            className={workspace.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'}
-          >
-            {workspace.enabled ? t('workspaces.enabled') : t('workspaces.disabled')}
-          </span>
-        </dd>
+          <SectionActions>
+            <Button
+              variant="default"
+              aria-busy={actionLoading || undefined}
+              disabled={actionLoading}
+              onClick={() => void handleToggleEnabled()}
+            >
+              {workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable')}
+            </Button>
+          </SectionActions>
+        </SectionCard>
 
-        <dt>{t('workspaces.created_at')}</dt>
-        <dd>{formatTimestamp(workspace.createdAt, { locale, fallback: t('common.never') })}</dd>
-      </dl>
-
-      <div>
-        <Button
-          variant="default"
-          aria-busy={actionLoading || undefined}
-          disabled={actionLoading}
-          onClick={() => void handleToggleEnabled()}
+        <SectionCard
+          tone="danger"
+          title={t('workspaces.danger.title')}
+          description={t('workspaces.danger.description')}
         >
-          {workspace.enabled ? t('workspaces.suspend') : t('workspaces.enable')}
-        </Button>
+          <SectionActions>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={deleteGuard.submitting}
+              onClick={() => {
+                setDeleteOpen(true);
+              }}
+            >
+              {t('workspaces.danger.delete')}
+            </Button>
+          </SectionActions>
+          <DeleteWorkspaceDialog
+            open={deleteOpen}
+            workspace={workspace}
+            pending={deleteGuard.submitting}
+            onCancel={() => {
+              if (!deleteGuard.submitting) setDeleteOpen(false);
+            }}
+            onConfirm={() => {
+              void handleDeleteConfirmed();
+            }}
+          />
+        </SectionCard>
       </div>
-
-      <section
-        aria-labelledby="workspace-danger-zone-heading"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-3)',
-          marginBlockStart: 'var(--nf-space-4)',
-          padding: 'var(--nf-space-4)',
-          border: '1px solid var(--nf-color-danger)',
-          borderRadius: 'var(--nf-radius-md)',
-          background: 'color-mix(in srgb, var(--nf-color-danger) 4%, var(--nf-color-bg))',
-        }}
-      >
-        <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-          <h2
-            id="workspace-danger-zone-heading"
-            style={{
-              margin: 0,
-              fontFamily: 'var(--nf-font-sans)',
-              fontSize: 'var(--nf-text-lg)',
-              color: 'var(--nf-color-danger-fg)',
-            }}
-          >
-            {t('workspaces.danger.title')}
-          </h2>
-          <p
-            style={{
-              margin: 0,
-              color: 'var(--nf-color-fg-muted)',
-              fontSize: 'var(--nf-text-sm)',
-            }}
-          >
-            {t('workspaces.danger.description')}
-          </p>
-        </header>
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            type="button"
-            variant="danger"
-            disabled={deleteGuard.submitting}
-            onClick={() => {
-              setDeleteOpen(true);
-            }}
-          >
-            {t('workspaces.danger.delete')}
-          </Button>
-        </div>
-        <DeleteWorkspaceDialog
-          open={deleteOpen}
-          workspace={workspace}
-          pending={deleteGuard.submitting}
-          onCancel={() => {
-            if (!deleteGuard.submitting) setDeleteOpen(false);
-          }}
-          onConfirm={() => {
-            void handleDeleteConfirmed();
-          }}
-        />
-      </section>
-    </div>
+    </>
   );
 }
 

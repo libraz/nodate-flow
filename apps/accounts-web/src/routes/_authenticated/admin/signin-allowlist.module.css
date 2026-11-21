@@ -1,10 +1,10 @@
 /**
  * Sign-in allowlist page.
  *
- * The shared `aw-*` classes carry the page shell, the tables and the
- * badges; what lives here is the part specific to this screen — the two
- * standing notices that explain what an empty list means, the per-kind
- * badge tones, and the muted treatment that keeps a withdrawn entry from
+ * The shared `aw-*` classes carry the tables; page header, section cards
+ * and badges come from the shared components. What lives here is specific
+ * to this screen — the two standing notices that explain what an empty
+ * list means, and the muted treatment that keeps a withdrawn entry from
  * reading as a live one. Every length and colour resolves to a `--nf-*`
  * token so the four themes override them without touching this file.
  */
@@ -35,34 +35,6 @@
   margin: 0;
 }
 
-.section {
-  animation: global(nf-fade-in) var(--nf-duration-base) var(--nf-ease-out);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-}
-
-.sectionHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-.kindDomain {
-  background: color-mix(in srgb, var(--nf-color-accent) 15%, transparent);
-  color: var(--nf-color-accent-fg);
-}
-
-.kindEmail {
-  background: color-mix(in srgb, var(--nf-color-info) 18%, transparent);
-  color: var(--nf-color-info-fg);
-}
-
-.statusWithdrawn {
-  background: var(--nf-color-bg-sunken);
-  color: var(--nf-color-fg-muted);
-}
-
 /*
  * A withdrawn row admits nobody. It keeps its own section, and the muted
  * foreground is the second signal so a glance at the table never reads it
@@ -84,26 +56,6 @@
   gap: var(--nf-space-3);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
 .fieldGrow {
   flex: 1;
-}
-
-.label {
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-3);
-  padding: var(--nf-space-4);
-  border: 1px solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
 }

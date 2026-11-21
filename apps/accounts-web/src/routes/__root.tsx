@@ -1,4 +1,5 @@
 import { ApiError, NetworkError } from '@nodate-flow/sdk';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { lazy, type ReactElement, Suspense, useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -14,7 +15,7 @@ function NotFound(): ReactElement {
     <main className={styles.shell}>
       <h1 className={styles.notFoundHeading}>404</h1>
       <p className={styles.subtle}>{t('not_found.description')}</p>
-      <Link to="/login" className={styles.linkButton}>
+      <Link to="/login" className={buttonClassName({ variant: 'primary' })}>
         {t('not_found.back_to_login')}
       </Link>
     </main>
@@ -69,10 +70,10 @@ export function FatalFallback({
       <p className={styles.subtle}>{t('fatal.description')}</p>
       {message ? <pre className={styles.errorBlock}>{message}</pre> : null}
       <div className={styles.actionRow}>
-        <button type="button" onClick={resetErrorBoundary} className={styles.ghostButton}>
+        <Button type="button" variant="default" onClick={resetErrorBoundary}>
           {t('fatal.retry')}
-        </button>
-        <Link to="/login" className={styles.linkButton}>
+        </Button>
+        <Link to="/login" className={buttonClassName({ variant: 'primary' })}>
           {t('fatal.back_to_login')}
         </Link>
       </div>

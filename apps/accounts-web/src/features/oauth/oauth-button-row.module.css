@@ -1,29 +1,14 @@
 /*
- * OAuthButtonRow — divider row + button stack styling.
- *
- * Replaces the inline `style={{ ... }}` blocks so layout / colour all
- * resolve through `--nf-*` design tokens. The `<hr>` rules use
- * `border-top` because logical-property fallbacks for divider lines
- * still ship as the cross-browser-safe shorthand.
+ * OAuthButtonRow — the root is transparent to layout, so the divider and
+ * the provider stack take their spacing from the page's own stack gap.
  */
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-3);
-  color: var(--nf-color-fg-muted);
-  font-size: var(--nf-text-sm);
-}
-
-.dividerRule {
-  flex: 1;
-  border: none;
-  border-top: 1px solid var(--nf-color-border);
+.row {
+  display: contents;
 }
 
 .providers {
   display: flex;
   flex-direction: column;
   gap: var(--nf-space-3);
-  margin-block-start: var(--nf-space-3);
 }

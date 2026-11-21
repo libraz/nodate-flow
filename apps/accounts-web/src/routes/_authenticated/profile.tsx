@@ -3,24 +3,17 @@
  * Authenticated-only, guarded by the _authenticated layout route.
  */
 
-import {
-  type components,
-  detectTimezone,
-  formatTimezoneLabel,
-  groupTimezonesByRegion,
-  SUPPORTED_COUNTRIES,
-} from '@nodate-flow/sdk';
+import { type components, detectTimezone } from '@nodate-flow/sdk';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
-import Button from '@nodate-flow/ui/primitives/button';
-import Card from '@nodate-flow/ui/primitives/card';
-import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import SegmentedControl, {
   type SegmentedControlOption,
 } from '@nodate-flow/ui/primitives/segmented-control';
 import { createFileRoute } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +21,7 @@ import PageHeader from '../../components/page-header';
 import SectionCard, { SectionActions } from '../../components/section-card';
 import { type ProfileFormValues, profileSchema } from '../../features/auth/auth-schemas';
 import { type AuthUser, authStore, selectUser, useAuth } from '../../features/auth/auth-store';
+import { useRegionOptions } from '../../features/auth/use-region-options';
 import { userFromMe } from '../../features/auth/user-from-me';
 import AvatarUpload from '../../features/profile/avatar-upload';
 import ThemeAppearance from '../../features/profile/theme-appearance';
@@ -60,18 +54,6 @@ type MeResponse = components['schemas']['MeBody'];
 
 /** Allowed `weekStart` values, mirrored from the SDK `MeBody` enum. */
 type WeekStart = components['schemas']['MeBody']['weekStart'];
-
-/**
- * Convert a 2-letter ISO 3166-1 alpha-2 country code into its regional
- * indicator emoji sequence (e.g. `JP` → `🇯🇵`). Returns an empty string for
- * malformed codes so callers can safely concatenate the result.
- */
-function countryFlag(code: string): string {
-  if (!/^[A-Z]{2}$/.test(code)) return '';
-  const A = 0x1f1e6;
-  const base = 'A'.charCodeAt(0);
-  return String.fromCodePoint(A + code.charCodeAt(0) - base, A + code.charCodeAt(1) - base);
-}
 
 /**
  * Resolves the count of workspaces the user belongs to so the page can
@@ -137,7 +119,7 @@ function useWorkspaceCount(user: AuthUser | null): number | undefined {
 }
 
 export function ProfilePage(): ReactElement {
-  const { t, i18n } = useTranslation('auth');
+  const { t } = useTranslation('auth');
   const user = useAuth(selectUser);
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -148,47 +130,7 @@ export function ProfilePage(): ReactElement {
   // the empty-state for users who actually have workspaces.
   const showEmptyWorkspacesCta = workspaceCount === 0;
 
-  // Flatten the IANA-region-grouped timezone list into Combobox options so
-  // users can search by region (`Asia`), city (`Tokyo`), or full id
-  // (`Asia/Tokyo`) — all match the same label substring.
-  const timezoneOptions = useMemo<ComboboxOption[]>(() => {
-    const groups = groupTimezonesByRegion();
-    const out: ComboboxOption[] = [];
-    for (const { region, zones } of groups) {
-      for (const tz of zones) {
-        out.push({
-          value: tz,
-          label: region === 'Global' ? tz : `${region} / ${formatTimezoneLabel(tz)}`,
-        });
-      }
-    }
-    return out;
-  }, []);
-
-  // Country options carry a flag emoji + localized name so users can scan
-  // visually and type either the localized name, the English fallback, or
-  // the alpha-2 code (which is appended in parentheses) to filter.
-  const countryOptions = useMemo<ComboboxOption[]>(() => {
-    let displayNames: Intl.DisplayNames | undefined;
-    try {
-      displayNames = new Intl.DisplayNames([i18n.language], { type: 'region' });
-    } catch {
-      displayNames = undefined;
-    }
-    const entries = Object.keys(SUPPORTED_COUNTRIES).map((code) => {
-      const localName = displayNames?.of(code) ?? SUPPORTED_COUNTRIES[code] ?? code;
-      const flag = countryFlag(code);
-      return {
-        value: code,
-        label: `${flag} ${localName} (${code})`,
-        sortKey: localName,
-      };
-    });
-    entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey, i18n.language));
-    const list: ComboboxOption[] = [{ value: '', label: t('profile.country_unset') }];
-    for (const e of entries) list.push({ value: e.value, label: e.label });
-    return list;
-  }, [i18n.language, t]);
+  const { timezoneOptions, countryOptions } = useRegionOptions();
 
   // The label for each segment is the language's *own* native name. Even
   // though we route the strings through `t()` so every visible token
@@ -337,44 +279,18 @@ export function ProfilePage(): ReactElement {
       />
       <div className="aw-stack aw-stack-6">
         {showEmptyWorkspacesCta ? (
-          <Card
-            data-testid="empty-workspaces-cta"
-            elevated
-            style={{
-              padding: 'var(--nf-space-5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--nf-space-3)',
-            }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                fontFamily: 'var(--nf-font-sans)',
-                fontSize: 'var(--nf-text-lg)',
-              }}
+          <div data-testid="empty-workspaces-cta">
+            <SectionCard
+              title={t('profile.empty_workspaces.title')}
+              description={t('profile.empty_workspaces.body')}
             >
-              {t('profile.empty_workspaces.title')}
-            </h2>
-            <output
-              style={{
-                margin: 0,
-                color: 'var(--nf-color-fg-muted)',
-                fontSize: 'var(--nf-text-sm)',
-              }}
-            >
-              {t('profile.empty_workspaces.body')}
-            </output>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => {
-                window.location.href = flowWebUrl('/setup');
-              }}
-            >
-              {t('profile.empty_workspaces.cta')}
-            </Button>
-          </Card>
+              <SectionActions>
+                <a href={flowWebUrl('/setup')} className={buttonClassName({ variant: 'primary' })}>
+                  {t('profile.empty_workspaces.cta')}
+                </a>
+              </SectionActions>
+            </SectionCard>
+          </div>
         ) : null}
 
         <form

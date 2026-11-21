@@ -1,93 +1,83 @@
 /**
- * PasswordInput — masked text field with a show/hide toggle and an
- * accessible CapsLock-on hint that surfaces while the field is focused.
+ * PasswordInput — masked text field with a show/hide toggle.
  *
  * Lives at the feature level (not in `packages/ui`) because the toggle
  * copy + `aria-pressed` semantics are auth-specific and only the auth
  * flows currently render password fields.
  *
- * TODO(@ui-ds): once flow-web grows password-change UI (currently the
- * second consumer trigger), lift this component into `packages/ui/`
- * and parameterise the show/hide labels via props so the design system
- * owns the focus-trap and CapsLock semantics. Tracking note from the
- * accounts-web token-cleanup sweep.
+ * CapsLock is reported to the surrounding {@link PasswordField}, which shows
+ * the hint in the form field's description slot so it is read with the field.
  */
 
+import FormField, {
+  type FormFieldControlProps,
+  type FormFieldProps,
+} from '@nodate-flow/ui/primitives/form-field';
 import Input, { type InputProps } from '@nodate-flow/ui/primitives/input';
 import {
-  type ChangeEvent,
-  type FocusEvent,
+  createContext,
   forwardRef,
   type KeyboardEvent,
   type ReactElement,
-  useCallback,
+  useContext,
   useId,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import CapsLockHint, { describedByWith } from './caps-lock-hint';
 import styles from './password-input.module.css';
 
-export interface PasswordInputProps extends Omit<InputProps, 'type'> {
-  /** Called whenever the underlying input value changes. */
-  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
-}
+type CapsReporter = (capsOn: boolean) => void;
+
+const CapsReporterContext = createContext<CapsReporter | null>(null);
 
 /**
- * PasswordInput renders a native password field plus a sibling button to
- * toggle between masked / unmasked rendering, and a polite live region
- * that announces "CapsLock is on" while the field has focus.
+ * FormField for a password input: while the input inside it has focus and
+ * CapsLock is on, a warning eases open below the control.
  */
+export function PasswordField({ children, ...rest }: FormFieldProps): ReactElement {
+  const [capsOn, setCapsOn] = useState(false);
+  const hintId = useId();
+  return (
+    <CapsReporterContext value={setCapsOn}>
+      <FormField {...rest}>
+        {(control) => (
+          <>
+            {children(withHint(control, hintId, capsOn))}
+            <CapsLockHint open={capsOn} id={hintId} />
+          </>
+        )}
+      </FormField>
+    </CapsReporterContext>
+  );
+}
+
+function withHint(
+  control: FormFieldControlProps,
+  hintId: string,
+  open: boolean,
+): FormFieldControlProps {
+  const merged = describedByWith(control['aria-describedby'], hintId, open);
+  const { 'aria-describedby': _base, ...rest } = control;
+  return merged ? { ...rest, 'aria-describedby': merged } : rest;
+}
+
+export type PasswordInputProps = Omit<InputProps, 'type'>;
+
+/** PasswordInput renders a native password field plus a sibling show/hide toggle. */
 const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  (
-    { onChange, onFocus, onBlur, onKeyDown, 'aria-describedby': describedBy, ...rest },
-    ref,
-  ): ReactElement => {
+  ({ onBlur, onKeyDown, ...rest }, ref): ReactElement => {
     const { t } = useTranslation('auth');
     const [revealed, setRevealed] = useState(false);
-    const [capsOn, setCapsOn] = useState(false);
-    const [focused, setFocused] = useState(false);
-    const capsHintId = useId();
+    const reportCaps = useContext(CapsReporterContext);
 
-    const detectCaps = useCallback((event: KeyboardEvent<HTMLInputElement>): void => {
-      // `getModifierState` is the canonical way to ask the OS whether the
-      // CapsLock LED is on; the alternative (watching for shifted letters
-      // in `value`) is unreliable on non-Latin keyboard layouts.
-      setCapsOn(event.getModifierState('CapsLock'));
-    }, []);
-
-    const handleFocus = useCallback(
-      (event: FocusEvent<HTMLInputElement>): void => {
-        setFocused(true);
-        onFocus?.(event);
-      },
-      [onFocus],
-    );
-
-    const handleBlur = useCallback(
-      (event: FocusEvent<HTMLInputElement>): void => {
-        setFocused(false);
-        // Reset the hint so it does not flash back as a stale state when
-        // the field is refocused.
-        setCapsOn(false);
-        onBlur?.(event);
-      },
-      [onBlur],
-    );
-
-    const handleKeyDown = useCallback(
-      (event: KeyboardEvent<HTMLInputElement>): void => {
-        detectCaps(event);
-        onKeyDown?.(event);
-      },
-      [detectCaps, onKeyDown],
-    );
-
-    const showCapsHint = focused && capsOn;
-    const mergedDescribedBy = [describedBy, showCapsHint ? capsHintId : null]
-      .filter(Boolean)
-      .join(' ')
-      .trim();
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+      // `getModifierState` asks the OS whether CapsLock is on; watching for
+      // shifted letters in `value` is unreliable on non-Latin layouts.
+      reportCaps?.(event.getModifierState('CapsLock'));
+      onKeyDown?.(event);
+    };
 
     return (
       <span className={styles.wrapper}>
@@ -96,11 +86,12 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           ref={ref}
           type={revealed ? 'text' : 'password'}
           dir="ltr"
-          onChange={onChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
+          onBlur={(event) => {
+            // Clear the hint so it does not return stale when the field is refocused.
+            reportCaps?.(false);
+            onBlur?.(event);
+          }}
           onKeyDown={handleKeyDown}
-          {...(mergedDescribedBy ? { 'aria-describedby': mergedDescribedBy } : {})}
           className={styles.input}
         />
         <button
@@ -110,15 +101,10 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           onClick={() => {
             setRevealed((prev) => !prev);
           }}
-          className={styles.toggle}
+          className={`${styles.toggle} nf-focus-ring-inset`}
         >
           {revealed ? t('login.password_hide') : t('login.password_show')}
         </button>
-        {showCapsHint ? (
-          <output id={capsHintId} aria-live="polite" className={styles.capsHint}>
-            {t('login.caps_lock_on')}
-          </output>
-        ) : null}
       </span>
     );
   },

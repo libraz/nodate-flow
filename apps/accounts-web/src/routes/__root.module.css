@@ -17,7 +17,7 @@
   gap: var(--nf-space-4);
   padding: var(--nf-space-8);
   font-family: var(--nf-font-sans);
-  background: var(--nf-color-bg);
+  background: var(--nf-app-bg);
   color: var(--nf-color-fg);
   text-align: center;
 }
@@ -58,21 +58,4 @@
 .actionRow {
   display: flex;
   gap: var(--nf-space-3);
-}
-
-.linkButton {
-  padding: var(--nf-space-2) var(--nf-space-4);
-  border-radius: var(--nf-radius-lg);
-  background: var(--nf-color-accent);
-  color: var(--nf-color-fg-on-accent);
-  text-decoration: none;
-}
-
-.ghostButton {
-  padding: var(--nf-space-2) var(--nf-space-4);
-  border-radius: var(--nf-radius-lg);
-  border: 1px solid var(--nf-color-border);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  cursor: pointer;
 }

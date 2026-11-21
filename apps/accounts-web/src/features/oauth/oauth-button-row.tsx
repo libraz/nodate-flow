@@ -2,9 +2,7 @@
  * Shared OAuth provider button row used by both /login and /signup.
  *
  * Reads {@link useCapabilities}'s `oidc*` flags to render at most one
- * button per enabled provider. The divider above the row mirrors the
- * styling that previously lived inline in {@code login.tsx} so the
- * extracted component preserves the original visual contract.
+ * button per enabled provider, under the shared "or" divider.
  *
  * The provider list and labels are identical between modes; only the
  * post-success flow differs (login resolves `?redirect=`, signup lands
@@ -21,6 +19,7 @@
 import Button from '@nodate-flow/ui/primitives/button';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import OrDivider from '../../components/or-divider';
 import { apiRequest } from '../../lib/api';
 import { type AuthErrorI18nKey, mapAuthThrown } from '../../lib/auth-errors';
 import { capsOf, useCapabilities } from '../auth/use-capabilities';
@@ -126,15 +125,9 @@ function OAuthButtonRow({ mode, redirect, onError }: OAuthButtonRowProps): React
   // `data-mode` is a stable hook for parent CSS / E2E selectors but
   // does not influence rendering today.
   return (
-    <div data-mode={mode}>
+    <div data-mode={mode} className={styles.row}>
       {/* The divider separates the buttons from the password form above; without one it has nothing to divide. */}
-      {caps.passwordLogin && (
-        <div className={styles.divider}>
-          <hr className={styles.dividerRule} />
-          <span>{t('login.sso_divider')}</span>
-          <hr className={styles.dividerRule} />
-        </div>
-      )}
+      {caps.passwordLogin && <OrDivider>{t('login.sso_divider')}</OrDivider>}
 
       <div className={styles.providers}>
         {caps.oidcGoogle && (

@@ -6,6 +6,7 @@
 import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
@@ -77,7 +78,7 @@ function WorkspacesPage(): ReactElement {
       ) : null}
 
       {loading ? (
-        <div className="aw-stack aw-stack-2" aria-busy="true">
+        <div className="aw-stack aw-stack-3" aria-busy="true">
           <VisuallyHidden>{t('workspaces.loading')}</VisuallyHidden>
           <Skeleton className={styles.rowSkeleton} />
           <Skeleton className={styles.rowSkeleton} />
@@ -88,7 +89,11 @@ function WorkspacesPage(): ReactElement {
         <ul className="aw-list">
           {workspaces.map((ws, index) => (
             <li key={ws.id} className={motion.enter} style={stagger(index)}>
-              <Link to="/workspaces/$wsId" params={{ wsId: ws.id }} className="aw-link-row">
+              <Link
+                to="/workspaces/$wsId"
+                params={{ wsId: ws.id }}
+                className="aw-link-row nf-focus-ring"
+              >
                 <div className="aw-stack aw-stack-1">
                   <span className="aw-weight-semibold">{ws.name}</span>
                   <span className="aw-muted aw-text-xs">
@@ -103,7 +108,7 @@ function WorkspacesPage(): ReactElement {
                     ) : null}
                   </span>
                 </div>
-                <span className={styles.role}>{roleLabel(ws.role)}</span>
+                <Badge tone="accent">{roleLabel(ws.role)}</Badge>
               </Link>
             </li>
           ))}

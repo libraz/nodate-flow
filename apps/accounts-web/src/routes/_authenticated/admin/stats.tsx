@@ -9,10 +9,12 @@
  */
 
 import Button from '@nodate-flow/ui/primitives/button';
+import ErrorFallback from '@nodate-flow/ui/primitives/error-fallback';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../../components/page-header';
 import {
   useInstanceStatsQuery,
   useInvalidateInstanceStats,
@@ -67,103 +69,77 @@ function StatsPage(): ReactElement {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-6)',
-      }}
-    >
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-        <h1 style={{ margin: 0 }}>{t('page.title')}</h1>
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-sm)',
-          }}
-        >
-          {t('page.subtitle', { appName: APP_NAME })}
-        </p>
-      </header>
-
+    <>
+      <PageHeader title={t('page.title')} description={t('page.subtitle', { appName: APP_NAME })} />
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 'var(--nf-space-3)',
+          flexDirection: 'column',
+          gap: 'var(--nf-space-6)',
         }}
       >
-        <output
-          aria-live="polite"
-          data-testid="stats-last-updated"
-          style={{
-            color: 'var(--nf-color-fg-muted)',
-            fontSize: 'var(--nf-text-xs)',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {t('actions.lastUpdated', { time: formatLastUpdated(lastUpdated, locale) })}
-        </output>
-        <Button
-          type="button"
-          variant="default"
-          aria-busy={isBusy || undefined}
-          disabled={isBusy}
-          onClick={handleRefresh}
-        >
-          {t('actions.refresh')}
-        </Button>
-      </div>
-
-      {query.isError ? (
         <div
-          role="alert"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
             gap: 'var(--nf-space-3)',
-            padding: 'var(--nf-space-4)',
-            borderRadius: 'var(--nf-radius-md)',
-            border: '1px solid var(--nf-color-border)',
-            background: 'color-mix(in srgb, var(--nf-color-danger) 10%, transparent)',
-            color: 'var(--nf-color-danger-fg)',
-            fontSize: 'var(--nf-text-sm)',
           }}
         >
-          <span>{t('error.fetchFailed')}</span>
-          <Button type="button" variant="default" onClick={handleRefresh}>
-            {t('error.retry')}
+          <output
+            aria-live="polite"
+            data-testid="stats-last-updated"
+            style={{
+              color: 'var(--nf-color-fg-muted)',
+              fontSize: 'var(--nf-text-xs)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {t('actions.lastUpdated', { time: formatLastUpdated(lastUpdated, locale) })}
+          </output>
+          <Button
+            type="button"
+            variant="default"
+            aria-busy={isBusy || undefined}
+            disabled={isBusy}
+            onClick={handleRefresh}
+          >
+            {t('actions.refresh')}
           </Button>
         </div>
-      ) : null}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))',
-          gap: 'var(--nf-space-4)',
-        }}
-      >
-        <KpiCard
-          title={t('kpi.users.title')}
-          help={t('kpi.users.help')}
-          value={data?.totalUsers}
-          loading={isBusy}
-        />
-        <KpiCard
-          title={t('kpi.workspaces.title')}
-          help={t('kpi.workspaces.help')}
-          value={data?.totalWorkspaces}
-          loading={isBusy}
-        />
+        {query.isError ? (
+          <ErrorFallback
+            title={t('error.fetchFailed')}
+            action={{ label: t('error.retry'), onClick: handleRefresh }}
+          />
+        ) : null}
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))',
+            gap: 'var(--nf-space-4)',
+          }}
+        >
+          <KpiCard
+            title={t('kpi.users.title')}
+            help={t('kpi.users.help')}
+            value={data?.totalUsers}
+            loading={isBusy}
+          />
+          <KpiCard
+            title={t('kpi.workspaces.title')}
+            help={t('kpi.workspaces.help')}
+            value={data?.totalWorkspaces}
+            loading={isBusy}
+          />
+        </div>
+
+        <PlaceholderSection title={t('placeholder.title')} body={t('placeholder.body')} />
       </div>
-
-      <PlaceholderSection title={t('placeholder.title')} body={t('placeholder.body')} />
-    </div>
+    </>
   );
 }
 

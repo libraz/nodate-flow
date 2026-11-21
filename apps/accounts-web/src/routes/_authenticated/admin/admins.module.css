@@ -10,13 +10,6 @@
   flex: 1;
 }
 
-.grantLabel {
-  display: block;
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-  margin-block-end: var(--nf-space-1);
-}
-
 .optionEmail {
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-xs);

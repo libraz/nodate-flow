@@ -3,7 +3,7 @@
  *
  * These class names exist to retire the most-repeated inline `style={{ ... }}`
  * objects scattered across the routes (page roots, vertical stacks, toolbar
- * rows, badges, error/muted text, hairline dividers, native control wrappers).
+ * rows, error/muted text, hairline dividers).
  *
  * All values resolve through `--nf-*` design tokens — no literals.
  *
@@ -129,49 +129,6 @@
   margin-inline: var(--nf-space-2);
 }
 
-.aw-rule {
-  flex: 1;
-  border: none;
-  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
-}
-
-/* ── badges ───────────────────────────────────────────────────────────── */
-
-.aw-badge {
-  display: inline-block;
-  padding-block: var(--nf-space-1);
-  padding-inline: var(--nf-space-2);
-  border-radius: var(--nf-radius-pill);
-  font-size: var(--nf-text-xs);
-  font-weight: var(--nf-weight-medium);
-}
-
-.aw-badge-success {
-  background: color-mix(in srgb, var(--nf-color-success) 15%, transparent);
-  color: var(--nf-color-success-fg);
-}
-
-.aw-badge-danger {
-  background: color-mix(in srgb, var(--nf-color-danger) 15%, transparent);
-  color: var(--nf-color-danger-fg);
-}
-
-/* ── native <select> wrapper ──────────────────────────────────────────── */
-/*
- * Bare <select> needs to visually match the design-system Input. Used in
- * places where the picker has fewer than ~5 options and a full Combobox
- * would be overkill (admin status filter, theme picker).
- */
-.aw-select {
-  padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-3);
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background: var(--nf-color-bg);
-  color: var(--nf-color-fg);
-  font-size: var(--nf-text-sm);
-}
-
 /* ── data table ───────────────────────────────────────────────────────── */
 
 .aw-table {
@@ -228,12 +185,6 @@
 }
 
 /* ── description list (admin detail pages) ────────────────────────────── */
-
-.aw-panel {
-  padding: var(--nf-space-4);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-md);
-}
 
 .aw-dl {
   display: grid;
@@ -313,16 +264,7 @@
 }
 
 /* ── section heading & generic surface ────────────────────────────────── */
-/*
- * `aw-section-title` matches the `<h2>` shown above each card section
- * (security, password, sessions). Keeps font sizing consistent without
- * an explicit inline style block.
- */
-.aw-section-title {
-  margin: 0;
-  font-family: var(--nf-font-sans);
-  font-size: var(--nf-text-lg);
-}
+/* ── status text ──────────────────────────────────────────────────────── */
 
 .aw-success {
   margin: 0;
@@ -402,12 +344,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--nf-space-1) var(--nf-space-4);
-}
-
-.aw-actions {
-  display: flex;
-  gap: var(--nf-space-2);
-  flex-wrap: wrap;
 }
 
 /* ── recovery-codes print mode ────────────────────────────────────────── */

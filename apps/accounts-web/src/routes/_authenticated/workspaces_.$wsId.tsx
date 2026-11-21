@@ -3,26 +3,23 @@
  * timezone, country). Only exposes fields backed by PATCH /workspaces/{wsId}.
  */
 
-import {
-  type components,
-  detectTimezone,
-  formatTimezoneLabel,
-  groupTimezonesByRegion,
-  SUPPORTED_COUNTRIES,
-} from '@nodate-flow/sdk';
+import { type components, detectTimezone } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { useZodForm } from '@nodate-flow/ui/hooks/use-zod-form';
-import Button from '@nodate-flow/ui/primitives/button';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
+import Combobox from '@nodate-flow/ui/primitives/combobox';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
-import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
+import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import PageHeader from '../../components/page-header';
 import SectionCard, { SectionActions } from '../../components/section-card';
+import { useRegionOptions } from '../../features/auth/use-region-options';
 import { apiRequest } from '../../lib/api';
 
 import styles from './workspaces.module.css';
@@ -58,14 +55,11 @@ function WorkspaceEditPage(): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const timezoneGroups = useMemo(() => groupTimezonesByRegion(), []);
-  const countries = useMemo(
-    () => Object.entries(SUPPORTED_COUNTRIES).sort(([, a], [, b]) => a.localeCompare(b)),
-    [],
-  );
+  const { timezoneOptions, countryOptions } = useRegionOptions();
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
   } = useZodForm<FormValues>(
@@ -146,7 +140,10 @@ function WorkspaceEditPage(): ReactElement {
   };
 
   const backLink = (
-    <Link to="/workspaces" className={`aw-muted aw-text-sm ${styles.back}`}>
+    <Link
+      to="/workspaces"
+      className={buttonClassName({ variant: 'ghost', size: 'sm', className: styles.back })}
+    >
       {t('workspaces.back')}
     </Link>
   );
@@ -170,11 +167,23 @@ function WorkspaceEditPage(): ReactElement {
       <>
         {backLink}
         <PageHeader title={t('workspaces.edit_title')} />
-        <div className="aw-stack aw-stack-5" aria-busy="true">
+        <div className="aw-stack aw-stack-6" aria-busy="true">
           <VisuallyHidden>{t('workspaces.loading')}</VisuallyHidden>
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
+          <SectionCard
+            title={t('workspaces.sections.general_title')}
+            description={t('workspaces.sections.general_description')}
+          >
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </SectionCard>
+          <SectionCard
+            title={t('workspaces.sections.region_title')}
+            description={t('workspaces.sections.region_description')}
+          >
+            <Skeleton />
+            <Skeleton />
+          </SectionCard>
         </div>
       </>
     );
@@ -236,41 +245,42 @@ function WorkspaceEditPage(): ReactElement {
             label={t('profile.timezone')}
             {...(errors.timezone?.message ? { error: t(errors.timezone.message) } : {})}
           >
-            {(control) => {
-              const { ref, ...field } = register('timezone');
-              return (
-                <select {...control} {...field} ref={ref} className="aw-select">
-                  {timezoneGroups.map(({ region, zones }) => (
-                    <optgroup key={region} label={region}>
-                      {zones.map((tz) => (
-                        <option key={tz} value={tz}>
-                          {region === 'Global' ? tz : formatTimezoneLabel(tz)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              );
-            }}
+            {(control2) => (
+              <Controller
+                name="timezone"
+                control={control}
+                render={({ field }) => (
+                  <Combobox
+                    id={control2.id}
+                    options={timezoneOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    aria-label={t('profile.timezone')}
+                  />
+                )}
+              />
+            )}
           </FormField>
 
           <FormField
             label={t('profile.country')}
             {...(errors.country?.message ? { error: t(errors.country.message) } : {})}
           >
-            {(control) => {
-              const { ref, ...field } = register('country');
-              return (
-                <select {...control} {...field} ref={ref} className="aw-select">
-                  <option value="">{t('profile.country_unset')}</option>
-                  {countries.map(([code, name]) => (
-                    <option key={code} value={code}>
-                      {code} — {name}
-                    </option>
-                  ))}
-                </select>
-              );
-            }}
+            {(control2) => (
+              <Controller
+                name="country"
+                control={control}
+                render={({ field }) => (
+                  <Combobox
+                    id={control2.id}
+                    options={countryOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    aria-label={t('profile.country')}
+                  />
+                )}
+              />
+            )}
           </FormField>
         </SectionCard>
 

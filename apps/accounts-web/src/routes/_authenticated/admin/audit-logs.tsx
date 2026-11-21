@@ -10,6 +10,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import PageHeader from '../../../components/page-header';
 import TableRegion from '../../../components/table-region';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
@@ -120,106 +121,107 @@ function AuditLogsPage(): ReactElement {
   };
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <h1 className="aw-page-title">{t('audit_logs.title')}</h1>
-
-      <div className={styles.filters}>
-        <div className={styles.filter}>
-          <label htmlFor={actionFilterId} className="aw-muted aw-text-xs">
-            {t('audit_logs.filter_action')}
-          </label>
-          <Input
-            id={actionFilterId}
-            type="text"
-            placeholder={t('audit_logs.filter_action')}
-            value={actionFilter}
-            onChange={handleActionChange}
-          />
+    <>
+      <PageHeader title={t('audit_logs.title')} />
+      <div className="aw-stack aw-stack-6">
+        <div className={styles.filters}>
+          <div className={styles.filter}>
+            <label htmlFor={actionFilterId} className="aw-muted aw-text-xs">
+              {t('audit_logs.filter_action')}
+            </label>
+            <Input
+              id={actionFilterId}
+              type="text"
+              placeholder={t('audit_logs.filter_action')}
+              value={actionFilter}
+              onChange={handleActionChange}
+            />
+          </div>
+          <div className="aw-stack aw-stack-1">
+            <span className="aw-muted aw-text-xs">{t('audit_logs.filter_from')}</span>
+            <DatePicker
+              value={fromDate}
+              onChange={handleFromChange}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              prevLabel={tCommon('common.date.prev_month')}
+              nextLabel={tCommon('common.date.next_month')}
+              triggerLabel={
+                fromDate ? formatIsoDate(fromDate, locale) : tCommon('common.date.placeholder')
+              }
+            />
+          </div>
+          <div className="aw-stack aw-stack-1">
+            <span className="aw-muted aw-text-xs">{t('audit_logs.filter_to')}</span>
+            <DatePicker
+              value={toDate}
+              onChange={handleToChange}
+              weekdayLabels={weekdayLabels}
+              formatMonthYear={formatMonthYear}
+              prevLabel={tCommon('common.date.prev_month')}
+              nextLabel={tCommon('common.date.next_month')}
+              triggerLabel={
+                toDate ? formatIsoDate(toDate, locale) : tCommon('common.date.placeholder')
+              }
+              {...(fromDate ? { minDate: fromDate } : {})}
+            />
+          </div>
         </div>
-        <div className="aw-stack aw-stack-1">
-          <span className="aw-muted aw-text-xs">{t('audit_logs.filter_from')}</span>
-          <DatePicker
-            value={fromDate}
-            onChange={handleFromChange}
-            weekdayLabels={weekdayLabels}
-            formatMonthYear={formatMonthYear}
-            prevLabel={tCommon('common.date.prev_month')}
-            nextLabel={tCommon('common.date.next_month')}
-            triggerLabel={
-              fromDate ? formatIsoDate(fromDate, locale) : tCommon('common.date.placeholder')
-            }
-          />
-        </div>
-        <div className="aw-stack aw-stack-1">
-          <span className="aw-muted aw-text-xs">{t('audit_logs.filter_to')}</span>
-          <DatePicker
-            value={toDate}
-            onChange={handleToChange}
-            weekdayLabels={weekdayLabels}
-            formatMonthYear={formatMonthYear}
-            prevLabel={tCommon('common.date.prev_month')}
-            nextLabel={tCommon('common.date.next_month')}
-            triggerLabel={
-              toDate ? formatIsoDate(toDate, locale) : tCommon('common.date.placeholder')
-            }
-            {...(fromDate ? { minDate: fromDate } : {})}
-          />
-        </div>
-      </div>
 
-      {error ? (
-        <p role="alert" className="aw-error">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p role="alert" className="aw-error">
+            {error}
+          </p>
+        ) : null}
 
-      <TableRegion
-        loading={loading}
-        rowCount={entries.length}
-        loadingLabel={t('common.loading')}
-        emptyTitle={t('audit_logs.no_results')}
-      >
-        <table className="aw-table">
-          <thead>
-            <tr>
-              <th className="aw-th">{t('audit_logs.occurred_at')}</th>
-              <th className="aw-th">{t('audit_logs.action')}</th>
-              <th className="aw-th">{t('audit_logs.actor')}</th>
-              <th className="aw-th">{t('audit_logs.target')}</th>
-              <th className="aw-th">{t('audit_logs.ip_address')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td className="aw-td">{formatTimestamp(entry.occurredAt, { locale })}</td>
-                <td className="aw-td">{entry.action}</td>
-                <td className="aw-td">{entry.actorDisplayName ?? ''}</td>
-                <td className="aw-td">
-                  {entry.targetResourceType ?? ''}
-                  {entry.targetWorkspaceName ? ` (${entry.targetWorkspaceName})` : ''}
-                </td>
-                <td className="aw-td">{entry.ipAddress ?? ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableRegion>
-
-      <div className="aw-pagination">
-        <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-          {t('common.previous')}
-        </Button>
-        <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
-        <Button
-          variant="default"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
+        <TableRegion
+          loading={loading}
+          rowCount={entries.length}
+          loadingLabel={t('common.loading')}
+          emptyTitle={t('audit_logs.no_results')}
         >
-          {t('common.next')}
-        </Button>
+          <table className="aw-table">
+            <thead>
+              <tr>
+                <th className="aw-th">{t('audit_logs.occurred_at')}</th>
+                <th className="aw-th">{t('audit_logs.action')}</th>
+                <th className="aw-th">{t('audit_logs.actor')}</th>
+                <th className="aw-th">{t('audit_logs.target')}</th>
+                <th className="aw-th">{t('audit_logs.ip_address')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="aw-td">{formatTimestamp(entry.occurredAt, { locale })}</td>
+                  <td className="aw-td">{entry.action}</td>
+                  <td className="aw-td">{entry.actorDisplayName ?? ''}</td>
+                  <td className="aw-td">
+                    {entry.targetResourceType ?? ''}
+                    {entry.targetWorkspaceName ? ` (${entry.targetWorkspaceName})` : ''}
+                  </td>
+                  <td className="aw-td">{entry.ipAddress ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
+
+        <div className="aw-pagination">
+          <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            {t('common.previous')}
+          </Button>
+          <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
+          <Button
+            variant="default"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            {t('common.next')}
+          </Button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

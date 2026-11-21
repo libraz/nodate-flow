@@ -7,10 +7,13 @@ import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Button from '@nodate-flow/ui/primitives/button';
 import Combobox, { type ComboboxOption } from '@nodate-flow/ui/primitives/combobox';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
+import FormField from '@nodate-flow/ui/primitives/form-field';
 import PresenceRow from '@nodate-flow/ui/primitives/presence-row';
 import { createFileRoute } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../../components/page-header';
+import SectionCard from '../../../components/section-card';
 import TableRegion from '../../../components/table-region';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { useArrivedRows } from '../../../hooks/use-arrived-rows';
@@ -157,118 +160,117 @@ export function AdminsPage(): ReactElement {
   };
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <h1 className="aw-page-title">{t('admins.title')}</h1>
-
-      {error ? (
-        <p role="alert" className="aw-error">
-          {error}
-        </p>
-      ) : null}
-
-      <TableRegion
-        loading={loading}
-        rowCount={adminPresence.entries.length}
-        loadingLabel={t('common.loading')}
-        emptyTitle={t('admins.no_admins')}
-      >
-        <table className="aw-table">
-          <thead>
-            <tr>
-              <th className="aw-th">{t('admins.name')}</th>
-              <th className="aw-th">{t('admins.email')}</th>
-              <th className="aw-th">{t('admins.granted_at')}</th>
-              <th className="aw-th">{t('admins.granted_by')}</th>
-              <th className="aw-th" />
-            </tr>
-          </thead>
-          <tbody>
-            {adminPresence.entries.map(({ key, item: admin, present }) => (
-              <PresenceRow
-                key={key}
-                present={present}
-                arrived={isArrived(key)}
-                onExited={() => {
-                  adminPresence.onExited(key);
-                }}
-              >
-                <td className="aw-td">{admin.displayName}</td>
-                <td className="aw-td">{admin.email}</td>
-                <td className="aw-td">{formatTimestamp(admin.grantedAt, { locale })}</td>
-                <td className="aw-td">{admin.grantedByDisplayName ?? ''}</td>
-                <td className="aw-td">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    aria-busy={actionLoading || undefined}
-                    disabled={actionLoading}
-                    onClick={() => void handleRevoke(admin.userId)}
-                  >
-                    {t('admins.revoke')}
-                  </Button>
-                </td>
-              </PresenceRow>
-            ))}
-          </tbody>
-        </table>
-      </TableRegion>
-
-      <section className="aw-panel aw-stack aw-stack-2" aria-labelledby="grant-admin-heading">
-        <h2 id="grant-admin-heading" className="aw-section-title">
-          {t('admins.grant')}
-        </h2>
-        <div className={styles.grantRow}>
-          <div className={styles.grantField}>
-            <label htmlFor="grant-user-search" className={styles.grantLabel}>
-              {t('admins.grant_search_label')}
-            </label>
-            <Combobox
-              id="grant-user-search"
-              aria-label={t('admins.grant_search_label')}
-              placeholder={t('admins.grant_search_placeholder')}
-              options={userResults.map<ComboboxOption>((u) => ({
-                value: u.id,
-                label: `${u.displayName} (${u.email})`,
-              }))}
-              value={selectedUserId}
-              onChange={setSelectedUserId}
-              onSearch={searchUsers}
-              isLoading={searching}
-              loadingMessage={t('common.loading')}
-              emptyMessage={t('users.no_results')}
-              renderItem={(opt) => {
-                const user = userResults.find((u) => u.id === opt.value);
-                if (!user) return opt.label;
-                return (
-                  <div>
-                    <div>{user.displayName}</div>
-                    <div className={styles.optionEmail}>{user.email}</div>
-                  </div>
-                );
-              }}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="primary"
-            aria-busy={actionLoading || undefined}
-            disabled={actionLoading || !selectedUserId}
-            onClick={() => {
-              const picked = userResults.find((u) => u.id === selectedUserId);
-              if (picked) void handleGrant(picked);
-            }}
-          >
-            {t('admins.grant_submit')}
-          </Button>
-        </div>
-        <p className="aw-flush aw-muted aw-text-xs">{t('admins.grant_hint')}</p>
-        {grantError ? (
+    <>
+      <PageHeader title={t('admins.title')} />
+      <div className="aw-stack aw-stack-6">
+        {error ? (
           <p role="alert" className="aw-error">
-            {grantError}
+            {error}
           </p>
         ) : null}
-      </section>
-    </div>
+
+        <TableRegion
+          loading={loading}
+          rowCount={adminPresence.entries.length}
+          loadingLabel={t('common.loading')}
+          emptyTitle={t('admins.no_admins')}
+        >
+          <table className="aw-table">
+            <thead>
+              <tr>
+                <th className="aw-th">{t('admins.name')}</th>
+                <th className="aw-th">{t('admins.email')}</th>
+                <th className="aw-th">{t('admins.granted_at')}</th>
+                <th className="aw-th">{t('admins.granted_by')}</th>
+                <th className="aw-th" />
+              </tr>
+            </thead>
+            <tbody>
+              {adminPresence.entries.map(({ key, item: admin, present }) => (
+                <PresenceRow
+                  key={key}
+                  present={present}
+                  arrived={isArrived(key)}
+                  onExited={() => {
+                    adminPresence.onExited(key);
+                  }}
+                >
+                  <td className="aw-td">{admin.displayName}</td>
+                  <td className="aw-td">{admin.email}</td>
+                  <td className="aw-td">{formatTimestamp(admin.grantedAt, { locale })}</td>
+                  <td className="aw-td">{admin.grantedByDisplayName ?? ''}</td>
+                  <td className="aw-td">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      aria-busy={actionLoading || undefined}
+                      disabled={actionLoading}
+                      onClick={() => void handleRevoke(admin.userId)}
+                    >
+                      {t('admins.revoke')}
+                    </Button>
+                  </td>
+                </PresenceRow>
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
+
+        <SectionCard title={t('admins.grant')}>
+          <div className={styles.grantRow}>
+            <div className={styles.grantField}>
+              <FormField label={t('admins.grant_search_label')}>
+                {(control) => (
+                  <Combobox
+                    id={control.id}
+                    aria-label={t('admins.grant_search_label')}
+                    placeholder={t('admins.grant_search_placeholder')}
+                    options={userResults.map<ComboboxOption>((u) => ({
+                      value: u.id,
+                      label: `${u.displayName} (${u.email})`,
+                    }))}
+                    value={selectedUserId}
+                    onChange={setSelectedUserId}
+                    onSearch={searchUsers}
+                    isLoading={searching}
+                    loadingMessage={t('common.loading')}
+                    emptyMessage={t('users.no_results')}
+                    renderItem={(opt) => {
+                      const user = userResults.find((u) => u.id === opt.value);
+                      if (!user) return opt.label;
+                      return (
+                        <div>
+                          <div>{user.displayName}</div>
+                          <div className={styles.optionEmail}>{user.email}</div>
+                        </div>
+                      );
+                    }}
+                  />
+                )}
+              </FormField>
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              aria-busy={actionLoading || undefined}
+              disabled={actionLoading || !selectedUserId}
+              onClick={() => {
+                const picked = userResults.find((u) => u.id === selectedUserId);
+                if (picked) void handleGrant(picked);
+              }}
+            >
+              {t('admins.grant_submit')}
+            </Button>
+          </div>
+          <p className="aw-flush aw-muted aw-text-xs">{t('admins.grant_hint')}</p>
+          {grantError ? (
+            <p role="alert" className="aw-error">
+              {grantError}
+            </p>
+          ) : null}
+        </SectionCard>
+      </div>
+    </>
   );
 }
 

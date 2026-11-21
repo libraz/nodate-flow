@@ -4,15 +4,19 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import Input from '@nodate-flow/ui/primitives/input';
+import Select from '@nodate-flow/ui/primitives/select';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../../components/page-header';
 import TableRegion from '../../../components/table-region';
 import { apiRequest } from '../../../lib/api';
 import { formatTimestamp } from '../../../lib/format-timestamp';
+import filterStyles from './list-filters.module.css';
 
 /**
  * SDK-derived shapes; the local interfaces this replaced silently allowed
@@ -96,99 +100,103 @@ function UsersPage(): ReactElement {
   };
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <h1 className="aw-page-title">{t('users.title')}</h1>
-
-      <div className="aw-row aw-row-3">
-        <div className="aw-grow">
-          <Input
-            type="search"
-            aria-label={t('users.search')}
-            placeholder={t('users.search')}
-            value={search}
-            onChange={handleSearchChange}
-          />
+    <>
+      <PageHeader title={t('users.title')} />
+      <div className="aw-stack aw-stack-6">
+        <div className={filterStyles.filters}>
+          <div className={filterStyles.search}>
+            <Input
+              type="search"
+              aria-label={t('users.search')}
+              placeholder={t('users.search')}
+              value={search}
+              onChange={handleSearchChange}
+            />
+          </div>
+          <div className={filterStyles.status}>
+            <Select
+              value={statusFilter}
+              onChange={handleFilterChange}
+              aria-label={t('users.status')}
+            >
+              <option value="all">{t('users.all_users')}</option>
+              <option value="active">{t('users.active_only')}</option>
+              <option value="suspended">{t('users.suspended_only')}</option>
+            </Select>
+          </div>
         </div>
-        <select
-          value={statusFilter}
-          onChange={handleFilterChange}
-          aria-label={t('users.status')}
-          className="aw-select"
+
+        {error ? (
+          <p role="alert" className="aw-error">
+            {error}
+          </p>
+        ) : null}
+
+        <TableRegion
+          loading={loading}
+          rowCount={users.length}
+          loadingLabel={t('common.loading')}
+          emptyTitle={t('users.no_results')}
         >
-          <option value="all">{t('users.all_users')}</option>
-          <option value="active">{t('users.active_only')}</option>
-          <option value="suspended">{t('users.suspended_only')}</option>
-        </select>
-      </div>
-
-      {error ? (
-        <p role="alert" className="aw-error">
-          {error}
-        </p>
-      ) : null}
-
-      <TableRegion
-        loading={loading}
-        rowCount={users.length}
-        loadingLabel={t('common.loading')}
-        emptyTitle={t('users.no_results')}
-      >
-        <table className="aw-table">
-          <thead>
-            <tr>
-              <th className="aw-th">{t('users.email')}</th>
-              <th className="aw-th">{t('users.name')}</th>
-              <th className="aw-th">{t('users.status')}</th>
-              <th className="aw-th">{t('users.admin')}</th>
-              <th className="aw-th">{t('users.workspaces')}</th>
-              <th className="aw-th">{t('users.last_login')}</th>
-              <th className="aw-th">{t('users.created_at')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u, index) => (
-              <tr key={u.id} className={motion.enter} style={stagger(index)}>
-                <td className="aw-td">
-                  <Link to="/admin/users/$userId" params={{ userId: u.id }} className="aw-link">
-                    {u.email}
-                  </Link>
-                </td>
-                <td className="aw-td">{u.displayName}</td>
-                <td className="aw-td">
-                  <span
-                    className={u.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'}
-                  >
-                    {u.enabled ? t('users.enabled') : t('users.disabled')}
-                  </span>
-                </td>
-                <td className="aw-td">{u.isInstanceAdmin ? t('common.yes') : t('common.no')}</td>
-                <td className="aw-td">{u.workspaceCount}</td>
-                <td className="aw-td">
-                  {formatTimestamp(u.lastLoginAt, { locale, fallback: t('common.never') })}
-                </td>
-                <td className="aw-td">
-                  {formatTimestamp(u.createdAt, { locale, fallback: t('common.never') })}
-                </td>
+          <table className="aw-table">
+            <thead>
+              <tr>
+                <th className="aw-th">{t('users.email')}</th>
+                <th className="aw-th">{t('users.name')}</th>
+                <th className="aw-th">{t('users.status')}</th>
+                <th className="aw-th">{t('users.admin')}</th>
+                <th className="aw-th">{t('users.workspaces')}</th>
+                <th className="aw-th">{t('users.last_login')}</th>
+                <th className="aw-th">{t('users.created_at')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableRegion>
+            </thead>
+            <tbody>
+              {users.map((u, index) => (
+                <tr key={u.id} className={motion.enter} style={stagger(index)}>
+                  <td className="aw-td">
+                    <Link
+                      to="/admin/users/$userId"
+                      params={{ userId: u.id }}
+                      className="aw-link nf-focus-ring"
+                    >
+                      {u.email}
+                    </Link>
+                  </td>
+                  <td className="aw-td">{u.displayName}</td>
+                  <td className="aw-td">
+                    <Badge tone={u.enabled ? 'success' : 'danger'}>
+                      {u.enabled ? t('users.enabled') : t('users.disabled')}
+                    </Badge>
+                  </td>
+                  <td className="aw-td">{u.isInstanceAdmin ? t('common.yes') : t('common.no')}</td>
+                  <td className="aw-td">{u.workspaceCount}</td>
+                  <td className="aw-td">
+                    {formatTimestamp(u.lastLoginAt, { locale, fallback: t('common.never') })}
+                  </td>
+                  <td className="aw-td">
+                    {formatTimestamp(u.createdAt, { locale, fallback: t('common.never') })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableRegion>
 
-      <div className="aw-pagination">
-        <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-          {t('common.previous')}
-        </Button>
-        <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
-        <Button
-          variant="default"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          {t('common.next')}
-        </Button>
+        <div className="aw-pagination">
+          <Button variant="default" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            {t('common.previous')}
+          </Button>
+          <span className="aw-muted">{t('common.page', { page, total: totalPages })}</span>
+          <Button
+            variant="default"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            {t('common.next')}
+          </Button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

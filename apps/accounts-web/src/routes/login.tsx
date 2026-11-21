@@ -17,10 +17,12 @@ import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-r
 import { type FormEvent, type ReactElement, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AuthCard from '../components/auth-card';
+import CollapsibleStatus from '../components/collapsible-status';
+import OrDivider from '../components/or-divider';
 import { type LoginFormValues, loginSchema } from '../features/auth/auth-schemas';
-import AuthStep from '../features/auth/auth-step';
+import AuthStep, { type AuthStepDirection } from '../features/auth/auth-step';
 import { authStore, selectIsAuthenticated, useAuth } from '../features/auth/auth-store';
-import PasswordInput from '../features/auth/password-input';
+import PasswordInput, { PasswordField } from '../features/auth/password-input';
 import TotpChallengeForm, { type TotpCredential } from '../features/auth/totp-challenge-form';
 import { capsOf, useCapabilities } from '../features/auth/use-capabilities';
 import { useRateLimitCountdown } from '../features/auth/use-rate-limit-countdown';
@@ -303,6 +305,8 @@ function LoginPage(): ReactElement {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const totpGuard = useSubmitGuard();
   const [showMagicLink, setShowMagicLink] = useState(false);
+  // Which way the next step arrives; unset for the step the page opens on.
+  const [direction, setDirection] = useState<AuthStepDirection | undefined>(undefined);
   const [magicLinkEmail, setMagicLinkEmail] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const magicLinkGuard = useSubmitGuard();
@@ -402,6 +406,7 @@ function LoginPage(): ReactElement {
       }
       const login = settled.data as LoginResponse;
       if (login.step === 'totp_required') {
+        setDirection('forward');
         setChallengeToken(login.challengeToken ?? '');
         return;
       }
@@ -436,6 +441,7 @@ function LoginPage(): ReactElement {
   };
 
   const handleCancelTotp = (): void => {
+    setDirection('back');
     setChallengeToken(null);
     setServerError(null);
   };
@@ -453,6 +459,7 @@ function LoginPage(): ReactElement {
           client.POST('/auth/magic-link/request', { body: { email: magicLinkEmail.trim() } }),
         'Failed to send the sign-in link',
       );
+      setDirection('forward');
       setMagicLinkSent(true);
     } catch (err) {
       setServerError(mapAuthThrown(err));
@@ -462,11 +469,13 @@ function LoginPage(): ReactElement {
   };
 
   const handleOpenMagicLink = (): void => {
+    setDirection('forward');
     setShowMagicLink(true);
     setServerError(null);
   };
 
   const handleCloseMagicLink = (): void => {
+    setDirection('back');
     setShowMagicLink(false);
     setMagicLinkSent(false);
     setServerError(null);
@@ -515,7 +524,11 @@ function LoginPage(): ReactElement {
 
   return (
     <AuthCard>
-      <AuthStep open={step === 'password' && shown === 'password'} onExited={handleStepExited}>
+      <AuthStep
+        open={step === 'password' && shown === 'password'}
+        direction={direction}
+        onExited={handleStepExited}
+      >
         <form
           onSubmit={(e) => {
             void submitWithFocus(e);
@@ -573,7 +586,7 @@ function LoginPage(): ReactElement {
                 }}
               </FormField>
 
-              <FormField
+              <PasswordField
                 label={t('login.password')}
                 required
                 {...(errors.password?.message ? { error: t(errors.password.message) } : {})}
@@ -593,21 +606,23 @@ function LoginPage(): ReactElement {
                     />
                   );
                 }}
-              </FormField>
+              </PasswordField>
             </>
           )}
 
-          {serverError ? (
-            <p
-              ref={alertRef}
-              role="alert"
-              tabIndex={-1}
-              className="aw-error"
-              data-testid="login-server-error"
-            >
-              {t(serverError)}
-            </p>
-          ) : null}
+          <CollapsibleStatus value={serverError}>
+            {(key) => (
+              <p
+                ref={alertRef}
+                role="alert"
+                tabIndex={-1}
+                className="aw-error"
+                data-testid="login-server-error"
+              >
+                {t(key)}
+              </p>
+            )}
+          </CollapsibleStatus>
 
           {passwordLogin && (
             <Button
@@ -628,11 +643,7 @@ function LoginPage(): ReactElement {
 
           {caps?.magicLink && (
             <>
-              <div className="aw-row aw-row-3 aw-muted aw-text-sm">
-                <hr className="aw-rule" />
-                <span>{t('login.magic_link_divider')}</span>
-                <hr className="aw-rule" />
-              </div>
+              <OrDivider>{t('login.magic_link_divider')}</OrDivider>
 
               <Button type="button" variant="ghost" onClick={handleOpenMagicLink}>
                 {t('login.magic_link_button')}
@@ -643,7 +654,7 @@ function LoginPage(): ReactElement {
           {passwordLogin && caps?.registrationOpen && (
             <p className="aw-flush aw-muted aw-text-sm aw-text-center">
               {t('login.no_account')}{' '}
-              <Link to="/signup" className="aw-link">
+              <Link to="/signup" className="aw-link nf-focus-ring">
                 {t('login.signup_link')}
               </Link>
             </p>
@@ -734,6 +745,7 @@ function LoginPage(): ReactElement {
       </AuthStep>
       <AuthStep
         open={step === 'magic-request' && shown === 'magic-request'}
+        direction={direction}
         onExited={handleStepExited}
       >
         <form
@@ -764,11 +776,13 @@ function LoginPage(): ReactElement {
               />
             )}
           </FormField>
-          {serverError ? (
-            <p role="alert" className="aw-error">
-              {t(serverError)}
-            </p>
-          ) : null}
+          <CollapsibleStatus value={serverError}>
+            {(key) => (
+              <p role="alert" className="aw-error">
+                {t(key)}
+              </p>
+            )}
+          </CollapsibleStatus>
           <div className="aw-stack aw-stack-2">
             <Button
               type="submit"
@@ -784,8 +798,12 @@ function LoginPage(): ReactElement {
           </div>
         </form>
       </AuthStep>
-      <AuthStep open={step === 'magic-sent' && shown === 'magic-sent'} onExited={handleStepExited}>
-        <div className="aw-stack aw-stack-5 aw-step-forward">
+      <AuthStep
+        open={step === 'magic-sent' && shown === 'magic-sent'}
+        direction={direction}
+        onExited={handleStepExited}
+      >
+        <div className="aw-stack aw-stack-5">
           <div className="aw-stack aw-stack-2">
             <h1 className="aw-page-title">{t('login.magic_link_title')}</h1>
             <output className="aw-flush aw-muted aw-text-sm">
@@ -804,7 +822,11 @@ function LoginPage(): ReactElement {
           </Button>
         </div>
       </AuthStep>
-      <AuthStep open={step === 'totp' && shown === 'totp'} onExited={handleStepExited}>
+      <AuthStep
+        open={step === 'totp' && shown === 'totp'}
+        direction={direction}
+        onExited={handleStepExited}
+      >
         <TotpChallengeForm
           error={serverError}
           submitting={totpGuard.submitting}

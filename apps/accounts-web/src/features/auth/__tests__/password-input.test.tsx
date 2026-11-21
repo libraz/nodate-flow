@@ -11,7 +11,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { describe, expect, it } from 'vitest';
 
 import enAuth from '../../../../locales/en/auth.json';
-import PasswordInput from '../password-input';
+import PasswordInput, { PasswordField } from '../password-input';
 
 function buildI18n(): ReturnType<typeof i18n.createInstance> {
   const instance = i18n.createInstance();
@@ -54,18 +54,26 @@ describe('<PasswordInput>', () => {
     expect(input.type).toBe('password');
   });
 
-  it('shows a CapsLock-on hint while the field is focused and CapsLock is engaged', () => {
+  it('shows a CapsLock-on hint below the field, linked by aria-describedby, while CapsLock is engaged', () => {
     const original = KeyboardEvent.prototype.getModifierState;
     let capsState = true;
     KeyboardEvent.prototype.getModifierState = (key: string): boolean =>
       key === 'CapsLock' ? capsState : false;
     try {
-      render(<PasswordInput aria-label="password" />, { wrapper: Wrapper });
+      render(
+        <PasswordField label="password">
+          {(control) => <PasswordInput {...control} />}
+        </PasswordField>,
+        { wrapper: Wrapper },
+      );
 
       const input = screen.getByLabelText('password') as HTMLInputElement;
       fireEvent.focus(input);
       fireEvent.keyDown(input, { key: 'A' });
-      expect(screen.getByText(enAuth.login.caps_lock_on)).toBeDefined();
+      const hint = screen.getByText(enAuth.login.caps_lock_on);
+      expect(input.getAttribute('aria-describedby')).toContain(
+        hint.closest('[id]')?.getAttribute('id') ?? 'missing',
+      );
 
       capsState = false;
       fireEvent.keyDown(input, { key: 'A' });
@@ -79,7 +87,12 @@ describe('<PasswordInput>', () => {
     const original = KeyboardEvent.prototype.getModifierState;
     KeyboardEvent.prototype.getModifierState = (): boolean => true;
     try {
-      render(<PasswordInput aria-label="password" />, { wrapper: Wrapper });
+      render(
+        <PasswordField label="password">
+          {(control) => <PasswordInput {...control} />}
+        </PasswordField>,
+        { wrapper: Wrapper },
+      );
 
       const input = screen.getByLabelText('password') as HTMLInputElement;
       fireEvent.focus(input);

@@ -6,14 +6,17 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import QRCode from 'qrcode';
-import { type FormEvent, type ReactElement, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type ReactElement, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SectionActions } from '../../components/section-card';
 import { apiRequest } from '../../lib/api';
 import { refusalCode } from '../../lib/auth-errors';
 import { APP_NAME } from '../../lib/brand';
 import { logError } from '../../lib/log';
-import PasswordInput from './password-input';
+import CapsLockHint, { describedByWith } from './caps-lock-hint';
+import PasswordInput, { PasswordField } from './password-input';
 import recoveryStyles from './recovery-codes.module.css';
+import styles from './totp-section.module.css';
 import { useCapsLockHint } from './use-caps-lock-hint';
 
 type TotpStatusOutputBody = components['schemas']['TotpStatusOutputBody'];
@@ -181,7 +184,7 @@ export function TotpSection(): ReactElement {
         className="aw-stack aw-stack-3"
       >
         <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.disabled_description')}</p>
-        <FormField
+        <PasswordField
           label={t('security.totp.password_required')}
           required
           {...(errorKey ? { error: t(errorKey) } : {})}
@@ -198,8 +201,8 @@ export function TotpSection(): ReactElement {
               required
             />
           )}
-        </FormField>
-        <div>
+        </PasswordField>
+        <SectionActions>
           <Button
             type="submit"
             variant="primary"
@@ -208,7 +211,7 @@ export function TotpSection(): ReactElement {
           >
             {t('security.totp.start_setup')}
           </Button>
-        </div>
+        </SectionActions>
       </form>
     );
   }
@@ -230,7 +233,7 @@ export function TotpSection(): ReactElement {
           className="aw-stack aw-stack-3"
         >
           <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.pending_description')}</p>
-          <FormField
+          <PasswordField
             label={t('security.totp.password_required')}
             required
             {...(errorKey ? { error: t(errorKey) } : {})}
@@ -247,16 +250,8 @@ export function TotpSection(): ReactElement {
                 required
               />
             )}
-          </FormField>
-          <div className="aw-actions">
-            <Button
-              type="submit"
-              variant="primary"
-              aria-busy={busy || undefined}
-              disabled={busy || startPassword === ''}
-            >
-              {t('security.totp.resume_restart')}
-            </Button>
+          </PasswordField>
+          <SectionActions>
             <Button
               type="button"
               variant="ghost"
@@ -267,7 +262,15 @@ export function TotpSection(): ReactElement {
             >
               {t('security.totp.cancel')}
             </Button>
-          </div>
+            <Button
+              type="submit"
+              variant="primary"
+              aria-busy={busy || undefined}
+              disabled={busy || startPassword === ''}
+            >
+              {t('security.totp.resume_restart')}
+            </Button>
+          </SectionActions>
         </form>
       );
     }
@@ -325,6 +328,7 @@ function EnrollmentStep({
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrFailed, setQrFailed] = useState(false);
   const capsHint = useCapsLockHint();
+  const capsHintId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -358,13 +362,15 @@ function EnrollmentStep({
           alt={t('security.totp.qr_label')}
           width={200}
           height={200}
-          className="aw-self-center"
+          className={styles.qr}
         />
       ) : qrFailed ? (
         <p role="alert" className="aw-warning">
           {t('security.qr_fallback_title')}
         </p>
-      ) : null}
+      ) : (
+        <Skeleton className={styles.qr} />
+      )}
       <div className="aw-grid-secret aw-surface">
         <span className="aw-text-sm aw-weight-semibold">
           {t('security.totp.manual_secret_label')}
@@ -375,26 +381,34 @@ function EnrollmentStep({
       </div>
       <FormField label={t('security.totp.code_input_label')} required>
         {(control) => (
-          <Input
-            {...control}
-            className="aw-otp"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            autoFocus
-            value={code}
-            onChange={(e) => {
-              setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-            }}
-            onKeyDown={capsHint.handlers.onKeyDown}
-            onFocus={capsHint.handlers.onFocus}
-            onBlur={capsHint.handlers.onBlur}
-            required
-          />
+          <>
+            <Input
+              {...control}
+              aria-describedby={describedByWith(
+                control['aria-describedby'],
+                capsHintId,
+                capsHint.capsLockOn,
+              )}
+              className="aw-otp"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              autoFocus
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+              }}
+              onKeyDown={capsHint.handlers.onKeyDown}
+              onFocus={capsHint.handlers.onFocus}
+              onBlur={capsHint.handlers.onBlur}
+              required
+            />
+            <CapsLockHint open={capsHint.capsLockOn} id={capsHintId} />
+          </>
         )}
       </FormField>
-      <FormField label={t('security.totp.password_required')} required>
+      <PasswordField label={t('security.totp.password_required')} required>
         {(control) => (
           <PasswordInput
             {...control}
@@ -406,26 +420,16 @@ function EnrollmentStep({
             required
           />
         )}
-      </FormField>
-      {capsHint.capsLockOn ? (
-        <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
-          {t('login.caps_lock_on')}
-        </output>
-      ) : null}
-      {errorKey ? (
-        <p role="alert" className="aw-error">
-          {t(errorKey)}
-        </p>
-      ) : null}
-      <div className="aw-actions">
-        <Button
-          type="submit"
-          variant="primary"
-          aria-busy={busy || undefined}
-          disabled={busy || code.length !== 6 || password === ''}
-        >
-          {t('security.totp.confirm')}
-        </Button>
+      </PasswordField>
+      <SectionActions
+        status={
+          errorKey ? (
+            <p role="alert" className="aw-error">
+              {t(errorKey)}
+            </p>
+          ) : null
+        }
+      >
         <Button
           type="button"
           variant="ghost"
@@ -436,7 +440,15 @@ function EnrollmentStep({
         >
           {t('security.totp.cancel')}
         </Button>
-      </div>
+        <Button
+          type="submit"
+          variant="primary"
+          aria-busy={busy || undefined}
+          disabled={busy || code.length !== 6 || password === ''}
+        >
+          {t('security.totp.confirm')}
+        </Button>
+      </SectionActions>
     </form>
   );
 }
@@ -558,11 +570,11 @@ export function RecoveryCodesView({
           {t('security.totp.recovery.print')}
         </Button>
       </div>
-      <div>
+      <SectionActions>
         <Button type="button" variant="primary" onClick={onDismiss}>
           {t('security.totp.recovery_codes_done')}
         </Button>
-      </div>
+      </SectionActions>
     </div>
   );
 }
@@ -585,6 +597,8 @@ function EnabledPanel({
   const [busy, setBusy] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  // Cancelling a form slides the idle view back in; the first idle view does not move.
+  const [returning, setReturning] = useState(false);
 
   // Remounts after a regenerate, so the count is re-read then.
   useEffect(() => {
@@ -614,6 +628,11 @@ function EnabledPanel({
     setPassword('');
     setErrorKey(null);
     setMode('idle');
+  };
+
+  const handleCancel = (): void => {
+    setReturning(true);
+    resetForm();
   };
 
   const handleDisable = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -663,14 +682,14 @@ function EnabledPanel({
 
   if (mode === 'idle') {
     return (
-      <div className="aw-stack aw-stack-3">
+      <div className={returning ? 'aw-stack aw-stack-3 aw-step-back' : 'aw-stack aw-stack-3'}>
         <p className="aw-flush aw-muted aw-text-sm">{t('security.totp.enabled_description')}</p>
         {remaining !== null ? (
           <p className="aw-flush aw-text-sm" data-testid="recovery-remaining">
             {t('security.totp.recovery.remaining', { count: remaining })}
           </p>
         ) : null}
-        <div className="aw-actions">
+        <SectionActions>
           <Button
             type="button"
             variant="ghost"
@@ -689,7 +708,7 @@ function EnabledPanel({
           >
             {t('security.totp.regenerate')}
           </Button>
-        </div>
+        </SectionActions>
       </div>
     );
   }
@@ -709,7 +728,7 @@ function EnabledPanel({
       className="aw-stack aw-stack-3 aw-step-forward"
     >
       <p className="aw-flush aw-text-sm">{title}</p>
-      <FormField
+      <PasswordField
         label={t('security.totp.password_required')}
         required
         {...(errorKey ? { error: t(errorKey) } : {})}
@@ -727,8 +746,11 @@ function EnabledPanel({
             required
           />
         )}
-      </FormField>
-      <div className="aw-actions">
+      </PasswordField>
+      <SectionActions>
+        <Button type="button" variant="ghost" disabled={busy} onClick={handleCancel}>
+          {t('security.totp.cancel')}
+        </Button>
         <Button
           type="submit"
           variant={mode === 'disable' ? 'danger' : 'primary'}
@@ -737,10 +759,7 @@ function EnabledPanel({
         >
           {submitLabel}
         </Button>
-        <Button type="button" variant="ghost" disabled={busy} onClick={resetForm}>
-          {t('security.totp.cancel')}
-        </Button>
-      </div>
+      </SectionActions>
     </form>
   );
 }

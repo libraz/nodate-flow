@@ -13,12 +13,14 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import Spinner from '@nodate-flow/ui/primitives/spinner';
 import { createFileRoute, Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AuthCard from '../components/auth-card';
+import AuthStep from '../features/auth/auth-step';
 import { authStore } from '../features/auth/auth-store';
 import TotpChallengeForm, { type TotpCredential } from '../features/auth/totp-challenge-form';
 import { type MeResponse, userFromMe } from '../features/auth/user-from-me';
@@ -162,22 +164,23 @@ export function OIDCCompletePage(): ReactElement {
   if (status === 'totp') {
     return (
       <AuthCard>
-        <TotpChallengeForm
-          className="aw-step-forward"
-          error={error}
-          submitting={totpGuard.submitting}
-          onSubmit={(credential) => {
-            void handleTotpSubmit(credential);
-          }}
-          onModeChange={() => {
-            setError(null);
-          }}
-          cancel={
-            <Link to="/login" className="aw-link aw-text-sm aw-self-center">
-              {t('login.totp_cancel')}
-            </Link>
-          }
-        />
+        <AuthStep open direction="forward">
+          <TotpChallengeForm
+            error={error}
+            submitting={totpGuard.submitting}
+            onSubmit={(credential) => {
+              void handleTotpSubmit(credential);
+            }}
+            onModeChange={() => {
+              setError(null);
+            }}
+            cancel={
+              <Link to="/login" className={buttonClassName({ variant: 'ghost' })}>
+                {t('login.totp_cancel')}
+              </Link>
+            }
+          />
+        </AuthStep>
       </AuthCard>
     );
   }
@@ -194,7 +197,7 @@ export function OIDCCompletePage(): ReactElement {
         ) : (
           <>
             <p className="aw-flush aw-error">{error ? t(error) : t('errors.generic')}</p>
-            <Link to="/login" className="aw-link aw-text-sm">
+            <Link to="/login" className="aw-link aw-text-sm nf-focus-ring">
               {t('login.magic_link_back')}
             </Link>
           </>

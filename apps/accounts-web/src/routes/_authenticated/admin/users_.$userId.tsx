@@ -6,7 +6,8 @@
 import type { components } from '@nodate-flow/sdk';
 import VisuallyHidden from '@nodate-flow/ui/a11y/visually-hidden';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
-import Button from '@nodate-flow/ui/primitives/button';
+import Badge from '@nodate-flow/ui/primitives/badge';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
 import { confirmAction } from '@nodate-flow/ui/primitives/confirm/action';
 import Dialog from '@nodate-flow/ui/primitives/dialog';
 import FormField from '@nodate-flow/ui/primitives/form-field';
@@ -17,6 +18,8 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import PageHeader from '../../../components/page-header';
+import SectionCard, { SectionActions } from '../../../components/section-card';
 import TableRegion from '../../../components/table-region';
 import { useInvalidateInstanceStats } from '../../../features/admin-stats/api';
 import { selectUser, useAuth } from '../../../features/auth/auth-store';
@@ -343,176 +346,183 @@ export function UserDetailPage(): ReactElement {
     }
   };
 
+  const backLink = (
+    <Link
+      to="/admin/users"
+      className={buttonClassName({ variant: 'ghost', size: 'sm', className: styles.back })}
+    >
+      {t('common.back_to_users')}
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="aw-stack aw-stack-6" aria-busy="true">
-        <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
-        <Skeleton className={styles.titleSkeleton} />
-        <div className="aw-panel aw-stack aw-stack-3">
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
+      <>
+        {backLink}
+        <PageHeader title={t('users.detail')} />
+        <div className="aw-stack aw-stack-6" aria-busy="true">
+          <VisuallyHidden>{t('common.loading')}</VisuallyHidden>
+          <SectionCard>
+            <Skeleton />
+            <Skeleton />
+            <Skeleton />
+          </SectionCard>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !user) {
     return (
-      <div className="aw-stack aw-stack-4">
+      <>
+        {backLink}
+        <PageHeader title={t('users.detail')} />
         <p role="alert" className="aw-error">
           {error ?? t('errors.generic')}
         </p>
-        <Link to="/admin/users" className="aw-link aw-text-sm">
-          {t('common.back_to_users')}
-        </Link>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="aw-stack aw-stack-6">
-      <div>
-        <Link to="/admin/users" className="aw-link aw-text-sm">
-          {t('common.back_to_users')}
-        </Link>
-      </div>
+    <>
+      {backLink}
+      <PageHeader title={t('users.detail')} description={user.displayName} />
+      <div className="aw-stack aw-stack-6">
+        <SectionCard>
+          <dl className="aw-dl">
+            <dt>{t('users.name')}</dt>
+            <dd>{user.displayName}</dd>
 
-      <h1 className="aw-page-title">{t('users.detail')}</h1>
+            <dt>{t('users.email')}</dt>
+            <dd>{user.email}</dd>
 
-      <dl className="aw-panel aw-dl">
-        <dt>{t('users.name')}</dt>
-        <dd>{user.displayName}</dd>
+            <dt>{t('users.status')}</dt>
+            <dd>
+              <Badge tone={user.enabled ? 'success' : 'danger'}>
+                {user.enabled ? t('users.enabled') : t('users.disabled')}
+              </Badge>
+            </dd>
 
-        <dt>{t('users.email')}</dt>
-        <dd>{user.email}</dd>
+            <dt>{t('users.admin')}</dt>
+            <dd>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</dd>
 
-        <dt>{t('users.status')}</dt>
-        <dd>
-          <span className={user.enabled ? 'aw-badge aw-badge-success' : 'aw-badge aw-badge-danger'}>
-            {user.enabled ? t('users.enabled') : t('users.disabled')}
-          </span>
-        </dd>
+            <dt>{t('users.workspaces')}</dt>
+            <dd>{user.workspaceCount}</dd>
 
-        <dt>{t('users.admin')}</dt>
-        <dd>{user.isInstanceAdmin ? t('common.yes') : t('common.no')}</dd>
+            <dt>{t('users.last_login')}</dt>
+            <dd>{formatTimestamp(user.lastLoginAt, { locale, fallback: t('common.never') })}</dd>
 
-        <dt>{t('users.workspaces')}</dt>
-        <dd>{user.workspaceCount}</dd>
+            <dt>{t('users.created_at')}</dt>
+            <dd>{formatTimestamp(user.createdAt, { locale, fallback: t('common.never') })}</dd>
+          </dl>
 
-        <dt>{t('users.last_login')}</dt>
-        <dd>{formatTimestamp(user.lastLoginAt, { locale, fallback: t('common.never') })}</dd>
+          <SectionActions>
+            <Button
+              variant="default"
+              aria-busy={enabledGuard.submitting || undefined}
+              disabled={enabledGuard.submitting}
+              onClick={() => void handleToggleEnabled()}
+            >
+              {user.enabled ? t('users.suspend') : t('users.enable')}
+            </Button>
+            <Button
+              variant="default"
+              aria-busy={adminGuard.submitting || undefined}
+              disabled={adminGuard.submitting}
+              onClick={() => void handleToggleAdmin()}
+            >
+              {user.isInstanceAdmin ? t('users.revoke_admin') : t('users.grant_admin')}
+            </Button>
+          </SectionActions>
+        </SectionCard>
 
-        <dt>{t('users.created_at')}</dt>
-        <dd>{formatTimestamp(user.createdAt, { locale, fallback: t('common.never') })}</dd>
-      </dl>
+        <SectionCard title={t('users.sessions')}>
+          <TableRegion
+            loading={false}
+            rowCount={sessionPresence.entries.length}
+            loadingLabel={t('common.loading')}
+            emptyTitle={t('users.no_results')}
+          >
+            <table className="aw-table">
+              <thead>
+                <tr>
+                  <th className="aw-th">{t('users.user_agent')}</th>
+                  <th className="aw-th">{t('users.ip_address')}</th>
+                  <th className="aw-th">{t('users.created_at')}</th>
+                  <th className="aw-th">
+                    <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionPresence.entries.map(({ key, item: s, present }) => (
+                  <PresenceRow
+                    key={key}
+                    present={present}
+                    onExited={() => {
+                      sessionPresence.onExited(key);
+                    }}
+                  >
+                    <td className="aw-td">{s.userAgent}</td>
+                    <td className="aw-td">{s.ipAddress}</td>
+                    <td className="aw-td">
+                      {formatTimestamp(s.createdAt, { locale, fallback: t('common.never') })}
+                    </td>
+                    <td className="aw-td">
+                      {s.active ? (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          aria-busy={sessionGuard.submitting || undefined}
+                          disabled={sessionGuard.submitting}
+                          onClick={() => void handleRevokeSession(s.id)}
+                        >
+                          {t('admins.revoke')}
+                        </Button>
+                      ) : null}
+                    </td>
+                  </PresenceRow>
+                ))}
+              </tbody>
+            </table>
+          </TableRegion>
+        </SectionCard>
 
-      <div className="aw-actions">
-        <Button
-          variant="default"
-          aria-busy={enabledGuard.submitting || undefined}
-          disabled={enabledGuard.submitting}
-          onClick={() => void handleToggleEnabled()}
-        >
-          {user.enabled ? t('users.suspend') : t('users.enable')}
-        </Button>
-        <Button
-          variant="default"
-          aria-busy={adminGuard.submitting || undefined}
-          disabled={adminGuard.submitting}
-          onClick={() => void handleToggleAdmin()}
-        >
-          {user.isInstanceAdmin ? t('users.revoke_admin') : t('users.grant_admin')}
-        </Button>
-      </div>
-
-      <h2 className="aw-section-title">{t('users.sessions')}</h2>
-
-      <TableRegion
-        loading={false}
-        rowCount={sessionPresence.entries.length}
-        loadingLabel={t('common.loading')}
-        emptyTitle={t('users.no_results')}
-      >
-        <table className="aw-table">
-          <thead>
-            <tr>
-              <th className="aw-th">{t('users.user_agent')}</th>
-              <th className="aw-th">{t('users.ip_address')}</th>
-              <th className="aw-th">{t('users.created_at')}</th>
-              <th className="aw-th">
-                <VisuallyHidden>{t('users.session_actions')}</VisuallyHidden>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sessionPresence.entries.map(({ key, item: s, present }) => (
-              <PresenceRow
-                key={key}
-                present={present}
-                onExited={() => {
-                  sessionPresence.onExited(key);
+        {currentUser?.id !== user.id ? (
+          <SectionCard
+            tone="danger"
+            title={t('users.danger.title')}
+            description={t('users.danger.description')}
+          >
+            <SectionActions>
+              <Button
+                type="button"
+                variant="danger"
+                aria-busy={deleteGuard.submitting || undefined}
+                disabled={deleteGuard.submitting}
+                onClick={() => {
+                  setDeleteOpen(true);
                 }}
               >
-                <td className="aw-td">{s.userAgent}</td>
-                <td className="aw-td">{s.ipAddress}</td>
-                <td className="aw-td">
-                  {formatTimestamp(s.createdAt, { locale, fallback: t('common.never') })}
-                </td>
-                <td className="aw-td">
-                  {s.active ? (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      aria-busy={sessionGuard.submitting || undefined}
-                      disabled={sessionGuard.submitting}
-                      onClick={() => void handleRevokeSession(s.id)}
-                    >
-                      {t('admins.revoke')}
-                    </Button>
-                  ) : null}
-                </td>
-              </PresenceRow>
-            ))}
-          </tbody>
-        </table>
-      </TableRegion>
-
-      {currentUser?.id !== user.id ? (
-        <section aria-labelledby="user-danger-zone-heading" className={styles.dangerZone}>
-          <header className={styles.dangerHeader}>
-            <h2 id="user-danger-zone-heading" className={styles.dangerTitle}>
-              {t('users.danger.title')}
-            </h2>
-            <p className={styles.dangerDescription}>{t('users.danger.description')}</p>
-          </header>
-          <div className={styles.dangerActions}>
-            <Button
-              type="button"
-              variant="danger"
-              aria-busy={deleteGuard.submitting || undefined}
-              disabled={deleteGuard.submitting}
-              onClick={() => {
-                setDeleteOpen(true);
+                {t('users.danger.delete')}
+              </Button>
+            </SectionActions>
+            <DeleteUserDialog
+              open={deleteOpen}
+              user={user}
+              pending={deleteGuard.submitting}
+              onCancel={() => {
+                if (!deleteGuard.submitting) setDeleteOpen(false);
               }}
-            >
-              {t('users.danger.delete')}
-            </Button>
-          </div>
-          <DeleteUserDialog
-            open={deleteOpen}
-            user={user}
-            pending={deleteGuard.submitting}
-            onCancel={() => {
-              if (!deleteGuard.submitting) setDeleteOpen(false);
-            }}
-            onConfirm={() => {
-              void handleDeleteConfirmed();
-            }}
-          />
-        </section>
-      ) : null}
-    </div>
+              onConfirm={() => {
+                void handleDeleteConfirmed();
+              }}
+            />
+          </SectionCard>
+        ) : null}
+      </div>
+    </>
   );
 }
 

@@ -7,7 +7,6 @@
  * entered credential through `onSubmit`.
  */
 
-import { cx } from '@nodate-flow/ui/lib/cx';
 import Button from '@nodate-flow/ui/primitives/button';
 import FormField from '@nodate-flow/ui/primitives/form-field';
 import Input from '@nodate-flow/ui/primitives/input';
@@ -16,12 +15,14 @@ import {
   type ReactElement,
   type ReactNode,
   useEffect,
+  useId,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AuthErrorI18nKey } from '../../lib/auth-errors';
+import CapsLockHint, { describedByWith } from './caps-lock-hint';
 import { useCapsLockHint } from './use-caps-lock-hint';
 
 /**
@@ -46,7 +47,6 @@ export interface TotpChallengeFormProps {
   onModeChange: () => void;
   /** Way out of the challenge (a button or a link), rendered last. */
   cancel?: ReactNode;
-  className?: string;
 }
 
 export default function TotpChallengeForm({
@@ -55,7 +55,6 @@ export default function TotpChallengeForm({
   onSubmit,
   onModeChange,
   cancel,
-  className,
 }: TotpChallengeFormProps): ReactElement {
   const { t } = useTranslation('auth');
   const [useRecovery, setUseRecovery] = useState(false);
@@ -63,6 +62,7 @@ export default function TotpChallengeForm({
   const [totpCode, setTotpCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const capsHint = useCapsLockHint();
+  const capsHintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
   // A refused code leaves focus on the (now re-enabled) submit button;
@@ -90,8 +90,8 @@ export default function TotpChallengeForm({
     onModeChange();
   };
 
-  // One status string at a time, so the description read with the field
-  // never contradicts itself; the disabled submit button is the second cue.
+  // One status at a time, so the description read with the field never
+  // contradicts itself; the disabled submit button is the second cue.
   const status = complete
     ? t('login.totp_status_awaiting')
     : useRecovery
@@ -102,7 +102,7 @@ export default function TotpChallengeForm({
     modeShift === 'forward' ? 'aw-step-forward' : modeShift === 'back' ? 'aw-step-back' : null;
 
   return (
-    <form onSubmit={handleSubmit} noValidate className={cx('aw-stack aw-stack-5', className)}>
+    <form onSubmit={handleSubmit} noValidate className="aw-stack aw-stack-5">
       <div className="aw-stack aw-stack-2">
         <h1 className="aw-page-title">{t('login.totp_title')}</h1>
         <p className="aw-flush aw-muted aw-text-sm">{t('login.totp_instructions')}</p>
@@ -117,24 +117,32 @@ export default function TotpChallengeForm({
           {...(errorText ? { error: errorText } : {})}
         >
           {(control) => (
-            <Input
-              {...control}
-              ref={inputRef}
-              className="aw-otp"
-              autoComplete="one-time-code"
-              autoCapitalize="characters"
-              spellCheck={false}
-              enterKeyHint="go"
-              maxLength={RECOVERY_MAX_LEN}
-              value={recoveryCode}
-              onChange={(e) => {
-                setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
-              }}
-              onKeyDown={capsHint.handlers.onKeyDown}
-              onFocus={capsHint.handlers.onFocus}
-              onBlur={capsHint.handlers.onBlur}
-              autoFocus
-            />
+            <>
+              <Input
+                {...control}
+                aria-describedby={describedByWith(
+                  control['aria-describedby'],
+                  capsHintId,
+                  capsHint.capsLockOn,
+                )}
+                ref={inputRef}
+                className="aw-otp"
+                autoComplete="one-time-code"
+                autoCapitalize="characters"
+                spellCheck={false}
+                enterKeyHint="go"
+                maxLength={RECOVERY_MAX_LEN}
+                value={recoveryCode}
+                onChange={(e) => {
+                  setRecoveryCode(e.target.value.toUpperCase().slice(0, RECOVERY_MAX_LEN));
+                }}
+                onKeyDown={capsHint.handlers.onKeyDown}
+                onFocus={capsHint.handlers.onFocus}
+                onBlur={capsHint.handlers.onBlur}
+                autoFocus
+              />
+              <CapsLockHint open={capsHint.capsLockOn} id={capsHintId} />
+            </>
           )}
         </FormField>
       ) : (
@@ -147,33 +155,36 @@ export default function TotpChallengeForm({
           {...(errorText ? { error: errorText } : {})}
         >
           {(control) => (
-            <Input
-              {...control}
-              ref={inputRef}
-              className="aw-otp"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              enterKeyHint="go"
-              pattern="[0-9]{6}"
-              maxLength={TOTP_LEN}
-              value={totpCode}
-              onChange={(e) => {
-                // Keeps only the digits, so a pasted "123 456" lands whole.
-                setTotpCode(e.target.value.replace(/\D/g, '').slice(0, TOTP_LEN));
-              }}
-              onKeyDown={capsHint.handlers.onKeyDown}
-              onFocus={capsHint.handlers.onFocus}
-              onBlur={capsHint.handlers.onBlur}
-              autoFocus
-            />
+            <>
+              <Input
+                {...control}
+                aria-describedby={describedByWith(
+                  control['aria-describedby'],
+                  capsHintId,
+                  capsHint.capsLockOn,
+                )}
+                ref={inputRef}
+                className="aw-otp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                enterKeyHint="go"
+                pattern="[0-9]{6}"
+                maxLength={TOTP_LEN}
+                value={totpCode}
+                onChange={(e) => {
+                  // Keeps only the digits, so a pasted "123 456" lands whole.
+                  setTotpCode(e.target.value.replace(/\D/g, '').slice(0, TOTP_LEN));
+                }}
+                onKeyDown={capsHint.handlers.onKeyDown}
+                onFocus={capsHint.handlers.onFocus}
+                onBlur={capsHint.handlers.onBlur}
+                autoFocus
+              />
+              <CapsLockHint open={capsHint.capsLockOn} id={capsHintId} />
+            </>
           )}
         </FormField>
       )}
-      {capsHint.capsLockOn ? (
-        <output aria-live="polite" className="aw-flush aw-muted aw-text-xs">
-          {t('login.caps_lock_on')}
-        </output>
-      ) : null}
       <div className="aw-stack aw-stack-2">
         <Button
           type="submit"
