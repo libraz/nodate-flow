@@ -55,4 +55,21 @@ describe.each(THEMES)('TimePicker [%s]', (theme) => {
     await user.click(screen.getByRole('option', { name: '10:30' }));
     expect(onChange).toHaveBeenCalledWith('10:30');
   });
+
+  it('passes id, aria-describedby and aria-invalid to the trigger', () => {
+    render(
+      <TimePicker
+        id="start"
+        aria-describedby="start-error"
+        aria-invalid
+        value="09:00"
+        onChange={() => undefined}
+        listLabel="Start time"
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: '09:00' });
+    expect(trigger.id).toBe('start');
+    expect(trigger.getAttribute('aria-describedby')).toBe('start-error');
+    expect(trigger.getAttribute('aria-invalid')).toBe('true');
+  });
 });

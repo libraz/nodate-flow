@@ -33,6 +33,7 @@ import {
   useFloating,
   useFocus,
   useInteractions,
+  useMergeRefs,
   useRole,
 } from '@floating-ui/react';
 import {
@@ -53,6 +54,7 @@ import {
   useState,
 } from 'react';
 import { useControllableState } from '../../hooks/use-controllable-state';
+import { usePresence } from '../../hooks/use-presence';
 import { cx } from '../../lib/cx';
 import styles from './combobox.module.css';
 
@@ -211,7 +213,12 @@ function ComboboxImpl(
 
   useEffect(() => () => cancelPendingSearch(), [cancelPendingSearch]);
 
-  const { refs, floatingStyles, context } = useFloating({
+  const {
+    refs,
+    floatingStyles,
+    context,
+    placement: resolvedPlacement,
+  } = useFloating({
     open,
     onOpenChange: (next) => {
       if (!next) cancelPendingSearch();
@@ -343,6 +350,54 @@ function ComboboxImpl(
   const showOptionsRow = open && filtered.length > 0;
   const showFloating = showLoadingRow || showEmptyRow || showOptionsRow;
 
+  const rows = showFloating ? (
+    <>
+      {showLoadingRow ? (
+        <li className={styles.statusRow} aria-live="polite">
+          {loadingMessage ?? ''}
+        </li>
+      ) : null}
+      {showEmptyRow ? (
+        <li className={styles.statusRow} role="status">
+          {emptyMessage}
+        </li>
+      ) : null}
+      {showOptionsRow
+        ? filtered.map((option, idx) => {
+            const active = idx === activeIndex;
+            const isSelected = option.value === selected;
+            return (
+              <li
+                key={option.value}
+                ref={(node) => {
+                  listRef.current[idx] = node;
+                }}
+                id={`${baseId}-opt-${idx}`}
+                role="option"
+                aria-selected={isSelected}
+                aria-disabled={option.disabled || undefined}
+                className={cx(
+                  styles.option,
+                  active && styles.optionActive,
+                  isSelected && styles.optionSelected,
+                )}
+                {...getItemProps({
+                  onClick: () => select(option),
+                })}
+              >
+                {renderItem ? renderItem(option) : option.label}
+              </li>
+            );
+          })
+        : null}
+    </>
+  ) : null;
+  // The list keeps its last rows while the exit animation runs.
+  const closingRows = useRef<ReactNode>(null);
+  if (showFloating) closingRows.current = rows;
+  const presence = usePresence<HTMLUListElement>(showFloating);
+  const listMergedRef = useMergeRefs([refs.setFloating, presence.ref]);
+
   return (
     <div className={cx(styles.root, className)}>
       <input
@@ -380,53 +435,19 @@ function ComboboxImpl(
         placeholder={placeholder}
         value={query}
       />
-      {showFloating ? (
+      {presence.mounted ? (
         <FloatingPortal>
           <ul
-            ref={refs.setFloating}
+            ref={listMergedRef}
             id={listId}
             style={floatingStyles}
+            data-state={presence.state}
+            data-side={resolvedPlacement.split('-')[0]}
+            inert={!showFloating}
             className={styles.list}
             {...getFloatingProps()}
           >
-            {showLoadingRow ? (
-              <li className={styles.statusRow} aria-live="polite">
-                {loadingMessage ?? ''}
-              </li>
-            ) : null}
-            {showEmptyRow ? (
-              <li className={styles.statusRow} role="status">
-                {emptyMessage}
-              </li>
-            ) : null}
-            {showOptionsRow
-              ? filtered.map((option, idx) => {
-                  const active = idx === activeIndex;
-                  const isSelected = option.value === selected;
-                  return (
-                    <li
-                      key={option.value}
-                      ref={(node) => {
-                        listRef.current[idx] = node;
-                      }}
-                      id={`${baseId}-opt-${idx}`}
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-disabled={option.disabled || undefined}
-                      className={cx(
-                        styles.option,
-                        active && styles.optionActive,
-                        isSelected && styles.optionSelected,
-                      )}
-                      {...getItemProps({
-                        onClick: () => select(option),
-                      })}
-                    >
-                      {renderItem ? renderItem(option) : option.label}
-                    </li>
-                  );
-                })
-              : null}
+            {showFloating ? rows : closingRows.current}
           </ul>
         </FloatingPortal>
       ) : null}

@@ -185,6 +185,9 @@
   --nf-motion-shift-sm: var(--nf-space-1);
   --nf-motion-scale: 0.97;
   --nf-motion-press-scale: 0.98;
+
+  /* shared fade for every disabled control */
+  --nf-opacity-disabled: 0.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

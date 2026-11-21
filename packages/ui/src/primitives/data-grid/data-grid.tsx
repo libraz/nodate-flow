@@ -484,7 +484,8 @@ function DataGridInner<TData>(
                     position: 'absolute',
                     insetInlineStart: 0,
                     insetInlineEnd: 0,
-                    insetBlockStart: `${start}px`,
+                    insetBlockStart: 0,
+                    translate: `0 ${start}px`,
                   }}
                 >
                   {visibleCells.map((cell, cIdx) => {

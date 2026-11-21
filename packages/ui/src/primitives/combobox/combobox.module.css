@@ -36,7 +36,7 @@
 }
 
 .input:disabled {
-  opacity: 0.5;
+  opacity: var(--nf-opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -54,7 +54,21 @@
   max-block-size: 16rem;
   overflow: auto;
   --nf-motion-shift: var(--nf-motion-shift-sm);
-  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
+  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
+}
+
+/* Enter from the anchor's side; exit is a quick fade. */
+.list[data-side="bottom"] {
+  animation-name: global(nf-slide-in-from-block-start);
+}
+
+.list[data-side="top"] {
+  animation-name: global(nf-slide-in-from-block-end);
+}
+
+.list[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .option {
@@ -65,6 +79,11 @@
   font-size: var(--nf-text-sm);
   cursor: pointer;
   transition: background var(--nf-duration-instant) var(--nf-ease-standard);
+}
+
+.option[aria-disabled="true"] {
+  opacity: var(--nf-opacity-disabled);
+  cursor: not-allowed;
 }
 
 .optionActive {

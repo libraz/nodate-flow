@@ -32,6 +32,11 @@
   box-shadow: var(--nf-shadow-lg);
 }
 
+/* Pressed settles back to the resting shadow rather than scaling a large surface. */
+.root:is(a[href], button, [role="button"]):active {
+  box-shadow: var(--nf-shadow-sm);
+}
+
 .root:is(a[href], button, [role="button"]):focus-visible {
   outline: none;
   box-shadow: var(--nf-shadow-focus);

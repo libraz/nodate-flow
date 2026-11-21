@@ -10,6 +10,8 @@
 }
 
 .toast {
+  position: relative;
+  overflow: clip;
   pointer-events: auto;
   background: var(--nf-color-bg-elevated);
   color: var(--nf-color-fg);
@@ -36,17 +38,27 @@
 }
 
 .info {
-  border-inline-start: 3px solid var(--nf-color-info);
+  --toast-tone: var(--nf-color-info);
 }
 
 .success {
-  border-inline-start: 3px solid var(--nf-color-success);
+  --toast-tone: var(--nf-color-success);
 }
 
 .warning {
-  border-inline-start: 3px solid var(--nf-color-warning);
+  --toast-tone: var(--nf-color-warning);
 }
 
 .danger {
-  border-inline-start: 3px solid var(--nf-color-danger);
+  --toast-tone: var(--nf-color-danger);
+}
+
+/* The tone stripe is clipped by the rounded corners instead of bending a border. */
+.toast::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--nf-space-0-5);
+  background: var(--toast-tone);
 }

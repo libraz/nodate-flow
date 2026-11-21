@@ -113,6 +113,10 @@
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
   overflow: auto;
+  /* Room inside the scroller for field focus rings; the negative margin keeps the layout. */
+  padding: var(--nf-space-1);
+  margin: calc(var(--nf-space-1) * -1);
+  scrollbar-gutter: stable;
 }
 
 /* Mobile: side drawers expand to near full-width, block drawers expand */
@@ -126,6 +130,6 @@
   .blockStart,
   .blockEnd {
     block-size: auto;
-    max-block-size: 80vh;
+    max-block-size: 80dvh;
   }
 }

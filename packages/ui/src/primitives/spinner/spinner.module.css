@@ -3,8 +3,9 @@
   inline-size: var(--nf-space-5);
   block-size: var(--nf-space-5);
   border-radius: var(--nf-radius-pill);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-inline-start-color: var(--nf-color-accent);
+  /* Same look as Button's busy spinner: a currentColor ring with an open top. */
+  border: var(--nf-space-0-5) solid currentColor;
+  border-block-start-color: transparent;
   /* One turn per three slow steps; a turn per step reads as alarm. */
   animation: global(nf-spin) calc(var(--nf-duration-slow) * 3) var(--nf-ease-linear) infinite;
 }

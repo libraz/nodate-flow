@@ -1,5 +1,9 @@
 .trigger {
   all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--nf-space-8);
   cursor: pointer;
   padding: var(--nf-space-1) var(--nf-space-3);
   border-radius: var(--nf-radius-md);
@@ -10,12 +14,17 @@
   background: var(--nf-color-accent-subtle);
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
 .trigger:hover {
   background: var(--nf-color-accent-hover);
   color: var(--nf-color-fg-on-accent);
+}
+
+.trigger:active:not(.field) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .trigger:focus-visible {
@@ -49,6 +58,11 @@
   color: var(--nf-color-fg);
 }
 
+.field[aria-invalid="true"],
+.field[aria-invalid="true"]:hover {
+  border-color: var(--nf-color-danger);
+}
+
 .field:focus-visible {
   outline: none;
   border-color: var(--nf-color-focus-ring);
@@ -62,24 +76,33 @@
   max-block-size: 15rem;
   overflow-y: auto;
   margin: calc(-1 * var(--nf-space-4));
-  padding: var(--nf-space-1) 0;
+  padding: var(--nf-space-1);
 }
 
+/* Option rows match Select and Combobox: concentric with the list padding. */
 .slot {
   all: unset;
+  box-sizing: border-box;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--nf-space-2) var(--nf-space-4);
+  padding: var(--nf-space-2) var(--nf-space-3);
+  border-radius: calc(var(--nf-radius-md) - var(--nf-space-1));
   font-size: var(--nf-text-sm);
   font-variant-numeric: tabular-nums;
   color: var(--nf-color-fg);
-  transition: background var(--nf-duration-instant) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-instant) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
 .slot:hover {
   background: var(--nf-color-surface-hover);
+}
+
+.slot:active {
+  scale: var(--nf-motion-press-scale);
 }
 
 .slot:focus-visible {
@@ -88,7 +111,6 @@
 }
 
 .slot[data-selected] {
-  background: var(--nf-color-accent-subtle);
   color: var(--nf-color-accent-fg);
-  font-weight: var(--nf-weight-semibold);
+  font-weight: var(--nf-weight-medium);
 }

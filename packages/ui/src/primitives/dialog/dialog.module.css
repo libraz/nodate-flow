@@ -60,7 +60,7 @@
     inset-inline: 0;
     inset-block-end: 0;
     max-inline-size: 100%;
-    max-block-size: 92vh;
+    max-block-size: 92dvh;
     border-radius: var(--nf-radius-lg) var(--nf-radius-lg) 0 0;
     border-block-end: none;
     overflow-y: auto;

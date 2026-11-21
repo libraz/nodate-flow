@@ -28,7 +28,7 @@
 
 .presence[data-state="closed"] {
   pointer-events: none;
-  animation: collapse var(--nf-duration-base) var(--nf-ease-in) forwards;
+  animation: collapse var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 .presence[data-state="closed"] > * {
@@ -46,7 +46,7 @@
 /* A table row cannot collapse its height, so a removed one fades in place (presence-row.tsx). */
 .exitRow[data-state="closed"] {
   pointer-events: none;
-  animation: global(nf-fade-out) var(--nf-duration-base) var(--nf-ease-in) forwards;
+  animation: global(nf-fade-out) var(--nf-duration-fast) var(--nf-ease-in) forwards;
 }
 
 /* Completion: a barely-there settle so the new state reads as the result of the click. */

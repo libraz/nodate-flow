@@ -27,6 +27,12 @@ export interface TimePickerProps {
   variant?: 'pill' | 'field';
   /** Additional class on the trigger button. */
   className?: string | undefined;
+  /** Id of the trigger button, for `<label htmlFor>` (FormField `control.id`). */
+  id?: string | undefined;
+  /** Ids of the elements describing the trigger (FormField `control['aria-describedby']`). */
+  'aria-describedby'?: string | undefined;
+  /** Marks the trigger invalid (FormField `control['aria-invalid']`). */
+  'aria-invalid'?: boolean | undefined;
 }
 
 function generateSlots(step: number): string[] {
@@ -58,6 +64,9 @@ export default function TimePicker({
   triggerLabel,
   variant = 'pill',
   className,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
 }: TimePickerProps): ReactElement {
   const [open, setOpen] = useState(false);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -110,6 +119,9 @@ export default function TimePicker({
     >
       <button
         type="button"
+        id={id}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         className={[styles.trigger, variant === 'field' && styles.field, className]
           .filter(Boolean)
           .join(' ')}

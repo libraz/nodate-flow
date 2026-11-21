@@ -11,7 +11,12 @@
   cursor: pointer;
   transition:
     background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.root:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .root:hover:not(:disabled) {
@@ -27,8 +32,8 @@
   border-radius: var(--nf-radius-pill);
   background: var(--nf-color-fg-on-accent);
   box-shadow: var(--nf-shadow-sm);
-  transform: translateY(-50%);
-  transition: inset-inline-start var(--nf-duration-base) var(--nf-ease-out);
+  translate: 0 -50%;
+  transition: translate var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .root[aria-checked="true"],
@@ -38,7 +43,12 @@
 }
 
 .root[aria-checked="true"] .thumb {
-  inset-inline-start: calc(var(--nf-space-10) - var(--nf-space-5));
+  /* Track inner width less the thumb and a gap on each side, so both rest gaps match. */
+  translate: calc(
+      (var(--nf-space-10) - var(--nf-space-px) * 2 - var(--nf-space-4) - var(--nf-space-1) * 2) *
+      var(--nf-motion-inline-sign, 1)
+    )
+    -50%;
 }
 
 .root:focus-visible {
@@ -47,6 +57,6 @@
 }
 
 .root:disabled {
-  opacity: 0.5;
+  opacity: var(--nf-opacity-disabled);
   cursor: not-allowed;
 }

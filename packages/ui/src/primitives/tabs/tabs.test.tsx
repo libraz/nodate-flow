@@ -154,21 +154,25 @@ describe('Tabs sliding indicator', () => {
   it('follows the active tab when a tab is inserted before it', async () => {
     stubTabLayout();
     const { container, rerender } = render(<Tabs items={ITEMS} value="b" aria-label="demo" />);
-    expect(indicator(container).style.insetInlineStart).toBe('50px');
+    expect(indicator(container).style.getPropertyValue('--indicator-start')).toBe('50px');
 
     const inserted: TabItem = { value: 'z', label: 'Zu', content: <p>panel-z</p> };
     rerender(<Tabs items={[inserted, ...ITEMS]} value="b" aria-label="demo" />);
-    await vi.waitFor(() => expect(indicator(container).style.insetInlineStart).toBe('70px'));
+    await vi.waitFor(() =>
+      expect(indicator(container).style.getPropertyValue('--indicator-start')).toBe('70px'),
+    );
   });
 
   it('follows the active tab when a sibling label changes width', async () => {
     stubTabLayout();
     const { container, rerender } = render(<Tabs items={ITEMS} value="b" aria-label="demo" />);
-    expect(indicator(container).style.insetInlineStart).toBe('50px');
+    expect(indicator(container).style.getPropertyValue('--indicator-start')).toBe('50px');
 
     const relabelled = ITEMS.map((it) => (it.value === 'a' ? { ...it, label: 'Alphabet' } : it));
     rerender(<Tabs items={relabelled} value="b" aria-label="demo" />);
-    await vi.waitFor(() => expect(indicator(container).style.insetInlineStart).toBe('80px'));
-    expect(indicator(container).style.inlineSize).toBe('50px');
+    await vi.waitFor(() =>
+      expect(indicator(container).style.getPropertyValue('--indicator-start')).toBe('80px'),
+    );
+    expect(indicator(container).style.getPropertyValue('--indicator-scale')).toBe('50');
   });
 });

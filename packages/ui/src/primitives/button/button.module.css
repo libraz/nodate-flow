@@ -4,6 +4,8 @@
  */
 .root {
   --btn-fg: var(--nf-color-fg);
+  /* Height floor per size; the padding math below lands on it for a text-only button. */
+  --btn-min-block: var(--nf-control-height);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -21,6 +23,7 @@
     ) /
     2
   );
+  min-block-size: var(--btn-min-block);
   border-radius: var(--nf-radius-md);
   border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-surface);
@@ -47,6 +50,16 @@
     scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
+/*
+ * An icon is sized to the label's line box (1em * leading), so it never
+ * makes the button taller than a text-only one; lucide's 24px default would.
+ */
+.root > svg {
+  inline-size: calc(1em * var(--nf-leading-tight));
+  block-size: calc(1em * var(--nf-leading-tight));
+  flex-shrink: 0;
+}
+
 .root:hover:not(:disabled) {
   background: var(--nf-color-surface-hover);
 }
@@ -65,18 +78,12 @@
 }
 
 /*
- * Disabled reads as unavailable, not as a faded version of the action: the
- * label drops to fg-subtle and the filled variants lose their fill. A busy
- * button is working rather than unavailable, so it keeps its look.
+ * Disabled fades the whole button by the shared disabled opacity, so it
+ * looks like a disabled input. A busy button is working rather than
+ * unavailable, so it keeps its look.
  */
 .root:disabled:not([aria-busy="true"]) {
-  --btn-fg: var(--nf-color-fg-subtle);
-}
-
-.primary:disabled:not([aria-busy="true"]),
-.danger:disabled:not([aria-busy="true"]) {
-  background: var(--nf-color-surface-hover);
-  border-color: var(--nf-color-border);
+  opacity: var(--nf-opacity-disabled);
 }
 
 .primary {
@@ -123,6 +130,7 @@
 }
 
 .sm {
+  --btn-min-block: var(--nf-space-8);
   padding-inline: var(--nf-space-3);
   /* Lands a one-line sm button on --nf-space-8 (32px), level with chips and
      sm segmented controls. */
@@ -134,6 +142,14 @@
 }
 
 .lg {
+  --btn-min-block: calc(
+    var(--nf-space-3) *
+    2 +
+    var(--nf-text-base) *
+    var(--nf-leading-tight) +
+    var(--nf-space-px) *
+    2
+  );
   padding-inline: var(--nf-space-5);
   padding-block: var(--nf-space-3);
   font-size: var(--nf-text-base);
@@ -184,6 +200,5 @@
 @media (max-width: 767px) {
   .root {
     min-inline-size: var(--nf-space-8);
-    min-block-size: var(--nf-space-8);
   }
 }

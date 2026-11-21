@@ -19,6 +19,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  inline-size: var(--nf-space-4);
+  block-size: var(--nf-space-4);
+  margin-inline-end: calc(var(--nf-space-1) * -1);
   padding: 0;
   border: none;
   border-radius: var(--nf-radius-pill);
@@ -69,4 +72,13 @@
   background: var(--nf-color-accent-subtle);
   border-color: var(--nf-color-accent);
   color: var(--nf-color-fg);
+}
+
+/* Touch hit area: the same floor Button uses. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .dismiss {
+    min-inline-size: var(--nf-space-8);
+    min-block-size: var(--nf-space-8);
+  }
 }

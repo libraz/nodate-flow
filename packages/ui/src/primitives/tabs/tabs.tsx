@@ -17,6 +17,7 @@
  */
 
 import {
+  type CSSProperties,
   forwardRef,
   type HTMLAttributes,
   type KeyboardEvent,
@@ -201,7 +202,14 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
             <span
               aria-hidden="true"
               className={styles.indicator}
-              style={{ insetInlineStart: indicator.start, inlineSize: indicator.size }}
+              style={
+                {
+                  // One-pixel base box, stretched to the tab's width by `scale`.
+                  inlineSize: 1,
+                  '--indicator-start': `${indicator.start}px`,
+                  '--indicator-scale': indicator.size,
+                } as CSSProperties
+              }
             />
           ) : null}
         </div>

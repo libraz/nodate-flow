@@ -328,7 +328,12 @@ function SegmentedControl<T extends string>({
         <span
           aria-hidden="true"
           className={styles.thumb}
-          style={{ insetInlineStart: thumb.start, inlineSize: thumb.size }}
+          style={
+            {
+              inlineSize: thumb.size,
+              '--thumb-start': `${thumb.start}px`,
+            } as CSSProperties
+          }
         />
       ) : null}
       {options.map((option) => {

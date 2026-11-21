@@ -38,8 +38,9 @@
 
 .link {
   color: var(--nf-color-fg-muted);
-  text-decoration: none;
   border-radius: var(--nf-radius-xs);
+  /* The underline is always laid out; only its colour fades in. */
+  text-decoration-line: underline;
   text-underline-offset: 0.2em;
   text-decoration-color: transparent;
   transition:
@@ -49,7 +50,6 @@
 
 .link:hover {
   color: var(--nf-color-fg);
-  text-decoration-line: underline;
   text-decoration-color: currentColor;
 }
 

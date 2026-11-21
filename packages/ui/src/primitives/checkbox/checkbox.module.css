@@ -56,7 +56,7 @@
 }
 
 .root:disabled {
-  opacity: 0.5;
+  opacity: var(--nf-opacity-disabled);
   cursor: not-allowed;
 }
 

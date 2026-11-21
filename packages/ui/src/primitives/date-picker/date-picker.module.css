@@ -1,5 +1,9 @@
 .trigger {
   all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--nf-space-8);
   cursor: pointer;
   padding: var(--nf-space-1) var(--nf-space-3);
   border-radius: var(--nf-radius-md);
@@ -10,12 +14,17 @@
   background: var(--nf-color-accent-subtle);
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
 }
 
 .trigger:hover {
   background: var(--nf-color-accent-hover);
   color: var(--nf-color-fg-on-accent);
+}
+
+.trigger:active:not(.field) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .trigger:focus-visible {
@@ -47,6 +56,11 @@
   background: var(--nf-color-bg-elevated);
   border-color: var(--nf-color-fg-subtle);
   color: var(--nf-color-fg);
+}
+
+.field[aria-invalid="true"],
+.field[aria-invalid="true"]:hover {
+  border-color: var(--nf-color-danger);
 }
 
 .field:focus-visible {
@@ -81,7 +95,19 @@
   block-size: 2rem;
   border-radius: var(--nf-radius-sm);
   color: var(--nf-color-fg);
-  transition: background var(--nf-duration-fast) var(--nf-ease-standard);
+  transition:
+    background var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.navBtn:active {
+  scale: var(--nf-motion-press-scale);
+}
+
+.navBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
 }
 
 .navBtn:hover {
@@ -143,7 +169,13 @@
   color: var(--nf-color-fg);
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.day:active:not([aria-disabled="true"]) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .day:hover:not([aria-disabled="true"]) {
@@ -156,7 +188,7 @@
 }
 
 .day[aria-disabled="true"] {
-  opacity: 0.3;
+  opacity: var(--nf-opacity-disabled);
   cursor: default;
 }
 
@@ -171,9 +203,12 @@
 }
 
 .dayToday {
-  outline: 2px solid var(--nf-color-accent);
-  outline-offset: -2px;
+  box-shadow: inset 0 0 0 var(--nf-space-0-5) var(--nf-color-accent);
   font-weight: var(--nf-weight-bold);
+}
+
+.daySelected.dayToday {
+  box-shadow: inset 0 0 0 var(--nf-space-0-5) var(--nf-color-fg-on-accent);
 }
 
 .footer {
@@ -181,11 +216,15 @@
   justify-content: flex-end;
   margin-block-start: var(--nf-space-2);
   padding-block-start: var(--nf-space-2);
-  border-block-start: 1px solid var(--nf-color-border);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 .clearBtn {
   all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--nf-space-8);
   cursor: pointer;
   padding: var(--nf-space-1) var(--nf-space-2);
   border-radius: var(--nf-radius-sm);

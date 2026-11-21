@@ -140,4 +140,25 @@ describe.each(THEMES)('DatePicker [%s]', (theme) => {
     await user.click(screen.getByRole('button', { name: 'Next month' }));
     expect(screen.getByText('July 2026')).toBeDefined();
   });
+
+  it('passes id, aria-describedby and aria-invalid to the trigger', () => {
+    render(
+      <>
+        <label htmlFor="due">Due</label>
+        <DatePicker
+          id="due"
+          aria-describedby="due-error"
+          aria-invalid
+          value="2026-06-15"
+          onChange={() => undefined}
+          prevLabel="Previous month"
+          nextLabel="Next month"
+        />
+      </>,
+    );
+    const trigger = screen.getByLabelText('Due');
+    expect(trigger.id).toBe('due');
+    expect(trigger.getAttribute('aria-describedby')).toBe('due-error');
+    expect(trigger.getAttribute('aria-invalid')).toBe('true');
+  });
 });

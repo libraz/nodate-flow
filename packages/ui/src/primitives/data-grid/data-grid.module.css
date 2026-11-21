@@ -55,9 +55,14 @@
   cursor: pointer;
 }
 
+.headerCell[aria-sort]:hover {
+  background: var(--nf-color-surface-hover);
+}
+
+/* Inset: an outer ring would be clipped by the neighbouring cells and the scroller. */
 .headerCell:focus-visible {
   outline: none;
-  box-shadow: var(--nf-shadow-focus);
+  box-shadow: inset 0 0 0 var(--nf-focus-ring-width) var(--nf-color-focus-ring);
 }
 
 .body {
@@ -68,7 +73,9 @@
 .row {
   display: flex;
   border-block-end: var(--nf-space-px) solid var(--nf-color-hairline);
-  transition: background-color var(--nf-duration-instant) var(--nf-ease-standard);
+  transition:
+    background-color var(--nf-duration-instant) var(--nf-ease-standard),
+    translate var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .row:hover {
@@ -77,6 +84,10 @@
 
 .row[aria-selected="true"] {
   background: var(--nf-color-accent-subtle);
+}
+
+.row[aria-selected="true"]:hover {
+  background-image: linear-gradient(var(--nf-overlay-press), var(--nf-overlay-press));
 }
 
 .cell {
@@ -99,7 +110,7 @@
 
 .cell:focus-visible {
   outline: none;
-  box-shadow: var(--nf-shadow-focus);
+  box-shadow: inset 0 0 0 var(--nf-focus-ring-width) var(--nf-color-focus-ring);
 }
 
 .empty {
@@ -127,20 +138,28 @@
   position: absolute;
   inset-block: 0;
   inset-inline-end: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 4px;
+  inline-size: var(--nf-space-2);
   cursor: col-resize;
   user-select: none;
   touch-action: none;
+}
+
+/* The grab area is wide; the visible line stays thin at the column edge. */
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: var(--nf-space-0-5);
   background: transparent;
   transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
-.resizeHandle:hover {
+.resizeHandle:hover::after {
   background: var(--nf-color-border-strong);
 }
 
-.resizeHandle.resizing {
+.resizeHandle.resizing::after {
   background: var(--nf-color-accent);
 }
 

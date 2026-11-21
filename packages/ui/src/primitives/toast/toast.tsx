@@ -8,6 +8,7 @@
  */
 
 import {
+  type CSSProperties,
   type ReactElement,
   type ReactNode,
   useEffect,
@@ -16,8 +17,10 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { usePresenceList } from '../../hooks/use-presence-list';
 import { cx } from '../../lib/cx';
 import { buttonClassName } from '../button/button';
+import PresenceItem from '../presence-item/presence-item';
 import styles from './toast.module.css';
 
 const PORTAL_ID = 'nf-toast-root';
@@ -124,6 +127,9 @@ function getPortalRoot(): HTMLElement | null {
   return el;
 }
 
+/** Closes the stack's row gap along with a dismissed toast. */
+const PRESENCE_STYLE = { '--presence-gap': 'var(--nf-space-2)' } as CSSProperties;
+
 interface ToastItemProps {
   toast: Toast;
 }
@@ -197,13 +203,21 @@ export interface ToastProviderProps {
  */
 export function ToastProvider({ label }: ToastProviderProps = {}): ReactElement | null {
   const toasts = useToaster();
+  const { entries, onExited } = usePresenceList(toasts, (t) => t.id);
   const root = getPortalRoot();
   if (!root) return null;
 
   return createPortal(
     <output aria-live="polite" aria-atomic="false" aria-label={label} className={styles.viewport}>
-      {toasts.map((t) => (
-        <ToastItem key={t.id} toast={t} />
+      {entries.map((entry) => (
+        <PresenceItem
+          key={entry.key}
+          present={entry.present}
+          onExited={() => onExited(entry.key)}
+          style={PRESENCE_STYLE}
+        >
+          <ToastItem toast={entry.item} />
+        </PresenceItem>
       ))}
     </output>,
     root,

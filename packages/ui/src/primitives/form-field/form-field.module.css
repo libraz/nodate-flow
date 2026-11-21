@@ -22,15 +22,17 @@
   color: var(--nf-color-fg-muted);
 }
 
-/* An empty slot still takes a flex gap; cancel it so no error means no space. */
-.errorSlot:empty {
+/*
+ * The slot's flex gap is cancelled and carried by the message's own top
+ * padding instead, so the Collapse around it animates the gap in and out.
+ */
+.errorSlot {
   margin-block-start: calc(var(--nf-space-1) * -1);
 }
 
 .error {
   display: block;
+  padding-block-start: var(--nf-space-1);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-danger-fg);
-  --nf-motion-shift: var(--nf-motion-shift-sm);
-  animation: global(nf-slide-in-from-block-start) var(--nf-duration-fast) var(--nf-ease-out);
 }

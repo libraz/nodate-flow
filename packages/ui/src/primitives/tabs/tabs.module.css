@@ -25,13 +25,19 @@
   font-family: var(--nf-font-sans);
   font-size: var(--nf-text-sm);
   font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
   padding-inline: var(--nf-space-3);
   padding-block: var(--nf-space-2);
   white-space: nowrap;
   flex-shrink: 0;
   transition:
     color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+    border-color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.tab:active:not([aria-disabled="true"]) {
+  scale: var(--nf-motion-press-scale);
 }
 
 .tab:hover:not([aria-disabled="true"], .tabActive) {
@@ -39,7 +45,7 @@
 }
 
 .tab[aria-disabled="true"] {
-  opacity: 0.5;
+  opacity: var(--nf-opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -63,12 +69,22 @@
 .indicator {
   position: absolute;
   inset-block-end: 0;
+  inset-inline-start: 0;
   block-size: var(--nf-space-0-5);
   background: var(--nf-color-accent);
   pointer-events: none;
+  /* A one-pixel box (set inline) stretched to the tab width from its start edge. */
+  transform-origin: 0 50%;
+  translate: calc(var(--indicator-start) * var(--nf-motion-inline-sign, 1)) 0;
+  scale: var(--indicator-scale) 1;
   transition:
-    inset-inline-start var(--nf-duration-base) var(--nf-ease-out),
-    inline-size var(--nf-duration-base) var(--nf-ease-out);
+    translate var(--nf-duration-base) var(--nf-ease-out),
+    scale var(--nf-duration-base) var(--nf-ease-out);
+}
+
+/* `transform-origin` has no logical form: the start edge is on the right in RTL. */
+:where([dir="rtl"]) .indicator {
+  transform-origin: 100% 50%;
 }
 
 .panel {

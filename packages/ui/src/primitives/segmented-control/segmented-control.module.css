@@ -79,12 +79,13 @@
 .thumb {
   position: absolute;
   inset-block: var(--nf-space-1);
-  border-radius: var(--nf-radius-sm);
+  inset-inline-start: 0;
+  /* Concentric with the group: its radius less the group's padding. */
+  border-radius: calc(var(--nf-radius-md) - var(--nf-space-1));
   background: var(--sc-active-bg);
   pointer-events: none;
-  transition:
-    inset-inline-start var(--nf-duration-base) var(--nf-ease-out),
-    inline-size var(--nf-duration-base) var(--nf-ease-out);
+  translate: calc(var(--thumb-start) * var(--nf-motion-inline-sign, 1)) 0;
+  transition: translate var(--nf-duration-base) var(--nf-ease-out);
 }
 
 .segment {
@@ -104,10 +105,15 @@
   letter-spacing: var(--nf-control-tracking);
   line-height: var(--nf-leading-tight);
   white-space: nowrap;
-  border-radius: var(--nf-radius-sm);
+  border-radius: calc(var(--nf-radius-md) - var(--nf-space-1));
   transition:
     background var(--nf-duration-fast) var(--nf-ease-standard),
-    color var(--nf-duration-fast) var(--nf-ease-standard);
+    color var(--nf-duration-fast) var(--nf-ease-standard),
+    scale var(--nf-duration-instant) var(--nf-ease-out);
+}
+
+.segment:active:not(:disabled) {
+  scale: var(--nf-motion-press-scale);
 }
 
 /* A segment fills the group height minus the group's padding and border. */
@@ -141,14 +147,13 @@
 }
 
 .segment:disabled {
-  opacity: 0.5;
+  opacity: var(--nf-opacity-disabled);
   cursor: not-allowed;
 }
 
 .segmentActive {
   background: var(--sc-active-bg);
   color: var(--sc-active-fg);
-  font-weight: var(--nf-weight-semibold);
 }
 
 /* Once measured, the sliding thumb replaces the per-segment fill. */
@@ -177,8 +182,7 @@
 /*
  * Colourful mode: the tone's `-fg` labels every segment, so the ordinal
  * colour ramp shows at rest; the selected one adds the tone's wash (over
- * bg-elevated, so the pair holds 4.5:1 on any backdrop) and the semibold
- * weight `.segmentActive` sets. No solid fills: no single text colour holds
+ * bg-elevated, so the pair holds 4.5:1 on any backdrop). No solid fills: no single text colour holds
  * 4.5:1 on all of them.
  */
 .segmentColourful {
@@ -245,4 +249,11 @@
 .toneMilestone {
   --sc-wash: var(--nf-cal-milestone-subtle);
   --sc-tone-fg: var(--nf-cal-milestone-fg);
+}
+
+/* Icons track the label's line box so they never grow the control. */
+.segment > svg {
+  inline-size: calc(1em * var(--nf-leading-tight));
+  block-size: calc(1em * var(--nf-leading-tight));
+  flex-shrink: 0;
 }

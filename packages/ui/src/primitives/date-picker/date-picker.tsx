@@ -62,6 +62,12 @@ export interface DatePickerProps {
   variant?: 'pill' | 'field';
   /** Additional class on the trigger button. */
   className?: string | undefined;
+  /** Id of the trigger button, for `<label htmlFor>` (FormField `control.id`). */
+  id?: string | undefined;
+  /** Ids of the elements describing the trigger (FormField `control['aria-describedby']`). */
+  'aria-describedby'?: string | undefined;
+  /** Marks the trigger invalid (FormField `control['aria-invalid']`). */
+  'aria-invalid'?: boolean | undefined;
   /**
    * Optional handler that, when provided, renders a "Clear" affordance in the
    * popover footer for unsetting the current selection (e.g. clearing a
@@ -206,6 +212,9 @@ export default function DatePicker({
   triggerLabel,
   variant = 'pill',
   className,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
   onClear,
   clearLabel,
 }: DatePickerProps): ReactElement {
@@ -518,6 +527,9 @@ export default function DatePicker({
     >
       <button
         type="button"
+        id={id}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         className={cx(styles.trigger, variant === 'field' && styles.field, className)}
       >
         {triggerLabel ?? value}

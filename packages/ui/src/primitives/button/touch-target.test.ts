@@ -85,18 +85,25 @@ describe('Button touch target', () => {
     const declarations = ruleBody(block ?? '', '\\.root');
     expect(declarations, 'the mobile block does not target .root').not.toBeNull();
 
-    for (const property of ['min-inline-size', 'min-block-size']) {
-      const value = declarations?.match(new RegExp(`${property}:\\s*([^;]+);`))?.[1];
-      expect(value, `.root declares no ${property} below md`).toBeDefined();
-      expect(resolvePx(value ?? '', scale)).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
-    }
+    const value = declarations?.match(/min-inline-size:\s*([^;]+);/)?.[1];
+    expect(value, '.root declares no min-inline-size below md').toBeDefined();
+    expect(resolvePx(value ?? '', scale)).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
+  });
+
+  it('keeps every size at or above the touch bar in height', () => {
+    // The block floor is a per-size custom property, not a media rule: the
+    // smallest size (sm) is the one that could fall below the bar.
+    const sm = ruleBody(buttonCss, '\\.sm')?.match(/--btn-min-block:\s*([^;]+);/)?.[1];
+    expect(sm, '.sm declares no --btn-min-block').toBeDefined();
+    expect(resolvePx(sm ?? '', scale)).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
   });
 
   it('leaves the wide-viewport geometry alone', () => {
-    // The floor belongs to the fingertip, not to the component: a size
-    // written outside the media query would move every toolbar and table
-    // row in the product.
+    // The inline floor belongs to the fingertip, not to the component: a
+    // width written outside the media query would widen every icon button
+    // in the product. The block floor is the size's own height, which the
+    // text-only padding math already lands on.
     const outsideMedia = buttonCss.slice(0, buttonCss.indexOf(`@media ${condition}`));
-    expect(outsideMedia).not.toMatch(/min-(inline|block)-size:/);
+    expect(outsideMedia).not.toMatch(/min-inline-size:/);
   });
 });

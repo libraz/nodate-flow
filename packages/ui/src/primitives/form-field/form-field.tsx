@@ -5,8 +5,16 @@
  * input element.
  */
 
-import { forwardRef, type HTMLAttributes, type ReactElement, type ReactNode, useId } from 'react';
+import {
+  forwardRef,
+  type HTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  useId,
+  useRef,
+} from 'react';
 import { cx } from '../../lib/cx';
+import Collapse from '../collapse/collapse';
 import styles from './form-field.module.css';
 
 export interface FormFieldControlProps {
@@ -34,6 +42,9 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
     const inputId = useId();
     const descId = useId();
     const errorId = useId();
+    // The message stays rendered while Collapse plays the exit.
+    const lastError = useRef<ReactNode>(null);
+    if (error) lastError.current = error;
 
     const describedBy: string[] = [];
     if (description) describedBy.push(descId);
@@ -66,11 +77,11 @@ const FormField = forwardRef<HTMLDivElement, FormFieldProps>(
             into it. Polite, not role="alert": the message is read once on
             arrival and again via aria-describedby when the field is focused. */}
         <div aria-live="polite" className={styles.errorSlot}>
-          {error ? (
+          <Collapse open={Boolean(error)}>
             <span id={errorId} className={styles.error}>
-              {error}
+              {error || lastError.current}
             </span>
-          ) : null}
+          </Collapse>
         </div>
       </div>
     );
