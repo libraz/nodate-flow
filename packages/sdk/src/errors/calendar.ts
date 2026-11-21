@@ -166,10 +166,25 @@ export const CalendarErrors = {
     status: 500,
     message: "Could not save comment",
   },
+  CALENDAR_EVENT_ALL_DAY_SHAPE: {
+    code: "CALENDAR.EVENT.ALL_DAY_SHAPE",
+    status: 422,
+    message: "An all-day event takes dates, not times",
+  },
+  CALENDAR_EVENT_ALL_DAY_TOGGLE_WITH_EXCEPTIONS: {
+    code: "CALENDAR.EVENT.ALL_DAY_TOGGLE_WITH_EXCEPTIONS",
+    status: 422,
+    message: "A repeating event with cancelled or changed occurrences cannot switch between all-day and timed",
+  },
   CALENDAR_EVENT_ALREADY_OCCURRENCE_OVERRIDE: {
     code: "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE",
     status: 422,
     message: "This event already replaces a single occurrence and cannot be divided further",
+  },
+  CALENDAR_EVENT_DATE_RANGE_INVALID: {
+    code: "CALENDAR.EVENT.DATE_RANGE_INVALID",
+    status: 422,
+    message: "endDate must be after startDate",
   },
   CALENDAR_EVENT_DATE_RANGE_UNPARSEABLE: {
     code: "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE",
@@ -200,6 +215,11 @@ export const CalendarErrors = {
     code: "CALENDAR.EVENT.MILESTONE_RECURRENCE_NOT_ALLOWED",
     status: 422,
     message: "A milestone cannot repeat",
+  },
+  CALENDAR_EVENT_NOTIFICATION_OFFSET_OUT_OF_RANGE: {
+    code: "CALENDAR.EVENT.NOTIFICATION_OFFSET_OUT_OF_RANGE",
+    status: 422,
+    message: "A reminder can be set from 0 minutes up to 7 days before the event",
   },
   CALENDAR_EVENT_NOTIFICATION_REQUIRES_START: {
     code: "CALENDAR.EVENT.NOTIFICATION_REQUIRES_START",

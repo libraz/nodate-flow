@@ -290,6 +290,42 @@ resources:
         description: "Returned when a write would leave a notification offset on an event with no start time. The offset is measured from the start, so without one there is no moment to remind at."
         userAction: "Give the event a start and end time, or remove the reminder."
 
+      all_day_shape:
+        code: CALENDAR.EVENT.ALL_DAY_SHAPE
+        status: 422
+        message: "An all-day event takes dates, not times"
+        message_ja: "終日のイベントには日時ではなく日付を指定してください"
+        message_zh: "全天事件应提供日期而非时间"
+        description: "Returned when a write marks an event all-day but supplies startAt / endAt instants, or supplies dates on an event that is not all-day. An all-day event is stored as whole UTC days (PROTOCOL.md §All-day events), so a time of day would have to be discarded."
+        userAction: "Send startDate and endDate (YYYY-MM-DD, end exclusive) for an all-day event, or startAt and endAt for a timed one."
+
+      date_range_invalid:
+        code: CALENDAR.EVENT.DATE_RANGE_INVALID
+        status: 422
+        message: "endDate must be after startDate"
+        message_ja: "終了日は開始日より後にしてください"
+        message_zh: "结束日期必须晚于开始日期"
+        description: "Returned when an all-day write supplies an endDate on or before its startDate. endDate is exclusive, so a one-day event ends the day after it starts; only a milestone is a single point, with endDate equal to startDate."
+        userAction: "Send the day after the last day as endDate (for a one-day event, startDate plus one day)."
+
+      notification_offset_out_of_range:
+        code: CALENDAR.EVENT.NOTIFICATION_OFFSET_OUT_OF_RANGE
+        status: 422
+        message: "A reminder can be set from 0 minutes up to 7 days before the event"
+        message_ja: "リマインダーはイベントの 0 分前から 7 日前までの範囲で設定してください"
+        message_zh: "提醒时间必须在事件开始前 0 分钟至 7 天之间"
+        description: "Returned when notificationOffset is negative or larger than 10080 minutes. The same bound is enforced by the chk_calendar_events_notification_offset_range database constraint."
+        userAction: "Send a notificationOffset between 0 and 10080, or omit it for no reminder."
+
+      all_day_toggle_with_exceptions:
+        code: CALENDAR.EVENT.ALL_DAY_TOGGLE_WITH_EXCEPTIONS
+        status: 422
+        message: "A repeating event with cancelled or changed occurrences cannot switch between all-day and timed"
+        message_ja: "個別の回を取り消し・変更した繰り返しイベントは、終日と時間指定を切り替えられません"
+        message_zh: "已取消或修改过单次日程的重复事件无法在全天与定时之间切换"
+        description: "Returned when a write toggles allDay on a series that carries recurrence exceptions or override rows. Those name occurrences by date on an all-day series and by instant on a timed one, so the switch would leave them pointing at nothing."
+        userAction: "Create a new event with the other shape, or remove the exceptions and changed occurrences first."
+
       milestone_recurrence_not_allowed:
         code: CALENDAR.EVENT.MILESTONE_RECURRENCE_NOT_ALLOWED
         status: 422
