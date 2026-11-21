@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   pathname: '/today',
+  taskId: null as string | null,
   workspaces: [] as Array<{ id: string; name: string }>,
   role: null as string | null,
   projects: [] as Array<{ id: string; name: string; isArchived: boolean }>,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
+  useMatch: () => (mocks.taskId ? { params: { taskId: mocks.taskId } } : undefined),
   useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
     select({ location: { pathname: mocks.pathname } }),
   Link: ({
@@ -96,15 +98,17 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+import { tasksKeys } from '../../../features/tasks/api';
 import { clearActiveWorkspaceId, setActiveWorkspaceId } from '../../../lib/use-current-workspace';
 import { OPEN_SHORTCUTS_HELP_EVENT } from '../../page-help';
 import Sidebar from '../sidebar';
 
 const ACME = [{ id: 'ws-1', name: 'Acme' }];
 
-function renderSidebar(): HTMLElement {
+function renderSidebar(seed?: (client: QueryClient) => void): HTMLElement {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(['workspaces', 'list'], mocks.workspaces);
+  seed?.(client);
   return render(
     <QueryClientProvider client={client}>
       <Sidebar />
@@ -114,6 +118,7 @@ function renderSidebar(): HTMLElement {
 
 beforeEach(() => {
   mocks.pathname = '/today';
+  mocks.taskId = null;
   mocks.workspaces = ACME;
   mocks.role = null;
   mocks.projects = [];
@@ -364,5 +369,34 @@ describe('project entries', () => {
     const row = await screen.findByRole('link', { name: 'Platform' });
 
     expect(row.className).not.toContain('itemActive');
+  });
+});
+
+describe('sidebar on a task page', () => {
+  it('marks the task project active from the cached task without fetching or erroring', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.pathname = '/tasks/t1';
+    mocks.taskId = 't1';
+    mocks.projects = [
+      { id: 'p1', name: 'Platform', isArchived: false },
+      { id: 'p2', name: 'Other', isArchived: false },
+    ];
+    renderSidebar((client) => {
+      client.setQueryData(tasksKeys.detail('t1'), { id: 't1', projectId: 'p1' });
+    });
+
+    const active = await screen.findByRole('link', { name: 'Platform' });
+    expect(active.getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Other' }).getAttribute('aria-current')).toBeNull();
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('does not observe a task query when no task is open', async () => {
+    mocks.projects = [{ id: 'p1', name: 'Platform', isArchived: false }];
+    renderSidebar();
+
+    const link = await screen.findByRole('link', { name: 'Platform' });
+    expect(link.getAttribute('aria-current')).toBeNull();
   });
 });

@@ -7,6 +7,8 @@
   "delete_widget_error": "ウィジェットの削除に失敗しました",
   "edit_layout": "レイアウトを編集",
   "done_editing": "完了",
+  "move_earlier": "{title} を前へ移動",
+  "move_later": "{title} を後ろへ移動",
   "remove_widget": "ウィジェットを削除",
   "widget_type": {
     "task_summary": "タスクサマリー",

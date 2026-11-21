@@ -60,23 +60,15 @@
 }
 
 .shortcut {
-  display: inline-flex;
-  align-items: center;
+  composes: kbd from "../kbd.module.css";
   margin-inline: var(--nf-space-2);
-  padding-block: var(--nf-space-px);
-  padding-inline: var(--nf-space-1-5);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  border-radius: var(--nf-radius-sm);
-  background: var(--nf-color-bg-elevated);
-  font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-subtle);
 }
 
 /* Touch devices have no keyboard to press the shortcut with. */
 @media (hover: none) and (pointer: coarse) {
-  .divider,
-  .shortcut {
+  /* Scoped under .dock so it outranks the composed kbd chip's display. */
+  .dock .divider,
+  .dock .shortcut {
     display: none;
   }
 }

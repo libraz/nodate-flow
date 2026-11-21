@@ -8,7 +8,8 @@ import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
 import { BP } from '@nodate-flow/ui/tokens/breakpoints';
-import { Link, useRouterState } from '@tanstack/react-router';
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { Link, useMatch, useRouterState } from '@tanstack/react-router';
 import {
   CheckSquare,
   ChevronRight,
@@ -38,6 +39,7 @@ import { useTranslation } from 'react-i18next';
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
 import { useProjectsQuery } from '../../features/projects/api';
 import ProjectCreateDialog from '../../features/projects/project-create-dialog';
+import { type Task, tasksKeys } from '../../features/tasks/api';
 import { useWorkspacesQuery } from '../../features/workspaces/api';
 import { APP_ICON, APP_LOGO, APP_NAME } from '../../lib/brand';
 import { useCurrentWorkspaceId } from '../../lib/use-current-workspace';
@@ -111,11 +113,11 @@ function NavLinkItem({
       className={cx(
         baseClass,
         (forcedActive || prefixActive) && styles.itemActive,
-        'nf-focus-ring',
+        'nf-focus-ring-inset',
       )}
       {...(prefixActive ? { 'aria-current': 'page' as const } : {})}
       activeOptions={{ exact }}
-      activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring') }}
+      activeProps={{ className: cx(baseClass, styles.itemActive, 'nf-focus-ring-inset') }}
     >
       <Icon icon={entry.icon} decorative />
       <span className={styles.label}>{label}</span>
@@ -151,36 +153,66 @@ const SETTINGS_ENTRY = navEntry('settings');
 function WorkspaceProjectsSection({
   workspaceId,
   pathname,
+  open,
 }: {
   workspaceId: string;
   pathname: string;
+  open: boolean;
 }): ReactElement | null {
   const { data: projects } = useProjectsQuery(workspaceId);
+  const taskProjectId = useTaskProjectId();
   const visible = projects.filter((p) => !p.isArchived);
   if (visible.length === 0) return null;
   return (
-    <div className={styles.subNav}>
-      {visible.map((p) => (
-        <Link
-          key={p.id}
-          to="/workspaces/$id/projects/$projectId/tasks"
-          params={{ id: workspaceId, projectId: p.id }}
-          className={cx(
-            styles.item,
-            styles.subItem,
-            isUnderProject(pathname, workspaceId, p.id) && styles.itemActive,
-            'nf-focus-ring',
-          )}
-          activeProps={{
-            className: cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring'),
-          }}
-        >
-          <Icon icon={FolderKanban} decorative />
-          <span className={styles.label}>{p.name}</span>
-        </Link>
-      ))}
-    </div>
+    <Collapse open={open} className={styles.subCollapse}>
+      <div className={styles.subNav}>
+        {visible.map((p) => {
+          const active = isUnderProject(pathname, workspaceId, p.id) || p.id === taskProjectId;
+          return (
+            <Link
+              key={p.id}
+              to="/workspaces/$id/projects/$projectId/tasks"
+              params={{ id: workspaceId, projectId: p.id }}
+              title={p.name}
+              className={cx(
+                styles.item,
+                styles.subItem,
+                active && styles.itemActive,
+                'nf-focus-ring-inset',
+              )}
+              {...(active ? { 'aria-current': 'page' as const } : {})}
+              activeProps={{
+                className: cx(
+                  styles.item,
+                  styles.subItem,
+                  styles.itemActive,
+                  'nf-focus-ring-inset',
+                ),
+              }}
+            >
+              <Icon icon={FolderKanban} decorative />
+              <span className={styles.label}>{p.name}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </Collapse>
   );
+}
+
+/**
+ * The project of the task open at `/tasks/$taskId`, read from the task-detail
+ * query cache (the page fetches it; this only observes, never fetches).
+ */
+function useTaskProjectId(): string | null {
+  const taskId =
+    useMatch({ from: '/_authenticated/tasks/$taskId', shouldThrow: false })?.params.taskId ?? null;
+  // `skipToken` observes the cache without ever fetching.
+  const { data } = useQuery<Task>({
+    queryKey: tasksKeys.detail(taskId ?? ''),
+    queryFn: skipToken,
+  });
+  return taskId && data ? data.projectId : null;
 }
 
 /**
@@ -219,8 +251,8 @@ function FavoriteRow({
 }): ReactElement | null {
   const { t } = useTranslation('labels');
   const icon = favoriteIconFor(favorite.targetType);
-  const className = cx(styles.item, styles.subItem, 'nf-focus-ring');
-  const activeClassName = cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring');
+  const className = cx(styles.item, styles.subItem, 'nf-focus-ring-inset');
+  const activeClassName = cx(styles.item, styles.subItem, styles.itemActive, 'nf-focus-ring-inset');
   if (favorite.targetType === 'task') {
     const fallback = t('favorites.untitled_task');
     return (
@@ -231,7 +263,9 @@ function FavoriteRow({
         activeProps={{ className: activeClassName }}
       >
         <Icon icon={icon} decorative />
-        <span className={styles.label}>{favorite.title ?? fallback}</span>
+        <span className={styles.label} title={favorite.title ?? fallback}>
+          {favorite.title ?? fallback}
+        </span>
       </Link>
     );
   }
@@ -246,7 +280,9 @@ function FavoriteRow({
         activeProps={{ className: activeClassName }}
       >
         <Icon icon={icon} decorative />
-        <span className={styles.label}>{favorite.title ?? t('favorites.untitled_project')}</span>
+        <span className={styles.label} title={favorite.title ?? t('favorites.untitled_project')}>
+          {favorite.title ?? t('favorites.untitled_project')}
+        </span>
       </Link>
     );
   }
@@ -332,7 +368,7 @@ function WorkspaceArea({
           <Link
             to="/setup"
             aria-label={t('nav.noWorkspace.cta')}
-            className={cx(styles.item, 'nf-focus-ring')}
+            className={cx(styles.item, 'nf-focus-ring-inset')}
           >
             <Icon icon={Plus} decorative />
           </Link>
@@ -343,7 +379,7 @@ function WorkspaceArea({
       <section className={styles.noWorkspace}>
         <p className={styles.noWorkspaceTitle}>{t('nav.noWorkspace.title')}</p>
         <p className={styles.noWorkspaceBody}>{t('nav.noWorkspace.body')}</p>
-        <Link to="/setup" className={cx(styles.cta, 'nf-focus-ring')}>
+        <Link to="/setup" className={cx(styles.cta, 'nf-focus-ring-inset')}>
           {t('nav.noWorkspace.cta')}
         </Link>
       </section>
@@ -384,20 +420,16 @@ function WorkspaceArea({
   };
 
   return (
-    <section
-      className={styles.workspaceSection}
-      {...(railCollapsed ? { 'aria-label': workspace.name } : { 'aria-labelledby': headingId })}
-    >
-      {railCollapsed ? null : (
-        <h2 id={headingId} className={styles.wsHeading}>
-          <span className={styles.monogram} aria-hidden="true">
-            {(Array.from(workspace.name.trim())[0] ?? '').toUpperCase()}
-          </span>
-          <span className={styles.wsHeadingName} title={workspace.name}>
-            {workspace.name}
-          </span>
-        </h2>
-      )}
+    <section className={styles.workspaceSection} aria-labelledby={headingId}>
+      {/* Stays mounted while the rail narrows; its name fades with the other labels. */}
+      <h2 id={headingId} className={styles.wsHeading}>
+        <span className={styles.monogram} aria-hidden="true">
+          {(Array.from(workspace.name.trim())[0] ?? '').toUpperCase()}
+        </span>
+        <span className={styles.wsHeadingName} title={workspace.name}>
+          {workspace.name}
+        </span>
+      </h2>
       {WORKSPACE_ENTRIES.map((entry) => {
         if (entry.key !== 'projects') {
           return (
@@ -418,12 +450,14 @@ function WorkspaceArea({
                 railCollapsed={railCollapsed}
                 exact
               />
-              {canCreateProject && !railCollapsed ? (
+              {canCreateProject ? (
                 <Tooltip content={t('projects.new')} placement="right">
                   <button
                     type="button"
-                    className={cx(styles.addButton, 'nf-focus-ring')}
+                    className={cx(styles.addButton, 'nf-focus-ring-inset')}
                     aria-label={t('projects.new')}
+                    tabIndex={railCollapsed ? -1 : undefined}
+                    aria-hidden={railCollapsed || undefined}
                     onClick={() => {
                       setProjectDialogOpen(true);
                     }}
@@ -433,14 +467,16 @@ function WorkspaceArea({
                 </Tooltip>
               ) : null}
             </div>
-            {railCollapsed ? null : (
-              // A 401/403/404 on the workspace lists hides the section, not the shell.
-              <ErrorBoundary fallback={null} resetKeys={[pathname, workspaceId]}>
-                <Suspense fallback={null}>
-                  <WorkspaceProjectsSection workspaceId={workspaceId} pathname={pathname} />
-                </Suspense>
-              </ErrorBoundary>
-            )}
+            {/* A 401/403/404 on the workspace lists hides the section, not the shell. */}
+            <ErrorBoundary fallback={null} resetKeys={[pathname, workspaceId]}>
+              <Suspense fallback={null}>
+                <WorkspaceProjectsSection
+                  workspaceId={workspaceId}
+                  pathname={pathname}
+                  open={!railCollapsed}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         );
       })}
@@ -472,7 +508,7 @@ function WorkspaceArea({
             className={cx(
               styles.item,
               isUnderMore(pathname, workspaceId) && styles.itemActive,
-              'nf-focus-ring',
+              'nf-focus-ring-inset',
             )}
             aria-label={t('nav.more')}
           >
@@ -484,7 +520,7 @@ function WorkspaceArea({
           <button
             ref={moreToggleRef}
             type="button"
-            className={cx(styles.item, styles.moreToggle, 'nf-focus-ring')}
+            className={cx(styles.item, styles.moreToggle, 'nf-focus-ring-inset')}
             aria-expanded={moreOpen}
             aria-controls={moreId}
             onClick={handleToggleMore}
@@ -533,7 +569,7 @@ function ShortcutsButton({ railCollapsed }: { railCollapsed: boolean }): ReactEl
   const button = (
     <button
       type="button"
-      className={cx(styles.item, 'nf-focus-ring')}
+      className={cx(styles.item, 'nf-focus-ring-inset')}
       aria-label={label}
       onClick={() => {
         window.dispatchEvent(new CustomEvent(OPEN_SHORTCUTS_HELP_EVENT));
@@ -716,7 +752,7 @@ export default function Sidebar(): ReactElement {
         <div className={styles.footer}>
           <button
             type="button"
-            className={cx(styles.toggle, 'nf-focus-ring')}
+            className={cx(styles.toggle, 'nf-focus-ring-inset')}
             onClick={handleToggle}
             aria-label={railCollapsed ? t('nav.expand') : t('nav.collapse')}
             aria-expanded={!railCollapsed}

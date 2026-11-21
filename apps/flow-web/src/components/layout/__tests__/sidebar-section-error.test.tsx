@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
+  useMatch: () => undefined,
   useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
     select({ location: { pathname: mocks.pathname } }),
   Link: ({

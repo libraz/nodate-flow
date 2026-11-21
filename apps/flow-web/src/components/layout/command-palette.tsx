@@ -572,7 +572,9 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
                           {it.icon ? (
                             <Icon icon={it.icon} decorative className={css.resultIcon} />
                           ) : null}
-                          <span className={css.resultLabel}>{it.label}</span>
+                          <span className={css.resultLabel} title={it.label}>
+                            {it.label}
+                          </span>
                         </button>
                       </li>
                     );

@@ -9,6 +9,7 @@
  */
 
 import { useFocusTrap } from '@nodate-flow/ui/hooks/use-focus-trap';
+import { usePresence } from '@nodate-flow/ui/hooks/use-presence';
 import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
@@ -617,6 +618,7 @@ function GlassDockImpl(): ReactElement {
   const [open, setOpen] = useState(false);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const panelPresence = usePresence<HTMLDivElement>(open);
 
   const workspaceId = useCurrentWorkspaceId() ?? undefined;
   const actorId = useAuth(selectUser)?.id;
@@ -682,31 +684,34 @@ function GlassDockImpl(): ReactElement {
       </span>
     ) : null;
 
-  if (!open) {
-    return (
-      <button
-        ref={(el) => {
-          if (el && restoreFocusRef.current) {
-            restoreFocusRef.current = false;
-            el.focus();
-          }
-        }}
-        type="button"
-        onClick={handleToggle}
-        aria-expanded={false}
-        aria-label={t('glass_dock.expand')}
-        className={cx(styles.pill, 'nf-focus-ring')}
-      >
-        <Icon icon={Sparkles} decorative />
-        <span className={styles.pillLabel}>{t('glass_dock.title')}</span>
-        {countBadge}
-      </button>
-    );
-  }
+  const pill = open ? null : (
+    <button
+      ref={(el) => {
+        if (el && restoreFocusRef.current) {
+          restoreFocusRef.current = false;
+          el.focus();
+        }
+      }}
+      type="button"
+      onClick={handleToggle}
+      aria-expanded={false}
+      aria-label={t('glass_dock.expand')}
+      className={cx(styles.pill, 'nf-focus-ring')}
+    >
+      <Icon icon={Sparkles} decorative />
+      <span className={styles.pillLabel}>{t('glass_dock.title')}</span>
+      {countBadge}
+    </button>
+  );
 
-  return (
+  const panel = (
     <div
-      ref={panelRef}
+      ref={(node) => {
+        panelRef.current = node;
+        panelPresence.ref(node);
+      }}
+      data-state={panelPresence.state}
+      inert={!open}
       role="region"
       aria-label={t('glass_dock.title')}
       className={styles.panel}
@@ -777,6 +782,13 @@ function GlassDockImpl(): ReactElement {
         saving={suggestionAction.decisionPending}
       />
     </div>
+  );
+
+  return (
+    <>
+      {pill}
+      {panelPresence.mounted ? panel : null}
+    </>
   );
 }
 

@@ -1,0 +1,16 @@
+/* The one keyboard-shortcut chip; consumers `composes` it and add only their own placement. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: var(--nf-space-px);
+  padding-inline: var(--nf-space-1-5);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-xs);
+  background: var(--nf-color-surface);
+  color: var(--nf-color-fg-muted);
+  font-family: var(--nf-font-mono);
+  font-size: var(--nf-text-xs);
+  line-height: var(--nf-leading-tight);
+  font-variant-numeric: tabular-nums;
+}

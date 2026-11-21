@@ -148,6 +148,14 @@
   color: var(--nf-color-fg-muted);
 }
 
+.headline {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--nf-weight-medium);
+}
+
 .kindLabel {
   min-inline-size: 0;
   font-size: var(--nf-text-supporting);

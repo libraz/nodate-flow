@@ -7,6 +7,8 @@
   "delete_widget_error": "移除小组件失败",
   "edit_layout": "编辑布局",
   "done_editing": "完成",
+  "move_earlier": "将 {title} 前移",
+  "move_later": "将 {title} 后移",
   "remove_widget": "移除小组件",
   "widget_type": {
     "task_summary": "任务汇总",

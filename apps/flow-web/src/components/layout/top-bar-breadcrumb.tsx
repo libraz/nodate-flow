@@ -99,6 +99,7 @@ function ProjectBreadcrumb({
           to="/workspaces/$id/projects/$projectId/tasks"
           params={{ id: workspaceId, projectId }}
           className={styles.breadcrumbProject}
+          title={project.name}
         >
           {project.name}
         </Link>

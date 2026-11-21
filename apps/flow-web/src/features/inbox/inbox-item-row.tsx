@@ -22,6 +22,8 @@ import {
 import { type ButtonHTMLAttributes, type ReactElement, type Ref, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatEpochDateTime } from '../../lib/format';
+import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import type { InboxItem } from './api';
 import styles from './inbox.module.css';
 import SnoozePopover from './snooze-popover';
@@ -107,6 +109,12 @@ export default function InboxItemRow({
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
   const kindKey = KIND_LABEL_KEY[item.kind];
   const kindLabel = kindKey ? t(kindKey) : item.kind;
+  const zone = useEffectiveZone();
+  const absoluteTime = formatEpochDateTime(item.receivedAt, locale, zone);
+  // The kind stands in as the headline when the row has no task or source title.
+  const itemTitle = item.taskId ? item.taskTitle : item.sourceDetail?.title;
+  const hasTitle = Boolean(itemTitle);
+  const headline = itemTitle || kindLabel;
 
   const handleArchive = (): void => {
     onArchive(item.id);
@@ -123,33 +131,29 @@ export default function InboxItemRow({
           <Icon icon={icon} decorative />
         </div>
         <div className={styles.content}>
-          <div className={styles.meta}>
-            <Badge tone="neutral">{sourceLabel}</Badge>
-            <span className={kindKey ? styles.kindLabel : styles.kind}>{kindLabel}</span>
-          </div>
           {item.taskId ? (
             <Link
               to="/tasks/$taskId"
               params={{ taskId: item.taskId }}
+              title={headline}
               className={cx(styles.taskLink, 'nf-focus-ring')}
             >
-              {item.taskTitle ?? item.taskId}
+              {headline}
             </Link>
-          ) : item.sourceDetail?.title ? (
-            <span
-              title={item.sourceDetail.title}
-              style={{
-                maxInlineSize: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontWeight: 'var(--nf-weight-medium)',
-              }}
-            >
-              {item.sourceDetail.title}
+          ) : (
+            <span className={styles.headline} title={headline}>
+              {headline}
             </span>
-          ) : null}
-          <span className={styles.time}>{formatRelative(item.receivedAt, locale)}</span>
+          )}
+          <div className={styles.meta}>
+            <Badge tone="neutral">{sourceLabel}</Badge>
+            {hasTitle ? (
+              <span className={kindKey ? styles.kindLabel : styles.kind}>{kindLabel}</span>
+            ) : null}
+          </div>
+          <span className={styles.time} title={absoluteTime ?? undefined}>
+            {formatRelative(item.receivedAt, locale)}
+          </span>
         </div>
         <div className={styles.actions}>
           {item.sourceDetail?.title && !item.taskId ? (

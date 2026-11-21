@@ -12,7 +12,7 @@
   min-block-size: var(--nf-control-height);
   padding: var(--nf-space-2) var(--nf-space-3);
   border-radius: var(--nf-radius-md);
-  border: 1px solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border);
   background: var(--nf-color-bg);
   color: var(--nf-color-fg);
   font-size: var(--nf-text-sm);
@@ -153,7 +153,7 @@
   align-items: center;
   gap: var(--nf-space-3);
   padding-block-start: var(--nf-space-2);
-  border-block-start: 1px solid var(--nf-color-border);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
   font-size: var(--nf-text-xs);
   color: var(--nf-color-fg-muted);
 }
@@ -170,14 +170,7 @@
 }
 
 .kbd {
-  font-family: var(--nf-font-mono);
-  font-size: var(--nf-text-micro);
-  padding: var(--nf-space-px) var(--nf-space-1-5);
-  border-radius: var(--nf-radius-sm);
-  border: 1px solid var(--nf-color-border);
-  background: var(--nf-color-surface);
-  color: var(--nf-color-fg);
-  line-height: 1.4;
+  composes: kbd from "../kbd.module.css";
 }
 
 /* ── Command mode ───────────────────────────────── */

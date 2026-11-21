@@ -66,17 +66,9 @@
 }
 
 .kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  composes: kbd from "./kbd.module.css";
   min-inline-size: var(--nf-space-6);
   block-size: var(--nf-space-6);
-  padding-inline: var(--nf-space-1-5);
-  border-radius: var(--nf-radius-xs);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background-color: var(--nf-color-bg-elevated);
-  font-family: inherit;
-  font-size: var(--nf-text-xs);
 }
 
 .note {

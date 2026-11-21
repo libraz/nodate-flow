@@ -7,6 +7,8 @@
   "delete_widget_error": "Failed to remove widget",
   "edit_layout": "Edit layout",
   "done_editing": "Done",
+  "move_earlier": "Move {title} earlier",
+  "move_later": "Move {title} later",
   "remove_widget": "Remove widget",
   "widget_type": {
     "task_summary": "Task summary",

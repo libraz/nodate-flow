@@ -107,6 +107,8 @@
   border-style: dashed;
   border-color: var(--nf-color-accent);
   cursor: grab;
+  /* The card owns its pointer gestures while editing, so touch drags are not taken by scrolling. */
+  touch-action: none;
 }
 
 /* Only a draggable widget lifts; a static card that moved would promise an action. */
@@ -118,9 +120,41 @@
   cursor: grabbing;
 }
 
+/* Follows the pointer through `translate`; `--drag-x/y` are set per move, so no transition. */
 .widgetDragging {
+  translate: var(--drag-x, 0) var(--drag-y, 0);
+  z-index: 1;
   opacity: 0.6;
   box-shadow: var(--nf-shadow-lg);
+  cursor: grabbing;
+  transition: none;
+}
+
+/* Drop settles the card into its new slot. */
+.widgetSettle {
+  composes: settle from "@nodate-flow/ui/styles/list-motion.module.css";
+}
+
+/* Insertion point: a bold leading or trailing bar plus a tint on the target card. */
+.widget[data-drop-target] {
+  background-color: var(--nf-color-accent-subtle);
+}
+
+.widget[data-drop-target]::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inline-size: var(--nf-space-1);
+  background: var(--nf-color-accent);
+  pointer-events: none;
+}
+
+.widget[data-drop-target="before"]::after {
+  inset-inline-start: 0;
+}
+
+.widget[data-drop-target="after"]::after {
+  inset-inline-end: 0;
 }
 
 /* Widget header */
@@ -155,6 +189,42 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.moveButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 1.75rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.moveButton:hover:not([aria-disabled="true"]) {
+  background: var(--nf-color-surface-hover);
+}
+
+.moveButton[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The arrows point along reading order, so they flip with the writing direction. */
+.moveIcon {
+  display: flex;
+}
+
+:dir(rtl) .moveIcon {
+  scale: -1 1;
 }
 
 .removeButton {

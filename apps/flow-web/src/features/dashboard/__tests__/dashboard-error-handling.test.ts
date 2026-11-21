@@ -15,11 +15,9 @@ describe('dashboard-view error handling', () => {
   const source = readFileSync(resolve(__dirname, '../dashboard-view.tsx'), 'utf-8');
 
   it('updatePosition has error handling', () => {
-    // The formatter may split `updatePosition\n.mutateAsync` across lines.
-    // Find the mutateAsync call for position updates specifically.
-    const positionCall = source.indexOf('updatePosition\n');
-    // Look further into the file from the mutation call
-    const afterCall = source.slice(positionCall + 16, positionCall + 500);
+    const positionCall = source.indexOf('updatePosition.mutateAsync');
+    expect(positionCall).toBeGreaterThan(-1);
+    const afterCall = source.slice(positionCall, positionCall + 700);
     expect(afterCall).toContain('.catch(');
   });
 

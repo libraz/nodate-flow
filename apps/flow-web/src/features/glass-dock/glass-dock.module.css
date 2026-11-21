@@ -73,6 +73,11 @@
   animation: global(nf-slide-in-from-block-end) var(--nf-duration-base) var(--nf-ease-out);
 }
 
+.panel[data-state="closed"] {
+  pointer-events: none;
+  animation: global(nf-slide-out-to-block-end) var(--nf-duration-fast) var(--nf-ease-in) forwards;
+}
+
 .header {
   display: flex;
   align-items: center;

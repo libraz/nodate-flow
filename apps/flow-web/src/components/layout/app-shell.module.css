@@ -21,6 +21,9 @@
 .shell {
   /* nf-token-override: sidebar rail widths, mirrored by sidebar.module.css */
   --nf-shell-sidebar-inline-size: 16rem;
+  /* Read by the top bar and by sticky page chrome that sits beneath it. */
+  /* nf-token-override: component dimension, not a spacing step */
+  --nf-topbar-height: 3.5rem;
   display: grid;
   grid-template-columns: var(--nf-shell-sidebar-inline-size) minmax(0, 1fr);
   /*

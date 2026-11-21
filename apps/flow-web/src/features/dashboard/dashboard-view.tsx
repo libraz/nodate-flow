@@ -1,7 +1,7 @@
 /**
  * DashboardView — main dashboard view that renders a grid of
- * customizable widgets. Supports an edit mode with drag-to-reorder
- * (mouse events, no external library) and widget removal.
+ * customizable widgets. Supports an edit mode with reordering by pointer
+ * drag or by move buttons, and widget removal.
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
@@ -10,15 +10,53 @@ import Icon from '@nodate-flow/ui/icon';
 import Button from '@nodate-flow/ui/primitives/button';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { LayoutDashboard, Pencil, Plus } from 'lucide-react';
-import { type ReactElement, Suspense, useEffect, useRef, useState } from 'react';
+import { type PointerEvent, type ReactElement, Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import AddWidgetDialog from './add-widget-dialog';
-import { useDeleteWidget, useUpdateWidgetPosition, useWidgetsQuery, type WidgetItem } from './api';
+import {
+  dashboardKeys,
+  useDeleteWidget,
+  useUpdateWidgetPosition,
+  useWidgetsQuery,
+  type WidgetItem,
+} from './api';
 import styles from './dashboard.module.css';
 import WidgetCard from './widget-card';
+
+/** Pointer travel before a press becomes a drag, so a plain click never lifts a card. */
+const DRAG_THRESHOLD_PX = 4;
+
+interface DragState {
+  id: string;
+  x: number;
+  y: number;
+  over: { id: string; side: 'before' | 'after' } | null;
+}
+
+/** The card under the pointer (other than the dragged one) and which half it is in. */
+function findDropTarget(e: PointerEvent<HTMLDivElement>, draggedId: string): DragState['over'] {
+  for (const el of e.currentTarget.ownerDocument.elementsFromPoint(e.clientX, e.clientY)) {
+    const card = el.closest<HTMLElement>('[data-widget-id]');
+    const id = card?.dataset.widgetId;
+    if (!card || !id || id === draggedId) continue;
+    const rect = card.getBoundingClientRect();
+    const grid = card.parentElement?.getBoundingClientRect();
+    // A card spanning the whole row (single-column layout) is split top/bottom instead.
+    if (grid && rect.width >= grid.width * 0.9) {
+      return { id, side: e.clientY < rect.top + rect.height / 2 ? 'before' : 'after' };
+    }
+    const rtl = getComputedStyle(card).direction === 'rtl';
+    const startHalf = rtl
+      ? e.clientX > rect.left + rect.width / 2
+      : e.clientX < rect.left + rect.width / 2;
+    return { id, side: startHalf ? 'before' : 'after' };
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Inner widget grid (inside Suspense boundary)
@@ -38,80 +76,88 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
   const stagger = useFirstLoadStagger();
   const presence = usePresenceList(widgets, (widget) => widget.id);
 
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const dragStartRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
-  const listenersRef = useRef<{
-    move: (e: MouseEvent) => void;
-    up: (e: MouseEvent) => void;
+  const queryClient = useQueryClient();
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [settledId, setSettledId] = useState<string | null>(null);
+  const pendingRef = useRef<{
+    id: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
   } | null>(null);
 
-  // Clean up drag listeners on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      if (listenersRef.current) {
-        document.removeEventListener('mousemove', listenersRef.current.move);
-        document.removeEventListener('mouseup', listenersRef.current.up);
-        listenersRef.current = null;
-      }
-    };
-  }, []);
+  // Moves one widget to `toIndex` in display order. The list is renumbered so ties in
+  // `sortWeight` (new widgets all start at 0) cannot leave the order ambiguous.
+  const commitMove = (widgetId: string, toIndex: number): void => {
+    const from = widgets.findIndex((w) => w.id === widgetId);
+    if (from < 0 || from === toIndex) return;
+    const next = widgets.slice();
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(toIndex, 0, moved);
+    const renumbered = next.map((w, i) => ({ ...w, sortWeight: i }));
+    queryClient.setQueryData(dashboardKeys.list(wsId), renumbered);
+    setSettledId(widgetId);
+    const before = new Map(widgets.map((w) => [w.id, w.sortWeight]));
+    void Promise.all(
+      renumbered
+        .filter((w) => before.get(w.id) !== w.sortWeight)
+        .map((w) =>
+          updatePosition.mutateAsync({
+            widgetId: w.id,
+            positionX: w.positionX,
+            positionY: w.positionY,
+            width: w.width,
+            height: w.height,
+            sortWeight: w.sortWeight,
+          }),
+        ),
+    ).catch((err: unknown) => {
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.list(wsId) });
+      toaster.show({
+        tone: 'danger',
+        message: formatApiError(err, t, 'update_position_error'),
+      });
+    });
+  };
 
-  const handleMouseDown = (widget: WidgetItem, e: React.MouseEvent<HTMLDivElement>): void => {
-    if (!editing) return;
-    dragStartRef.current = {
+  const handlePointerDown = (widget: WidgetItem, e: PointerEvent<HTMLDivElement>): void => {
+    if (!editing || e.button !== 0) return;
+    // Buttons inside the card keep their own click behaviour.
+    if (e.target instanceof Element && e.target.closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pendingRef.current = {
       id: widget.id,
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
     };
-    setDraggingId(widget.id);
+  };
 
-    const handleMouseMove = (_moveEvent: MouseEvent): void => {
-      // Visual feedback is handled via the dragging CSS class.
-      // Full grid-snap repositioning would require more complex logic
-      // and is deferred to a future iteration.
-    };
+  const handlePointerMove = (widget: WidgetItem, e: PointerEvent<HTMLDivElement>): void => {
+    const start = pendingRef.current;
+    if (!start || start.id !== widget.id || start.pointerId !== e.pointerId) return;
+    const x = e.clientX - start.startX;
+    const y = e.clientY - start.startY;
+    if (!drag && Math.hypot(x, y) < DRAG_THRESHOLD_PX) return;
+    setSettledId(null);
+    setDrag({ id: widget.id, x, y, over: findDropTarget(e, widget.id) });
+  };
 
-    const handleMouseUp = (upEvent: MouseEvent): void => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      listenersRef.current = null;
-      setDraggingId(null);
-
-      const start = dragStartRef.current;
-      if (!start) return;
-
-      const dx = upEvent.clientX - start.startX;
-      const dy = upEvent.clientY - start.startY;
-
-      // Only commit position change if the drag was significant
-      if (Math.abs(dx) > 40 || Math.abs(dy) > 40) {
-        const colDelta = Math.round(dx / 80);
-        const rowDelta = Math.round(dy / 80);
-        const newX = Math.max(0, widget.positionX + colDelta);
-        const newY = Math.max(0, widget.positionY + rowDelta);
-        void updatePosition
-          .mutateAsync({
-            widgetId: widget.id,
-            positionX: newX,
-            positionY: newY,
-            width: widget.width,
-            height: widget.height,
-            sortWeight: widget.sortWeight,
-          })
-          .catch((err: unknown) => {
-            toaster.show({
-              tone: 'danger',
-              message: formatApiError(err, t, 'update_position_error'),
-            });
-          });
-      }
-
-      dragStartRef.current = null;
-    };
-
-    listenersRef.current = { move: handleMouseMove, up: handleMouseUp };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+  const finishDrag = (widget: WidgetItem, e: PointerEvent<HTMLDivElement>, drop: boolean): void => {
+    const start = pendingRef.current;
+    if (!start || start.id !== widget.id || start.pointerId !== e.pointerId) return;
+    pendingRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    const over = drag?.over ?? null;
+    setDrag(null);
+    if (!drop || !over) return;
+    const others = widgets.filter((w) => w.id !== widget.id);
+    const targetIndex = others.findIndex((w) => w.id === over.id);
+    if (targetIndex < 0) return;
+    commitMove(widget.id, over.side === 'before' ? targetIndex : targetIndex + 1);
   };
 
   const handleRemove = async (widgetId: string): Promise<void> => {
@@ -157,13 +203,39 @@ function WidgetGrid({ wsId, editing, onAddWidget }: WidgetGridProps): ReactEleme
           }}
           enterStyle={stagger(index)}
           editing={editing}
-          dragging={draggingId === entry.key}
+          dragging={drag?.id === entry.key}
+          dragOffset={drag?.id === entry.key ? { x: drag.x, y: drag.y } : undefined}
+          dropSide={drag?.over?.id === entry.key ? drag.over.side : undefined}
+          settling={settledId === entry.key}
+          onSettled={() => {
+            setSettledId(null);
+          }}
+          canMoveEarlier={widgets.findIndex((w) => w.id === entry.key) > 0}
+          canMoveLater={
+            widgets.findIndex((w) => w.id === entry.key) >= 0 &&
+            widgets.findIndex((w) => w.id === entry.key) < widgets.length - 1
+          }
+          onMoveEarlier={() => {
+            commitMove(entry.key, widgets.findIndex((w) => w.id === entry.key) - 1);
+          }}
+          onMoveLater={() => {
+            commitMove(entry.key, widgets.findIndex((w) => w.id === entry.key) + 1);
+          }}
           removing={deleteWidget.isPending && deleteWidget.variables === entry.key}
           onRemove={() => {
             void handleRemove(entry.key);
           }}
-          onMouseDown={(e) => {
-            handleMouseDown(entry.item, e);
+          onPointerDown={(e) => {
+            handlePointerDown(entry.item, e);
+          }}
+          onPointerMove={(e) => {
+            handlePointerMove(entry.item, e);
+          }}
+          onPointerUp={(e) => {
+            finishDrag(entry.item, e, true);
+          }}
+          onPointerCancel={(e) => {
+            finishDrag(entry.item, e, false);
           }}
         />
       ))}

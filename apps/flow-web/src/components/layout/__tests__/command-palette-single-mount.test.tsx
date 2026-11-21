@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
+  useMatch: () => undefined,
   useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
     select({ location: { pathname: '/today' } }),
 }));
