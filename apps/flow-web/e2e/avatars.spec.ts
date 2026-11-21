@@ -20,7 +20,7 @@
 import { Buffer } from 'node:buffer';
 import { deflateSync } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
-
+import enCommon from '../locales/en/common.json' with { type: 'json' };
 import {
   AUTH_API_URL,
   cleanupTenant,
@@ -94,7 +94,7 @@ test.describe('avatar proxy integration', () => {
     // Wait for the topbar to mount (its Suspense children settle after
     // /me returns).
     await expect(page.getByRole('banner')).toBeVisible({ timeout: 15_000 });
-    const avatarTrigger = page.getByRole('button', { name: /open account menu/i });
+    const avatarTrigger = page.getByRole('button', { name: enCommon.topbar.user_menu.open });
     await expect(avatarTrigger).toBeVisible({ timeout: 10_000 });
 
     // The Avatar primitive renders an <img> only when src is provided.
@@ -134,7 +134,7 @@ test.describe('avatar proxy integration', () => {
     await page.goto('/today');
 
     await expect(page.getByRole('banner')).toBeVisible({ timeout: 15_000 });
-    const avatarTrigger = page.getByRole('button', { name: /open account menu/i });
+    const avatarTrigger = page.getByRole('button', { name: enCommon.topbar.user_menu.open });
     await expect(avatarTrigger).toBeVisible({ timeout: 10_000 });
 
     // No <img> should be mounted because /me did not carry avatarUrl.
@@ -144,7 +144,10 @@ test.describe('avatar proxy integration', () => {
     // are "EU" (first letter of first + last word, uppercase).
     // displayName matches the literal seeded by createTestTenant.
     const initials = computeInitials(tenant.displayName);
-    await expect(avatarTrigger).toContainText(initials);
+    await expect(avatarTrigger.locator('[data-initials]')).toHaveAttribute(
+      'data-initials',
+      initials,
+    );
 
     expect(avatarRequests, 'a user without an avatar makes zero image requests').toEqual([]);
 
@@ -194,7 +197,7 @@ test.describe('avatar proxy integration', () => {
     const initials = computeTimelineInitials(tenant.displayName);
     for (let i = 0; i < actorAvatarCount; i++) {
       const actorAvatar = actorAvatars.nth(i);
-      await expect(actorAvatar).toContainText(initials);
+      await expect(actorAvatar).toHaveAttribute('data-initials', initials);
       await expect(actorAvatar.locator('img')).toHaveCount(0);
     }
     expect(avatarRequests, 'an actor without an avatar makes zero image requests').toEqual([]);

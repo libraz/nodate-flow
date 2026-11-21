@@ -223,7 +223,7 @@ export default function TopBar(): ReactElement {
           >
             <AvatarTrigger
               label={t('topbar.user_menu.open')}
-              accessibleName={`${initials} ${t('topbar.user_menu.open')}`}
+              accessibleName={t('topbar.user_menu.open')}
               expanded={userMenuOpen}
             >
               <Avatar

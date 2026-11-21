@@ -138,9 +138,11 @@ export default function WorkspaceSwitcher({
                 handleSelect(w.id);
               }}
             >
-              <span className={styles.monogram} aria-hidden="true">
-                {monogramOf(w.name)}
-              </span>
+              <span
+                className={styles.monogram}
+                data-monogram={monogramOf(w.name)}
+                aria-hidden="true"
+              />
               <span className={styles.switcherItemName}>{w.name}</span>
               {w.id === current?.id ? <Icon icon={Check} decorative /> : null}
             </button>
@@ -189,13 +191,15 @@ export default function WorkspaceSwitcher({
         className={styles.switcherPopover}
       >
         <SwitcherTrigger
-          label={`${monogramOf(currentName)} ${currentName}: ${t('nav.switchWorkspace')}`}
+          label={`${currentName}: ${t('nav.switchWorkspace')}`}
           tooltip={railCollapsed ? currentName : null}
           expanded={menuOpen}
         >
-          <span className={styles.monogram} aria-hidden="true">
-            {monogramOf(currentName)}
-          </span>{' '}
+          <span
+            className={styles.monogram}
+            data-monogram={monogramOf(currentName)}
+            aria-hidden="true"
+          />
           {railCollapsed ? null : (
             <>
               <span className={styles.switcherName}>{currentName}</span>

@@ -1,6 +1,7 @@
 /**
  * Avatar — user avatar primitive. Shows an image when `src` is provided,
- * otherwise falls back to `initials` text. Always requires an `alt` for a11y.
+ * otherwise falls back to `initials`, rendered as CSS generated content
+ * (not a text node) so it never counts toward an ancestor's accessible name. Always requires an `alt` for a11y.
  */
 
 import { forwardRef, type HTMLAttributes, type ReactElement } from 'react';
@@ -27,10 +28,11 @@ const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(
       ref={ref}
       role="img"
       aria-label={alt}
+      data-initials={src ? undefined : initials}
       className={cx(styles.root, size === 'sm' && styles.sm, size === 'lg' && styles.lg, className)}
       {...rest}
     >
-      {src ? <img className={styles.image} src={src} alt="" /> : initials}
+      {src ? <img className={styles.image} src={src} alt="" /> : null}
     </span>
   ),
 );

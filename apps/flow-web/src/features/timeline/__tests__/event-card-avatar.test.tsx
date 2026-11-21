@@ -71,7 +71,7 @@ describe('EventCard actor avatar', () => {
     const avatar = container.querySelector<HTMLElement>('[role="img"]');
     if (!avatar) throw new Error('actor avatar was not rendered');
     expect(avatar.getAttribute('aria-label')).toBe('Avery River');
-    expect(avatar.textContent).toContain('AR');
+    expect(avatar.dataset.initials).toBe('AR');
     expect(avatar.querySelector('img')).toBeNull();
   });
 

@@ -101,11 +101,14 @@ describe('mention picker', () => {
     expect(listbox).toBeTruthy();
     const options = screen.getAllByRole('option');
     // Each row names the person and the address that tells two same-named
-    // people apart, behind their avatar initials.
+    // people apart. Initials are CSS-generated, so they live in data-initials.
     expect(options.map((o) => o.textContent)).toEqual([
-      'ARAnn Riversann@example.com',
-      'BMBee Marshbee@example.com',
+      'Ann Riversann@example.com',
+      'Bee Marshbee@example.com',
     ]);
+    expect(
+      options.map((o) => o.querySelector('[role="img"]')?.getAttribute('data-initials')),
+    ).toEqual(['AR', 'BM']);
     // The field becomes a real combobox only while the list is open.
     expect(textarea.getAttribute('role')).toBe('combobox');
     expect(textarea.getAttribute('aria-expanded')).toBe('true');

@@ -171,7 +171,9 @@ describe('WorkspaceSwitcher menu', () => {
     const button = screen.getByRole('button', { name: /nav\.switchWorkspace/ });
     expect(button.getAttribute('aria-haspopup')).toBe('menu');
     expect(button.textContent).toContain('acme');
-    expect(button.textContent).toContain('A');
+    expect(button.textContent).not.toContain('A');
+    expect(button.getAttribute('aria-label')).toBe('acme: nav.switchWorkspace');
+    expect(button.querySelector('[data-monogram]')?.getAttribute('data-monogram')).toBe('A');
 
     await user.click(button);
 

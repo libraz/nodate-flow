@@ -48,7 +48,7 @@ describe('ActivityRow actor avatar', () => {
 
     const avatar = container.querySelector<HTMLElement>('[role="img"]');
     if (!avatar) throw new Error('actor avatar was not rendered');
-    expect(avatar.textContent).toContain('AR');
+    expect(avatar.dataset.initials).toBe('AR');
     expect(container.querySelector('img')).toBeNull();
   });
 

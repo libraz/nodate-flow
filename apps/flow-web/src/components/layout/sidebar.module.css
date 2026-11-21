@@ -147,6 +147,11 @@
   font-weight: var(--nf-weight-semibold);
 }
 
+/* Generated content keeps the switcher letter out of the accessible name. */
+.monogram[data-monogram]::before {
+  content: attr(data-monogram) / "";
+}
+
 .switcherPopover {
   max-inline-size: 100%;
 }

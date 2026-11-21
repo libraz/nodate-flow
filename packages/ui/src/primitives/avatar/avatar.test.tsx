@@ -27,13 +27,17 @@ describe.each(THEMES)('Avatar [%s]', (theme) => {
   it('renders initials fallback and has no a11y violations', async () => {
     const { container } = render(<Avatar alt="Alice" initials="AL" />);
     expect(screen.getByRole('img', { name: 'Alice' })).toBeDefined();
-    expect(screen.getByText('AL')).toBeDefined();
+    const root = screen.getByRole('img', { name: 'Alice' });
+    expect(root.getAttribute('data-initials')).toBe('AL');
+    expect(root.textContent).toBe('');
+    expect(root.getAttribute('aria-label')).toBe('Alice');
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it('renders image when src is provided', async () => {
     const { container } = render(<Avatar alt="Bob" src="data:image/png;base64,iVBORw0KGgo=" />);
     expect(container.querySelector('img')).not.toBeNull();
+    expect(container.querySelector('[data-initials]')).toBeNull();
     expect(await axe(container)).toHaveNoViolations();
   });
 });

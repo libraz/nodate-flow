@@ -17,6 +17,10 @@
   user-select: none;
 }
 
+.root[data-initials]::before {
+  content: attr(data-initials) / "";
+}
+
 .image {
   inline-size: 100%;
   block-size: 100%;
