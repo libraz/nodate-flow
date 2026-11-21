@@ -56,7 +56,7 @@
   text-align: center;
   color: var(--nf-color-fg-muted);
   font-size: var(--nf-text-sm);
-  border: 1px dashed var(--nf-color-border);
+  border: var(--nf-space-px) dashed var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-bg-sunken);
 }
@@ -64,15 +64,6 @@
 .headerCard {
   padding: var(--nf-space-3) var(--nf-space-4);
   background: var(--nf-color-surface);
-}
-
-.dndHint {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-1-5);
-  margin: 0 0 var(--nf-space-3);
-  font-size: var(--nf-text-supporting);
-  color: var(--nf-color-fg-muted);
 }
 
 /*
@@ -122,6 +113,17 @@
     );
     animation: board-edge-fade linear both;
     animation-timeline: scroll(self inline);
+  }
+
+  /* Progress runs from the inline start, so the gradient flips with it. */
+  .board:dir(rtl) {
+    mask-image: linear-gradient(
+      to left,
+      transparent,
+      var(--nf-color-fg) var(--board-fade-start),
+      var(--nf-color-fg) calc(100% - var(--board-fade-end)),
+      transparent
+    );
   }
 }
 

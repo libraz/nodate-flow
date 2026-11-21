@@ -11,19 +11,35 @@ import Input from '@nodate-flow/ui/primitives/input';
 import Switch from '@nodate-flow/ui/primitives/switch';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, useState } from 'react';
+import { type CSSProperties, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
+import StateDot from '../tasks/state-dot';
 import listStyles from '../workspaces/workspaces.module.css';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
 import ProjectArchiveActions from './project-archive-actions';
 import styles from './projects.module.css';
 
 const STATE_ORDER: readonly TaskDerivedState[] = ['open', 'waiting', 'review', 'done', 'cancelled'];
+
+/** Fraction of all tasks in `state` and every state before it. */
+function cumulativeShare(
+  counts: Record<TaskDerivedState, number>,
+  state: TaskDerivedState,
+  total: number,
+): number {
+  if (total === 0) return 0;
+  let sum = 0;
+  for (const s of STATE_ORDER) {
+    sum += counts[s];
+    if (s === state) break;
+  }
+  return sum / total;
+}
 
 /** Feature flag keys exposed on the project resource. */
 type FeatureFlag = 'featurePages' | 'featureTimeboxes' | 'featureLenses' | 'featureCalendar';
@@ -93,13 +109,13 @@ export function SettingsPanel({ id }: { id: string }): ReactElement {
   const featureFlags = project as unknown as Record<FeatureFlag, boolean | undefined>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-6)' }}>
-      <Card style={{ padding: 'var(--nf-space-5)' }}>
+    <div className={styles.settings}>
+      <Card className={styles.settingsCard}>
         <form
           onSubmit={(e) => {
             void handleRename(e);
           }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-4)' }}
+          className={styles.settingsForm}
         >
           <FormField label={t('projects.form.name')} required>
             {(control) => (
@@ -112,7 +128,7 @@ export function SettingsPanel({ id }: { id: string }): ReactElement {
               />
             )}
           </FormField>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div className={styles.actionsEnd}>
             <Button
               type="submit"
               variant="primary"
@@ -125,27 +141,23 @@ export function SettingsPanel({ id }: { id: string }): ReactElement {
         </form>
       </Card>
 
-      <Card style={{ padding: 'var(--nf-space-5)' }}>
+      <Card className={styles.settingsCard}>
         <section>
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
-              {tLabels('feature_toggles.title')}
-            </h3>
-            <small className="text-xs text-[var(--nf-color-fg-muted)]">
+          <div className={styles.sectionHead}>
+            <h3 className={styles.sectionTitle}>{tLabels('feature_toggles.title')}</h3>
+            <small className={styles.sectionSubtitle}>
               {tLabels('feature_toggles.coming_soon_subtitle')}
             </small>
           </div>
-          <p className="text-sm text-[var(--nf-color-fg-muted)] mb-4">
-            {tLabels('feature_toggles.description')}
-          </p>
-          <div className="flex flex-col gap-4">
+          <p className={styles.sectionDescription}>{tLabels('feature_toggles.description')}</p>
+          <div className={styles.toggleList}>
             {FEATURE_TOGGLES.map(({ flag, labelKey }) => (
-              <div key={flag} className="flex items-center justify-between gap-4">
+              <div key={flag} className={styles.toggleRow}>
                 <div>
-                  <span className="text-sm font-medium text-[var(--nf-color-fg)]">
+                  <span className={styles.toggleLabel}>
                     {tLabels(`feature_toggles.${labelKey}`)}
                   </span>
-                  <p className="text-xs text-[var(--nf-color-fg-muted)]">
+                  <p className={styles.toggleHint}>
                     {tLabels(`feature_toggles.${labelKey}_description`)}
                   </p>
                 </div>
@@ -162,15 +174,11 @@ export function SettingsPanel({ id }: { id: string }): ReactElement {
 
       <ProjectArchiveActions id={id} />
 
-      <Card style={{ padding: 'var(--nf-space-5)' }}>
+      <Card className={styles.settingsCard}>
         <section>
-          <h3 className="text-base font-semibold text-[var(--nf-color-fg)]">
-            {t('projects.settings.danger_title')}
-          </h3>
-          <p className="text-sm text-[var(--nf-color-fg-muted)] mb-4">
-            {t('projects.settings.disable_description')}
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <h3 className={styles.sectionTitle}>{t('projects.settings.danger_title')}</h3>
+          <p className={styles.sectionDescription}>{t('projects.settings.disable_description')}</p>
+          <div className={styles.actionsEnd}>
             <Button
               variant="danger"
               onClick={() => {
@@ -229,13 +237,18 @@ export function OverviewPanel({
         <div className={styles.progress}>{t('projects.detail.progress', { pct })}</div>
       </div>
       <div className={styles.bar}>
-        {/* Every state keeps its segment (at zero width when empty) so a count change animates. */}
-        {STATE_ORDER.map((s) => (
+        {/* Layers are cumulative and painted back to front, so a count change scales them instead of re-flowing a flex row. */}
+        {[...STATE_ORDER].reverse().map((s) => (
           <div
             key={s}
             className={styles.segment}
             title={`${t(`tasks.status.${s}`)}: ${counts[s]}`}
-            style={{ flex: `${counts[s]} 1 0`, background: STATE_COLOR[s] }}
+            style={
+              {
+                '--share': cumulativeShare(counts, s, total),
+                background: STATE_COLOR[s],
+              } as CSSProperties
+            }
           />
         ))}
       </div>
@@ -243,11 +256,7 @@ export function OverviewPanel({
         {STATE_ORDER.map((s) => (
           <li key={s} className={styles.state}>
             <span className={styles.stateLabel}>
-              <span
-                aria-hidden
-                className={styles.stateDot}
-                style={{ background: STATE_COLOR[s] }}
-              />
+              <StateDot state={s} />
               {t(`tasks.status.${s}`)}
             </span>
             <span className={styles.stateCount}>{counts[s]}</span>

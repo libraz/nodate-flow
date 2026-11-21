@@ -1,7 +1,7 @@
 /**
  * PriorityControl: the one priority picker used by task detail and the
  * create-task dialog. Segments stay neutral until chosen; each carries the
- * priority's colour as a small dot beside its label, from `PRIORITY_COLOR`.
+ * priority's colour as a small mark beside its label (see PriorityMark).
  */
 
 import SegmentedControl from '@nodate-flow/ui/primitives/segmented-control';
@@ -9,8 +9,9 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TASK_PRIORITIES, type TaskPriority } from './api';
-import { PRIORITY_COLOR, PRIORITY_KEY } from './constants';
+import { PRIORITY_KEY } from './constants';
 import styles from './priority-control.module.css';
+import PriorityMark from './priority-mark';
 
 /** The segmented control is generic over string values; these bridge the 0–4 ranks. */
 type PriorityToken = 'none' | 'low' | 'medium' | 'high' | 'urgent';
@@ -60,11 +61,7 @@ export default function PriorityControl({
           ariaLabel: label,
           label: (
             <span className={styles.segment}>
-              <span
-                aria-hidden="true"
-                className={styles.dot}
-                style={{ background: PRIORITY_COLOR[p] }}
-              />
+              <PriorityMark priority={p} />
               <span className={styles.text}>{label}</span>
             </span>
           ),

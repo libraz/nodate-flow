@@ -9,10 +9,12 @@
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import EmptyState from '@nodate-flow/ui/primitives/empty-state';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Day } from '@nodate-flow/ui/time';
 import { createFileRoute, Link } from '@tanstack/react-router';
@@ -30,6 +32,7 @@ import {
 } from '../features/tasks/api';
 import CompleteTaskButton from '../features/tasks/complete-task-button';
 import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
+import rowStyles from '../features/tasks/task-row.module.css';
 import { formatDueDate } from '../lib/format-date';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.today.module.css';
@@ -72,6 +75,72 @@ function classifyDue(dueOn: string | undefined, today: Day): SectionKey {
   if (dueOn === today.addDays(1).toString()) return 'tomorrow';
   if (dueOn <= today.addDays(7).toString()) return 'thisWeek';
   return 'later';
+}
+
+interface TodayListProps {
+  items: AssignedTask[];
+  isOverdue: boolean;
+  stagger: (index: number) => CSSProperties | undefined;
+  locale: string;
+}
+
+/** One section's rows; a completed row collapses out so the rows below close the gap. */
+function TodayList({ items, isOverdue, stagger, locale }: TodayListProps): ReactElement {
+  const { t } = useTranslation('common');
+  const { entries, onExited } = usePresenceList(items, (task) => task.id);
+
+  return (
+    <ul className={rowStyles.list}>
+      {entries.map(({ key, item: task, present }, index) => {
+        const pri = (task.priority ?? 0) as TaskPriority;
+        const context = task.projectName
+          ? `${task.workspaceName} · ${task.projectName}`
+          : task.workspaceName;
+        return (
+          <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
+            <div
+              className={cx(motion.enter, rowStyles.item, isOverdue && rowStyles.itemOverdue)}
+              style={
+                {
+                  ...stagger(index),
+                  '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
+                } as CSSProperties
+              }
+            >
+              {task.actorRole === 'assignee' ? (
+                <CompleteTaskButton
+                  task={{
+                    id: task.id,
+                    title: task.title,
+                    derivedState: task.derivedState as TaskDerivedState,
+                    projectId: task.projectId,
+                  }}
+                />
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <Link
+                to="/tasks/$taskId"
+                params={{ taskId: task.id }}
+                className={cx(rowStyles.row, 'nf-focus-ring')}
+              >
+                <span className={rowStyles.taskTitle} title={task.title}>
+                  {task.title}
+                </span>
+                {pri > 0 ? <Badge tone={PRIORITY_TONE[pri]}>{t(PRIORITY_KEY[pri])}</Badge> : null}
+                <span className={cx(rowStyles.context, rowStyles.contextHideNarrow)}>
+                  {context}
+                </span>
+                <span className={rowStyles.due}>
+                  {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
+                </span>
+              </Link>
+            </div>
+          </PresenceItem>
+        );
+      })}
+    </ul>
+  );
 }
 
 function TodayRoute(): ReactElement {
@@ -153,54 +222,7 @@ function TodayRoute(): ReactElement {
               {label}
               <span className={styles.sectionCount}>({items.length})</span>
             </h2>
-            <ul className={styles.list}>
-              {items.map((task, index) => {
-                const pri = (task.priority ?? 0) as TaskPriority;
-                return (
-                  <li
-                    key={task.id}
-                    className={cx(motion.enter, styles.item, isOverdue && styles.itemOverdue)}
-                    style={
-                      {
-                        ...stagger(index),
-                        '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
-                      } as CSSProperties
-                    }
-                  >
-                    {task.actorRole === 'assignee' ? (
-                      <CompleteTaskButton
-                        task={{
-                          id: task.id,
-                          title: task.title,
-                          derivedState: task.derivedState as TaskDerivedState,
-                          projectId: task.projectId,
-                        }}
-                      />
-                    ) : (
-                      <span aria-hidden="true" />
-                    )}
-                    <Link
-                      to="/tasks/$taskId"
-                      params={{ taskId: task.id }}
-                      className={cx(styles.row, 'nf-focus-ring')}
-                    >
-                      <span className={styles.taskTitle}>{task.title}</span>
-                      {pri > 0 ? (
-                        <Badge tone={PRIORITY_TONE[pri]}>{t(PRIORITY_KEY[pri])}</Badge>
-                      ) : null}
-                      <span className={styles.context}>
-                        {task.projectName
-                          ? `${task.workspaceName} · ${task.projectName}`
-                          : task.workspaceName}
-                      </span>
-                      <span className={styles.due}>
-                        {task.dueOn ? formatDueDate(task.dueOn, locale) : t('today.no_due_label')}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <TodayList items={items} isOverdue={isOverdue} stagger={stagger} locale={locale} />
           </section>
         );
       })}

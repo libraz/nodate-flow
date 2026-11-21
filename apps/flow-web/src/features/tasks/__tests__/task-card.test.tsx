@@ -76,14 +76,14 @@ describe('<TaskCard>', () => {
     );
 
     // The due date badge should have the aria-label from i18n key.
-    const dueBadge = screen.getByLabelText('tasks.columns.due');
+    const dueBadge = screen.getByLabelText(/^tasks\.columns\.due: /);
     expect(dueBadge).toBeDefined();
   });
 
   it('does not render due date badge when dueOn is absent', () => {
     renderWithProviders(<TaskCard {...defaultProps()} />);
 
-    const badges = screen.queryByLabelText('tasks.columns.due');
+    const badges = screen.queryByLabelText(/^tasks\.columns\.due/);
     expect(badges).toBeNull();
   });
 

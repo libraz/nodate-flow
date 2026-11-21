@@ -17,7 +17,6 @@ import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { useNavigate } from '@tanstack/react-router';
-import { MoreVertical } from 'lucide-react';
 import { type ReactElement, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
@@ -175,11 +174,6 @@ export default function TaskBoardView({ projectId }: TaskBoardViewProps): ReactE
       {mayBeTruncated ? (
         <p className={css.limitNotice}>{t('tasks.limit_notice', { count: TASKS_QUERY_LIMIT })}</p>
       ) : null}
-      {/* One line above the board, so every column header keeps the same height. */}
-      <p className={css.dndHint}>
-        <MoreVertical size={14} aria-hidden="true" />
-        {t('tasks.board.dnd_disabled_hint')}
-      </p>
       <div
         role="region"
         aria-label={t('tasks.views.board')}

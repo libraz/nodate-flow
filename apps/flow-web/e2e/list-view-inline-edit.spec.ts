@@ -168,11 +168,10 @@ test.describe('task list view inline edit', () => {
     const rowIdx = await readRowIndex(initialRow);
     const stableRow = rowByIndex(page, rowIdx);
 
-    // Double-click swaps the <Link> for <input aria-label="Edit title">.
-    // We dblclick the title link directly; the InlineTitleCell handler
-    // clears the pending navigation timer and switches to edit mode.
-    const titleLink = initialRow.getByRole('link', { name: original, exact: true });
-    await titleLink.dblclick();
+    // The pencil button in the title cell swaps the <Link> for
+    // <input aria-label="Edit title">. It is revealed on row hover/focus.
+    await initialRow.hover();
+    await initialRow.getByRole('button', { name: 'Edit title' }).click();
     const input = stableRow.getByRole('textbox', { name: 'Edit title' });
     await expect(input).toBeVisible({ timeout: 5_000 });
 
@@ -223,8 +222,8 @@ test.describe('task list view inline edit', () => {
       }
     });
 
-    const titleLink = initialRow.getByRole('link', { name: original, exact: true });
-    await titleLink.dblclick();
+    await initialRow.hover();
+    await initialRow.getByRole('button', { name: 'Edit title' }).click();
     const input = stableRow.getByRole('textbox', { name: 'Edit title' });
     await expect(input).toBeVisible({ timeout: 5_000 });
     await input.fill('TYPED BUT CANCELLED');
@@ -517,8 +516,8 @@ test.describe('task list view inline edit', () => {
     const rowIdx = await readRowIndex(initialRow);
     const stableRow = rowByIndex(page, rowIdx);
 
-    const titleLink = initialRow.getByRole('link', { name: original, exact: true });
-    await titleLink.dblclick();
+    await initialRow.hover();
+    await initialRow.getByRole('button', { name: 'Edit title' }).click();
     const input = stableRow.getByRole('textbox', { name: 'Edit title' });
     await expect(input).toBeVisible({ timeout: 5_000 });
 

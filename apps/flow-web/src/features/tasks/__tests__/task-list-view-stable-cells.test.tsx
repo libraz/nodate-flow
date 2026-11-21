@@ -105,7 +105,9 @@ describe('TaskListView cell stability', () => {
   it('keeps the same focused inline-edit input across a parent re-render', () => {
     const { rerender } = render(<Harness tick={0} />);
 
-    fireEvent.doubleClick(screen.getByText('Task A'));
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'tasks.inline.edit_title' })[0] as HTMLElement,
+    );
     const input = screen.getByRole('textbox', { name: 'tasks.inline.edit_title' });
     input.focus();
     fireEvent.change(input, { target: { value: 'Task A edited' } });

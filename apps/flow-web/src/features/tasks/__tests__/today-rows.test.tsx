@@ -61,10 +61,11 @@ function renderToday(rows: MyTaskListItem[]) {
   );
 }
 
+/** The row grid inside the list item (the item itself is a presence wrapper). */
 function itemFor(title: string): HTMLElement {
-  const item = screen.getByText(title).closest('li');
-  if (!item) throw new Error(`no row for ${title}`);
-  return item;
+  const row = screen.getByText(title).closest('li')?.firstElementChild?.firstElementChild;
+  if (!(row instanceof HTMLElement)) throw new Error(`no row for ${title}`);
+  return row;
 }
 
 describe('/today rows', () => {

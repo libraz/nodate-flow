@@ -70,21 +70,6 @@ export const STATE_COLOR: Record<TaskDerivedState, string> = {
   cancelled: 'var(--nf-color-fg-muted)',
 };
 
-/**
- * Text colour for each derived state. The fills above sit between 1.9:1
- * and 4.0:1 against the page background, so a label painted with one is
- * somewhere between hard and impossible to read; the `-fg` counterparts
- * are 7.3:1 or better in every theme. `review` uses the state token,
- * which is already a text-strength violet.
- */
-export const STATE_TEXT_COLOR: Record<TaskDerivedState, string> = {
-  open: 'var(--nf-color-info-fg)',
-  waiting: 'var(--nf-color-warning-fg)',
-  review: 'var(--nf-color-state-review-fg)',
-  done: 'var(--nf-color-success-fg)',
-  cancelled: 'var(--nf-color-fg-muted)',
-};
-
 /** Badge tone for each derived state. */
 export const STATE_TONE: Record<TaskDerivedState, BadgeTone> = {
   open: 'info',

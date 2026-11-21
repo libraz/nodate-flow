@@ -23,7 +23,8 @@ import {
   useArchiveTask,
   useUnarchiveTask,
 } from './api';
-import { STATE_COLOR, STATE_KEY } from './constants';
+import { STATE_KEY } from './constants';
+import StateDot from './state-dot';
 import styles from './task-move-menu.module.css';
 
 const TRANSITION_LABEL_KEY: Record<TransitionName, string> = {
@@ -176,11 +177,7 @@ export default function TaskMoveMenu({
                 <span>{t(TRANSITION_LABEL_KEY[name])}</span>
                 <span className={styles.menuItemLanding}>
                   <span aria-hidden="true">→</span>
-                  <span
-                    aria-hidden="true"
-                    className={styles.menuItemDot}
-                    style={{ background: STATE_COLOR[landing] }}
-                  />
+                  <StateDot state={landing} />
                   {t(STATE_KEY[landing])}
                 </span>
               </button>

@@ -7,8 +7,11 @@
  */
 
 import { useFirstLoadStagger } from '@nodate-flow/ui/hooks/use-first-load-stagger';
+import { usePresenceList } from '@nodate-flow/ui/hooks/use-presence-list';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
+import Button, { buttonClassName } from '@nodate-flow/ui/primitives/button';
+import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { createFileRoute, Link } from '@tanstack/react-router';
@@ -31,9 +34,10 @@ import PageHeader from '../components/page-header';
 import { selectUser, useAuth } from '../features/auth/auth-store';
 import DashboardView from '../features/dashboard/dashboard-view';
 import OnboardingChecklist from '../features/onboarding/onboarding-checklist';
-import { type TaskDerivedState, useMyTasksQuery } from '../features/tasks/api';
+import { type MyTaskListItem, type TaskDerivedState, useMyTasksQuery } from '../features/tasks/api';
 import CompleteTaskButton from '../features/tasks/complete-task-button';
 import { STATE_COLOR } from '../features/tasks/constants';
+import rowStyles from '../features/tasks/task-row.module.css';
 import { useWorkspacesQuery } from '../features/workspaces/api';
 import { todayKey } from '../lib/date-utils';
 import { useCurrentWorkspaceId } from '../lib/use-current-workspace';
@@ -88,6 +92,60 @@ function TaskSummarySkeleton(): ReactElement {
 }
 
 /* ── Task summary (suspense boundary) ──────────────────────── */
+
+/** The home summary's rows; a completed row collapses out so the rows below close the gap. */
+function RecentTaskList({
+  tasks,
+  stagger,
+}: {
+  tasks: MyTaskListItem[];
+  stagger: (index: number) => CSSProperties | undefined;
+}): ReactElement {
+  const { entries, onExited } = usePresenceList(tasks, (task) => task.id);
+
+  return (
+    <ul className={rowStyles.list}>
+      {entries.map(({ key, item: task, present }, index) => (
+        <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
+          <div
+            className={cx(motion.enter, rowStyles.item)}
+            style={
+              {
+                ...stagger(index),
+                '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
+              } as CSSProperties
+            }
+          >
+            {task.actorRole === 'assignee' ? (
+              <CompleteTaskButton
+                task={{
+                  id: task.id,
+                  title: task.title,
+                  derivedState: task.derivedState as TaskDerivedState,
+                  projectId: task.projectId,
+                }}
+              />
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <Link
+              to="/tasks/$taskId"
+              params={{ taskId: task.id }}
+              className={cx(rowStyles.row, 'nf-focus-ring')}
+            >
+              <span className={rowStyles.taskTitle} title={task.title}>
+                {task.title}
+              </span>
+              {task.projectName ? (
+                <span className={rowStyles.context}>{task.projectName}</span>
+              ) : null}
+            </Link>
+          </div>
+        </PresenceItem>
+      ))}
+    </ul>
+  );
+}
 
 function TaskSummary(): ReactElement {
   const { t } = useTranslation('common');
@@ -165,56 +223,16 @@ function TaskSummary(): ReactElement {
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
           <div className={styles.emptyTasks}>
             <p className={styles.mutedText}>{t('home.recent_tasks_empty')}</p>
-            <button
-              type="button"
-              onClick={handleCreateTask}
-              className={cx(styles.action, 'nf-focus-ring')}
-            >
+            <Button type="button" onClick={handleCreateTask}>
               <Icon icon={Plus} decorative />
               {t('home.quick_create')}
-            </button>
+            </Button>
           </div>
         </section>
       ) : (
         <section>
           <h2 className={styles.sectionTitle}>{t('home.recent_tasks')}</h2>
-          <ul className={styles.taskList}>
-            {recentTasks.map((task, index) => (
-              <li
-                key={task.id}
-                className={cx(motion.enter, styles.taskItem)}
-                style={
-                  {
-                    ...stagger(index),
-                    '--state-tone': STATE_COLOR[task.derivedState as TaskDerivedState],
-                  } as CSSProperties
-                }
-              >
-                {task.actorRole === 'assignee' ? (
-                  <CompleteTaskButton
-                    task={{
-                      id: task.id,
-                      title: task.title,
-                      derivedState: task.derivedState as TaskDerivedState,
-                      projectId: task.projectId,
-                    }}
-                  />
-                ) : (
-                  <span aria-hidden="true" />
-                )}
-                <Link
-                  to="/tasks/$taskId"
-                  params={{ taskId: task.id }}
-                  className={cx(styles.taskRow, 'nf-focus-ring')}
-                >
-                  <span className={styles.taskTitle}>{task.title}</span>
-                  {task.projectName ? (
-                    <span className={styles.taskProject}>{task.projectName}</span>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <RecentTaskList tasks={recentTasks} stagger={stagger} />
           <Link to="/today" className={cx(styles.viewAll, 'nf-focus-ring')}>
             {t('home.view_all_tasks')}
           </Link>
@@ -242,7 +260,7 @@ function WorkspaceLinks(): ReactElement | null {
             key={ws.id}
             to="/workspaces/$id/projects"
             params={{ id: ws.id }}
-            className={cx(styles.workspaceLink, 'nf-focus-ring')}
+            className={buttonClassName({ className: styles.workspaceLink })}
           >
             <Icon icon={FolderKanban} decorative />
             <span className={styles.workspaceName}>{ws.name}</span>
@@ -300,19 +318,15 @@ function HomePage(): ReactElement {
       </Suspense>
 
       <div className={styles.quickActions}>
-        <button
-          type="button"
-          onClick={handleCreateTask}
-          className={cx(styles.action, styles.actionPrimary, 'nf-focus-ring')}
-        >
+        <Button type="button" variant="primary" onClick={handleCreateTask}>
           <Icon icon={Plus} decorative />
           {t('home.quick_create')}
-        </button>
-        <button type="button" onClick={handleSearch} className={cx(styles.action, 'nf-focus-ring')}>
+        </Button>
+        <Button type="button" onClick={handleSearch}>
           <Icon icon={Search} decorative />
           {t('home.quick_search')}
-        </button>
-        <Link to="/inbox" className={cx(styles.action, 'nf-focus-ring')}>
+        </Button>
+        <Link to="/inbox" className={buttonClassName()}>
           <Icon icon={Inbox} decorative />
           {t('nav.inbox')}
         </Link>

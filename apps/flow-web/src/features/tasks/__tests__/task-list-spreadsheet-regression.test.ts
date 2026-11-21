@@ -12,14 +12,16 @@ describe('task list/spreadsheet regressions', () => {
 
     const componentStart = source.indexOf('function InlineTitleCell');
     const editingReturn = source.indexOf('if (editing) {', componentStart);
-    const clickTimerHook = source.indexOf('const clickTimer = useRef', componentStart);
-    const cleanupEffect = source.indexOf('Clean up pending click timer', componentStart);
+    const draftHook = source.indexOf('const [draft, setDraft] = useState', componentStart);
+    const focusEffect = source.indexOf('Reset draft and focus', componentStart);
 
     expect(componentStart).toBeGreaterThanOrEqual(0);
-    expect(clickTimerHook).toBeGreaterThan(componentStart);
-    expect(cleanupEffect).toBeGreaterThan(componentStart);
-    expect(clickTimerHook).toBeLessThan(editingReturn);
-    expect(cleanupEffect).toBeLessThan(editingReturn);
+    expect(draftHook).toBeGreaterThan(componentStart);
+    expect(focusEffect).toBeGreaterThan(componentStart);
+    expect(draftHook).toBeLessThan(editingReturn);
+    expect(focusEffect).toBeLessThan(editingReturn);
+    // A plain click navigates through the link; no delayed-click timer is left behind.
+    expect(source).not.toContain('clickTimer');
   });
 
   it('clears spreadsheet row selection when task filters change', () => {

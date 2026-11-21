@@ -1,19 +1,12 @@
-/* Priority picker segment: colour dot plus label, so priority is never colour-only. */
+/* Priority picker segment: colour mark plus label, so priority is never colour-only. */
 
 .segment {
   display: inline-flex;
   align-items: center;
-  gap: var(--nf-space-1);
+  gap: var(--nf-space-0-5);
   min-inline-size: 0;
-}
-
-.dot {
-  flex-shrink: 0;
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 0.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 0.5rem;
-  border-radius: var(--nf-radius-pill);
+  /* Takes back most of the segment's inline padding so "Medium" and "Urgent" fit a side-card column. */
+  margin-inline: calc(var(--nf-space-1-5) * -1);
 }
 
 .text {

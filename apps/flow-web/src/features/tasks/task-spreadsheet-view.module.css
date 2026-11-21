@@ -15,9 +15,11 @@
 }
 
 .tableContainer {
+  /* Handle, title, state, priority, assignee, due, updated. */
+  --sheet-cols: 2.5rem 1fr 7rem 6rem 8rem 7.5rem 7.5rem;
   flex: 1;
   overflow: auto;
-  border: 1px solid var(--nf-color-border);
+  border: var(--nf-space-px) solid var(--nf-color-border);
   border-radius: var(--nf-radius-md);
   background: var(--nf-color-bg);
 }
@@ -33,7 +35,7 @@
 
 .headerRow {
   display: grid;
-  grid-template-columns: 2.5rem 1fr 7rem 6rem 8rem 7.5rem 7.5rem;
+  grid-template-columns: var(--sheet-cols);
   position: sticky;
   inset-block-start: 0;
   z-index: var(--nf-z-sticky);
@@ -51,7 +53,7 @@
   font-weight: var(--nf-weight-semibold);
   color: var(--nf-color-fg);
   user-select: none;
-  border-inline-end: 1px solid var(--nf-color-border);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-border);
 }
 
 .headerCell:last-child {
@@ -68,7 +70,7 @@
 
 .bodyRow {
   display: grid;
-  grid-template-columns: 2.5rem 1fr 7rem 6rem 8rem 7.5rem 7.5rem;
+  grid-template-columns: var(--sheet-cols);
   border-block-end: var(--nf-space-px) solid var(--nf-color-hairline);
   transition: background var(--nf-duration-fast) var(--nf-ease-standard);
 }
@@ -91,7 +93,7 @@
   padding-inline: var(--nf-space-3);
   font-size: var(--nf-text-sm);
   color: var(--nf-color-fg);
-  border-inline-end: 1px solid var(--nf-color-border);
+  border-inline-end: var(--nf-space-px) solid var(--nf-color-hairline);
   cursor: default;
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 2.25rem;
@@ -147,8 +149,8 @@
 }
 
 .cellActive {
-  outline: 2px solid var(--nf-color-accent);
-  outline-offset: -2px;
+  outline: var(--nf-focus-ring-width) solid var(--nf-color-accent);
+  outline-offset: calc(var(--nf-focus-ring-width) * -1);
   border-radius: var(--nf-radius-xs);
   z-index: calc(var(--nf-z-base) + 1);
 }
@@ -212,24 +214,8 @@
 
 /* ── Status / Priority indicators ───────────────────────────── */
 
-.statusDot {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 0.5rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 0.5rem;
-  border-radius: var(--nf-radius-pill);
-  flex-shrink: 0;
-  margin-inline-end: var(--nf-space-2);
-}
-
-.priorityBar {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 0.25rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 0.75rem;
-  /* nf-token-override: corner of a 4x12px data swatch; must read the same in every theme */
-  border-radius: 0.0625rem;
-  flex-shrink: 0;
+/* Gap between a state or priority mark and its label. */
+.markGap {
   margin-inline-end: var(--nf-space-2);
 }
 
@@ -306,9 +292,8 @@
 
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
-  .headerRow,
-  .bodyRow {
-    grid-template-columns: 2.5rem 1fr 5.5rem 5rem;
+  .tableContainer {
+    --sheet-cols: 2.5rem 1fr 5.5rem 5rem;
   }
 
   .colAssignee,

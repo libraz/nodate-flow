@@ -37,7 +37,7 @@
 
 .top {
   display: flex;
-  align-items: flex-start;
+  align-items: first baseline;
   gap: var(--nf-space-1);
 }
 

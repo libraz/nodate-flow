@@ -1,0 +1,21 @@
+/* Colour marks beside a state or priority label; one size each everywhere. */
+
+.stateDot {
+  display: inline-block;
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  border-radius: var(--nf-radius-pill);
+}
+
+.priorityMark {
+  display: inline-block;
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.25rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.75rem;
+  border-radius: var(--nf-radius-xs);
+}

@@ -26,7 +26,7 @@
   inline-size: 1.125rem;
   /* nf-token-override: check circle diameter, a control dimension, not a spacing step */
   block-size: 1.125rem;
-  border: 1.5px solid var(--state-tone, var(--nf-color-fg-muted));
+  border: calc(var(--nf-space-px) * 1.5) solid var(--state-tone, var(--nf-color-fg-muted));
   border-radius: var(--nf-radius-pill);
   background: transparent;
   transition:
@@ -55,6 +55,16 @@
 /* Unavailable: dashed ring, dimmed, and no hover affordance. */
 .button[aria-disabled="true"] {
   cursor: not-allowed;
+  opacity: var(--nf-opacity-disabled, 0.5);
+}
+
+.button[aria-disabled="true"] .circle {
+  border-style: dashed;
+}
+
+.button[aria-disabled="true"]:hover .check,
+.button[aria-disabled="true"]:focus-visible .check {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

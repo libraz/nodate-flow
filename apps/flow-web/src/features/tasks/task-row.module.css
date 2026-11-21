@@ -1,0 +1,91 @@
+/* Task row shared by /today and the home summary. */
+
+.list {
+  --presence-gap: var(--nf-space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+/* Complete control in the first column; the link fills the rest of the row. */
+.item {
+  display: grid;
+  grid-template-columns: var(--nf-space-8) 1fr;
+  align-items: center;
+  border-radius: var(--nf-radius-md);
+  border: var(--nf-space-px) solid transparent;
+  background: var(--nf-color-surface);
+  transition:
+    background-color var(--nf-duration-fast) var(--nf-ease-standard),
+    border-color var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.item:hover {
+  background: var(--nf-color-surface-hover);
+  border-color: var(--nf-color-border);
+}
+
+/* Overdue: full hairline border plus a light tint, never an edge stripe. */
+.itemOverdue,
+.itemOverdue:hover {
+  background: var(--nf-color-danger-subtle);
+  border-color: color-mix(in oklch, var(--nf-color-danger) 30%, transparent);
+}
+
+.itemOverdue:hover {
+  border-color: var(--nf-color-danger);
+}
+
+/* The link covers the title area, so the hit target matches what looks clickable. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-3);
+  min-block-size: var(--nf-control-height);
+  padding-block: var(--nf-space-2-5);
+  padding-inline: var(--nf-space-3);
+  border-radius: inherit;
+  color: var(--nf-color-fg);
+  text-decoration: none;
+}
+
+.taskTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.due {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  min-inline-size: 5.5rem;
+  text-align: end;
+  white-space: nowrap;
+  font-size: var(--nf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .contextHideNarrow {
+    display: none;
+  }
+}

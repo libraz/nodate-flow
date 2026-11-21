@@ -34,6 +34,7 @@ import { History, Pencil, Plus, X } from 'lucide-react';
 import { type FormEvent, type ReactElement, Suspense, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageFrame from '../components/page-frame';
+import frameStyles from '../components/page-frame.module.css';
 import PageHelp from '../components/page-help';
 import AiConsequence from '../features/ai-suggestions/ai-consequence';
 import { selectUser, useAuth } from '../features/auth/auth-store';
@@ -66,19 +67,14 @@ import {
   useUpdateTask,
 } from '../features/tasks/api';
 import CommentRow from '../features/tasks/comment-row';
-import {
-  PRIORITY_COLOR,
-  PRIORITY_KEY,
-  STATE_COLOR,
-  STATE_KEY,
-  STATE_TONE,
-} from '../features/tasks/constants';
+import { PRIORITY_KEY, STATE_COLOR, STATE_KEY, STATE_TONE } from '../features/tasks/constants';
 import DependenciesSection from '../features/tasks/dependencies-section';
 import DescriptionHistoryDrawer from '../features/tasks/description-history/description-history-drawer';
 import EventFromTaskDialog from '../features/tasks/event-from-task/event-from-task-dialog';
 import LinkedEventsSection from '../features/tasks/links/linked-events-section';
 import MarkdownEditor from '../features/tasks/markdown-editor';
 import PriorityControl from '../features/tasks/priority-control';
+import PriorityMark from '../features/tasks/priority-mark';
 import TaskAttachments from '../features/tasks/task-attachments';
 import TaskSourceLinks from '../features/tasks/task-source-links';
 import TaskStepsPanel from '../features/tasks/task-steps-panel';
@@ -217,34 +213,6 @@ function TitleEditor({
   const update = useUpdateTask();
   const errorId = useId();
 
-  // Same type as PageHeader's title; the heading sits inline with its edit controls.
-  const headingStyle = {
-    margin: 0,
-    fontFamily: 'var(--nf-font-display)',
-    fontSize: 'var(--nf-text-page-title)',
-    fontWeight: 'var(--nf-weight-semibold)',
-    letterSpacing: '-0.01em',
-    lineHeight: 'var(--nf-leading-tight)',
-  } as const;
-
-  /**
-   * Applied to the `<h1>` while editing so it disappears visually but
-   * stays a page-level heading landmark for assistive technology. Mirrors
-   * the standard "sr-only" clip pattern used by `<VisuallyHidden>` without
-   * wrapping the heading in a non-semantic `<span>`.
-   */
-  const headingHiddenStyle = {
-    ...headingStyle,
-    position: 'absolute',
-    inlineSize: '1px',
-    blockSize: '1px',
-    padding: 0,
-    overflow: 'hidden',
-    clip: 'rect(0, 0, 0, 0)',
-    whiteSpace: 'nowrap',
-    borderWidth: 0,
-  } as const;
-
   if (!editing) {
     const enterEdit = (): void => {
       setValue(initial);
@@ -252,15 +220,8 @@ function TitleEditor({
       setEditing(true);
     };
     return (
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--nf-space-2)',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <h1 style={{ ...headingStyle, flex: 1, minInlineSize: 0 }}>{initial}</h1>
+      <div className={css.titleRow}>
+        <h1 className={cx(frameStyles.title, css.titleHeading)}>{initial}</h1>
         <PageHelp topic="task-detail" />
         <Suspense fallback={<Skeleton className={css.starSkeleton} />}>
           <TaskFavoriteStar taskId={id} workspaceId={workspaceId} />
@@ -306,20 +267,10 @@ function TitleEditor({
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-1-5)',
-        position: 'relative',
-      }}
-    >
+    <div className={css.titleEditing}>
       {/* Preserve the page-level heading landmark while editing. */}
-      <h1 style={headingHiddenStyle}>{initial}</h1>
-      <div
-        className={css.editorEnter}
-        style={{ display: 'flex', gap: 'var(--nf-space-2)', alignItems: 'center' }}
-      >
+      <h1 className={cx(frameStyles.title, css.titleHidden)}>{initial}</h1>
+      <div className={cx(css.editorEnter, css.titleEditRow)}>
         <Input
           value={value}
           onChange={(e) => {
@@ -342,7 +293,7 @@ function TitleEditor({
           aria-label={t('tasks.detail.title_edit')}
           aria-invalid={showEmptyError ? true : undefined}
           aria-describedby={showEmptyError ? errorId : undefined}
-          style={{ flex: 1 }}
+          className={css.titleInput}
         />
         <Button
           type="button"
@@ -499,16 +450,8 @@ function DescriptionSection({
   const { t } = useTranslation('common');
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
-    <Card style={{ padding: 'var(--nf-space-4)' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 'var(--nf-space-2)',
-          marginBlockEnd: 'var(--nf-space-2)',
-        }}
-      >
+    <Card>
+      <div className={css.descriptionToolbar}>
         <Button
           type="button"
           size="sm"
@@ -556,14 +499,7 @@ function TaskActionsCard({
   const { t } = useTranslation('common');
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   return (
-    <Card
-      style={{
-        padding: 'var(--nf-space-4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-2)',
-      }}
-    >
+    <Card className={css.sideCard}>
       <CardHeading title={t('tasks.actions.title')} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--nf-space-2)' }}>
         <Button type="button" variant="default" onClick={() => setEventDialogOpen(true)}>
@@ -885,29 +821,10 @@ function Sidebar({
   });
 
   return (
-    <aside
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--nf-space-4)',
-        position: 'sticky',
-        top: 'var(--nf-space-4)',
-        alignSelf: 'start',
-        // nf-token-override: component dimension, not a spacing step
-        maxBlockSize: 'calc(100vh - 5rem)',
-        overflowY: 'auto',
-      }}
-    >
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-3)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: 'var(--nf-color-fg-muted)' }}>{t('tasks.detail.state_label')}</span>
+    <aside className={css.aside}>
+      <Card className={css.sideCard}>
+        <div className={css.stateRow}>
+          <span className={css.mutedLabel}>{t('tasks.detail.state_label')}</span>
           <StateBadge state={state} />
         </div>
         <Separator />
@@ -919,31 +836,10 @@ function Sidebar({
          * `<label htmlFor>`, so we compose the visible label + colour dot
          * manually to match the surrounding sidebar rhythm.
          */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--nf-space-1)' }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 'var(--nf-space-1-5)',
-              fontSize: 'var(--nf-text-sm)',
-              fontWeight: 'var(--nf-weight-medium)',
-              color: 'var(--nf-color-fg)',
-            }}
-          >
+        <div className={css.fieldStack}>
+          <span className={css.fieldLabel}>
             {t('tasks.detail.priority_label')}
-            <span
-              aria-hidden
-              style={{
-                display: 'inline-block',
-                // nf-token-override: component dimension, not a spacing step
-                width: '0.5rem',
-                // nf-token-override: component dimension, not a spacing step
-                height: '0.5rem',
-                // nf-token-override: a fixed corner for an 8px priority dot; --nf-radius-xs varies per theme, and the shape is what distinguishes it from the status dots beside it
-                borderRadius: '0.125rem',
-                background: PRIORITY_COLOR[priority],
-              }}
-            />
+            <PriorityMark priority={priority} />
           </span>
           <PriorityControl
             value={priority}
@@ -986,14 +882,7 @@ function Sidebar({
         </FormField>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading
           title={t('tasks.detail.transitions.title')}
           hint={t('tasks.detail.transitions.hint')}
@@ -1026,28 +915,14 @@ function Sidebar({
 
       <TaskActionsCard taskId={id} workspaceId={workspaceId} />
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading title={t('tasks.detail.assignees.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <AssigneesSection taskId={id} workspaceId={workspaceId} />
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading
           title={t('taskWorkflow.rolesHeading')}
           hint={t('taskWorkflow.rolesDescription')}
@@ -1057,14 +932,7 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading
           title={tAgents('task_detail.agent.assign.title')}
           hint={tAgents('task_detail.agent.assign.description')}
@@ -1074,53 +942,25 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <Suspense fallback={<SectionSkeleton />}>
           <StateGraphSection taskId={id} current={state} />
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <Suspense fallback={<SectionSkeleton />}>
           <ConstraintEditor taskId={id} />
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <Suspense fallback={<SectionSkeleton />}>
           <ReplayPanel taskId={id} />
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading
           title={t('tasks.detail.infer_state.title')}
           hint={t('tasks.detail.infer_state.hint')}
@@ -1135,14 +975,7 @@ function Sidebar({
         <TaskStepsPanel taskId={id} workspaceId={workspaceId} />
       </Suspense>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading
           title={t('tasks.detail.duplicates.title')}
           hint={t('tasks.detail.duplicates.hint')}
@@ -1152,14 +985,7 @@ function Sidebar({
         </Suspense>
       </Card>
 
-      <Card
-        style={{
-          padding: 'var(--nf-space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--nf-space-2)',
-        }}
-      >
+      <Card className={css.sideCard}>
         <CardHeading title={t('tasks.detail.activity.title')} />
         <Suspense fallback={<SectionSkeleton />}>
           <TaskMiniTimeline taskId={id} />
@@ -1196,11 +1022,7 @@ function TaskMetaStrip({
       <div className={css.metaItem}>
         <dt className={css.metaLabel}>{t('tasks.detail.priority_label')}</dt>
         <dd className={css.metaValue}>
-          <span
-            aria-hidden="true"
-            className={css.metaDot}
-            style={{ background: PRIORITY_COLOR[priority] }}
-          />
+          <PriorityMark priority={priority} />
           {t(PRIORITY_KEY[priority])}
         </dd>
       </div>

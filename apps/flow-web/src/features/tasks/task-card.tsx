@@ -117,7 +117,7 @@ export default function TaskCard({
                 ? 'danger'
                 : 'neutral'
             }
-            aria-label={t('tasks.columns.due')}
+            aria-label={`${t('tasks.columns.due')}: ${formatDate(task.dueOn, locale)}`}
           >
             {formatDate(task.dueOn, locale)}
           </Badge>

@@ -7,6 +7,7 @@
 
 import Button from '@nodate-flow/ui/primitives/button';
 import Chip from '@nodate-flow/ui/primitives/chip';
+import Collapse from '@nodate-flow/ui/primitives/collapse';
 import Combobox from '@nodate-flow/ui/primitives/combobox';
 import Input from '@nodate-flow/ui/primitives/input';
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
@@ -195,6 +196,11 @@ export default function TaskFiltersBar({
             <Input disabled placeholder={assigneeLabel} aria-label={assigneeLabel} />
           </div>
         )}
+        {workspaceId !== undefined ? (
+          <Suspense fallback={<Skeleton className={styles.lensSkeleton} />}>
+            <LensPicker workspaceId={workspaceId} projectId={projectId} />
+          </Suspense>
+        ) : null}
         {hasActiveFilter ? (
           <Button
             type="button"
@@ -207,15 +213,10 @@ export default function TaskFiltersBar({
             {t('tasks.filters.clear')}
           </Button>
         ) : null}
-        {workspaceId !== undefined ? (
-          <Suspense fallback={<Skeleton className={styles.lensSkeleton} />}>
-            <LensPicker workspaceId={workspaceId} projectId={projectId} />
-          </Suspense>
-        ) : null}
       </div>
 
       {/* Active filter chips */}
-      {hasActiveFilter ? (
+      <Collapse open={hasActiveFilter}>
         <div role="status" aria-live="polite" className={styles.chipsRow}>
           {activeSearch ? (
             <Chip
@@ -277,7 +278,7 @@ export default function TaskFiltersBar({
             )
           ) : null}
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

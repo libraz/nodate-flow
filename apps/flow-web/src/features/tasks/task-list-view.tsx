@@ -7,16 +7,18 @@
  * inline editing for title (double-click), priority (click), and due date (click).
  */
 
+import Badge from '@nodate-flow/ui/primitives/badge';
 import Button from '@nodate-flow/ui/primitives/button';
 import DataGrid from '@nodate-flow/ui/primitives/data-grid';
 import DatePicker from '@nodate-flow/ui/primitives/date-picker';
+import EmptyState from '@nodate-flow/ui/primitives/empty-state';
 import Input from '@nodate-flow/ui/primitives/input';
 import PresenceItem from '@nodate-flow/ui/primitives/presence-item';
 import Select from '@nodate-flow/ui/primitives/select';
 import { toaster } from '@nodate-flow/ui/primitives/toast';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table';
-import { GripVertical, Lock } from 'lucide-react';
+import { GripVertical, Lock, Pencil } from 'lucide-react';
 import {
   createContext,
   type DragEvent,
@@ -30,6 +32,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OPEN_CREATE_TASK_EVENT } from '../../components/layout/glass-dock';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatDate, formatEpoch, isOverdue } from '../../lib/format';
@@ -46,16 +49,12 @@ import {
   useUpdateTask,
 } from './api';
 import AssigneeSummary from './assignee-summary';
-import {
-  PRIORITY_COLOR,
-  PRIORITY_KEY,
-  STATE_COLOR,
-  STATE_KEY,
-  STATE_TEXT_COLOR,
-} from './constants';
+import { PRIORITY_KEY, STATE_KEY, STATE_TONE } from './constants';
+import PriorityMark from './priority-mark';
+import StateDot from './state-dot';
 import css from './task-list-view.module.css';
 import { useInlineEdit } from './use-inline-edit';
-import { useTaskFilters } from './use-task-filters';
+import { resetTaskFilters, useTaskFilters } from './use-task-filters';
 
 export interface TaskListViewProps {
   projectId: string;
@@ -220,22 +219,16 @@ function InlineTitleCell({
   onStartEdit,
   onStopEdit,
   onSave,
-  onNavigate,
 }: {
   task: TaskListItem;
   editing: boolean;
   onStartEdit: () => void;
   onStopEdit: () => void;
   onSave: (title: string) => void;
-  onNavigate: () => void;
 }): ReactElement {
   const { t } = useTranslation('common');
   const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(task.title);
-  /* Distinguish single click (navigate) from double click (edit).
-     We delay navigation by 250ms; a double-click within that window
-     cancels the pending navigate and enters edit mode instead. */
-  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Reset draft and focus when switching to edit mode. */
   useEffect(() => {
@@ -247,15 +240,6 @@ function InlineTitleCell({
       }
     });
   }, [editing, task.title]);
-
-  // Clean up pending click timer on unmount to prevent stale navigation.
-  useEffect(() => {
-    return () => {
-      if (clickTimer.current !== null) {
-        clearTimeout(clickTimer.current);
-      }
-    };
-  }, []);
 
   if (editing) {
     return (
@@ -288,30 +272,26 @@ function InlineTitleCell({
   }
 
   return (
-    <Link
-      to="/tasks/$taskId"
-      params={{ taskId: task.id }}
-      onClick={(e) => {
-        e.preventDefault();
-        if (clickTimer.current !== null) return;
-        clickTimer.current = setTimeout(() => {
-          clickTimer.current = null;
-          onNavigate();
-        }, 250);
-      }}
-      onDoubleClick={() => {
-        if (clickTimer.current !== null) {
-          clearTimeout(clickTimer.current);
-          clickTimer.current = null;
-        }
-        onStartEdit();
-      }}
-      title={task.title}
-      data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
-      className={css.title}
-    >
-      {task.title}
-    </Link>
+    <span className={css.titleCell}>
+      <Link
+        to="/tasks/$taskId"
+        params={{ taskId: task.id }}
+        title={task.title}
+        data-closed={task.derivedState === 'done' || task.derivedState === 'cancelled'}
+        className={css.title}
+      >
+        {task.title}
+      </Link>
+      <button
+        type="button"
+        aria-label={t('tasks.inline.edit_title')}
+        title={t('tasks.inline.edit_title')}
+        onClick={onStartEdit}
+        className={css.renameTrigger}
+      >
+        <Pencil size={12} aria-hidden />
+      </button>
+    </span>
   );
 }
 
@@ -331,7 +311,6 @@ function InlinePriorityCell({
   const { t } = useTranslation('common');
   const selectRef = useRef<HTMLSelectElement>(null);
   const p = (task.priority as TaskPriority) ?? 0;
-  const color = PRIORITY_COLOR[p] ?? PRIORITY_COLOR[0];
 
   /* Auto-focus and open when switching to edit mode. */
   if (editing && selectRef.current && document.activeElement !== selectRef.current) {
@@ -385,7 +364,7 @@ function InlinePriorityCell({
       className={css.editTrigger}
       style={{ fontSize: 'var(--nf-text-supporting)' }}
     >
-      <span aria-hidden className={css.prioritySwatch} style={{ background: color }} />
+      <PriorityMark priority={p} />
       {label}
     </span>
   );
@@ -485,7 +464,6 @@ interface ListCellState {
   startEdit: (taskId: string, column: EditColumn) => void;
   stopEdit: () => void;
   save: (taskId: string, patch: InlinePatch) => void;
-  openTask: (taskId: string) => void;
   reorderKeyDown: (e: KeyboardEvent, index: number) => void;
 }
 
@@ -506,7 +484,6 @@ function TitleCell({ task }: { task: TaskListItem }): ReactElement {
       onStartEdit={() => cell.startEdit(task.id, 'title')}
       onStopEdit={cell.stopEdit}
       onSave={(title) => cell.save(task.id, { title })}
-      onNavigate={() => cell.openTask(task.id)}
     />
   );
 }
@@ -603,7 +580,6 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
   const locale = i18n.resolvedLanguage ?? 'en';
   const updateTask = useUpdateTask();
   const reorderTasks = useReorderTasks();
-  const navigate = useNavigate();
   const inlineEdit = useInlineEdit();
   const gridRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -737,6 +713,21 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     [reorderRows],
   );
 
+  /* F2, or Enter on the cell itself, renames the focused row; keys inside an editor or link are left alone. */
+  const handleRowKeyDown = (e: KeyboardEvent<HTMLDivElement>, taskId: string): void => {
+    const onCell = (e.target as HTMLElement).getAttribute('role') === 'gridcell';
+    if (e.key === 'F2' ? !(e.target instanceof HTMLInputElement) : e.key === 'Enter' && onCell) {
+      e.preventDefault();
+      inlineEdit.startEdit(taskId, 'title');
+    }
+  };
+  const handleClearFilters = (): void => {
+    resetTaskFilters(projectId);
+  };
+  const handleCreateTask = (): void => {
+    window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
+  };
+
   const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
 
   const handleClearSelection = useCallback(() => {
@@ -804,51 +795,22 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       {
         id: 'status',
         accessorKey: 'derivedState',
-        size: 100,
+        size: 120,
         minSize: 120,
         header: () => t('tasks.columns.status'),
         cell: ({ row }) => {
           const state = row.original.derivedState as TaskDerivedState;
-          const color = STATE_COLOR[state] ?? STATE_COLOR.open;
-          const textColor = STATE_TEXT_COLOR[state] ?? STATE_TEXT_COLOR.open;
           return (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 'var(--nf-space-1)',
-                fontSize: 'var(--nf-text-xs)',
-                fontWeight: 500,
-                padding: 'var(--nf-space-0-5) var(--nf-space-2)',
-                borderRadius: 'var(--nf-radius-pill)',
-                // Appending an alpha suffix to `var(--x)` produces
-                // `var(--x)18`, which is not a colour: the declaration was
-                // dropped and the pill had no wash at all.
-                background: `color-mix(in oklab, ${color} 9%, transparent)`,
-                color: textColor,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  // nf-token-override: component dimension, not a spacing step
-                  width: '0.375rem',
-                  // nf-token-override: component dimension, not a spacing step
-                  height: '0.375rem',
-                  borderRadius: 'var(--nf-radius-pill)',
-                  background: color,
-                  flexShrink: 0,
-                }}
-              />
+            <Badge tone={STATE_TONE[state] ?? STATE_TONE.open}>
+              <StateDot state={state} />
               {t(STATE_KEY[state] ?? 'tasks.status.open')}
-            </span>
+            </Badge>
           );
         },
       },
       {
         id: 'deps',
-        size: 60,
+        size: 64,
         minSize: 64,
         enableSorting: false,
         header: () => t('tasks.columns.deps'),
@@ -888,7 +850,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       {
         id: 'priority',
         accessorKey: 'priority',
-        size: 90,
+        size: 104,
         minSize: 104,
         header: () => t('tasks.columns.priority'),
         cell: ({ row }) => <PriorityCell task={row.original} />,
@@ -896,7 +858,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
       {
         id: 'updated',
         accessorKey: 'updatedAt',
-        size: 110,
+        size: 120,
         minSize: 120,
         header: () => t('tasks.columns.updated'),
         cell: ({ row }) => (
@@ -912,7 +874,6 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
     startEdit: inlineEdit.startEdit,
     stopEdit: inlineEdit.stopEdit,
     save: handleInlineSave,
-    openTask: (taskId) => void navigate({ to: '/tasks/$taskId', params: { taskId } }),
     reorderKeyDown: handleReorderKeyDown,
   };
 
@@ -926,7 +887,29 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
           columns={columns}
           data={tasks}
           getRowId={(row) => row.id}
-          emptyContent={hasActiveFilter ? t('tasks.empty_filtered') : t('tasks.empty')}
+          emptyContent={
+            hasActiveFilter ? (
+              <EmptyState
+                title={t('tasks.empty_filtered')}
+                titleAs="p"
+                action={
+                  <Button type="button" variant="default" onClick={handleClearFilters}>
+                    {t('tasks.filters.clear')}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title={t('tasks.empty')}
+                titleAs="p"
+                action={
+                  <Button type="button" variant="primary" onClick={handleCreateTask}>
+                    {t('tasks.new')}
+                  </Button>
+                }
+              />
+            )
+          }
           enableRowSelection
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
@@ -940,6 +923,7 @@ export default function TaskListView({ projectId }: TaskListViewProps): ReactEle
             onDragOver: (e) => handleDragOver(e, row.index),
             onDragLeave: handleDragLeave,
             onDrop: (e) => handleDrop(e, row.index),
+            onKeyDown: (e) => handleRowKeyDown(e, row.original.id),
           })}
         />
       </ListCellContext>

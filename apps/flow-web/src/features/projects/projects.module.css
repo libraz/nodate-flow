@@ -43,7 +43,7 @@
 }
 
 .bar {
-  display: flex;
+  position: relative;
   /* nf-token-override: component dimension, not a spacing step */
   block-size: 0.5rem;
   border-radius: var(--nf-radius-pill);
@@ -51,10 +51,17 @@
   background: var(--nf-color-bg-sunken);
 }
 
-/* Each state's share; a changed count re-flows the bar instead of snapping. */
+/* Each layer spans from the inline start to the end of its state; scale animates a changed count. */
 .segment {
-  min-inline-size: 0;
-  transition: flex-grow var(--nf-duration-slow) var(--nf-ease-out);
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  scale: var(--share, 0) 1;
+  transition: scale var(--nf-duration-slow) var(--nf-ease-out);
+}
+
+.segment:dir(rtl) {
+  transform-origin: right center;
 }
 
 .states {
@@ -84,15 +91,79 @@
   color: var(--nf-color-fg-muted);
 }
 
-.stateDot {
-  inline-size: var(--nf-space-2);
-  block-size: var(--nf-space-2);
-  border-radius: var(--nf-radius-pill);
-  flex-shrink: 0;
-}
-
 .stateCount {
   font-size: var(--nf-text-xl);
   font-weight: var(--nf-weight-semibold);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Settings ──────────────────────────────────── */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-6);
+}
+
+.settingsCard {
+  padding: var(--nf-space-5);
+}
+
+.settingsForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.actionsEnd {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+.sectionTitle {
+  font-size: var(--nf-text-base);
+  font-weight: var(--nf-weight-semibold);
+  color: var(--nf-color-fg);
+}
+
+.sectionSubtitle {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
+}
+
+.sectionDescription {
+  margin-block-end: var(--nf-space-4);
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.toggleList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+}
+
+.toggleLabel {
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg);
+}
+
+.toggleHint {
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg-muted);
 }

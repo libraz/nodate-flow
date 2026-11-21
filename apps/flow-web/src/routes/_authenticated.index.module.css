@@ -17,48 +17,6 @@
   flex-wrap: wrap;
 }
 
-.action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-2);
-  min-block-size: var(--nf-control-height);
-  padding-block: var(--nf-space-2);
-  padding-inline: var(--nf-space-4);
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid var(--nf-color-border);
-  background: transparent;
-  color: var(--nf-color-fg);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--nf-text-sm);
-  text-decoration: none;
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard),
-    scale var(--nf-duration-instant) var(--nf-ease-standard);
-}
-
-.action:hover {
-  background: var(--nf-color-surface-hover);
-  border-color: var(--nf-color-border-strong);
-}
-
-.action:active {
-  scale: var(--nf-motion-press-scale);
-}
-
-.actionPrimary {
-  border-color: var(--nf-color-accent);
-  background: var(--nf-color-accent);
-  color: var(--nf-color-fg-on-accent);
-  font-weight: var(--nf-weight-medium);
-}
-
-.actionPrimary:hover {
-  border-color: var(--nf-color-accent-hover);
-  background: var(--nf-color-accent-hover);
-}
-
 /* ── Stats ─────────────────────────────────────── */
 
 .stats {
@@ -153,64 +111,6 @@
 
 /* ── Recent tasks ──────────────────────────────── */
 
-.taskList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nf-space-1);
-}
-
-/* Complete control in the first column; the link fills the rest of the row. */
-.taskItem {
-  display: grid;
-  grid-template-columns: var(--nf-space-8) 1fr;
-  align-items: center;
-  border-radius: var(--nf-radius-md);
-  border: var(--nf-space-px) solid transparent;
-  background: var(--nf-color-surface);
-  transition:
-    background-color var(--nf-duration-fast) var(--nf-ease-standard),
-    border-color var(--nf-duration-fast) var(--nf-ease-standard);
-}
-
-.taskItem:hover {
-  background: var(--nf-color-surface-hover);
-  border-color: var(--nf-color-border);
-}
-
-.taskRow {
-  display: flex;
-  align-items: center;
-  gap: var(--nf-space-3);
-  min-block-size: var(--nf-control-height);
-  padding-block: var(--nf-space-2-5);
-  padding-inline: var(--nf-space-3);
-  border-radius: inherit;
-  color: var(--nf-color-fg);
-  text-decoration: none;
-}
-
-.taskTitle {
-  flex: 1 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.taskProject {
-  flex-shrink: 1;
-  /* nf-token-override: component dimension, not a spacing step */
-  max-inline-size: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--nf-text-xs);
-  color: var(--nf-color-fg-muted);
-}
-
 .viewAll {
   display: inline-block;
   margin-block-start: var(--nf-space-2);
@@ -234,7 +134,6 @@
 }
 
 .workspaceLink {
-  composes: action;
   background: var(--nf-color-surface);
   /* nf-token-override: component dimension, not a spacing step */
   max-inline-size: 20rem;

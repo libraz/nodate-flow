@@ -68,5 +68,4 @@
   gap: var(--nf-space-2);
   flex-wrap: wrap;
   align-items: center;
-  animation: global(nf-fade-in) var(--nf-duration-fast) var(--nf-ease-out);
 }

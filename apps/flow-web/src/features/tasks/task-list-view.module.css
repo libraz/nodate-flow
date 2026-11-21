@@ -3,13 +3,20 @@
 .grid {
   /* nf-token-override: component dimension, not a spacing step */
   min-block-size: 20rem;
+  /* Same type size and cell padding as the spreadsheet, so both views give rows the same height. */
+  font-size: var(--nf-text-sm);
 }
 
-/* A reorder or re-sort slides rows to their new place instead of teleporting. */
+.grid :global([role="gridcell"]) {
+  padding-block: var(--nf-space-1-5);
+  padding-inline: var(--nf-space-3);
+}
+
+/* Drag affordances; restates the primitive's translate and background transitions, which this list would otherwise replace. */
 .grid :global([role="row"][aria-selected]),
 .grid :global([role="row"][aria-rowindex]) {
   transition:
-    inset-block-start var(--nf-duration-base) var(--nf-ease-standard),
+    translate var(--nf-duration-base) var(--nf-ease-out),
     background-color var(--nf-duration-instant) var(--nf-ease-standard),
     box-shadow var(--nf-duration-fast) var(--nf-ease-standard),
     scale var(--nf-duration-fast) var(--nf-ease-standard),
@@ -136,6 +143,54 @@
   text-decoration-color: currentColor;
 }
 
+.titleCell {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+}
+
+.titleCell .title {
+  min-inline-size: 0;
+}
+
+/* Rename entry for pointer users: revealed with the row, always on touch. */
+.renameTrigger {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--nf-space-1);
+  border: 0;
+  border-radius: var(--nf-radius-sm);
+  background: transparent;
+  color: var(--nf-color-fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.grid :global([role="row"]):hover .renameTrigger,
+.renameTrigger:focus-visible {
+  opacity: 1;
+}
+
+.renameTrigger:hover {
+  color: var(--nf-color-fg);
+  background: var(--nf-color-surface-hover);
+}
+
+.renameTrigger:focus-visible {
+  outline: none;
+  box-shadow: var(--nf-shadow-focus);
+}
+
+@media (hover: none) {
+  .renameTrigger {
+    opacity: 1;
+  }
+}
+
 .titleInput {
   inline-size: 100%;
   font-size: inherit;
@@ -177,16 +232,6 @@
 .editTrigger[data-overdue="true"] {
   color: var(--nf-color-danger-fg);
   font-weight: var(--nf-weight-semibold);
-}
-
-.prioritySwatch {
-  /* nf-token-override: component dimension, not a spacing step */
-  inline-size: 0.375rem;
-  /* nf-token-override: component dimension, not a spacing step */
-  block-size: 0.75rem;
-  /* nf-token-override: the corner of a 6x12px colour swatch. --nf-radius-xs spans 0 to 6px across the themes, which on a swatch this small is the difference between a square and a lozenge; a data legend has to read the same in every theme */
-  border-radius: 0.125rem;
-  flex-shrink: 0;
 }
 
 .prioritySelect {

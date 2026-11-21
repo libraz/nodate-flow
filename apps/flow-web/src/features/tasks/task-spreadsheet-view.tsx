@@ -32,7 +32,9 @@ import {
   useUpdateTask,
 } from './api';
 import AssigneeSummary from './assignee-summary';
-import { PRIORITY_COLOR, PRIORITY_KEY, STATE_COLOR, STATE_KEY } from './constants';
+import { PRIORITY_KEY, STATE_KEY } from './constants';
+import PriorityMark from './priority-mark';
+import StateDot from './state-dot';
 import css from './task-spreadsheet-view.module.css';
 import { useTaskFilters } from './use-task-filters';
 
@@ -440,7 +442,6 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
   const renderStatusCell = (task: TaskListItem, rowIdx: number): ReactElement => {
     const state = (task.derivedState as TaskDerivedState) ?? 'open';
-    const color = STATE_COLOR[state] ?? STATE_COLOR.open;
 
     if (isEditing(rowIdx, 'status')) {
       return (
@@ -470,7 +471,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-        <span className={css.statusDot} style={{ background: color }} aria-hidden />
+        <StateDot state={state} className={css.markGap} />
         {t(STATE_KEY[state] ?? 'tasks.status.open')}
       </span>
     );
@@ -478,7 +479,6 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
   const renderPriorityCell = (task: TaskListItem, rowIdx: number): ReactElement => {
     const p = (task.priority as TaskPriority) ?? 0;
-    const color = PRIORITY_COLOR[p] ?? PRIORITY_COLOR[0];
 
     if (isEditing(rowIdx, 'priority')) {
       return (
@@ -507,7 +507,7 @@ export default function TaskSpreadsheetView({ projectId }: TaskSpreadsheetViewPr
 
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-        <span className={css.priorityBar} style={{ background: color }} aria-hidden />
+        <PriorityMark priority={p} className={css.markGap} />
         {t(PRIORITY_KEY[p] ?? 'tasks.priority.none')}
       </span>
     );
