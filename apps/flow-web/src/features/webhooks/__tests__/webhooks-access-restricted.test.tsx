@@ -1,6 +1,11 @@
-/** A 401/403 on the webhook list shows the access-restricted panel, not the generic load error. */
+/**
+ * A 401/403 on the webhook list reaches the route boundary through the app's
+ * `throwOnError: true` QueryClient and renders the access-restricted panel.
+ */
 
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../../../lib/api-error';
@@ -8,7 +13,12 @@ import { ApiError } from '../../../lib/api-error';
 const mocks = vi.hoisted(() => ({ error: null as unknown }));
 
 vi.mock('@tanstack/react-router', () => ({
+  createLazyFileRoute: () => (options: { component: unknown }) => ({ options }),
   getRouteApi: () => ({ useParams: () => ({ id: 'ws-1' }) }),
+}));
+
+vi.mock('../../../lib/api', () => ({
+  apiRequest: () => Promise.reject(mocks.error),
 }));
 
 vi.mock('../../workspaces/access-restricted', () => ({
@@ -25,43 +35,34 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { resolvedLanguage: 'en' } }),
 }));
 
-const idleMutation = { isPending: false, mutateAsync: vi.fn(), variables: undefined };
+import { Route } from '../../../routes/_authenticated.workspaces.$id.settings.webhooks.lazy';
 
-vi.mock('../api', () => ({
-  useWebhooksQuery: () => ({
-    data: undefined,
-    error: mocks.error,
-    isPending: false,
-    isError: true,
-    isFetching: false,
-    refetch: vi.fn(),
-  }),
-  useWebhookQuery: () => ({ data: undefined, isPending: false }),
-  useDeliveriesQuery: () => ({ data: undefined, isPending: false }),
-  useCreateWebhookMutation: () => idleMutation,
-  useDeleteWebhookMutation: () => idleMutation,
-  useToggleWebhookMutation: () => idleMutation,
-  useTestWebhookMutation: () => idleMutation,
-}));
+const RouteComponent = (Route as unknown as { options: { component: () => ReactNode } }).options
+  .component;
 
-import WebhooksSettingsPage from '../webhooks-settings-page';
+function renderRoute(): void {
+  // Mirrors createQueryClient() in @nodate-flow/sdk: queries throw to the nearest boundary.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, throwOnError: true } },
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouteComponent />
+    </QueryClientProvider>,
+  );
+}
 
 beforeEach(() => {
   mocks.error = null;
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
-describe('WebhooksSettingsPage access', () => {
-  it.each([401, 403])('renders AccessRestricted for a %i', (status) => {
+describe('webhooks route access', () => {
+  it.each([401, 403])('renders AccessRestricted for a %i', async (status) => {
     mocks.error = new ApiError('WS.FORBIDDEN', 'forbidden', status);
-    render(<WebhooksSettingsPage />);
-    expect(screen.getByTestId('access-restricted').textContent).toBe('nav.webhooks');
-    expect(screen.queryByText('settings.webhooks.load_error')).toBeNull();
-  });
-
-  it('keeps the generic load error for other failures', () => {
-    mocks.error = new ApiError('WS.INTERNAL', 'boom', 500);
-    render(<WebhooksSettingsPage />);
-    expect(screen.queryByTestId('access-restricted')).toBeNull();
-    expect(screen.getByText('settings.webhooks.load_error')).toBeTruthy();
+    renderRoute();
+    await waitFor(() => {
+      expect(screen.getByTestId('access-restricted').textContent).toBe('nav.webhooks');
+    });
   });
 });

@@ -22,6 +22,7 @@ const routeApi = getRouteApi('/_authenticated/workspaces/$id/settings');
 type SectionTitleKey =
   | 'nav.mcp_tokens'
   | 'nav.webhooks'
+  | 'nav.public_shares'
   | 'nav.auto_actions'
   | 'nav.ai_activity'
   | 'nav.ai_metrics'

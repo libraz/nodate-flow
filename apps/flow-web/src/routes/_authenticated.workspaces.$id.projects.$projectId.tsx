@@ -281,7 +281,9 @@ async function loadProjectForGuard(projectId: string): Promise<{ workspaceId: st
 
 function ProjectErrorComponent({ error }: { error: unknown }): ReactElement {
   const { id } = Route.useParams();
-  if (error instanceof ForbiddenError) {
+  // Child routes read the project through their own suspense queries, so their
+  // refusal arrives as a raw ApiError rather than the loader's sentinel.
+  if (error instanceof ForbiddenError || (error instanceof ApiError && error.httpStatus === 403)) {
     return <Forbidden />;
   }
   if (errorCodeOf(error) === 'WS.PROJECT.NOT_FOUND') {

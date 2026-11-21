@@ -189,13 +189,13 @@ export default function WorkspaceSwitcher({
         className={styles.switcherPopover}
       >
         <SwitcherTrigger
-          label={t('nav.switchWorkspace')}
+          label={`${monogramOf(currentName)} ${currentName}: ${t('nav.switchWorkspace')}`}
           tooltip={railCollapsed ? currentName : null}
           expanded={menuOpen}
         >
           <span className={styles.monogram} aria-hidden="true">
             {monogramOf(currentName)}
-          </span>
+          </span>{' '}
           {railCollapsed ? null : (
             <>
               <span className={styles.switcherName}>{currentName}</span>

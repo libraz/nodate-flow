@@ -82,6 +82,6 @@ describe('TopBar AI cost meter', () => {
     renderTopBar();
 
     expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'nav.switchWorkspace' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /nav\.switchWorkspace/ })).toBeNull();
   });
 });

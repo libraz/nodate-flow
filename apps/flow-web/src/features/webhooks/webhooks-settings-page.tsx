@@ -62,7 +62,6 @@ import ColumnHelp from '../settings/column-help';
 import SecretCallout from '../settings/secret-callout';
 import ui from '../settings/settings-ui.module.css';
 import TruncatedText from '../settings/truncated-text';
-import AccessRestricted from '../workspaces/access-restricted';
 import {
   useCreateWebhookMutation,
   useDeleteWebhookMutation,
@@ -795,11 +794,6 @@ export default function WebhooksSettingsPage(): ReactElement {
   const openCreate = (): void => {
     setCreateOpen(true);
   };
-
-  const error = webhooksQuery.error;
-  if (error instanceof ApiError && (error.httpStatus === 401 || error.httpStatus === 403)) {
-    return <AccessRestricted sectionTitleKey="nav.webhooks" />;
-  }
 
   return (
     <div className={ui.page}>

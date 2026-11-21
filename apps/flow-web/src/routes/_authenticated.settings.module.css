@@ -14,6 +14,7 @@
 }
 
 .navColumn {
+  min-inline-size: 0;
   align-self: start;
   position: sticky;
   inset-block-start: var(--nf-space-4);
@@ -33,10 +34,16 @@
   position: static;
 }
 
-.externalLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nf-space-1);
+.externalLabel svg {
+  margin-inline-start: var(--nf-space-1);
+  vertical-align: middle;
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (min-width: 768px) {
+  .externalLabel {
+    white-space: normal;
+  }
 }
 
 .accountHint {
@@ -99,7 +106,7 @@
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @media (max-width: 767px) {
   .layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--nf-space-3);
   }
 

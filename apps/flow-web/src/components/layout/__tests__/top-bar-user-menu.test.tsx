@@ -10,6 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
+  useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
+    select({ location: { pathname: '/today' } }),
 }));
 
 vi.mock('../../../features/ai-providers/cost-meter', () => ({ default: () => null }));
@@ -36,7 +38,7 @@ describe('TopBar user menu', () => {
         <TopBar />
       </QueryClientProvider>,
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: 'topbar.user_menu.open' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /topbar\.user_menu\.open/ }));
 
     const account = screen.getByRole('menuitem', { name: 'topbar.user_menu.account' });
     expect(account.tagName).toBe('A');

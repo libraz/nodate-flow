@@ -144,7 +144,7 @@ describe('palette and sidebar render the same destinations', () => {
     render(wrap(<Sidebar />));
     await screen.findByRole('heading', { name: 'Acme' });
     await user.click(screen.getByRole('button', { name: 'nav.more' }));
-    await user.click(screen.getByRole('button', { name: 'nav.switchWorkspace' }));
+    await user.click(screen.getByRole('button', { name: /nav\.switchWorkspace/ }));
 
     for (const entry of NAV_ENTRIES) {
       const candidates = screen
@@ -160,7 +160,7 @@ describe('palette and sidebar render the same destinations', () => {
     await screen.findByRole('heading', { name: 'Acme' });
     expect(screen.queryByText('nav.allWorkspaces')).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'nav.switchWorkspace' }));
+    await user.click(screen.getByRole('button', { name: /nav\.switchWorkspace/ }));
 
     expect(screen.getByRole('menuitem', { name: 'nav.allWorkspaces' })).toBeTruthy();
   });

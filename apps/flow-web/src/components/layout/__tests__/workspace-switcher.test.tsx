@@ -101,7 +101,7 @@ beforeEach(() => {
 });
 
 async function openMenu(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.click(screen.getByRole('button', { name: 'nav.switchWorkspace' }));
+  await user.click(screen.getByRole('button', { name: /nav\.switchWorkspace/ }));
 }
 
 describe.each(['/', '/calendar', '/today'])(
@@ -168,7 +168,7 @@ describe('WorkspaceSwitcher menu', () => {
     renderSwitcher(newClient());
 
     expect(screen.queryByRole('combobox')).toBeNull();
-    const button = screen.getByRole('button', { name: 'nav.switchWorkspace' });
+    const button = screen.getByRole('button', { name: /nav\.switchWorkspace/ });
     expect(button.getAttribute('aria-haspopup')).toBe('menu');
     expect(button.textContent).toContain('acme');
     expect(button.textContent).toContain('A');

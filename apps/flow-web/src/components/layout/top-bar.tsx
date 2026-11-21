@@ -3,7 +3,7 @@ import { cx } from '@nodate-flow/ui/lib/cx';
 import Avatar from '@nodate-flow/ui/primitives/avatar';
 import Popover from '@nodate-flow/ui/primitives/popover';
 import Tooltip from '@nodate-flow/ui/primitives/tooltip';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 
 import { Bell, Keyboard, LogOut, Search, Settings } from 'lucide-react';
 import {
@@ -14,6 +14,7 @@ import {
   Suspense,
   useState,
 } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
@@ -42,6 +43,8 @@ function initialsFrom(name: string | undefined): string {
 type AvatarTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   ref?: Ref<HTMLElement>;
   label: string;
+  /** Accessible name; must contain the visible avatar text. */
+  accessibleName: string;
   expanded: boolean;
   children: ReactNode;
 };
@@ -53,6 +56,7 @@ type AvatarTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 function AvatarTrigger({
   ref,
   label,
+  accessibleName,
   expanded,
   children,
   ...buttonProps
@@ -63,7 +67,7 @@ function AvatarTrigger({
         <button
           type="button"
           className={cx(styles.avatarTrigger, 'nf-focus-ring')}
-          aria-label={label}
+          aria-label={accessibleName}
           {...buttonProps}
           aria-haspopup="menu"
           aria-expanded={expanded}
@@ -78,6 +82,7 @@ function AvatarTrigger({
 export default function TopBar(): ReactElement {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const openPalette = useCommandPaletteStore((state) => state.openPalette);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const showCostMeter = isWorkspaceAdmin(useCurrentWorkspaceRole());
@@ -175,9 +180,12 @@ export default function TopBar(): ReactElement {
       <header className={styles.topBar}>
         <div className={styles.center}>
           <div className={styles.breadcrumbSlot}>
-            <Suspense fallback={null}>
-              <TopBarBreadcrumb />
-            </Suspense>
+            {/* Decorative: a failed label fetch (e.g. a 403 on the project) must not reach the root boundary. */}
+            <ErrorBoundary fallback={null} resetKeys={[pathname]}>
+              <Suspense fallback={null}>
+                <TopBarBreadcrumb />
+              </Suspense>
+            </ErrorBoundary>
           </div>
           <div className={styles.search}>
             <button
@@ -213,7 +221,11 @@ export default function TopBar(): ReactElement {
             placement="bottom-end"
             content={userMenuContent}
           >
-            <AvatarTrigger label={t('topbar.user_menu.open')} expanded={userMenuOpen}>
+            <AvatarTrigger
+              label={t('topbar.user_menu.open')}
+              accessibleName={`${initials} ${t('topbar.user_menu.open')}`}
+              expanded={userMenuOpen}
+            >
               <Avatar
                 alt={avatarLabel}
                 initials={initials}
