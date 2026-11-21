@@ -445,8 +445,12 @@ jobs:
       # -short is deliberately absent: the integration guards skip on it as
       # well as on NF_TEST_INTEGRATION, so passing it would silence the
       # suites this job just opted into.
+      # ubuntu-latest ships the mysql client the e2e conformance sweep needs;
+      # NF_CONFORMANCE_REQUIRED turns a missing client into a failure.
       - name: Tests (flow-api)
         working-directory: apps/flow-api
+        env:
+          NF_CONFORMANCE_REQUIRED: "1"
         run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Tests (auth-api)

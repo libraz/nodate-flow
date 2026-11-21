@@ -14,8 +14,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
@@ -94,8 +98,45 @@ func TestMain(m *testing.M) {
 	testDB = inst.DB
 	helpers.RegisterCleanupDB(inst.DB)
 	code := m.Run()
+	if !sweepConformance(inst.DSN) && code == 0 {
+		code = 1
+	}
 	cleanup()
 	os.Exit(code)
+}
+
+// sweepConformance runs the shared-contract data checks over the rows the
+// suite wrote, and reports whether the database is clean. A missing mysql
+// client skips the sweep unless NF_CONFORMANCE_REQUIRED=1.
+func sweepConformance(driverDSN string) bool {
+	if _, err := exec.LookPath("mysql"); err != nil {
+		if os.Getenv("NF_CONFORMANCE_REQUIRED") == "1" {
+			fmt.Fprintln(os.Stderr, "e2e: conformance sweep required but no mysql client is on PATH")
+			return false
+		}
+		fmt.Fprintln(os.Stderr, "e2e: no mysql client on PATH; skipping the conformance data sweep")
+		return true
+	}
+	cfg, err := mysqldriver.ParseDSN(driverDSN)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: parse shared dsn:", err)
+		return false
+	}
+	script, err := filepath.Abs("../../../../sql/core/conformance/run.sh")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: locate conformance script:", err)
+		return false
+	}
+	// The mysql client reads host "localhost" as a Unix socket; force TCP.
+	addr := strings.Replace(cfg.Addr, "localhost:", "127.0.0.1:", 1)
+	dsn := fmt.Sprintf("%s:%s@%s/%s", cfg.User, cfg.Passwd, addr, cfg.DBName)
+	out, err := exec.Command("bash", script, "--dsn", dsn, "--mode", "data").CombinedOutput()
+	fmt.Fprintf(os.Stderr, "e2e: conformance data sweep\n%s", out)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "e2e: conformance data sweep reported violations:", err)
+		return false
+	}
+	return true
 }
 
 // requireStorage asserts the shared MinIO bundle is wired. Tests that
