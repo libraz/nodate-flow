@@ -26,6 +26,8 @@ COPY packages/holidays ./packages/holidays
 COPY packages/i18n-shared ./packages/i18n-shared
 COPY apps/accounts-web ./apps/accounts-web
 COPY apps/flow-web ./apps/flow-web
+# The flow-web date tests type-check against the shared all-day fixtures.
+COPY sql/core/all-day ./sql/core/all-day
 
 # Origins are compiled into the bundles by Vite, so moving a deployment to
 # another hostname means rebuilding. Compose always passes all of them.
