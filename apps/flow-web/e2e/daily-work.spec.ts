@@ -30,7 +30,6 @@ import {
 
 const copy = {
   undo: enCommon.common.undo,
-  completeUnavailable: enCommon.today.complete_unavailable,
   newTask: enCommon.tasks.new,
   commentsTitle: enCommon.tasks.comments.title,
   dependenciesTitle: enCommon.tasks.detail.dependencies.title,
@@ -167,9 +166,11 @@ test.describe('daily work', () => {
     await expect(rows).toHaveCount(5);
   });
 
-  test('waiting task: the complete button is aria-disabled and explains why', async ({ page }) => {
+  test('waiting task: complete from My tasks, undo restores the in-progress state', async ({
+    page,
+  }) => {
     const tenant = await setup();
-    const title = `Waiting ${Date.now().toString(36)}`;
+    const title = `Complete waiting ${Date.now().toString(36)}`;
     const task = await createTask(tenant, title);
     await transition(tenant, task.id, 'start');
     expect(await derivedState(tenant, task.id)).toBe('waiting');
@@ -178,16 +179,17 @@ test.describe('daily work', () => {
     await page.goto('/today');
     const button = page.getByRole('button', { name: completeName(title) });
     await expect(button).toBeVisible({ timeout: 15_000 });
-    await expect(button).toHaveAttribute('aria-disabled', 'true');
+    await expect(button).not.toHaveAttribute('aria-disabled', 'true');
 
-    const describedBy = await button.getAttribute('aria-describedby');
-    expect(describedBy).toBeTruthy();
-    await expect(page.locator(`[id="${describedBy}"]`)).toHaveText(copy.completeUnavailable);
+    await button.click();
+    await expect(button).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => derivedState(tenant, task.id)).toBe('done');
 
-    // Playwright treats aria-disabled as non-actionable, hence force.
-    await button.click({ force: true });
-    await expect(button).toBeVisible();
-    expect(await derivedState(tenant, task.id)).toBe('waiting');
+    await page.getByRole('button', { name: copy.undo, exact: true }).click();
+    await expect(page.getByRole('button', { name: completeName(title) })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect.poll(() => derivedState(tenant, task.id)).toBe('waiting');
   });
 
   test('create dialog: picking another member makes them the assignee', async ({ page }) => {
