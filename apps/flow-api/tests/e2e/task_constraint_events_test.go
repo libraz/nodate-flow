@@ -180,7 +180,7 @@ func requireCompleteAllowed(t *testing.T, token, taskID, msg string) {
 func requireCompleteRejected(t *testing.T, token, taskID, msg string) {
 	t.Helper()
 	status, raw := completeTaskStatus(t, token, taskID)
-	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.TRANSITION_REJECTED", msg)
+	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.COMPLETION_NEEDS_APPROVAL", msg)
 }
 
 // TestCompleteGateUsesFreshVerdict pins that the completion gate decides on

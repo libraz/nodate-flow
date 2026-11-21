@@ -129,7 +129,7 @@ func TestRequiredConstraintGatesApprovedCompletion(t *testing.T) {
 
 	status, raw := doJSONStatus(t, http.MethodPost, base+"/transitions", owner.AccessToken,
 		map[string]any{"transition": "complete"})
-	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.TRANSITION_REJECTED",
+	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.COMPLETION_NEEDS_APPROVAL",
 		"an unsatisfied required constraint")
 
 	doJSON(t, http.MethodPost, base+"/actors", owner.AccessToken,
@@ -158,7 +158,7 @@ func TestMCPTransitionCompleteHonoursReviewGate(t *testing.T) {
 		"taskId":     taskID,
 		"transition": "complete",
 	})
-	require.Equal(t, "WS.TASK.TRANSITION_REJECTED", code)
+	require.Equal(t, "WS.TASK.COMPLETION_NEEDS_APPROVAL", code)
 	require.Equal(t, "open", workflowTaskDerivedState(t, owner.WorkspacePublicID, taskID))
 }
 

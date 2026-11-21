@@ -63,7 +63,7 @@ func TestReviewRequiredCompletionRequiresCurrentApprovedSubmission(t *testing.T)
 		map[string]any{"decision": "reject", "reason": "Please attach the reproducible output"}, nil)
 	status, raw = doJSONStatus(t, http.MethodPost, base+"/transitions", owner.AccessToken,
 		map[string]any{"transition": "complete"})
-	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.TRANSITION_REJECTED",
+	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.COMPLETION_NEEDS_APPROVAL",
 		"completing rejected work without a current approval")
 
 	var approvedSubmission struct {
@@ -89,7 +89,7 @@ func TestReviewRequiredCompletionRequiresCurrentApprovedSubmission(t *testing.T)
 		map[string]any{"title": "Review-required work, revised"}, nil)
 	status, raw = doJSONStatus(t, http.MethodPost, base+"/transitions", owner.AccessToken,
 		map[string]any{"transition": "complete"})
-	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.TRANSITION_REJECTED",
+	requireDenied(t, status, raw, http.StatusUnprocessableEntity, "WS.TASK.COMPLETION_NEEDS_APPROVAL",
 		"completing an edited task with an approval for a prior revision")
 	var staleWorkflow struct {
 		WorkRevision      uint32 `json:"workRevision"`
