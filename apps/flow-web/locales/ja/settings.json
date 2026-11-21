@@ -1,11 +1,10 @@
 {
   "nav": {
-    "profile": "プロフィール",
     "notifications": "通知",
     "general": "一般",
     "data": "データ",
     "public_shares": "公開シェアページ",
-    "mcp_tokens": "MCP トークン",
+    "mcp_tokens": "AI ツール連携トークン（MCP）",
     "webhooks": "Webhook",
     "ai_providers": "AI プロバイダ",
     "ai_agents": "AI エージェント",
@@ -13,15 +12,16 @@
     "ai_metrics": "AI メトリクス",
     "weekly_digest": "週次ダイジェスト",
     "audit_log": "監査ログ",
-    "security": "セキュリティ",
     "integrations": "連携",
-    "auto_actions": "自動アクション"
+    "auto_actions": "自動アクション",
+    "account": "アカウント（プロフィール・セキュリティ）",
+    "account_hint": "プロフィール・パスワード・ログイン方法はアカウント画面で変更します。"
   },
   "nav_group": {
     "workspace": "ワークスペース",
     "integrations": "連携",
-    "ai": "AI",
-    "reports": "レポート"
+    "ai": "AI の設定",
+    "reports": "利用状況と記録"
   },
   "save_status": {
     "saved": "保存しました",
@@ -135,80 +135,6 @@
     "copy_failed": "クリップボードにコピーできませんでした。",
     "countsHint": "現在の状態ごとのタスク数です。過去 7 日間に限った数ではありません。"
   },
-  "profile": {
-    "title": "プロフィール",
-    "display_name": "表示名",
-    "locale": {
-      "label": "言語",
-      "en": "English",
-      "ja": "日本語",
-      "zh": "中文"
-    },
-    "timezone": "タイムゾーン",
-    "country": "国",
-    "country_help": "カレンダーに表示する祝日の国を指定します。未設定の場合は祝日を表示しません。",
-    "country_unset": "（未設定）",
-    "week_start": {
-      "label": "週の初めの曜日",
-      "help": "カレンダーの曜日順に反映されます",
-      "mon": "月曜",
-      "sun": "日曜",
-      "sat": "土曜"
-    },
-    "theme": "テーマ",
-    "theme_glass": "Glass",
-    "theme_modern": "Modern",
-    "theme_washi": "和",
-    "theme_classic": "Classic",
-    "theme_nothing": "Nothing",
-    "color_mode": "カラーモード",
-    "color_mode_light": "ライト",
-    "color_mode_dark": "ダーク",
-    "color_mode_system": "システム",
-    "theme_system": "システム",
-    "theme_glass_light": "Glass ライト",
-    "theme_glass_dark": "Glass ダーク",
-    "theme_modern_light": "Modern ライト",
-    "theme_modern_dark": "Modern ダーク",
-    "theme_washi_light": "和 ライト",
-    "theme_washi_dark": "和 ダーク",
-    "theme_classic_light": "Classic ライト",
-    "theme_classic_dark": "Classic ダーク",
-    "theme_nothing_light": "Nothing ライト",
-    "theme_nothing_dark": "Nothing ダーク",
-    "save": "保存",
-    "avatar": {
-      "label": "プロフィール画像",
-      "description": "JPEG / PNG / WebP / GIF (5 MB まで)",
-      "upload": "画像をアップロード",
-      "change": "画像を変更",
-      "remove": "削除",
-      "uploading": "アップロード中…",
-      "removed": "プロフィール画像を削除しました。",
-      "updated": "プロフィール画像を更新しました。",
-      "alt": "{name} のプロフィール画像",
-      "empty_alt": "プロフィール画像なし",
-      "upload_aria": "プロフィール画像をアップロード",
-      "replace_aria": "プロフィール画像を変更",
-      "delete_aria": "プロフィール画像を削除",
-      "upload_error": "プロフィール画像をアップロードできませんでした。もう一度お試しください。",
-      "remove_error": "プロフィール画像を削除できませんでした。もう一度お試しください。",
-      "remove_confirm": "プロフィール画像を削除しますか？"
-    },
-    "validation": {
-      "display_name_required": "表示名は必須です。",
-      "timezone_required": "タイムゾーンは必須です。",
-      "country_invalid": "国は 2 文字の ISO コード（大文字）または未設定を指定してください。"
-    },
-    "errors": {
-      "update_failed": "プロフィールを更新できませんでした。もう一度お試しください。"
-    },
-    "section_identity": "基本情報",
-    "section_appearance": "外観",
-    "section_appearance_help": "テーマの変更はすぐに反映され、保存ボタンの対象には含まれません。",
-    "description": "名前・言語・タイムゾーン・見た目の設定です。アカウント単位で、すべてのワークスペースに適用されます。",
-    "timezone_help": "日時はこのタイムゾーンで表示されます。"
-  },
   "notifications": {
     "title": "通知",
     "save": "保存",
@@ -246,97 +172,6 @@
     },
     "description": "アプリ内の通知ベルに表示する内容を、ワークスペースごとに選びます。",
     "workspace_help": "通知の設定はワークスペースごとに別々に保存されます。"
-  },
-  "security": {
-    "title": "セキュリティ",
-    "load_error": "セキュリティ設定を読み込めませんでした。",
-    "retry": "再試行",
-    "password": {
-      "title": "パスワード",
-      "description": "パスワードを変更します。他の端末はすべてサインアウトされます。",
-      "current": "現在のパスワード",
-      "next": "新しいパスワード",
-      "confirm": "新しいパスワード（確認）",
-      "save": "パスワードを変更",
-      "changed": "パスワードを変更しました。他の {count} 件のセッションがサインアウトされました。",
-      "validation": {
-        "too_short": "新しいパスワードは 8 文字以上で入力してください。",
-        "mismatch": "新しいパスワードと確認用が一致しません。"
-      },
-      "errors": {
-        "current_mismatch": "現在のパスワードが正しくありません。",
-        "no_local_identity": "このアカウントにはローカルパスワードがありません。ID プロバイダ側で変更してください。",
-        "generic": "パスワードを変更できませんでした。もう一度お試しください。"
-      }
-    },
-    "totp": {
-      "title": "二要素認証",
-      "disabled_description": "サインイン時に認証アプリの 6 桁コードを要求して、アカウントを追加保護します。",
-      "enabled_description": "二要素認証が有効です。無効化するには現在のパスワードを入力してください。",
-      "pending_description": "登録を開始しましたが確認が完了していません。シークレットを再生成して 2FA を完了してください。",
-      "enroll_instructions": "このシークレットを認証アプリ（Google Authenticator、1Password、Authy など）に追加し、表示される 6 桁コードを入力してください。",
-      "qr_alt": "TOTP QR コード",
-      "secret_label": "シークレット",
-      "code_label": "6 桁のコード",
-      "password_label": "現在のパスワード",
-      "enable": "二要素認証を有効にする",
-      "resume_enroll": "登録をやり直す",
-      "confirm": "確認",
-      "disable": "無効化",
-      "disable_confirm": "二要素認証を無効にしますか？アカウントはパスワードのみで保護されます。",
-      "copy": "コピー",
-      "secret_copied": "シークレットをコピーしました",
-      "secret_copy_failed": "シークレットをコピーできませんでした",
-      "open_in_app": "認証アプリで開く",
-      "enabled_toast": "二要素認証を有効にしました。",
-      "disabled_toast": "二要素認証を無効にしました。",
-      "errors": {
-        "enroll_failed": "登録を開始できませんでした。もう一度お試しください。",
-        "confirm_failed": "コードを確認できませんでした。もう一度お試しください。",
-        "code_mismatch": "このコードは無効です。認証アプリを確認してもう一度お試しください。",
-        "password_mismatch": "現在のパスワードが正しくありません。",
-        "disable_failed": "2FA を無効化できませんでした。もう一度お試しください。",
-        "not_configured": "このサーバーでは二要素認証が利用できません。管理者に NF_SECRET_KEY の設定を依頼してください。"
-      },
-      "recovery": {
-        "title": "リカバリーコード",
-        "description": "認証アプリを使えなくなった場合に、これらのワンタイムコードでサインインできます。安全な場所に保存してください — 再表示はされません。",
-        "remaining": "残りリカバリーコード: {count}",
-        "regenerate": "リカバリーコードを再生成",
-        "regenerate_confirm": "リカバリーコードを新しく生成しますか?以前のコードは使用できなくなります。",
-        "regenerate_password_label": "現在のパスワード",
-        "copy_all": "すべてコピー",
-        "download": ".txt でダウンロード",
-        "saved": "保存しました",
-        "copied": "リカバリーコードをコピーしました",
-        "copy_failed": "リカバリコードをコピーできませんでした",
-        "regenerated_toast": "新しいリカバリーコードを生成しました。",
-        "errors": {
-          "regenerate_failed": "リカバリーコードを再生成できませんでした。もう一度お試しください。"
-        }
-      }
-    },
-    "sessions": {
-      "title": "アクティブなセッション",
-      "description": "現在アカウントにサインインしている端末です。見覚えのないセッションは失効させてください。",
-      "empty": "アクティブなセッションはありません。",
-      "revoke": "失効",
-      "revoke_all": "他の端末からすべてサインアウト",
-      "revoke_all_confirm": "他の端末からすべてサインアウトしますか？他のブラウザやアプリは直ちに動作しなくなります。",
-      "revoked": "セッションを失効しました",
-      "revoked_all": "他の {count} 件のセッションを失効しました",
-      "current_badge": "現在",
-      "unknown_device": "不明なデバイス",
-      "unknown_ip": "不明な場所",
-      "created_at": "サインイン: {time}",
-      "last_used_at": "最終利用: {time}",
-      "errors": {
-        "revoke_failed": "セッションを失効できませんでした。もう一度お試しください。",
-        "revoke_all_failed": "他のセッションを失効できませんでした。もう一度お試しください。"
-      },
-      "revoke_all_help": "このデバイス以外のすべてのデバイスからサインアウトします。"
-    },
-    "description": "パスワード、二要素認証、アカウントにログイン中の端末を管理します。"
   },
   "workspace": {
     "general": {
@@ -380,7 +215,8 @@
         "errors": {
           "delete_failed": "ワークスペースを削除できませんでした。もう一度お試しください。"
         }
-      }
+      },
+      "read_only_note": "ワークスペースの設定を変更できるのは管理者だけです。"
     },
     "public_shares": {
       "title": "公開シェアページ",
@@ -502,7 +338,7 @@
       }
     },
     "mcp_tokens": {
-      "title": "MCP トークン",
+      "title": "AI ツール連携トークン（MCP）",
       "description": "AI アシスタントなどの MCP クライアントが、あなたとしてこのワークスペースで作業するためのトークンです。トークンはこのワークスペースと、選んだスコープに限定されます。",
       "create": "トークンを作成",
       "empty": "トークンはまだありません。作成して、このサーバーの /mcp のアドレスと一緒に MCP クライアントに設定します。",

@@ -1,11 +1,10 @@
 {
   "nav": {
-    "profile": "Profile",
     "notifications": "Notifications",
     "general": "General",
     "data": "Data",
     "public_shares": "Public share pages",
-    "mcp_tokens": "MCP tokens",
+    "mcp_tokens": "AI tool tokens (MCP)",
     "webhooks": "Webhooks",
     "ai_providers": "AI providers",
     "ai_agents": "AI agents",
@@ -13,15 +12,16 @@
     "ai_metrics": "AI metrics",
     "weekly_digest": "Weekly digest",
     "audit_log": "Audit log",
-    "security": "Security",
     "integrations": "Integrations",
-    "auto_actions": "Auto-actions"
+    "auto_actions": "Auto-actions",
+    "account": "Account (profile & security)",
+    "account_hint": "Profile, password and sign-in are managed on your account page."
   },
   "nav_group": {
     "workspace": "Workspace",
     "integrations": "Integrations",
-    "ai": "AI",
-    "reports": "Reports"
+    "ai": "AI setup",
+    "reports": "Usage & records"
   },
   "save_status": {
     "saved": "Saved",
@@ -135,80 +135,6 @@
     "copy_failed": "Could not copy to the clipboard.",
     "countsHint": "Number of tasks in each state right now, not only from the last seven days."
   },
-  "profile": {
-    "title": "Profile",
-    "display_name": "Display name",
-    "locale": {
-      "label": "Language",
-      "en": "English",
-      "ja": "日本語",
-      "zh": "中文"
-    },
-    "timezone": "Timezone",
-    "country": "Country",
-    "country_help": "Used to show the right public holidays on your calendar. Leave unset for none.",
-    "country_unset": "(none)",
-    "week_start": {
-      "label": "First day of the week",
-      "help": "Used by the calendar grid",
-      "mon": "Monday",
-      "sun": "Sunday",
-      "sat": "Saturday"
-    },
-    "theme": "Theme",
-    "theme_glass": "Glass",
-    "theme_modern": "Modern",
-    "theme_washi": "Washi",
-    "theme_classic": "Classic",
-    "theme_nothing": "Nothing",
-    "color_mode": "Color mode",
-    "color_mode_light": "Light",
-    "color_mode_dark": "Dark",
-    "color_mode_system": "System",
-    "theme_system": "System",
-    "theme_glass_light": "Glass Light",
-    "theme_glass_dark": "Glass Dark",
-    "theme_modern_light": "Modern Light",
-    "theme_modern_dark": "Modern Dark",
-    "theme_washi_light": "Washi Light",
-    "theme_washi_dark": "Washi Dark",
-    "theme_classic_light": "Classic Light",
-    "theme_classic_dark": "Classic Dark",
-    "theme_nothing_light": "Nothing Light",
-    "theme_nothing_dark": "Nothing Dark",
-    "save": "Save",
-    "avatar": {
-      "label": "Profile picture",
-      "description": "JPEG, PNG, WebP, or GIF. Max 5 MB.",
-      "upload": "Upload image",
-      "change": "Change image",
-      "remove": "Remove",
-      "uploading": "Uploading…",
-      "removed": "Profile picture removed.",
-      "updated": "Profile picture updated.",
-      "alt": "{name}'s profile picture",
-      "empty_alt": "No profile picture",
-      "upload_aria": "Upload profile picture",
-      "replace_aria": "Replace profile picture",
-      "delete_aria": "Remove profile picture",
-      "upload_error": "Could not upload the profile picture. Please try again.",
-      "remove_error": "Could not remove the profile picture. Please try again.",
-      "remove_confirm": "Remove your profile picture?"
-    },
-    "validation": {
-      "display_name_required": "Display name is required.",
-      "timezone_required": "Timezone is required.",
-      "country_invalid": "Country must be a 2-letter ISO code (uppercase) or left empty."
-    },
-    "errors": {
-      "update_failed": "Could not update your profile. Please try again."
-    },
-    "section_identity": "Profile details",
-    "section_appearance": "Appearance",
-    "section_appearance_help": "Theme changes apply immediately and are not part of Save.",
-    "description": "Your name, language, timezone and appearance. Applies to your account in every workspace.",
-    "timezone_help": "Dates and times are shown in this timezone."
-  },
   "notifications": {
     "title": "Notifications",
     "save": "Save",
@@ -246,97 +172,6 @@
     },
     "description": "Choose which activity appears in your in-app notification bell, per workspace.",
     "workspace_help": "Notification settings are saved separately for each workspace."
-  },
-  "security": {
-    "title": "Security",
-    "load_error": "Could not load the security settings.",
-    "retry": "Try again",
-    "password": {
-      "title": "Password",
-      "description": "Change your password. Every other device will be signed out.",
-      "current": "Current password",
-      "next": "New password",
-      "confirm": "Confirm new password",
-      "save": "Change password",
-      "changed": "Password changed. {count} other session(s) were signed out.",
-      "validation": {
-        "too_short": "New password must be at least 8 characters.",
-        "mismatch": "New password and confirmation do not match."
-      },
-      "errors": {
-        "current_mismatch": "Current password is incorrect.",
-        "no_local_identity": "This account has no local password to change. Change it through your identity provider instead.",
-        "generic": "Could not change your password. Please try again."
-      }
-    },
-    "totp": {
-      "title": "Two-factor authentication",
-      "disabled_description": "Add an extra layer of protection by requiring a 6-digit code from your authenticator app at sign-in.",
-      "enabled_description": "Two-factor authentication is enabled. Enter your password to disable it.",
-      "pending_description": "An enrollment was started but never confirmed. Regenerate the secret to finish setting up 2FA.",
-      "enroll_instructions": "Add this secret to your authenticator app (Google Authenticator, 1Password, Authy, ...) and enter the 6-digit code it shows.",
-      "qr_alt": "TOTP QR code",
-      "secret_label": "Secret",
-      "code_label": "6-digit code",
-      "password_label": "Current password",
-      "enable": "Enable two-factor authentication",
-      "resume_enroll": "Restart enrollment",
-      "confirm": "Confirm",
-      "disable": "Disable",
-      "disable_confirm": "Disable two-factor authentication? Your account will be protected by a password only.",
-      "copy": "Copy",
-      "secret_copied": "Secret copied",
-      "secret_copy_failed": "Could not copy the secret",
-      "open_in_app": "Open in authenticator app",
-      "enabled_toast": "Two-factor authentication is now enabled.",
-      "disabled_toast": "Two-factor authentication disabled.",
-      "errors": {
-        "enroll_failed": "Could not start enrollment. Please try again.",
-        "confirm_failed": "Could not confirm the code. Please try again.",
-        "code_mismatch": "That code is not valid. Check your authenticator app and try again.",
-        "password_mismatch": "Current password is incorrect.",
-        "disable_failed": "Could not disable 2FA. Please try again.",
-        "not_configured": "Two-factor authentication is not available on this server. Ask an administrator to configure NF_SECRET_KEY."
-      },
-      "recovery": {
-        "title": "Recovery codes",
-        "description": "Use these one-time codes to sign in if you lose access to your authenticator app. Save them somewhere safe — they will not be shown again.",
-        "remaining": "{count, plural, one {# recovery code remaining} other {# recovery codes remaining}}",
-        "regenerate": "Regenerate recovery codes",
-        "regenerate_confirm": "Generate a new set of recovery codes? Your previous codes will stop working.",
-        "regenerate_password_label": "Current password",
-        "copy_all": "Copy all",
-        "download": "Download as .txt",
-        "saved": "I've saved them",
-        "copied": "Recovery codes copied",
-        "copy_failed": "Could not copy the recovery codes",
-        "regenerated_toast": "New recovery codes generated.",
-        "errors": {
-          "regenerate_failed": "Could not regenerate recovery codes. Please try again."
-        }
-      }
-    },
-    "sessions": {
-      "title": "Active sessions",
-      "description": "Devices currently signed in to your account. Revoke any session you do not recognise.",
-      "empty": "No active sessions.",
-      "revoke": "Revoke",
-      "revoke_all": "Sign out of all other devices",
-      "revoke_all_confirm": "Sign out of all other devices? Other browsers and apps will stop working immediately.",
-      "revoked": "Session revoked",
-      "revoked_all": "Revoked {count} other session(s)",
-      "current_badge": "Current",
-      "unknown_device": "Unknown device",
-      "unknown_ip": "Unknown location",
-      "created_at": "Signed in {time}",
-      "last_used_at": "last active {time}",
-      "errors": {
-        "revoke_failed": "Could not revoke the session. Please try again.",
-        "revoke_all_failed": "Could not revoke the other sessions. Please try again."
-      },
-      "revoke_all_help": "Sign out every device except this one."
-    },
-    "description": "Password, two-factor authentication and the devices signed in to your account."
   },
   "workspace": {
     "general": {
@@ -380,7 +215,8 @@
         "errors": {
           "delete_failed": "Could not delete the workspace. Please try again."
         }
-      }
+      },
+      "read_only_note": "Only workspace admins can change these settings."
     },
     "public_shares": {
       "title": "Public share pages",
@@ -502,7 +338,7 @@
       }
     },
     "mcp_tokens": {
-      "title": "MCP tokens",
+      "title": "AI tool tokens (MCP)",
       "description": "Tokens that let an MCP client, such as an AI assistant, work in this workspace as you. Each token is limited to this workspace and to the scopes you pick.",
       "create": "Create token",
       "empty": "No tokens yet. Create one, then give it to your MCP client together with this server's /mcp address.",

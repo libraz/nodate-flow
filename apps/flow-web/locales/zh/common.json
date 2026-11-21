@@ -95,10 +95,10 @@
     },
     "user_menu": {
       "open": "账户菜单",
-      "settings": "个人设置",
       "avatar_alt": "{name} 的头像",
       "notification_settings": "通知设置",
-      "shortcuts": "键盘快捷键"
+      "shortcuts": "键盘快捷键",
+      "account": "账户（个人资料与安全）"
     },
     "notifications": {
       "label": "通知"
@@ -475,14 +475,6 @@
       "projects_nav_label": "工作区子板块",
       "overview_empty": "还没有项目。项目用于存放一项工作的任务。创建第一个吧。"
     },
-    "nav": {
-      "overview": "概览",
-      "projects": "项目",
-      "timeline": "时间线",
-      "settings": "设置",
-      "label": "工作区分区",
-      "members": "成员"
-    },
     "not_found": {
       "title": "未找到工作区",
       "body": "该工作区不存在，或你已无权限访问。",
@@ -502,7 +494,8 @@
       "remove_failed": "移除成员失败",
       "role_updated": "已更新角色",
       "role_update_failed": "修改角色失败",
-      "role_hint": "所有者和管理员可管理一切，成员可处理任务，访客只能查看。"
+      "role_hint": "所有者和管理员可管理一切，成员可处理任务，访客只能查看。",
+      "page_description": "此工作区的成员和待接受的邀请。管理员可以更改角色并发送邀请。"
     },
     "invites": {
       "create": "创建邀请链接",
@@ -687,7 +680,9 @@
     "settings": {
       "rename": "重命名",
       "disable": "删除项目",
-      "disable_confirm": "要删除此项目吗？其中的所有任务也会被删除，且无法恢复。如需保留，请改为归档项目。"
+      "disable_confirm": "要删除此项目吗？其中的所有任务也会被删除，且无法恢复。如需保留，请改为归档项目。",
+      "danger_title": "删除项目",
+      "disable_description": "删除项目及其所有任务，且无法撤销。如需保留，请改为归档。"
     },
     "validation": {
       "name_required": "请填写名称。",

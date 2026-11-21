@@ -1,11 +1,10 @@
 {
   "nav": {
-    "profile": "个人资料",
     "notifications": "通知",
     "general": "常规",
     "data": "数据",
     "public_shares": "公开分享页",
-    "mcp_tokens": "MCP 令牌",
+    "mcp_tokens": "AI 工具令牌（MCP）",
     "webhooks": "Webhook",
     "ai_providers": "AI 服务商",
     "ai_agents": "AI 代理",
@@ -13,15 +12,16 @@
     "ai_metrics": "AI 指标",
     "weekly_digest": "每周摘要",
     "audit_log": "审计日志",
-    "security": "安全",
     "integrations": "集成",
-    "auto_actions": "自动操作"
+    "auto_actions": "自动操作",
+    "account": "账户（个人资料与安全）",
+    "account_hint": "个人资料、密码和登录方式在账户页面中管理。"
   },
   "nav_group": {
     "workspace": "工作区",
     "integrations": "集成",
-    "ai": "AI",
-    "reports": "报告"
+    "ai": "AI 设置",
+    "reports": "使用情况与记录"
   },
   "save_status": {
     "saved": "已保存",
@@ -135,80 +135,6 @@
     "copy_failed": "无法复制到剪贴板。",
     "countsHint": "当前各状态的任务数，并不仅限于过去 7 天。"
   },
-  "profile": {
-    "title": "个人资料",
-    "display_name": "显示名称",
-    "locale": {
-      "label": "语言",
-      "en": "English",
-      "ja": "日本語",
-      "zh": "中文"
-    },
-    "timezone": "时区",
-    "country": "国家/地区",
-    "country_help": "用于在日历中显示对应的法定假日。留空则不显示。",
-    "country_unset": "（无）",
-    "week_start": {
-      "label": "每周起始日",
-      "help": "用于日历网格",
-      "mon": "星期一",
-      "sun": "星期日",
-      "sat": "星期六"
-    },
-    "theme": "主题",
-    "theme_glass": "Glass",
-    "theme_modern": "Modern",
-    "theme_washi": "和",
-    "theme_classic": "Classic",
-    "theme_nothing": "Nothing",
-    "color_mode": "配色模式",
-    "color_mode_light": "浅色",
-    "color_mode_dark": "深色",
-    "color_mode_system": "跟随系统",
-    "theme_system": "跟随系统",
-    "theme_glass_light": "Glass 浅色",
-    "theme_glass_dark": "Glass 深色",
-    "theme_modern_light": "Modern 浅色",
-    "theme_modern_dark": "Modern 深色",
-    "theme_washi_light": "和 浅色",
-    "theme_washi_dark": "和 深色",
-    "theme_classic_light": "Classic 浅色",
-    "theme_classic_dark": "Classic 深色",
-    "theme_nothing_light": "Nothing 浅色",
-    "theme_nothing_dark": "Nothing 深色",
-    "save": "保存",
-    "avatar": {
-      "label": "头像",
-      "description": "支持 JPEG、PNG、WebP 或 GIF，最大 5 MB。",
-      "upload": "上传图片",
-      "change": "更换图片",
-      "remove": "移除",
-      "uploading": "上传中…",
-      "removed": "已移除头像。",
-      "updated": "已更新头像。",
-      "alt": "{name} 的头像",
-      "empty_alt": "暂无头像",
-      "upload_aria": "上传头像",
-      "replace_aria": "更换头像",
-      "delete_aria": "删除头像",
-      "upload_error": "上传头像失败，请重试。",
-      "remove_error": "移除头像失败，请重试。",
-      "remove_confirm": "要删除你的头像吗？"
-    },
-    "validation": {
-      "display_name_required": "请填写显示名称。",
-      "timezone_required": "请填写时区。",
-      "country_invalid": "国家/地区必须为 2 位 ISO 大写代码，或留空。"
-    },
-    "errors": {
-      "update_failed": "更新个人资料失败，请重试。"
-    },
-    "section_identity": "基本信息",
-    "section_appearance": "外观",
-    "section_appearance_help": "主题更改会立即生效，不需要点击保存。",
-    "description": "姓名、语言、时区和外观设置。属于账号，适用于所有工作区。",
-    "timezone_help": "日期和时间将按此时区显示。"
-  },
   "notifications": {
     "title": "通知",
     "save": "保存",
@@ -246,97 +172,6 @@
     },
     "description": "按工作区选择哪些动态显示在应用内通知铃铛中。",
     "workspace_help": "通知设置按工作区分别保存。"
-  },
-  "security": {
-    "title": "安全",
-    "load_error": "无法加载安全设置。",
-    "retry": "重试",
-    "password": {
-      "title": "密码",
-      "description": "更改密码后，所有其他设备都将被注销。",
-      "current": "当前密码",
-      "next": "新密码",
-      "confirm": "确认新密码",
-      "save": "更改密码",
-      "changed": "密码已更改。{count} 个其他会话已被注销。",
-      "validation": {
-        "too_short": "新密码至少 8 位。",
-        "mismatch": "新密码与确认密码不一致。"
-      },
-      "errors": {
-        "current_mismatch": "当前密码不正确。",
-        "no_local_identity": "此账户没有本地密码可更改，请通过你的身份提供方修改。",
-        "generic": "更改密码失败，请重试。"
-      }
-    },
-    "totp": {
-      "title": "两步验证",
-      "disabled_description": "在登录时要求输入身份验证器应用中的 6 位代码，提供额外的安全防护。",
-      "enabled_description": "已启用两步验证。请输入密码以禁用。",
-      "pending_description": "已开始注册但未完成确认，请重新生成密钥以完成 2FA 设置。",
-      "enroll_instructions": "将该密钥添加到身份验证器应用（Google Authenticator、1Password、Authy 等），然后输入显示的 6 位代码。",
-      "qr_alt": "TOTP 二维码",
-      "secret_label": "密钥",
-      "code_label": "6 位代码",
-      "password_label": "当前密码",
-      "enable": "启用两步验证",
-      "resume_enroll": "重新开始注册",
-      "confirm": "确认",
-      "disable": "禁用",
-      "disable_confirm": "禁用两步验证？账户将仅由密码保护。",
-      "copy": "复制",
-      "secret_copied": "已复制密钥",
-      "secret_copy_failed": "无法复制密钥",
-      "open_in_app": "在身份验证器中打开",
-      "enabled_toast": "已启用两步验证。",
-      "disabled_toast": "已禁用两步验证。",
-      "errors": {
-        "enroll_failed": "无法开始注册，请重试。",
-        "confirm_failed": "无法确认代码，请重试。",
-        "code_mismatch": "代码无效，请检查身份验证器后重试。",
-        "password_mismatch": "当前密码不正确。",
-        "disable_failed": "无法禁用 2FA，请重试。",
-        "not_configured": "本服务器未启用两步验证。请联系管理员配置 NF_SECRET_KEY。"
-      },
-      "recovery": {
-        "title": "恢复代码",
-        "description": "如果你失去对身份验证器的访问，可使用这些一次性代码登录。请妥善保存——它们不会再次显示。",
-        "remaining": "{count, plural, other {还剩 # 个恢复代码}}",
-        "regenerate": "重新生成恢复代码",
-        "regenerate_confirm": "重新生成恢复代码？之前的代码将立即失效。",
-        "regenerate_password_label": "当前密码",
-        "copy_all": "复制全部",
-        "download": "下载为 .txt",
-        "saved": "我已保存",
-        "copied": "已复制恢复代码",
-        "copy_failed": "无法复制恢复代码",
-        "regenerated_toast": "已生成新的恢复代码。",
-        "errors": {
-          "regenerate_failed": "无法重新生成恢复代码，请重试。"
-        }
-      }
-    },
-    "sessions": {
-      "title": "活动会话",
-      "description": "当前已登录到你账户的设备。请撤销任何你不认识的会话。",
-      "empty": "暂无活动会话。",
-      "revoke": "撤销",
-      "revoke_all": "退出所有其他设备",
-      "revoke_all_confirm": "退出所有其他设备？其他浏览器和应用将立即停止工作。",
-      "revoked": "已撤销会话",
-      "revoked_all": "已撤销 {count} 个其他会话",
-      "current_badge": "当前",
-      "unknown_device": "未知设备",
-      "unknown_ip": "未知位置",
-      "created_at": "登录于 {time}",
-      "last_used_at": "最近活跃 {time}",
-      "errors": {
-        "revoke_failed": "无法撤销该会话，请重试。",
-        "revoke_all_failed": "无法撤销其他会话，请重试。"
-      },
-      "revoke_all_help": "将除本设备外的所有设备退出登录。"
-    },
-    "description": "管理密码、两步验证以及已登录你账号的设备。"
   },
   "workspace": {
     "general": {
@@ -380,7 +215,8 @@
         "errors": {
           "delete_failed": "无法删除工作区，请重试。"
         }
-      }
+      },
+      "read_only_note": "只有工作区管理员可以更改这些设置。"
     },
     "public_shares": {
       "title": "公开分享页",
@@ -502,7 +338,7 @@
       }
     },
     "mcp_tokens": {
-      "title": "MCP 令牌",
+      "title": "AI 工具令牌（MCP）",
       "description": "让 AI 助手等 MCP 客户端以你的身份在此工作区工作的令牌。每个令牌仅限此工作区和你所选的权限范围。",
       "create": "创建令牌",
       "empty": "还没有令牌。创建一个，然后连同本服务器的 /mcp 地址一起配置到 MCP 客户端。",

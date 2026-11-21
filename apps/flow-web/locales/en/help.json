@@ -118,7 +118,7 @@
     "summary": "One project's overview, tasks, schedule and activity. The star adds it to your favorites.",
     "tips": {
       "t1": "Overview shows how many tasks are active and a bar split by state. Progress is the share of tasks that are done.",
-      "t2": "Members and Settings are tabs inside Overview. Members sets each person's role: Viewer, Commenter, Editor or Lead.",
+      "t2": "Members and Settings are tabs next to Overview.",
       "t3": "Settings lets you rename, archive or delete the project. Archiving only hides it from the sidebar; its tasks stay and you can restore it any time. Deleting removes its tasks too and cannot be undone.",
       "t4": "Tasks has board, list, graph and spreadsheet views. Gantt and Timeline are read-only views of the same project."
     }
@@ -202,26 +202,6 @@
       "t2": "Only the in-app bell is controlled here. Email and push delivery are not available yet.",
       "t3": "Turning a category off hides those notifications; the activity itself still happens and stays visible in the activity feed and task history.",
       "t4": "Agents is the category for AI agents picking up, handing back or being attached to tasks."
-    }
-  },
-  "settings-profile": {
-    "title": "Profile",
-    "summary": "Your name, language, timezone and look. These belong to your account and apply in every workspace.",
-    "tips": {
-      "t1": "Display name is what other members see on tasks, comments and assignments.",
-      "t2": "Timezone and country decide how dates are shown and which public holidays appear on your calendar. Leave country empty to hide holidays.",
-      "t3": "Theme and color mode apply immediately and are not part of Save. Display name, language, week start, timezone and country need Save.",
-      "t4": "The profile picture is limited to JPEG, PNG, WebP or GIF up to 5 MB."
-    }
-  },
-  "settings-security": {
-    "title": "Security",
-    "summary": "Protect your account: change your password, add two-factor authentication and review signed-in devices.",
-    "tips": {
-      "t1": "Changing your password signs out every other device. This browser stays signed in.",
-      "t2": "Two-factor authentication asks for a 6-digit code from an authenticator app at sign-in. Turning it off needs your password.",
-      "t3": "Recovery codes work once each and are shown only when generated. Save them before closing; regenerating invalidates the old set.",
-      "t4": "Under Active sessions, revoke any device you do not recognise. Accounts that sign in through an external identity provider change their password there instead."
     }
   },
   "setup": {
@@ -412,7 +392,7 @@
     }
   },
   "workspace-settings-mcp-tokens": {
-    "title": "MCP tokens",
+    "title": "AI tool tokens (MCP)",
     "summary": "Create tokens that let an MCP client such as an AI assistant read, and optionally change, this workspace.",
     "tips": {
       "t1": "A token works only for this workspace. It acts as you, so the client can reach only what you can reach. The list shows your own tokens.",

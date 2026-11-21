@@ -95,10 +95,10 @@
     },
     "user_menu": {
       "open": "Account menu",
-      "settings": "Personal settings",
       "avatar_alt": "{name}'s profile picture",
       "notification_settings": "Notification settings",
-      "shortcuts": "Keyboard shortcuts"
+      "shortcuts": "Keyboard shortcuts",
+      "account": "Account (profile & security)"
     },
     "notifications": {
       "label": "Notifications"
@@ -475,14 +475,6 @@
       "projects_nav_label": "Workspace sub-sections",
       "overview_empty": "No projects yet. A project holds the tasks for one piece of work. Create the first one."
     },
-    "nav": {
-      "overview": "Overview",
-      "projects": "Projects",
-      "timeline": "Timeline",
-      "settings": "Settings",
-      "label": "Workspace sections",
-      "members": "Members"
-    },
     "not_found": {
       "title": "Workspace not found",
       "body": "This workspace does not exist or you no longer have access.",
@@ -502,7 +494,8 @@
       "remove_failed": "Failed to remove the member",
       "role_updated": "Role updated",
       "role_update_failed": "Failed to change the role",
-      "role_hint": "Owner and admin can manage everything. Member can work on tasks. Guest can only view."
+      "role_hint": "Owner and admin can manage everything. Member can work on tasks. Guest can only view.",
+      "page_description": "People in this workspace and pending invites. Admins can change roles and send invites."
     },
     "invites": {
       "create": "Create invite link",
@@ -687,7 +680,9 @@
     "settings": {
       "rename": "Rename",
       "disable": "Delete project",
-      "disable_confirm": "Delete this project? All of its tasks are deleted too, and this cannot be undone. To keep them, archive the project instead."
+      "disable_confirm": "Delete this project? All of its tasks are deleted too, and this cannot be undone. To keep them, archive the project instead.",
+      "danger_title": "Delete project",
+      "disable_description": "Deletes the project and all of its tasks. This cannot be undone. To keep them, archive the project instead."
     },
     "validation": {
       "name_required": "Name is required.",
