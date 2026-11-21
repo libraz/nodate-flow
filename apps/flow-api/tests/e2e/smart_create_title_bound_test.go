@@ -8,10 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// smartCreateLongTitleSentinel is the opening of the deliberately
-// overlong title in testdata/ai/smart_create.json. It is long enough to
-// identify that subtask and short enough to survive the cut.
-const smartCreateLongTitleSentinel = "Overlong AAAAA"
+// smartCreateLongTitleSentinel is the opening of the column-wide title in
+// testdata/ai/smart_create.json. It is long enough to identify that subtask.
+const smartCreateLongTitleSentinel = "Bounded AAAAA"
 
 // tasksTitleMaxLen is the width of tasks.title in characters. Stated here
 // rather than read from the tool so the test fails if the tool's bound is
@@ -21,11 +20,10 @@ const tasksTitleMaxLen = 500
 // TestMCPSmartCreateBoundsModelTitles holds the boundary between what a
 // model returns and what a column accepts.
 //
-// The caller's own title is bounded by the tool's input schema; the
-// titles in the proposal are not bounded by anything, and each one is
-// written straight into tasks.title. An overlong one failed the insert
-// and took the whole batch — the parent task included — down with it,
-// after the LLM call had already been paid for.
+// The caller's own title is bounded by the tool's input schema and the
+// proposal's titles by the smart-create output contract, which refuses one
+// wider than tasks.title. A title exactly at that width, ending in
+// multi-byte characters, must pass the contract and reach the column whole.
 func TestMCPSmartCreateBoundsModelTitles(t *testing.T) {
 	bootstrap(t)
 	requireAIMock(t)
@@ -52,7 +50,7 @@ func TestMCPSmartCreateBoundsModelTitles(t *testing.T) {
 	}](t, body)
 
 	require.NotEmptyf(t, result.ID,
-		"the batch must survive an overlong proposed title, body=%s", string(body))
+		"the batch must survive a column-wide proposed title, body=%s", string(body))
 
 	var found bool
 	for _, sub := range result.Subtasks {
@@ -60,11 +58,11 @@ func TestMCPSmartCreateBoundsModelTitles(t *testing.T) {
 			continue
 		}
 		found = true
-		require.NotEmptyf(t, sub.ID, "the overlong subtask must have been persisted")
-		// Equal rather than at-most: the fixture's title is longer than the
-		// column, so a title at the bound is the proof that the cut ran.
+		require.NotEmptyf(t, sub.ID, "the column-wide subtask must have been persisted")
+		// Equal rather than at-most: the fixture's title is exactly the
+		// column width, so anything shorter means it was cut.
 		require.Equalf(t, tasksTitleMaxLen, utf8.RuneCountInString(sub.Title),
-			"the proposed title was not cut at the column width")
+			"a title at the column width was shortened")
 		require.Truef(t, utf8.ValidString(sub.Title),
 			"the cut severed a multi-byte character: %q", sub.Title)
 
@@ -76,5 +74,5 @@ func TestMCPSmartCreateBoundsModelTitles(t *testing.T) {
 			"the row stores something other than what the tool reported")
 	}
 	require.Truef(t, found,
-		"the fixture's overlong subtask did not come back, body=%s", string(body))
+		"the fixture's column-wide subtask did not come back, body=%s", string(body))
 }

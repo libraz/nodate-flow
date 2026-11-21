@@ -15,12 +15,15 @@ import (
 // seedTriageFixtureItems inserts an inbox item for every id the mock's
 // triage fixture names. The suggestion list only replays suggestions about
 // items that exist in the workspace, so the canned ids must be real ones.
+// An item the fixture recommends opening is linked to a task the actor can
+// read, because the triage contract refuses "open" for any other item.
 func seedTriageFixtureItems(t *testing.T, tt *helpers.TestTenant) {
 	t.Helper()
 	raw, err := os.ReadFile("../../testdata/ai/inbox_triage.json")
 	require.NoError(t, err)
 	var fixture []struct {
-		InboxItemID string `json:"inboxItemId"`
+		InboxItemID       string `json:"inboxItemId"`
+		RecommendedAction string `json:"recommendedAction"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &fixture))
 	require.NotEmpty(t, fixture)
@@ -28,10 +31,18 @@ func seedTriageFixtureItems(t *testing.T, tt *helpers.TestTenant) {
 	wsID := helpers.ResolveWorkspaceInternalID(t, testDB, tt.WorkspacePublicID)
 	for _, f := range fixture {
 		id := uuid.MustParse(f.InboxItemID)
+		var taskID any
+		subjectType := "workspace"
+		if f.RecommendedAction == "open" {
+			taskPublicID := createTaskWithVisibility(t, tt, "Triage open target", "public")
+			_, taskInternalID := helpers.AgentTaskInternalIDs(t, testDB, tt.WorkspacePublicID, taskPublicID)
+			taskID = taskInternalID
+			subjectType = "task"
+		}
 		_, err := testDB.Exec(
-			`INSERT INTO signals (public_id, workspace_id, source, kind, payload_json, received_at)
-			 VALUES (?, ?, 'manual', 'manual', JSON_OBJECT(), NOW(3))`,
-			id[:], wsID)
+			`INSERT INTO signals (public_id, workspace_id, task_id, source, kind, payload_json, received_at, subject_type, subject_id)
+			 VALUES (?, ?, ?, 'manual', 'manual', JSON_OBJECT(), NOW(3), ?, ?)`,
+			id[:], wsID, taskID, subjectType, taskID)
 		require.NoError(t, err)
 	}
 }
