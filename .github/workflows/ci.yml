@@ -264,6 +264,9 @@ jobs:
           --health-retries=20
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # test-0004.sh reads the pre-0004 schema from an older commit.
+          fetch-depth: 0
 
       - name: Schema drift
         run: bash scripts/schema-diff.sh
@@ -371,6 +374,11 @@ jobs:
           bash sql/core/tools/check-layer-equivalence.sh \
             --dsn-a 'root:conformance@127.0.0.1:3306/time_plus_flow' \
             --dsn-b 'root:conformance@127.0.0.1:3306/fresh_full'
+
+      - name: Upgrade 0004 converts all-day rows and stops on the rows it must
+        env:
+          NF_0004_TEST_DSN: root:conformance@127.0.0.1:3306
+        run: bash sql/core/tools/test-0004.sh
 
   api:
     name: API (format, lint, test)
