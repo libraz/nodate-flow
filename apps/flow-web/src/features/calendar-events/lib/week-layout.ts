@@ -73,8 +73,16 @@ export function eventStartDay(evt: CalendarEvent, zone: Zone): Date | null {
 
 /** Resolve an event's end as a day cell, falling back to its start. */
 export function eventEndDay(evt: CalendarEvent, zone: Zone): Date | null {
-  if (typeof evt.endAt === 'number') return eventStartOfDay(evt.endAt, evt.allDay === true, zone);
-  return eventStartDay(evt, zone);
+  if (typeof evt.endAt !== 'number') return eventStartDay(evt, zone);
+  // An all-day end is exclusive (the day after the last day), so the last
+  // day is one earlier; a milestone's end equals its start.
+  if (evt.allDay === true && typeof evt.startAt === 'number') {
+    return eventStartOfDay(evt.startAt, true, zone).getTime() ===
+      eventStartOfDay(evt.endAt, true, zone).getTime()
+      ? eventStartDay(evt, zone)
+      : eventStartOfDay(evt.endAt - 86_400, true, zone);
+  }
+  return eventStartOfDay(evt.endAt, false, zone);
 }
 
 /** True when an event spans more than one calendar day in local time. */

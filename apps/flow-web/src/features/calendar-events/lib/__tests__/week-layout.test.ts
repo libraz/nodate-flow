@@ -12,6 +12,7 @@ import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it } from 'vitest';
 
 import {
+  eventEndDay,
   eventStartKey,
   groupEventsByWeek,
   isMultiDay,
@@ -199,5 +200,38 @@ describe('groupEventsByWeek', () => {
       endAt: Math.floor(new Date(2020, 0, 1, 10).getTime() / 1000),
     });
     expect(groupEventsByWeek([before], weekStarts, key, hostZone).size).toBe(0);
+  });
+});
+
+describe('all-day end is exclusive', () => {
+  const secs = (iso: string): number => Date.parse(iso) / 1000;
+  const tokyo = Zone.resolve('Asia/Tokyo');
+
+  it('a one-day all-day event is not multi-day', () => {
+    const evt = makeEvent({
+      id: 'a',
+      allDay: true,
+      startAt: secs('2026-03-10T00:00:00Z'),
+      endAt: secs('2026-03-11T00:00:00Z'),
+    });
+    expect(isMultiDay(evt, tokyo)).toBe(false);
+  });
+
+  it('ends a three-day event on its last day, whatever the zone', () => {
+    const evt = makeEvent({
+      id: 'b',
+      allDay: true,
+      startAt: secs('2026-03-10T00:00:00Z'),
+      endAt: secs('2026-03-13T00:00:00Z'),
+    });
+    expect(isMultiDay(evt, tokyo)).toBe(true);
+    const end = eventEndDay(evt, tokyo);
+    expect([end?.getFullYear(), end?.getMonth(), end?.getDate()]).toEqual([2026, 2, 12]);
+  });
+
+  it('keeps a milestone on its own day', () => {
+    const at = secs('2026-03-10T00:00:00Z');
+    const evt = makeEvent({ id: 'c', allDay: true, kind: 'milestone', startAt: at, endAt: at });
+    expect(isMultiDay(evt, tokyo)).toBe(false);
   });
 });

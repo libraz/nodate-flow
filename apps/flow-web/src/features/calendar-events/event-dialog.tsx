@@ -56,7 +56,14 @@ import {
 import { useTranslation } from 'react-i18next';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
-import { allDayToUnix, todayKey, unixToWallClock, wallClockToUnix } from '../../lib/date-utils';
+import {
+  allDayLastDateKey,
+  allDayRangeToUnix,
+  eventDateKey,
+  todayKey,
+  unixToWallClock,
+  wallClockToUnix,
+} from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { useWeekStart } from '../../lib/use-week-start';
 import { selectUser, useAuth } from '../auth/auth-store';
@@ -331,6 +338,20 @@ export function occurrenceRange(
     startAt: occurrenceStartAt,
     endAt: endAt === null ? null : occurrenceStartAt + (endAt - startAt),
   };
+}
+
+/**
+ * The end date the form shows for a stored range. An all-day row stores
+ * the day after its last day, read in UTC; a timed row ends where it ends.
+ */
+export function displayEndDate(
+  range: { startAt: number | null; endAt: number | null },
+  allDay: boolean,
+  zone: Zone,
+): string {
+  if (range.endAt === null) return '';
+  if (allDay && range.startAt !== null) return allDayLastDateKey(range.startAt, range.endAt);
+  return unixToWallClock(range.endAt, zone).date;
 }
 
 /**
@@ -656,7 +677,9 @@ export default function EventDialog({
       : { startAt: null, endAt: null };
 
   const initialDate =
-    mode.kind === 'create' ? mode.date : inferEditDate(initialRange.startAt, zone);
+    mode.kind === 'create'
+      ? mode.date
+      : inferEditDate(initialRange.startAt, mode.event.allDay === true, zone);
 
   /* ── dirty tracking ─── */
 
@@ -690,7 +713,9 @@ export default function EventDialog({
   // startDate/startTime + endDate/endTime + allDay.
   const [startDate, setStartDate] = useState<string>(initialDate);
   const [endDate, setEndDate] = useState<string>(
-    initialRange.endAt != null ? unixToWallClock(initialRange.endAt, zone).date : initialDate,
+    initialRange.endAt != null
+      ? displayEndDate(initialRange, mode.kind === 'edit' && mode.event.allDay === true, zone)
+      : initialDate,
   );
 
   // Read only on the first render — as the initial value of the two time
@@ -806,12 +831,12 @@ export default function EventDialog({
       const range = occurrenceRange(detail, openedOccurrenceStart);
       if (range.startAt != null) {
         const wall = unixToWallClock(range.startAt, zone);
-        setStartDate(wall.date);
+        setStartDate(eventDateKey(range.startAt, detail.allDay, zone));
         setStartTime(wall.time);
       }
       if (range.endAt != null) {
         const wall = unixToWallClock(range.endAt, zone);
-        setEndDate(wall.date);
+        setEndDate(displayEndDate(range, detail.allDay, zone));
         setEndTime(wall.time);
       }
     }
@@ -1115,11 +1140,9 @@ export default function EventDialog({
     };
     if (calKind === 'milestone') {
       // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-      body.startAt = allDayToUnix(startDate);
-      body.endAt = body.startAt;
+      Object.assign(body, allDayRangeToUnix(startDate, startDate, true));
     } else if (allDay) {
-      body.startAt = allDayToUnix(startDate);
-      body.endAt = allDayToUnix(endDate);
+      Object.assign(body, allDayRangeToUnix(startDate, endDate));
     } else {
       body.startAt = wallClockToUnix(startDate, startTime, zone);
       body.endAt = wallClockToUnix(endDate, endTime, zone);
@@ -1162,11 +1185,9 @@ export default function EventDialog({
       body.allDay = calKind === 'milestone' ? true : allDay;
       if (calKind === 'milestone') {
         // Backend enforces (StartAt == nil) != (EndAt == nil); set both.
-        body.startAt = allDayToUnix(startDate);
-        body.endAt = body.startAt;
+        Object.assign(body, allDayRangeToUnix(startDate, startDate, true));
       } else if (allDay) {
-        body.startAt = allDayToUnix(startDate);
-        body.endAt = allDayToUnix(endDate);
+        Object.assign(body, allDayRangeToUnix(startDate, endDate));
       } else {
         body.startAt = wallClockToUnix(startDate, startTime, zone);
         body.endAt = wallClockToUnix(endDate, endTime, zone);
@@ -1866,7 +1887,7 @@ export default function EventDialog({
 }
 
 /** Best-effort derivation of the initial date for an edit-mode dialog. */
-function inferEditDate(startAt: number | null, zone: Zone): string {
-  if (startAt !== null) return unixToWallClock(startAt, zone).date;
+function inferEditDate(startAt: number | null, allDay: boolean, zone: Zone): string {
+  if (startAt !== null) return eventDateKey(startAt, allDay, zone);
   return todayKey(zone);
 }

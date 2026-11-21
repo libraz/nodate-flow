@@ -63,7 +63,7 @@ export default function LinkedEventRow({
 
   const kind = relationToKind(link.relation as LinkRelation);
   const title = link.eventTitle ?? '';
-  const today = isToday(link.eventStartAt);
+  const today = isToday(link.eventStartAt, Date.now(), link.eventAllDay ?? false);
 
   // Deep-link target for the calendar event detail route. Linked events
   // are always searched within the task's own workspace, so the active

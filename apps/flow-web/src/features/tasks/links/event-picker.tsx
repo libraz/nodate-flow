@@ -79,7 +79,7 @@ function buildEntries(
     const entry: PickerEntry = {
       event,
       isLinked,
-      isPastEvent: isPast(event.startAt),
+      isPastEvent: isPast(event.startAt, Date.now(), event.allDay ?? false),
     };
     if (entry.isPastEvent) past.push(entry);
     else upcoming.push(entry);

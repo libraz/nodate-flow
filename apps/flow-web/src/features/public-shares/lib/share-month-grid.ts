@@ -18,7 +18,10 @@
 
 import type { components } from '@nodate-flow/sdk';
 import { expandAllRecurrences, type RecurrenceRule } from '@nodate-flow/ui/calendar';
+import { Zone } from '@nodate-flow/ui/time';
 import { DateTime } from 'luxon';
+
+import { allDayLastDateKey, eventDateKey } from '../../../lib/date-utils';
 
 type ShareEvent = components['schemas']['PublicShareRenderEvent'];
 type RecurrenceExpansionInput<T> = {
@@ -144,14 +147,24 @@ function dayDiff(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / MS_PER_DAY);
 }
 
+/** `YYYY-MM-DD` of an all-day start, read in UTC. */
+function allDayFirstDateKey(startAt: number): string {
+  return eventDateKey(startAt, true, Zone.utc());
+}
+
 /** Resolve an event's start day as a zoned UTC-midnight token, or null. */
 function eventStartDay(evt: ShareEvent, zone: string): Date | null {
   if (typeof evt.startAt !== 'number') return null;
+  if (evt.allDay) return keyToUtcMidnight(allDayFirstDateKey(evt.startAt));
   return keyToUtcMidnight(zonedDateKey(new Date(evt.startAt * 1000), zone));
 }
 
 /** Resolve an event's end day, falling back to its start day. */
 function eventEndDay(evt: ShareEvent, zone: string): Date | null {
+  // An all-day end is exclusive, so its last day is the one before.
+  if (evt.allDay && typeof evt.startAt === 'number') {
+    return keyToUtcMidnight(allDayLastDateKey(evt.startAt, evt.endAt));
+  }
   if (typeof evt.endAt === 'number') {
     return keyToUtcMidnight(zonedDateKey(new Date(evt.endAt * 1000), zone));
   }
@@ -169,6 +182,7 @@ export function isMultiDay(evt: ShareEvent, zone: string): boolean {
 /** The zoned `YYYY-MM-DD` key for an event's start day, or null. */
 export function eventStartKey(evt: ShareEvent, zone: string): string | null {
   if (typeof evt.startAt !== 'number') return null;
+  if (evt.allDay) return allDayFirstDateKey(evt.startAt);
   return zonedDateKey(new Date(evt.startAt * 1000), zone);
 }
 

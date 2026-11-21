@@ -136,6 +136,74 @@ export function allDayToUnix(dayKey: string): number {
   return Math.floor(day.start(Zone.utc()).toSeconds());
 }
 
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * The stored `{ startAt, endAt }` for an all-day range given as the
+ * first and last displayed day (both inclusive).
+ *
+ * The server keeps an all-day row half-open: `endAt` is UTC midnight of
+ * the day after the last day, so a one-day event spans 24 hours. A
+ * milestone is the one point, with `endAt = startAt`.
+ */
+export function allDayRangeToUnix(
+  firstDayKey: string,
+  lastDayKey: string,
+  milestone = false,
+): { startAt: number; endAt: number } {
+  const startAt = allDayToUnix(firstDayKey);
+  if (milestone) return { startAt, endAt: startAt };
+  const lastAt = allDayToUnix(lastDayKey < firstDayKey ? firstDayKey : lastDayKey);
+  return { startAt, endAt: lastAt + SECONDS_PER_DAY };
+}
+
+/**
+ * `YYYY-MM-DD` of the last displayed day of a stored all-day row: the
+ * UTC date of `endAt` minus one day, or the start day for a milestone
+ * (`endAt <= startAt`). Read in UTC, so it never depends on the viewer.
+ */
+export function allDayLastDateKey(startAt: number, endAt: number | null | undefined): string {
+  const last = typeof endAt === 'number' && endAt > startAt ? endAt - SECONDS_PER_DAY : startAt;
+  const d = new Date(last * 1000);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * A UTC-midnight `Date` for a `YYYY-MM-DD` key, for formatting with
+ * `timeZone: 'UTC'` so the date never moves with the viewer.
+ */
+function utcDateFromKey(key: string): Date {
+  return new Date(`${key}T00:00:00Z`);
+}
+
+/**
+ * Localised label for a stored all-day range: the first day, then
+ * ` – last day` when it spans more than one. Both days are read in UTC.
+ * `singleSuffix` is appended to the one-day form only.
+ */
+export function formatAllDayRange(
+  startAt: number,
+  endAt: number | null | undefined,
+  locale: string,
+  singleSuffix = '',
+): string {
+  const fmt = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
+  const first = new Date(startAt * 1000);
+  const lastKey = allDayLastDateKey(startAt, endAt);
+  if (lastKey === eventDateKey(startAt, true, Zone.utc())) {
+    return `${fmt.format(first)}${singleSuffix}`;
+  }
+  return `${fmt.format(first)} – ${fmt.format(utcDateFromKey(lastKey))}`;
+}
+
+/** `Date` for the last displayed day of a stored all-day range, as a UTC-midnight instant. */
+export function allDayLastDate(startAt: number, endAt: number | null | undefined): Date {
+  return utcDateFromKey(allDayLastDateKey(startAt, endAt));
+}
+
 /**
  * ISO instant for the first moment of `dayKey` in `zone`.
  *

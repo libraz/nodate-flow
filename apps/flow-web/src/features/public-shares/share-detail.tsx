@@ -43,6 +43,7 @@ import { type CSSProperties, type ReactElement, Suspense, useEffect, useState } 
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { formatApiError } from '../../lib/api-error';
+import { formatAllDayRange } from '../../lib/date-utils';
 import ui from '../settings/settings-ui.module.css';
 import AddEventsDialog from './add-events-dialog';
 import {
@@ -73,8 +74,7 @@ function formatWhen(event: ShareEvent, locale: string, allDayLabel: string): str
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
   const timeFmt = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
   if (event.allDay) {
-    if (!end || sameDay(start, end)) return `${dateFmt.format(start)} · ${allDayLabel}`;
-    return `${dateFmt.format(start)} – ${dateFmt.format(end)}`;
+    return formatAllDayRange(event.startAt, event.endAt, locale, ` · ${allDayLabel}`);
   }
   if (!end) return `${dateFmt.format(start)} ${timeFmt.format(start)}`;
   if (sameDay(start, end)) {

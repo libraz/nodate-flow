@@ -19,7 +19,7 @@ import { type ReactElement, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatApiError } from '../../lib/api-error';
-import { endOfDayIso, startOfDayIso } from '../../lib/date-utils';
+import { endOfDayIso, formatAllDayRange, startOfDayIso } from '../../lib/date-utils';
 import { formatDate } from '../../lib/format';
 import { useEffectiveZone } from '../../lib/use-effective-timezone';
 import { useWeekStart } from '../../lib/use-week-start';
@@ -280,8 +280,7 @@ function formatRange(event: CrossCalendarEvent, locale: string, allDayLabel: str
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
   const timeFmt = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
   if (event.allDay) {
-    if (!end || sameDay(start, end)) return `${dateFmt.format(start)} · ${allDayLabel}`;
-    return `${dateFmt.format(start)} – ${dateFmt.format(end)}`;
+    return formatAllDayRange(event.startAt, event.endAt, locale, ` · ${allDayLabel}`);
   }
   if (!end) return `${dateFmt.format(start)} ${timeFmt.format(start)}`;
   if (sameDay(start, end)) {

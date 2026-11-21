@@ -186,3 +186,22 @@ describe('shiftMonthAnchor', () => {
     expect(shiftMonthAnchor('2024-12-01', 1)).toBe('2025-01-01');
   });
 });
+
+describe('all-day events with an exclusive end', () => {
+  const tokyo = 'Asia/Tokyo';
+
+  it('does not treat a one-day all-day event as multi-day', () => {
+    const e = evt({ id: 'a', allDay: true, startAt: utc(2026, 3, 10), endAt: utc(2026, 3, 11) });
+    expect(isMultiDay(e, tokyo)).toBe(false);
+  });
+
+  it('treats a two-day all-day event as multi-day', () => {
+    const e = evt({ id: 'b', allDay: true, startAt: utc(2026, 3, 10), endAt: utc(2026, 3, 12) });
+    expect(isMultiDay(e, tokyo)).toBe(true);
+  });
+
+  it('reads the start date in UTC, not in the share zone', () => {
+    const e = evt({ id: 'c', allDay: true, startAt: utc(2026, 3, 10), endAt: utc(2026, 3, 11) });
+    expect(eventStartKey(e, 'America/Los_Angeles')).toBe('2026-03-10');
+  });
+});

@@ -1,7 +1,17 @@
 import { Zone } from '@nodate-flow/ui/time';
 import { describe, expect, it } from 'vitest';
 
-import { dateKey, endOfDayUnix, eventDateKey, eventStartOfDay, todayKey } from '../date-utils';
+import fixtures from '../../../../../sql/core/all-day/fixtures.json';
+import {
+  allDayLastDateKey,
+  allDayRangeToUnix,
+  dateKey,
+  endOfDayUnix,
+  eventDateKey,
+  eventStartOfDay,
+  formatAllDayRange,
+  todayKey,
+} from '../date-utils';
 
 const utc = Zone.utc();
 const tokyo = Zone.resolve('Asia/Tokyo');
@@ -125,5 +135,59 @@ describe('endOfDayUnix', () => {
 
   it('ends a UTC day one second before midnight UTC', () => {
     expect(endOfDayUnix('2026-03-15', utc)).toBe(Date.UTC(2026, 2, 16) / 1000 - 1);
+  });
+});
+
+describe('all-day range conversion', () => {
+  const secs = (iso: string): number => Date.parse(iso) / 1000;
+
+  it('stores end as the day after the last day', () => {
+    expect(allDayRangeToUnix('2026-03-10', '2026-03-10')).toEqual({
+      startAt: secs('2026-03-10T00:00:00Z'),
+      endAt: secs('2026-03-11T00:00:00Z'),
+    });
+  });
+
+  it('stores a milestone as a point', () => {
+    const r = allDayRangeToUnix('2026-03-10', '2026-03-10', true);
+    expect(r.endAt).toBe(r.startAt);
+  });
+
+  it('displays the last day as end minus one day', () => {
+    expect(allDayLastDateKey(secs('2026-03-10T00:00:00Z'), secs('2026-03-13T00:00:00Z'))).toBe(
+      '2026-03-12',
+    );
+    expect(allDayLastDateKey(secs('2026-03-10T00:00:00Z'), secs('2026-03-10T00:00:00Z'))).toBe(
+      '2026-03-10',
+    );
+  });
+
+  describe('fixtures.json', () => {
+    for (const c of fixtures.cases) {
+      for (const [zoneName, v] of Object.entries(c.viewers)) {
+        it(`${c.name} as seen from ${zoneName}`, () => {
+          const startAt = secs(c.startAt);
+          const endAt = secs(c.endAt);
+          const zone = Zone.resolve(zoneName);
+          const milestone = c.kind === 'milestone';
+          expect(eventDateKey(startAt, true, zone)).toBe(v.firstDate);
+          expect(allDayLastDateKey(startAt, endAt)).toBe(v.lastDate);
+          expect(allDayRangeToUnix(v.firstDate, v.lastDate, milestone)).toEqual({ startAt, endAt });
+          expect(allDayRangeToUnix(v.startDate, v.lastDate, milestone).endAt).toBe(endAt);
+        });
+      }
+    }
+  });
+});
+
+describe('formatAllDayRange', () => {
+  const d = (n: number): number => Date.UTC(2026, 2, n) / 1000;
+
+  it('shows a one-day event as one date plus the suffix', () => {
+    expect(formatAllDayRange(d(10), d(11), 'en', ' · all day')).toBe('Mar 10, 2026 · all day');
+  });
+
+  it('ends a multi-day range on its last day', () => {
+    expect(formatAllDayRange(d(10), d(13), 'en')).toBe('Mar 10, 2026 – Mar 12, 2026');
   });
 });

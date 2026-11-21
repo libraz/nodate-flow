@@ -46,8 +46,11 @@ export interface ShareOverrideNoticeProps {
  */
 function formatMoment(seconds: number, locale: string, allDay: boolean): string {
   const at = new Date(seconds * 1000);
+  // An all-day moment is a date, read in UTC so it names the same day for everyone.
+  if (allDay) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(at);
+  }
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(at);
-  if (allDay) return date;
   return `${date} ${new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(at)}`;
 }
 

@@ -12,7 +12,7 @@
 import type { components } from '@nodate-flow/sdk';
 import type { Zone } from '@nodate-flow/ui/time';
 
-import { dateKey, eventStartOfDay } from '../../../lib/date-utils';
+import { allDayLastDate, dateKey, eventStartOfDay } from '../../../lib/date-utils';
 
 type CalendarEvent = components['schemas']['MyCalendarEventResponse'];
 
@@ -41,7 +41,10 @@ export function eventDayKeys(event: CalendarEvent, zone: Zone): string[] {
   const allDay = event.allDay === true;
   const start = eventStartOfDay(event.startAt, allDay, zone);
   const endSeconds = typeof event.endAt === 'number' ? event.endAt : event.startAt;
-  const end = eventStartOfDay(endSeconds, allDay, zone);
+  // An all-day end is exclusive, so its last day is the one before.
+  const end = allDay
+    ? eventStartOfDay(allDayLastDate(event.startAt, endSeconds).getTime() / 1000, true, zone)
+    : eventStartOfDay(endSeconds, false, zone);
 
   const keys = [dateKey(start)];
   const cursor = new Date(start);

@@ -17,9 +17,11 @@
  * happens for malformed events and is intentionally non-fatal.
  */
 
+import { Zone } from '@nodate-flow/ui/time';
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { eventStartOfDay } from '../../../lib/date-utils';
 import styles from './linked-events.module.css';
 
 const DAY_MS = 86_400_000;
@@ -71,8 +73,11 @@ function compute(
   nowMs: number,
   t: (key: string, vars?: Record<string, unknown>) => string,
 ): Computed {
-  const startMs = epochStartSec * 1000;
-  const date = new Date(startMs);
+  // An all-day start is a date: take its UTC day as the local day cell.
+  const date = allDay
+    ? eventStartOfDay(epochStartSec, true, Zone.utc())
+    : new Date(epochStartSec * 1000);
+  const startMs = date.getTime();
   const todayStart = startOfLocalDay(new Date(nowMs));
   const eventDayStart = startOfLocalDay(date);
   const dayDelta = Math.round((eventDayStart - todayStart) / DAY_MS);
@@ -190,7 +195,9 @@ export function formatPickerDate(
   allDay: boolean,
 ): string {
   if (epochStartSec === undefined) return '—';
-  const date = new Date(epochStartSec * 1000);
+  const date = allDay
+    ? eventStartOfDay(epochStartSec, true, Zone.utc())
+    : new Date(epochStartSec * 1000);
   if (allDay) return formatAbsoluteDate(date, locale);
   return `${formatAbsoluteDate(date, locale)} · ${formatTime(date, locale)}`;
 }
@@ -199,9 +206,15 @@ export function formatPickerDate(
  * Compute whether a given start lies on the local "today" so the row
  * can render the small accent dot before its glyph.
  */
-export function isToday(epochStartSec: number | undefined, nowMs: number = Date.now()): boolean {
+export function isToday(
+  epochStartSec: number | undefined,
+  nowMs: number = Date.now(),
+  allDay = false,
+): boolean {
   if (epochStartSec === undefined) return false;
-  const startDay = startOfLocalDay(new Date(epochStartSec * 1000));
+  const startDay = startOfLocalDay(
+    allDay ? eventStartOfDay(epochStartSec, true, Zone.utc()) : new Date(epochStartSec * 1000),
+  );
   const today = startOfLocalDay(new Date(nowMs));
   return startDay === today;
 }
@@ -210,7 +223,16 @@ export function isToday(epochStartSec: number | undefined, nowMs: number = Date.
  * Whether a given start is strictly in the past (used by the picker
  * grouping divider).
  */
-export function isPast(epochStartSec: number | undefined, nowMs: number = Date.now()): boolean {
+export function isPast(
+  epochStartSec: number | undefined,
+  nowMs: number = Date.now(),
+  allDay = false,
+): boolean {
   if (epochStartSec === undefined) return false;
+  if (allDay) {
+    return (
+      eventStartOfDay(epochStartSec, true, Zone.utc()).getTime() < startOfLocalDay(new Date(nowMs))
+    );
+  }
   return epochStartSec * 1000 < nowMs;
 }

@@ -609,6 +609,45 @@ describe('<EventDialog>', () => {
     expect(args.body.endAt).toBe(endAt);
   });
 
+  /* ── all-day dates ──────────────────────────────────────────── */
+
+  it('saves an all-day event with end = last day + 1, in UTC whatever the zone', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(renderDialog({ zone: eventZone }));
+
+    await user.type(screen.getByRole('textbox', { name: 'field.title' }), 'Holiday');
+    await user.click(screen.getByRole('switch', { name: 'field.allDay' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.create' }));
+
+    const args = mocks.createEvent.mock.calls[0]?.[0] as { body: CreateEventInput };
+    expect(args.body.allDay).toBe(true);
+    expect(args.body.startAt).toBe(Date.UTC(2030, 5, 15) / 1000);
+    expect(args.body.endAt).toBe(Date.UTC(2030, 5, 16) / 1000);
+  });
+
+  it('shows a stored one-day all-day event as one day and saves it back unchanged', async () => {
+    const user = userEvent.setup();
+    const startAt = Date.UTC(2030, 5, 15) / 1000;
+    const endAt = Date.UTC(2030, 5, 16) / 1000;
+    withDetail({ allDay: true, startAt, endAt });
+    renderWithProviders(
+      renderDialog({ mode: editMode({ allDay: true, startAt, endAt }), zone: eventZone }),
+    );
+
+    await screen.findByRole('switch', { name: 'field.allDay' });
+    expect(screen.getAllByRole('button', { name: dayTrigger('2030-06-15') })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: dayTrigger('2030-06-16') })).toBeNull();
+
+    // Toggle twice to mark the range edited without changing it.
+    await user.click(screen.getByRole('switch', { name: 'field.allDay' }));
+    await user.click(screen.getByRole('switch', { name: 'field.allDay' }));
+    await user.click(screen.getByRole('button', { name: 'action.submit.edit' }));
+
+    const args = mocks.updateEvent.mock.calls[0]?.[0] as { body: PatchEventInput };
+    expect(args.body.startAt).toBe(startAt);
+    expect(args.body.endAt).toBe(endAt);
+  });
+
   /* ── occurrence seeding ─────────────────────────────────────── */
 
   // A series is stored once, as its first occurrence on 15 June, while
@@ -635,7 +674,8 @@ describe('<EventDialog>', () => {
 
   it('opens an all-day occurrence on its own days, keeping the span', async () => {
     const startAt = Date.UTC(2030, 5, 15) / 1000;
-    const endAt = Date.UTC(2030, 5, 16) / 1000;
+    // Exclusive end: 15-16 June is stored as ending at 17 June 00:00Z.
+    const endAt = Date.UTC(2030, 5, 17) / 1000;
     withDetail({
       allDay: true,
       startAt,

@@ -78,7 +78,7 @@ describe('eventDayKeys', () => {
       eventDayKeys(
         {
           startAt: utcDate(2027, 8, 5),
-          endAt: utcDate(2027, 8, 7),
+          endAt: utcDate(2027, 8, 8),
           allDay: true,
         } as never,
         utc,
@@ -120,5 +120,34 @@ describe('eventDayKeys', () => {
     );
     expect(keys.length).toBe(MAX_EVENT_SPAN_DAYS + 1);
     expect(keys[0]).toBe('2027-06-01');
+  });
+});
+
+describe('eventDayKeys with an exclusive all-day end', () => {
+  it('gives a one-day all-day event one key', () => {
+    expect(
+      eventDayKeys(
+        { startAt: utcDate(2027, 3, 10), endAt: utcDate(2027, 3, 11), allDay: true } as never,
+        utc,
+      ),
+    ).toEqual(['2027-03-10']);
+  });
+
+  it('stops at the last day of a multi-day all-day event', () => {
+    expect(
+      eventDayKeys(
+        { startAt: utcDate(2027, 3, 10), endAt: utcDate(2027, 3, 13), allDay: true } as never,
+        utc,
+      ),
+    ).toEqual(['2027-03-10', '2027-03-11', '2027-03-12']);
+  });
+
+  it('keeps a milestone on its own day', () => {
+    expect(
+      eventDayKeys(
+        { startAt: utcDate(2027, 3, 10), endAt: utcDate(2027, 3, 10), allDay: true } as never,
+        utc,
+      ),
+    ).toEqual(['2027-03-10']);
   });
 });

@@ -30,6 +30,7 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import { type ReactElement, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { allDayLastDate } from '../../lib/date-utils';
 import CreatorChip from '../calendar-events/creator-chip';
 import { useEventQuery } from './api';
 import AttachmentsTab from './attachments-tab';
@@ -71,11 +72,28 @@ function formatEpoch(epochSec: number, locale: string, allDay: boolean): string 
   try {
     return new Intl.DateTimeFormat(locale, {
       dateStyle: 'medium',
-      ...(allDay ? {} : { timeStyle: 'short' }),
+      ...(allDay ? { timeZone: 'UTC' } : { timeStyle: 'short' }),
     }).format(new Date(epochSec * 1000));
   } catch {
     return '';
   }
+}
+
+/**
+ * The end shown in the header. An all-day end is exclusive, so the last
+ * day is shown instead.
+ */
+export function formatEventEnd(
+  startAt: number | undefined,
+  endAt: number | undefined,
+  locale: string,
+  allDay: boolean,
+): string {
+  if (endAt === undefined) return '';
+  if (allDay && startAt !== undefined) {
+    return formatEpoch(allDayLastDate(startAt, endAt).getTime() / 1000, locale, true);
+  }
+  return formatEpoch(endAt, locale, allDay);
 }
 
 /** Header card — kind, title, start/end, all-day flag, calendar color dot. */
@@ -95,7 +113,7 @@ function EventHeader({ workspaceId, calendarId, eventId }: EventHeaderProps): Re
   const allDay = event.allDay ?? false;
   const startDisplay =
     event.startAt !== undefined ? formatEpoch(event.startAt, locale, allDay) : '';
-  const endDisplay = event.endAt !== undefined ? formatEpoch(event.endAt, locale, allDay) : '';
+  const endDisplay = formatEventEnd(event.startAt, event.endAt, locale, allDay);
 
   return (
     <header className={styles.headerCard}>

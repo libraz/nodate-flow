@@ -22,6 +22,7 @@ import { ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react';
 import { type CSSProperties, type ReactElement, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatAllDayRange } from '../../lib/date-utils';
 import {
   buildMonthGrid,
   eventStartKey,
@@ -506,7 +507,6 @@ interface FormatWhenArgs {
  */
 function formatWhen({ start, end, allDay, zone, locale, t }: FormatWhenArgs): string {
   if (!start) return t('share.event_undated');
-  const dateMedium = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: zone });
   const dateTimeMedium = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -522,7 +522,12 @@ function formatWhen({ start, end, allDay, zone, locale, t }: FormatWhenArgs): st
     }
   };
 
-  if (allDay) return safe(() => dateMedium.format(start), start.toISOString());
+  if (allDay) {
+    return safe(
+      () => formatAllDayRange(start.getTime() / 1000, end ? end.getTime() / 1000 : null, locale),
+      start.toISOString(),
+    );
+  }
   if (end && isSameZonedDay(start, end, zone)) {
     return `${safe(() => dateTimeMedium.format(start), start.toISOString())} - ${safe(
       () => timeShort.format(end),
