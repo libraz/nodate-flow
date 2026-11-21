@@ -39,6 +39,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError, formatApiError } from '../../../lib/api-error';
 import { resolveAvatarUrl } from '../../../lib/avatar-url';
 import { useProjectsQuery } from '../../projects/api';
+import ArchivedProjectsSection from '../../projects/archived-projects-section';
 import { useWorkspaceMembersQuery } from '../../workspaces/api';
 import { type TaskListItem, useUnarchiveTask } from '../api';
 import styles from './archived.module.css';
@@ -253,7 +254,10 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
   // 2. Filtered to zero → "Couldn't find any matching archive".
   // 3. Otherwise → virtualized list with infinite-scroll prefetch.
   let body: ReactElement;
-  if (total === 0) {
+  const hasArchivedProjects = projectsQuery.data.some((p) => p.isArchived);
+  if (total === 0 && hasArchivedProjects) {
+    body = <p className={styles.countLine}>{t('empty.noTasks')}</p>;
+  } else if (total === 0) {
     body = <ArchivedEmptyState workspaceId={workspaceId} />;
   } else if (filteredRows.length === 0) {
     body = <ArchivedEmptyFiltered onClearFilters={handleClearFilters} />;
@@ -287,6 +291,8 @@ export default function ArchivedTasksPage({ workspaceId }: ArchivedTasksPageProp
   return (
     <section className={styles.page} aria-labelledby="archive-title">
       <ArchivedHeader count={filteredRows.length} lastArchivedAt={lastArchivedAt} locale={locale} />
+
+      <ArchivedProjectsSection workspaceId={workspaceId} projects={projectsQuery.data} />
 
       <ArchivedFilters
         search={filters.search}

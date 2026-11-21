@@ -86,6 +86,30 @@ beforeEach(() => {
   mocks.resolve.mockReset();
 });
 
+describe('project candidates', () => {
+  it('leaves archived projects out of the palette', async () => {
+    mocks.get.mockImplementation((path: string) =>
+      Promise.resolve({
+        data:
+          path === '/workspaces/{wsId}/projects'
+            ? {
+                projects: [
+                  { id: 'prj-1', name: 'Platform', isArchived: false },
+                  { id: 'prj-old', name: 'Retired', isArchived: true },
+                ],
+              }
+            : { tasks: [], total: 0 },
+        error: null,
+        response: new Response(null, { status: 200 }),
+      }),
+    );
+    renderWithProviders(<CommandPalette open onClose={() => {}} />);
+
+    expect(await screen.findByText('Platform')).toBeTruthy();
+    expect(screen.queryByText('Retired')).toBeNull();
+  });
+});
+
 describe('NL command execution', () => {
   it('runs the resolved transition against the API', async () => {
     mocks.resolve.mockReturnValue({

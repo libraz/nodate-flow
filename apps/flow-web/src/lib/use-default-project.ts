@@ -82,7 +82,8 @@ export function useDefaultProjectId(): DefaultProjectResolution {
     return { projectId: urlProjectId, workspaceId: urlWorkspaceId };
   }
 
-  const first = projectsQuery.data?.[0];
+  // Archived projects are hidden from pickers, so never a default destination.
+  const first = projectsQuery.data?.find((p) => !p.isArchived);
   if (first && fallbackWsId) {
     return { projectId: first.id, workspaceId: fallbackWsId };
   }

@@ -20,6 +20,7 @@ import { type TaskDerivedState, useTasksQuery } from '../tasks/api';
 import { STATE_COLOR } from '../tasks/constants';
 import listStyles from '../workspaces/workspaces.module.css';
 import { useDisableProject, useProjectQuery, useUpdateProject } from './api';
+import ProjectArchiveActions from './project-archive-actions';
 import ProjectMembersTable from './project-members-table';
 import styles from './projects.module.css';
 
@@ -170,6 +171,8 @@ function SettingsPanel({ id }: { id: string }): ReactElement {
           </div>
         </section>
       </Card>
+
+      <ProjectArchiveActions id={id} />
 
       <Card style={{ padding: 'var(--nf-space-5)' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

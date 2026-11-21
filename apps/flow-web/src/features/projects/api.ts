@@ -14,6 +14,9 @@
  *               (which would also nuke members / dependencies).
  *   - Delete  → same as Update; we additionally rely on the route
  *               unmount to clear sub-queries.
+ *   - Archive / unarchive → detail + every list key + the command
+ *               palette's project candidates (`['command-palette',
+ *               'projects']`, which lives outside `projectsKeys`).
  *   - Members → invalidate the per-project members key only. The
  *               Project DTO does not embed member counts, so the
  *               detail key does not need to refresh.
@@ -196,6 +199,38 @@ export function useDisableProject(): UseMutationResult<void, ApiError, string> {
       void qc.invalidateQueries({ queryKey: [...projectsKeys.all, 'list'] });
     },
   });
+}
+
+function useProjectArchiveMutation(
+  action: 'archive' | 'unarchive',
+): UseMutationResult<void, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await apiRequest(
+        (client) =>
+          action === 'archive'
+            ? client.POST('/projects/{prjId}/archive', { params: { path: { prjId: id } } })
+            : client.POST('/projects/{prjId}/unarchive', { params: { path: { prjId: id } } }),
+        action === 'archive' ? 'Failed to archive project' : 'Failed to restore project',
+      );
+    },
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: projectsKeys.detail(id) });
+      void qc.invalidateQueries({ queryKey: [...projectsKeys.all, 'list'] });
+      void qc.invalidateQueries({ queryKey: ['command-palette', 'projects'] });
+    },
+  });
+}
+
+/** POST /projects/{prjId}/archive — hides the project from pickers; tasks stay. */
+export function useArchiveProject(): UseMutationResult<void, ApiError, string> {
+  return useProjectArchiveMutation('archive');
+}
+
+/** POST /projects/{prjId}/unarchive. */
+export function useUnarchiveProject(): UseMutationResult<void, ApiError, string> {
+  return useProjectArchiveMutation('unarchive');
 }
 
 export interface AddProjectMemberArgs {

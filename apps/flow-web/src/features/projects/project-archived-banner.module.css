@@ -1,0 +1,39 @@
+.banner {
+  /* nf-token-override: container query host for the narrow wrap below */
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3) var(--nf-space-4);
+  border: var(--nf-space-px) solid var(--nf-color-border);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-bg-sunken);
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-sm);
+}
+
+.icon {
+  flex: none;
+}
+
+.text {
+  margin: 0;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.action {
+  flex: none;
+}
+
+/* nf-token-override: container query thresholds cannot use custom properties */
+@container (max-inline-size: 32rem) {
+  .text {
+    flex-basis: calc(100% - var(--nf-space-8));
+  }
+
+  .action {
+    margin-inline-start: var(--nf-space-8);
+  }
+}

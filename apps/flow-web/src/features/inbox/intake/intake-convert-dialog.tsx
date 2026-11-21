@@ -63,7 +63,8 @@ export default function IntakeConvertDialog({
   }) as string[];
   const formatMonthYear = (year: number, month: number): string =>
     t('common.date.monthYear', { ns: 'common', year, month });
-  const { data: projects } = useProjectsQuery(workspaceId);
+  const { data: allProjects } = useProjectsQuery(workspaceId);
+  const projects = allProjects.filter((p) => !p.isArchived);
   const { data: members } = useWorkspaceMembersQuery(workspaceId);
   const convert = useConvertIntakeItemMutation();
   const navigate = useNavigate();

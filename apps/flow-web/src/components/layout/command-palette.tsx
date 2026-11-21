@@ -371,7 +371,9 @@ function PaletteBody({ onSelect, initialCommandMode }: InnerProps): ReactElement
           'Failed to load projects',
           { onError: 'empty', empty: null },
         );
-        return (data?.projects ?? []).map((p) => ({ ...p, workspaceId: w.id }));
+        return (data?.projects ?? [])
+          .filter((p) => !p.isArchived)
+          .map((p) => ({ ...p, workspaceId: w.id }));
       },
     })),
   });

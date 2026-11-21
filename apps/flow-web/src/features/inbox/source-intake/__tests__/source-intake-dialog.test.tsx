@@ -47,6 +47,12 @@ const inboxItem = {
 } as unknown as InboxItem;
 
 const project = { id: 'project-1', name: 'Platform', identifier: 'PLAT' } as Project;
+const archivedProject = {
+  id: 'project-old',
+  name: 'Retired',
+  identifier: 'OLD',
+  isArchived: true,
+} as Project;
 const member = {
   id: 'member-1',
   userId: 'user-1',
@@ -140,7 +146,7 @@ function createSourceQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  queryClient.setQueryData(projectsKeys.list('ws-1'), [project]);
+  queryClient.setQueryData(projectsKeys.list('ws-1'), [project, archivedProject]);
   queryClient.setQueryData(projectsKeys.list('ws-2'), [project]);
   queryClient.setQueryData(workspacesKeys.members('ws-1'), [member]);
   queryClient.setQueryData(workspacesKeys.members('ws-2'), [member]);
@@ -249,6 +255,17 @@ describe('SourceIntakeDialog API workflow', () => {
         .join(' '),
     ).toContain('sourceIntake.project_required');
     expect(requests.convert).toHaveLength(0);
+  });
+
+  it('does not offer archived projects as a destination', async () => {
+    installSourceHandlers();
+    renderDialog();
+
+    const projectSelect = await screen.findByRole('combobox', {
+      name: /intake\.convert\.project_label/,
+    });
+    expect(projectSelect.textContent).toContain('Platform');
+    expect(projectSelect.textContent).not.toContain('Retired');
   });
 
   it('exposes the two task destinations as a radio group', async () => {

@@ -24,6 +24,7 @@ import PageHeader from '../components/page-header';
 import { useFavoritesQuery } from '../features/favorites/api';
 import FavoriteButton from '../features/favorites/favorite-button';
 import { useProjectQuery } from '../features/projects/api';
+import ProjectArchivedBanner from '../features/projects/project-archived-banner';
 import styles from '../features/workspaces/workspaces.module.css';
 import { apiRequest } from '../lib/api';
 import { ApiError } from '../lib/api-error';
@@ -133,6 +134,11 @@ function ProjectLayout(): ReactElement {
             <ProjectFavoriteStar projectId={projectId} workspaceId={id} />
           </Suspense>
         }
+      />
+      <ProjectArchivedBanner
+        projectId={projectId}
+        projectName={project.name}
+        isArchived={project.isArchived}
       />
       <nav ref={navRef} aria-label={t('projects.nav.label')} className={styles.subNav}>
         {PROJECT_SUB_NAV.map((item) => (

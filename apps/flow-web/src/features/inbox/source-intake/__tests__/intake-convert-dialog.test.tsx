@@ -55,6 +55,7 @@ function renderDialog() {
   });
   queryClient.setQueryData(projectsKeys.list('ws-1'), [
     { id: 'project-1', name: 'Platform', identifier: 'PLAT' } as Project,
+    { id: 'project-old', name: 'Retired', identifier: 'OLD', isArchived: true } as Project,
   ]);
   queryClient.setQueryData(workspacesKeys.members('ws-1'), [
     {
@@ -96,6 +97,7 @@ describe('IntakeConvertDialog source preservation', () => {
     );
     renderDialog();
 
+    expect(screen.queryByText(/Retired/)).toBeNull();
     expect(screen.getByDisplayValue(item.title)).toBeDefined();
     expect(screen.getByDisplayValue(item.body ?? '')).toBeDefined();
     expect(
