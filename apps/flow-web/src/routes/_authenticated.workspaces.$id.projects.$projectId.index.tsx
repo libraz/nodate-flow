@@ -3,7 +3,7 @@
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { type ReactElement, Suspense } from 'react';
 
 import { OverviewPanel } from '../features/projects/project-detail';
@@ -29,6 +29,28 @@ function ProjectOverviewRoute(): ReactElement {
   );
 }
 
+/** Legacy `?tab=` links: members and settings became their own routes. */
+export function legacyTabTarget(
+  tab: string,
+):
+  | '/workspaces/$id/projects/$projectId/members'
+  | '/workspaces/$id/projects/$projectId/settings'
+  | '/workspaces/$id/projects/$projectId' {
+  if (tab === 'members') return '/workspaces/$id/projects/$projectId/members';
+  if (tab === 'settings') return '/workspaces/$id/projects/$projectId/settings';
+  return '/workspaces/$id/projects/$projectId';
+}
+
 export const Route = createFileRoute('/_authenticated/workspaces/$id/projects/$projectId/')({
+  validateSearch: (search: Record<string, unknown>): { tab?: string } =>
+    typeof search.tab === 'string' ? { tab: search.tab } : {},
+  beforeLoad: ({ search, params }) => {
+    if (search.tab === undefined) return;
+    throw redirect({
+      to: legacyTabTarget(search.tab),
+      params: { id: params.id, projectId: params.projectId },
+      replace: true,
+    });
+  },
   component: ProjectOverviewRoute,
 });

@@ -84,21 +84,29 @@ test.describe('project sub-nav', () => {
     }
   });
 
-  test('legacy ?tab= query does not open the settings page', async ({ page }) => {
+  test('legacy ?tab= query redirects to the matching route', async ({ page }) => {
     const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     const base = `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}`;
+    const cases: Array<{ tab: string; url: RegExp; current: string }> = [
+      { tab: 'settings', url: new RegExp(`${base}/settings$`), current: nav.settings },
+      { tab: 'members', url: new RegExp(`${base}/members$`), current: nav.members },
+      { tab: 'overview', url: new RegExp(`${base}$`), current: nav.overview },
+    ];
+    for (const c of cases) {
+      await page.goto(`${base}?tab=${c.tab}`);
+      await expect(page, `URL for ?tab=${c.tab}`).toHaveURL(c.url, { timeout: 15_000 });
+      await expect(
+        subNav(page).getByRole('link', { name: c.current, exact: true }),
+      ).toHaveAttribute('aria-current', 'page', { timeout: 15_000 });
+      await expect(page.getByRole('main')).toBeVisible();
+    }
+    // Settings page carries the archive action.
     await page.goto(`${base}?tab=settings`);
-    await expect(subNav(page)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('main')).toBeVisible();
-    // Archive lives on the Settings page only.
     await expect(
       page.getByRole('button', { name: enCommon.projects.archive.action, exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      subNav(page).getByRole('link', { name: nav.settings, exact: true }),
-    ).not.toHaveAttribute('aria-current', 'page');
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test('opening a project from the workspace project list lands on its tasks', async ({ page }) => {
