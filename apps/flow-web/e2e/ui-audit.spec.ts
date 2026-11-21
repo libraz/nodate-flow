@@ -12,25 +12,45 @@
 
 import { expect, test } from '@playwright/test';
 
+import enCommon from '../locales/en/common.json' with { type: 'json' };
 import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 import { checkA11y } from './helpers/a11y';
 
 test.describe('not-found page', () => {
-  test('renders 404 page with translated content', async ({ page }) => {
-    await page.goto('/this-route-does-not-exist-abc123');
-    await page.waitForLoadState('networkidle');
+  test('unknown URL sends a signed-out visitor to sign in', async ({ page }) => {
+    const unknownPath = '/this-route-does-not-exist-abc123';
+    await page.goto(unknownPath);
 
-    // Should show "404" text (use main region to avoid footer/layout duplicates)
-    await expect(page.getByRole('main').getByText('404')).toBeVisible();
+    // The authenticated layout's catch-all redirects unknown URLs to accounts-web login.
+    await expect(page).toHaveURL(/\/login/);
 
-    // Should have a "back home" link
-    const backLink = page.getByRole('link', { name: /back|home/i });
-    await expect(backLink).toBeVisible();
+    // The login redirect carries the original location in its `redirect` param.
+    const redirectParam = new URL(page.url()).searchParams.get('redirect');
+    expect(redirectParam, 'login URL carries the original path').not.toBeNull();
+    expect(new URL(redirectParam ?? '').pathname).toBe(unknownPath);
 
     // No raw i18n keys
     const body = await page.locator('body').textContent();
     expect(body).not.toMatch(/\bnot_found\.\w+\b/);
+  });
+});
+
+test.describe('authenticated not-found page', () => {
+  test('renders inside the app shell with working shortcuts', async ({ page }) => {
+    const { user: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    await page.goto('/no-such-page');
+    await expect(
+      page.getByRole('heading', { level: 1, name: enCommon.not_found.title }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('main').getByText(enCommon.not_found.code)).toBeVisible();
+    await expect(page.getByRole('navigation').first()).toBeVisible();
+    await expect(page.getByRole('banner')).toBeVisible();
+
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: enCommon.shortcuts.title })).toBeVisible();
   });
 });
 

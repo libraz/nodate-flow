@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as SignupRouteImport } from './routes/signup';
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index';
+import { Route as AuthenticatedSplatRouteImport } from './routes/_authenticated.$';
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated.calendar';
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated.inbox';
 import { Route as AuthenticatedPagesRouteImport } from './routes/_authenticated.pages';
@@ -91,6 +92,11 @@ const SignupRoute = SignupRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any);
+const AuthenticatedSplatRoute = AuthenticatedSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => AuthenticatedRoute,
 } as any);
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
@@ -573,6 +579,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute;
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
+  '/$': typeof AuthenticatedSplatRoute;
   '/calendar': typeof AuthenticatedCalendarRoute;
   '/inbox': typeof AuthenticatedInboxRoute;
   '/pages': typeof AuthenticatedPagesRouteWithChildren;
@@ -637,6 +644,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
+  '/$': typeof AuthenticatedSplatRoute;
   '/calendar': typeof AuthenticatedCalendarRoute;
   '/inbox': typeof AuthenticatedInboxRoute;
   '/settings': typeof AuthenticatedSettingsRouteWithChildren;
@@ -695,6 +703,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren;
   '/login': typeof LoginRoute;
   '/signup': typeof SignupRoute;
+  '/_authenticated/$': typeof AuthenticatedSplatRoute;
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute;
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute;
   '/_authenticated/pages': typeof AuthenticatedPagesRouteWithChildren;
@@ -763,6 +772,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/$'
     | '/calendar'
     | '/inbox'
     | '/pages'
@@ -827,6 +837,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/signup'
+    | '/$'
     | '/calendar'
     | '/inbox'
     | '/settings'
@@ -884,6 +895,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/signup'
+    | '/_authenticated/$'
     | '/_authenticated/calendar'
     | '/_authenticated/inbox'
     | '/_authenticated/pages'
@@ -986,6 +998,13 @@ declare module '@tanstack/react-router' {
       path: '/';
       fullPath: '/';
       preLoaderRoute: typeof AuthenticatedIndexRouteImport;
+      parentRoute: typeof AuthenticatedRoute;
+    };
+    '/_authenticated/$': {
+      id: '/_authenticated/$';
+      path: '/$';
+      fullPath: '/$';
+      preLoaderRoute: typeof AuthenticatedSplatRouteImport;
       parentRoute: typeof AuthenticatedRoute;
     };
     '/_authenticated/calendar': {
@@ -1674,6 +1693,7 @@ const AuthenticatedProjectsProjectIdRouteWithChildren =
   );
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedSplatRoute: typeof AuthenticatedSplatRoute;
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute;
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute;
   AuthenticatedPagesRoute: typeof AuthenticatedPagesRouteWithChildren;
@@ -1687,6 +1707,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedSplatRoute: AuthenticatedSplatRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedPagesRoute: AuthenticatedPagesRouteWithChildren,

@@ -13,7 +13,8 @@
  * Loader + errorComponent intercept WS.WORKSPACE.NOT_FOUND so
  * fabricated or stale workspace UUIDs land on a branded "Workspace not
  * found" screen instead of the root FatalFallback. Other errors bubble
- * up to the root boundary.
+ * up to the root boundary. A 401/403 (the caller is not a member) renders
+ * the Forbidden page inside the shell.
  */
 
 import Skeleton from '@nodate-flow/ui/primitives/skeleton';
@@ -21,6 +22,7 @@ import { createFileRoute, Link, Navigate, Outlet, useChildMatches } from '@tanst
 import { type ReactElement, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import Forbidden from '../components/forbidden';
 import PageFrame from '../components/page-frame';
 import styles from '../features/workspaces/workspaces.module.css';
 import { authApiProbe } from '../lib/api';
@@ -172,6 +174,9 @@ export const Route = createFileRoute('/_authenticated/workspaces/$id')({
     if (errorCodeOf(error) === 'WS.WORKSPACE.NOT_FOUND') {
       return <WorkspaceNotFound />;
     }
+    if (error instanceof ApiError && (error.httpStatus === 401 || error.httpStatus === 403)) {
+      return <Forbidden />;
+    }
     throw error;
   },
   loader: async ({ params }) => {
@@ -183,6 +188,13 @@ export const Route = createFileRoute('/_authenticated/workspaces/$id')({
     );
     if (status === 404) {
       throw new ApiError('WS.WORKSPACE.NOT_FOUND', 'Workspace not found');
+    }
+    if (status === 403) {
+      throw new ApiError(
+        'WS.WORKSPACE.ACCESS_DENIED',
+        'You do not have access to this workspace',
+        403,
+      );
     }
     return null;
   },

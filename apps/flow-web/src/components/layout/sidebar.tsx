@@ -32,6 +32,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
 import { type Favorite, useFavoritesQuery } from '../../features/favorites/api';
@@ -312,7 +313,7 @@ function WorkspaceArea({
   workspaceId: string | null;
   pathname: string;
   railCollapsed: boolean;
-}): ReactElement {
+}): ReactElement | null {
   const { t } = useTranslation('common');
   const { data: workspaces } = useWorkspacesQuery();
   const role = useCurrentWorkspaceRole();
@@ -349,9 +350,14 @@ function WorkspaceArea({
     );
   }
 
-  const workspace = workspaces.find((w) => w.id === workspaceId);
-  if (!workspaceId || !workspace) {
+  // A null id is transient: the id-only projection resolves it on the next render.
+  if (!workspaceId) {
     return <div className={styles.headingSkeleton} aria-hidden="true" />;
+  }
+  // The list is loaded, so an id missing from it is final (not a member), not loading.
+  const workspace = workspaces.find((w) => w.id === workspaceId);
+  if (!workspace) {
+    return null;
   }
 
   const canCreateProject = isWorkspaceAdmin(role);
@@ -428,9 +434,12 @@ function WorkspaceArea({
               ) : null}
             </div>
             {railCollapsed ? null : (
-              <Suspense fallback={null}>
-                <WorkspaceProjectsSection workspaceId={workspaceId} pathname={pathname} />
-              </Suspense>
+              // A 401/403/404 on the workspace lists hides the section, not the shell.
+              <ErrorBoundary fallback={null} resetKeys={[pathname, workspaceId]}>
+                <Suspense fallback={null}>
+                  <WorkspaceProjectsSection workspaceId={workspaceId} pathname={pathname} />
+                </Suspense>
+              </ErrorBoundary>
             )}
           </div>
         );
@@ -498,9 +507,11 @@ function WorkspaceArea({
               ))}
             </div>
           </Collapse>
-          <Suspense fallback={null}>
-            <FavoritesSection workspaceId={workspaceId} pathname={pathname} />
-          </Suspense>
+          <ErrorBoundary fallback={null} resetKeys={[pathname, workspaceId]}>
+            <Suspense fallback={null}>
+              <FavoritesSection workspaceId={workspaceId} pathname={pathname} />
+            </Suspense>
+          </ErrorBoundary>
         </>
       )}
       {canCreateProject ? (
