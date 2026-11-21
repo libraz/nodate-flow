@@ -196,8 +196,8 @@ func createEventWithIdempotency(
 		snapshot := eventFromFullRow(created)
 		normalizeCreatedEventResponse(&snapshot)
 		out.Body = snapshot
-		scrubEventDetails(string(created.Visibility), string(currentCalendar.DefaultEventVisibility),
-			created.OwnerUserID, actorID, false, &out.Body.Location, &out.Body.Memo, &out.Body.URL)
+		scrubEventDetailsForParty(string(created.Visibility), string(currentCalendar.DefaultEventVisibility),
+			created.OwnerUserID, created.CreatedByUserID, actorID, false, &out.Body.Location, &out.Body.Memo, &out.Body.URL)
 
 		payload := map[string]any{
 			"eventId":    created.PublicID.String(),
@@ -281,39 +281,48 @@ func replayCreateEventReceipt(
 		eventacl.Event{
 			Visibility:      eventacl.Visibility(evt.Visibility),
 			OwnerUserID:     evt.OwnerUserID,
+			CreatedByUserID: evt.CreatedByUserID,
 			CalendarDefault: eventacl.Visibility(cal.DefaultEventVisibility),
 		},
 		eventacl.Actor{UserID: actorID, IsAttendee: isAttendee},
 	) {
 		return errEventNotFound
 	}
-	scrubEventDetails(string(evt.Visibility), string(cal.DefaultEventVisibility), evt.OwnerUserID, actorID, isAttendee,
+	scrubEventDetailsForParty(string(evt.Visibility), string(cal.DefaultEventVisibility), evt.OwnerUserID, evt.CreatedByUserID, actorID, isAttendee,
 		&snapshot.Location, &snapshot.Memo, &snapshot.URL)
 	out.Body = snapshot
 	return nil
 }
 
+// calendarEventAttendee reports whether the actor is an enabled attendee
+// of this occurrence. An override that holds attendee rows of its own,
+// enabled or not, is judged on them alone; one with none reads its
+// series' rows.
 func calendarEventAttendee(
 	ctx context.Context,
 	queries *calendar.Queries,
 	actorID, eventID uint32,
 	recurrenceParentID sql.NullInt32,
 ) (bool, error) {
-	eventIDs := []sql.NullInt32{handlerutil.NullInt32From(eventID)}
+	target := handlerutil.NullInt32From(eventID)
 	if recurrenceParentID.Valid {
-		eventIDs = append(eventIDs, recurrenceParentID)
-	}
-	for _, id := range eventIDs {
-		_, err := queries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-			EventID: id,
-			UserID:  actorID,
-		})
-		if err == nil {
-			return true, nil
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
+		own, err := queries.HasCalendarEventAttendeeRows(ctx, target)
+		if err != nil {
 			return false, err
 		}
+		if !own {
+			target = recurrenceParentID
+		}
 	}
-	return false, nil
+	_, err := queries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+		EventID: target,
+		UserID:  actorID,
+	})
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return false, err
 }

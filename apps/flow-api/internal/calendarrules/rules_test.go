@@ -212,3 +212,75 @@ func TestUnixSecondsTreatsTheZeroInstantAsAbsent(t *testing.T) {
 		t.Errorf("a window with one end unknown was refused with %s", err.Spec.Code)
 	}
 }
+
+func TestRequireAllDayInputRefusesTheOtherFormsMembers(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name                  string
+		allDay, instants, day bool
+		refused               bool
+	}{
+		{"all-day by dates", true, false, true, false},
+		{"all-day with an instant", true, true, false, true},
+		{"all-day with both", true, true, true, true},
+		{"timed by instants", false, true, false, false},
+		{"timed with a date", false, false, true, true},
+	}
+	for _, c := range cases {
+		err := RequireAllDayInput(c.allDay, c.instants, c.day)
+		if c.refused != (err != nil) {
+			t.Errorf("%s: refused = %v, want %v", c.name, err != nil, c.refused)
+		}
+		if err != nil && err.Spec != apierrors.CalendarEventAllDayShape {
+			t.Errorf("%s: spec = %v, want %v", c.name, err.Spec, apierrors.CalendarEventAllDayShape)
+		}
+	}
+}
+
+func TestAllDayEndRoundTripsThroughTheLastDay(t *testing.T) {
+	t.Parallel()
+
+	last := time.Date(2030, 6, 12, 0, 0, 0, 0, time.UTC)
+	for _, kind := range []string{"event", "block", "milestone"} {
+		end := AllDayEndExclusive(kind, last)
+		if kind == "milestone" && !end.Equal(last) {
+			t.Errorf("milestone end = %v, want its own day %v", end, last)
+		}
+		if kind != "milestone" && !end.Equal(last.AddDate(0, 0, 1)) {
+			t.Errorf("%s end = %v, want the midnight after %v", kind, end, last)
+		}
+		if got := AllDayLastDay(kind, end); !got.Equal(last) {
+			t.Errorf("%s: last day = %v, want %v back", kind, got, last)
+		}
+	}
+}
+
+func TestRequireAllDayWindowHoldsTheCanonicalShape(t *testing.T) {
+	t.Parallel()
+
+	d := func(day int, hour int) sql.NullTime {
+		return sql.NullTime{Time: time.Date(2030, 6, day, hour, 0, 0, 0, time.UTC), Valid: true}
+	}
+	cases := []struct {
+		name       string
+		allDay     bool
+		kind       string
+		start, end sql.NullTime
+		refused    bool
+	}{
+		{"one day", true, "event", d(3, 0), d(4, 0), false},
+		{"end equals start", true, "event", d(3, 0), d(3, 0), true},
+		{"end before start", true, "event", d(4, 0), d(3, 0), true},
+		{"off midnight", true, "event", d(3, 9), d(4, 0), true},
+		{"milestone point", true, "milestone", d(3, 0), d(3, 0), false},
+		{"milestone with length", true, "milestone", d(3, 0), d(4, 0), true},
+		{"timed is not checked", false, "event", d(3, 9), d(3, 9), false},
+		{"undated is not checked", true, "event", sql.NullTime{}, sql.NullTime{}, false},
+	}
+	for _, c := range cases {
+		if err := RequireAllDayWindow(c.allDay, c.kind, c.start, c.end); c.refused != (err != nil) {
+			t.Errorf("%s: refused = %v, want %v", c.name, err != nil, c.refused)
+		}
+	}
+}

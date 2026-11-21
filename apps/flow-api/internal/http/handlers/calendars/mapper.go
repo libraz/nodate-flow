@@ -10,7 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
-// scrubEventDetails redacts an event's free-text fields from a viewer
+// scrubEventDetailsForParty redacts an event's free-text fields from a viewer
 // who may see that the time is taken but not what fills it.
 //
 // The decision itself is eventacl.CanSeeDetails, so REST and MCP answer
@@ -28,11 +28,15 @@ import (
 // row-level decision and it belongs in the query, because dropping rows
 // afterwards would leave any total counting events the viewer is not
 // supposed to know about.
-func scrubEventDetails(visibility string, calendarDefault string, ownerUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
+//
+// createdByUserID is the row's creator, a party to the event beside its owner
+// and attendees; zero treats the creator as any member.
+func scrubEventDetailsForParty(visibility string, calendarDefault string, ownerUserID, createdByUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
 	if eventacl.CanSeeDetails(
 		eventacl.Event{
 			Visibility:      eventacl.Visibility(visibility),
 			OwnerUserID:     ownerUserID,
+			CreatedByUserID: createdByUserID,
 			CalendarDefault: eventacl.Visibility(calendarDefault),
 		},
 		eventacl.Actor{UserID: viewerUserID, IsAttendee: isAttendee},
@@ -189,7 +193,7 @@ func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow, viewerUserID uin
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(r.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-	scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	return resp
 }
 
@@ -202,7 +206,7 @@ func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, vie
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-	scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw

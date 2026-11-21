@@ -160,7 +160,7 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 	// lookup per drifted row to fetch them would read the same two rows
 	// again.
 	const q = `SELECT t.id, t.public_id, t.workspace_id, ce.id, ce.public_id,
-	             t.due_on, ce.start_at, ce.timezone
+	             t.due_on, ce.start_at, ce.timezone, ce.all_day
 	      FROM tasks t
 	      JOIN calendar_events ce ON ce.task_id = t.id AND ce.enabled
 	      WHERE t.enabled
@@ -194,8 +194,9 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		var d drift
 		var startAt sql.NullTime
 		var tz string
+		var allDay bool
 		if err := rows.Scan(&d.taskID, &d.taskPubID, &d.workspaceID, &d.eventID, &d.eventPubID,
-			&d.taskDate, &startAt, &tz); err != nil {
+			&d.taskDate, &startAt, &tz, &allDay); err != nil {
 			r.logError("scan row failed", err, "role", role)
 			continue
 		}
@@ -203,6 +204,10 @@ func (r *Reconciler) scanDueDateDrift(ctx context.Context) {
 		lastID = d.eventID
 		if !startAt.Valid {
 			continue
+		}
+		// An all-day row's date is its UTC date, whatever zone it records.
+		if allDay {
+			tz = region.DefaultTimezone
 		}
 		z, err := region.Resolve(tz)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -342,7 +343,9 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 		if occ.dated {
 			if r.AllDay {
 				item["startDate"] = occ.startAt.UTC().Format("2006-01-02")
-				item["endDate"] = occ.endAt.UTC().Format("2006-01-02")
+				// endDate is the last day, so a value read here can be
+				// written back to update_calendar_event unchanged.
+				item["endDate"] = calendarrules.AllDayLastDay(string(r.Kind), occ.endAt).UTC().Format("2006-01-02")
 			} else {
 				item["startAt"] = occ.startAt.Unix()
 				item["endAt"] = occ.endAt.Unix()

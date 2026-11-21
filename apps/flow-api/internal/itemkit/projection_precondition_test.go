@@ -70,10 +70,11 @@ func TestScheduleTaskPinsAnAllDayProjectionToUTCMidnight(t *testing.T) {
 		}
 	})
 
+	// One day is the half-open [date, date + 1 day).
 	midnight := time.Date(2030, 6, 3, 0, 0, 0, 0, time.UTC)
 	gotStart, gotEnd := eventWindow(ctx, t, db, evtID)
-	if !gotStart.Equal(midnight) || !gotEnd.Equal(midnight) {
-		t.Errorf("stored window = %v..%v, want both pinned to %v", gotStart, gotEnd, midnight)
+	if !gotStart.Equal(midnight) || !gotEnd.Equal(midnight.AddDate(0, 0, 1)) {
+		t.Errorf("stored window = %v..%v, want %v..%v", gotStart, gotEnd, midnight, midnight.AddDate(0, 0, 1))
 	}
 	if got := dueOnString(ctx, t, db, fx.taskID); got != "2030-06-03" {
 		t.Errorf("tasks.due_on = %q, want 2030-06-03 — the task keeps the date the row now stands for", got)
@@ -253,7 +254,7 @@ func TestRescheduleEventKeepsAnAllDayRowOnMidnight(t *testing.T) {
 			Role:        RoleDue,
 			Title:       "Company holiday",
 			StartAt:     start,
-			EndAt:       start,
+			EndAt:       start.AddDate(0, 0, 1),
 			AllDay:      true,
 			Timezone:    "UTC",
 		})
@@ -272,7 +273,7 @@ func TestRescheduleEventKeepsAnAllDayRowOnMidnight(t *testing.T) {
 			EventID:     evtID,
 			ActorUserID: fx.userID,
 			StartAt:     moved,
-			EndAt:       moved.Add(2 * time.Hour),
+			EndAt:       moved.AddDate(0, 0, 1),
 		}); err != nil {
 			t.Fatalf("RescheduleEvent: %v", err)
 		}
@@ -280,8 +281,8 @@ func TestRescheduleEventKeepsAnAllDayRowOnMidnight(t *testing.T) {
 
 	midnight := time.Date(2030, 6, 5, 0, 0, 0, 0, time.UTC)
 	gotStart, gotEnd := eventWindow(ctx, t, db, evtID)
-	if !gotStart.Equal(midnight) || !gotEnd.Equal(midnight) {
-		t.Errorf("stored window = %v..%v, want both pinned to %v", gotStart, gotEnd, midnight)
+	if !gotStart.Equal(midnight) || !gotEnd.Equal(midnight.AddDate(0, 0, 1)) {
+		t.Errorf("stored window = %v..%v, want %v..%v", gotStart, gotEnd, midnight, midnight.AddDate(0, 0, 1))
 	}
 	if got := dueOnString(ctx, t, db, fx.taskID); got != "2030-06-05" {
 		t.Errorf("tasks.due_on = %q, want 2030-06-05", got)

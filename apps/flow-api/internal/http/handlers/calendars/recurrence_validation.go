@@ -1,9 +1,14 @@
 package calendars
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 )
 
@@ -46,4 +51,32 @@ func validateRecurrenceExceptions(data *json.RawMessage) *apierrors.Spec {
 		return apierrors.ValidationBodyFieldInvalid
 	}
 	return nil
+}
+
+// earliestOverrideStart precedes every occurrence key a row can hold.
+var earliestOverrideStart = time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// seriesNamesOccurrences reports whether a series carries anything that
+// names one of its occurrences: an exception entry or an override row,
+// soft-deleted ones included. Those are keyed by date on an all-day series
+// and by instant on a timed one, so the series cannot switch form under
+// them.
+func seriesNamesOccurrences(
+	ctx context.Context,
+	q *calendar.Queries,
+	workspaceID uint32,
+	master calendar.FindCalendarEventByPublicIdRow,
+) (bool, error) {
+	if len(recurrence.ParseExceptions(master.RecurrenceExceptions)) > 0 {
+		return true, nil
+	}
+	overrides, err := q.ListCalendarEventOverridesFromStart(ctx, calendar.ListCalendarEventOverridesFromStartParams{
+		WorkspaceID: workspaceID,
+		ParentID:    handlerutil.NullInt32From(master.ID),
+		FromStart:   sql.NullTime{Time: earliestOverrideStart, Valid: true},
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(overrides) > 0, nil
 }

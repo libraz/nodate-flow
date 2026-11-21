@@ -248,13 +248,24 @@ func (q *Queries) DisableCalendarEventOverridesByParent(ctx context.Context, arg
 }
 
 const disableCalendarEventOverridesFromStart = `-- name: DisableCalendarEventOverridesFromStart :execrows
-UPDATE calendar_events
-SET enabled = FALSE
-WHERE workspace_id = ?
-  AND recurrence_parent_id = ?
-  AND recurrence_original_start >= ?
-  AND enabled = TRUE
-  AND (visibility <> 'confidential' OR owner_user_id = ?)
+UPDATE calendar_events ce
+SET ce.enabled = FALSE
+WHERE ce.workspace_id = ?
+  AND ce.recurrence_parent_id = ?
+  AND ce.recurrence_original_start >= ?
+  AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 `
 
 type DisableCalendarEventOverridesFromStartParams struct {
@@ -282,8 +293,8 @@ type DisableCalendarEventOverridesFromStartParams struct {
 // is already withdrawn changes nothing and must not be counted.
 //
 // Scoped to the overrides the acting user can see, on the row filter the
-// range queries carry: a confidential override belonging to somebody else
-// stays enabled past the truncation and keeps rendering to its owner, since
+// range queries carry: a confidential override the actor is not a party to
+// stays enabled past the truncation and keeps rendering to its parties, since
 // disabling it would remove an occurrence from a calendar the actor has no
 // view of.
 func (q *Queries) DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error) {
@@ -291,6 +302,8 @@ func (q *Queries) DisableCalendarEventOverridesFromStart(ctx context.Context, ar
 		arg.WorkspaceID,
 		arg.ParentID,
 		arg.SplitStart,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 		arg.ViewerUserID,
 	)
 	if err != nil {
@@ -361,6 +374,29 @@ type DisableCalendarEventsByTaskParams struct {
 func (q *Queries) DisableCalendarEventsByTask(ctx context.Context, arg DisableCalendarEventsByTaskParams) error {
 	_, err := q.db.ExecContext(ctx, disableCalendarEventsByTask, arg.WorkspaceID, arg.TaskID)
 	return err
+}
+
+const findCalendarEventAllDay = `-- name: FindCalendarEventAllDay :one
+SELECT all_day
+FROM calendar_events
+WHERE id = ?
+  AND workspace_id = ?
+LIMIT 1
+`
+
+type FindCalendarEventAllDayParams struct {
+	ID          uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Whether a row is an all-day event, by internal id. The recurrence
+// exception list of a series is spelled by the series' shape, so a caller
+// holding only an override reads the master's flag here.
+func (q *Queries) FindCalendarEventAllDay(ctx context.Context, arg FindCalendarEventAllDayParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarEventAllDay, arg.ID, arg.WorkspaceID)
+	var all_day bool
+	err := row.Scan(&all_day)
+	return all_day, err
 }
 
 const findCalendarEventByPublicId = `-- name: FindCalendarEventByPublicId :one
@@ -626,6 +662,23 @@ func (q *Queries) FindCalendarEventOwner(ctx context.Context, arg FindCalendarEv
 	return i, err
 }
 
+const findCalendarEventParentID = `-- name: FindCalendarEventParentID :one
+SELECT recurrence_parent_id
+FROM calendar_events
+WHERE id = ?
+LIMIT 1
+`
+
+// The series an override stands in for, by internal id; NULL for any other
+// row. Lets a caller holding only an event id find whose attendee list it
+// reads.
+func (q *Queries) FindCalendarEventParentID(ctx context.Context, id uint32) (sql.NullInt32, error) {
+	row := q.db.QueryRowContext(ctx, findCalendarEventParentID, id)
+	var recurrence_parent_id sql.NullInt32
+	err := row.Scan(&recurrence_parent_id)
+	return recurrence_parent_id, err
+}
+
 const findCalendarEventRecurrenceLink = `-- name: FindCalendarEventRecurrenceLink :one
 SELECT
   ce.recurrence_parent_id,
@@ -681,7 +734,18 @@ FROM calendar_events ce
 WHERE ce.workspace_id = ?
   AND ce.recurrence_parent_id IN (/*SLICE:parent_ids*/?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.recurrence_parent_id ASC, ce.recurrence_original_start ASC
 LIMIT 5000
 `
@@ -731,9 +795,10 @@ type ListCalendarEventOverriddenStartsRow struct {
 //
 // detail-visibility: not-applicable — no title, location, memo or url is selected for attendance to unlock.
 // The detail rule governs those fields alone, so is_attendee would be a
-// column on the generated row that no mapper could read. The row filter
-// above is a separate matter and stays: a confidential occurrence must not
-// be subtracted from a master the viewer can see.
+// column on the generated row that no mapper could read. Attendance still
+// enters through the row filter, which opens a confidential occurrence to
+// its attendees: a confidential occurrence must not be subtracted from a
+// master the viewer can see.
 //
 // The LIMIT is a runaway bound, not a page size. Truncation here would
 // resurrect duplicates, so it sits far above the number of overrides a
@@ -750,6 +815,8 @@ func (q *Queries) ListCalendarEventOverriddenStarts(ctx context.Context, arg Lis
 	} else {
 		query = strings.Replace(query, "/*SLICE:parent_ids*/?", "NULL", 1)
 	}
+	queryParams = append(queryParams, arg.ViewerUserID)
+	queryParams = append(queryParams, arg.ViewerUserID)
 	queryParams = append(queryParams, arg.ViewerUserID)
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
@@ -789,13 +856,17 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -831,7 +902,18 @@ WHERE ce.workspace_id = ?
     OR (ce.start_at = ce.end_at AND ce.end_at = ?)
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
@@ -859,6 +941,7 @@ type ListCalendarEventsAcrossCalendarsRow struct {
 	Timezone                  string                          `json:"timezone"`
 	Location                  sql.NullString                  `json:"location"`
 	OwnerUserID               uint32                          `json:"-"`
+	CreatedByUserID           uint32                          `json:"-"`
 	BlockLabel                sql.NullString                  `json:"blockLabel"`
 	TaskID                    sql.NullInt32                   `json:"-"`
 	UpdatedAt                 sql.NullTime                    `json:"updatedAt"`
@@ -877,6 +960,8 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 		arg.RangeEnd,
 		arg.RangeStart,
 		arg.RangeStart,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 		arg.ViewerUserID,
 	)
 	if err != nil {
@@ -901,6 +986,7 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.CreatedByUserID,
 			&i.BlockLabel,
 			&i.TaskID,
 			&i.UpdatedAt,
@@ -947,11 +1033,14 @@ SELECT
   ce.task_id,
   ce.updated_at,
   ce.created_at,
-  -- An override shares its series' attendee list, so attendance is read
-  -- off the master as well as off the row itself.
+  -- An override with no attendee rows of its own shares its series' list;
+  -- one that has any replaces it.
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -974,7 +1063,18 @@ WHERE ce.calendar_id = ?
     OR (ce.start_at = ce.end_at AND ce.end_at = ?)
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000
 `
@@ -1023,6 +1123,8 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 		arg.RangeEnd,
 		arg.RangeStart,
 		arg.RangeStart,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 		arg.ViewerUserID,
 	)
 	if err != nil {
@@ -1092,6 +1194,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   uo.public_id AS owner_public_id,
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
@@ -1107,7 +1210,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1153,7 +1259,18 @@ WHERE ce.recurrence_rule IS NULL
     OR (ce.start_at = ce.end_at AND ce.end_at = ?)
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
@@ -1183,6 +1300,7 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 	Timezone                     string                          `json:"timezone"`
 	Location                     sql.NullString                  `json:"location"`
 	OwnerUserID                  uint32                          `json:"-"`
+	CreatedByUserID              uint32                          `json:"-"`
 	OwnerPublicID                types.PublicID                  `json:"ownerPublicId"`
 	CreatorPublicID              types.PublicID                  `json:"creatorPublicId"`
 	CreatorDisplayName           sql.NullString                  `json:"creatorDisplayName"`
@@ -1219,6 +1337,8 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 		arg.RangeStart,
 		arg.RangeStart,
 		arg.ViewerUserID,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -1245,6 +1365,7 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.CreatedByUserID,
 			&i.OwnerPublicID,
 			&i.CreatorPublicID,
 			&i.CreatorDisplayName,
@@ -1292,6 +1413,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   uo.public_id AS owner_public_id,
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
@@ -1310,7 +1432,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1347,7 +1472,18 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000
 `
@@ -1378,6 +1514,7 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 	Timezone                     string                          `json:"timezone"`
 	Location                     sql.NullString                  `json:"location"`
 	OwnerUserID                  uint32                          `json:"-"`
+	CreatedByUserID              uint32                          `json:"-"`
 	OwnerPublicID                types.PublicID                  `json:"ownerPublicId"`
 	CreatorPublicID              types.PublicID                  `json:"creatorPublicId"`
 	CreatorDisplayName           sql.NullString                  `json:"creatorDisplayName"`
@@ -1413,6 +1550,8 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 		arg.StartAt,
 		arg.RecurrenceEnd,
 		arg.ViewerUserID,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -1440,6 +1579,7 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.CreatedByUserID,
 			&i.OwnerPublicID,
 			&i.CreatorPublicID,
 			&i.CreatorDisplayName,
@@ -1487,6 +1627,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -1496,7 +1637,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1523,7 +1667,18 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
@@ -1552,6 +1707,7 @@ type ListRecurringCalendarEventsAcrossCalendarsRow struct {
 	Timezone                  string                          `json:"timezone"`
 	Location                  sql.NullString                  `json:"location"`
 	OwnerUserID               uint32                          `json:"-"`
+	CreatedByUserID           uint32                          `json:"-"`
 	BlockLabel                sql.NullString                  `json:"blockLabel"`
 	RecurrenceRule            json.RawMessage                 `json:"recurrenceRule"`
 	RecurrenceEnd             sql.NullTime                    `json:"recurrenceEnd"`
@@ -1579,6 +1735,8 @@ func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context
 		arg.StartAt,
 		arg.RecurrenceEnd,
 		arg.ViewerUserID,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -1603,6 +1761,7 @@ func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context
 			&i.Timezone,
 			&i.Location,
 			&i.OwnerUserID,
+			&i.CreatedByUserID,
 			&i.BlockLabel,
 			&i.RecurrenceRule,
 			&i.RecurrenceEnd,
@@ -1657,7 +1816,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -1671,7 +1833,18 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = ?)
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = ?
+    OR ce.created_by_user_id = ?
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = ?
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC
 LIMIT 1000
 `
@@ -1722,6 +1895,8 @@ func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg Li
 		arg.CalendarID,
 		arg.StartAt,
 		arg.RecurrenceEnd,
+		arg.ViewerUserID,
+		arg.ViewerUserID,
 		arg.ViewerUserID,
 	)
 	if err != nil {

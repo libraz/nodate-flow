@@ -175,6 +175,58 @@ func NormalizeAllDayBounds(allDay bool, start, end sql.NullTime) (sql.NullTime, 
 	return start, end
 }
 
+// RequireAllDayInput refuses a request that mixes the two ways of naming a
+// window: an all-day event is named by dates and a timed one by instants.
+// instants and dates say which members the caller sent.
+func RequireAllDayInput(allDay, instants, dates bool) *apierrors.APIError {
+	if (allDay && instants) || (!allDay && dates) {
+		return apierrors.New(apierrors.CalendarEventAllDayShape)
+	}
+	return nil
+}
+
+// AllDayEndExclusive turns the last day a caller names into the stored end,
+// the midnight after it. A milestone is a point, so its end is its start.
+func AllDayEndExclusive(kind string, lastDay time.Time) time.Time {
+	if kind == string(calendar.CalendarEventsKindMilestone) {
+		return lastDay
+	}
+	return lastDay.AddDate(0, 0, 1)
+}
+
+// AllDayLastDay is the inverse of [AllDayEndExclusive]: the last day a
+// stored all-day end stands for, so a value read back can be written back
+// without stretching the event.
+func AllDayLastDay(kind string, end time.Time) time.Time {
+	if kind == string(calendar.CalendarEventsKindMilestone) {
+		return end
+	}
+	return end.AddDate(0, 0, -1)
+}
+
+// RequireAllDayWindow refuses an all-day window that is not the canonical
+// stored shape (chk_calendar_events_all_day_canonical): both ends at UTC
+// midnight, and an end after the start unless the kind is a milestone,
+// whose end is its start. A timed or undated row has nothing to check.
+func RequireAllDayWindow(allDay bool, kind string, start, end sql.NullTime) *apierrors.APIError {
+	if !allDay || !start.Valid || !end.Valid {
+		return nil
+	}
+	if !start.Time.Equal(TruncateToUTCDay(start.Time)) || !end.Time.Equal(TruncateToUTCDay(end.Time)) {
+		return apierrors.New(apierrors.ValidationBodyFieldInvalid).WithDetail("field", "startAt")
+	}
+	if kind == string(calendar.CalendarEventsKindMilestone) {
+		if !end.Time.Equal(start.Time) {
+			return apierrors.New(apierrors.CalendarEventDateRangeInvalid)
+		}
+		return nil
+	}
+	if !end.Time.After(start.Time) {
+		return apierrors.New(apierrors.CalendarEventDateRangeInvalid)
+	}
+	return nil
+}
+
 // TruncateToUTCDay returns midnight UTC on the calendar day t falls on in
 // UTC.
 //

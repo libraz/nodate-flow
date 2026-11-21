@@ -156,3 +156,21 @@ func TestDateDriftSaysNothingWhenTheHealMatchedNoRow(t *testing.T) {
 	require.Equal(t, 0, countStatements(rec.stub, "INSERT INTO events"),
 		"a pass that healed nothing recorded a reconciliation; the loop would add another every five minutes")
 }
+
+// An all-day row stands for the UTC date of its stored start, whatever zone
+// it records. Read in a zone west of Greenwich, midnight UTC is the evening
+// before, so the scan would call a task due on the row's own date drifted
+// and heal it a day early.
+func TestDateDriftReadsAnAllDayRowInUTC(t *testing.T) {
+	t.Parallel()
+
+	db, rec := newStubReconciler(t, onlyDriftScanReturnsARow)
+	defer db.Close()
+	rec.stub.allDayZone = "America/Los_Angeles"
+	rec.stub.healRows = 1
+
+	rec.RunOnce(context.Background())
+
+	require.Zero(t, countStatements(rec.stub, "UPDATE tasks SET due_on"),
+		"a task due on the all-day row's UTC date has not drifted")
+}

@@ -145,49 +145,34 @@ func RenderPublicShare(deps Deps) func(context.Context, *RenderPublicShareInput)
 				),
 				OverriddenStarts: overridden[e.EventID],
 			}
-			// `private`-visibility events honour a "time only" contract on
-			// the public, unauthenticated page: the time block stays visible
-			// (start/end, show_as, flexibility, block_label) but all
-			// descriptive content is stripped so title/notes/location/url
-			// never leak. `confidential` events are excluded entirely by the
-			// render query.
-			//
-			// `default` resolves against the calendar's setting rather than
-			// falling through as public. It is the column's own default, so
-			// most events carry it, and reading it as public put the full
-			// text of ordinary events on an unauthenticated URL — the one
-			// place where guessing wrong is irreversible.
-			if !eventacl.CanSeeDetails(
-				eventacl.Event{
-					Visibility:      eventacl.Visibility(e.Visibility),
-					OwnerUserID:     0,
-					CalendarDefault: eventacl.Visibility(e.CalendarDefaultVisibility),
-				},
-				eventacl.Actor{},
-			) {
-				stripPrivateEventDetails(&ev)
-			}
+			applyAnonymousView(&ev, string(e.Visibility), string(e.CalendarDefaultVisibility))
 			out.Body.Events[i] = ev
 		}
 		return out, nil
 	}
 }
 
-// stripPrivateEventDetails enforces the "time only" contract for
-// `private`-visibility events on the public render page. The time block
-// stays observable (start/end, all-day, timezone, show_as, flexibility,
-// block_label, recurrence) while every descriptive field that could leak
-// content to an unauthenticated viewer is cleared: title, location, memo,
-// and url.
+// applyAnonymousView trims an event to the anonymous column of the
+// visibility table: memo and url never, and title and location only from a
+// public event. `confidential` events are excluded by the render query.
 //
-// flexibility stays because it is an availability property rather than
-// content: someone looking at the share to find a slot needs to know which
-// blocks are movable, which is the whole reason the column exists.
-func stripPrivateEventDetails(ev *PublicShareRenderEvent) {
-	ev.Title = ""
-	ev.Location = nil
+// `default` resolves against the calendar's setting rather than falling
+// through as public. It is the column's own default, so most events carry
+// it, and reading it as public put the full text of ordinary events on an
+// unauthenticated URL — the one place where guessing wrong is irreversible.
+func applyAnonymousView(ev *PublicShareRenderEvent, visibility, calendarDefault string) {
+	view := eventacl.AnonymousFields(eventacl.Event{
+		Visibility:      eventacl.Visibility(visibility),
+		CalendarDefault: eventacl.Visibility(calendarDefault),
+	})
 	ev.Memo = nil
 	ev.URL = nil
+	if !view.Title {
+		ev.Title = ""
+	}
+	if !view.Location {
+		ev.Location = nil
+	}
 }
 
 // rawMessagePtr hands a stored JSON column through to the response as

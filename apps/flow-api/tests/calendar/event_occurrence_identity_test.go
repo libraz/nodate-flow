@@ -25,15 +25,21 @@ import (
 func zonedWeeklySeries(t *testing.T, tt *helpers.CalendarTestTenant, calID, timezone string, allDay bool, start, end time.Time) string {
 	t.Helper()
 	var created eventView
-	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars", calID, "events"), tt.AccessToken, map[string]any{
+	body := map[string]any{
 		"kind":           "event",
 		"title":          "Weekly",
 		"allDay":         allDay,
-		"startAt":        start.Unix(),
-		"endAt":          end.Unix(),
 		"timezone":       timezone,
 		"recurrenceRule": map[string]any{"freq": "weekly", "interval": 1},
-	}, &created)
+	}
+	if allDay {
+		body["startDate"] = start.Format("2006-01-02")
+		body["endDate"] = end.Format("2006-01-02")
+	} else {
+		body["startAt"] = start.Unix()
+		body["endAt"] = end.Unix()
+	}
+	helpers.DoJSON(t, http.MethodPost, tt.WsPath("calendars", calID, "events"), tt.AccessToken, body, &created)
 	require.NotEmpty(t, created.ID)
 	return created.ID
 }

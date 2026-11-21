@@ -10,9 +10,10 @@
 //	default       whatever the calendar's default_event_visibility says,
 //	              which is public or private and never confidential
 //	private       every calendar member sees that the time is taken;
-//	              the location, memo and URL are for the owner and the
-//	              people actually invited
-//	confidential  only the owner knows the event exists at all
+//	              the location, memo and URL are for the owner, the
+//	              creator and the people actually invited
+//	confidential  only the owner, the creator and the attendees know
+//	              the event exists at all
 //
 // So `private` is a field-level decision and `confidential` is a
 // row-level one. A single boolean cannot express "visible but
@@ -34,6 +35,10 @@
 // precisely what a naive "owner only" scrub withholds. AttendeeExistsSQL
 // is the matching fragment; list queries project it as is_attendee so
 // the mapper can decide per row without a query per row.
+//
+// Who is an attendee of one occurrence follows the override-attendee
+// rule in sql/core/PROTOCOL.md: an override row with any attendee row of
+// its own replaces the series' list; one with none inherits it.
 //
 // System calendars (holiday feeds) carry no personal data and no
 // confidential rows; they need no exception here, and leaving one out
@@ -64,6 +69,9 @@ const (
 type Event struct {
 	Visibility  Visibility
 	OwnerUserID uint32
+	// CreatedByUserID is the row's created_by_user_id. Zero means the
+	// caller does not know it, and the creator is then not a party.
+	CreatedByUserID uint32
 	// CalendarDefault is the calendars.default_event_visibility of the
 	// calendar the event sits on, and is what Visibility resolves to when
 	// it is 'default'. Leaving it zero means public, which is both the
@@ -103,7 +111,7 @@ func (e Event) effective() Visibility {
 }
 
 // Actor is the requesting user's context. IsAttendee is true when the
-// actor has an enabled row in calendar_event_attendees for this event;
+// actor is an enabled attendee of this occurrence (see AttendeeExistsSQL);
 // list queries supply it from the is_attendee column, detail handlers
 // from a direct lookup.
 //
@@ -116,18 +124,24 @@ type Actor struct {
 	IsAttendee bool
 }
 
+// isParty reports whether the actor is the event's owner or creator, or
+// an attendee of the occurrence.
+func (e Event) isParty(actor Actor) bool {
+	if actor.UserID != 0 && (e.OwnerUserID == actor.UserID || e.CreatedByUserID == actor.UserID) {
+		return true
+	}
+	return actor.IsAttendee
+}
+
 // CanSee reports whether the actor may know the event exists.
 //
-// Only `confidential` hides a row, and only from anyone who is not its
-// owner. Attendance is deliberately not an exception: a confidential
-// event with attendees would be a contradiction the column cannot
-// express, and treating attendance as consent here would let the owner
-// leak the event by adding someone to it.
+// Only `confidential` hides a row, and only from anyone who is not a
+// party to it: the owner, the creator or an attendee of the occurrence.
 func CanSee(evt Event, actor Actor) bool {
 	if evt.effective() != VisibilityConfidential {
 		return true
 	}
-	return actor.UserID != 0 && evt.OwnerUserID == actor.UserID
+	return evt.isParty(actor)
 }
 
 // CanSeeDetails reports whether the actor may read the event's
@@ -135,7 +149,7 @@ func CanSee(evt Event, actor Actor) bool {
 //
 // A row the actor may not see at all has no readable details either, so
 // this is strictly narrower than CanSee. Beyond that, `private` limits
-// the details to the owner and the invited.
+// the details to the parties.
 func CanSeeDetails(evt Event, actor Actor) bool {
 	if !CanSee(evt, actor) {
 		return false
@@ -143,10 +157,29 @@ func CanSeeDetails(evt Event, actor Actor) bool {
 	if evt.effective() != VisibilityPrivate {
 		return true
 	}
-	if actor.UserID != 0 && evt.OwnerUserID == actor.UserID {
-		return true
+	return evt.isParty(actor)
+}
+
+// AnonymousView is what a reader reaching an event through a public
+// share or embed may be shown. Times and all_day are shown whenever
+// Exists is true; memo and url are never shown.
+type AnonymousView struct {
+	// Exists is false for an event the reader is told nothing about.
+	Exists   bool
+	Title    bool
+	Location bool
+}
+
+// AnonymousFields decides the anonymous column of the visibility table.
+func AnonymousFields(evt Event) AnonymousView {
+	switch evt.effective() {
+	case VisibilityPublic:
+		return AnonymousView{Exists: true, Title: true, Location: true}
+	case VisibilityPrivate:
+		return AnonymousView{Exists: true}
+	default:
+		return AnonymousView{}
 	}
-	return actor.IsAttendee
 }
 
 // RowVisibilitySQL is the WHERE fragment that removes rows the actor
@@ -154,28 +187,43 @@ func CanSeeDetails(evt Event, actor Actor) bool {
 //
 // The fragment names `ce` for calendar_events and takes the viewer's
 // internal user id as the named argument viewer_user_id, which the
-// queries reuse for AttendeeExistsSQL so both cost one bind between
-// them. It deliberately joins nothing, so a query that does not already
-// have `calendars` can still apply it.
-const RowVisibilitySQL = `(ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))`
+// queries reuse for AttendeeExistsSQL so every use costs one bind. It
+// deliberately joins nothing, so a query that does not already have
+// `calendars` can still apply it.
+const RowVisibilitySQL = `(ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR ` + AttendeeExistsSQL + `)`
 
 // RowVisibilityFilter is [RowVisibilitySQL] for a statement assembled at
 // runtime: the same fragment with the named argument as a positional
-// bind, so a hand-written query cannot spell the rule differently.
+// bind, so a hand-written query cannot spell the rule differently. The
+// viewer is bound once per occurrence of the named argument.
 func RowVisibilityFilter(viewerUserID uint32) (fragment string, args []any) {
-	return strings.ReplaceAll(RowVisibilitySQL, "sqlc.arg(viewer_user_id)", "?"), []any{viewerUserID}
+	const arg = "sqlc.arg(viewer_user_id)"
+	n := strings.Count(RowVisibilitySQL, arg)
+	args = make([]any, n)
+	for i := range args {
+		args[i] = viewerUserID
+	}
+	return strings.ReplaceAll(RowVisibilitySQL, arg, "?"), args
 }
 
 // AttendeeExistsSQL is the SELECT fragment that tells a list query
-// whether the viewer is on the event's attendee list, which decides
-// whether the private-event details are theirs to read.
+// whether the viewer is an enabled attendee of the occurrence, which
+// decides whether the private-event details are theirs to read and
+// whether a confidential event exists for them.
 //
 // A correlated EXISTS rather than a join, so an event with several
-// attendees still produces one row. An override shares its series'
-// attendee list, so attendance is read off the master as well.
+// attendees still produces one row. An override whose own attendee rows
+// are absent (enabled or not) reads the master's; one that has any
+// replaces them.
 const AttendeeExistsSQL = `EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   )`

@@ -435,7 +435,7 @@ func registerTools(h *Handler) {
 			"startAt":     intSchema("New start time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"endAt":       intSchema("New end time, unix seconds since epoch.", Constraints{Min: intPtr(0)}),
 			"startDate":   stringSchema("New start date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
-			"endDate":     stringSchema("New end date YYYY-MM-DD (all-day events).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
+			"endDate":     stringSchema("New last day YYYY-MM-DD (all-day events, inclusive, as list_calendar_events returns it).", Constraints{Pattern: `^\d{4}-\d{2}-\d{2}$`}),
 			"kind":        stringSchema("New event kind.", Constraints{Enum: calendarEventKinds}),
 			"showAs":      stringSchema("New reading of the time to others.", Constraints{Enum: calendarEventShowAs}),
 			"flexibility": stringSchema("New answer to whether the commitment can be moved. Independent of showAs, which only says whether the time reads as taken.", Constraints{Enum: calendarEventFlexibility}),

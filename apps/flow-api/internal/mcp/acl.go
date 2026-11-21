@@ -663,8 +663,24 @@ func requireCalendarWritable(ctx context.Context, deps Deps, s *session, calenda
 func canEditCalendarEvent(ctx context.Context, deps Deps, s *session, eventOwnerUserID uint32, eventID uint32, calendarID uint32) (bool, error) {
 	actor := eventacl.Editor{UserID: s.userID}
 
+	// An override with attendee rows of its own is judged on them alone;
+	// one with none reads its series'.
+	source := sql.NullInt32{Int32: int32(eventID), Valid: true} //#nosec G115 -- internal row id, bounded by realistic deployments
+	parent, err := deps.CalendarQueries.FindCalendarEventParentID(ctx, eventID)
+	if err != nil && !stderrors.Is(err, sql.ErrNoRows) {
+		return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if parent.Valid {
+		own, err := deps.CalendarQueries.HasCalendarEventAttendeeRows(ctx, source)
+		if err != nil {
+			return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if !own {
+			source = parent
+		}
+	}
 	if att, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-		EventID: sql.NullInt32{Int32: int32(eventID), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
+		EventID: source,
 		UserID:  s.userID,
 	}); err == nil {
 		actor.AttendeeCanEdit = att.CanEdit

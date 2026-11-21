@@ -170,14 +170,64 @@ func TestApplyPinsAnAllDayWindowToUTCMidnight(t *testing.T) {
 	// zone.
 	allDay := true
 	start := time.Date(2030, 6, 3, 15, 0, 0, 0, time.UTC)
-	end := time.Date(2030, 6, 3, 18, 0, 0, 0, time.UTC)
+	end := time.Date(2030, 6, 4, 18, 0, 0, 0, time.UTC)
 	got, err := Patch{AllDay: &allDay, StartAt: &start, EndAt: &end}.Apply(base())
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	midnight := time.Date(2030, 6, 3, 0, 0, 0, 0, time.UTC)
-	if !got.StartAt.Time.Equal(midnight) || !got.EndAt.Time.Equal(midnight) {
-		t.Errorf("window = %v..%v, want both pinned to %v", got.StartAt.Time, got.EndAt.Time, midnight)
+	if !got.StartAt.Time.Equal(midnight) || !got.EndAt.Time.Equal(midnight.AddDate(0, 0, 1)) {
+		t.Errorf("window = %v..%v, want %v..%v", got.StartAt.Time, got.EndAt.Time, midnight, midnight.AddDate(0, 0, 1))
+	}
+}
+
+// The end of an all-day window is the midnight after its last day, so a
+// one-day event whose ends land on the same day is not a window at all.
+func TestApplyRefusesAnAllDayWindowThatCollapsesToZeroLength(t *testing.T) {
+	t.Parallel()
+
+	allDay := true
+	start := time.Date(2030, 6, 3, 15, 0, 0, 0, time.UTC)
+	end := time.Date(2030, 6, 3, 18, 0, 0, 0, time.UTC)
+	_, err := Patch{AllDay: &allDay, StartAt: &start, EndAt: &end}.Apply(base())
+	if err == nil {
+		t.Fatal("Apply stored an all-day window with end = start on a non-milestone")
+	}
+
+	// A milestone is the one point-shaped kind.
+	milestone := string(calendar.CalendarEventsKindMilestone)
+	if _, err := (Patch{Kind: &milestone, AllDay: &allDay, StartAt: &start, EndAt: &end}).Apply(base()); err != nil {
+		t.Errorf("Apply refused an all-day milestone with end = start: %v", err)
+	}
+}
+
+func TestAppendOccurrenceExceptionWritesADateForAnAllDaySeries(t *testing.T) {
+	t.Parallel()
+
+	// Midnight UTC is the evening before in Los Angeles; the entry names
+	// the occurrence's UTC date whatever zone the writer works in.
+	start := time.Date(2030, 6, 10, 0, 0, 0, 0, time.UTC)
+	got, changed, err := AppendOccurrenceException(nil, start.In(time.FixedZone("PDT", -7*3600)), true)
+	if err != nil || !changed {
+		t.Fatalf("append: changed=%v err=%v", changed, err)
+	}
+	if string(got) != `["2030-06-10"]` {
+		t.Errorf("exceptions = %s, want [\"2030-06-10\"]", got)
+	}
+
+	// Entries in any readable form that already cancel the date are kept
+	// as they are and not repeated.
+	for _, spelled := range []string{"2030-06-10", "2030-06-10T00:00:00Z", "2030-06-10T09:00:00+09:00"} {
+		stored, _ := json.Marshal([]string{spelled})
+		if _, changed, err := AppendOccurrenceException(stored, start, true); err != nil || changed {
+			t.Errorf("stored %q: changed=%v err=%v, want the date already cancelled", spelled, changed, err)
+		}
+	}
+
+	// A timed series keeps the RFC 3339 instant.
+	timed, _, _ := AppendOccurrenceException(nil, start.Add(9*time.Hour), false)
+	if string(timed) != `["2030-06-10T09:00:00Z"]` {
+		t.Errorf("timed exceptions = %s", timed)
 	}
 }
 
@@ -195,8 +245,8 @@ func TestApplyRefusesAnInvertedAllDayPairRatherThanCollapsingIt(t *testing.T) {
 	if err == nil {
 		t.Fatal("Apply accepted an all-day pair with the days the wrong way round")
 	}
-	if err.Spec != apierrors.CalendarEventEndBeforeStart {
-		t.Errorf("spec = %v, want %v", err.Spec, apierrors.CalendarEventEndBeforeStart)
+	if err.Spec != apierrors.CalendarEventDateRangeInvalid {
+		t.Errorf("spec = %v, want %v", err.Spec, apierrors.CalendarEventDateRangeInvalid)
 	}
 }
 
@@ -254,28 +304,28 @@ func TestTruncationPointStopsJustBeforeTheSplit(t *testing.T) {
 	}
 }
 
-func TestAppendExceptionDoesNotRepeatAnInstantAlreadyCancelled(t *testing.T) {
+func TestAppendOccurrenceExceptionDoesNotRepeatAnInstantAlreadyCancelled(t *testing.T) {
 	t.Parallel()
 
 	start := time.Date(2030, 6, 10, 9, 0, 0, 0, time.UTC)
-	first, changed, err := AppendException(nil, start)
+	first, changed, err := AppendOccurrenceException(nil, start, false)
 	if err != nil || !changed {
 		t.Fatalf("first append: changed=%v err=%v", changed, err)
 	}
 	// The same instant written in another zone is the same occurrence.
 	tokyo := start.In(time.FixedZone("JST", 9*3600))
-	if _, changed, err := AppendException(first, tokyo); err != nil || changed {
+	if _, changed, err := AppendOccurrenceException(first, tokyo, false); err != nil || changed {
 		t.Errorf("second append: changed=%v err=%v; the list already cancels that occurrence", changed, err)
 	}
 }
 
-func TestAppendExceptionRefusesAListItCannotRead(t *testing.T) {
+func TestAppendOccurrenceExceptionRefusesAListItCannotRead(t *testing.T) {
 	t.Parallel()
 
 	// Starting over would drop every occurrence the series had already
 	// cancelled, and they would all come back.
-	if _, _, err := AppendException(json.RawMessage(`{"broken":true}`), time.Now()); err == nil {
-		t.Fatal("AppendException accepted a stored list it could not parse")
+	if _, _, err := AppendOccurrenceException(json.RawMessage(`{"broken":true}`), time.Now(), false); err == nil {
+		t.Fatal("AppendOccurrenceException accepted a stored list it could not parse")
 	}
 }
 

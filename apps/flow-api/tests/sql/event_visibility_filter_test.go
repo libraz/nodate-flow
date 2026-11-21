@@ -125,7 +125,7 @@ func TestEventListQueriesCarryVisibilityFilter(t *testing.T) {
 
 		marked := detailMarkerPattern.MatchString(headerComment(body))
 		switch {
-		case strings.Contains(body, eventacl.AttendeeExistsSQL):
+		case strings.Contains(body, eventacl.AttendeeExistsSQL+" AS is_attendee"):
 			if marked {
 				t.Errorf("%s projects eventacl.AttendeeExistsSQL and carries a detail-visibility marker, "+
 					"so the marker exempts nothing and a reader takes the statement for one that "+

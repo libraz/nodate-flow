@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -164,6 +165,12 @@ func AddAttendees(deps Deps) func(context.Context, *AddAttendeesInput) (*AddAtte
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
 		}
 
+		if evt.RecurrenceParentID.Valid {
+			if err := calendaroccurrence.OwnAttendees(ctx, deps.CalendarQueries, wsID, evt.ID, uint32(evt.RecurrenceParentID.Int32)); err != nil { //#nosec G115 -- internal row id read back from an INT UNSIGNED column
+				return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
+			}
+		}
+
 		out := &AddAttendeesOutput{}
 		out.Body.Attendees = make([]AttendeeResponse, 0, len(input.Body.UserIDs))
 
@@ -300,8 +307,18 @@ func ListAttendees(deps Deps) func(context.Context, *ListAttendeesInput) (*ListA
 			return nil, err
 		}
 
+		source := handlerutil.NullInt32From(evt.ID)
+		if evt.RecurrenceParentID.Valid {
+			own, err := deps.CalendarQueries.HasCalendarEventAttendeeRows(ctx, source)
+			if err != nil {
+				return nil, httpErr(apierrors.CalendarAttendeeListQueryInterrupted)
+			}
+			if !own {
+				source = evt.RecurrenceParentID
+			}
+		}
 		rows, err := deps.CalendarQueries.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
-			EventID:     handlerutil.NullInt32From(evt.ID),
+			EventID:     source,
 			WorkspaceID: wsID,
 		})
 		if err != nil {
@@ -351,6 +368,11 @@ func RemoveAttendee(deps Deps) func(context.Context, *RemoveAttendeeInput) (*Rem
 			return nil, httpErr(apierrors.CalendarAttendeeUserNotFound)
 		}
 
+		if evt.RecurrenceParentID.Valid {
+			if err := calendaroccurrence.OwnAttendees(ctx, deps.CalendarQueries, wsID, evt.ID, uint32(evt.RecurrenceParentID.Int32)); err != nil { //#nosec G115 -- internal row id read back from an INT UNSIGNED column
+				return nil, httpErr(apierrors.CalendarAttendeeStoreRemoveInterrupted)
+			}
+		}
 		err = deps.CalendarQueries.DisableCalendarEventAttendee(ctx, calendar.DisableCalendarEventAttendeeParams{
 			EventID: handlerutil.NullInt32From(evt.ID),
 			UserID:  targetUserID,

@@ -83,6 +83,7 @@ type eventRow struct {
 	calendarID  uint32
 	taskID      sql.NullInt32
 	taskRole    sql.NullString
+	kind        string
 	title       string
 	startAt     sql.NullTime
 	endAt       sql.NullTime
@@ -126,13 +127,13 @@ func findTaskByID(ctx context.Context, tx TX, workspaceID, taskID uint32) (taskR
 
 // findEventByID reads the minimal calendar_events row under the given workspace.
 func findEventByID(ctx context.Context, tx TX, workspaceID, eventID uint32) (eventRow, error) {
-	const q = `SELECT id, public_id, workspace_id, calendar_id, task_id, task_role, title,
+	const q = `SELECT id, public_id, workspace_id, calendar_id, task_id, task_role, kind, title,
 	                  start_at, end_at, timezone, owner_user_id, all_day, updated_at
 	           FROM calendar_events
 	           WHERE id = ? AND workspace_id = ? AND enabled = TRUE`
 	var e eventRow
 	err := tx.QueryRowContext(ctx, q, eventID, workspaceID).Scan(
-		&e.id, &e.publicID, &e.workspaceID, &e.calendarID, &e.taskID, &e.taskRole, &e.title,
+		&e.id, &e.publicID, &e.workspaceID, &e.calendarID, &e.taskID, &e.taskRole, &e.kind, &e.title,
 		&e.startAt, &e.endAt, &e.timezone, &e.ownerUserID, &e.allDay, &e.updatedAt,
 	)
 	return e, err
@@ -143,7 +144,7 @@ func findEventByID(ctx context.Context, tx TX, workspaceID, eventID uint32) (eve
 // exists. For RoleScheduled the query returns the most recently-
 // updated one (callers that need all of them should list separately).
 func findLinkedEvent(ctx context.Context, tx TX, taskID uint32, role DateRole) (eventRow, error) {
-	const q = `SELECT id, public_id, workspace_id, calendar_id, task_id, task_role, title,
+	const q = `SELECT id, public_id, workspace_id, calendar_id, task_id, task_role, kind, title,
 	                  start_at, end_at, timezone, owner_user_id, all_day, updated_at
 	           FROM calendar_events
 	           WHERE task_id = ? AND task_role = ? AND enabled = TRUE
@@ -151,7 +152,7 @@ func findLinkedEvent(ctx context.Context, tx TX, taskID uint32, role DateRole) (
 	           LIMIT 1`
 	var e eventRow
 	err := tx.QueryRowContext(ctx, q, taskID, string(role)).Scan(
-		&e.id, &e.publicID, &e.workspaceID, &e.calendarID, &e.taskID, &e.taskRole, &e.title,
+		&e.id, &e.publicID, &e.workspaceID, &e.calendarID, &e.taskID, &e.taskRole, &e.kind, &e.title,
 		&e.startAt, &e.endAt, &e.timezone, &e.ownerUserID, &e.allDay, &e.updatedAt,
 	)
 	return e, err
@@ -203,17 +204,21 @@ func projectionDate(t time.Time, tz string, allDay bool) (region.Day, error) {
 }
 
 // allDayWindow pins an all-day projection's window to the canonical
-// instants, and leaves a timed one alone.
+// half-open form, [first day, day after the last), and leaves a timed one
+// alone.
 //
-// The rule itself is [calendarrules.NormalizeAllDayBounds], shared with
-// the transports that write calendar_events directly; what this adds is
-// the shape itemkit carries a window in. A zero instant means that end of
-// the window is absent, which the nullable form the rule takes says
-// directly.
-func allDayWindow(allDay bool, start, end time.Time) (time.Time, time.Time) {
+// The instants are cut to UTC midnight by
+// [calendarrules.NormalizeAllDayBounds] and the result is held to
+// [calendarrules.RequireAllDayWindow]. A zero instant means that end of the
+// window is absent, which the nullable form the rules take says directly.
+func allDayWindow(allDay bool, kind string, start, end time.Time) (time.Time, time.Time, error) {
 	normStart, normEnd := calendarrules.NormalizeAllDayBounds(allDay,
 		nullableInstant(start), nullableInstant(end))
-	return normStart.Time, normEnd.Time
+	if refusal := calendarrules.RequireAllDayWindow(allDay, kind, normStart, normEnd); refusal != nil {
+		return normStart.Time, normEnd.Time, wrapInvariant("all_day_window",
+			"an all-day window must end after the day it starts on")
+	}
+	return normStart.Time, normEnd.Time, nil
 }
 
 // nullableInstant renders an instant in the nullable form the shared

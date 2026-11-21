@@ -1,6 +1,9 @@
 package eventacl
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The two predicates are tested separately because the bug they replace
 // came from treating them as one. A table that only asserted "can the
@@ -46,9 +49,24 @@ func TestCanSee(t *testing.T) {
 			Actor{UserID: 42},
 			true,
 		},
-		{"attendance does not open a confidential event",
+		{"an attendee of the occurrence sees a confidential event",
 			Event{Visibility: VisibilityConfidential, OwnerUserID: 99},
 			Actor{UserID: 7, IsAttendee: true},
+			true,
+		},
+		{"the creator sees a confidential event they do not own",
+			Event{Visibility: VisibilityConfidential, OwnerUserID: 99, CreatedByUserID: 7},
+			Actor{UserID: 7},
+			true,
+		},
+		{"a co-member who created nothing does not",
+			Event{Visibility: VisibilityConfidential, OwnerUserID: 99, CreatedByUserID: 5},
+			Actor{UserID: 7},
+			false,
+		},
+		{"a zero actor id is no creator",
+			Event{Visibility: VisibilityConfidential, OwnerUserID: 99, CreatedByUserID: 0},
+			Actor{UserID: 0},
 			false,
 		},
 		{"a zero actor id owns nothing",
@@ -101,17 +119,27 @@ func TestCanSeeDetails(t *testing.T) {
 		},
 		{"confidential details follow the hidden row",
 			Event{Visibility: VisibilityConfidential, OwnerUserID: 99},
-			Actor{UserID: 7, IsAttendee: true},
+			Actor{UserID: 7},
 			false,
+		},
+		{"confidential details reach an attendee",
+			Event{Visibility: VisibilityConfidential, OwnerUserID: 99},
+			Actor{UserID: 7, IsAttendee: true},
+			true,
+		},
+		{"private details reach the creator",
+			Event{Visibility: VisibilityPrivate, OwnerUserID: 99, CreatedByUserID: 7},
+			Actor{UserID: 7},
+			true,
 		},
 		{"confidential details reach its owner",
 			Event{Visibility: VisibilityConfidential, OwnerUserID: 42},
 			Actor{UserID: 42},
 			true,
 		},
-		{"an unrecognised visibility withholds the details from an attendee",
+		{"an unrecognised visibility withholds the details from a co-member",
 			Event{Visibility: Visibility("internal"), OwnerUserID: 99},
-			Actor{UserID: 7, IsAttendee: true},
+			Actor{UserID: 7},
 			false,
 		},
 	}
@@ -191,11 +219,63 @@ func TestDetailsNeverExceedRowVisibility(t *testing.T) {
 func TestRowVisibilityFilterMatchesSQLForm(t *testing.T) {
 	t.Parallel()
 	frag, args := RowVisibilityFilter(42)
-	want := `(ce.visibility <> 'confidential' OR ce.owner_user_id = ?)`
+	want := strings.ReplaceAll(RowVisibilitySQL, "sqlc.arg(viewer_user_id)", "?")
 	if frag != want {
 		t.Fatalf("fragment = %q, want %q", frag, want)
 	}
-	if len(args) != 1 || args[0] != uint32(42) {
-		t.Fatalf("args = %v, want [42]", args)
+	if strings.Contains(frag, "sqlc.") {
+		t.Fatalf("fragment still carries a named argument: %q", frag)
+	}
+	if len(args) != strings.Count(frag, "?") {
+		t.Fatalf("%d args for %d placeholders", len(args), strings.Count(frag, "?"))
+	}
+	for _, a := range args {
+		if a != uint32(42) {
+			t.Fatalf("args = %v, want only 42", args)
+		}
+	}
+}
+
+// The row filter has to open a confidential row to exactly the parties
+// CanSee names.
+func TestRowVisibilitySQLNamesEveryParty(t *testing.T) {
+	t.Parallel()
+	for _, part := range []string{"ce.owner_user_id = sqlc.arg(viewer_user_id)", "ce.created_by_user_id = sqlc.arg(viewer_user_id)", AttendeeExistsSQL} {
+		if !strings.Contains(RowVisibilitySQL, part) {
+			t.Errorf("RowVisibilitySQL lacks %q", part)
+		}
+	}
+}
+
+// An override that holds attendee rows of its own, enabled or not, does
+// not fall back to its series' list.
+func TestAttendeeExistsSQLReplacesInsteadOfUnioning(t *testing.T) {
+	t.Parallel()
+	if strings.Contains(AttendeeExistsSQL, "IN (ce.id, ce.recurrence_parent_id)") {
+		t.Fatal("attendance is a union of the override's and the series' rows")
+	}
+	if !strings.Contains(AttendeeExistsSQL, "NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)") {
+		t.Fatal("the series' list applies without checking the override's own rows, disabled ones included")
+	}
+}
+
+func TestAnonymousFields(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		evt  Event
+		want AnonymousView
+	}{
+		{"public shows title and location", Event{Visibility: VisibilityPublic}, AnonymousView{Exists: true, Title: true, Location: true}},
+		{"default on a public calendar is public", Event{Visibility: VisibilityDefault}, AnonymousView{Exists: true, Title: true, Location: true}},
+		{"default on a private calendar is private", Event{Visibility: VisibilityDefault, CalendarDefault: VisibilityPrivate}, AnonymousView{Exists: true}},
+		{"private shows times only", Event{Visibility: VisibilityPrivate}, AnonymousView{Exists: true}},
+		{"confidential does not exist", Event{Visibility: VisibilityConfidential}, AnonymousView{}},
+		{"unrecognised does not exist", Event{Visibility: Visibility("internal")}, AnonymousView{}},
+	}
+	for _, c := range cases {
+		if got := AnonymousFields(c.evt); got != c.want {
+			t.Errorf("%s: AnonymousFields = %+v, want %+v", c.name, got, c.want)
+		}
 	}
 }

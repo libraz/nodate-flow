@@ -55,6 +55,16 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	if in.AllDay != nil {
 		allDay = *in.AllDay
 	}
+	// An all-day event is named by dates and a timed one by instants; a
+	// request mixing the two is refused rather than guessed at.
+	if shapeErr := calendarrules.RequireAllDayInput(allDay,
+		in.StartAt != nil || in.EndAt != nil, in.StartDate != "" || in.EndDate != ""); shapeErr != nil {
+		return nil, shapeErr
+	}
+	kind := calendar.CalendarEventsKindEvent
+	if in.Kind != "" {
+		kind = calendar.CalendarEventsKind(in.Kind)
+	}
 	var startAt, endAt time.Time
 	if allDay {
 		if in.StartDate == "" || in.EndDate == "" {
@@ -75,27 +85,28 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		startAt = time.Unix(*in.StartAt, 0).UTC()
 		endAt = time.Unix(*in.EndAt, 0).UTC()
 	}
-	// The window is checked before it is normalised, and through the same
+	// The stored end of an all-day event is the midnight after its last
+	// day, the one shape every transport writes. An empty or reversed
+	// all-day range is refused by the window rule, ahead of the timed
+	// chronology rule, so a client gets one code for that mistake.
+	if allDay {
+		endAt = calendarrules.AllDayEndExclusive(string(kind), endAt)
+	}
+	normStart, normEnd := calendarrules.NormalizeAllDayBounds(allDay,
+		sql.NullTime{Time: startAt, Valid: true}, sql.NullTime{Time: endAt, Valid: true})
+	if shapeErr := calendarrules.RequireAllDayWindow(allDay, string(kind), normStart, normEnd); shapeErr != nil {
+		return nil, shapeErr
+	}
+	// The window is checked before it is stored, and through the same
 	// rule the REST create applies: an agent that inverts it is told which
 	// way round it goes, instead of being handed the CHECK constraint's
 	// refusal as an unexplained execution failure.
 	if rangeErr := calendarrules.RequireEventChronology(
-		calendarrules.UnixSeconds(startAt), calendarrules.UnixSeconds(endAt)); rangeErr != nil {
+		calendarrules.UnixSeconds(normStart.Time), calendarrules.UnixSeconds(normEnd.Time)); rangeErr != nil {
 		return nil, rangeErr
 	}
-	// An all-day row is stored as UTC midnight on the author's date.
-	// parseDayBoundary already lands there, so this changes nothing today
-	// — it is here because the canonical form is one decision for every
-	// transport, and reading it off the shared rule is what stops the two
-	// from drifting apart the way they did before.
-	normStart, normEnd := calendarrules.NormalizeAllDayBounds(allDay,
-		sql.NullTime{Time: startAt, Valid: true}, sql.NullTime{Time: endAt, Valid: true})
 	startAt, endAt = normStart.Time, normEnd.Time
 
-	kind := calendar.CalendarEventsKindEvent
-	if in.Kind != "" {
-		kind = calendar.CalendarEventsKind(in.Kind)
-	}
 	showAs := calendar.CalendarEventsShowAsBusy
 	if in.ShowAs != "" {
 		showAs = calendar.CalendarEventsShowAs(in.ShowAs)
@@ -200,7 +211,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	if allDay {
 		out["startDate"] = startAt.UTC().Format("2006-01-02")
-		out["endDate"] = endAt.UTC().Format("2006-01-02")
+		out["endDate"] = calendarrules.AllDayLastDay(string(kind), endAt).UTC().Format("2006-01-02")
 	} else {
 		out["startAt"] = startAt.Unix()
 		out["endAt"] = endAt.Unix()
@@ -315,30 +326,24 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		}
 	}
 
+	// The row decides whether the window is named by dates or by instants;
+	// this tool takes no allDay argument, so a mismatched request is refused.
+	shapeKind := string(evt.Kind)
+	if in.Kind != nil {
+		shapeKind = *in.Kind
+	}
 	var newStartAt, newEndAt time.Time
 	timeChanged := false
-	switch {
-	case in.StartAt != nil:
-		newStartAt = time.Unix(*in.StartAt, 0).UTC()
-		timeChanged = true
-	case in.StartDate != nil && *in.StartDate != "":
-		t, perr := parseDayBoundary(*in.StartDate)
-		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate")
-		}
-		newStartAt = t
+	winStart, winEnd, winErr := updateWindow(&in, evt.AllDay, shapeKind)
+	if winErr != nil {
+		return nil, winErr
+	}
+	if winStart != nil {
+		newStartAt = *winStart
 		timeChanged = true
 	}
-	switch {
-	case in.EndAt != nil:
-		newEndAt = time.Unix(*in.EndAt, 0).UTC()
-		timeChanged = true
-	case in.EndDate != nil && *in.EndDate != "":
-		t, perr := parseDayBoundary(*in.EndDate)
-		if perr != nil {
-			return nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate")
-		}
-		newEndAt = t
+	if winEnd != nil {
+		newEndAt = *winEnd
 		timeChanged = true
 	}
 	// When only one side of the time window arrived, fall back to the
@@ -360,20 +365,18 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			return nil, pairErr
 		}
 		// Both branches below write this pair — the standalone patch and
-		// the itemkit reschedule — so the ordering is checked once, here,
-		// through the rule the REST patch applies. Without it an inverted
-		// window reached chk_calendar_events_chronology and came back as
-		// an execution failure that named nothing.
-		if rangeErr := calendarrules.RequireEventChronology(
-			calendarrules.UnixSeconds(newStartAt), calendarrules.UnixSeconds(newEndAt)); rangeErr != nil {
-			return nil, rangeErr
-		}
-		// The stored row decides whether the pair is a date or an instant:
-		// this tool takes no allDay argument, so moving an all-day event by
-		// startAt would otherwise store an off-midnight instant and put the
-		// event on a different square for readers in another zone.
+		// the itemkit reschedule — so the window is checked once, here,
+		// through the rules the REST patch applies. An all-day range goes
+		// first so it answers with its own code, not the timed one.
 		normStart, normEnd := calendarrules.NormalizeAllDayBounds(evt.AllDay,
 			sql.NullTime{Time: newStartAt, Valid: true}, sql.NullTime{Time: newEndAt, Valid: true})
+		if shapeErr := calendarrules.RequireAllDayWindow(evt.AllDay, shapeKind, normStart, normEnd); shapeErr != nil {
+			return nil, shapeErr
+		}
+		if rangeErr := calendarrules.RequireEventChronology(
+			calendarrules.UnixSeconds(normStart.Time), calendarrules.UnixSeconds(normEnd.Time)); rangeErr != nil {
+			return nil, rangeErr
+		}
 		newStartAt, newEndAt = normStart.Time, normEnd.Time
 	}
 	if in.Title != nil {
@@ -385,10 +388,6 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	// The row as it will stand, refused here by the rule REST applies
 	// rather than by the CHECK that would answer it as a store failure.
-	shapeKind := string(evt.Kind)
-	if in.Kind != nil {
-		shapeKind = *in.Kind
-	}
 	if refusal := calendarrules.RequireEventShape(shapeKind, timeChanged || evt.StartAt.Valid,
 		calendaroccurrence.HasRule(evt.RecurrenceRule), evt.NotificationOffset.Valid); refusal != nil {
 		return nil, refusal

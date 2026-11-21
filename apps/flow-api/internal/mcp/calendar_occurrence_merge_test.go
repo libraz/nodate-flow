@@ -114,38 +114,60 @@ func TestMergeOccurrenceFieldsFoldsToolArgumentsOntoTheOccurrence(t *testing.T) 
 		requireErrorSpec(t, err, apierrors.CalendarEventEndBeforeStart)
 	})
 
-	t.Run("an all-day occurrence keeps both ends on a UTC midnight", func(t *testing.T) {
+	t.Run("an all-day occurrence is moved by dates and ends the midnight after its last day", func(t *testing.T) {
 		t.Parallel()
 		// No tool takes an allDay argument, so the stored flag decides
-		// whether the pair is a date or an instant. Without the pin,
-		// moving an all-day occurrence by startAt stores an off-midnight
-		// instant and puts it on a different square for readers in
-		// another zone.
+		// whether the window is named by dates or by instants.
 		day := time.Date(2030, 3, 4, 0, 0, 0, 0, time.UTC)
-		fields, err := mergeOccurrenceFields(mergeBase(true, day, day), &updateCalendarEventArgs{
-			StartAt: unixPtr(time.Date(2030, 3, 6, 9, 30, 0, 0, time.UTC)),
-			EndAt:   unixPtr(time.Date(2030, 3, 6, 18, 0, 0, 0, time.UTC)),
+		fields, err := mergeOccurrenceFields(mergeBase(true, day, day.AddDate(0, 0, 1)), &updateCalendarEventArgs{
+			StartDate: strPtr("2030-03-06"),
+			EndDate:   strPtr("2030-03-06"),
 		})
 		require.NoError(t, err)
 		want := time.Date(2030, 3, 6, 0, 0, 0, 0, time.UTC)
 		require.Equal(t, want, fields.StartAt.Time)
-		require.Equal(t, want, fields.EndAt.Time)
+		require.Equal(t, want.AddDate(0, 0, 1), fields.EndAt.Time)
+	})
+
+	t.Run("an all-day occurrence refuses instants and a timed one refuses dates", func(t *testing.T) {
+		t.Parallel()
+		day := time.Date(2030, 3, 4, 0, 0, 0, 0, time.UTC)
+		_, err := mergeOccurrenceFields(mergeBase(true, day, day.AddDate(0, 0, 1)), &updateCalendarEventArgs{
+			StartAt: unixPtr(time.Date(2030, 3, 6, 9, 30, 0, 0, time.UTC)),
+		})
+		requireErrorSpec(t, err, apierrors.CalendarEventAllDayShape)
+		_, err = mergeOccurrenceFields(mergeBase(false, start, end), &updateCalendarEventArgs{
+			StartDate: strPtr("2030-03-06"),
+		})
+		requireErrorSpec(t, err, apierrors.CalendarEventAllDayShape)
+	})
+
+	t.Run("a date range with the last day before the first is refused", func(t *testing.T) {
+		t.Parallel()
+		day := time.Date(2030, 3, 4, 0, 0, 0, 0, time.UTC)
+		_, err := mergeOccurrenceFields(mergeBase(true, day, day.AddDate(0, 0, 1)), &updateCalendarEventArgs{
+			StartDate: strPtr("2030-03-06"),
+			EndDate:   strPtr("2030-03-05"),
+		})
+		requireErrorSpec(t, err, apierrors.CalendarEventDateRangeInvalid)
 	})
 
 	t.Run("an all-day date is the other spelling of the same bound", func(t *testing.T) {
 		t.Parallel()
-		fields, err := mergeOccurrenceFields(mergeBase(false, start, end), &updateCalendarEventArgs{
+		day := time.Date(2030, 3, 4, 0, 0, 0, 0, time.UTC)
+		fields, err := mergeOccurrenceFields(mergeBase(true, day, day.AddDate(0, 0, 1)), &updateCalendarEventArgs{
 			StartDate: strPtr("2030-03-06"),
 			EndDate:   strPtr("2030-03-07"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2030, 3, 6, 0, 0, 0, 0, time.UTC), fields.StartAt.Time)
-		require.Equal(t, time.Date(2030, 3, 7, 0, 0, 0, 0, time.UTC), fields.EndAt.Time)
+		require.Equal(t, time.Date(2030, 3, 8, 0, 0, 0, 0, time.UTC), fields.EndAt.Time)
 	})
 
 	t.Run("a date that does not parse names the argument to correct", func(t *testing.T) {
 		t.Parallel()
-		_, err := mergeOccurrenceFields(mergeBase(false, start, end), &updateCalendarEventArgs{
+		day := time.Date(2030, 3, 4, 0, 0, 0, 0, time.UTC)
+		_, err := mergeOccurrenceFields(mergeBase(true, day, day.AddDate(0, 0, 1)), &updateCalendarEventArgs{
 			EndDate: strPtr("the seventh"),
 		})
 		requireErrorSpec(t, err, apierrors.McpToolArgumentsInvalid)

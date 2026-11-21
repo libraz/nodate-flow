@@ -255,7 +255,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.CreatorAvatarURL = handlerutil.AvatarURLPtr(r.CreatorAvatarUrl, r.CreatorAvatarStorageObjectID, r.CreatorPublicID)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -295,7 +295,7 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetails(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

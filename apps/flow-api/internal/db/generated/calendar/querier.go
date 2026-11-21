@@ -181,8 +181,8 @@ type Querier interface {
 	// is already withdrawn changes nothing and must not be counted.
 	//
 	// Scoped to the overrides the acting user can see, on the row filter the
-	// range queries carry: a confidential override belonging to somebody else
-	// stays enabled past the truncation and keeps rendering to its owner, since
+	// range queries carry: a confidential override the actor is not a party to
+	// stays enabled past the truncation and keeps rendering to its parties, since
 	// disabling it would remove an occurrence from a calendar the actor has no
 	// view of.
 	DisableCalendarEventOverridesFromStart(ctx context.Context, arg DisableCalendarEventOverridesFromStartParams) (int64, error)
@@ -239,6 +239,10 @@ type Querier interface {
 	FindCalendarByPublicId(ctx context.Context, arg FindCalendarByPublicIdParams) (FindCalendarByPublicIdRow, error)
 	// Resolve a checklist item by UUID v7.
 	FindCalendarChecklistItemByPublicId(ctx context.Context, arg FindCalendarChecklistItemByPublicIdParams) (FindCalendarChecklistItemByPublicIdRow, error)
+	// Whether a row is an all-day event, by internal id. The recurrence
+	// exception list of a series is spelled by the series' shape, so a caller
+	// holding only an override reads the master's flag here.
+	FindCalendarEventAllDay(ctx context.Context, arg FindCalendarEventAllDayParams) (bool, error)
 	// Resolve an attachment by UUID v7 for download or deletion, including the
 	// backing storage_objects metadata so the handler can build a presigned URL
 	// without a second round trip.
@@ -294,6 +298,10 @@ type Querier interface {
 	// the replacement will query via calendar_public_shares.
 	// Quick lookup for permission checks: who owns this event?
 	FindCalendarEventOwner(ctx context.Context, arg FindCalendarEventOwnerParams) (FindCalendarEventOwnerRow, error)
+	// The series an override stands in for, by internal id; NULL for any other
+	// row. Lets a caller holding only an event id find whose attendee list it
+	// reads.
+	FindCalendarEventParentID(ctx context.Context, id uint32) (sql.NullInt32, error)
 	// Where one event row sits in a series. The three columns separate the three
 	// shapes a row can have: recurrence_parent_id set means the row is an
 	// override and recurrence_original_start names the occurrence it replaces,
@@ -338,6 +346,12 @@ type Querier interface {
 	// public render path. Returns only enabled rows; caller applies the
 	// expires_at gate so the 410 code path can be distinguished from 404.
 	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
+	// Whether an event has any attendee row, enabled or not.
+	//
+	// An override row with any row of its own replaces its series' attendee
+	// list; one with none inherits it. Disabled rows count, because they are
+	// how an override records that someone on the series is not attending.
+	HasCalendarEventAttendeeRows(ctx context.Context, eventID sql.NullInt32) (bool, error)
 	// List checklist items for an event in display order. Paginated
 	// (LIMIT/OFFSET) so the result set is always bounded; total carries the
 	// pre-page count.
@@ -410,9 +424,10 @@ type Querier interface {
 	//
 	// detail-visibility: not-applicable — no title, location, memo or url is selected for attendance to unlock.
 	// The detail rule governs those fields alone, so is_attendee would be a
-	// column on the generated row that no mapper could read. The row filter
-	// above is a separate matter and stays: a confidential occurrence must not
-	// be subtracted from a master the viewer can see.
+	// column on the generated row that no mapper could read. Attendance still
+	// enters through the row filter, which opens a confidential occurrence to
+	// its attendees: a confidential occurrence must not be subtracted from a
+	// master the viewer can see.
 	//
 	// The LIMIT is a runaway bound, not a page size. Truncation here would
 	// resurrect duplicates, so it sits far above the number of overrides a

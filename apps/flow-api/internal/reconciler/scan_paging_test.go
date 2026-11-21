@@ -163,6 +163,10 @@ type stubDriver struct {
 	// scan finds drift to heal. Left false, every page it serves is
 	// consistent and no heal runs.
 	driftDates bool
+	// allDayZone, when set, makes the date-drift page an all-day row
+	// recording that zone, with the stored start at UTC midnight on the
+	// task's due date.
+	allDayZone string
 }
 
 func (d *stubDriver) Open(string) (driver.Conn, error) { return &stubConn{d: d}, nil }
@@ -215,7 +219,7 @@ func (c *stubConn) ExecContext(_ context.Context, query string, args []driver.Na
 
 func (c *stubConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.d.record(recordedQuery{sql: query, args: values(args)})
-	return newStubRows(query, c.d.rowsFor(query), c.d.driftDates), nil
+	return newStubRows(query, c.d.rowsFor(query), c.d.driftDates, c.d.allDayZone), nil
 }
 
 // stubResult reports both halves of a statement's outcome: the affected
@@ -259,7 +263,7 @@ type stubRows struct {
 //
 // drift shifts the date-drift page's event away from its task's stored
 // due date, which is the disagreement that scan exists to find.
-func newStubRows(query string, n int, drift bool) *stubRows {
+func newStubRows(query string, n int, drift bool, allDayZone string) *stubRows {
 	day := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	switch {
 	case strings.Contains(query, "ce.timezone"):
@@ -271,14 +275,18 @@ func newStubRows(query string, n int, drift bool) *stubRows {
 			cols: []string{
 				"task_id", "task_public_id", "workspace_id",
 				"event_id", "event_public_id",
-				"due_on", "start_at", "timezone",
+				"due_on", "start_at", "timezone", "all_day",
 			},
 			n: n,
 			row: func(i int) []driver.Value {
+				zone, allDay := "UTC", false
+				if allDayZone != "" {
+					zone, allDay = allDayZone, true
+				}
 				return []driver.Value{
 					int64(i), driftTaskPublicID[:], int64(driftWorkspaceID),
 					int64(i), driftEventPublicID[:],
-					day, start, "UTC",
+					day, start, zone, allDay,
 				}
 			},
 		}

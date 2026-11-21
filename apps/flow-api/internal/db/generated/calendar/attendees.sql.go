@@ -145,6 +145,25 @@ func (q *Queries) FindCalendarEventAttendee(ctx context.Context, arg FindCalenda
 	return i, err
 }
 
+const hasCalendarEventAttendeeRows = `-- name: HasCalendarEventAttendeeRows :one
+SELECT EXISTS (
+  SELECT 1 FROM calendar_event_attendees
+  WHERE event_id = ?
+) AS has_rows
+`
+
+// Whether an event has any attendee row, enabled or not.
+//
+// An override row with any row of its own replaces its series' attendee
+// list; one with none inherits it. Disabled rows count, because they are
+// how an override records that someone on the series is not attending.
+func (q *Queries) HasCalendarEventAttendeeRows(ctx context.Context, eventID sql.NullInt32) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasCalendarEventAttendeeRows, eventID)
+	var has_rows bool
+	err := row.Scan(&has_rows)
+	return has_rows, err
+}
+
 const listCalendarEventAttendees = `-- name: ListCalendarEventAttendees :many
 SELECT
   a.id,

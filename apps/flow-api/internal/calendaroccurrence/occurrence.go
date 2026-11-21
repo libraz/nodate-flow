@@ -41,6 +41,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 )
 
 // Scope names which occurrences of a recurring series a write reaches.
@@ -326,13 +327,20 @@ func (p Patch) Apply(base Fields) (Fields, *apierrors.APIError) {
 		f.NotificationOffset = sql.NullInt32{Int32: *p.NotificationOffset, Valid: true}
 	}
 
+	f.StartAt, f.EndAt = calendarrules.NormalizeAllDayBounds(f.AllDay, f.StartAt, f.EndAt)
+	if p.StartAt != nil || p.EndAt != nil || p.AllDay != nil {
+		// Ahead of the chronology rule so an all-day range answers with
+		// its own code, not the timed one.
+		if err := calendarrules.RequireAllDayWindow(f.AllDay, string(f.Kind), f.StartAt, f.EndAt); err != nil {
+			return Fields{}, err
+		}
+	}
 	if p.StartAt != nil || p.EndAt != nil {
 		if err := calendarrules.RequireEventChronology(
 			nullableUnix(f.StartAt), nullableUnix(f.EndAt)); err != nil {
 			return Fields{}, err
 		}
 	}
-	f.StartAt, f.EndAt = calendarrules.NormalizeAllDayBounds(f.AllDay, f.StartAt, f.EndAt)
 	return f, nil
 }
 
@@ -380,19 +388,21 @@ func truncationPoint(end sql.NullTime, splitStart time.Time) time.Time {
 	return truncateAt
 }
 
-// AppendException adds one occurrence start to a stored exception list,
-// and reports whether the list changed.
+// AppendOccurrenceException adds one occurrence start to a stored exception
+// list, and reports whether the list changed.
 //
-// The entry is written as an RFC 3339 instant in UTC, the spelling the
-// expander turns into an exact skip keyed by unix seconds — so the entry
-// matches the occurrence whatever timezone the series is drawn in. An
-// entry already naming the same instant is left alone rather than
-// repeated.
+// A timed series gets an RFC 3339 instant in UTC, the spelling the expander
+// turns into an exact skip keyed by unix seconds — so the entry matches the
+// occurrence whatever timezone the series is drawn in. An all-day series
+// names its occurrences by date, so the entry is the occurrence's UTC date
+// as YYYY-MM-DD, and any entry already cancelling that date, in whichever
+// readable form, leaves the list alone. Either way an entry already naming
+// the same occurrence is not repeated.
 //
 // A stored list that does not parse is an error rather than a fresh list:
 // starting over would drop every occurrence the series had already
 // cancelled, and they would all come back.
-func AppendException(stored json.RawMessage, start time.Time) (json.RawMessage, bool, error) {
+func AppendOccurrenceException(stored json.RawMessage, start time.Time, allDay bool) (json.RawMessage, bool, error) {
 	var list []string
 	if len(stored) > 0 && string(stored) != "null" {
 		if err := json.Unmarshal(stored, &list); err != nil {
@@ -401,6 +411,14 @@ func AppendException(stored json.RawMessage, start time.Time) (json.RawMessage, 
 	}
 
 	entry := start.UTC().Format(time.RFC3339)
+	if allDay {
+		entry = start.UTC().Format("2006-01-02")
+		for _, existing := range list {
+			if recurrence.EntryNames(existing, recurrence.ZoneName("", true), start) {
+				return nil, false, nil
+			}
+		}
+	}
 	for _, existing := range list {
 		if existing == entry {
 			return nil, false, nil

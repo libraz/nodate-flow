@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/packages/go-shared/dbtype"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
@@ -91,11 +92,16 @@ func ScheduleTask(ctx context.Context, tx TX, args ScheduleTaskArgs) (dbtype.Pub
 	snap := applySnap(args.StartAt, args.EndAt, args.Snap)
 	args.StartAt = snap.NewStart
 	args.EndAt = snap.NewEnd
-	// An all-day projection is a date, and the stored instant that stands
-	// for it has to be the same one whichever writer produced it. Snap runs
+	// An all-day projection is one day, [date, date + 1 day). Snap runs
 	// first because it moves the whole window by a whole number of days in
 	// the actor's zone, so pinning afterwards is what lands on midnight.
-	args.StartAt, args.EndAt = allDayWindow(args.AllDay, args.StartAt, args.EndAt)
+	if args.AllDay {
+		args.EndAt = calendarrules.TruncateToUTCDay(args.StartAt).AddDate(0, 0, 1)
+	}
+	args.StartAt, args.EndAt, err = allDayWindow(args.AllDay, string(calendar.CalendarEventsKindEvent), args.StartAt, args.EndAt)
+	if err != nil {
+		return dbtype.PublicID{}, 0, err
+	}
 
 	task, err := findTaskByID(ctx, tx, args.WorkspaceID, args.TaskID)
 	if err != nil {
@@ -331,9 +337,11 @@ func appendItemEventsWithActor(
 		}
 		legacyPayload["eventId"] = subject.publicID.String()
 		legacyPayload["title"] = subject.title
+		calendarID := subject.calendarID
 		if _, err := eventlog.Append(ctx, tx, eventlog.Event{
 			Type:            legacy,
 			WorkspaceID:     workspaceID,
+			CalendarID:      &calendarID,
 			ActorUserID:     actorUserID,
 			ActorAgentID:    actorAgentID,
 			TaskID:          taskID,
@@ -348,8 +356,9 @@ func appendItemEventsWithActor(
 
 // legacySubject is a calendar event a legacy calendar.event.* row is about.
 type legacySubject struct {
-	publicID dbtype.PublicID
-	title    string
+	publicID   dbtype.PublicID
+	title      string
+	calendarID uint32
 }
 
 // legacyEventSubjects names the calendar events the legacy row dual-emitted
@@ -375,24 +384,24 @@ func legacyEventSubjects(
 		if err != nil {
 			return nil, fmt.Errorf("eventPublicId %q: %w", pub, err)
 		}
-		query = `SELECT public_id, title FROM calendar_events WHERE workspace_id = ? AND public_id = ?`
+		query = `SELECT public_id, title, calendar_id FROM calendar_events WHERE workspace_id = ? AND public_id = ?`
 		args = []any{workspaceID, id}
 	} else if taskID == nil {
 		return nil, nil
 	} else if kind == eventbus.ItemUnscheduled {
 		role, _ := payload["role"].(string)
-		query = `SELECT public_id, title FROM calendar_events
+		query = `SELECT public_id, title, calendar_id FROM calendar_events
 		         WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = FALSE
 		           AND updated_at = (SELECT MAX(updated_at) FROM calendar_events
 		                             WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = FALSE)
 		         ORDER BY id`
 		args = []any{workspaceID, *taskID, role, workspaceID, *taskID, role}
 	} else if kind == eventbus.ItemRescheduled {
-		query = `SELECT public_id, title FROM calendar_events
+		query = `SELECT public_id, title, calendar_id FROM calendar_events
 		         WHERE workspace_id = ? AND task_id = ? AND task_role = ? AND enabled = TRUE ORDER BY id`
 		args = []any{workspaceID, *taskID, string(RoleDue)}
 	} else {
-		query = `SELECT public_id, title FROM calendar_events
+		query = `SELECT public_id, title, calendar_id FROM calendar_events
 		         WHERE workspace_id = ? AND task_id = ? AND enabled = TRUE ORDER BY id`
 		args = []any{workspaceID, *taskID}
 	}
@@ -404,7 +413,7 @@ func legacyEventSubjects(
 	var out []legacySubject
 	for rows.Next() {
 		var subject legacySubject
-		if err := rows.Scan(&subject.publicID, &subject.title); err != nil {
+		if err := rows.Scan(&subject.publicID, &subject.title, &subject.calendarID); err != nil {
 			return nil, err
 		}
 		out = append(out, subject)

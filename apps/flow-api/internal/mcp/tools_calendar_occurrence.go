@@ -273,29 +273,47 @@ func deleteCalendarEventOccurrences(
 	return map[string]any{"success": true}, nil
 }
 
-// occurrenceWindowArg resolves one end of the window an update names,
-// from either the unix-seconds argument or the all-day date argument,
-// and reports whether the caller named it at all.
+// updateWindow resolves the window an update names, against the row's own
+// shape, and reports each end it was sent.
 //
-// This is the shape only these tools have: two arguments for one bound,
-// where REST carries a single instant. The shared merge takes an instant
-// already decided, so the decision is made here and nothing downstream
-// has to know which of the two the caller sent.
-//
-// field names the date argument in the refusal, so a caller that sent an
-// unparseable date knows which one to correct.
-func occurrenceWindowArg(at *int64, date *string, field string) (time.Time, bool, error) {
-	if at != nil {
-		return time.Unix(*at, 0).UTC(), true, nil
+// An all-day row is named by dates and a timed one by instants, so the
+// other form is refused. A date pair keeps the endDate the caller named as
+// the last day, which is what a read returns, and stores the midnight after
+// it; either end may be sent on its own, and the other is then taken from
+// the row the write falls back to.
+func updateWindow(in *updateCalendarEventArgs, allDay bool, kind string) (start, end *time.Time, err error) {
+	sent := func(d *string) bool { return d != nil && *d != "" }
+	if refusal := calendarrules.RequireAllDayInput(allDay,
+		in.StartAt != nil || in.EndAt != nil, sent(in.StartDate) || sent(in.EndDate)); refusal != nil {
+		return nil, nil, refusal
 	}
-	if date != nil && *date != "" {
-		t, err := parseDayBoundary(*date)
-		if err != nil {
-			return time.Time{}, false, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid %s", field)
+	if !allDay {
+		if in.StartAt != nil {
+			t := time.Unix(*in.StartAt, 0).UTC()
+			start = &t
 		}
-		return t, true, nil
+		if in.EndAt != nil {
+			t := time.Unix(*in.EndAt, 0).UTC()
+			end = &t
+		}
+		return start, end, nil
 	}
-	return time.Time{}, false, nil
+	if sent(in.StartDate) {
+		t, perr := parseDayBoundary(*in.StartDate)
+		if perr != nil {
+			return nil, nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid startDate")
+		}
+		start = &t
+	}
+	if sent(in.EndDate) {
+		t, perr := parseDayBoundary(*in.EndDate)
+		if perr != nil {
+			return nil, nil, apierrors.Newf(apierrors.McpToolArgumentsInvalid, "invalid endDate")
+		}
+		t = calendarrules.AllDayEndExclusive(kind, t)
+		end = &t
+	}
+	return start, end, nil
 }
 
 // occurrencePatch reads the arguments an update call sends into the
@@ -310,7 +328,7 @@ func occurrenceWindowArg(at *int64, date *string, field string) (time.Time, bool
 // path: see [eventFieldClears]. A nullable column the call did not
 // mention keeps whatever the base carries. There is no allDay, timezone,
 // url or notificationOffset argument, so those columns are the base's too.
-func occurrencePatch(in *updateCalendarEventArgs) (calendaroccurrence.Patch, error) {
+func occurrencePatch(in *updateCalendarEventArgs, allDay bool, kind string) (calendaroccurrence.Patch, error) {
 	clears := eventFieldClears(in)
 	p := calendaroccurrence.Patch{
 		Kind:        in.Kind,
@@ -329,20 +347,15 @@ func occurrencePatch(in *updateCalendarEventArgs) (calendaroccurrence.Patch, err
 	if !clears.BlockLabel {
 		p.BlockLabel = in.BlockLabel
 	}
-	start, startSent, err := occurrenceWindowArg(in.StartAt, in.StartDate, "startDate")
+	if in.Kind != nil {
+		kind = *in.Kind
+	}
+	start, end, err := updateWindow(in, allDay, kind)
 	if err != nil {
 		return calendaroccurrence.Patch{}, err
 	}
-	end, endSent, err := occurrenceWindowArg(in.EndAt, in.EndDate, "endDate")
-	if err != nil {
-		return calendaroccurrence.Patch{}, err
-	}
-	if startSent {
-		p.StartAt = &start
-	}
-	if endSent {
-		p.EndAt = &end
-	}
+	p.StartAt = start
+	p.EndAt = end
 	return p, nil
 }
 
@@ -368,7 +381,7 @@ func mergeOccurrenceFields(
 	base calendaroccurrence.Fields,
 	in *updateCalendarEventArgs,
 ) (calendaroccurrence.Fields, error) {
-	patch, err := occurrencePatch(in)
+	patch, err := occurrencePatch(in, base.AllDay, string(base.Kind))
 	if err != nil {
 		return calendaroccurrence.Fields{}, err
 	}
@@ -406,7 +419,7 @@ func patchCalendarEventOccurrence(
 	originalStart time.Time,
 	record func(context.Context, *dbretry.Tx, types.PublicID) error,
 ) error {
-	patch, err := occurrencePatch(in)
+	patch, err := occurrencePatch(in, master.AllDay, string(master.Kind))
 	if err != nil {
 		return err
 	}
@@ -458,7 +471,7 @@ func patchCalendarEventFollowing(
 	splitStart time.Time,
 	record func(context.Context, *dbretry.Tx, types.PublicID) error,
 ) error {
-	patch, err := occurrencePatch(in)
+	patch, err := occurrencePatch(in, master.AllDay, string(master.Kind))
 	if err != nil {
 		return err
 	}

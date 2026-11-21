@@ -181,11 +181,11 @@ var Rules = []Rule{
 		Table:   "calendar_events",
 		Columns: []string{"all_day"},
 		Enforcers: []string{
-			modulePath + "/internal/calendarrules.NormalizeAllDayBounds",
+			modulePath + "/internal/calendarrules.RequireAllDayWindow",
 		},
 		Marker: "calendar-precondition",
-		Why: "an all-day row is a date, stored as UTC midnight; a transport " +
-			"that writes the instant it was handed puts the same event on a " +
+		Why: "an all-day row is a date, stored as UTC midnight with a half-open " +
+			"end; a window of any other shape puts the same event on a " +
 			"different square for readers in another zone",
 	},
 	{

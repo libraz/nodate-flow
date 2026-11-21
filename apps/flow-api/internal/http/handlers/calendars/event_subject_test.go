@@ -22,6 +22,7 @@ var notDrivenByThisTest = map[string]string{
 	string(eventbus.CalEventAttachmentCreated): "needs object storage",
 	string(eventbus.CalEventAttachmentDeleted): "needs object storage",
 	"calendar.event.attendee.updated":          "registered for readers; no writer",
+	string(eventbus.CalEventRestored):          "flow-api has no restore operation",
 	string(eventbus.CalMemoCompleted):          "the memo patch appends calendar.memo.updated",
 }
 

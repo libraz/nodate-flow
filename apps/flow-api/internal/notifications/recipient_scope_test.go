@@ -137,6 +137,48 @@ func TestOverrideReminderReachesTheSeriesAttendees(t *testing.T) {
 		"the series' invitee is reminded of the overridden occurrence")
 }
 
+// TestOverrideWithItsOwnAttendeeRowsReplacesTheSeries: an override that
+// holds attendee rows, even only a disabled one, is reminded to its own
+// enabled attendees and not to the series' invitees.
+func TestOverrideWithItsOwnAttendeeRowsReplacesTheSeries(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	inst := helpers.StartShared(t)
+	db := inst.DB
+	ctx := context.Background()
+
+	fx := seedClaimFixture(t, db)
+	seriesInvitee := seedWorkspaceUser(t, db, fx, true)
+	occurrenceInvitee := seedWorkspaceUser(t, db, fx, true)
+	seedAttendee(t, db, fx, fx.eventID, seriesInvitee)
+
+	start := time.Now().UTC().Add(10 * time.Minute)
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO calendar_events (
+			public_id, workspace_id, calendar_id, recurrence_parent_id, recurrence_original_start,
+			title, start_at, end_at, timezone, owner_user_id, created_by_user_id, notification_offset
+		) VALUES (?, ?, ?, ?, ?, 'Moved', ?, ?, 'UTC', ?, ?, 30)`,
+		types.New(), fx.workspaceID, fx.calendarID, fx.eventID, start.Add(-time.Hour),
+		start, start.Add(time.Hour), fx.userID, fx.userID)
+	require.NoError(t, err)
+	raw, err := res.LastInsertId()
+	require.NoError(t, err)
+	overrideID := uint32(raw) //#nosec G115 -- LastInsertId in test seed, fits uint32
+
+	// The series' invitee is recorded as not attending this occurrence.
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO calendar_event_attendees (public_id, workspace_id, event_id, user_id, enabled)
+		 VALUES (?, ?, ?, ?, FALSE)`,
+		types.New(), fx.workspaceID, overrideID, seriesInvitee)
+	require.NoError(t, err)
+	seedAttendee(t, db, fx, overrideID, occurrenceInvitee)
+
+	got, err := reminderRecipients(ctx, db, pendingNotification{
+		ID: overrideID, OwnerUserID: fx.userID, WorkspaceID: fx.workspaceID, SeriesID: fx.eventID,
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint32{fx.userID, occurrenceInvitee}, got)
+}
+
 // TestClaimedOccurrencesAreReadBeforeRecipients pins the pre-check that
 // keeps a claimed occurrence from costing a recipient read every tick.
 func TestClaimedOccurrencesAreReadBeforeRecipients(t *testing.T) {

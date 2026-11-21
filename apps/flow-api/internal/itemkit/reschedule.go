@@ -95,7 +95,10 @@ func rescheduleEvent(ctx context.Context, tx TX, args RescheduleEventArgs, actor
 	// hold: this call moves an event but never converts one, so an all-day
 	// row stays a date and the instants that stand for it stay canonical
 	// whichever transport asked for the move.
-	args.StartAt, args.EndAt = allDayWindow(evt.allDay, args.StartAt, args.EndAt)
+	args.StartAt, args.EndAt, err = allDayWindow(evt.allDay, evt.kind, args.StartAt, args.EndAt)
+	if err != nil {
+		return err
+	}
 
 	const updateSQL = `UPDATE calendar_events
 	                   SET start_at = ?, end_at = ?
@@ -276,7 +279,19 @@ func propagateEventFromTaskDate(ctx context.Context, tx TX, task taskRow, role D
 
 	// Task date has already been snapped upstream; re-run snap here only
 	// to badge the mirrored event's flags consistently.
+	if existing.allDay {
+		// An all-day row stays whole days from the new date at UTC midnight,
+		// whatever the zone's clock says.
+		newStart = dateOnly(newDate).DateColumn()
+		newEnd = newStart.Add(dur)
+	}
 	out := applySnap(newStart, newEnd, snap)
+	if existing.allDay {
+		out.NewStart, out.NewEnd, err = allDayWindow(true, existing.kind, out.NewStart, out.NewEnd)
+		if err != nil {
+			return err
+		}
+	}
 
 	const upd = `UPDATE calendar_events SET start_at = ?, end_at = ? WHERE id = ?`
 	if _, err := tx.ExecContext(ctx, upd,

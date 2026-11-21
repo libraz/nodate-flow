@@ -38,6 +38,10 @@ type Event struct {
 	ActorAgentID *uint32
 	// TaskID is the internal task id when the event targets a task.
 	TaskID *uint32
+	// CalendarID is the internal calendar id when the event targets a
+	// calendar or something inside one. A calendar.* kind about an
+	// existing event carries it; it names the calendar at write time.
+	CalendarID *uint32
 	// Payload is any JSON-encodable value stored in payload_json.
 	Payload any
 	// SubjectPublicID is the public_id of the entity the event is about,
@@ -127,7 +131,7 @@ func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.P
 	}
 	pubID := dbtype.New()
 
-	var actorArg, agentArg, taskArg, subjectArg any
+	var actorArg, agentArg, taskArg, calendarArg, subjectArg any
 	if evt.SubjectPublicID != (dbtype.PublicID{}) {
 		subjectArg = evt.SubjectPublicID
 	}
@@ -140,12 +144,15 @@ func Append(ctx context.Context, db dbretry.CommitBoundary, evt Event) (dbtype.P
 	if evt.TaskID != nil {
 		taskArg = *evt.TaskID
 	}
+	if evt.CalendarID != nil {
+		calendarArg = *evt.CalendarID
+	}
 
-	const q = `INSERT INTO events (public_id, workspace_id, task_id, actor_user_id, actor_agent_id, subject_public_id, type, payload_json, occurred_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `INSERT INTO events (public_id, workspace_id, task_id, calendar_id, actor_user_id, actor_agent_id, subject_public_id, type, payload_json, occurred_at)
+	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	var lastID int64
 	insert := func(ctx context.Context) error {
-		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, actorArg, agentArg, subjectArg, string(evt.Type), raw, occurred)
+		res, err := db.ExecContext(ctx, q, pubID, evt.WorkspaceID, taskArg, calendarArg, actorArg, agentArg, subjectArg, string(evt.Type), raw, occurred)
 		if err != nil {
 			return err
 		}

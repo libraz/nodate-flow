@@ -3,7 +3,6 @@ package calendar
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/tests/helpers"
+	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 )
 
 // seriesBounds is the pair of columns a partial delete writes on the
@@ -49,11 +49,15 @@ func exceptionInstants(t *testing.T, stored sql.NullString) []time.Time {
 	if !stored.Valid || stored.String == "" || stored.String == "null" {
 		return nil
 	}
-	var list []string
-	require.NoError(t, json.Unmarshal([]byte(stored.String), &list), "parse recurrence_exceptions")
+	list := recurrence.ParseExceptions([]byte(stored.String))
 	out := make([]time.Time, 0, len(list))
 	for _, raw := range list {
-		at, err := time.Parse(time.RFC3339, raw)
+		// An all-day series stores bare dates (the UTC midnight they
+		// name); a timed one stores RFC 3339 instants.
+		at, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			at, err = time.Parse(time.RFC3339, raw)
+		}
 		require.NoError(t, err, "parse exception entry %q", raw)
 		out = append(out, at.UTC())
 	}

@@ -61,8 +61,8 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if !strings.Contains(got.query, "INSERT INTO events") {
 		t.Fatalf("query = %q, want an INSERT INTO events", got.query)
 	}
-	if len(got.args) != 9 {
-		t.Fatalf("arg count = %d, want 9", len(got.args))
+	if len(got.args) != 10 {
+		t.Fatalf("arg count = %d, want 10", len(got.args))
 	}
 	if got.args[0] != driver.Value(pubID) {
 		t.Errorf("public_id arg = %v, want the returned %v", got.args[0], pubID)
@@ -73,27 +73,30 @@ func TestAppendWritesTheRow(t *testing.T) {
 	if got.args[2] != driver.Value(task) {
 		t.Errorf("task_id arg = %v, want %d", got.args[2], task)
 	}
-	if got.args[3] != driver.Value(actor) {
-		t.Errorf("actor_user_id arg = %v, want %d", got.args[3], actor)
+	if got.args[3] != nil {
+		t.Errorf("calendar_id arg = %v, want NULL when the event names no calendar", got.args[3])
 	}
-	if got.args[4] != nil {
-		t.Errorf("actor_agent_id arg = %v, want NULL for a human actor", got.args[4])
+	if got.args[4] != driver.Value(actor) {
+		t.Errorf("actor_user_id arg = %v, want %d", got.args[4], actor)
 	}
 	if got.args[5] != nil {
-		t.Errorf("subject_public_id arg = %v, want NULL for a kind with no subject", got.args[5])
+		t.Errorf("actor_agent_id arg = %v, want NULL for a human actor", got.args[5])
 	}
-	if got.args[6] != driver.Value(string(eventbus.ItemScheduled)) {
-		t.Errorf("type arg = %v, want item.scheduled", got.args[6])
+	if got.args[6] != nil {
+		t.Errorf("subject_public_id arg = %v, want NULL for a kind with no subject", got.args[6])
 	}
-	raw, ok := got.args[7].(json.RawMessage)
+	if got.args[7] != driver.Value(string(eventbus.ItemScheduled)) {
+		t.Errorf("type arg = %v, want item.scheduled", got.args[7])
+	}
+	raw, ok := got.args[8].(json.RawMessage)
 	if !ok {
-		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[7])
+		t.Fatalf("payload arg is %T, want json.RawMessage", got.args[8])
 	}
 	if string(raw) != `{"note":"hello"}` {
 		t.Errorf("payload arg = %s, want the marshalled payload", raw)
 	}
-	if got.args[8] != driver.Value(occurred) {
-		t.Errorf("occurred_at arg = %v, want %v", got.args[8], occurred)
+	if got.args[9] != driver.Value(occurred) {
+		t.Errorf("occurred_at arg = %v, want %v", got.args[9], occurred)
 	}
 }
 
@@ -136,14 +139,14 @@ func TestAppendWritesAgentActorWithoutHumanActor(t *testing.T) {
 	if !strings.Contains(got.query, "actor_agent_id") {
 		t.Fatalf("query = %q, want actor_agent_id in the events insert", got.query)
 	}
-	if len(got.args) != 9 {
-		t.Fatalf("arg count = %d, want 9", len(got.args))
+	if len(got.args) != 10 {
+		t.Fatalf("arg count = %d, want 10", len(got.args))
 	}
-	if got.args[3] != nil {
-		t.Errorf("actor_user_id arg = %v, want NULL for an agent actor", got.args[3])
+	if got.args[4] != nil {
+		t.Errorf("actor_user_id arg = %v, want NULL for an agent actor", got.args[4])
 	}
-	if got.args[4] != driver.Value(agent) {
-		t.Errorf("actor_agent_id arg = %v, want %d", got.args[4], agent)
+	if got.args[5] != driver.Value(agent) {
+		t.Errorf("actor_agent_id arg = %v, want %d", got.args[5], agent)
 	}
 }
 
@@ -160,22 +163,22 @@ func TestAppendDefaultsPayloadAndTimestamp(t *testing.T) {
 	after := time.Now().UTC()
 
 	args := rec.statements()[0].args
-	raw, ok := args[7].(json.RawMessage)
+	raw, ok := args[8].(json.RawMessage)
 	if !ok || string(raw) != "{}" {
-		t.Errorf("payload arg = %v, want {}", args[7])
+		t.Errorf("payload arg = %v, want {}", args[8])
 	}
 	if args[2] != nil {
 		t.Errorf("task_id arg = %v, want NULL for an event with no task", args[2])
 	}
-	if args[3] != nil {
-		t.Errorf("actor_user_id arg = %v, want NULL for a system event", args[3])
-	}
 	if args[4] != nil {
-		t.Errorf("actor_agent_id arg = %v, want NULL for a system event", args[4])
+		t.Errorf("actor_user_id arg = %v, want NULL for a system event", args[4])
 	}
-	occurred, ok := args[8].(time.Time)
+	if args[5] != nil {
+		t.Errorf("actor_agent_id arg = %v, want NULL for a system event", args[5])
+	}
+	occurred, ok := args[9].(time.Time)
 	if !ok {
-		t.Fatalf("occurred_at arg is %T, want time.Time", args[8])
+		t.Fatalf("occurred_at arg is %T, want time.Time", args[9])
 	}
 	if occurred.Before(before) || occurred.After(after) {
 		t.Errorf("occurred_at = %v, want a timestamp taken during the call", occurred)
@@ -684,7 +687,7 @@ func TestAppendWritesTheSubject(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append: %v", err)
 	}
-	if got := rec.statements()[0].args[5]; got != driver.Value(subject) {
+	if got := rec.statements()[0].args[6]; got != driver.Value(subject) {
 		t.Errorf("subject_public_id arg = %v, want %v", got, subject)
 	}
 
@@ -694,5 +697,24 @@ func TestAppendWritesTheSubject(t *testing.T) {
 	}
 	if n := len(rec.statements()); n != 1 {
 		t.Errorf("statement count = %d, want the refused append to write nothing", n)
+	}
+}
+
+// TestAppendWritesTheCalendar pins that a calendar named on the event reaches
+// events.calendar_id.
+func TestAppendWritesTheCalendar(t *testing.T) {
+	db, rec := stubDB(t)
+
+	calendarID := uint32(9)
+	if _, err := Append(context.Background(), dbretry.AutoCommit(db), Event{
+		Type:            eventbus.CalEventUpdated,
+		WorkspaceID:     1,
+		CalendarID:      &calendarID,
+		SubjectPublicID: dbtype.New(),
+	}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if got := rec.statements()[0].args[3]; got != driver.Value(calendarID) {
+		t.Errorf("calendar_id arg = %v, want %d", got, calendarID)
 	}
 }

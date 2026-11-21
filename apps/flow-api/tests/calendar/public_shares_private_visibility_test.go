@@ -112,13 +112,14 @@ func TestRenderPublicShare_PrivateEventIsTimeOnly(t *testing.T) {
 		assert.NotEqual(t, secretEvt.ID, id, "confidential event id must not appear")
 	}
 
-	// Default event: full details remain visible.
+	// Default event: title, times and location are visible; memo and url
+	// are not part of what an anonymous reader receives.
 	pub, ok := byID[publicEvt.ID]
 	require.True(t, ok, "default-visibility event must be present")
 	assert.Equal(t, "Public Kickoff", pub["title"], "default event keeps its title")
 	assert.Equal(t, "HQ Room 1", pub["location"], "default event keeps its location")
-	assert.Equal(t, "Bring the roadmap deck", pub["memo"], "default event keeps its memo")
-	assert.Equal(t, "https://example.com/kickoff", pub["url"], "default event keeps its url")
+	assert.Empty(t, pub["memo"], "an anonymous reader never receives the memo")
+	assert.Empty(t, pub["url"], "an anonymous reader never receives the url")
 
 	// Private event: time block visible, descriptive content stripped.
 	priv, ok := byID[privateEvt.ID]

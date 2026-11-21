@@ -103,11 +103,14 @@ SELECT
   ce.task_id,
   ce.updated_at,
   ce.created_at,
-  -- An override shares its series' attendee list, so attendance is read
-  -- off the master as well as off the row itself.
+  -- An override with no attendee rows of its own shares its series' list;
+  -- one that has any replaces it.
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -130,7 +133,18 @@ WHERE ce.calendar_id = ?
     OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -166,7 +180,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -180,7 +197,18 @@ WHERE ce.calendar_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -202,13 +230,17 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   ce.block_label,
   ce.task_id,
   ce.updated_at,
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -244,7 +276,18 @@ WHERE ce.workspace_id = ?
     OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 1000;
 
@@ -273,6 +316,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   ce.block_label,
   ce.recurrence_rule,
   ce.recurrence_end,
@@ -282,7 +326,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -309,7 +356,18 @@ WHERE ce.workspace_id = ?
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC
 LIMIT 1000;
 
@@ -345,6 +403,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   uo.public_id AS owner_public_id,
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
@@ -360,7 +419,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -406,7 +468,18 @@ WHERE ce.recurrence_rule IS NULL
     OR (ce.start_at = ce.end_at AND ce.end_at = sqlc.arg(range_start))
   )
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
@@ -440,6 +513,7 @@ SELECT
   ce.timezone,
   ce.location,
   ce.owner_user_id,
+  ce.created_by_user_id,
   uo.public_id AS owner_public_id,
   uc.public_id AS creator_public_id,
   uc.display_name AS creator_display_name,
@@ -458,7 +532,10 @@ SELECT
   ce.created_at,
   EXISTS (
     SELECT 1 FROM calendar_event_attendees a
-    WHERE a.event_id IN (ce.id, ce.recurrence_parent_id)
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
@@ -495,7 +572,18 @@ WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
   AND (ce.recurrence_end IS NULL OR ce.recurrence_end > ?)
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.start_at ASC, ce.public_id ASC
 LIMIT 2000;
 
@@ -656,9 +744,10 @@ LIMIT 1;
 --
 -- detail-visibility: not-applicable — no title, location, memo or url is selected for attendance to unlock.
 -- The detail rule governs those fields alone, so is_attendee would be a
--- column on the generated row that no mapper could read. The row filter
--- above is a separate matter and stays: a confidential occurrence must not
--- be subtracted from a master the viewer can see.
+-- column on the generated row that no mapper could read. Attendance still
+-- enters through the row filter, which opens a confidential occurrence to
+-- its attendees: a confidential occurrence must not be subtracted from a
+-- master the viewer can see.
 --
 -- The LIMIT is a runaway bound, not a page size. Truncation here would
 -- resurrect duplicates, so it sits far above the number of overrides a
@@ -670,7 +759,18 @@ FROM calendar_events ce
 WHERE ce.workspace_id = ?
   AND ce.recurrence_parent_id IN (sqlc.slice('parent_ids'))
   AND ce.enabled = TRUE
-  AND (ce.visibility <> 'confidential' OR ce.owner_user_id = sqlc.arg(viewer_user_id))
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ))
 ORDER BY ce.recurrence_parent_id ASC, ce.recurrence_original_start ASC
 LIMIT 5000;
 
@@ -750,6 +850,25 @@ FROM calendar_events ce
 WHERE ce.workspace_id = ?
   AND ce.recurrence_parent_id = ?
   AND ce.recurrence_original_start = ?
+LIMIT 1;
+
+-- name: FindCalendarEventParentID :one
+-- The series an override stands in for, by internal id; NULL for any other
+-- row. Lets a caller holding only an event id find whose attendee list it
+-- reads.
+SELECT recurrence_parent_id
+FROM calendar_events
+WHERE id = ?
+LIMIT 1;
+
+-- name: FindCalendarEventAllDay :one
+-- Whether a row is an all-day event, by internal id. The recurrence
+-- exception list of a series is spelled by the series' shape, so a caller
+-- holding only an override reads the master's flag here.
+SELECT all_day
+FROM calendar_events
+WHERE id = ?
+  AND workspace_id = ?
 LIMIT 1;
 
 -- name: FindCalendarEventRecurrenceLink :one
@@ -864,14 +983,25 @@ WHERE workspace_id = ?
 -- is already withdrawn changes nothing and must not be counted.
 --
 -- Scoped to the overrides the acting user can see, on the row filter the
--- range queries carry: a confidential override belonging to somebody else
--- stays enabled past the truncation and keeps rendering to its owner, since
+-- range queries carry: a confidential override the actor is not a party to
+-- stays enabled past the truncation and keeps rendering to its parties, since
 -- disabling it would remove an occurrence from a calendar the actor has no
 -- view of.
-UPDATE calendar_events
-SET enabled = FALSE
-WHERE workspace_id = ?
-  AND recurrence_parent_id = sqlc.arg('parent_id')
-  AND recurrence_original_start >= sqlc.arg('split_start')
-  AND enabled = TRUE
-  AND (visibility <> 'confidential' OR owner_user_id = sqlc.arg('viewer_user_id'));
+UPDATE calendar_events ce
+SET ce.enabled = FALSE
+WHERE ce.workspace_id = ?
+  AND ce.recurrence_parent_id = sqlc.arg('parent_id')
+  AND ce.recurrence_original_start >= sqlc.arg('split_start')
+  AND ce.enabled = TRUE
+  AND (ce.visibility <> 'confidential'
+    OR ce.owner_user_id = sqlc.arg(viewer_user_id)
+    OR ce.created_by_user_id = sqlc.arg(viewer_user_id)
+    OR EXISTS (
+    SELECT 1 FROM calendar_event_attendees a
+    WHERE a.event_id = CASE
+        WHEN ce.recurrence_parent_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM calendar_event_attendees o WHERE o.event_id = ce.id)
+        THEN ce.recurrence_parent_id ELSE ce.id END
+      AND a.user_id = sqlc.arg(viewer_user_id)
+      AND a.enabled = TRUE
+  ));

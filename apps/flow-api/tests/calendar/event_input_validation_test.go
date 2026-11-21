@@ -290,27 +290,35 @@ func TestCreateEventRejectsEndBeforeStart(t *testing.T) {
 	start := time.Date(2026, 5, 6, 10, 0, 0, 0, time.UTC)
 
 	cases := []struct {
-		name   string
-		allDay bool
-		end    time.Time
+		name string
+		body map[string]any
+		want string
 	}{
-		{"timed", false, start.Add(-time.Hour)},
-		{"all day, days inverted", true, start.AddDate(0, 0, -2)},
+		{"timed", map[string]any{
+			"startAt": start.Unix(),
+			"endAt":   start.Add(-time.Hour).Unix(),
+		}, "CALENDAR.EVENT.END_BEFORE_START"},
+		{"all day, days inverted", map[string]any{
+			"allDay":    true,
+			"startDate": "2026-05-06",
+			"endDate":   "2026-05-04",
+		}, "CALENDAR.EVENT.DATE_RANGE_INVALID"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			body := map[string]any{
+				"kind":     "event",
+				"title":    "Inverted " + c.name,
+				"timezone": "UTC",
+			}
+			for k, v := range c.body {
+				body[k] = v
+			}
 			status, raw := helpers.DoJSONStatus(t, http.MethodPost,
-				tt.WsPath("calendars", calID, "events"), tt.AccessToken, map[string]any{
-					"kind":     "event",
-					"title":    "Inverted " + c.name,
-					"allDay":   c.allDay,
-					"startAt":  start.Unix(),
-					"endAt":    c.end.Unix(),
-					"timezone": "UTC",
-				})
+				tt.WsPath("calendars", calID, "events"), tt.AccessToken, body)
 			assert.Equal(t, http.StatusUnprocessableEntity, status,
 				"an inverted range is bad input, not a server fault: got %d body=%s", status, string(raw))
-			assert.Equal(t, "CALENDAR.EVENT.END_BEFORE_START", problemType(t, raw),
+			assert.Equal(t, c.want, problemType(t, raw),
 				"the answer has to name which fields are wrong")
 		})
 	}

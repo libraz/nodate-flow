@@ -701,27 +701,15 @@ func TestRecurrenceEndStopsExpansion(t *testing.T) {
 // TestAllDayEventIsStoredAsACanonicalDate pins the stored form.
 //
 // "All day on 5 August" is a date, and a date is the same square on the
-// calendar for everyone. The column pair is DATETIME, so the date has to
-// be encoded as an instant — and which instant it is has to be one
-// thing. Left to the writer it is two: a browser sends local midnight
-// and MCP sends UTC midnight, so a Tokyo user's holiday arrives as
-// 2026-08-04T15:00Z and shows as the 4th in Europe while its author
-// called it the 5th.
+// calendar for everyone. An all-day write names its window by dates, so the
+// author's zone cannot move it: a Tokyo user's holiday on the 5th is stored
+// at 2027-08-05T00:00Z and read back as the 5th everywhere.
 func TestAllDayEventIsStoredAsACanonicalDate(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
 	tt := newTenant(t)
 	calID := createCalendarMut(t, tt, "All Day Calendar")
-
-	jst, err := time.LoadLocation("Asia/Tokyo")
-	require.NoError(t, err)
-
-	// What the browser dialog sends today: local midnight on 5 August,
-	// which is 2027-08-04T15:00Z.
-	localMidnight := time.Date(2027, 8, 5, 0, 0, 0, 0, jst)
-	require.Equal(t, "2027-08-04", localMidnight.UTC().Format("2006-01-02"),
-		"the fixture must actually straddle the date line, or it proves nothing")
 
 	var evt struct {
 		ID      string `json:"id"`
@@ -731,12 +719,12 @@ func TestAllDayEventIsStoredAsACanonicalDate(t *testing.T) {
 	doJSON(t, http.MethodPost,
 		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/calendars/"+calID+"/events",
 		tt.AccessToken, map[string]any{
-			"kind":     "event",
-			"title":    "Company holiday",
-			"allDay":   true,
-			"startAt":  localMidnight.Unix(),
-			"endAt":    localMidnight.Add(24 * time.Hour).Unix(),
-			"timezone": "Asia/Tokyo",
+			"kind":      "event",
+			"title":     "Company holiday",
+			"allDay":    true,
+			"startDate": "2027-08-05",
+			"endDate":   "2027-08-06",
+			"timezone":  "Asia/Tokyo",
 		}, &evt)
 	require.NotEmpty(t, evt.ID)
 	require.NotNil(t, evt.StartAt)
@@ -744,8 +732,21 @@ func TestAllDayEventIsStoredAsACanonicalDate(t *testing.T) {
 	stored := time.Unix(*evt.StartAt, 0).UTC()
 	assert.Equal(t, 0, stored.Hour(), "an all-day event must be stored at midnight UTC")
 	assert.Equal(t, 0, stored.Minute())
-	assert.Equal(t, "2027-08-04", stored.Format("2006-01-02"),
-		"the date is the UTC day the request's instant falls on")
+	assert.Equal(t, "2027-08-05", stored.Format("2006-01-02"),
+		"the stored day is the date the request named")
+
+	status, body := doJSONStatus(t, http.MethodPost,
+		testServerURL+"/workspaces/"+tt.WorkspacePublicID+"/calendars/"+calID+"/events",
+		tt.AccessToken, map[string]any{
+			"kind":     "event",
+			"title":    "Instants with allDay",
+			"allDay":   true,
+			"startAt":  time.Date(2027, 8, 5, 0, 0, 0, 0, time.UTC).Unix(),
+			"endAt":    time.Date(2027, 8, 6, 0, 0, 0, 0, time.UTC).Unix(),
+			"timezone": "Asia/Tokyo",
+		})
+	assert.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.ALL_DAY_SHAPE")
 
 	out := mcpTool(t, tt, "list_calendar_events", map[string]any{
 		"startDate": "2027-08-01",
@@ -772,11 +773,10 @@ func TestAllDayEventIsStoredAsACanonicalDate(t *testing.T) {
 	assert.True(t, found, "the all-day event must appear in the MCP listing: %s", out)
 }
 
-// TestAllDayNormalisationSurvivesAPatch covers the case where the flag
-// and the times move separately: flipping allDay on later has to pin the
-// instants the row already had, or it keeps wall-clock times that read
-// as a different day for half the workspace.
-func TestAllDayNormalisationSurvivesAPatch(t *testing.T) {
+// TestAllDayToggleNeedsDates covers the flag and the window moving
+// separately: flipping allDay on a timed row has to bring the dates, since
+// the row's instants are not an all-day window.
+func TestAllDayToggleNeedsDates(t *testing.T) {
 	bootstrap(t)
 	t.Parallel()
 
@@ -802,19 +802,22 @@ func TestAllDayNormalisationSurvivesAPatch(t *testing.T) {
 		"/calendars/" + calID + "/events/" + evt.ID
 	status, body := doJSONStatus(t, http.MethodPatch, eventURL, tt.AccessToken,
 		map[string]any{"allDay": true})
+	require.Equal(t, http.StatusUnprocessableEntity, status, "body=%s", string(body))
+	assert.Contains(t, string(body), "CALENDAR.EVENT.ALL_DAY_SHAPE")
+
+	status, body = doJSONStatus(t, http.MethodPatch, eventURL, tt.AccessToken,
+		map[string]any{"allDay": true, "startDate": "2027-08-05", "endDate": "2027-08-06"})
 	require.Equal(t, http.StatusOK, status, "body=%s", string(body))
 
 	var after struct {
 		AllDay  bool   `json:"allDay"`
 		StartAt *int64 `json:"startAt"`
+		EndAt   *int64 `json:"endAt"`
 	}
 	require.NoError(t, json.Unmarshal(body, &after))
 	require.True(t, after.AllDay)
 	require.NotNil(t, after.StartAt)
-
-	stored := time.Unix(*after.StartAt, 0).UTC()
-	assert.Equal(t, 0, stored.Hour(),
-		"flipping allDay must pin the existing instants to midnight UTC, not leave 22:00")
-	assert.Equal(t, "2027-08-05", stored.Format("2006-01-02"),
-		"and it must stay on the day the row was already on")
+	require.NotNil(t, after.EndAt)
+	assert.Equal(t, time.Date(2027, 8, 5, 0, 0, 0, 0, time.UTC).Unix(), *after.StartAt)
+	assert.Equal(t, time.Date(2027, 8, 6, 0, 0, 0, 0, time.UTC).Unix(), *after.EndAt)
 }

@@ -524,7 +524,7 @@ func CancelOccurrence(
 	if refusal := occurrenceRefusal(lockedState(master, locked), at); refusal != nil {
 		return refusal, nil
 	}
-	if err := tombstone(ctx, q, workspaceID, master.ID, locked.RecurrenceExceptions, at); err != nil {
+	if err := tombstone(ctx, q, workspaceID, master.ID, locked.RecurrenceExceptions, at, master.AllDay); err != nil {
 		return nil, err
 	}
 
@@ -583,13 +583,22 @@ func CancelOverride(ctx context.Context, q Queries, workspaceID uint32, row cale
 	if err != nil {
 		return err
 	}
-	return tombstone(ctx, q, workspaceID, masterID, locked.RecurrenceExceptions, link.RecurrenceOriginalStart.Time)
+	// The entry is spelled by the series' shape, which the override's own
+	// all_day flag need not agree with.
+	masterAllDay, err := q.Calendar.FindCalendarEventAllDay(ctx, calendar.FindCalendarEventAllDayParams{
+		ID:          masterID,
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return err
+	}
+	return tombstone(ctx, q, workspaceID, masterID, locked.RecurrenceExceptions, link.RecurrenceOriginalStart.Time, masterAllDay)
 }
 
 // tombstone appends one occurrence's original start to a locked master's
-// exception list.
-func tombstone(ctx context.Context, q Queries, workspaceID, masterID uint32, stored json.RawMessage, at time.Time) error {
-	exceptions, changed, err := AppendException(stored, at)
+// exception list, spelled for a series of whole days or of instants.
+func tombstone(ctx context.Context, q Queries, workspaceID, masterID uint32, stored json.RawMessage, at time.Time, allDay bool) error {
+	exceptions, changed, err := AppendOccurrenceException(stored, at, allDay)
 	if err != nil || !changed {
 		return err
 	}
@@ -1220,4 +1229,36 @@ func nullID(id uint32) sql.NullInt32 {
 // rowID narrows LAST_INSERT_ID onto the INT UNSIGNED id it names.
 func rowID(lastID int64) uint32 {
 	return uint32(lastID) //#nosec G115 -- LAST_INSERT_ID of an INT UNSIGNED column
+}
+
+// OwnAttendees gives an override attendee rows of its own, so that a change
+// to who attends one occurrence replaces the series' list instead of
+// standing alone on it: an override with any attendee row stops reading
+// its series'. When it has none yet, the series' enabled attendees are
+// copied onto it as enabled rows; one that already has rows is left alone.
+func OwnAttendees(ctx context.Context, q *calendar.Queries, workspaceID, overrideID, seriesID uint32) error {
+	has, err := q.HasCalendarEventAttendeeRows(ctx, nullID(overrideID))
+	if err != nil || has {
+		return err
+	}
+	series, err := q.ListCalendarEventAttendees(ctx, calendar.ListCalendarEventAttendeesParams{
+		EventID:     nullID(seriesID),
+		WorkspaceID: workspaceID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, a := range series {
+		if _, err := q.CreateCalendarEventAttendee(ctx, calendar.CreateCalendarEventAttendeeParams{
+			PublicID:    types.New(),
+			WorkspaceID: workspaceID,
+			EventID:     nullID(overrideID),
+			UserID:      a.UserID,
+			Rsvp:        a.Rsvp,
+			CanEdit:     a.CanEdit,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

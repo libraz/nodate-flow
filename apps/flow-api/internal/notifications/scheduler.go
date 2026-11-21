@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/notification"
 	"github.com/libraz/nodate-flow/packages/go-shared/eventbus"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // reminderSystemSource is the events.actor_system_source value stamped
@@ -97,9 +98,14 @@ type pendingNotification struct {
 	OwnerUserID        uint32
 	WorkspaceID        uint32
 	// SeriesID is the master an override stands in for an occurrence of,
-	// zero for any other row. An override shares its series' attendee
-	// list, so the recipients are read off both.
+	// zero for any other row. An override with no attendee rows of its own
+	// inherits its series' list.
 	SeriesID uint32
+	// AllDay and Timezone place an all-day reminder: it is due at
+	// midnight of the occurrence's date in Timezone, not at the UTC
+	// midnight the occurrence is keyed by.
+	AllDay   bool
+	Timezone string
 }
 
 // CheckAndNotify queries for events whose notification window has opened
@@ -323,11 +329,13 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 		  AND ce.start_at IS NOT NULL
 		  AND ce.enabled = TRUE
 		  AND (
-		    (ce.recurrence_rule IS NULL AND ce.start_at > ? AND ce.start_at <= ?)
+		    (ce.recurrence_rule IS NULL AND ce.start_at <= ?
+		        AND ce.start_at > IF(ce.all_day, ?, ?))
 		    OR (ce.recurrence_rule IS NOT NULL
-		        AND (ce.recurrence_end IS NULL OR ce.recurrence_end >= ?))
+		        AND (ce.recurrence_end IS NULL OR ce.recurrence_end >= IF(ce.all_day, ?, ?)))
 		  )
-	`, now, horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute), now)
+	`, horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute),
+		now.Add(-allDaySlack), now, now.Add(-allDaySlack), now)
 	if err != nil {
 		return nil, err
 	}
@@ -355,6 +363,8 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 		if seriesID.Valid {
 			c.n.SeriesID = uint32(seriesID.Int32) //#nosec G115 -- internal row id read back from an INT UNSIGNED column
 		}
+		c.n.AllDay = c.allDay
+		c.n.Timezone = c.timezone
 
 		rule, perr := recurrence.ParseRule(ruleRaw)
 		if perr != nil {
@@ -402,7 +412,7 @@ func dueReminders(ctx context.Context, db *sql.DB, now time.Time) ([]pendingNoti
 			OverriddenStarts: overridden[overrideKey{workspaceID: c.n.WorkspaceID, parentID: c.n.ID}],
 			RecurrenceEnd:    c.seriesEnd,
 			AllDay:           c.allDay,
-		}, now, horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute)) {
+		}, expandFrom(c.allDay, now), horizon.Add(time.Duration(maxReminderOffsetMinutes)*time.Minute)) {
 			if occ, ok := dueOccurrence(c.n, inst.StartAt, now); ok {
 				claimedRows = append(claimedRows, occ)
 			}
@@ -541,10 +551,24 @@ type claimKey struct {
 	occurrence int64
 }
 
+// claimFloor is the earliest claim key worth reading. A claim is keyed by
+// the occurrence's start, and an all-day occurrence in a western zone is
+// still ahead after its UTC midnight has passed, so reading from now
+// would miss the claim and send the reminder again.
+func claimFloor(due []pendingNotification, now time.Time) time.Time {
+	floor := now
+	for _, n := range due {
+		if n.OccurrenceStart.Before(floor) {
+			floor = n.OccurrenceStart
+		}
+	}
+	return floor
+}
+
 // claimedOccurrences returns which of the due occurrences already hold a
-// claim. Claims are read from now onwards, since a due occurrence has not
-// started yet.
+// claim, read from [claimFloor].
 func claimedOccurrences(ctx context.Context, db *sql.DB, due []pendingNotification, now time.Time) (map[claimKey]bool, error) {
+	floor := claimFloor(due, now)
 	var ids []any
 	seen := map[uint32]bool{}
 	for _, n := range due {
@@ -562,7 +586,7 @@ func claimedOccurrences(ctx context.Context, db *sql.DB, due []pendingNotificati
 			FROM calendar_event_reminders
 			WHERE occurrence_start >= ?
 			  AND event_id IN (?` + strings.Repeat(",?", len(chunk)-1) + `)`
-		args := append([]any{now}, chunk...)
+		args := append([]any{floor}, chunk...)
 		if err := func() error {
 			rows, err := db.QueryContext(ctx, q, args...)
 			if err != nil {
@@ -593,13 +617,44 @@ func claimedOccurrences(ctx context.Context, db *sql.DB, due []pendingNotificati
 // this" and keeps the scan bounded.
 const maxReminderOffsetMinutes = 7 * 24 * 60
 
+// allDaySlack is how far before now an all-day occurrence's UTC midnight
+// may lie while its reminder is still ahead: the zone midnight it is due
+// at is up to a day later than the UTC midnight it is keyed by.
+const allDaySlack = 24 * time.Hour
+
+// expandFrom is the lower bound of the occurrence expansion for a series.
+func expandFrom(allDay bool, now time.Time) time.Time {
+	if allDay {
+		return now.Add(-allDaySlack)
+	}
+	return now
+}
+
+// startInstant is the instant an occurrence begins at. A timed
+// occurrence begins at its own start; an all-day one at midnight of its
+// UTC date in the event's timezone, which is also what its reminder
+// counts back from. An unreadable zone falls back to UTC.
+func startInstant(base pendingNotification, occurrenceStart time.Time) time.Time {
+	if !base.AllDay {
+		return occurrenceStart
+	}
+	zone, err := region.Resolve(base.Timezone)
+	if err != nil {
+		return occurrenceStart
+	}
+	d := occurrenceStart.UTC()
+	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, zone.Location())
+}
+
 // dueOccurrence decides whether one occurrence's reminder is due now:
 // the occurrence has not started, and its reminder time has passed.
+// The occurrence is keyed by occurrenceStart whatever instant it begins at.
 func dueOccurrence(base pendingNotification, occurrenceStart, now time.Time) (pendingNotification, bool) {
-	if !occurrenceStart.After(now) {
+	begins := startInstant(base, occurrenceStart)
+	if !begins.After(now) {
 		return pendingNotification{}, false
 	}
-	remindAt := occurrenceStart.Add(-time.Duration(base.NotificationOffset) * time.Minute)
+	remindAt := begins.Add(-time.Duration(base.NotificationOffset) * time.Minute)
 	if remindAt.After(now) {
 		return pendingNotification{}, false
 	}
@@ -608,16 +663,31 @@ func dueOccurrence(base pendingNotification, occurrenceStart, now time.Time) (pe
 	return out, true
 }
 
+// attendeeSource picks whose attendee rows decide an occurrence's
+// recipients: an override's own when it has any (enabled or not), else its
+// series'. This is replacement, not union.
+func attendeeSource(n pendingNotification, overrideHasRows bool) uint32 {
+	if n.SeriesID != 0 && !overrideHasRows {
+		return n.SeriesID
+	}
+	return n.ID
+}
+
 // reminderRecipients returns the set of user ids that should receive a
-// reminder: every enabled attendee plus the event owner, kept only while
-// each is an enabled user and an enabled member of the event's
-// workspace. An override's attendees are its series', so both rows are
-// read. Each user appears once, so an owner who is also an attendee
-// receives one notification row, not two.
+// reminder: every enabled attendee of the occurrence plus the event owner,
+// kept only while each is an enabled user and an enabled member of the
+// event's workspace. Each user appears once, so an owner who is also an
+// attendee receives one notification row, not two.
 func reminderRecipients(ctx context.Context, db *sql.DB, n pendingNotification) ([]uint32, error) {
-	seriesID := n.SeriesID
-	if seriesID == 0 {
-		seriesID = n.ID
+	source := n.ID
+	if n.SeriesID != 0 {
+		var own bool
+		if err := db.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM calendar_event_attendees WHERE event_id = ?)`, n.ID,
+		).Scan(&own); err != nil {
+			return nil, err
+		}
+		source = attendeeSource(n, own)
 	}
 	rows, err := db.QueryContext(ctx, `
 		SELECT DISTINCT wm.user_id
@@ -630,11 +700,11 @@ func reminderRecipients(ctx context.Context, db *sql.DB, n pendingNotification) 
 		    OR wm.user_id IN (
 		      SELECT a.user_id
 		      FROM calendar_event_attendees a
-		      WHERE a.event_id IN (?, ?)
+		      WHERE a.event_id = ?
 		        AND a.enabled = TRUE
 		    )
 		  )
-	`, n.WorkspaceID, n.OwnerUserID, n.ID, seriesID)
+	`, n.WorkspaceID, n.OwnerUserID, source)
 	if err != nil {
 		return nil, err
 	}

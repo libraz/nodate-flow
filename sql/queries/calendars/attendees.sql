@@ -68,6 +68,17 @@ WHERE event_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: HasCalendarEventAttendeeRows :one
+-- Whether an event has any attendee row, enabled or not.
+--
+-- An override row with any row of its own replaces its series' attendee
+-- list; one with none inherits it. Disabled rows count, because they are
+-- how an override records that someone on the series is not attending.
+SELECT EXISTS (
+  SELECT 1 FROM calendar_event_attendees
+  WHERE event_id = ?
+) AS has_rows;
+
 -- name: UpdateAttendeeRsvp :exec
 -- Update an attendee's RSVP response (self-service).
 --

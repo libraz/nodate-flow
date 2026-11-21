@@ -3,6 +3,7 @@ package mcp_test
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -279,15 +280,14 @@ func TestMCPCalendarMutationsNameTheCalendarTheyLandedOn(t *testing.T) {
 			"the edited event sits on calendar %d and the edit was recorded against %d", landed, recorded.Int64)
 	})
 
-	t.Run("update_calendar_event/linked_records_no_calendar", func(t *testing.T) {
-		// Stated behaviour, not an oversight. A linked event's edit is
-		// appended by itemkit inside its own transaction, through an event
-		// type that carries no calendar column at all — so this branch has
-		// no calendar id to record and deliberately passes none. Anyone
-		// "fixing" it has to change what itemkit appends first; until then
-		// a value here would be written by nobody and read by nobody.
+	t.Run("update_calendar_event/linked_rows_name_the_calendar", func(t *testing.T) {
+		// A linked event's edit is appended by itemkit inside its own
+		// transaction. Its calendar.* rows are about an existing event, so
+		// they name that event's calendar; the item.* rows are not about a
+		// calendar and leave the column empty.
 		require.NotEqual(t, uuid.Nil, fx.linkedEventPub, "the projection event was not created")
 		linkedPub := fx.linkedEventPub.String()
+		linkedCal := calSubjectLandedCalendar(t, db, fx.wsID, fx.linkedEventPub)
 		beforeAudit := countAuditRows(t, db, fx.wsID, "calendar.event.update")
 
 		_, err := mcp.RunUpdateCalendarEvent(ctx, deps, sess, mcpTrailArgs(t, map[string]any{
@@ -309,9 +309,12 @@ func TestMCPCalendarMutationsNameTheCalendarTheyLandedOn(t *testing.T) {
 			var calID sql.NullInt64
 			require.NoError(t, rows.Scan(&kind, &calID))
 			seen++
-			require.Falsef(t, calID.Valid,
-				"%s carries calendar %d; itemkit appends this row and has no calendar to put there, so a value in it came from somewhere that did not read the event",
-				kind, calID.Int64)
+			if strings.HasPrefix(kind, "calendar.") {
+				require.Truef(t, calID.Valid, "%s names no calendar", kind)
+				require.Equalf(t, int64(linkedCal), calID.Int64, "%s names calendar %d", kind, calID.Int64)
+			} else {
+				require.Falsef(t, calID.Valid, "%s is not about a calendar but carries %d", kind, calID.Int64)
+			}
 		}
 		require.NoError(t, rows.Err())
 		require.NotZero(t, seen,
@@ -380,13 +383,9 @@ func TestMCPCalendarMutationsNameTheCalendarTheyLandedOn(t *testing.T) {
 			"a task-projected event holds the due role; any other value is a row the projection engine will not recognise")
 		require.True(t, enabled)
 
-		// No calendar id is recorded, and that follows from the event type
-		// the projection engine appends through rather than from the tool
-		// forgetting: itemkit files item.scheduled and its legacy
-		// counterpart, and neither carries a calendar column. So this path
-		// records the audit half only — the same shape as the linked branch
-		// of update_calendar_event above. A value here would have to be
-		// written by something that does not read the event.
+		// itemkit files item.scheduled and its legacy calendar.event.created
+		// counterpart: the calendar.* row names the calendar the projection
+		// landed on, the item.* row is not about a calendar.
 		rows, err := db.Query(
 			`SELECT type, calendar_id FROM events
 			 WHERE workspace_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.eventPublicId')) = ?`,
@@ -399,9 +398,12 @@ func TestMCPCalendarMutationsNameTheCalendarTheyLandedOn(t *testing.T) {
 			var calID sql.NullInt64
 			require.NoError(t, rows.Scan(&kind, &calID))
 			seen++
-			require.Falsef(t, calID.Valid,
-				"%s carries calendar %d; the projection engine appends this row through an event type with no calendar field",
-				kind, calID.Int64)
+			if strings.HasPrefix(kind, "calendar.") {
+				require.Truef(t, calID.Valid, "%s names no calendar", kind)
+				require.Equalf(t, int64(landedCal), calID.Int64, "%s names calendar %d", kind, calID.Int64)
+			} else {
+				require.Falsef(t, calID.Valid, "%s is not about a calendar but carries %d", kind, calID.Int64)
+			}
 		}
 		require.NoError(t, rows.Err())
 		require.NotZero(t, seen,
