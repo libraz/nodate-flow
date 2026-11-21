@@ -1,97 +1,77 @@
 /**
- * Theme switching E2E.
+ * Theme E2E.
  *
- * Documented behaviour (verified from source):
+ * The theme picker lives in accounts-web; flow-web only applies the result.
+ * The preference is changed with `PATCH /me { themePreference }` and the
+ * test asserts what flow-web renders after loading:
  *
- *   - The theme is set via `<html data-theme="...">`. The provider in
- *     `apps/flow-web/src/providers/theme-provider.tsx` delegates to
- *     `packages/ui/src/providers/theme-provider.tsx` which writes the
- *     attribute via `document.documentElement.setAttribute('data-theme', next)`.
- *   - The picker lives at /settings (redirected to /settings/profile) and is
- *     rendered by `ProfileForm` using the shared `ThemePicker` primitive
- *     (`role="radiogroup" aria-label="Theme"` with `role="radio"` family
- *     buttons + a separate `Color mode` radiogroup).
- *   - Ten concrete themes exist: {glass,modern,washi,classic,nothing}-{light,dark}.
- *     The picker exposes 5 family buttons and 3 mode buttons (light / dark /
- *     system); we cycle every (family, mode) pair to visit all ten.
- *   - Persistence: `nf.theme` localStorage key + `PATCH /me` with
- *     `{ themePreference }`. The OpenAPI enum is
- *     `glass-light,glass-dark,modern-light,modern-dark,washi-light,washi-dark,classic-light,classic-dark,nothing-light,nothing-dark,system`.
- *   - Calendar tokens differ across themes: `--nf-cal-task-color`,
- *     `--nf-cal-task-subtle`, `--nf-cal-color-1` ... `-10`.
- *   - Flash prevention: an inline IIFE in `apps/flow-web/index.html`
- *     reads localStorage and sets `data-theme` BEFORE React renders.
+ *   - `<html data-theme>` converges to the stored concrete theme (the
+ *     provider hydrates from `GET /me` over whatever localStorage holds).
+ *   - `system` follows the emulated OS colour scheme.
+ *   - Colour and calendar tokens differ between dark and light variants.
+ *   - An inline boot script in `index.html` sets `data-theme` from
+ *     localStorage before React mounts (no flash on reload).
+ *
+ * Every test owns a fresh tenant so the PATCH cannot leak into other specs.
  */
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { loadTenants } from './fixtures/load-tenants';
-import { AUTH_API_URL, injectAuth, type TestTenant } from './fixtures/tenant';
+import {
+  AUTH_API_URL,
+  cleanupTenant,
+  createTestTenant,
+  injectAuth,
+  type TestTenant,
+} from './fixtures/tenant';
 
 type Family = 'glass' | 'modern' | 'washi' | 'classic' | 'nothing';
 type Mode = 'light' | 'dark';
 type ThemeId = `${Family}-${Mode}`;
 
-const FAMILY_LABEL: Record<Family, RegExp> = {
-  glass: /^glass$/i,
-  modern: /^modern$/i,
-  washi: /^washi$/i,
-  classic: /^classic$/i,
-  nothing: /^nothing$/i,
-};
+const FAMILIES: readonly Family[] = ['glass', 'modern', 'washi', 'classic', 'nothing'];
 
-const MODE_LABEL: Record<Mode, RegExp> = {
-  // The settings UI uses translated labels ("Light"/"Dark" or
-  // "ライト"/"ダーク"). Match either to stay locale-agnostic.
-  light: /^(light|ライト)$/i,
-  dark: /^(dark|ダーク)$/i,
-};
+const ALL_THEMES: ThemeId[] = FAMILIES.flatMap((f) => [`${f}-light`, `${f}-dark`] as ThemeId[]);
 
-const ALL_THEMES: ThemeId[] = [
-  'glass-light',
-  'glass-dark',
-  'modern-light',
-  'modern-dark',
-  'washi-light',
-  'washi-dark',
-  'classic-light',
-  'classic-dark',
-  'nothing-light',
-  'nothing-dark',
-];
-
-/**
- * Open /settings/profile for the supplied tenant and wait for the picker
- * to be interactable. Returns the page handle for chaining.
- */
-async function openSettings(page: Page, tenant: TestTenant): Promise<void> {
-  await injectAuth(page.context(), tenant);
-  await page.goto('/settings/profile');
-  // Theme radiogroups are rendered by ThemePicker. Wait for both groups
-  // (family + color mode) so subsequent clicks aren't racing the lazy
-  // settings route mount.
-  await expect(page.getByRole('radiogroup', { name: /^theme|^テーマ/i })).toBeVisible({
-    timeout: 15_000,
+async function patchThemePreference(tenant: TestTenant, themePreference: string): Promise<void> {
+  const res = await fetch(`${AUTH_API_URL}/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+      authorization: `Bearer ${tenant.accessToken}`,
+    },
+    body: JSON.stringify({ themePreference }),
   });
-  await expect(
-    page.getByRole('radiogroup', { name: /color mode|カラーモード|配色/i }),
-  ).toBeVisible();
+  if (!res.ok) {
+    throw new Error(`PATCH /me ${themePreference} -> ${res.status} ${await res.text()}`);
+  }
+  const body = (await res.json()) as { themePreference?: string };
+  expect(body.themePreference, 'PATCH /me must echo the stored preference').toBe(themePreference);
 }
 
 /**
- * Select the given (family, mode) pair via the picker. Mirrors a real
- * user click on the theme card and the mode pill.
+ * Stores `theme` on the server, loads flow-web and waits for data-theme to converge.
+ *
+ * When the stored local preference differs from the server's, the provider
+ * hydrates and writes the value back with its own `PATCH /me`. That request
+ * is awaited so it cannot land after the next test step's PATCH.
  */
-async function selectTheme(page: Page, family: Family, mode: Mode): Promise<void> {
-  const themeGroup = page.getByRole('radiogroup', { name: /^theme|^テーマ/i });
-  await themeGroup.getByRole('radio', { name: FAMILY_LABEL[family] }).click();
-  const modeGroup = page.getByRole('radiogroup', { name: /color mode|カラーモード|配色/i });
-  await modeGroup.getByRole('radio', { name: MODE_LABEL[mode] }).click();
-  // The provider writes data-theme synchronously inside a useEffect, so
-  // wait for the attribute to converge before the caller asserts.
-  await expect(page.locator('html')).toHaveAttribute('data-theme', `${family}-${mode}`, {
-    timeout: 5_000,
-  });
+async function loadWithTheme(page: Page, tenant: TestTenant, theme: string): Promise<void> {
+  const previous = page.url().startsWith('http')
+    ? await page.evaluate(() => window.localStorage.getItem('nf.theme'))
+    : null;
+  await patchThemePreference(tenant, theme);
+  const writeBack =
+    previous === theme
+      ? Promise.resolve(null)
+      : page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().endsWith('/me'), {
+          timeout: 15_000,
+        });
+  await page.goto('/settings/notifications');
+  await writeBack;
+  await expect(page.locator('#main-content').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme, { timeout: 10_000 });
 }
 
 async function readVar(page: Page, name: string): Promise<string> {
@@ -101,34 +81,51 @@ async function readVar(page: Page, name: string): Promise<string> {
   );
 }
 
-test.describe('theme switching', () => {
-  test('theme attribute reflects each of the ten concrete selections', async ({ page }) => {
-    const { user: tenant } = loadTenants();
-    await openSettings(page, tenant);
+test.describe('theme', () => {
+  let tenant: TestTenant;
+  test.beforeEach(async ({ page }) => {
+    tenant = await createTestTenant({ locale: 'en' });
+    await injectAuth(page.context(), tenant);
+  });
+  test.afterEach(async () => {
+    await cleanupTenant(tenant);
+  });
 
+  test('data-theme reflects each of the ten concrete preferences stored via PATCH /me', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
     for (const id of ALL_THEMES) {
-      const [family, mode] = id.split('-') as [Family, Mode];
-      await selectTheme(page, family, mode);
-      // selectTheme already waits, but re-read explicitly so the failure
-      // message points at the exact pair the loop is on.
+      await loadWithTheme(page, tenant, id);
       const attr = await page.locator('html').getAttribute('data-theme');
-      expect(attr, `expected data-theme=${id} after picking ${family}+${mode}`).toBe(id);
+      expect(attr, `expected data-theme=${id} after PATCH /me`).toBe(id);
     }
   });
 
-  test('core color tokens flip between dark and light variants', async ({ page }) => {
-    const { user: tenant } = loadTenants();
-    await openSettings(page, tenant);
+  test('system preference follows the OS colour scheme', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await patchThemePreference(tenant, 'system');
+    await page.goto('/settings/notifications');
+    await expect(page.locator('#main-content').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', /-dark$/, { timeout: 10_000 });
 
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', /-light$/, {
+      timeout: 10_000,
+    });
+  });
+
+  test('core color tokens flip between dark and light variants', async ({ page }) => {
+    test.setTimeout(120_000);
     // Only the roles that must invert; classic and nothing keep one accent and success across modes.
     const TOKENS = ['--nf-color-fg', '--nf-color-bg', '--nf-color-border'];
 
-    for (const family of ['glass', 'modern', 'washi', 'classic', 'nothing'] as Family[]) {
-      await selectTheme(page, family, 'dark');
+    for (const family of FAMILIES) {
+      await loadWithTheme(page, tenant, `${family}-dark`);
       const dark: Record<string, string> = {};
       for (const t of TOKENS) dark[t] = await readVar(page, t);
 
-      await selectTheme(page, family, 'light');
+      await loadWithTheme(page, tenant, `${family}-light`);
       for (const t of TOKENS) {
         const lightVal = await readVar(page, t);
         expect(lightVal, `${t} must be defined for ${family}-light`).not.toBe('');
@@ -141,101 +138,40 @@ test.describe('theme switching', () => {
   });
 
   test('calendar tokens flip across themes', async ({ page }) => {
-    const { user: tenant } = loadTenants();
-    await openSettings(page, tenant);
-
-    // --nf-cal-task-color is defined per-theme; dark and light variants
-    // of the same family use different oklch lightness values, so the
-    // computed value must change. We don't pin a specific oklch literal —
-    // any non-empty difference is enough.
-    const family: Family = 'washi';
-    await selectTheme(page, family, 'dark');
+    await loadWithTheme(page, tenant, 'washi-dark');
     const darkVal = await readVar(page, '--nf-cal-task-color');
     expect(darkVal, '--nf-cal-task-color must be defined in washi-dark').not.toBe('');
 
-    await selectTheme(page, family, 'light');
+    await loadWithTheme(page, tenant, 'washi-light');
     const lightVal = await readVar(page, '--nf-cal-task-color');
     expect(lightVal, '--nf-cal-task-color must be defined in washi-light').not.toBe('');
-    expect(
-      lightVal,
-      `--nf-cal-task-color must differ between dark (${darkVal}) and light (${lightVal})`,
-    ).not.toBe(darkVal);
+    expect(lightVal, 'washi-dark vs washi-light must differ').not.toBe(darkVal);
 
-    // Cross-family comparison too: washi-light vs glass-light should
-    // also differ because each family defines its own calendar palette.
-    await selectTheme(page, 'glass', 'light');
+    await loadWithTheme(page, tenant, 'glass-light');
     const glassLight = await readVar(page, '--nf-cal-task-color');
     expect(glassLight).not.toBe('');
     expect(glassLight, 'washi-light vs glass-light must differ').not.toBe(lightVal);
   });
 
-  test('persists themePreference on the server via PATCH /me', async ({ page }) => {
-    const { user: tenant } = loadTenants();
-    await openSettings(page, tenant);
+  test('no flash on reload: data-theme is set before React mounts', async ({ page }) => {
+    await loadWithTheme(page, tenant, 'washi-light');
 
-    await selectTheme(page, 'washi', 'dark');
+    // The provider mirrors the applied theme into localStorage.
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem('nf.theme')), { timeout: 5_000 })
+      .toBe('washi-light');
 
-    // The provider writes localStorage in the same useEffect that sets
-    // data-theme, but the server PATCH is fire-and-forget, so poll until
-    // the server reflects our pick (or fail loudly).
-    const stored = await page.evaluate(() => window.localStorage.getItem('nf.theme'));
-    expect(stored).toBe('washi-dark');
-
-    let serverPref: string | null = null;
-    for (let attempt = 0; attempt < 20; attempt++) {
-      const res = await fetch(`${AUTH_API_URL}/me`, {
-        headers: {
-          accept: 'application/json',
-          authorization: `Bearer ${tenant.accessToken}`,
-        },
-      });
-      expect(res.ok, `GET /me -> ${res.status}`).toBeTruthy();
-      const body = (await res.json()) as { themePreference?: string };
-      if (body.themePreference === 'washi-dark') {
-        serverPref = body.themePreference;
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    expect(serverPref, 'PATCH /me must persist themePreference').toBe('washi-dark');
-  });
-
-  test('no flash on reload — data-theme is set before React mounts', async ({ page }) => {
-    const { user: tenant } = loadTenants();
-    await openSettings(page, tenant);
-
-    // Pick a non-default theme so the boot script has something to do.
-    await selectTheme(page, 'washi', 'light');
-
-    // Confirm localStorage carries the pick before reload.
-    const stored = await page.evaluate(() => window.localStorage.getItem('nf.theme'));
-    expect(stored).toBe('washi-light');
-
-    // `domcontentloaded` fires AFTER the HTML head is parsed (so the
-    // inline IIFE in index.html that sets data-theme has executed) but
-    // BEFORE the deferred <script type="module"> for React has finished
-    // evaluating. Reading data-theme at this point therefore measures
-    // the boot script's effect, not React's.
-    //
-    // Note: `commit` is too early — the document is essentially empty
-    // and `<html>` has no children yet, so data-theme reads as null.
-    await page.goto('/settings/profile', { waitUntil: 'domcontentloaded' });
+    // `domcontentloaded` fires after the head's inline boot script ran but
+    // before the deferred module bundle has rendered, so data-theme read here
+    // is the boot script's doing, not React's.
+    await page.goto('/settings/notifications', { waitUntil: 'domcontentloaded' });
     const initial = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-    expect(initial, 'data-theme must be set by inline boot IIFE before React renders').toBe(
+    expect(initial, 'data-theme must be set by the inline boot script before React renders').toBe(
       'washi-light',
     );
-    // Defence-in-depth: at DOMContentLoaded the React root must still
-    // be empty (or at least not hydrated past the <head> script). The
-    // body's #root div should have no children yet because the React
-    // bundle is in a <script type="module"> which is deferred.
     const rootHtml = await page.evaluate(() => document.getElementById('root')?.innerHTML ?? null);
-    expect(
-      rootHtml,
-      'React root must not have rendered yet at DOMContentLoaded — otherwise this test does not actually verify pre-React paint',
-    ).toBe('');
+    expect(rootHtml, 'React root must still be empty at DOMContentLoaded').toBe('');
 
-    // Ensure the React mount converges to the same value rather than
-    // overwriting with a default.
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'washi-light', {
       timeout: 10_000,
     });

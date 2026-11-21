@@ -1,67 +1,104 @@
 /**
- * Project detail tab strip navigation E2E.
+ * Project sub-nav E2E.
  *
- * The project layout (`/workspaces/$id/projects/$projectId`) renders a
- * tab strip with Overview / Tasks / Gantt / Timeline. Existing tests
- * exercise individual destinations (gantt.spec.ts, timeline.spec.ts) by
- * jumping directly to URLs; none drive the tab strip with clicks. A
- * regression where a tab's `to` prop or `params` shape changes ships
- * green under that pattern.
- *
- * This spec lands on the project overview, then walks the four tabs by
- * click and asserts both the URL and the main content area mount.
+ * The project layout (`/workspaces/$id/projects/$projectId`) renders one
+ * navigation with six links: Tasks / Gantt / Timeline / Overview / Members /
+ * Settings. Members and Settings are their own routes, and the pages behind
+ * Overview, Members and Settings carry no second tab strip of their own.
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import enCommon from '../locales/en/common.json' with { type: 'json' };
 import { loadTenants } from './fixtures/load-tenants';
 import { injectAuth } from './fixtures/tenant';
 
-test.describe('project tab strip', () => {
-  test('navigates between overview, tasks, gantt and timeline via clicks', async ({ page }) => {
-    const { user2: tenant } = loadTenants();
-    await injectAuth(page.context(), tenant);
+const nav = enCommon.projects.nav;
 
-    const projectBase = `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}`;
+function subNav(page: Page) {
+  return page.getByRole('navigation', { name: nav.label });
+}
 
-    await page.goto(projectBase);
-    await expect(page.getByRole('main')).toBeVisible({ timeout: 15_000 });
-
-    const tabStrip = page.getByRole('navigation', { name: enCommon.projects.nav.label });
-    await expect(tabStrip).toBeVisible();
-
-    // Tasks
-    await tabStrip.getByRole('link', { name: enCommon.projects.nav.tasks, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`${projectBase}/tasks(/.*)?$`), { timeout: 10_000 });
-    await expect(page.getByRole('main')).toBeVisible();
-
-    // Gantt
-    await tabStrip.getByRole('link', { name: enCommon.projects.nav.gantt, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`${projectBase}/gantt$`), { timeout: 10_000 });
-    await expect(page.getByRole('main')).toBeVisible();
-
-    // Timeline
-    await tabStrip.getByRole('link', { name: enCommon.projects.nav.timeline, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`${projectBase}/timeline$`), { timeout: 10_000 });
-    await expect(page.getByRole('main')).toBeVisible();
-
-    // Overview (return)
-    await tabStrip.getByRole('link', { name: enCommon.projects.nav.overview, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`${projectBase}$`), { timeout: 10_000 });
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
-  test('lists the tabs as tasks, gantt, timeline, overview', async ({ page }) => {
+test.describe('project sub-nav', () => {
+  test('lists six links: tasks, gantt, timeline, overview, members, settings', async ({ page }) => {
     const { user2: tenant } = loadTenants();
     await injectAuth(page.context(), tenant);
 
     await page.goto(`/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}/tasks`);
-    const tabStrip = page.getByRole('navigation', { name: enCommon.projects.nav.label });
-    await expect(tabStrip).toBeVisible({ timeout: 15_000 });
+    await expect(subNav(page)).toBeVisible({ timeout: 15_000 });
 
-    const { tasks, gantt, timeline, overview } = enCommon.projects.nav;
-    await expect(tabStrip.getByRole('link')).toHaveText([tasks, gantt, timeline, overview]);
+    await expect(subNav(page).getByRole('link')).toHaveText([
+      nav.tasks,
+      nav.gantt,
+      nav.timeline,
+      nav.overview,
+      nav.members,
+      nav.settings,
+    ]);
+  });
+
+  test('walks every link by click and lands on its own URL', async ({ page }) => {
+    const { user2: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    const base = `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}`;
+    await page.goto(base);
+    await expect(subNav(page)).toBeVisible({ timeout: 15_000 });
+
+    const steps: Array<{ label: string; url: RegExp }> = [
+      { label: nav.tasks, url: new RegExp(`${base}/tasks(/.*)?$`) },
+      { label: nav.gantt, url: new RegExp(`${base}/gantt$`) },
+      { label: nav.timeline, url: new RegExp(`${base}/timeline$`) },
+      { label: nav.members, url: new RegExp(`${base}/members$`) },
+      { label: nav.settings, url: new RegExp(`${base}/settings$`) },
+      { label: nav.overview, url: new RegExp(`${base}$`) },
+    ];
+    for (const step of steps) {
+      const link = subNav(page).getByRole('link', { name: step.label, exact: true });
+      await link.click();
+      await expect(page, `URL after clicking ${step.label}`).toHaveURL(step.url, {
+        timeout: 10_000,
+      });
+      await expect(link).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('main')).toBeVisible();
+    }
+  });
+
+  test('overview, members and settings pages have no inner tablist', async ({ page }) => {
+    const { user2: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    const base = `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}`;
+    for (const [path, label] of [
+      ['', nav.overview],
+      ['/members', nav.members],
+      ['/settings', nav.settings],
+    ] as const) {
+      await page.goto(`${base}${path}`);
+      await expect(
+        subNav(page).getByRole('link', { name: label, exact: true }),
+        `${label} link is current`,
+      ).toHaveAttribute('aria-current', 'page', { timeout: 15_000 });
+      await expect(page.getByRole('main')).toBeVisible();
+      await expect(page.getByRole('tablist'), `tablist on ${label}`).toHaveCount(0);
+    }
+  });
+
+  test('legacy ?tab= query does not open the settings page', async ({ page }) => {
+    const { user2: tenant } = loadTenants();
+    await injectAuth(page.context(), tenant);
+
+    const base = `/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}`;
+    await page.goto(`${base}?tab=settings`);
+    await expect(subNav(page)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('main')).toBeVisible();
+    // Archive lives on the Settings page only.
+    await expect(
+      page.getByRole('button', { name: enCommon.projects.archive.action, exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      subNav(page).getByRole('link', { name: nav.settings, exact: true }),
+    ).not.toHaveAttribute('aria-current', 'page');
   });
 
   test('opening a project from the workspace project list lands on its tasks', async ({ page }) => {

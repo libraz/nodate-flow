@@ -1,6 +1,6 @@
 /**
- * Project archive E2E: archive from the project settings tab (toast with
- * Undo), the archived banner above the tabs, the archived-projects section
+ * Project archive E2E: archive from the project Settings page (toast with
+ * Undo), the archived banner above the project sub-nav, the archived-projects section
  * on the Archive page, and the command palette candidates.
  */
 
@@ -15,7 +15,8 @@ const copy = {
   restore: enCommon.projects.archive.restore,
   undo: enCommon.common.undo,
   banner: enCommon.projects.archived_banner.text,
-  settingsTab: enCommon.projects.detail.tabs.settings,
+  settingsLink: enCommon.projects.nav.settings,
+  navLabel: enCommon.projects.nav.label,
   archivedProjects: enArchive.projects.title,
   history: enCommon.nav.history,
 } as const;
@@ -33,7 +34,7 @@ function restored(name: string): string {
 }
 
 async function openSettings(page: Page, tenant: TestTenant): Promise<void> {
-  await page.goto(`/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}?tab=settings`);
+  await page.goto(`/workspaces/${tenant.workspaceId}/projects/${tenant.projectId}/settings`);
   await expect(page.getByRole('button', { name: copy.archive, exact: true })).toBeVisible({
     timeout: 15_000,
   });
@@ -64,7 +65,7 @@ test.describe('project archive', () => {
     tenant = null;
   });
 
-  test('archive with undo from the settings tab', async ({ page }) => {
+  test('archive with undo from the project settings page', async ({ page }) => {
     tenant = await createTestTenant();
     const name = projectName(tenant);
     await injectAuth(page.context(), tenant);
@@ -80,7 +81,7 @@ test.describe('project archive', () => {
     await expect(page.getByRole('button', { name: copy.archive, exact: true })).toBeVisible();
   });
 
-  test('banner sits above the tabs and its restore button brings the project back', async ({
+  test('banner sits above the sub-nav and its restore button brings the project back', async ({
     page,
   }) => {
     tenant = await createTestTenant();
@@ -90,11 +91,14 @@ test.describe('project archive', () => {
 
     const banner = page.getByText(copy.banner);
     await expect(banner).toBeVisible({ timeout: 10_000 });
-    const tab = page.getByRole('tab', { name: copy.settingsTab, exact: true });
+    const settingsLink = page
+      .getByRole('navigation', { name: copy.navLabel })
+      .getByRole('link', { name: copy.settingsLink, exact: true });
+    await expect(settingsLink).toHaveAttribute('aria-current', 'page');
     const bannerBox = await banner.boundingBox();
-    const tabBox = await tab.boundingBox();
+    const linkBox = await settingsLink.boundingBox();
     expect(bannerBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(
-      tabBox?.y ?? Number.NEGATIVE_INFINITY,
+      linkBox?.y ?? Number.NEGATIVE_INFINITY,
     );
 
     // Reload so the restore comes from the banner, not the toast.

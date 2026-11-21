@@ -52,10 +52,9 @@ test.describe('workspace sidebar navigation', () => {
       });
       await expect(page.getByText(description, { exact: true })).toBeVisible({ timeout: 10_000 });
 
-      // The tab strip is gone: no navigation landmark named after it.
-      await expect(
-        page.getByRole('navigation', { name: enCommon.workspaces.nav.label }),
-      ).toHaveCount(0);
+      // The tab strip is gone: the page content has no tabs or navigation of its own.
+      await expect(page.getByRole('main').getByRole('tablist')).toHaveCount(0);
+      await expect(page.getByRole('main').getByRole('navigation')).toHaveCount(0);
     } finally {
       await cleanupTenant(tenant);
     }
