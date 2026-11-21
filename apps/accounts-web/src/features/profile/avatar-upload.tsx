@@ -140,7 +140,11 @@ export default function AvatarUpload({ avatarUrl, displayName }: AvatarUploadPro
           className={`${styles.preview} nf-focus-ring`}
           onClick={openPicker}
           disabled={busy}
-          aria-label={hasImage ? t('profile.avatar.replace_aria') : t('profile.avatar.upload_aria')}
+          aria-label={
+            hasImage
+              ? t('profile.avatar.replace_aria')
+              : `${initialsFrom(displayName)} ${t('profile.avatar.upload_aria')}`
+          }
         >
           {previewSrc ? (
             <img

@@ -2,7 +2,13 @@
 
 import { authStore } from '@nodate-flow/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import i18n from 'i18next';
+import ICU from 'i18next-icu';
+import type { ReactElement, ReactNode } from 'react';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import enAuth from '../../../../locales/en/auth.json';
 
 const sdkMocks = vi.hoisted(() => ({ post: vi.fn(), delete: vi.fn() }));
 const toasterMock = vi.hoisted(() => ({ show: vi.fn() }));
@@ -20,8 +26,6 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
 vi.mock('@nodate-flow/ui/primitives/confirm/action', () => confirmMock);
 
 import AvatarUpload from '../avatar-upload';
-import { newKeys } from './new-auth-keys';
-import { withI18n } from './test-i18n';
 
 const BASE_USER = {
   id: 'u1',
@@ -61,6 +65,23 @@ beforeEach(() => {
   globalThis.URL.revokeObjectURL = vi.fn();
 });
 
+function withI18n(children: ReactNode): ReactElement {
+  const instance = i18n.createInstance();
+  void instance
+    .use(ICU)
+    .use(initReactI18next)
+    .init({
+      lng: 'en',
+      fallbackLng: 'en',
+      defaultNS: 'auth',
+      ns: ['auth'],
+      resources: { en: { auth: enAuth } },
+      interpolation: { escapeValue: false },
+      react: { useSuspense: false },
+    });
+  return <I18nextProvider i18n={instance}>{children}</I18nextProvider>;
+}
+
 describe('AvatarUpload', () => {
   it('uploads the picked file as multipart and syncs the session avatar', async () => {
     sdkMocks.post.mockImplementation(() => ok(meBody('https://cdn.test/a.png?v=1')));
@@ -95,7 +116,7 @@ describe('AvatarUpload', () => {
     });
     const call = toasterMock.show.mock.calls[0]?.[0] as { tone: string; message: string };
     expect(call.tone).toBe('danger');
-    expect(call.message.startsWith(newKeys.profile.avatar.upload_error)).toBe(true);
+    expect(call.message.startsWith(enAuth.profile.avatar.upload_error)).toBe(true);
     expect(authStore.getState().user?.avatarUrl ?? null).toBeNull();
   });
 
@@ -123,6 +144,8 @@ describe('AvatarUpload', () => {
   it('offers no Remove button when there is no avatar', () => {
     render(withI18n(<AvatarUpload avatarUrl={null} displayName="Alice Doe" />));
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
-    expect(screen.getByRole('button', { name: newKeys.profile.avatar.upload_aria })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: new RegExp(enAuth.profile.avatar.upload_aria) }),
+    ).toBeTruthy();
   });
 });

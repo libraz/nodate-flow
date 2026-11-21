@@ -8,7 +8,13 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import i18n from 'i18next';
+import ICU from 'i18next-icu';
+import type { ReactElement, ReactNode } from 'react';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import enAuth from '../../../../locales/en/auth.json';
 
 const sdkMocks = vi.hoisted(() => ({ get: vi.fn(), delete: vi.fn(), post: vi.fn() }));
 const toasterMock = vi.hoisted(() => ({ show: vi.fn() }));
@@ -40,8 +46,6 @@ vi.mock('../../../features/auth/use-capabilities', async (importOriginal) => ({
   }),
 }));
 
-import { newKeys } from '../../../features/profile/__tests__/new-auth-keys';
-import { withI18n } from '../../../features/profile/__tests__/test-i18n';
 import { SecurityPage } from '../security';
 
 function mountSecurity(): void {
@@ -92,6 +96,23 @@ beforeEach(() => {
   });
 });
 
+function withI18n(children: ReactNode): ReactElement {
+  const instance = i18n.createInstance();
+  void instance
+    .use(ICU)
+    .use(initReactI18next)
+    .init({
+      lng: 'en',
+      fallbackLng: 'en',
+      defaultNS: 'auth',
+      ns: ['auth'],
+      resources: { en: { auth: enAuth } },
+      interpolation: { escapeValue: false },
+      react: { useSuspense: false },
+    });
+  return <I18nextProvider i18n={instance}>{children}</I18nextProvider>;
+}
+
 describe('SecurityPage -- sign out of all other devices', () => {
   it('asks first, revokes, then refetches the session list', async () => {
     let listCalls = 0;
@@ -109,7 +130,7 @@ describe('SecurityPage -- sign out of all other devices', () => {
     confirmMock.confirmAction.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 
     mountSecurity();
-    const button = await screen.findByRole('button', { name: newKeys.security.session_revoke_all });
+    const button = await screen.findByRole('button', { name: enAuth.security.session_revoke_all });
 
     fireEvent.click(button);
     await waitFor(() => {
@@ -129,9 +150,7 @@ describe('SecurityPage -- sign out of all other devices', () => {
     );
     // Only the current session is left, so the action is no longer offered.
     await waitFor(() => {
-      expect(
-        screen.queryByRole('button', { name: newKeys.security.session_revoke_all }),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: enAuth.security.session_revoke_all })).toBeNull();
     });
   });
 
@@ -153,7 +172,7 @@ describe('SecurityPage -- sign out of all other devices', () => {
 
     mountSecurity();
     fireEvent.click(
-      await screen.findByRole('button', { name: newKeys.security.session_revoke_all }),
+      await screen.findByRole('button', { name: enAuth.security.session_revoke_all }),
     );
 
     await waitFor(() => {
@@ -161,7 +180,7 @@ describe('SecurityPage -- sign out of all other devices', () => {
     });
     const call = toasterMock.show.mock.calls[0]?.[0] as { tone: string; message: string };
     expect(call.tone).toBe('danger');
-    expect(call.message.startsWith(newKeys.security.session_revoke_all_failed)).toBe(true);
+    expect(call.message.startsWith(enAuth.security.session_revoke_all_failed)).toBe(true);
     expect(listCalls).toBe(1);
   });
 
@@ -171,6 +190,6 @@ describe('SecurityPage -- sign out of all other devices', () => {
     );
     mountSecurity();
     await screen.findByText(/10\.0\.0\.2/);
-    expect(screen.queryByRole('button', { name: newKeys.security.session_revoke_all })).toBeNull();
+    expect(screen.queryByRole('button', { name: enAuth.security.session_revoke_all })).toBeNull();
   });
 });

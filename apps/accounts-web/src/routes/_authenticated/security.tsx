@@ -458,7 +458,7 @@ export function SecurityPage(): ReactElement {
             <div>
               <Button
                 type="button"
-                variant="ghost"
+                variant="danger"
                 aria-busy={revokingAll || undefined}
                 disabled={revokingAll}
                 onClick={() => {
