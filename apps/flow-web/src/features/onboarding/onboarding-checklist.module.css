@@ -93,15 +93,14 @@
   padding-block: var(--nf-space-3);
   padding-inline: var(--nf-space-4);
   border-radius: var(--nf-radius-md);
-  border-inline-start: var(--nf-space-0-5) solid transparent;
+  border: var(--nf-space-px) solid transparent;
   background: var(--nf-color-bg);
 }
 
-/* The next step to take: a 3px accent edge marks where to look. */
+/* The next step: accent ring and tint; the filled badge carries the emphasis. */
 .stepNext {
-  /* nf-token-override: 3px emphasis edge, not a spacing step */
-  border-inline-start: 3px solid var(--nf-color-accent);
-  background: var(--nf-color-accent-subtle);
+  border-color: color-mix(in oklab, var(--nf-color-accent) 28%, var(--nf-color-border));
+  background: color-mix(in oklab, var(--nf-color-accent) 10%, var(--nf-color-bg));
 }
 
 .stepDone {

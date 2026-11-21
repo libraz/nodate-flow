@@ -350,11 +350,9 @@
   gap: var(--nf-space-3);
   padding: var(--nf-space-2) var(--nf-space-4);
   cursor: pointer;
-  border-inline-start: 2px solid transparent;
   font-size: var(--nf-text-sm);
   transition:
     background-color var(--nf-duration-instant) var(--nf-ease-standard),
-    border-color var(--nf-duration-instant) var(--nf-ease-standard),
     opacity var(--nf-duration-fast) var(--nf-ease-standard);
 }
 
@@ -364,8 +362,7 @@
 }
 
 .resultRow[data-active="true"] {
-  background: color-mix(in oklab, var(--nf-color-accent) 6%, transparent);
-  border-inline-start-color: var(--nf-color-accent);
+  background: color-mix(in oklab, var(--nf-color-accent) 10%, transparent);
 }
 
 .resultRow:hover:not([aria-disabled="true"]) {

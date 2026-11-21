@@ -91,18 +91,14 @@
   transition-duration: var(--nf-duration-instant);
 }
 
-/* The keyboard position must read at a glance: accent fill, accent text, start bar. */
+/* The keyboard position must read at a glance: accent tint, accent text, full ring. */
 .resultItemActive,
 .resultItemActive:hover {
-  background: var(--nf-color-accent-subtle);
+  background: color-mix(in oklab, var(--nf-color-accent) 10%, var(--nf-color-bg-elevated));
   color: var(--nf-color-accent-fg);
-  box-shadow: inset var(--nf-space-0-5) 0 0 var(--nf-color-accent);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklab, var(--nf-color-accent) 28%, transparent);
   transition-duration: var(--nf-duration-instant);
-}
-
-/* Logical side for the start bar under RTL. */
-:dir(rtl) .resultItemActive {
-  box-shadow: inset calc(var(--nf-space-0-5) * -1) 0 0 var(--nf-color-accent);
 }
 
 .resultIcon {
