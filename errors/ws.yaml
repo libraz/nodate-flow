@@ -30,7 +30,7 @@ resources:
         message_ja: "このワークスペースの URL 用の名前は既に使われています"
         message_zh: "该工作区的 URL 名称已被使用"
         description: "Returned when the requested workspace slug conflicts with an existing workspace on the same instance."
-        userAction: "Choose a different slug."
+        userAction: "Choose a different URL name."
 
   workspace_invite:
     breadcrumb: "Workspace > Invite"
@@ -162,7 +162,7 @@ resources:
         message_ja: "このプロジェクトの URL 用の名前は既に使われています"
         message_zh: "该项目的 URL 名称已被使用"
         description: "Returned when the requested project slug already exists within the workspace."
-        userAction: "Choose a different slug."
+        userAction: "Choose a different URL name."
 
       identifier_already_taken:
         code: WS.PROJECT.IDENTIFIER_ALREADY_TAKEN
