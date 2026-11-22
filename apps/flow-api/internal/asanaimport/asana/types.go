@@ -48,24 +48,31 @@ type Membership struct {
 
 // Task is an Asana task or subtask. Date-only fields stay strings (YYYY-MM-DD).
 type Task struct {
-	GID             string       `json:"gid"`
-	Name            string       `json:"name"`
-	ResourceSubtype string       `json:"resource_subtype"`
-	HTMLNotes       string       `json:"html_notes"`
-	Assignee        *User        `json:"assignee"`
-	Followers       []User       `json:"followers"`
-	CreatedBy       *User        `json:"created_by"`
-	CreatedAt       time.Time    `json:"created_at"`
-	DueOn           string       `json:"due_on"`
-	DueAt           *time.Time   `json:"due_at"`
-	StartOn         string       `json:"start_on"`
-	StartAt         *time.Time   `json:"start_at"`
-	Completed       bool         `json:"completed"`
-	Parent          *Ref         `json:"parent"`
-	Memberships     []Membership `json:"memberships"`
-	Tags            []Tag        `json:"tags"`
-	Dependencies    []Ref        `json:"dependencies"`
-	NumSubtasks     int          `json:"num_subtasks"`
+	GID             string        `json:"gid"`
+	Name            string        `json:"name"`
+	ResourceSubtype string        `json:"resource_subtype"`
+	HTMLNotes       string        `json:"html_notes"`
+	Assignee        *User         `json:"assignee"`
+	Followers       []User        `json:"followers"`
+	CreatedBy       *User         `json:"created_by"`
+	CreatedAt       time.Time     `json:"created_at"`
+	DueOn           string        `json:"due_on"`
+	DueAt           *time.Time    `json:"due_at"`
+	StartOn         string        `json:"start_on"`
+	StartAt         *time.Time    `json:"start_at"`
+	Completed       bool          `json:"completed"`
+	Parent          *Ref          `json:"parent"`
+	Memberships     []Membership  `json:"memberships"`
+	Tags            []Tag         `json:"tags"`
+	Dependencies    []Ref         `json:"dependencies"`
+	NumSubtasks     int           `json:"num_subtasks"`
+	CustomFields    []CustomField `json:"custom_fields"`
+}
+
+// CustomField is one custom field slot on a task; DisplayValue is nil when unset.
+type CustomField struct {
+	GID          string  `json:"gid"`
+	DisplayValue *string `json:"display_value"`
 }
 
 // StoryCommentAdded is the resource_subtype of a user comment.
@@ -100,7 +107,8 @@ const (
 		"created_by.gid,created_by.name,created_by.email," +
 		"created_at,due_on,due_at,start_on,start_at,completed,parent.gid,parent.name," +
 		"memberships.project.gid,memberships.project.name,memberships.section.gid,memberships.section.name," +
-		"tags.gid,tags.name,dependencies.gid,dependencies.name,num_subtasks"
+		"tags.gid,tags.name,dependencies.gid,dependencies.name,num_subtasks," +
+		"custom_fields.gid,custom_fields.display_value"
 	storyFields      = "gid,resource_subtype,html_text,created_by.gid,created_by.name,created_by.email,created_at,num_likes"
 	attachmentFields = "gid,name,host,download_url,view_url,size"
 	projectFields    = "gid,name,archived"
