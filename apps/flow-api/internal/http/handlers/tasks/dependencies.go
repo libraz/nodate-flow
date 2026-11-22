@@ -9,7 +9,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdeps"
@@ -179,52 +178,35 @@ func RemoveDependency(deps Deps) func(context.Context, *RemoveTaskDependencyInpu
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
 		actorID, _ := middleware.ActorFromContext(ctx)
-		taskInternal := int64(task.ID)
-		// Delete the edge and record it atomically inside one tx so
-		// the timeline row cannot be lost between the UPDATE and a
-		// post-commit append (the AddDependency path already commits both
-		// in one tx). dbretry retries transient FK deadlocks with
-		// concurrent transition transactions on the same task rows.
-		var affected int64
+		// Delete the edge and append its timeline row in one tx so the
+		// row cannot be lost between the UPDATE and a post-commit append.
+		// dbretry retries transient FK deadlocks with concurrent
+		// transition transactions on the same task rows.
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.RemoveDependency", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			qtx := deps.Queries.WithTx(tx.RawTx())
-			n, e := qtx.DeleteDependency(ctx, generated.DeleteDependencyParams{
-				WorkspaceID: ws.ID,
-				PublicID:    depID,
-				FromTaskID:  task.ID,
-			})
-			if e != nil {
-				return e
-			}
-			affected = n
-			if n == 0 {
-				// Nothing was deleted, so no event must be appended; the
-				// NOT_FOUND mapping happens outside the tx.
-				return nil
-			}
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-				EventType:    eventbus.TaskDependencyRemoved,
-				AuditAction:  "task.dependency.remove",
-				ResourceType: "task_dependency",
-				ResourceID:   depID.String(),
-				TaskID:       &taskInternal,
-				Payload: map[string]any{
-					"taskId":       task.PublicID.String(),
-					"dependencyId": depID.String(),
-				},
-				CallSite: "tasks.RemoveDependency",
+			return taskdeps.Remove(ctx, tx, taskdeps.RemoveArgs{
+				WorkspaceID:      ws.ID,
+				FromTaskID:       task.ID,
+				DependencyID:     depID,
+				ActorUserID:      actorPtr(ctx),
+				FromTaskPublicID: task.PublicID.String(),
 			})
 		})
 		if txErr != nil {
+			// ErrNotFound means the edge does not exist on this task's
+			// path (it may belong to a sibling task), so a no-op is
+			// distinguishable from a real delete and one task cannot
+			// delete another task's edge.
+			if stderrors.Is(txErr, taskdeps.ErrNotFound) {
+				return nil, httpErr(apierrors.WsTaskNotFound)
+			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
-		// 0 rows means the edge does not exist on this task's path (it may
-		// belong to a sibling task). Return NOT_FOUND so a no-op is
-		// distinguishable from a real delete and one task cannot delete
-		// another task's edge.
-		if affected == 0 {
-			return nil, httpErr(apierrors.WsTaskNotFound)
-		}
+		deps.Mutations.RecordTxAudit(ctx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
+			AuditAction:  "task.dependency.remove",
+			ResourceType: "task_dependency",
+			ResourceID:   depID.String(),
+			CallSite:     "tasks.RemoveDependency (taskdeps.Remove appended the event)",
+		})
 		out := &RemoveTaskDependencyOutput{}
 		out.Body.Ok = true
 		return out, nil

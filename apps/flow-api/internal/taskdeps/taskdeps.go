@@ -1,5 +1,6 @@
 // Package taskdeps owns the one way a task_dependencies edge is
-// written. Every writer goes through [Add] so the guarantees that make
+// written and removed. Every writer goes through [Add] (and [Remove])
+// so the guarantees that make
 // the dependency graph usable — it stays a DAG, and every edge has a
 // timeline row — hold for all of them rather than for whichever call
 // site remembered them.
@@ -33,6 +34,10 @@ var ErrCycle = errors.New("taskdeps: edge closes a dependency cycle")
 // suggestion for an edge somebody already drew is success, while asking
 // for the same edge twice over the API is not.
 var ErrDuplicate = errors.New("taskdeps: edge already exists")
+
+// ErrNotFound is returned by [Remove] when no live edge with that id
+// hangs off the given task in the workspace.
+var ErrNotFound = errors.New("taskdeps: edge not found")
 
 // Args describes one edge. Internal ids drive the writes; the public
 // ids are only used to build the event payload.
@@ -131,6 +136,50 @@ func Add(ctx context.Context, tx *dbretry.Tx, args Args) (types.PublicID, error)
 		return types.PublicID{}, err
 	}
 	return pub, nil
+}
+
+// RemoveArgs identifies the edge to remove. The edge is addressed by its
+// public id and scoped to its owning (from) task, so one task's path
+// cannot delete a sibling's edge.
+type RemoveArgs struct {
+	WorkspaceID  uint32
+	FromTaskID   uint32
+	DependencyID types.PublicID
+
+	// ActorUserID is the internal id of the acting user, nil for system
+	// writers.
+	ActorUserID *int64
+
+	// FromTaskPublicID appears in the event payload.
+	FromTaskPublicID string
+}
+
+// Remove soft-deletes the edge and appends the timeline event on the
+// supplied transaction. It returns [ErrNotFound], appending nothing,
+// when no live edge matches. Audit is the caller's job, after commit.
+func Remove(ctx context.Context, tx *dbretry.Tx, args RemoveArgs) error {
+	n, err := generated.New(tx).DeleteDependency(ctx, generated.DeleteDependencyParams{
+		WorkspaceID: args.WorkspaceID,
+		PublicID:    args.DependencyID,
+		FromTaskID:  args.FromTaskID,
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	fromTask := int64(args.FromTaskID)
+	return eventbus.Append(ctx, tx, eventbus.Event{
+		Type:        eventbus.TaskDependencyRemoved,
+		WorkspaceID: args.WorkspaceID,
+		ActorUserID: args.ActorUserID,
+		TaskID:      &fromTask,
+		Payload: map[string]any{
+			"taskId":       args.FromTaskPublicID,
+			"dependencyId": args.DependencyID.String(),
+		},
+	})
 }
 
 // Edge is one live dependency edge as the cycle walk sees it.
