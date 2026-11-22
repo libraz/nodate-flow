@@ -13,8 +13,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/labels"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/labelkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 )
 
@@ -79,36 +79,35 @@ func runCreateLabel(ctx context.Context, deps Deps, s *session, raw json.RawMess
 	if in.Color == "" {
 		in.Color = "#6b7280"
 	}
-	pub := newPublicID()
+	actor := mutationActor(s)
+	var created labelkit.Label
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.create_label", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		if _, err := deps.Queries.WithTx(tx.RawTx()).CreateLabel(ctx, generated.CreateLabelParams{
-			PublicID:        pub,
-			WorkspaceID:     s.workspaceID,
-			CreatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- actor user id from session, bounded by realistic deployments
-			Name:            in.Name,
-			Color:           in.Color,
-			Description:     sql.NullString{String: in.Description, Valid: in.Description != ""},
-		}); err != nil {
-			return err
-		}
-		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.LabelCreated,
-			AuditAction:  "label.create",
-			ResourceType: "label",
-			ResourceID:   pub.String(),
-			Payload:      map[string]any{"labelId": pub.String(), "name": in.Name, "via": "mcp"},
-			CallSite:     "mcp.create_label",
+		l, err := labelkit.Create(ctx, tx, labelkit.CreateArgs{
+			WorkspaceID: s.workspaceID,
+			Name:        in.Name,
+			Color:       in.Color,
+			Description: in.Description,
+			Actor:       actor,
+			Via:         "mcp",
 		})
+		created = l
+		return err
 	}); err != nil {
-		// A name already in use within the same scope is a refusal the
-		// caller can act on by choosing another one, and no retry changes
-		// it. It is named the way the REST route names it rather than
-		// reported as a tool fault, which reads as a server problem.
-		if handlerutil.IsDuplicateEntry(err) {
+		// A name already in use is a refusal the caller can act on, named
+		// the way the REST route names it rather than as a tool fault.
+		if stderrors.Is(err, labelkit.ErrNameTaken) {
 			return nil, apierrors.New(apierrors.WsLabelNameAlreadyTaken)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	pub := created.PublicID
+	recorder(deps).RecordTxAudit(ctx, actor, mutationlog.Mutation{
+		AuditAction:  "label.create",
+		ResourceType: "label",
+		ResourceID:   pub.String(),
+		Payload:      map[string]any{"labelId": pub.String(), "name": in.Name, "via": "mcp"},
+		CallSite:     "mcp.create_label (labelkit.Create appended the event)",
+	})
 	return map[string]any{"id": pub.String(), "name": in.Name, "color": in.Color}, nil
 }
 
@@ -156,35 +155,31 @@ func runAddTaskLabel(ctx context.Context, deps Deps, s *session, raw json.RawMes
 	if spec := labels.CheckAttachScope(label.ProjectID, access.Task.ProjectID); spec != nil {
 		return nil, apierrors.New(spec)
 	}
-	junctionPub := newPublicID()
+	actor := mutationActor(s)
 	taskID64 := int64(access.Task.ID)
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_task_label", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		if _, err := deps.Queries.WithTx(tx.RawTx()).CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
-			PublicID:    junctionPub,
-			WorkspaceID: s.workspaceID,
-			TaskID:      access.Task.ID,
-			LabelID:     label.ID,
-		}); err != nil {
-			return err
-		}
-		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.TaskLabelAdded,
-			AuditAction:  "task.label.add",
-			ResourceType: "task_label",
-			ResourceID:   labelPub.String(),
-			TaskID:       &taskID64,
-			Payload:      map[string]any{"taskId": taskPub.String(), "labelId": labelPub.String(), "via": "mcp"},
-			CallSite:     "mcp.add_task_label",
+		return labelkit.Attach(ctx, tx, labelkit.AttachArgs{
+			TaskID:        access.Task.ID,
+			LabelID:       label.ID,
+			LabelPublicID: labelPub,
+			Actor:         actor,
+			Via:           "mcp",
 		})
 	}); err != nil {
-		// The label is already on this task. The junction carries one live
-		// row per (task, label), so the state the caller asked for already
-		// holds; the code is the one REST answers for the same duplicate.
-		if handlerutil.IsDuplicateEntry(err) {
+		// The code is the one REST answers for the same duplicate.
+		if stderrors.Is(err, labelkit.ErrAlreadyAttached) {
 			return nil, apierrors.New(apierrors.WsLabelAlreadyAttached)
 		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	recorder(deps).RecordTxAudit(ctx, actor, mutationlog.Mutation{
+		AuditAction:  "task.label.add",
+		ResourceType: "task_label",
+		ResourceID:   labelPub.String(),
+		TaskID:       &taskID64,
+		Payload:      map[string]any{"taskId": taskPub.String(), "labelId": labelPub.String(), "via": "mcp"},
+		CallSite:     "mcp.add_task_label (labelkit.Attach appended the event)",
+	})
 	return map[string]any{"ok": true}, nil
 }
 
@@ -207,27 +202,33 @@ func runRemoveTaskLabel(ctx context.Context, deps Deps, s *session, raw json.Raw
 	if err != nil {
 		return nil, err
 	}
+	actor := mutationActor(s)
 	taskID64 := int64(taskInternal)
-	if err := dbretry.InTx(ctx, deps.DB, "mcp.remove_task_label", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		if err := deps.Queries.WithTx(tx.RawTx()).DisableTaskLabel(ctx, generated.DisableTaskLabelParams{
-			WorkspaceID: s.workspaceID,
-			TaskID:      taskInternal,
-			LabelID:     label.ID,
-		}); err != nil {
-			return err
-		}
-		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.TaskLabelRemoved,
-			AuditAction:  "task.label.remove",
-			ResourceType: "task_label",
-			ResourceID:   labelPub.String(),
-			TaskID:       &taskID64,
-			Payload:      map[string]any{"taskId": taskPub.String(), "labelId": labelPub.String(), "via": "mcp"},
-			CallSite:     "mcp.remove_task_label",
+	err = dbretry.InTx(ctx, deps.DB, "mcp.remove_task_label", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		return labelkit.Detach(ctx, tx, labelkit.AttachArgs{
+			TaskID:        taskInternal,
+			LabelID:       label.ID,
+			LabelPublicID: labelPub,
+			Actor:         actor,
+			Via:           "mcp",
 		})
-	}); err != nil {
+	})
+	// Detaching a label the task does not carry asks for a state that
+	// already holds: success, with nothing written to record.
+	if stderrors.Is(err, labelkit.ErrNotAttached) {
+		return map[string]any{"ok": true}, nil
+	}
+	if err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
+	recorder(deps).RecordTxAudit(ctx, actor, mutationlog.Mutation{
+		AuditAction:  "task.label.remove",
+		ResourceType: "task_label",
+		ResourceID:   labelPub.String(),
+		TaskID:       &taskID64,
+		Payload:      map[string]any{"taskId": taskPub.String(), "labelId": labelPub.String(), "via": "mcp"},
+		CallSite:     "mcp.remove_task_label (labelkit.Detach appended the event)",
+	})
 	return map[string]any{"ok": true}, nil
 }
 
