@@ -1,0 +1,30 @@
+Asana workspace "Acme" (1): projects=3 mapped=2 users=3 tags=2
+Asana project 900 name="Marketing" archived=false
+  mapping: mapped (source: Marketing)
+  tasks: 6 (top-level 4, subtasks 2; default 4, milestone 1, approval 1; completed 2)
+  by section: "Todo"=3, "(no label)"=2, "Done"=1
+  tags: "Bug"=2, "Urgent"=1
+  comments: 8; attachments: asana=2 external=1 too_large=1 type_not_allowed=1
+  dependencies: blocks=2 outside_the_mapping=1 cycle=1
+  person "Hanako" (101) email -> hanako@example.com: assignee=3 creator=2 commenter=4 follower=1
+  person "Taro" (103) unmatched: assignee=0 creator=0 commenter=1 follower=2
+  skipped: empty title=1, parent not imported=0, empty body=2, too large=1, type not allowed=1, outside the mapping=1, cycle=1
+  not imported: custom_fields=3 likes=4 system_stories=5
+  project "Marketing": reuse existing
+Asana project 901 name="Sales" archived=true
+  mapping: mapped (source: 901)
+  tasks: 2 (top-level 2, subtasks 0; default 2, milestone 0, approval 0; completed 0)
+  by section: none
+  tags: none
+  comments: 0; attachments: asana=0 external=0 too_large=0 type_not_allowed=0
+  dependencies: blocks=0 outside_the_mapping=0 cycle=0
+  skipped: empty title=0, parent not imported=0, empty body=0, too large=0, type not allowed=0, outside the mapping=0, cycle=0
+  not imported: custom_fields=0 likes=0 system_stories=0
+  project "Sales": create (slug "asana-901")
+project "Marketing": sync plan tasks create=1 update=1 unchanged=2 delete=1 moved=1 kept=2 synced=5 orphaned=1 repeated=1
+project "Marketing": sync plan comments create=3 update=1 unchanged=4 delete=1 moved=0 kept=1 synced=8 orphaned=0 repeated=0
+project "Sales": sync plan tasks create=2 update=0 unchanged=0 delete=0 moved=0 kept=0 synced=0 orphaned=0 repeated=0
+project "Sales": sync plan comments create=0 update=0 unchanged=0 delete=0 moved=0 kept=0 synced=0 orphaned=0 repeated=0
+sign-in restriction: domains=1 allowlist=2
+users to create: a@example.com, b@example.com
+validation errors: 0
