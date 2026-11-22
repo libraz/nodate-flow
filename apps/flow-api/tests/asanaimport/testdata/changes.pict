@@ -1,0 +1,9 @@
+# One synced task; each parameter is a field Asana can change between runs.
+# Generated rows: pict changes.pict /e:changes-seed.txt /r:7
+Title:       same, changed
+Description: same, changed
+Due:         same, changed, cleared
+Assignee:    same, changed, removed
+Watchers:    same, added, removed
+Labels:      same, tagAdded, sectionChanged, tagRemoved
+Completion:  same, complete, reopen

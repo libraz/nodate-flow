@@ -1,0 +1,19 @@
+Asana workspace "Acme Asana" (1): projects=2 mapped=1 users=5 tags=2
+Asana project 900 name="Marketing" archived=false
+  mapping: mapped (source: 900)
+  tasks: 5 (top-level 4, subtasks 1; default 3, milestone 1, approval 1; completed 2)
+  by section: "Todo"=2, "Done"=1, "(no label)"=1
+  tags: "Bug"=2, "Docs"=1
+  comments: 4; attachments: asana=2 external=1 too_large=0 type_not_allowed=1
+  dependencies: blocks=1 outside_the_mapping=1 cycle=0
+  person "Ghost Writer" (103) unmatched: assignee=1 creator=1 commenter=1 follower=0
+  person "Hanako Yamada" (101) explicit -> {{HANAKO}}: assignee=1 creator=1 commenter=2 follower=0
+  person "Kenji Sato" (104) not-member -> {{KENJI}}: assignee=0 creator=0 commenter=0 follower=1
+  person "Ops Lead" (100) email -> {{OPS}}: assignee=0 creator=1 commenter=1 follower=1
+  person "Taro Suzuki" (102) email -> {{TARO}}: assignee=1 creator=1 commenter=0 follower=1
+  skipped: empty title=1, parent not imported=0, empty body=1, too large=0, type not allowed=1, outside the mapping=1, cycle=0
+  not imported: custom_fields=1 likes=3 system_stories=1
+  project "Marketing": create (slug "asana-900")
+sign-in restriction: open
+users to create: {{TARO}}, {{KENJI}}
+validation errors: 0
