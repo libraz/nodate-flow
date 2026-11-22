@@ -246,8 +246,10 @@ INSERT INTO tasks (
   priority,
   due_on,
   started_on,
-  visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  visibility,
+  created_at,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP(3)), ?)
 `
 
 type CreateTaskParams struct {
@@ -264,6 +266,8 @@ type CreateTaskParams struct {
 	DueOn           sql.NullTime    `json:"dueOn"`
 	StartedOn       sql.NullTime    `json:"startedOn"`
 	Visibility      TasksVisibility `json:"visibility"`
+	CreatedAt       interface{}     `json:"createdAt"`
+	SourceUid       sql.NullString  `json:"-"`
 }
 
 // Insert a new task. derived_state defaults to 'open' and must NOT be set
@@ -286,6 +290,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.DueOn,
 		arg.StartedOn,
 		arg.Visibility,
+		arg.CreatedAt,
+		arg.SourceUid,
 	)
 	if err != nil {
 		return 0, err

@@ -16,6 +16,8 @@ CREATE TABLE comments (
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
   edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
+  source_uid VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Namespaced ID of the external record this comment was imported from, such as asana:<gid>. NULL when the comment was written here. Never exposed through the API.',
+  source_uid_key VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin GENERATED ALWAYS AS (IF(enabled, source_uid, NULL)) STORED COMMENT 'source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_comments_task_id_source_uid_key to live rows. Generated: never written directly.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -35,6 +37,7 @@ CREATE TABLE comments (
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
+  UNIQUE KEY uniq_comments_task_id_source_uid_key (task_id, source_uid_key),
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

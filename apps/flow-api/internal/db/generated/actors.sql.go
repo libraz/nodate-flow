@@ -90,6 +90,37 @@ func (q *Queries) AddAgentActor(ctx context.Context, arg AddAgentActorParams) (i
 	return result.LastInsertId()
 }
 
+const findActiveTaskActor = `-- name: FindActiveTaskActor :one
+SELECT public_id
+FROM task_actors
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND user_id = ?
+  AND role = ?
+  AND enabled = TRUE
+LIMIT 1
+`
+
+type FindActiveTaskActorParams struct {
+	WorkspaceID uint32         `json:"-"`
+	TaskID      uint32         `json:"-"`
+	UserID      sql.NullInt32  `json:"-"`
+	Role        TaskActorsRole `json:"role"`
+}
+
+// Used to refuse re-adding an active actor without the upsert minting a new public id.
+func (q *Queries) FindActiveTaskActor(ctx context.Context, arg FindActiveTaskActorParams) (types.PublicID, error) {
+	row := q.db.QueryRowContext(ctx, findActiveTaskActor,
+		arg.WorkspaceID,
+		arg.TaskID,
+		arg.UserID,
+		arg.Role,
+	)
+	var public_id types.PublicID
+	err := row.Scan(&public_id)
+	return public_id, err
+}
+
 const findAgentIDByPublicIDForWorkspace = `-- name: FindAgentIDByPublicIDForWorkspace :one
 SELECT id
 FROM ai_agents

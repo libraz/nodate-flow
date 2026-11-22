@@ -7,6 +7,7 @@ sql:
       - "queries/ai"
       - "queries/ai-embeddings"
       - "queries/ai-settings"
+      - "queries/asanaimport"
       - "queries/attachments"
       - "queries/audit"
       - "queries/auth"
@@ -231,6 +232,13 @@ sql:
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
           - column: "*.source_uid_key"
+            go_struct_tag: 'json:"-"'
+          # Import provenance of tasks / comments / attachments; never an API field.
+          - column: "tasks.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "comments.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "attachments.source_uid"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'
@@ -595,6 +603,13 @@ sql:
             go_struct_tag: 'json:"-"'
           - column: "*.source_uid_key"
             go_struct_tag: 'json:"-"'
+          # See the import provenance note in the flow-api block above.
+          - column: "tasks.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "comments.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "attachments.source_uid"
+            go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_parent_page_id"
@@ -892,6 +907,13 @@ sql:
           - column: "*.event_id_key"
             go_struct_tag: 'json:"-"'
           - column: "*.source_uid_key"
+            go_struct_tag: 'json:"-"'
+          # See the import provenance note in the flow-api block above.
+          - column: "tasks.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "comments.source_uid"
+            go_struct_tag: 'json:"-"'
+          - column: "attachments.source_uid"
             go_struct_tag: 'json:"-"'
           - column: "*.scope_key"
             go_struct_tag: 'json:"-"'

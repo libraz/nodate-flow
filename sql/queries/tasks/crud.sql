@@ -17,8 +17,10 @@ INSERT INTO tasks (
   priority,
   due_on,
   started_on,
-  visibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+  visibility,
+  created_at,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(sqlc.narg('created_at'), CURRENT_TIMESTAMP(3)), sqlc.narg('source_uid'));
 
 -- name: FindTaskByPublicId :one
 -- Detail projection via v_task_detail. Workspace-scoped.

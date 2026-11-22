@@ -20,8 +20,9 @@ INSERT INTO attachments (
   task_id,
   uploader_id,
   storage_object_id,
-  filename
-) VALUES (?, ?, ?, ?, ?, ?)
+  filename,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type AddAttachmentParams struct {
@@ -31,6 +32,7 @@ type AddAttachmentParams struct {
 	UploaderID      uint32         `json:"-"`
 	StorageObjectID uint32         `json:"-"`
 	Filename        string         `json:"filename"`
+	SourceUid       sql.NullString `json:"-"`
 }
 
 // Insert per-task attachment metadata. The blob itself (sha256, byte_size,
@@ -45,6 +47,7 @@ func (q *Queries) AddAttachment(ctx context.Context, arg AddAttachmentParams) (i
 		arg.UploaderID,
 		arg.StorageObjectID,
 		arg.Filename,
+		arg.SourceUid,
 	)
 	if err != nil {
 		return 0, err

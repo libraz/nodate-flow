@@ -9,8 +9,9 @@ INSERT INTO attachments (
   task_id,
   uploader_id,
   storage_object_id,
-  filename
-) VALUES (?, ?, ?, ?, ?, ?);
+  filename,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, sqlc.narg('source_uid'));
 
 -- name: ListAttachmentsForTask :many
 -- List attachments on a task with uploader display fields and the

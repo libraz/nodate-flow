@@ -23,8 +23,10 @@ INSERT INTO comments (
   author_agent_id,
   author_agent_public_id,
   author_agent_name,
-  body
-) VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, 0x00000000000000000000000000000000), ?, ?)
+  body,
+  created_at,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, 0x00000000000000000000000000000000), ?, ?, COALESCE(?, CURRENT_TIMESTAMP(3)), ?)
 `
 
 type AddCommentParams struct {
@@ -37,6 +39,8 @@ type AddCommentParams struct {
 	AuthorAgentPublicID interface{}        `json:"authorAgentPublicId"`
 	AuthorAgentName     sql.NullString     `json:"authorAgentName"`
 	Body                string             `json:"body"`
+	CreatedAt           interface{}        `json:"createdAt"`
+	SourceUid           sql.NullString     `json:"-"`
 }
 
 // Append a comment to a task. A human comment sets author_id; an agent
@@ -53,6 +57,8 @@ func (q *Queries) AddComment(ctx context.Context, arg AddCommentParams) (int64, 
 		arg.AuthorAgentPublicID,
 		arg.AuthorAgentName,
 		arg.Body,
+		arg.CreatedAt,
+		arg.SourceUid,
 	)
 	if err != nil {
 		return 0, err

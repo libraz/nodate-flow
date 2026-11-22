@@ -386,6 +386,9 @@ type Querier interface {
 	CountArchivedTasksForWorkspace(ctx context.Context, arg CountArchivedTasksForWorkspaceParams) (int64, error)
 	// Count enabled child pages for a given parent. Used to check before deletion.
 	CountChildPages(ctx context.Context, arg CountChildPagesParams) (int64, error)
+	// Number of live OAuth sign-in allowlist entries; the allowlist is
+	// instance-wide, so there is no workspace to scope by.
+	CountEnabledSigninAllowlistForImport(ctx context.Context) (int64, error)
 	// Number of live tenants on this instance. Used by the inbound webhook
 	// receivers to decide whether NF_FLOW_DEFAULT_WORKSPACE_ID may act as a
 	// fallback for an unmapped sender: that fallback is only meaningful on a
@@ -419,6 +422,9 @@ type Querier interface {
 	// existence of tasks the caller cannot see, as a total larger than the
 	// rows they can page through.
 	CountTasksForWorkspace(ctx context.Context, arg CountTasksForWorkspaceParams) (int64, error)
+	// Live tasks carrying any source_uid, per project. Subtracting the sourced
+	// count of a run gives the orphaned tasks.
+	CountTasksWithSourceUIDByProject(ctx context.Context, workspaceID uint32) ([]CountTasksWithSourceUIDByProjectRow, error)
 	// Count unread notifications for a user across all workspaces.
 	// Used by the global notification badge when no workspace is selected.
 	// Same membership join as the lists, so the badge never counts a row
@@ -785,6 +791,8 @@ type Querier interface {
 	// Lookup the single active (task, event, relation) tuple. Used by
 	// itemkit to detect duplicates before attempting to insert.
 	FindActiveLink(ctx context.Context, arg FindActiveLinkParams) (FindActiveLinkRow, error)
+	// Used to refuse re-adding an active actor without the upsert minting a new public id.
+	FindActiveTaskActor(ctx context.Context, arg FindActiveTaskActorParams) (types.PublicID, error)
 	// Resolve an ai_agents public id to its internal id, scoped to the
 	// workspace. Used by task actor handlers to bind by public id.
 	// id is required: returned as FK value for task_actors.agent_id.
@@ -1263,6 +1271,9 @@ type Querier interface {
 	// Return the role string for an enabled workspace member. Returns
 	// sql.ErrNoRows when the user is not a member.
 	GetWorkspaceMemberRole(ctx context.Context, arg GetWorkspaceMemberRoleParams) (WorkspaceMembersRole, error)
+	// Role and liveness of one user's membership in the workspace. A disabled
+	// membership still answers so the importer can say why it refuses the user.
+	GetWorkspaceMemberRoleForImport(ctx context.Context, arg GetWorkspaceMemberRoleForImportParams) (GetWorkspaceMemberRoleForImportRow, error)
 	// Final stage of the admin user immediate destructive delete. Fires in
 	// the same request as the caller's MinIO sweep (avatar storage_objects
 	// + per-attachment ref_count decrements); there is no soft-disabled
@@ -1457,6 +1468,9 @@ type Querier interface {
 	// signal_kind as a deterministic tie-breaker (NULL/wildcard rows last so
 	// specific rules surface before fallbacks).
 	ListAutoActionRulesForWorkspace(ctx context.Context, workspaceID uint32) ([]ListAutoActionRulesForWorkspaceRow, error)
+	// Enabled blocks edges whose source side is one of the tasks. id and
+	// public_id identify the edge itself, which removal is keyed by.
+	ListBlockingDependenciesForTasks(ctx context.Context, arg ListBlockingDependenciesForTasksParams) ([]ListBlockingDependenciesForTasksRow, error)
 	// Calendar-event variant of ListAttachmentsForUploaderPurge. Same
 	// contract: enumerate every calendar_event_attachments row uploaded
 	// by the target user with the joined storage_objects.storage_key and
@@ -1674,6 +1688,8 @@ type Querier interface {
 	// Disabled rows are included: they still hold the claim on the source,
 	// so hiding them would make "already mapped" errors inexplicable.
 	ListIntegrationSourceMappings(ctx context.Context, workspaceID uint32) ([]ListIntegrationSourceMappingsRow, error)
+	// Enabled labels of the workspace, matched by name.
+	ListLabelsForImport(ctx context.Context, workspaceID uint32) ([]ListLabelsForImportRow, error)
 	// List labels scoped to a specific project (includes workspace-wide labels).
 	ListLabelsForProject(ctx context.Context, arg ListLabelsForProjectParams) ([]ListLabelsForProjectRow, error)
 	// List all labels in a workspace, optionally filtered by project.
@@ -1892,11 +1908,15 @@ type Querier interface {
 	ListPendingSuggestionsForWorkspace(ctx context.Context, arg ListPendingSuggestionsForWorkspaceParams) ([]ListPendingSuggestionsForWorkspaceRow, error)
 	// List members of a project joined with user display fields.
 	ListProjectMembers(ctx context.Context, arg ListProjectMembersParams) ([]ListProjectMembersRow, error)
+	// Enabled project memberships for the given projects.
+	ListProjectMembersForImport(ctx context.Context, arg ListProjectMembersForImportParams) ([]ListProjectMembersForImportRow, error)
 	// List the public_ids of every enabled project in a workspace for which
 	// the given user has an enabled project_members row. Used by the
 	// per-project ACL filter on GET /workspaces/{wsId}/projects so non-member
 	// workspace members do not enumerate projects they cannot open.
 	ListProjectPublicIdsForUserInWorkspace(ctx context.Context, arg ListProjectPublicIdsForUserInWorkspaceParams) ([]types.PublicID, error)
+	// Enabled projects of the workspace, for matching mapped project names.
+	ListProjectsForImport(ctx context.Context, workspaceID uint32) ([]ListProjectsForImportRow, error)
 	// List projects in a workspace via v_projects.
 	ListProjectsForWorkspace(ctx context.Context, arg ListProjectsForWorkspaceParams) ([]ListProjectsForWorkspaceRow, error)
 	// Reload every task quoted by a cached proposal through the current
@@ -1979,6 +1999,17 @@ type Querier interface {
 	// List signals attached to a task via v_inbox_all; a task lists its
 	// snoozed signals too, since snooze only hides them from the inbox.
 	ListSignalsForTask(ctx context.Context, arg ListSignalsForTaskParams) ([]ListSignalsForTaskRow, error)
+	// Live attachments of the given tasks whose source_uid starts with the
+	// prefix, with the owning storage object. uploaded_at NULL means the object
+	// was reserved but never confirmed present in storage.
+	ListSourcedAttachmentsByTasks(ctx context.Context, arg ListSourcedAttachmentsByTasksParams) ([]ListSourcedAttachmentsByTasksRow, error)
+	// Live comments of the given tasks whose source_uid starts with the prefix.
+	ListSourcedCommentsByTasks(ctx context.Context, arg ListSourcedCommentsByTasksParams) ([]ListSourcedCommentsByTasksRow, error)
+	// Live tasks whose source_uid starts with the prefix, across every project
+	// of the workspace. source_uid_key is NULL for a soft-deleted row, so a
+	// deleted task never matches.
+	// task-visibility: not-applicable — operator import tooling, no viewer
+	ListSourcedTasksInWorkspace(ctx context.Context, arg ListSourcedTasksInWorkspaceParams) ([]ListSourcedTasksInWorkspaceRow, error)
 	// List tasks whose embedding is missing or older than tasks.updated_at for
 	// the given (workspace_id, model). Used by the background re-embed worker.
 	// LEFT JOIN so tasks with no row at all are returned as "stale".
@@ -2008,6 +2039,8 @@ type Querier interface {
 	// ListTaskActorRolesForEngine with FOR SHARE. Used by the completion gate,
 	// which runs inside a caller transaction whose snapshot may predate the facts.
 	ListTaskActorRolesForEngineLocked(ctx context.Context, arg ListTaskActorRolesForEngineLockedParams) ([]TaskActorsRole, error)
+	// Enabled user actors (assignee, reviewer, watcher, approver) of the tasks.
+	ListTaskActorsForTasks(ctx context.Context, arg ListTaskActorsForTasksParams) ([]ListTaskActorsForTasksRow, error)
 	// Human assignees for a page of tasks, in display order. Humans only,
 	// matching assignee_count in _v_task_list_all: the INNER JOIN on users drops
 	// agent actors (user_id IS NULL) and disabled users. The caller passes the
@@ -2026,6 +2059,8 @@ type Querier interface {
 	ListTaskIntakeSources(ctx context.Context, arg ListTaskIntakeSourcesParams) ([]ListTaskIntakeSourcesRow, error)
 	// List labels attached to a task.
 	ListTaskLabels(ctx context.Context, arg ListTaskLabelsParams) ([]ListTaskLabelsRow, error)
+	// Enabled label links of the tasks.
+	ListTaskLabelsForTasks(ctx context.Context, arg ListTaskLabelsForTasksParams) ([]ListTaskLabelsForTasksRow, error)
 	// List tasks in a project via v_task_list.
 	//
 	// The page total is NOT computed here. COUNT(*) OVER() would make the
@@ -2118,6 +2153,10 @@ type Querier interface {
 	// List every active integration owned by a user. Tokens are NOT
 	// selected; only metadata used by the /me/integrations list view.
 	ListUserIntegrations(ctx context.Context, userID uint32) ([]ListUserIntegrationsRow, error)
+	// Resolve source-system e-mail addresses to users. Disabled accounts are
+	// returned with their flag so the importer can report them instead of
+	// treating them as unknown.
+	ListUsersByEmailsForImport(ctx context.Context, emails []string) ([]ListUsersByEmailsForImportRow, error)
 	// List all view preferences for a user in a workspace.
 	ListViewPreferencesForUser(ctx context.Context, arg ListViewPreferencesForUserParams) ([]ListViewPreferencesForUserRow, error)
 	// List deliveries for a subscription with pagination.

@@ -15,6 +15,8 @@ CREATE TABLE attachments (
   storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
 
   filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
+  source_uid VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Namespaced ID of the external record this attachment was imported from, such as asana:<gid>. NULL when the file was uploaded here. Never exposed through the API.',
+  source_uid_key VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin GENERATED ALWAYS AS (IF(enabled, source_uid, NULL)) STORED COMMENT 'source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_attachments_task_id_source_uid_key to live rows. Generated: never written directly.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -27,6 +29,7 @@ CREATE TABLE attachments (
   KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
   KEY idx_attachments_storage_object (storage_object_id),
+  UNIQUE KEY uniq_attachments_task_id_source_uid_key (task_id, source_uid_key),
 
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,

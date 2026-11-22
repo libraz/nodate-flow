@@ -2233,6 +2233,8 @@ CREATE TABLE attachments (
   storage_object_id INT UNSIGNED NOT NULL COMMENT 'FK to storage_objects.id; holds the actual blob metadata (sha256, byte_size, content_type, storage_key)',
 
   filename VARCHAR(512) NOT NULL COMMENT 'Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths',
+  source_uid VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Namespaced ID of the external record this attachment was imported from, such as asana:<gid>. NULL when the file was uploaded here. Never exposed through the API.',
+  source_uid_key VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin GENERATED ALWAYS AS (IF(enabled, source_uid, NULL)) STORED COMMENT 'source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_attachments_task_id_source_uid_key to live rows. Generated: never written directly.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -2245,6 +2247,7 @@ CREATE TABLE attachments (
   KEY idx_attachments_workspace_id_task_id (workspace_id, task_id),
   KEY idx_attachments_workspace_id_uploader_id (workspace_id, uploader_id),
   KEY idx_attachments_storage_object (storage_object_id),
+  UNIQUE KEY uniq_attachments_task_id_source_uid_key (task_id, source_uid_key),
 
   CONSTRAINT fk_attachments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   CONSTRAINT fk_attachments_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
@@ -2315,6 +2318,8 @@ CREATE TABLE comments (
 
   body MEDIUMTEXT NOT NULL COMMENT 'Markdown body',
   edited_at DATETIME(3) NULL COMMENT 'Last edit time (null = never edited)',
+  source_uid VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Namespaced ID of the external record this comment was imported from, such as asana:<gid>. NULL when the comment was written here. Never exposed through the API.',
+  source_uid_key VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin GENERATED ALWAYS AS (IF(enabled, source_uid, NULL)) STORED COMMENT 'source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_comments_task_id_source_uid_key to live rows. Generated: never written directly.',
 
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
   notes TEXT NULL COMMENT 'Admin notes',
@@ -2334,6 +2339,7 @@ CREATE TABLE comments (
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListCommentsForTaskKeyset.
   KEY idx_comments_task_id_keyset (task_id, created_at, public_id),
+  UNIQUE KEY uniq_comments_task_id_source_uid_key (task_id, source_uid_key),
   FULLTEXT KEY ft_comments_body (body),
 
   CONSTRAINT fk_comments_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -3561,6 +3567,8 @@ CREATE TABLE tasks (
   started_on DATE NULL COMMENT 'Date work began on this task',
   completed_at DATETIME(3) NULL COMMENT 'Time derived_state transitioned to done',
   archived_at DATETIME(3) NULL COMMENT 'Set when task is archived (distinct from enabled)',
+  source_uid VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT 'Namespaced ID of the external record this task was imported from, such as asana:<gid>. NULL when the task was created here. Never exposed through the API.',
+  source_uid_key VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin GENERATED ALWAYS AS (IF(enabled, source_uid, NULL)) STORED COMMENT 'source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_tasks_project_id_source_uid_key to live rows. Generated: never written directly.',
 
   visibility ENUM('public','project','private') NOT NULL DEFAULT 'public' COMMENT 'ACL Layer 4: public=workspace members, project=project members, private=task actors only',
   sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order',
@@ -3577,6 +3585,7 @@ CREATE TABLE tasks (
   UNIQUE KEY uniq_tasks_project_id_task_number (project_id, task_number),
   KEY idx_tasks_workspace_id_archived_at (workspace_id, archived_at),
   KEY idx_tasks_parent_task_id (parent_task_id),
+  UNIQUE KEY uniq_tasks_project_id_source_uid_key (project_id, source_uid_key),
   -- Supports keyset pagination on (created_at DESC, public_id DESC) for
   -- ListTasksForWorkspaceKeyset / ListTasksForProjectKeyset / ListMyTasksKeyset.
   KEY idx_tasks_workspace_id_keyset (workspace_id, created_at, public_id),

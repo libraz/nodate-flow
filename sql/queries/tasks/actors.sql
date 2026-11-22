@@ -82,6 +82,17 @@ WHERE workspace_id = ?
   AND enabled = TRUE
 LIMIT 1;
 
+-- name: FindActiveTaskActor :one
+-- Used to refuse re-adding an active actor without the upsert minting a new public id.
+SELECT public_id
+FROM task_actors
+WHERE workspace_id = ?
+  AND task_id = ?
+  AND user_id = ?
+  AND role = ?
+  AND enabled = TRUE
+LIMIT 1;
+
 -- name: RemoveActor :execrows
 -- Soft-remove an actor from a task.
 UPDATE task_actors

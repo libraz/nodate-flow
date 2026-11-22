@@ -3088,6 +3088,10 @@ type Attachment struct {
 	StorageObjectID uint32 `json:"-"`
 	// Original filename as supplied by the uploader; widened to 512 to safely hold multibyte paths
 	Filename string `json:"filename"`
+	// Namespaced ID of the external record this attachment was imported from, such as asana:<gid>. NULL when the file was uploaded here. Never exposed through the API.
+	SourceUid sql.NullString `json:"-"`
+	// source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_attachments_task_id_source_uid_key to live rows. Generated: never written directly.
+	SourceUidKey sql.NullString `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -3588,6 +3592,10 @@ type Comment struct {
 	Body string `json:"body"`
 	// Last edit time (null = never edited)
 	EditedAt sql.NullTime `json:"editedAt"`
+	// Namespaced ID of the external record this comment was imported from, such as asana:<gid>. NULL when the comment was written here. Never exposed through the API.
+	SourceUid sql.NullString `json:"-"`
+	// source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_comments_task_id_source_uid_key to live rows. Generated: never written directly.
+	SourceUidKey sql.NullString `json:"-"`
 	// Display order
 	SortWeight int32 `json:"sortWeight"`
 	// Admin notes
@@ -4588,6 +4596,10 @@ type Task struct {
 	CompletedAt sql.NullTime `json:"completedAt"`
 	// Set when task is archived (distinct from enabled)
 	ArchivedAt sql.NullTime `json:"archivedAt"`
+	// Namespaced ID of the external record this task was imported from, such as asana:<gid>. NULL when the task was created here. Never exposed through the API.
+	SourceUid sql.NullString `json:"-"`
+	// source_uid while the row is live, NULL once it is soft-deleted. Exists solely to scope uniq_tasks_project_id_source_uid_key to live rows. Generated: never written directly.
+	SourceUidKey sql.NullString `json:"-"`
 	// ACL Layer 4: public=workspace members, project=project members, private=task actors only
 	Visibility TasksVisibility `json:"visibility"`
 	// Display order

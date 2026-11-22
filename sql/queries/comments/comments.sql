@@ -11,8 +11,10 @@ INSERT INTO comments (
   author_agent_id,
   author_agent_public_id,
   author_agent_name,
-  body
-) VALUES (?, ?, ?, ?, ?, ?, NULLIF(sqlc.arg('author_agent_public_id'), 0x00000000000000000000000000000000), ?, ?);
+  body,
+  created_at,
+  source_uid
+) VALUES (?, ?, ?, ?, ?, ?, NULLIF(sqlc.arg('author_agent_public_id'), 0x00000000000000000000000000000000), ?, ?, COALESCE(sqlc.narg('created_at'), CURRENT_TIMESTAMP(3)), sqlc.narg('source_uid'));
 
 -- name: LockCommentHumanAuthor :one
 -- Read an enabled human author's byline and share-lock the row so a
