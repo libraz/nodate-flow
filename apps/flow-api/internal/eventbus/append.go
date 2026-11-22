@@ -279,6 +279,20 @@ func ActorAgentIDFromContext(ctx context.Context) uint32 {
 	return v
 }
 
+type noFanoutCtxKey struct{}
+
+// WithoutFanout returns a context that suppresses every in-process notify
+// hook (notifications, webhooks, on_event agents, reeval, SSE taps) for
+// events written with it. Used by operator import tooling.
+func WithoutFanout(ctx context.Context) context.Context {
+	return context.WithValue(ctx, noFanoutCtxKey{}, true)
+}
+
+func fanoutSuppressed(ctx context.Context) bool {
+	v, _ := ctx.Value(noFanoutCtxKey{}).(bool)
+	return v
+}
+
 // fireNotifyHooks dispatches one event to every registered subscriber,
 // stamping the context with the event's sequence number on the way.
 //
@@ -288,6 +302,9 @@ func ActorAgentIDFromContext(ctx context.Context) uint32 {
 // other's events unnumbered, and numbering at both leaves the two
 // sequences disagreeing about what comes next.
 func fireNotifyHooks(ctx context.Context, workspaceInternalID uint32, eventType string, eventInternalID uint64) {
+	if fanoutSuppressed(ctx) {
+		return
+	}
 	ctx = WithSeq(ctx, nextSeq(workspaceInternalID))
 	notifyMu.RLock()
 	hooks := make([]NotifyHook, 0, len(notifyHooks))
