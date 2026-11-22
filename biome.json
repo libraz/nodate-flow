@@ -23,7 +23,8 @@
       "!**/apps/flow-web/src/routeTree.gen.ts",
       "!**/apps/accounts-web/src/routeTree.gen.ts",
       "!**/packages/sdk/src/openapi.ts",
-      "!**/packages/sdk/src/schema.d.ts"
+      "!**/packages/sdk/src/schema.d.ts",
+      "!**/apps/flow-api/internal/asanaimport/richtext/testdata"
     ]
   },
   "formatter": {
