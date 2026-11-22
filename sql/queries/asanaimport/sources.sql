@@ -35,7 +35,7 @@ ORDER BY project_id, user_id, id;
 
 -- name: ListLabelsForImport :many
 -- Enabled labels of the workspace, matched by name.
-SELECT id, project_id, name
+SELECT id, public_id, project_id, name
 FROM labels
 WHERE workspace_id = ?
   AND enabled = TRUE

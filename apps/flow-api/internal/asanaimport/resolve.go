@@ -241,7 +241,7 @@ func (r *resolver) workspace() error {
 		return fmt.Errorf("read labels: %w", err)
 	}
 	for _, l := range rows {
-		p.labels.add(uint32(l.ProjectID.Int32), l.Name, l.ID) //#nosec G115 -- generated NullInt32 of an INT UNSIGNED project id
+		p.labels.add(uint32(l.ProjectID.Int32), l.Name, labelEntry{l.ID, l.PublicID}) //#nosec G115 -- generated NullInt32 of an INT UNSIGNED project id
 	}
 	return nil
 }

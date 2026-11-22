@@ -11,6 +11,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/asanaimport/asana"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -38,7 +39,7 @@ func (w *world) comment(taskID, id uint32, gid string, author uint32, body strin
 }
 
 func (w *world) label(id, project uint32, name string) {
-	row := generated.ListLabelsForImportRow{ID: id, Name: name}
+	row := generated.ListLabelsForImportRow{ID: id, Name: name, PublicID: types.New()}
 	if project != 0 {
 		row.ProjectID = nullID(project)
 	}

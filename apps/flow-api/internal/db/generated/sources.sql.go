@@ -158,7 +158,7 @@ func (q *Queries) ListBlockingDependenciesForTasks(ctx context.Context, arg List
 }
 
 const listLabelsForImport = `-- name: ListLabelsForImport :many
-SELECT id, project_id, name
+SELECT id, public_id, project_id, name
 FROM labels
 WHERE workspace_id = ?
   AND enabled = TRUE
@@ -166,9 +166,10 @@ ORDER BY id
 `
 
 type ListLabelsForImportRow struct {
-	ID        uint32        `json:"-"`
-	ProjectID sql.NullInt32 `json:"-"`
-	Name      string        `json:"name"`
+	ID        uint32         `json:"-"`
+	PublicID  types.PublicID `json:"publicId"`
+	ProjectID sql.NullInt32  `json:"-"`
+	Name      string         `json:"name"`
 }
 
 // Enabled labels of the workspace, matched by name.
@@ -181,7 +182,12 @@ func (q *Queries) ListLabelsForImport(ctx context.Context, workspaceID uint32) (
 	items := []ListLabelsForImportRow{}
 	for rows.Next() {
 		var i ListLabelsForImportRow
-		if err := rows.Scan(&i.ID, &i.ProjectID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.ProjectID,
+			&i.Name,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

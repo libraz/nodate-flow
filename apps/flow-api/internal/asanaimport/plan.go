@@ -8,6 +8,7 @@ import (
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/asanaimport/asana"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 )
 
@@ -251,25 +252,37 @@ type labelKey struct {
 }
 
 // labelIndex finds enabled labels by scope and collation-equal name.
-type labelIndex map[labelKey]uint32
+type labelIndex map[labelKey]labelEntry
 
-func (l labelIndex) add(project uint32, name string, id uint32) {
+// labelEntry is a label's internal id and its public id.
+type labelEntry struct {
+	id  uint32
+	pub types.PublicID
+}
+
+func (l labelIndex) add(project uint32, name string, e labelEntry) {
 	k := labelKey{project, nameKey(name)}
 	if _, ok := l[k]; !ok {
-		l[k] = id
+		l[k] = e
 	}
 }
 
-// LabelID finds the existing label a reference names.
-func (p *Plan) LabelID(ref LabelRef) (uint32, bool) {
+// label finds the existing label a reference names.
+func (p *Plan) label(ref LabelRef) (labelEntry, bool) {
 	var project uint32
 	if ref.Project >= 0 {
 		if project = p.Projects[ref.Project].ExistingID; project == 0 {
-			return 0, false
+			return labelEntry{}, false
 		}
 	}
-	id, ok := p.labels[labelKey{project, nameKey(ref.Name)}]
-	return id, ok
+	e, ok := p.labels[labelKey{project, nameKey(ref.Name)}]
+	return e, ok
+}
+
+// LabelID finds the internal id of the existing label a reference names.
+func (p *Plan) LabelID(ref LabelRef) (uint32, bool) {
+	e, ok := p.label(ref)
+	return e.id, ok
 }
 
 // Task returns the plan of a placed Asana task.
