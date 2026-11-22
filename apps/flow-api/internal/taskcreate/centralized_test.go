@@ -27,10 +27,11 @@ var bannedSymbols = []string{
 }
 
 // exemptDirs are the directories allowed to name the generated task-insert
-// API: this package, which owns it, and the generated code that defines it.
+// API: this package, which owns it, taskactors, which owns attaching users, and the generated code that defines it.
 // Paths are slash-separated and matched as prefixes relative to the
 // apps/flow-api module root.
 var exemptDirs = []string{
+	"internal/taskactors",
 	"internal/taskcreate",
 	"internal/db/generated",
 }
@@ -41,7 +42,6 @@ var exemptDirs = []string{
 // taskcreate.Attribution answers. Paths are slash-separated and matched
 // exactly, relative to the apps/flow-api module root.
 var exemptFiles = []string{
-	"internal/http/handlers/tasks/actors.go",
 	"internal/http/handlers/tasks/agent_actors.go",
 	"internal/http/handlers/tasks/handoff.go",
 	"internal/http/handlers/taskworkflow/handoffs.go",
