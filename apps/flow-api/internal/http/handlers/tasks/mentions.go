@@ -9,22 +9,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mentions"
 )
 
-// syncDescriptionMentions re-derives the mentions a task's description
-// names, on the boundary the description itself commits through.
-//
-// The task arrives as the middleware resolved it, so the internal id and
-// the public id come from the same row the handler was authorized against
-// rather than from two separate lookups.
-func syncDescriptionMentions(ctx context.Context, db dbretry.CommitBoundary, workspaceID uint32, task middleware.TaskContext, actor *int64, body string) error {
-	return mentions.SyncTaskDescription(ctx, db, mentions.TaskDescriptionArgs{
-		WorkspaceID:  workspaceID,
-		TaskID:       task.ID,
-		TaskPublicID: types.FromUUID(task.PublicID),
-		ActorUserID:  actor,
-		Body:         body,
-	})
-}
-
 // syncCommentMentions re-derives the mentions a comment names, on the
 // boundary the comment body itself commits through.
 //

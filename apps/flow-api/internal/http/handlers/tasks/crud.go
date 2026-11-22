@@ -19,8 +19,8 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskupdate"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -328,47 +328,45 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 		// Dates in the body are parsed before the transaction; everything
 		// merged against the stored row happens inside it.
-		var bodyDue, bodyStart, expectedDueOn sql.NullTime
-		if in.Body.DueOn != nil {
-			parsed, err := parseDateOrNullTime(*in.Body.DueOn)
-			if err != nil {
-				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
-			}
-			bodyDue = parsed
+		patch := taskupdate.Patch{
+			Title:       in.Body.Title,
+			Description: in.Body.Description,
+			Priority:    in.Body.Priority,
+			SortWeight:  in.Body.SortWeight,
 		}
-		if in.Body.StartOn != nil {
-			parsed, err := parseDateOrNullTime(*in.Body.StartOn)
+		for _, d := range []struct {
+			body *string
+			dst  **sql.NullTime
+		}{
+			{in.Body.DueOn, &patch.DueOn},
+			{in.Body.StartOn, &patch.StartOn},
+			{in.Body.ExpectedDueOn, &patch.ExpectedDueOn},
+		} {
+			if d.body == nil {
+				continue
+			}
+			parsed, err := parseDateOrNullTime(*d.body)
 			if err != nil {
 				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
 			}
-			bodyStart = parsed
+			*d.dst = &parsed
 		}
-		if in.Body.ExpectedDueOn != nil {
-			parsed, err := parseDateOrNullTime(*in.Body.ExpectedDueOn)
-			if err != nil {
-				return nil, httpErr(apierrors.ValidationBodyDateFormatInvalid)
-			}
-			expectedDueOn = parsed
+		if in.Body.Visibility != nil {
+			v := generated.TasksVisibility(*in.Body.Visibility)
+			patch.Visibility = &v
 		}
 
-		taskInternal := int64(task.ID)
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		var (
-			newTitle     taskrules.Title
-			newDesc      sql.NullString
-			titleChanged bool
-			descChanged  bool
-			answered     error
-			replayed     bool
-			output       PatchTaskOutput
+			result   taskupdate.Result
+			answered error
+			replayed bool
+			output   PatchTaskOutput
 		)
-		// One transaction for the merge and the write. The row is locked
-		// before it is read, so the merge starts from what the previous
-		// writer committed and a concurrent PATCH of another field is kept
-		// rather than overwritten with a value read before it landed.
+		// One transaction for the idempotency receipt, the update and the
+		// response the receipt stores.
 		txErr := dbretry.InTx(ctx, deps.DB, "tasks.Patch", taskMutationTxOptions(in.IdempotencyKey), func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
-			titleChanged = false
-			descChanged = false
 			replayed = false
 			receipt, isReplay, err := lockTaskMutation(ctx, tx, ws, task, actorID,
 				execution.CapabilityEditTask, "task.patch", in.IdempotencyKey, in.Body, &output.Body)
@@ -379,178 +377,21 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 				replayed = true
 				return nil
 			}
-			qtx := deps.Queries.WithTx(tx.RawTx())
-			if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
-				ID:          task.ID,
+			result, err = taskupdate.Apply(ctx, tx, taskupdate.Args{
 				WorkspaceID: ws.ID,
-			}); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					answered = httpErr(apierrors.WsTaskNotFound)
-					return errAnswered
-				}
-				return err
-			}
-			current, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
-				WorkspaceID: ws.ID,
+				TaskID:      task.ID,
 				PublicID:    types.FromUUID(task.PublicID),
+				Patch:       patch,
+				Actor:       actor,
 			})
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					answered = httpErr(apierrors.WsTaskNotFound)
-					return errAnswered
-				}
-				return err
-			}
-			if in.Body.ExpectedDueOn != nil &&
-				(current.DueOn.Valid != expectedDueOn.Valid ||
-					(current.DueOn.Valid && current.DueOn.Time.Format("2006-01-02") != expectedDueOn.Time.Format("2006-01-02"))) {
-				answered = httpErr(apierrors.WsTaskUpdateConflict)
-				return errAnswered
-			}
-
-			newTitle, err = taskrules.PatchTitle(current.Title, in.Body.Title)
-			if err != nil {
-				answered = translateTaskRuleError(err)
-				return errAnswered
-			}
-			newDesc = current.Description
-			if in.Body.Description != nil {
-				newDesc = sql.NullString{String: *in.Body.Description, Valid: *in.Body.Description != ""}
-			}
-			newPriority := current.Priority
-			if in.Body.Priority != nil {
-				newPriority = *in.Body.Priority
-			}
-			newDue := current.DueOn
-			if in.Body.DueOn != nil {
-				newDue = bodyDue
-			}
-			newStart := current.StartedOn
-			if in.Body.StartOn != nil {
-				newStart = bodyStart
-			}
-			// The merged pair, not the body: a patch that moves only one
-			// side still has to face the other side's stored value.
-			if err := taskrules.DateOrder(newDue, newStart); err != nil {
-				answered = translateTaskRuleError(err)
-				return errAnswered
-			}
-			newSortWeight := current.SortWeight
-			if in.Body.SortWeight != nil {
-				newSortWeight = *in.Body.SortWeight
-			}
-			newVisibility := current.Visibility
-			if in.Body.Visibility != nil {
-				newVisibility = generated.TasksVisibility(*in.Body.Visibility)
-			}
-
-			titleChanged = in.Body.Title != nil && newTitle.String() != current.Title
-			dueOnChanged := in.Body.DueOn != nil && newDue != current.DueOn
-			// Against the stored value, not the presence of the field: a
-			// client that round-trips the whole task re-sends a description
-			// it never edited, and a version is a body the task has held
-			// rather than a record of who sent what.
-			descChanged = in.Body.Description != nil && newDesc != current.Description
-
-			needsItemkit := false
-			if titleChanged || dueOnChanged {
-				linkedCount, err := qtx.CountActiveCalendarEventsByTaskId(ctx,
-					sql.NullInt32{Int32: int32(task.ID), Valid: true}, //#nosec G115 -- task id is tasks.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-				)
-				if err != nil {
-					return err
-				}
-				needsItemkit = linkedCount > 0
-			}
-
-			updateParams := generated.UpdateTaskParams{
-				Title:           newTitle.String(),
-				Description:     newDesc,
-				Priority:        newPriority,
-				DueOn:           newDue,
-				StartedOn:       newStart,
-				SortWeight:      newSortWeight,
-				Visibility:      newVisibility,
-				UpdatedByUserID: sql.NullInt32{Int32: int32(actorID), Valid: true}, //#nosec G115 -- actor user id sourced from session, fits int32 within realistic deployments
-				WorkspaceID:     ws.ID,
-				PublicID:        types.FromUUID(task.PublicID),
-			}
-			// Not an existence check: a PATCH that re-sends the task's
-			// current values changes nothing and MySQL counts zero. The row
-			// lock above is what established the task exists.
-			if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
-				return err
-			}
-			// Inside the transaction that writes the description: a body
-			// that commits without its snapshot is one no restore can
-			// return to.
-			if descChanged {
-				version, err := taskdesc.Snapshot(ctx, qtx, ws.ID, task.ID, updateParams.UpdatedByUserID, newDesc.String)
-				if err != nil {
-					return err
-				}
-				if err := announceDescriptionVersion(ctx, tx, ws.ID, task, actorPtr(ctx), version); err != nil {
-					return err
-				}
-				// Alongside the snapshot, not inside it: a body edited down
-				// to nothing writes no version and still has to stop naming
-				// the people it used to.
-				if err := syncDescriptionMentions(ctx, tx, ws.ID, task, actorPtr(ctx), newDesc.String); err != nil {
-					return err
-				}
-			}
-			if needsItemkit && titleChanged {
-				// The renamed text is discarded here: this handler carries
-				// the task's new title and body already and refreshes the
-				// embedding from them below.
-				if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-					WorkspaceID: ws.ID,
-					ActorUserID: actorID,
-					TaskID:      task.ID,
-					NewTitle:    newTitle,
-				}); err != nil {
-					answered = translateItemkitTaskError(err)
-					return err
-				}
-			}
-			if needsItemkit && dueOnChanged {
-				snap, err := itemkit.ResolveSnapConfig(ctx, tx, ws.ID, actorID)
-				if err != nil {
-					return err
-				}
-				var t time.Time
-				if newDue.Valid {
-					t = newDue.Time
-				}
-				if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-					WorkspaceID: ws.ID,
-					TaskID:      task.ID,
-					ActorUserID: actorID,
-					SetDueOn:    true,
-					DueOn:       t,
-					Snap:        snap,
-				}); err != nil {
-					answered = translateItemkitTaskError(err)
-					return err
-				}
-			}
-			// The lifecycle event commits with the change; the audit row
-			// waits for the commit.
-			if err := deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-				EventType:    eventbus.TaskUpdated,
-				AuditAction:  "task.update",
-				ResourceType: "task",
-				ResourceID:   task.PublicID.String(),
-				TaskID:       &taskInternal,
-				Payload:      map[string]any{"taskId": task.PublicID.String()},
-				CallSite:     "tasks.Patch",
-			}); err != nil {
+				answered = translateTaskUpdateError(err)
 				return err
 			}
 			if in.IdempotencyKey == "" {
 				return nil
 			}
-			row, err := qtx.FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
+			row, err := deps.Queries.WithTx(tx.RawTx()).FindTaskByPublicId(ctx, generated.FindTaskByPublicIdParams{
 				WorkspaceID: ws.ID,
 				PublicID:    types.FromUUID(task.PublicID),
 			})
@@ -569,11 +410,17 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		if replayed {
 			return &output, nil
 		}
+		deps.Mutations.RecordTxAudit(ctx, actor, mutationlog.Mutation{
+			AuditAction:  "task.update",
+			ResourceType: "task",
+			ResourceID:   task.PublicID.String(),
+			Payload:      result.Payload,
+			CallSite:     "tasks.Patch (taskupdate.Apply appended the event)",
+		})
 		// Only text that actually moved invalidates the vector: a refresh
 		// costs a provider call the workspace pays for.
-		textChanged := titleChanged || descChanged
-		if textChanged {
-			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, newTitle.String(), nullStr(newDesc))
+		if result.TitleChanged || result.DescChanged {
+			embed.RefreshTaskAfterCommit(ctx, deps.Embedder, ws.ID, task.ID, result.NewTitle.String(), nullStr(result.NewDesc))
 		}
 
 		if in.IdempotencyKey == "" {
@@ -588,6 +435,24 @@ func Patch(deps Deps) func(context.Context, *PatchTaskInput) (*PatchTaskOutput, 
 		}
 		return &output, nil
 	}
+}
+
+// translateTaskUpdateError renders a [taskupdate.Apply] refusal as the
+// problem+json envelope PATCH answers with. Errors it does not recognise
+// return nil, leaving the transaction error to taskMutationHTTPError.
+func translateTaskUpdateError(err error) error {
+	var ike *taskupdate.ItemkitError
+	switch {
+	case errors.Is(err, taskupdate.ErrTaskNotFound):
+		return httpErr(apierrors.WsTaskNotFound)
+	case errors.Is(err, taskupdate.ErrDueOnConflict):
+		return httpErr(apierrors.WsTaskUpdateConflict)
+	case errors.As(err, &ike):
+		return translateItemkitTaskError(ike.Err)
+	case taskrules.Classify(err) != taskrules.ViolationOther:
+		return translateTaskRuleError(err)
+	}
+	return nil
 }
 
 // translateItemkitTaskError converts an itemkit invariant into the

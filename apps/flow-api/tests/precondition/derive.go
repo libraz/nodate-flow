@@ -219,6 +219,7 @@ var Rules = []Rule{
 		Columns: []string{"description"},
 		Enforcers: []string{
 			modulePath + "/internal/taskdesc.Snapshot",
+			modulePath + "/internal/taskdesc.SnapshotWithActor",
 		},
 		Marker: "task-precondition",
 		Why: "the version history is the only copy of a body the task no " +
