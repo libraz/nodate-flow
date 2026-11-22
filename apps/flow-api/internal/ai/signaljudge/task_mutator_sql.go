@@ -9,8 +9,7 @@
 //     canonical in-transaction derived_state writer the REST
 //     /tasks/{id}/transitions handler and the auto-action executor also
 //     use, so the completion actually moves the task to 'done'.
-//   - `add_comment` reuses the generated AddComment INSERT (the same one
-//     the REST POST /tasks/{id}/comments handler issues), persisting a
+//   - `add_comment` goes through [taskservice.WriteComment], persisting a
 //     real comments row authored by the judging agent.
 //   - `generate_retro` materialises a new retro task plus its retro_of
 //     dependency edge in one transaction.
@@ -63,8 +62,10 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
@@ -258,23 +259,22 @@ func (m *SQLTaskMutator) taskIsDone(ctx context.Context, tx *sql.Tx, workspaceID
 	return state == string(generated.TasksDerivedStateDone)
 }
 
-// AddComment persists a real comment row for the judged auto-comment,
-// reusing the same generated.AddComment INSERT the REST
-// POST /tasks/{id}/comments handler uses. The row is authored by the
-// judging agent (author_kind='agent', no human author) and snapshots the
-// agent's public id and name so the byline survives the agent's deletion;
-// the body is prefixed with agentCommentPrefix.
+// AddComment persists a real comment row for the judged auto-comment
+// through [taskservice.WriteComment], the writer the REST and MCP comment
+// paths share. The row is authored by the judging agent (author_kind='agent',
+// no human author) with its byline snapshotted; the body is prefixed with
+// agentCommentPrefix.
 //
-// The applier emits no follow-on event for the add_comment branch, so
-// the "no event without a state change" invariant is not at stake here.
-// When the judging agent is no longer enabled the call logs and returns
-// nil rather than writing a comment no live agent authored.
+// The Applier adds no event of its own for the add_comment branch; the kit
+// appends task.comment.added and syncs mentions like every other comment
+// path. When the judging agent is no longer enabled the call logs and
+// returns nil rather than writing a comment no live agent authored.
 //
 // The trusted workspaceID / taskInternalID references are used as-is to
-// scope the agent lookup and the INSERT.
+// scope the INSERT.
 func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, taskInternalID int64, agentID uint32, body string) error {
-	if m == nil || m.DB == nil || m.Queries == nil {
-		return errors.New("signaljudge: SQLTaskMutator missing DB or Queries")
+	if m == nil || m.DB == nil {
+		return errors.New("signaljudge: SQLTaskMutator missing DB")
 	}
 	if workspaceID == 0 {
 		return errors.New("signaljudge: AddComment: workspaceID is zero")
@@ -292,33 +292,35 @@ func (m *SQLTaskMutator) AddComment(ctx context.Context, workspaceID uint32, tas
 		return nil
 	}
 
-	agent, err := m.Queries.GetCommentAgentByline(ctx, generated.GetCommentAgentBylineParams{
-		WorkspaceID: workspaceID,
-		ID:          agentID,
-	})
+	pub, err := m.loadTaskPublicID(ctx, workspaceID, taskInternalID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			m.logger().WarnContext(ctx, "signaljudge: AddComment skipped — judging agent is not enabled",
-				slog.Uint64("workspace_internal", uint64(workspaceID)),
-				slog.Int64("task_internal", taskInternalID),
-				slog.Uint64("agent_internal", uint64(agentID)),
-			)
-			return nil
+			return fmt.Errorf("signaljudge: AddComment: task not found: %w", err)
 		}
-		return fmt.Errorf("signaljudge: AddComment: resolve agent: %w", err)
+		return fmt.Errorf("signaljudge: AddComment: load task public id: %w", err)
 	}
 
-	if _, err := m.Queries.AddComment(ctx, generated.AddCommentParams{
-		PublicID:            types.New(),
-		WorkspaceID:         workspaceID,
-		TaskID:              sql.NullInt32{Int32: int32(taskInternalID), Valid: true}, //#nosec G115 -- tasks.id (INT UNSIGNED), fits int32
-		AuthorKind:          generated.CommentsAuthorKindAgent,
-		AuthorAgentID:       sql.NullInt32{Int32: int32(agentID), Valid: true}, //#nosec G115 -- ai_agents.id (INT UNSIGNED), fits int32
-		AuthorAgentPublicID: agent.PublicID,
-		AuthorAgentName:     sql.NullString{String: agent.Name, Valid: true},
-		Body:                agentCommentPrefix + trimmed,
-	}); err != nil {
-		return fmt.Errorf("signaljudge: AddComment: insert comment: %w", err)
+	txErr := dbretry.InTx(ctx, m.DB, "signaljudge.SQLTaskMutator.AddComment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		_, err := taskservice.WriteComment(ctx, tx, taskservice.WriteArgs{
+			Actor:         mutationlog.Actor{AgentID: agentID, WorkspaceID: workspaceID},
+			TaskID:        uint32(taskInternalID), //#nosec G115 -- tasks.id (INT UNSIGNED), fits uint32
+			TaskPublicID:  pub,
+			AuthorAgentID: sql.NullInt64{Int64: int64(agentID), Valid: true},
+			Body:          agentCommentPrefix + trimmed,
+			Payload:       map[string]any{"authorKind": taskservice.AuthorKindAgent},
+		})
+		return err
+	})
+	if errors.Is(txErr, taskservice.ErrCommentAgentUnavailable) {
+		m.logger().WarnContext(ctx, "signaljudge: AddComment skipped — judging agent is not enabled",
+			slog.Uint64("workspace_internal", uint64(workspaceID)),
+			slog.Int64("task_internal", taskInternalID),
+			slog.Uint64("agent_internal", uint64(agentID)),
+		)
+		return nil
+	}
+	if txErr != nil {
+		return fmt.Errorf("signaljudge: AddComment: write comment: %w", txErr)
 	}
 	return nil
 }
