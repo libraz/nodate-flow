@@ -23,20 +23,6 @@ func syncTaskDescriptionMentions(ctx context.Context, db dbretry.CommitBoundary,
 	})
 }
 
-// syncCommentMentions re-derives the mentions a comment names, on the
-// boundary the comment body itself commits through.
-func syncCommentMentions(ctx context.Context, db dbretry.CommitBoundary, s *session, taskID uint32, taskPub types.PublicID, commentID uint32, commentPub types.PublicID, body string) error {
-	return mentions.SyncComment(ctx, db, mentions.CommentArgs{
-		WorkspaceID:     s.workspaceID,
-		TaskID:          taskID,
-		TaskPublicID:    taskPub,
-		CommentID:       commentID,
-		CommentPublicID: commentPub,
-		ActorUserID:     sessionActor(s),
-		Body:            body,
-	})
-}
-
 // sessionActor widens the session's user id onto the optional actor shape
 // the mention sync takes. A session always carries one, so the pointer is
 // never nil here; the parameter is optional for the paths where a process

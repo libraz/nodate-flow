@@ -19,6 +19,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskservice"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskupdate"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
@@ -576,45 +577,31 @@ func runAddComment(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	cpub := newPublicID()
-	taskID64 := int64(taskInternal)
-	// One commit boundary for the body, the mentions it names and its event:
-	// a mention row that lands without its comment, or a comment that lands
-	// without its mentions, is a thread that says one thing and notifies
-	// another.
+	actor := mutationActor(s)
+	var written taskservice.WrittenComment
+	// One commit boundary for the body, the mentions it names and its event.
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.add_comment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		qtx := deps.Queries.WithTx(tx.RawTx())
-		id, e := qtx.AddComment(ctx, generated.AddCommentParams{
-			PublicID:    cpub,
-			WorkspaceID: s.workspaceID,
-			TaskID:      sql.NullInt32{Int32: int32(taskInternal), Valid: true}, //#nosec G115 -- internal row id, bounded by realistic deployments
-			AuthorID:    sql.NullInt32{Int32: int32(s.userID), Valid: true},     //#nosec G115 -- verified users.id is an INT UNSIGNED key
-			AuthorKind:  generated.CommentsAuthorKindUser,
-			Body:        in.Body,
+		var e error
+		written, e = taskservice.WriteComment(ctx, tx, taskservice.WriteArgs{
+			Actor:        actor,
+			TaskID:       taskInternal,
+			TaskPublicID: pub,
+			AuthorUserID: sql.NullInt64{Int64: int64(s.userID), Valid: true},
+			Body:         in.Body,
+			Payload:      map[string]any{"via": "mcp"},
 		})
-		if e != nil {
-			return e
-		}
-		if err := syncCommentMentions(ctx, tx, s, taskInternal, pub, uint32(id), cpub, in.Body); err != nil { //#nosec G115 -- LastInsertId for comments.id (INT UNSIGNED), fits uint32 within realistic deployments
-			return err
-		}
-		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.TaskCommentAdded,
-			AuditAction:  "comment.create",
-			ResourceType: "comment",
-			ResourceID:   cpub.String(),
-			TaskID:       &taskID64,
-			Payload: map[string]any{
-				"taskId":    pub.String(),
-				"commentId": cpub.String(),
-				"via":       "mcp",
-			},
-			CallSite: "mcp.add_comment",
-		})
+		return e
 	}); err != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
-	return map[string]any{"id": cpub.String()}, nil
+	recorder(deps).RecordTxAudit(ctx, actor, mutationlog.Mutation{
+		AuditAction:  "comment.create",
+		ResourceType: "comment",
+		ResourceID:   written.PublicID.String(),
+		Payload:      written.Payload,
+		CallSite:     "mcp.add_comment",
+	})
+	return map[string]any{"id": written.PublicID.String()}, nil
 }
 
 // runSearchTasks searches tasks by title or description using LIKE.
