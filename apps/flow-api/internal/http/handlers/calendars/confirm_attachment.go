@@ -7,8 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/attachkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -86,16 +85,14 @@ func ConfirmAttachment(deps Deps) func(context.Context, *ConfirmAttachmentInput)
 		}
 		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
-		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
+		if !storage.ExceedsUploadLimit(size, storage.MaxUploadSize) {
 			// The size is now a measurement rather than a claim, so the
 			// row stops being a reservation: it becomes a dedup
 			// candidate and the sweeper leaves it alone.
-			// A shared object's upload trigger also locks task rows, so a deadlock with a task confirm is retried.
-			if err := dbretry.InTx(ctx, deps.DB, "calendars.ConfirmAttachment", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-				return generated.New(tx).MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
-					ByteSize: size,
-					ID:       att.StorageObjectID,
-				})
+			if err := attachkit.MarkUploaded(ctx, deps.DB, attachkit.MarkArgs{
+				WorkspaceID:     wsID,
+				StorageObjectID: att.StorageObjectID,
+				Size:            size,
 			}); err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}

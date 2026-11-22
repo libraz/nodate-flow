@@ -1,6 +1,8 @@
-package handlerutil
+package storage
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestIsAllowedContentType(t *testing.T) {
 	t.Parallel()

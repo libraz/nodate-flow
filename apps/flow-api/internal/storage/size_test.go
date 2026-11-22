@@ -1,14 +1,10 @@
 package storage
 
-import (
-	"testing"
-
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
-)
+import "testing"
 
 func TestExceedsUploadLimit(t *testing.T) {
 	t.Parallel()
-	const maxSize = handlerutil.MaxUploadSize
+	const maxSize = MaxUploadSize
 
 	cases := []struct {
 		name   string

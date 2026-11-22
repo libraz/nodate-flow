@@ -23,8 +23,7 @@ func (c *Client) StatObject(ctx context.Context, key string) (int64, error) {
 // ExceedsUploadLimit reports whether an object's actual stored size exceeds
 // the per-file upload ceiling. Only the real size (fetched via StatObject)
 // is considered; the client-declared size is deliberately ignored because
-// it is attacker-controlled. Callers pass maxSize from
-// handlerutil.MaxUploadSize.
+// it is attacker-controlled. Callers pass maxSize from MaxUploadSize.
 func ExceedsUploadLimit(actualSize, maxSize uint64) bool {
 	return actualSize > maxSize
 }

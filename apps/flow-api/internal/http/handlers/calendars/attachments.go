@@ -2,16 +2,14 @@ package calendars
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	stderrors "errors"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/attachkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -26,13 +24,6 @@ import (
 )
 
 const calendarPresignExpiry = 15 * time.Minute
-
-// calendarPresignMaxAttempts bounds the duplicate-entry retry loop in
-// PresignAttachment. Mirrors tasks.presignMaxAttempts: under
-// REPEATABLE READ a same-tx re-find after MySQL 1062 still misses the
-// winning racer, so we roll the tx back and start fresh. Three is a
-// defensive ceiling; convergence in practice happens by attempt 1.
-const calendarPresignMaxAttempts = 3
 
 // --- Input/Output types ---
 
@@ -194,10 +185,10 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		// Cross-surface upload validation: mirror the task presign path
 		// so calendar attachments enforce the same MIME allowlist,
 		// blocked-extension deny list, and per-file size ceiling.
-		if !handlerutil.IsAllowedUpload(input.Body.ContentType, input.Body.Filename) {
+		if !storage.IsAllowedUpload(input.Body.ContentType, input.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
-		if input.Body.ByteSize > handlerutil.MaxUploadSize {
+		if input.Body.ByteSize > storage.MaxUploadSize {
 			return nil, httpErr(apierrors.ValidationFileTooLarge)
 		}
 		shaBytes, err := hex.DecodeString(input.Body.Sha256)
@@ -218,30 +209,22 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			return nil, err
 		}
 
-		// Build the content-addressed storage key. The wsId path
-		// param is already the workspace public_id (UUID v7) and
-		// resolveWorkspace above has authenticated it, so we can
-		// derive the hex prefix straight from the input rather than
-		// re-querying the row.
+		// The wsId path param is already the workspace public_id (UUID v7)
+		// and resolveWorkspace above has authenticated it, so the storage
+		// key prefix derives straight from the input.
 		wsUID, err := uuid.Parse(input.WsID)
 		if err != nil {
 			return nil, httpErr(apierrors.ValidationPathParamInvalid)
 		}
-		wsHex := hex.EncodeToString(wsUID[:])
-		shaHex := strings.ToLower(input.Body.Sha256)
-		baseStorageKey := storage.KeyForWorkspace(wsHex, shaHex)
 
 		var (
-			storageObjectID    uint32
-			deduplicated       bool
-			existingUploadedAt sql.NullTime
-			storageKey         string
-			attPub             = types.New()
-			committed          bool
+			resv      attachkit.Reservation
+			attPub    = types.New()
+			committed bool
 		)
 
 	attempts:
-		for attempt := 0; attempt < calendarPresignMaxAttempts; attempt++ {
+		for attempt := 0; attempt < attachkit.MaxAttempts; attempt++ {
 			tx, err := deps.DB.BeginTx(ctx, nil)
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
@@ -256,58 +239,25 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			qtx := deps.Queries.WithTx(tx)
 			cqtx := deps.CalendarQueries.WithTx(tx)
 
-			storageKey = baseStorageKey
-			deduplicated = false
-
-			existing, findErr := qtx.FindStorageObjectByWorkspaceSha(ctx, generated.FindStorageObjectByWorkspaceShaParams{
-				WorkspaceID: handlerutil.NullInt32From(wsID),
-				Sha256:      shaBytes,
+			resv, err = attachkit.ReserveObject(ctx, qtx, attachkit.Object{
+				WorkspaceID:       wsID,
+				WorkspacePublicID: types.FromUUID(wsUID),
+				SHA256:            shaBytes,
+				Size:              input.Body.ByteSize,
+				ContentType:       input.Body.ContentType,
 			})
 			switch {
-			case findErr == nil:
-				if err := qtx.IncrementStorageObjectRefCount(ctx, existing.ID); err != nil {
-					rollback()
-					return nil, httpErr(apierrors.CalendarAttachmentStoreWriteInterrupted)
-				}
-				storageObjectID = existing.ID
-				storageKey = existing.StorageKey
-				existingUploadedAt = existing.UploadedAt
-				deduplicated = true
-			case stderrors.Is(findErr, sql.ErrNoRows):
-				// Miss: allocate a new storage_objects row with ref_count=1.
-				soPub := types.New()
-				insRes, insErr := qtx.InsertStorageObject(ctx, generated.InsertStorageObjectParams{
-					PublicID:    soPub,
-					WorkspaceID: handlerutil.NullInt32From(wsID),
-					OwnerUserID: sql.NullInt32{},
-					Sha256:      shaBytes,
-					ByteSize:    input.Body.ByteSize,
-					ContentType: input.Body.ContentType,
-					StorageKey:  storageKey,
-				})
-				switch {
-				case insErr == nil:
-					lastID, idErr := insRes.LastInsertId()
-					if idErr != nil || lastID <= 0 {
-						rollback()
-						return nil, httpErr(apierrors.CalendarAttachmentStoreWriteInterrupted)
-					}
-					storageObjectID = uint32(lastID) //#nosec G115 -- AUTO_INCREMENT id fits uint32 within realistic deployments
-				case handlerutil.IsDuplicateEntry(insErr):
-					// Race lost: roll back so the next attempt's
-					// REPEATABLE READ snapshot can observe the
-					// winning racer's committed row. A same-tx
-					// re-find would still see ErrNoRows because the
-					// snapshot was pinned at our first SELECT above.
-					rollback()
-					continue attempts
-				default:
-					rollback()
-					return nil, httpErr(apierrors.CalendarAttachmentStoreWriteInterrupted)
-				}
-			default:
+			case err == nil:
+			case stderrors.Is(err, attachkit.ErrRaceLost):
+				// Roll back so the next attempt's snapshot sees the winner.
+				rollback()
+				continue attempts
+			case stderrors.Is(err, attachkit.ErrObjectRead):
 				rollback()
 				return nil, httpErr(apierrors.CalendarAttachmentStoreReadInterrupted)
+			default:
+				rollback()
+				return nil, httpErr(apierrors.CalendarAttachmentStoreWriteInterrupted)
 			}
 
 			if _, err := cqtx.CreateCalendarEventAttachment(ctx, calendar.CreateCalendarEventAttachmentParams{
@@ -315,7 +265,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 				WorkspaceID:     wsID,
 				EventID:         handlerutil.NullInt32From(evt.ID),
 				UploaderID:      actorID,
-				StorageObjectID: storageObjectID,
+				StorageObjectID: resv.StorageObjectID,
 				Filename:        input.Body.Filename,
 			}); err != nil {
 				rollback()
@@ -337,49 +287,10 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
-		// A dedup hit promises the bytes are already stored, and until
-		// now nothing checked whether they were. The storage_objects
-		// row is committed at presign time, before the client has
-		// uploaded anything, so an upload the client starts and never
-		// finishes leaves a row claiming that content exists at a key
-		// holding nothing. Every later upload of the same content then
-		// dedups onto that row, is told it need not upload, and ends up
-		// attached to an object that will never exist — the first
-		// abandoned upload of a given file poisons that file for the
-		// whole workspace, permanently.
-		//
-		// Asking the store settles it. A claim with no object behind it
-		// is treated as a miss: the caller gets an upload URL for the
-		// very same key, so the row it already points at is filled in
-		// rather than duplicated. That repairs rows poisoned before
-		// this check existed, on the next attempt to use them, without
-		// a migration.
-		//
-		// The check is deliberately outside the transaction: it is a
-		// network round trip to the object store, and holding a
-		// database transaction open across one is how lock contention
-		// becomes an outage.
-		if deduplicated {
-			// Two different ways the promise can be false, and neither
-			// implies the other.
-			//
-			// A row with no uploaded_at is a reservation: it was
-			// created to hand out an upload URL, and the only size
-			// anyone has for it is the one the client declared. That is
-			// exactly the number an attacker lies about — declare one
-			// byte, send ten gigabytes, never confirm — so treating it
-			// as stored content would let the lie be inherited by
-			// everyone who uploads the same file afterwards.
-			//
-			// A row that was confirmed can still have lost its object
-			// afterwards, to a bucket lifecycle rule or a partial
-			// restore, and no column records that. Only the store knows.
-			if !existingUploadedAt.Valid {
-				deduplicated = false
-			} else if _, statErr := deps.Storage.StatObject(ctx, storageKey); statErr != nil {
-				deduplicated = false
-			}
-		}
+		// A dedup hit is only kept when its object is confirmed and still
+		// in the store; otherwise the caller uploads to the same key.
+		deduplicated := attachkit.StillStored(ctx, deps.Storage, resv)
+		storageKey := resv.StorageKey
 
 		// Mint the signed upload URL only on the miss branch. The URL binds
 		// the exact size, media type and SHA-256, and the blob relay has the
@@ -388,7 +299,7 @@ func PresignAttachment(deps Deps) func(context.Context, *PresignAttachmentInput)
 		// legitimate uploader of A would dedup onto.
 		var uploadURL string
 		if !deduplicated {
-			u, err := deps.Storage.SignedPutURL(storageKey, input.Body.ContentType, int64(input.Body.ByteSize), shaHex, calendarPresignExpiry)
+			u, err := deps.Storage.SignedPutURL(storageKey, input.Body.ContentType, int64(input.Body.ByteSize), hex.EncodeToString(shaBytes), calendarPresignExpiry)
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}

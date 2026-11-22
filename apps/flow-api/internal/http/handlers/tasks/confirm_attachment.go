@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/attachkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
@@ -86,37 +87,20 @@ func ConfirmUpload(deps Deps) func(context.Context, *ConfirmTaskAttachmentInput)
 		}
 		size := uint64(actual) //#nosec G115 -- StatObject returns a non-negative object size
 
-		if !storage.ExceedsUploadLimit(size, handlerutil.MaxUploadSize) {
+		if !storage.ExceedsUploadLimit(size, storage.MaxUploadSize) {
 			// The size is now a measurement rather than a claim, so the
 			// row stops being a reservation: it becomes a dedup
-			// candidate and the sweeper leaves it alone. The measured
-			// size replaces the declared one, which until this point
-			// was whatever the client felt like sending.
-			// The stamp bumps the task's work revision through a trigger, so
-			// the task row is locked first, in the order presign takes them.
-			var taskGone bool
-			if err := dbretry.InTx(ctx, deps.DB, "tasks.ConfirmUpload", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-				taskGone = false
-				qtx := generated.New(tx)
-				if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
-					ID:          task.ID,
-					WorkspaceID: ws.ID,
-				}); err != nil {
-					if stderrors.Is(err, sql.ErrNoRows) {
-						taskGone = true
-						return nil
-					}
-					return err
-				}
-				return qtx.MarkStorageObjectUploaded(ctx, generated.MarkStorageObjectUploadedParams{
-					ByteSize: size,
-					ID:       row.StorageObjectID,
-				})
+			// candidate and the sweeper leaves it alone.
+			if err := attachkit.MarkUploaded(ctx, deps.DB, attachkit.MarkArgs{
+				WorkspaceID:     ws.ID,
+				TaskID:          task.ID,
+				StorageObjectID: row.StorageObjectID,
+				Size:            size,
 			}); err != nil {
+				if stderrors.Is(err, attachkit.ErrTaskGone) {
+					return nil, httpErr(apierrors.WsTaskNotFound)
+				}
 				return nil, httpErr(apierrors.InternalUnexpected)
-			}
-			if taskGone {
-				return nil, httpErr(apierrors.WsTaskNotFound)
 			}
 			out := &ConfirmTaskAttachmentOutput{}
 			out.Body.Ok = true

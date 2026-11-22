@@ -3,21 +3,21 @@ package tasks
 import (
 	"testing"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/storage"
 )
 
 // TestPresignSharedValidation guards that the task presign surface routes
-// its content-type / extension checks through the shared handlerutil
+// its content-type / extension checks through the shared storage
 // helpers, keeping the task and calendar upload flows consistent.
 func TestPresignSharedValidation(t *testing.T) {
 	t.Parallel()
-	if !handlerutil.IsAllowedContentType("image/png") {
+	if !storage.IsAllowedContentType("image/png") {
 		t.Error("expected image/png to be allowed")
 	}
-	if handlerutil.IsAllowedContentType("application/octet-stream") {
+	if storage.IsAllowedContentType("application/octet-stream") {
 		t.Error("expected application/octet-stream to be blocked")
 	}
-	if !handlerutil.HasBlockedExtension("malware.exe") {
+	if !storage.HasBlockedExtension("malware.exe") {
 		t.Error("expected .exe to be a blocked extension")
 	}
 }

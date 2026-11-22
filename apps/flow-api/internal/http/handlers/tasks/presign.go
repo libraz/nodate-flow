@@ -2,17 +2,14 @@ package tasks
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	stderrors "errors"
-	"strings"
 	"time"
 
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/attachkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
@@ -21,67 +18,24 @@ import (
 
 const presignExpiry = 15 * time.Minute
 
-// errPresignRaceLost ends an attempt that lost the storage_objects insert
-// race, so the loop opens a fresh transaction whose snapshot sees the winner.
-var errPresignRaceLost = stderrors.New("tasks.PresignUpload: storage object race lost")
-
-// errPresignInternal ends an attempt on a driver result that cannot be used.
-var errPresignInternal = stderrors.New("tasks.PresignUpload: no insert id")
-
-// errPresignTaskGone ends an attempt whose task was disabled or deleted
-// after the middleware resolved it.
-var errPresignTaskGone = stderrors.New("tasks.PresignUpload: task gone")
-
-// presignMaxAttempts bounds the duplicate-entry retry loop in
-// PresignUpload. We restart the transaction (not just the SELECT)
-// when InsertStorageObject hits MySQL 1062, because the same
-// transaction's REPEATABLE READ snapshot was pinned at the first
-// FindStorageObjectByWorkspaceSha and cannot observe the winning
-// inserter's committed row. Three attempts is plenty for two-way
-// races; in practice attempt 0 succeeds, attempt 1 dedups onto the
-// winner, and attempt 2 is a defensive ceiling against pathological
-// many-way contention.
-const presignMaxAttempts = 3
-
 // PresignUpload handles POST /tasks/{id}/attachments/presign.
 //
-// The flow has two branches driven by the SHA-256 the client computed
-// over the file body:
-//
-//  1. Dedup hit. The (workspace_id, sha256) UNIQUE key on
-//     storage_objects already has a row, so the handler bumps that
-//     row's ref_count, inserts the attachment with the existing FK,
-//     and returns deduplicated=true with no upload URL — the
-//     client should NOT issue a PUT.
-//  2. Miss. The handler allocates a new storage_objects row at
-//     ref_count=1 with a content-addressed storage key
-//     (workspace/{wsHex}/{sha256Hex}), inserts the attachment, and
-//     returns a short-lived signed PUT URL the client streams the
-//     file bytes to. The blob lands at the predetermined key so the
-//     server never has to mutate the storage_objects row after the
-//     upload completes.
-//
-// Both branches happen inside a single transaction so the attachment
-// row and the storage_objects row stay consistent if either INSERT
-// fails. The signed URL is generated AFTER commit so a failed
-// MinIO call cannot leave an orphan attachment.
-//
-// Concurrent-race retry: on InsertStorageObject MySQL 1062 we MUST
-// roll the transaction back and start a fresh one before re-running
-// FindStorageObjectByWorkspaceSha. Under REPEATABLE READ the snapshot
-// is pinned at the first SELECT inside the transaction, so a same-tx
-// re-find still sees ErrNoRows even after the winning racer commits.
-// Restarting the tx resets the snapshot so the next attempt observes
-// the winner row and can dedup onto it instead of leaking a 500.
+// attachkit.Reserve settles the storage object against the SHA-256 the
+// client computed over the file body: a dedup hit on a confirmed object
+// that is still in the store returns deduplicated=true with no upload URL
+// (the client must NOT issue a PUT); anything else returns a short-lived
+// signed PUT URL for the content-addressed key the row already points at.
+// The signed URL is minted after commit so a failed store call cannot
+// leave an orphan attachment.
 func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*PresignUploadOutput, error) {
 	return func(ctx context.Context, in *PresignUploadInput) (*PresignUploadOutput, error) {
 		if deps.Storage == nil {
 			return nil, httpErr(apierrors.InternalStorageNotConfigured)
 		}
-		if !handlerutil.IsAllowedUpload(in.Body.ContentType, in.Body.Filename) {
+		if !storage.IsAllowedUpload(in.Body.ContentType, in.Body.Filename) {
 			return nil, httpErr(apierrors.ValidationFileTypeNotAllowed)
 		}
-		if in.Body.ByteSize > handlerutil.MaxUploadSize {
+		if in.Body.ByteSize > storage.MaxUploadSize {
 			return nil, httpErr(apierrors.ValidationFileTooLarge)
 		}
 		shaBytes, err := hex.DecodeString(in.Body.Sha256)
@@ -101,193 +55,51 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 			return nil, httpErr(apierrors.WsTaskAccessDenied)
 		}
 
-		wsHex := hex.EncodeToString(ws.PublicID[:])
-		shaHex := strings.ToLower(in.Body.Sha256)
-		baseStorageKey := storage.KeyForWorkspace(wsHex, shaHex)
-
-		var (
-			storageObjectID    uint32
-			deduplicated       bool
-			existingUploadedAt sql.NullTime
-			storageKey         string
-			attachPub          = types.New()
-			committed          bool
-		)
-
-		taskInternal := int64(task.ID)
-		for attempt := 0; attempt < presignMaxAttempts && !committed; attempt++ {
-			txErr := dbretry.InTx(ctx, deps.DB, "tasks.PresignUpload", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-				qtx := generated.New(tx)
-
-				storageKey = baseStorageKey
-				deduplicated = false
-
-				// Task row first: the attachment insert takes a shared FK lock
-				// on it and the work-revision trigger then needs it exclusively,
-				// so two presigns on one task would otherwise deadlock.
-				if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
-					ID:          task.ID,
-					WorkspaceID: ws.ID,
-				}); err != nil {
-					if stderrors.Is(err, sql.ErrNoRows) {
-						return errPresignTaskGone
-					}
-					return err
-				}
-
-				existing, findErr := qtx.FindStorageObjectByWorkspaceSha(ctx, generated.FindStorageObjectByWorkspaceShaParams{
-					WorkspaceID: handlerutil.NullInt32From(ws.ID),
-					Sha256:      shaBytes,
-				})
-				switch {
-				case findErr == nil:
-					// Dedup hit: bump the existing row's ref_count.
-					if err := qtx.IncrementStorageObjectRefCount(ctx, existing.ID); err != nil {
-						return err
-					}
-					storageObjectID = existing.ID
-					storageKey = existing.StorageKey
-					existingUploadedAt = existing.UploadedAt
-					deduplicated = true
-				case stderrors.Is(findErr, sql.ErrNoRows):
-					// Miss: allocate a new storage_objects row with ref_count=1.
-					soPub := types.New()
-					insRes, insErr := qtx.InsertStorageObject(ctx, generated.InsertStorageObjectParams{
-						PublicID:    soPub,
-						WorkspaceID: handlerutil.NullInt32From(ws.ID),
-						OwnerUserID: sql.NullInt32{},
-						Sha256:      shaBytes,
-						ByteSize:    in.Body.ByteSize,
-						ContentType: in.Body.ContentType,
-						StorageKey:  storageKey,
-					})
-					switch {
-					case insErr == nil:
-						lastID, idErr := insRes.LastInsertId()
-						if idErr != nil || lastID <= 0 {
-							return errPresignInternal
-						}
-						storageObjectID = uint32(lastID) //#nosec G115 -- AUTO_INCREMENT id fits uint32 within realistic deployments
-					case handlerutil.IsDuplicateEntry(insErr):
-						// Race lost: another tx committed the
-						// (workspace_id, sha256) row first. Roll back this
-						// tx so the next attempt's REPEATABLE READ
-						// snapshot can observe the winner; a same-tx
-						// re-find would still hit the pinned snapshot and
-						// see ErrNoRows.
-						return errPresignRaceLost
-					default:
-						return insErr
-					}
-				default:
-					return findErr
-				}
-
-				if _, err := qtx.AddAttachment(ctx, generated.AddAttachmentParams{
-					PublicID:        attachPub,
-					WorkspaceID:     ws.ID,
-					TaskID:          handlerutil.NullInt32From(task.ID),
-					UploaderID:      actorID,
-					StorageObjectID: storageObjectID,
-					Filename:        in.Body.Filename,
-				}); err != nil {
-					return err
-				}
-
-				// Whether the caller still has to upload is settled against
-				// the store after commit, so the event carries only what
-				// this transaction makes true.
-				return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-					EventType:    eventbus.TaskAttachmentAdded,
-					AuditAction:  "attachment.create",
-					ResourceType: "attachment",
-					ResourceID:   attachPub.String(),
-					TaskID:       &taskInternal,
-					Payload: map[string]any{
-						"taskId":       task.PublicID.String(),
-						"attachmentId": attachPub.String(),
-						"filename":     in.Body.Filename,
-					},
-					CallSite: "tasks.PresignUpload",
-				})
-			})
-			switch {
-			case txErr == nil:
-				committed = true
-			case stderrors.Is(txErr, errPresignRaceLost):
-				continue
-			case stderrors.Is(txErr, errPresignTaskGone):
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
+		res, err := attachkit.Reserve(ctx, deps.DB, attachkit.Args{
+			WorkspaceID:       ws.ID,
+			WorkspacePublicID: types.FromUUID(ws.PublicID),
+			TaskID:            task.ID,
+			TaskPublicID:      types.FromUUID(task.PublicID),
+			Filename:          in.Body.Filename,
+			ContentType:       in.Body.ContentType,
+			Size:              in.Body.ByteSize,
+			SHA256:            shaBytes,
+			UploaderUserID:    actorID,
+			Actor:             actor,
+			Store:             deps.Storage,
+		})
+		if err != nil {
+			if stderrors.Is(err, attachkit.ErrTaskGone) {
 				return nil, httpErr(apierrors.WsTaskNotFound)
-			default:
-				return nil, httpErr(apierrors.InternalUnexpected)
 			}
-		}
-		if !committed {
-			// All retries lost the race. In practice unreachable: with
-			// presignMaxAttempts=3 a two-way race converges on attempt
-			// 1 and a many-way race on attempt 2. Surface as 500 so
-			// the (extremely rare) ceiling event is observable.
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		attachID := res.AttachmentPublicID.String()
+		taskInternal := int64(task.ID)
+		deps.Mutations.RecordTxAudit(ctx, actor, mutationlog.Mutation{
+			AuditAction:  "attachment.create",
+			ResourceType: "attachment",
+			ResourceID:   attachID,
+			TaskID:       &taskInternal,
+			Payload: map[string]any{
+				"taskId":       task.PublicID.String(),
+				"attachmentId": attachID,
+				"filename":     in.Body.Filename,
+			},
+			CallSite: "tasks.PresignUpload (attachkit.Reserve appended the event)",
+		})
 
-		// A dedup hit promises the bytes are already stored, and until
-		// now nothing checked whether they were. The storage_objects
-		// row is committed at presign time, before the client has
-		// uploaded anything, so an upload the client starts and never
-		// finishes leaves a row claiming that content exists at a key
-		// holding nothing. Every later upload of the same content then
-		// dedups onto that row, is told it need not upload, and ends up
-		// attached to an object that will never exist — the first
-		// abandoned upload of a given file poisons that file for the
-		// whole workspace, permanently.
-		//
-		// Asking the store settles it. A claim with no object behind it
-		// is treated as a miss: the caller gets an upload URL for the
-		// very same key, so the row it already points at is filled in
-		// rather than duplicated. That repairs rows poisoned before
-		// this check existed, on the next attempt to use them, without
-		// a migration.
-		//
-		// The check is deliberately outside the transaction: it is a
-		// network round trip to the object store, and holding a
-		// database transaction open across one is how lock contention
-		// becomes an outage.
-		if deduplicated {
-			// Two different ways the promise can be false, and neither
-			// implies the other.
-			//
-			// A row with no uploaded_at is a reservation: it was
-			// created to hand out an upload URL, and the only size
-			// anyone has for it is the one the client declared. That is
-			// exactly the number an attacker lies about — declare one
-			// byte, send ten gigabytes, never confirm — so treating it
-			// as stored content would let the lie be inherited by
-			// everyone who uploads the same file afterwards.
-			//
-			// A row that was confirmed can still have lost its object
-			// afterwards, to a bucket lifecycle rule or a partial
-			// restore, and no column records that. Only the store knows.
-			if !existingUploadedAt.Valid {
-				deduplicated = false
-			} else if _, statErr := deps.Storage.StatObject(ctx, storageKey); statErr != nil {
-				deduplicated = false
-			}
-		}
-
-		// Mint the signed upload URL only on the miss branch. The URL binds
-		// the exact size, media type and SHA-256, and the blob relay has the
-		// store reject bytes that hash differently, so a client cannot upload
-		// bytes B against a claim of sha=A and poison the dedup row that the
-		// next legitimate uploader of A would land on.
+		// The URL binds the exact size, media type and SHA-256, and the blob
+		// relay has the store reject bytes that hash differently, so a client
+		// cannot upload bytes B against a claim of sha=A and poison the dedup
+		// row the next legitimate uploader of A would land on.
 		var uploadURL string
-		if !deduplicated {
-			u, err := deps.Storage.SignedPutURL(storageKey, in.Body.ContentType, int64(in.Body.ByteSize), shaHex, presignExpiry)
+		if !res.AlreadyUploaded {
+			u, err := deps.Storage.SignedPutURL(res.StorageKey, in.Body.ContentType, int64(in.Body.ByteSize), hex.EncodeToString(shaBytes), presignExpiry)
 			if err != nil {
-				// The DB is committed; we cannot rollback. The client
-				// can retry the presign endpoint and will hit the
-				// dedup branch on the second call (since the
-				// storage_objects row is now in place). Surface the
-				// error so the client knows not to upload.
+				// The DB is committed; a retried presign dedups onto the
+				// row now in place.
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
 			uploadURL = u
@@ -295,9 +107,9 @@ func PresignUpload(deps Deps) func(context.Context, *PresignUploadInput) (*Presi
 
 		return &PresignUploadOutput{Body: PresignUploadOutputBody{
 			UploadURL:    uploadURL,
-			StorageKey:   storageKey,
-			AttachmentID: attachPub.String(),
-			Deduplicated: deduplicated,
+			StorageKey:   res.StorageKey,
+			AttachmentID: attachID,
+			Deduplicated: res.AlreadyUploaded,
 		}}, nil
 	}
 }

@@ -1,4 +1,4 @@
-package handlerutil
+package storage
 
 import (
 	"path"
@@ -19,10 +19,8 @@ import (
 // cannot be translated — this project routes every user-facing message
 // through errors/*.yaml into i18n — and a presign body carries metadata
 // only, so there are no wasted bytes to save by rejecting one round trip
-// earlier. The tag was present on the calendar surface for a while and
-// its handler check was dead code the whole time; nothing caught it
-// because that surface had no oversize test. Both surfaces now state the
-// limit in `doc:` and enforce it here.
+// earlier. Every surface states the limit in `doc:` and checks it in its
+// handler against this constant.
 const MaxUploadSize = 100 * 1024 * 1024
 
 // allowedMIMEPrefixes lists the safe MIME type prefixes accepted for
