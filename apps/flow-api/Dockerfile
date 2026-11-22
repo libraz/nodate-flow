@@ -34,10 +34,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/healthcheck /tmp/healthcheck/main.go
 
+# Operator CLI for Asana imports; run inside the container as `/importasana`.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    cd apps/flow-api && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/importasana ./cmd/importasana
+
 FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /
 COPY --from=build /out/api /api
 COPY --from=build /out/healthcheck /healthcheck
+COPY --from=build /out/importasana /importasana
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/api"]
