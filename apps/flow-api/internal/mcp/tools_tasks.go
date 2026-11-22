@@ -7,7 +7,6 @@ import (
 	stderrors "errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
@@ -17,12 +16,11 @@ import (
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskcreate"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskdesc"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskstate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskupdate"
 	"github.com/libraz/nodate-flow/packages/go-shared/stringutil"
 )
 
@@ -346,20 +344,20 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	}
 	// Dates are parsed before the transaction; everything merged against
 	// the stored row happens inside it.
-	var argDue, argStart sql.NullTime
+	patch := taskupdate.Patch{Title: in.Title, Description: in.Description, Priority: in.Priority}
 	if in.DueOn != nil {
 		p, err := parseDateOrNull(*in.DueOn)
 		if err != nil {
 			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 		}
-		argDue = p
+		patch.DueOn = &p
 	}
 	if in.StartOn != nil {
 		p, err := parseDateOrNull(*in.StartOn)
 		if err != nil {
 			return nil, apierrors.New(apierrors.McpToolArgumentsInvalid)
 		}
-		argStart = p
+		patch.StartOn = &p
 	}
 	if _, err := requireWorkspaceMember(ctx, deps, s); err != nil {
 		return nil, err
@@ -369,167 +367,27 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 		return nil, err
 	}
 
-	taskID64 := int64(taskInternal)
 	var (
-		title        taskrules.Title
-		desc         sql.NullString
-		titleChanged bool
-		descChanged  bool
-		answered     error
+		result   taskupdate.Result
+		answered error
 	)
-	// One transaction for the merge and the write, as REST PATCH does. The
-	// row is locked before it is read, so the merge starts from what the
-	// previous writer committed and a concurrent edit of another field is
-	// kept rather than overwritten with a value read before it landed.
+	// One transaction for the merge and the write, as REST PATCH does;
+	// Apply locks the row before it reads it.
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_task", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 		answered = nil
-		qtx := deps.Queries.WithTx(tx.RawTx())
-		if _, err := qtx.LockTaskForTransition(ctx, generated.LockTaskForTransitionParams{
-			ID:          taskInternal,
+		var err error
+		result, err = taskupdate.Apply(ctx, tx, taskupdate.Args{
 			WorkspaceID: s.workspaceID,
-		}); err != nil {
-			if stderrors.Is(err, sql.ErrNoRows) {
-				answered = apierrors.New(apierrors.WsTaskNotFound)
-			}
-			return err
-		}
-		current, err := loadTaskRow(ctx, qtx, s.workspaceID, pub)
-		if err != nil {
-			if stderrors.Is(err, sql.ErrNoRows) {
-				answered = apierrors.New(apierrors.WsTaskNotFound)
-			}
-			return err
-		}
-		title, err = taskrules.PatchTitle(current.Title, in.Title)
-		if err != nil {
-			answered = translateTaskRuleError(err)
-			return err
-		}
-		desc = current.Description
-		if in.Description != nil {
-			desc = sql.NullString{String: *in.Description, Valid: *in.Description != ""}
-		}
-		prio := current.Priority
-		if in.Priority != nil {
-			prio = *in.Priority
-		}
-		due := current.DueOn
-		if in.DueOn != nil {
-			due = argDue
-		}
-		start := current.StartedOn
-		if in.StartOn != nil {
-			start = argStart
-		}
-		// The merged pair, not the arguments: a call that moves only one
-		// side still has to face the other side's stored value.
-		if err := taskrules.DateOrder(due, start); err != nil {
-			answered = translateTaskRuleError(err)
-			return err
-		}
-
-		titleChanged = in.Title != nil && title.String() != current.Title
-		dueOnChanged := in.DueOn != nil && due != current.DueOn
-		// Whether the stored body moved, not whether the caller named it:
-		// the history holds the bodies the task has actually carried.
-		descChanged = in.Description != nil && desc != current.Description
-
-		needsItemkit := false
-		if titleChanged || dueOnChanged {
-			n, err := qtx.CountActiveCalendarEventsByTaskId(ctx, sql.NullInt32{
-				Int32: int32(taskInternal), //#nosec G115 -- internal row id, bounded by realistic deployments
-				Valid: true,
-			})
-			if err != nil {
-				return err
-			}
-			needsItemkit = n > 0
-		}
-
-		updateParams := generated.UpdateTaskParams{
-			Title:           title.String(),
-			Description:     desc,
-			Priority:        prio,
-			DueOn:           due,
-			StartedOn:       start,
-			SortWeight:      current.SortWeight,
-			Visibility:      current.Visibility,
-			UpdatedByUserID: sql.NullInt32{Int32: int32(s.userID), Valid: true}, //#nosec G115 -- session user id is users.id (BIGINT UNSIGNED), fits int32 within realistic deployments
-			WorkspaceID:     s.workspaceID,
-			PublicID:        current.PublicID,
-		}
-		// Not an existence check: an update carrying the task's current
-		// values changes nothing and MySQL counts zero. The row lock above
-		// is what established the task exists.
-		if _, err := qtx.UpdateTask(ctx, updateParams); err != nil {
-			return err
-		}
-		// Inside the transaction that writes the description: a body that
-		// commits without its snapshot is one no restore can return to.
-		if descChanged {
-			version, err := taskdesc.Snapshot(ctx, qtx, s.workspaceID, taskInternal, updateParams.UpdatedByUserID, desc.String)
-			if err != nil {
-				return err
-			}
-			if err := announceTaskDescriptionVersion(ctx, tx, s, taskInternal, current.PublicID, version); err != nil {
-				return err
-			}
-			// Alongside the snapshot, not inside it: a body edited down to
-			// nothing writes no version and still has to stop naming the
-			// people it used to.
-			if err := syncTaskDescriptionMentions(ctx, tx, s, taskInternal, current.PublicID, desc.String); err != nil {
-				return err
-			}
-		}
-		if needsItemkit && titleChanged {
-			// The renamed text is discarded here: this tool carries the
-			// task's new title and body already and refreshes the embedding
-			// from them below.
-			if _, err := itemkit.RenameItem(ctx, tx, itemkit.RenameItemArgs{
-				WorkspaceID: s.workspaceID,
-				ActorUserID: s.userID,
-				TaskID:      taskInternal,
-				NewTitle:    title,
-			}); err != nil {
-				answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
-				return err
-			}
-		}
-		if needsItemkit && dueOnChanged {
-			// The snap badges come from the actor's working week and holiday
-			// set, resolved from the same workspace and actor REST resolves
-			// them from.
-			snap, err := itemkit.ResolveSnapConfig(ctx, tx, s.workspaceID, s.userID)
-			if err != nil {
-				return err
-			}
-			var t time.Time
-			if due.Valid {
-				t = due.Time
-			}
-			if err := itemkit.RescheduleTask(ctx, tx, itemkit.RescheduleTaskArgs{
-				WorkspaceID: s.workspaceID,
-				TaskID:      taskInternal,
-				ActorUserID: s.userID,
-				SetDueOn:    true,
-				DueOn:       t,
-				Snap:        snap,
-			}); err != nil {
-				answered = translateItemkitMCPError(err, apierrors.WsTaskNotFound)
-				return err
-			}
-		}
-		// The lifecycle event commits with the change; the audit row waits
-		// for the commit.
-		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
-			EventType:    eventbus.TaskUpdated,
-			AuditAction:  "task.update",
-			ResourceType: "task",
-			ResourceID:   current.PublicID.String(),
-			TaskID:       &taskID64,
-			Payload:      map[string]any{"taskId": current.PublicID.String(), "via": "mcp"},
-			CallSite:     "mcp.update_task",
+			TaskID:      taskInternal,
+			PublicID:    pub,
+			Patch:       patch,
+			Actor:       mutationActor(s),
+			Via:         "mcp",
 		})
+		if err != nil {
+			answered = translateTaskUpdateMCPError(err)
+		}
+		return err
 	})
 	if answered != nil {
 		return nil, answered
@@ -537,12 +395,37 @@ func runUpdateTask(ctx context.Context, deps Deps, s *session, raw json.RawMessa
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
 	}
+	// Apply appended the task.updated event inside the transaction; only the
+	// audit row belongs to the transport.
+	recorder(deps).RecordTxAudit(ctx, mutationActor(s), mutationlog.Mutation{
+		AuditAction:  "task.update",
+		ResourceType: "task",
+		ResourceID:   pub.String(),
+		Payload:      result.Payload,
+		CallSite:     "mcp.update_task (taskupdate.Apply appended the event)",
+	})
 	// Only text that actually moved invalidates the vector: a refresh costs
 	// a provider call the workspace pays for.
-	if titleChanged || descChanged {
-		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, title.String(), desc.String)
+	if result.TitleChanged || result.DescChanged {
+		embed.RefreshTaskAfterCommit(ctx, deps.Embedder, s.workspaceID, taskInternal, result.NewTitle.String(), result.NewDesc.String)
 	}
 	return map[string]any{"id": pub.String()}, nil
+}
+
+// translateTaskUpdateMCPError renders a taskupdate.Apply refusal as the
+// error the tool answers with. Anything unrecognised returns nil and is
+// answered as a tool-execution failure by the caller.
+func translateTaskUpdateMCPError(err error) error {
+	var ike *taskupdate.ItemkitError
+	switch {
+	case stderrors.Is(err, taskupdate.ErrTaskNotFound):
+		return apierrors.New(apierrors.WsTaskNotFound)
+	case stderrors.As(err, &ike):
+		return translateItemkitMCPError(ike.Err, apierrors.WsTaskNotFound)
+	case taskrules.Classify(err) != taskrules.ViolationOther:
+		return translateTaskRuleError(err)
+	}
+	return nil
 }
 
 // translateItemkitMCPError maps an itemkit failure onto the error a
