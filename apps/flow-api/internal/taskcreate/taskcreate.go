@@ -42,6 +42,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -174,6 +175,13 @@ type Args struct {
 	// which is what the column default and the REST create handler both
 	// apply when the request omits it.
 	Visibility generated.TasksVisibility
+	// CreatedAt is optional. The zero value stores the current time; a
+	// non-zero value is stored as tasks.created_at, for rows carried over
+	// from another system.
+	CreatedAt time.Time
+	// SourceUID is optional. Empty stores NULL; otherwise it is the
+	// external identity of the row, written to tasks.source_uid.
+	SourceUID string
 }
 
 // Result is what callers need after the insert: the internal id for
@@ -234,6 +242,12 @@ func New(ctx context.Context, tx *dbretry.Tx, attr Attribution, args Args) (Resu
 	}
 	taskNumber := uint32(nextNum) //#nosec G115 -- per-project sequence, fits uint32
 
+	// A nil CreatedAt lets the INSERT fall back to the column default.
+	var createdAt interface{}
+	if !args.CreatedAt.IsZero() {
+		createdAt = args.CreatedAt
+	}
+
 	pub := types.New()
 	id, err := q.CreateTask(ctx, generated.CreateTaskParams{
 		PublicID:        pub,
@@ -249,6 +263,8 @@ func New(ctx context.Context, tx *dbretry.Tx, attr Attribution, args Args) (Resu
 		DueOn:           args.DueOn,
 		StartedOn:       args.StartedOn,
 		Visibility:      visibility,
+		CreatedAt:       createdAt,
+		SourceUid:       sql.NullString{String: args.SourceUID, Valid: args.SourceUID != ""},
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("taskcreate: insert task: %w", err)
