@@ -2,14 +2,14 @@ package projects
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/projectkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
 
@@ -84,11 +84,33 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 		if err != nil {
 			return nil, err
 		}
-		// Idempotency.
-		if existing, err := deps.Queries.FindProjectMemberByUserId(ctx, generated.FindProjectMemberByUserIdParams{
-			ProjectID: prj.ID,
-			UserID:    uid,
-		}); err == nil {
+		now := time.Now()
+		memPub := types.New()
+		role := generated.ProjectMembersRole(in.Body.Role)
+		var added bool
+		txErr := dbretry.InTx(ctx, deps.DB, "projects.AddMember", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			var err error
+			added, err = projectkit.AddMember(ctx, tx, projectkit.MemberArgs{
+				WorkspaceID: ws.ID,
+				ProjectID:   prj.ID,
+				UserID:      uid,
+				Role:        role,
+				PublicID:    memPub,
+				AddedAt:     now,
+			})
+			return err
+		})
+		if txErr != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if !added {
+			existing, err := deps.Queries.FindProjectMemberByUserId(ctx, generated.FindProjectMemberByUserIdParams{
+				ProjectID: prj.ID,
+				UserID:    uid,
+			})
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 			return &AddProjectMemberOutput{Body: ProjectMember{
 				ID:        existing.PublicID.String(),
 				UserID:    userPub.String(),
@@ -96,22 +118,6 @@ func AddMember(deps Deps) func(context.Context, *AddProjectMemberInput) (*AddPro
 				AddedAt:   nullTimeUnix(existing.AddedAt),
 				CreatedAt: existing.CreatedAt.Unix(),
 			}}, nil
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return nil, httpErr(apierrors.InternalUnexpected)
-		}
-
-		now := time.Now()
-		memPub := types.New()
-		role := generated.ProjectMembersRole(in.Body.Role)
-		if _, err := deps.Queries.AddProjectMember(ctx, generated.AddProjectMemberParams{
-			PublicID:    memPub,
-			WorkspaceID: ws.ID,
-			ProjectID:   prj.ID,
-			UserID:      uid,
-			Role:        role,
-			AddedAt:     sql.NullTime{Time: now, Valid: true},
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 		return &AddProjectMemberOutput{Body: ProjectMember{
 			ID:        memPub.String(),

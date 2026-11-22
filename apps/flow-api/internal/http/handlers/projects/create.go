@@ -3,16 +3,15 @@ package projects
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
-	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/audit"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
-	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/projectkit"
 )
 
 // Create handles POST /workspaces/{wsId}/projects.
@@ -28,61 +27,50 @@ func Create(deps Deps) func(context.Context, *CreateProjectInput) (*CreateProjec
 		// a row the caller never named.
 		slug := in.Body.Slug
 
-		pub := types.New()
 		desc := sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""}
 		color := sql.NullString{String: in.Body.Color, Valid: in.Body.Color != ""}
 		identifier := strings.ToUpper(strings.TrimSpace(in.Body.Identifier))
 		identifierParam := sql.NullString{String: identifier, Valid: identifier != ""}
-		projectID, err := deps.Queries.CreateProject(ctx, generated.CreateProjectParams{
-			PublicID:    pub,
-			WorkspaceID: ws.ID,
-			Slug:        slug,
-			Identifier:  identifierParam,
-			Name:        in.Body.Name,
-			Description: desc,
-			Color:       color,
+		userID, ok := middleware.ActorFromContext(ctx)
+		if !ok {
+			return nil, httpErr(apierrors.AuthSessionUnauthorized)
+		}
+		var created projectkit.Project
+		txErr := dbretry.InTx(ctx, deps.DB, "projects.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			var err error
+			// The creator is enrolled as lead in the same transaction so
+			// the project is visible to per-project ACL predicates and the
+			// members grid without the workspace owner/admin escape hatch.
+			created, err = projectkit.Create(ctx, tx, projectkit.CreateArgs{
+				WorkspaceID: ws.ID,
+				Slug:        slug,
+				Identifier:  identifierParam,
+				Name:        in.Body.Name,
+				Description: desc,
+				Color:       color,
+				LeadUserID:  userID,
+			})
+			return err
 		})
-		if err != nil {
-			switch key, _ := apierr.DuplicateKey(err); key {
-			case "uniq_projects_workspace_id_slug_active":
+		if txErr != nil {
+			switch {
+			case errors.Is(txErr, projectkit.ErrSlugTaken):
 				return nil, httpErr(apierrors.WsProjectSlugAlreadyTaken)
-			case "uniq_projects_workspace_id_identifier_active":
+			case errors.Is(txErr, projectkit.ErrIdentifierTaken):
 				return nil, httpErr(apierrors.WsProjectIdentifierAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		pub := created.PublicID
 
-		if userID, ok := middleware.ActorFromContext(ctx); ok {
-			deps.Audit.Record(ctx, audit.Entry{
-				Action:       "project.create",
-				ActorID:      userID,
-				WorkspaceID:  ws.ID,
-				ResourceType: "project",
-				ResourceID:   pub.String(),
-				Metadata:     map[string]any{"slug": slug, "name": in.Body.Name},
-			})
-		}
-
-		// Auto-enroll the creator as a project lead so they can see the
-		// project in the members grid, satisfy per-project ACL predicates
-		// (e.g. workspace timeline), and don't need the workspace
-		// owner/admin escape hatch. Best-effort: a failure here is
-		// logged but not fatal (the project itself is already created).
-		if userID, ok := middleware.ActorFromContext(ctx); ok {
-			memberPub := types.New()
-			if _, mErr := deps.Queries.AddProjectMember(ctx, generated.AddProjectMemberParams{
-				PublicID:    memberPub,
-				WorkspaceID: ws.ID,
-				ProjectID:   uint32(projectID), //#nosec G115 -- LastInsertId for projects.id (BIGINT UNSIGNED), fits uint32 within realistic deployments
-				UserID:      userID,
-				Role:        generated.ProjectMembersRoleLead,
-				AddedAt:     sql.NullTime{Time: time.Now(), Valid: true},
-			}); mErr != nil {
-				// Swallow: not fatal. Caller can still open the project
-				// via workspace owner/admin escape hatch if they have it.
-				_ = mErr
-			}
-		}
+		deps.Audit.Record(ctx, audit.Entry{
+			Action:       "project.create",
+			ActorID:      userID,
+			WorkspaceID:  ws.ID,
+			ResourceType: "project",
+			ResourceID:   pub.String(),
+			Metadata:     map[string]any{"slug": slug, "name": in.Body.Name},
+		})
 
 		return &CreateProjectOutput{Body: Project{
 			ID:               pub.String(),
