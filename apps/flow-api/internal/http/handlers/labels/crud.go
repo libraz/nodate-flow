@@ -3,6 +3,7 @@ package labels
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/acl"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -12,6 +13,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/labelkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
 )
@@ -31,7 +33,6 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 			return nil, httpErr(apierrors.WsWorkspaceNotFound)
 		}
 
-		pub := types.New()
 		color := in.Body.Color
 		if color == "" {
 			color = "#6b7280"
@@ -78,39 +79,35 @@ func Create(deps Deps) func(context.Context, *CreateLabelInput) (*CreateLabelOut
 		}
 
 		actorID, _ := middleware.ActorFromContext(ctx)
-		var createdByUserID sql.NullInt32
-		if actorID != 0 {
-			createdByUserID = sql.NullInt32{Int32: int32(actorID), Valid: true} //#nosec G115 -- actor user id from session, bounded by realistic deployments
-		}
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 
+		var created labelkit.Label
 		if err := dbretry.InTx(ctx, deps.DB, "labels.Create", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			if _, err := generated.New(tx).CreateLabel(ctx, generated.CreateLabelParams{
-				PublicID:        pub,
-				WorkspaceID:     ws.ID,
-				ProjectID:       projectID,
-				ParentLabelID:   parentLabelID,
-				CreatedByUserID: createdByUserID,
-				Name:            in.Body.Name,
-				Color:           color,
-				Description:     sql.NullString{String: in.Body.Description, Valid: in.Body.Description != ""},
-				SortWeight:      0,
-			}); err != nil {
-				return err
-			}
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-				EventType:    eventbus.LabelCreated,
-				AuditAction:  "label.create",
-				ResourceType: "label",
-				ResourceID:   pub.String(),
-				Payload:      map[string]any{"labelId": pub.String(), "name": in.Body.Name},
-				CallSite:     "labels.Create",
+			l, err := labelkit.Create(ctx, tx, labelkit.CreateArgs{
+				WorkspaceID: ws.ID,
+				ProjectID:   sql.NullInt64{Int64: int64(projectID.Int32), Valid: projectID.Valid},
+				ParentID:    sql.NullInt64{Int64: int64(parentLabelID.Int32), Valid: parentLabelID.Valid},
+				Name:        in.Body.Name,
+				Color:       color,
+				Description: in.Body.Description,
+				Actor:       actor,
 			})
+			created = l
+			return err
 		}); err != nil {
-			if isDuplicateEntry(err) {
+			if stderrors.Is(err, labelkit.ErrNameTaken) {
 				return nil, httpErr(apierrors.WsLabelNameAlreadyTaken)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		pub := created.PublicID
+		deps.Mutations.RecordTxAudit(ctx, actor, mutationlog.Mutation{
+			AuditAction:  "label.create",
+			ResourceType: "label",
+			ResourceID:   pub.String(),
+			Payload:      map[string]any{"labelId": pub.String(), "name": in.Body.Name},
+			CallSite:     "labels.Create (labelkit.Create appended the event)",
+		})
 
 		row, err := deps.Queries.FindLabelByPublicId(ctx, generated.FindLabelByPublicIdParams{
 			WorkspaceID: ws.ID,
@@ -410,34 +407,30 @@ func AddTaskLabel(deps Deps) func(context.Context, *AddTaskLabelInput) (*AddTask
 			return nil, httpErr(spec)
 		}
 
-		pub := types.New()
 		actorID, _ := middleware.ActorFromContext(ctx)
-		taskID := int64(task.ID)
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
 		if err := dbretry.InTx(ctx, deps.DB, "labels.AddTaskLabel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			if _, err := generated.New(tx).CreateTaskLabel(ctx, generated.CreateTaskLabelParams{
-				PublicID:    pub,
-				WorkspaceID: ws.ID,
-				TaskID:      task.ID,
-				LabelID:     label.ID,
-				SortWeight:  0,
-			}); err != nil {
-				return err
-			}
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-				EventType:    eventbus.TaskLabelAdded,
-				AuditAction:  "task.label.add",
-				ResourceType: "task_label",
-				ResourceID:   labelPub.String(),
-				TaskID:       &taskID,
-				Payload:      map[string]any{"labelId": labelPub.String()},
-				CallSite:     "labels.AddTaskLabel",
+			return labelkit.Attach(ctx, tx, labelkit.AttachArgs{
+				TaskID:        task.ID,
+				LabelID:       label.ID,
+				LabelPublicID: labelPub,
+				Actor:         actor,
 			})
 		}); err != nil {
-			if isDuplicateEntry(err) {
+			if stderrors.Is(err, labelkit.ErrAlreadyAttached) {
 				return nil, httpErr(apierrors.WsLabelAlreadyAttached)
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		taskID := int64(task.ID)
+		deps.Mutations.RecordTxAudit(ctx, actor, mutationlog.Mutation{
+			AuditAction:  "task.label.add",
+			ResourceType: "task_label",
+			ResourceID:   labelPub.String(),
+			TaskID:       &taskID,
+			Payload:      map[string]any{"labelId": labelPub.String()},
+			CallSite:     "labels.AddTaskLabel (labelkit.Attach appended the event)",
+		})
 
 		return &AddTaskLabelOutput{Body: TaskLabel{
 			ID:          labelPub.String(),
@@ -505,26 +498,30 @@ func RemoveTaskLabel(deps Deps) func(context.Context, *RemoveTaskLabelInput) (*R
 		}
 
 		actorID, _ := middleware.ActorFromContext(ctx)
-		taskID := int64(task.ID)
-		if err := dbretry.InTx(ctx, deps.DB, "labels.RemoveTaskLabel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			if err := generated.New(tx).DisableTaskLabel(ctx, generated.DisableTaskLabelParams{
-				WorkspaceID: ws.ID,
-				TaskID:      task.ID,
-				LabelID:     label.ID,
-			}); err != nil {
-				return err
-			}
-			return deps.Mutations.RecordInTx(ctx, tx, mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}, mutationlog.Mutation{
-				EventType:    eventbus.TaskLabelRemoved,
+		actor := mutationlog.Actor{UserID: actorID, WorkspaceID: ws.ID}
+		err = dbretry.InTx(ctx, deps.DB, "labels.RemoveTaskLabel", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+			return labelkit.Detach(ctx, tx, labelkit.AttachArgs{
+				TaskID:        task.ID,
+				LabelID:       label.ID,
+				LabelPublicID: labelPub,
+				Actor:         actor,
+			})
+		})
+		// Detaching a label the task does not carry asks for a state that
+		// already holds: success, with nothing written to record.
+		if err != nil && !stderrors.Is(err, labelkit.ErrNotAttached) {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
+		if err == nil {
+			taskID := int64(task.ID)
+			deps.Mutations.RecordTxAudit(ctx, actor, mutationlog.Mutation{
 				AuditAction:  "task.label.remove",
 				ResourceType: "task_label",
 				ResourceID:   labelPub.String(),
 				TaskID:       &taskID,
 				Payload:      map[string]any{"labelId": labelPub.String()},
-				CallSite:     "labels.RemoveTaskLabel",
+				CallSite:     "labels.RemoveTaskLabel (labelkit.Detach appended the event)",
 			})
-		}); err != nil {
-			return nil, httpErr(apierrors.InternalUnexpected)
 		}
 
 		out := &RemoveTaskLabelOutput{}
