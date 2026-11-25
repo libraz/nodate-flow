@@ -384,7 +384,7 @@ func (r *resolver) people() error {
 	if snap == nil {
 		return nil
 	}
-	known := map[string]bool{}
+	known := referencedUsers(snap)
 	for _, u := range snap.Users {
 		known[u.GID] = true
 	}
@@ -394,6 +394,30 @@ func (r *resolver) people() error {
 		}
 	}
 	return nil
+}
+
+// referencedUsers is the set of user gids the fetched tasks and comments
+// name. It covers people who have left the workspace: Asana omits them
+// from the user listing and their embedded records carry no email, so
+// source_users is the only way to map them.
+func referencedUsers(snap *asana.Snapshot) map[string]bool {
+	out := map[string]bool{}
+	add := func(u *asana.User) {
+		if u != nil && u.GID != "" {
+			out[u.GID] = true
+		}
+	}
+	for _, d := range snap.Tasks {
+		add(d.Task.Assignee)
+		add(d.Task.CreatedBy)
+		for i := range d.Task.Followers {
+			add(&d.Task.Followers[i])
+		}
+		for i := range d.Comments {
+			add(d.Comments[i].CreatedBy)
+		}
+	}
+	return out
 }
 
 // projects resolves each mapped project and decides between reuse and creation.

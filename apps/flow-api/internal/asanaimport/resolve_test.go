@@ -273,6 +273,20 @@ func TestResolve(t *testing.T) {
 		{"source user Asana does not have", func(w *world) {
 			w.m.SourceUsers = map[string]string{"555": "jiro@example.com", "102": "jiro@example.com"}
 		}, []string{`source_users["555"]: is not a user of Asana workspace "Acme"`}},
+		{"source user who left, named only by a comment", func(w *world) {
+			w.list("900", true, "1")
+			w.define("1", func(d *asana.TaskDetail) {
+				d.Comments = []asana.Story{{GID: "70", ResourceSubtype: asana.StoryCommentAdded, HTMLText: "<body>hi</body>", CreatedBy: &asana.User{GID: "555", Name: "Gone"}}}
+			})
+			w.m.SourceUsers = map[string]string{"555": "jiro@example.com"}
+		}, nil},
+		{"source user who left, named only as a follower", func(w *world) {
+			w.list("900", true, "1")
+			w.define("1", func(d *asana.TaskDetail) {
+				d.Task.Followers = []asana.User{{GID: "555", Name: "Gone"}}
+			})
+			w.m.SourceUsers = map[string]string{"555": "jiro@example.com"}
+		}, nil},
 		{"two flow projects of that name", func(w *world) {
 			w.reuse("Marketing", 10)
 			w.reuse("marketing", 11)
