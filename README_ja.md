@@ -22,22 +22,23 @@ Go、MySQL、React で作られた自前ホスト型のタスク基盤です。�
 
 ## できること
 
-- **導出されるタスク状態** — 依存関係と制約、イベントログがタスクの状態を決めます。直接の更新はデータベースのトリガーが拒否します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
-- **ビューとレンズ** — プロジェクトごとのボード、リスト、依存関係グラフ、スプレッドシートに加え、タイムライン、ガント、ダッシュボードのウィジェット、読み取り専用で共有できるレンズ。
+- **導出されるタスク状態** — 依存関係と制約、イベントログがタスクの状態を決めます。制約はイベントを受けて評価し直され、判定が変わるたびに記録されます。直接の更新はデータベースのトリガーが拒否します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **ビューとレンズ** — プロジェクトごとのボード、リスト、依存関係グラフ、スプレッドシートに加え、タイムライン、ガント、ダッシュボードのウィジェット、すべての変更の履歴、読み取り専用で共有できるレンズ。プロジェクトはアーカイブと復元ができます。
 - **レビューゲート** — 完了ポリシーで、レビュアーが承認した提出を完了の条件にできます。ハンドオフもタスクに記録されます。
 - **シグナルと判定ループ** — GitHub、Slack、Google の Webhook、Discord のプレゼンス、カレンダーの当日、手動メモがシグナルになり、LLM の判定器がタスクのイベントを提案します。提案にとどめるか、下書きにするか、自動で適用するかは、ワークスペースごとの自律度が決めます。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
-- **AI アシスト** — スマートなタスク作成、状態の推定、優先度のインサイト、関連の検出、自然言語のコマンド。OpenAI、Anthropic、Google、Ollama、OpenAI 互換のプロバイダーに対応します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
+- **AI アシスト** — スマートなタスク作成、状態の推定、優先度のインサイト、タスクの埋め込みによる関連の検出、手順の提案、自然言語のコマンド。OpenAI、Anthropic、Google、Ollama（キーの有無を問わず）、OpenAI 互換のプロバイダーに対応します。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
 - **MCP サーバー** — エージェントや外部ツールが、スコープ付きのトークンでワークスペースを読み書きします。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
 - **カレンダー** — 共有・個人カレンダー、繰り返しイベント、参加者、招待、リマインダー、タスクとのリンク、公開共有と埋め込みページ。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md)
 - **ページ** — Markdown ページのツリーと、AI による下書き生成。
 - **受信トレイと取り込み** — スヌーズ付きの通知、取り込んだソースをタスクにするトリアージ、週次ダイジェスト、Server-Sent Events によるリアルタイム更新。
-- **Webhook とデータ** — HMAC 署名つきの送信 Webhook、CSV と JSON のエクスポート、CSV のインポート。
-- **アカウントとアクセス** — Argon2id のパスワード、Google・GitHub・Microsoft の OIDC サインイン、リカバリーコード付きの TOTP、OIDC 専用モード、ロールベースのアクセス制御を持つワークスペース。[デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)
+- **Webhook とデータ** — HMAC 署名つきの送信 Webhook、CSV と JSON のエクスポート、CSV のインポート、タスクとカレンダーイベントの書き込みでの `Idempotency-Key`。
+- **アカウントとアクセス** — Argon2id のパスワード、Google・GitHub・Microsoft の OIDC サインイン、リカバリーコード付きの TOTP、OIDC 専用モード、ロールベースのアクセス制御を持つワークスペース。プロフィール、アバター、テーマ、セッションは accounts-web で管理します。[デプロイ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/deployment.md)
+- **テーマ、言語、ヘルプ** — 5 つのテーマファミリー（glass、modern、washi、classic、nothing）とライト・ダーク・システム連動のモード。英語、日本語、中国語。画面ごとのヘルプとオンボーディングのチェックリスト。
 - **nodate-time との共有データベース** — nodate-flow と、別プロダクトのカレンダー nodate-time は、1 つの MySQL に向けると、公開されたスキーマ契約を通してユーザー、グループ、カレンダーのデータを共有できます。コードの依存はありません。[概要](https://github.com/libraz/nodate-flow/blob/main/docs/ja/introduction.md) · [アーキテクチャ](https://github.com/libraz/nodate-flow/blob/main/docs/ja/architecture.md)
 
 ## はじめに
 
-Go、Bun、Docker が必要です。バージョンは `go.mod` と `package.json` で固定しています。
+Go、Bun、Docker が必要です。バージョンは `mise.toml` で固定しています。
 
 ```sh
 git clone https://github.com/libraz/nodate-flow.git && cd nodate-flow

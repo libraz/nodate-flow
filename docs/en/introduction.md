@@ -11,9 +11,10 @@ nodate-flow is a self-hosted task platform in which a task is a process rather t
 - **Constraints.** Dependencies between tasks and constraint rules decide when a task can start and finish.
 - **Events.** Every change is a row in the `events` table, appended in the same transaction as the change. The actor is a user, an AI agent or a system source such as the worker.
 - **Derived state.** A task's state is computed from its events. A database trigger refuses direct updates to `derived_state`, and a transition that the constraints reject is returned as an error rather than applied.
+- **Constraint verdicts.** Constraints are re-evaluated when an event that can change them is written, and the dependents of a task are re-evaluated when it transitions, completes or is deleted. A change of verdict is appended as a `task.constraint.satisfied` or `task.constraint.failed` event, so the timeline shows why a task became startable or blocked.
 - **Review gates.** A completion policy can require a submission that a reviewer approves before the task completes. Handoffs are recorded on the task.
 
-The interface follows from this. flow-web shows the flow instead of offering status buttons: board, list, dependency graph, spreadsheet, timeline and Gantt views per project, a dashboard of widgets, an activity feed, and an AI activity log. Lenses save a filtered view, and a lens can be shared read-only through a public link.
+The interface follows from this. flow-web shows the flow instead of offering status buttons: board, list, dependency graph, spreadsheet, timeline and Gantt views per project, a dashboard of widgets, a history that holds the timeline and the activity log, and an AI activity log. Lenses save a filtered view, and a lens can be shared read-only through a public link. A project can be archived, which keeps it out of pickers until it is restored. Each screen carries its own help, and a new workspace starts with an onboarding checklist.
 
 ## Signals and the judge loop
 
@@ -33,16 +34,18 @@ Discord presence is the one source that needs a gateway process. Each operator r
 
 ## AI and MCP
 
-Every LLM call goes through one invocation path, so cost limits, invocation logs and per-workspace provider choice apply to all of them. Providers are configured per workspace: OpenAI, Anthropic, Google, Ollama, or any OpenAI-compatible endpoint. A daily budget and request-rate limits cap spending. AI features need a provider configured in the workspace settings.
+Every LLM call goes through one invocation path, so cost limits, invocation logs and per-workspace provider choice apply to all of them. Providers are configured per workspace: OpenAI, Anthropic, Google, Ollama (with or without an API key), or any OpenAI-compatible endpoint. A daily budget and request-rate limits cap spending. AI features need a provider configured in the workspace settings.
 
 The AI features are:
 
 - smart task creation from free text,
 - state inference and priority suggestions,
-- relation suggestions between tasks,
+- relation suggestions between tasks, ranked by task embeddings,
+- step proposals for a task, optionally steered by an instruction,
 - natural-language commands and queries that compile to lenses,
 - inbox triage and a weekly digest,
-- page drafting.
+- page drafting,
+- reply proposals on a task and a workspace task digest, through the API.
 
 Suggestions are shown with accept, edit and dismiss actions. Per-workspace auto-action rules decide which ones may apply on their own.
 

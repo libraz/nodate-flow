@@ -22,22 +22,23 @@ A self-hosted task platform built on Go, MySQL and React. Task state is never ed
 
 ## What it does
 
-- **Derived task state** — Dependencies and constraints plus an event log decide a task's state; a database trigger rejects direct updates. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
-- **Views and lenses** — Board, list, dependency graph and spreadsheet per project, with timeline, Gantt, dashboard widgets and read-only shared lenses.
+- **Derived task state** — Dependencies and constraints plus an event log decide a task's state; constraints are re-evaluated from events, each change of verdict is recorded, and a database trigger rejects direct updates. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
+- **Views and lenses** — Board, list, dependency graph and spreadsheet per project, with timeline, Gantt, dashboard widgets, a history of every change and read-only shared lenses. Projects can be archived and restored.
 - **Review gates** — A completion policy can require a submission that a reviewer approves, and handoffs are tracked on the task.
 - **Signals and judge loop** — GitHub, Slack and Google webhooks, Discord presence, calendar days and manual notes become signals; an LLM judge proposes task events and per-workspace autonomy decides whether to suggest, draft or apply. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md) · [Architecture](https://github.com/libraz/nodate-flow/blob/main/docs/en/architecture.md)
-- **AI assistance** — Smart task creation, state inference, priority insights, relation detection and natural-language commands, on OpenAI, Anthropic, Google, Ollama or any OpenAI-compatible provider. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
+- **AI assistance** — Smart task creation, state inference, priority insights, relation detection from task embeddings, step proposals and natural-language commands, on OpenAI, Anthropic, Google, Ollama (with or without a key) or any OpenAI-compatible provider. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
 - **MCP server** — Agents and external tools read and write a workspace through scoped tokens. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
 - **Calendar** — Shared and personal calendars with recurring events, attendees, invites, reminders, task links and public share and embed pages. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md)
 - **Pages** — A tree of Markdown pages with AI-assisted drafting.
 - **Inbox and intake** — Notifications with snooze, source triage that turns captured sources into tasks, a weekly digest, and live updates over server-sent events.
-- **Webhooks and data** — HMAC-signed outbound webhooks, CSV and JSON export, and CSV import.
-- **Accounts and access** — Argon2id passwords, OIDC sign-in with Google, GitHub and Microsoft, TOTP with recovery codes, an OIDC-only mode, and workspaces with role-based access. [Deployment](https://github.com/libraz/nodate-flow/blob/main/docs/en/deployment.md)
+- **Webhooks and data** — HMAC-signed outbound webhooks, CSV and JSON export, CSV import, and `Idempotency-Key` on task and calendar event writes.
+- **Accounts and access** — Argon2id passwords, OIDC sign-in with Google, GitHub and Microsoft, TOTP with recovery codes, an OIDC-only mode, and workspaces with role-based access. Profile, avatar, theme and sessions are managed in accounts-web. [Deployment](https://github.com/libraz/nodate-flow/blob/main/docs/en/deployment.md)
+- **Themes, languages and help** — Five theme families (glass, modern, washi, classic, nothing) in light, dark or system mode; English, Japanese and Chinese; in-context help and an onboarding checklist.
 - **Shared database with nodate-time** — nodate-flow and the separate nodate-time calendar product can point at one MySQL and share users, groups and calendar data through a published schema contract, with no code dependency. [Introduction](https://github.com/libraz/nodate-flow/blob/main/docs/en/introduction.md) · [Architecture](https://github.com/libraz/nodate-flow/blob/main/docs/en/architecture.md)
 
 ## Getting started
 
-Requires Go, Bun and Docker; the versions are pinned in `go.mod` and `package.json`.
+Requires Go, Bun and Docker; the versions are pinned in `mise.toml`.
 
 ```sh
 git clone https://github.com/libraz/nodate-flow.git && cd nodate-flow
