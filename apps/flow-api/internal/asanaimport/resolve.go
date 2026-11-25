@@ -10,6 +10,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/asanaimport/asana"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
+	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
 
 // KindUnresolved marks a stage-2 problem: the mapping disagrees with Asana
@@ -226,9 +227,11 @@ func (r *resolver) workspace() error {
 		return nil
 	}
 	p.Workspace, p.WorkspaceFound = ws, true
-	if p.Location, err = time.LoadLocation(ws.Timezone); err != nil {
+	zone, err := region.Resolve(ws.Timezone)
+	if err != nil {
 		return fmt.Errorf("workspace timezone %q: %w", ws.Timezone, err)
 	}
+	p.Location = zone.Location()
 	if p.SignIn.Allowlist, err = r.lk.allowlistCount(r.ctx); err != nil {
 		return fmt.Errorf("count sign-in allowlist: %w", err)
 	}
