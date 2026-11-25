@@ -104,9 +104,9 @@ type Store interface {
 	// other devices". A missing match is not an error.
 	RevokeAllExcept(ctx context.Context, userID uint32, keep dbtype.PublicID) error
 
-	// RevokeAllForUser revokes every active session for a user. Used by
-	// the refresh-token reuse detector to tear down the whole session
-	// family the moment a rotated token is replayed. A user with no
-	// active session is not an error.
+	// RevokeAllForUser revokes every active session for a user, in every
+	// product. Used when the account's credentials change hands, such as
+	// linking an OIDC identity. A user with no active session is not an
+	// error.
 	RevokeAllForUser(ctx context.Context, userID uint32) error
 }

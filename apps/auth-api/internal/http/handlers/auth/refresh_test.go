@@ -28,9 +28,9 @@ type stubRefreshSessions struct {
 	// presented token away. supersededErr overrides it when non-nil.
 	supersededSession *sessionstore.Session
 	supersededErr     error
-	// revokeAllCalls records the userIDs passed to RevokeAllForUser so
-	// reuse-detection tests can assert the session family was torn down.
-	revokeAllCalls []uint32
+	// revokeCalls records the sessions passed to Revoke so reuse-detection
+	// tests can assert which session was torn down.
+	revokeCalls []dbtype.PublicID
 }
 
 func (s *stubRefreshSessions) Create(_ context.Context, _ sessionstore.CreateParams) (uint32, error) {
@@ -48,8 +48,9 @@ func (s *stubRefreshSessions) RotateRefreshHash(_ context.Context, _, _ string, 
 	return nil
 }
 
-func (s *stubRefreshSessions) Revoke(_ context.Context, _ uint32, _ dbtype.PublicID) error {
-	panic("not implemented")
+func (s *stubRefreshSessions) Revoke(_ context.Context, _ uint32, publicID dbtype.PublicID) error {
+	s.revokeCalls = append(s.revokeCalls, publicID)
+	return nil
 }
 
 func (s *stubRefreshSessions) ListActive(_ context.Context, _ uint32) ([]sessionstore.Session, error) {
@@ -77,9 +78,10 @@ func (s *stubRefreshSessions) FindSupersededBy(_ context.Context, _ string) (*se
 	return s.supersededSession, nil
 }
 
-func (s *stubRefreshSessions) RevokeAllForUser(_ context.Context, userID uint32) error {
-	s.revokeAllCalls = append(s.revokeAllCalls, userID)
-	return nil
+// RevokeAllForUser must not be reached: a replayed token costs only the
+// session it belongs to.
+func (s *stubRefreshSessions) RevokeAllForUser(_ context.Context, _ uint32) error {
+	panic("refresh must not revoke every session of the user")
 }
 
 // TestRefresh_RejectsIdleSessionPastTimeout is the idle-timeout regression:
@@ -228,3 +230,32 @@ func TestRefresh_FreshSessionWithStaleCreatedAtIsRejected(t *testing.T) {
 // Compile-time guard: stubRefreshSessions must satisfy
 // sessionstore.Store even though we only exercise a subset.
 var _ sessionstore.Store = (*stubRefreshSessions)(nil)
+
+// TestRefresh_ReplayRevokesOnlyTheReplayedSession pins the scope of the
+// reuse response: a token rotated away long ago costs the session it
+// belongs to, and the stub panics if the handler reaches for every session
+// of the user instead.
+func TestRefresh_ReplayRevokesOnlyTheReplayedSession(t *testing.T) {
+	t.Parallel()
+	jwt, err := internauth.NewJWTIssuer(nil, "iss", "aud", time.Minute)
+	require.NoError(t, err)
+
+	rotatedAt := time.Now().Add(-5 * time.Hour)
+	replayed := &sessionstore.Session{
+		InternalID: 1,
+		PublicID:   dbtype.New(),
+		UserID:     7,
+		ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
+		LastUsedAt: &rotatedAt,
+		CreatedAt:  rotatedAt.Add(-time.Hour),
+	}
+	sessions := &stubRefreshSessions{err: sessionstore.ErrNotFound, supersededSession: replayed}
+
+	_, err = Refresh(Deps{JWT: jwt, Sessions: sessions})(context.Background(), &RefreshInput{
+		RefreshCookie: http.Cookie{Name: "nd_rt", Value: "superseded"}, //#nosec G124 -- test cookie
+	})
+	var problem *handlerutil.ProblemDetails
+	require.True(t, errors.As(err, &problem), "expected handlerutil.ProblemDetails, got %T", err)
+	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
+	assert.Equal(t, []dbtype.PublicID{replayed.PublicID}, sessions.revokeCalls)
+}

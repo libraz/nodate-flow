@@ -251,8 +251,11 @@ func TestLoginTotp_ReplayedCodeRejected(t *testing.T) {
 	assert.Equal(t, now.Unix()/30, ident.MfaLastStep.Int64)
 }
 
-// TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits drives a real
-// rotation and then replays the token it superseded.
+// TestRefresh_ReplayedRotatedTokenRevokesItsSessionAndAudits drives a
+// real rotation and then replays the token it superseded. The replayed
+// session is revoked; the user's other device keeps its session, since
+// its token was never exposed and the replay may be the owner's own
+// client retrying after a lost rotation response.
 //
 // The previous version of this test built the state by hand: it revoked
 // a session while leaving its refresh hash in place, and asserted the
@@ -261,7 +264,7 @@ func TestLoginTotp_ReplayedCodeRejected(t *testing.T) {
 // anything real, and the only state that did reach it was the benign
 // one (a signed-out session), where firing was wrong. Rotating through
 // the handler is what makes the assertion mean something.
-func TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits(t *testing.T) {
+func TestRefresh_ReplayedRotatedTokenRevokesItsSessionAndAudits(t *testing.T) {
 	t.Parallel()
 	db := requireB2DB(t)
 	deps, sink := b2Deps(t, db)
@@ -271,7 +274,7 @@ func TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits(t *testing.T) {
 	stolenPlain, stolenHash := b2NewSession(t, deps, uid)
 
 	// A second device the user is still signed in on.
-	_, _ = b2NewSession(t, deps, uid)
+	_, otherHash := b2NewSession(t, deps, uid)
 
 	// The legitimate client refreshes: the stolen token is now the one
 	// this session rotated away.
@@ -288,8 +291,14 @@ func TestRefresh_ReplayedRotatedTokenRevokesFamilyAndAudits(t *testing.T) {
 	problem := problemFor(t, err)
 	assert.Equal(t, apierrors.AuthTokenRefreshInvalid.Code, problem.Type)
 
-	assert.Equal(t, 0, b2ActiveSessions(t, db, uid),
-		"replaying a superseded token must tear down the whole family")
+	assert.Equal(t, 1, b2ActiveSessions(t, db, uid),
+		"replaying a superseded token must revoke its own session and no other")
+	var otherLive int
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sessions WHERE refresh_hash = ? AND enabled = TRUE AND revoked_at IS NULL",
+		otherHash,
+	).Scan(&otherLive))
+	assert.Equal(t, 1, otherLive, "the other device must stay signed in")
 
 	found := false
 	for _, e := range sink.snapshot() {

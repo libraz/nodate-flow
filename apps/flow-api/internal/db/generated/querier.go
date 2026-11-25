@@ -2392,9 +2392,8 @@ type Querier interface {
 	// finds through the shared task ACL and returns the error before the title
 	// reaches the caller, so a task the actor may not see is answered as missing.
 	ResolveTaskRef(ctx context.Context, arg ResolveTaskRefParams) (ResolveTaskRefRow, error)
-	// Revoke every active session for a user, whatever its audience. Used by
-	// the refresh-reuse detector to tear down the entire session family when
-	// a rotated / revoked refresh token is replayed.
+	// Revoke every active session for a user, whatever its audience. Used when
+	// the account's credentials change hands, such as linking an OIDC identity.
 	//
 	// affected-rows: not-applicable — it revokes a set whose size is not known
 	// in advance and nobody named a session. What the caller asked for is that

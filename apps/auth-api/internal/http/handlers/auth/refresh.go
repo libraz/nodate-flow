@@ -18,8 +18,8 @@ import (
 // signal. Inside the window the loser of the race is answered with an
 // access token for the same session and no new cookie, since the winner's
 // response carries the current one; outside it, the presentation is
-// treated as refresh-token reuse and the entire session family is torn
-// down. Kept short so a stolen token replayed later still trips the
+// treated as refresh-token reuse and the session it belongs to is
+// revoked. Kept short so a stolen token replayed later still trips the
 // detector.
 const refreshReuseGrace = 10 * time.Second
 
@@ -128,9 +128,9 @@ func refreshSuperseded(ctx context.Context, deps Deps, hash string) (*RefreshOut
 
 // detectRefreshReuse inspects a refresh hash that matched no active
 // session. When the hash is one a session rotated away more than
-// [refreshReuseGrace] ago, a superseded token is being replayed: every
-// active session for that user is revoked (session-family teardown) and
-// an "auth.refresh_reuse_detected" audit entry is written. It returns the
+// [refreshReuseGrace] ago, a superseded token is being replayed: the
+// session that rotated it away is revoked and an
+// "auth.refresh_reuse_detected" audit entry is written. It returns the
 // rotating session only when the rotation is inside the grace window, and
 // nil otherwise. Store failures are swallowed — the caller then rejects
 // the token, and a detection hiccup must never change that outcome.
@@ -145,6 +145,13 @@ func refreshSuperseded(ctx context.Context, deps Deps, hash string) (*RefreshOut
 // filed a high-severity finding about it. Meanwhile the case the check
 // was written for could never match, because rotation overwrites the
 // hash in place and leaves the superseded token resolving to nothing.
+//
+// The revocation stops at that one session. Rotation keeps a session's
+// row, so the session is the whole token family: the user's other
+// sessions, on other devices and in other products, hold tokens a thief
+// of this one never had. The replay is also indistinguishable from the
+// owner's own client retrying after it lost a rotation response, and
+// signing that user out everywhere punished them for a dropped request.
 func detectRefreshReuse(ctx context.Context, deps Deps, hash string) *sessionstore.Session {
 	if deps.Sessions == nil {
 		return nil
@@ -166,7 +173,7 @@ func detectRefreshReuse(ctx context.Context, deps Deps, hash string) *sessionsto
 		return superseded
 	}
 
-	if rerr := deps.Sessions.RevokeAllForUser(ctx, superseded.UserID); rerr != nil {
+	if rerr := deps.Sessions.Revoke(ctx, superseded.UserID, superseded.PublicID); rerr != nil {
 		// Best-effort: still record the detection below.
 		_ = rerr
 	}
@@ -183,7 +190,7 @@ func detectRefreshReuse(ctx context.Context, deps Deps, hash string) *sessionsto
 			Metadata: map[string]any{
 				"severity":           "high",
 				"replayed_session":   superseded.PublicID.String(),
-				"sessions_revoked":   "all",
+				"sessions_revoked":   "replayed",
 				"replayed_token_age": time.Since(rotatedAt).String(),
 			},
 		})
