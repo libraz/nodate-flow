@@ -596,6 +596,13 @@
   }
 }
 
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
 .layers {
   display: flex;
   min-inline-size: 0;

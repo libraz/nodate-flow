@@ -321,6 +321,11 @@
       "milestone": "Milestones",
       "holidays": "Holidays"
     },
+    "labelFilter": {
+      "group": "Labels",
+      "none": "No label",
+      "showAll": "Show all"
+    },
     "holiday_more": "{name} +{count} more",
     "weekday": {
       "mon": "Mon",

@@ -82,6 +82,7 @@ import {
   eventPillClassName,
   eventPillMarkerClassName,
 } from '../features/calendar-events/event-pill';
+import LabelLegend, { deriveLegend, eventLabelKey } from '../features/calendar-events/label-legend';
 import type { CalendarDragPayload } from '../features/calendar-events/lib/drag-payload';
 import { eventDayKeys } from '../features/calendar-events/lib/event-days';
 import {
@@ -647,6 +648,9 @@ function CalendarRoute(): ReactElement {
     holidays: true,
   });
 
+  // Label keys the viewer switched off; in-memory like `layers`.
+  const [hiddenLabels, setHiddenLabels] = useState<ReadonlySet<string>>(() => new Set());
+
   const { data: workspaces } = useWorkspacesQuery();
   const activeWsId = useActiveWorkspaceId();
   const { data: me } = useMeQuery();
@@ -977,7 +981,41 @@ function CalendarRoute(): ReactElement {
   }, [tasks, layers.tasksDue]);
 
   /**
-   * dateKey → calendar events (after layer filtering by kind).
+   * Events after kind-layer filtering. Each kind gates on its own layer
+   * flag; unknown kinds fall through to the generic `events` flag so the
+   * UI never silently hides them.
+   */
+  const kindFilteredEvents = useMemo(() => {
+    return expandedEvents.filter((ev) => {
+      if (typeof ev.startAt !== 'number') return false;
+      const k = ev.kind;
+      if (k === 'block') return layers.blocks;
+      if (k === 'free') return layers.free;
+      if (k === 'milestone') return layers.milestone;
+      return layers.events;
+    });
+  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone]);
+
+  /** Legend for the kind-filtered events; null when none is labelled. */
+  const labelLegend = useMemo(
+    () => deriveLegend(kindFilteredEvents, i18n.language),
+    [kindFilteredEvents, i18n.language],
+  );
+
+  /**
+   * Flat event list feeding the grid, the mobile month-scroll and the day
+   * sheet: kind layers, then the label filter. Multi-day events stay whole
+   * so the week-row layout can stretch them across columns. The label
+   * filter only applies while the legend is shown, so a hidden key can
+   * never filter events the viewer has no chip to restore.
+   */
+  const filteredEvents = useMemo(() => {
+    if (!labelLegend || hiddenLabels.size === 0) return kindFilteredEvents;
+    return kindFilteredEvents.filter((ev) => !hiddenLabels.has(eventLabelKey(ev)));
+  }, [kindFilteredEvents, labelLegend, hiddenLabels]);
+
+  /**
+   * dateKey → calendar events (after kind and label filtering).
    *
    * An event is filed under every day it covers, not just the day it
    * starts. Filing it once put a five-day "Out of office" on the grid as
@@ -988,15 +1026,7 @@ function CalendarRoute(): ReactElement {
    */
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const ev of expandedEvents) {
-      if (!ev.startAt) continue;
-      // Each kind gates on its own layer flag; unknown kinds fall through
-      // to the generic `events` flag so the UI never silently hides them.
-      const k = ev.kind;
-      if (k === 'block' && !layers.blocks) continue;
-      if (k === 'free' && !layers.free) continue;
-      if (k === 'milestone' && !layers.milestone) continue;
-      if (k !== 'block' && k !== 'free' && k !== 'milestone' && !layers.events) continue;
+    for (const ev of filteredEvents) {
       for (const key of eventDayKeys(ev, zone)) {
         const arr = map.get(key);
         if (arr) arr.push(ev);
@@ -1011,24 +1041,7 @@ function CalendarRoute(): ReactElement {
     // change has to rebuild the map. Zones are interned, so the same
     // IANA name is the same object on every render and listing it here
     // does not invalidate the memo the way a freshly built value would.
-  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone, zone]);
-
-  /**
-   * Flat layer-filtered event list for the mobile month-scroll. Mirrors
-   * the kind-gating in {@link eventsByDate} but keeps multi-day events
-   * whole so the week-row layout can stretch them across columns (the
-   * day-keyed map above would otherwise drop their span).
-   */
-  const filteredEvents = useMemo(() => {
-    return expandedEvents.filter((ev) => {
-      if (typeof ev.startAt !== 'number') return false;
-      const k = ev.kind;
-      if (k === 'block') return layers.blocks;
-      if (k === 'free') return layers.free;
-      if (k === 'milestone') return layers.milestone;
-      return layers.events;
-    });
-  }, [expandedEvents, layers.events, layers.blocks, layers.free, layers.milestone]);
+  }, [filteredEvents, zone]);
 
   /**
    * dateKey → public holidays for the visible grid range. Empty when the
@@ -1301,68 +1314,77 @@ function CalendarRoute(): ReactElement {
         </div>
 
         {/* The wrapper takes the tooltip: the group does not forward handlers. */}
-        <Tooltip content={t('calendar.layerHint')}>
-          <div className={styles.layers}>
-            <ToggleChipGroup label={t('calendar.layers')}>
-              <ToggleChip
-                pressed={layers.tasksDue}
-                onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
-                color="var(--nf-cal-task-color)"
-              >
-                {t('calendar.layer.tasks_due')}
-              </ToggleChip>
-              <ToggleChip
-                pressed={layers.events}
-                onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
-                label={t('calendar.layer.events')}
-              >
-                <span className={styles.kindChip}>
-                  <span aria-hidden className={eventKindSampleClassName} data-kind="event" />
-                  {t('calendar.layer.events')}
-                </span>
-              </ToggleChip>
-              <ToggleChip
-                pressed={layers.blocks}
-                onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
-                label={t('calendar.layer.blocks')}
-              >
-                <span className={styles.kindChip}>
-                  <span aria-hidden className={eventKindSampleClassName} data-kind="block" />
-                  {t('calendar.layer.blocks')}
-                </span>
-              </ToggleChip>
-              <ToggleChip
-                pressed={layers.free}
-                onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
-                label={t('calendar.layer.free')}
-              >
-                <span className={styles.kindChip}>
-                  <span aria-hidden className={eventKindSampleClassName} data-kind="free" />
-                  {t('calendar.layer.free')}
-                </span>
-              </ToggleChip>
-              <ToggleChip
-                pressed={layers.milestone}
-                onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
-                label={t('calendar.layer.milestone')}
-              >
-                <span className={styles.kindChip}>
-                  <span aria-hidden className={eventKindSampleClassName} data-kind="milestone" />
-                  {t('calendar.layer.milestone')}
-                </span>
-              </ToggleChip>
-              {country ? (
+        <div className={styles.filters}>
+          <Tooltip content={t('calendar.layerHint')}>
+            <div className={styles.layers}>
+              <ToggleChipGroup label={t('calendar.layers')}>
                 <ToggleChip
-                  pressed={layers.holidays}
-                  onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
-                  color="var(--nf-color-danger)"
+                  pressed={layers.tasksDue}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, tasksDue: v }))}
+                  color="var(--nf-cal-task-color)"
                 >
-                  {t('calendar.layer.holidays')}
+                  {t('calendar.layer.tasks_due')}
                 </ToggleChip>
-              ) : null}
-            </ToggleChipGroup>
-          </div>
-        </Tooltip>
+                <ToggleChip
+                  pressed={layers.events}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, events: v }))}
+                  label={t('calendar.layer.events')}
+                >
+                  <span className={styles.kindChip}>
+                    <span aria-hidden className={eventKindSampleClassName} data-kind="event" />
+                    {t('calendar.layer.events')}
+                  </span>
+                </ToggleChip>
+                <ToggleChip
+                  pressed={layers.blocks}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, blocks: v }))}
+                  label={t('calendar.layer.blocks')}
+                >
+                  <span className={styles.kindChip}>
+                    <span aria-hidden className={eventKindSampleClassName} data-kind="block" />
+                    {t('calendar.layer.blocks')}
+                  </span>
+                </ToggleChip>
+                <ToggleChip
+                  pressed={layers.free}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, free: v }))}
+                  label={t('calendar.layer.free')}
+                >
+                  <span className={styles.kindChip}>
+                    <span aria-hidden className={eventKindSampleClassName} data-kind="free" />
+                    {t('calendar.layer.free')}
+                  </span>
+                </ToggleChip>
+                <ToggleChip
+                  pressed={layers.milestone}
+                  onPressedChange={(v) => setLayers((s) => ({ ...s, milestone: v }))}
+                  label={t('calendar.layer.milestone')}
+                >
+                  <span className={styles.kindChip}>
+                    <span aria-hidden className={eventKindSampleClassName} data-kind="milestone" />
+                    {t('calendar.layer.milestone')}
+                  </span>
+                </ToggleChip>
+                {country ? (
+                  <ToggleChip
+                    pressed={layers.holidays}
+                    onPressedChange={(v) => setLayers((s) => ({ ...s, holidays: v }))}
+                    color="var(--nf-color-danger)"
+                  >
+                    {t('calendar.layer.holidays')}
+                  </ToggleChip>
+                ) : null}
+              </ToggleChipGroup>
+            </div>
+          </Tooltip>
+          {labelLegend ? (
+            <LabelLegend
+              legend={labelLegend}
+              hidden={hiddenLabels}
+              onHiddenChange={setHiddenLabels}
+            />
+          ) : null}
+        </div>
       </div>
 
       {/* Mobile-only trigger to open the calendars rail as a drawer. */}

@@ -1,0 +1,64 @@
+.legend {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.caption {
+  flex-shrink: 0;
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  line-height: var(--nf-leading-tight);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  min-inline-size: 0;
+}
+
+.chips > * {
+  flex-shrink: 0;
+}
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nf-space-2);
+}
+
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 767px) {
+  .chips {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-inline-end: var(--nf-space-6);
+    mask-image: linear-gradient(
+      to right,
+      var(--nf-color-fg) calc(100% - var(--nf-space-6)),
+      transparent
+    );
+  }
+
+  .chips:dir(rtl) {
+    mask-image: linear-gradient(
+      to left,
+      var(--nf-color-fg) calc(100% - var(--nf-space-6)),
+      transparent
+    );
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .group {
+    flex-wrap: nowrap;
+  }
+}

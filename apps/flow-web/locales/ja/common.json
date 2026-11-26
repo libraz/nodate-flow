@@ -321,6 +321,11 @@
       "milestone": "マイルストーン",
       "holidays": "祝日"
     },
+    "labelFilter": {
+      "group": "ラベル",
+      "none": "ラベルなし",
+      "showAll": "すべて表示"
+    },
     "holiday_more": "{name} 他{count}件",
     "weekday": {
       "mon": "月",

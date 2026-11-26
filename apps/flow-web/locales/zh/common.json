@@ -321,6 +321,11 @@
       "milestone": "里程碑",
       "holidays": "节假日"
     },
+    "labelFilter": {
+      "group": "标签",
+      "none": "无标签",
+      "showAll": "全部显示"
+    },
     "holiday_more": "{name} +{count} 更多",
     "weekday": {
       "mon": "一",
