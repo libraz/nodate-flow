@@ -2508,6 +2508,8 @@ const (
 	UsersThemePreferenceModernDark   UsersThemePreference = "modern-dark"
 	UsersThemePreferenceWashiLight   UsersThemePreference = "washi-light"
 	UsersThemePreferenceWashiDark    UsersThemePreference = "washi-dark"
+	UsersThemePreferenceSakuraLight  UsersThemePreference = "sakura-light"
+	UsersThemePreferenceSakuraDark   UsersThemePreference = "sakura-dark"
 	UsersThemePreferenceClassicLight UsersThemePreference = "classic-light"
 	UsersThemePreferenceClassicDark  UsersThemePreference = "classic-dark"
 	UsersThemePreferenceNothingLight UsersThemePreference = "nothing-light"
