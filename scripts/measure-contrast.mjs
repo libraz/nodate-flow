@@ -33,6 +33,8 @@ const THEMES = [
   'packages/ui/src/themes/modern-dark.css',
   'packages/ui/src/themes/washi-light.css',
   'packages/ui/src/themes/washi-dark.css',
+  'packages/ui/src/themes/sakura-light.css',
+  'packages/ui/src/themes/sakura-dark.css',
   'packages/ui/src/themes/classic-light.css',
   'packages/ui/src/themes/classic-dark.css',
   'packages/ui/src/themes/nothing-light.css',

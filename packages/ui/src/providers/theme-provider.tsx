@@ -29,7 +29,7 @@ export type { ThemeId };
 // ---------------------------------------------------------------------------
 
 /** Theme "family" — the visual design, independent of light/dark. */
-export type ThemeFamily = 'glass' | 'modern' | 'washi' | 'classic' | 'nothing';
+export type ThemeFamily = 'glass' | 'modern' | 'washi' | 'sakura' | 'classic' | 'nothing';
 
 /** Color mode preference. */
 export type ColorMode = 'light' | 'dark' | 'system';
@@ -45,6 +45,7 @@ export const THEME_FAMILIES: readonly ThemeFamily[] = [
   'glass',
   'modern',
   'washi',
+  'sakura',
   'classic',
   'nothing',
 ] as const;

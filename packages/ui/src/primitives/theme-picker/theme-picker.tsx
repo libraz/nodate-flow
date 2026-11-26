@@ -96,6 +96,11 @@ export const DEFAULT_THEME_PREVIEWS: Record<ThemeFamily, ThemePreviewStyle> = {
     accent: 'oklch(52.35% 0.1709 27.73)',
     radius: '4px',
   },
+  sakura: {
+    bg: 'linear-gradient(135deg, oklch(96.65% 0.0111 3.49) 50%, oklch(18.97% 0.01 341.39) 50%)',
+    accent: 'oklch(56.74% 0.1631 3.71)',
+    radius: '10px',
+  },
   classic: {
     bg: 'linear-gradient(135deg, oklch(100% 0 0) 50%, oklch(21.78% 0 0) 50%)',
     accent: 'oklch(75.01% 0.1616 158.67)',

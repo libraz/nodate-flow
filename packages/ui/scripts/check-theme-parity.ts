@@ -34,6 +34,8 @@ const themePaths = [
   'modern-dark',
   'washi-light',
   'washi-dark',
+  'sakura-light',
+  'sakura-dark',
   'classic-light',
   'classic-dark',
   'nothing-light',

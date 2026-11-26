@@ -16,6 +16,8 @@
     "./themes/modern-dark.css": "./src/themes/modern-dark.css",
     "./themes/washi-light.css": "./src/themes/washi-light.css",
     "./themes/washi-dark.css": "./src/themes/washi-dark.css",
+    "./themes/sakura-light.css": "./src/themes/sakura-light.css",
+    "./themes/sakura-dark.css": "./src/themes/sakura-dark.css",
     "./themes/classic-light.css": "./src/themes/classic-light.css",
     "./themes/classic-dark.css": "./src/themes/classic-dark.css",
     "./themes/nothing-light.css": "./src/themes/nothing-light.css",

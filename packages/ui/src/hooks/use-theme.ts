@@ -15,6 +15,8 @@ export type ThemeId =
   | 'modern-dark'
   | 'washi-light'
   | 'washi-dark'
+  | 'sakura-light'
+  | 'sakura-dark'
   | 'classic-light'
   | 'classic-dark'
   | 'nothing-light'
@@ -27,6 +29,8 @@ export const THEME_IDS: readonly ThemeId[] = [
   'modern-dark',
   'washi-light',
   'washi-dark',
+  'sakura-light',
+  'sakura-dark',
   'classic-light',
   'classic-dark',
   'nothing-light',

@@ -1,0 +1,136 @@
+/*
+ * sakura-light — blush ground, plum-brown ink, deep rose accent, rounded type.
+ */
+
+[data-theme="sakura-light"] {
+  color-scheme: light;
+
+  --nf-color-bg: oklch(96.65% 0.0111 3.49);
+  --nf-color-bg-elevated: oklch(100% 0 0);
+  --nf-color-bg-sunken: oklch(94.84% 0.015 356.63);
+  --nf-color-surface: oklch(98.92% 0.0055 3.33);
+  --nf-color-surface-hover: oklch(94.81% 0.0185 356.43);
+  --nf-color-overlay: oklch(27.65% 0.0538 353.56 / 0.28);
+
+  --nf-color-fg: oklch(26.05% 0.0261 349.45);
+  --nf-color-fg-muted: oklch(47.99% 0.038 351.41);
+  --nf-color-fg-subtle: oklch(50.53% 0.0388 347.05);
+  --nf-color-fg-on-accent: oklch(100% 0 0);
+  --nf-color-fg-on-danger: oklch(100% 0 0);
+
+  --nf-color-border: oklch(91.46% 0.0223 356.36);
+  --nf-color-border-strong: oklch(84.86% 0.0363 355.79);
+  --nf-color-border-control: oklch(64.69% 0.0499 356.18);
+  --nf-color-hairline: oklch(93.19% 0.0171 359.3);
+
+  --nf-color-accent: oklch(56.74% 0.1631 3.71);
+  --nf-color-accent-hover: oklch(50.88% 0.1496 3.85);
+  --nf-color-accent-active: oklch(45.58% 0.1322 3.48);
+  --nf-color-accent-subtle: oklch(56.74% 0.1631 3.71 / 0.13);
+  --nf-color-accent-fg: oklch(53.17% 0.1562 3.27);
+
+  --nf-color-success: oklch(53.03% 0.0997 157.77);
+  --nf-color-success-subtle: oklch(53.03% 0.0997 157.77 / 0.1);
+  --nf-color-success-fg: oklch(50.57% 0.0946 158.32);
+  --nf-color-warning: oklch(68.05% 0.1341 73.91);
+  --nf-color-warning-subtle: oklch(68.05% 0.1341 73.91 / 0.1);
+  --nf-color-warning-fg: oklch(53.97% 0.1133 68.03);
+  --nf-color-danger: oklch(54.26% 0.1805 31.98);
+  --nf-color-danger-subtle: oklch(54.26% 0.1805 31.98 / 0.09);
+  --nf-color-danger-fg: oklch(52.09% 0.1742 31.98);
+  --nf-color-info: oklch(53.74% 0.0707 152.63);
+  --nf-color-info-subtle: oklch(53.74% 0.0707 152.63 / 0.1);
+  --nf-color-info-fg: oklch(50.18% 0.0672 152.47);
+
+  --nf-color-focus-ring: oklch(56.74% 0.1631 3.71);
+  --nf-focus-ring-width: 2px;
+  --nf-focus-ring-offset: 2px;
+
+  /* Petal-soft corners: rounder than the flat themes, short of glass. */
+  --nf-radius-xs: 0.5rem;
+  --nf-radius-sm: 0.75rem;
+  --nf-radius-md: 1rem;
+  --nf-radius-lg: 1.375rem;
+  --nf-radius-pill: 9999px;
+
+  --nf-shadow-sm: 0 1px 2px oklch(40.55% 0.1152 0.47 / 0.05);
+  --nf-shadow-md: 0 4px 14px -2px oklch(40.55% 0.1152 0.47 / 0.09);
+  --nf-shadow-lg: 0 10px 28px -6px oklch(40.55% 0.1152 0.47 / 0.13);
+  --nf-shadow-elevated: 0 18px 44px -10px oklch(40.55% 0.1152 0.47 / 0.2);
+  --nf-shadow-focus:
+    0 0 0 var(--nf-focus-ring-offset) var(--nf-color-bg),
+    0 0 0 calc(var(--nf-focus-ring-offset) + var(--nf-focus-ring-width)) var(--nf-color-focus-ring);
+
+  --nf-overlay-press: oklch(0% 0 0 / 0.04);
+  --nf-overlay-hover: oklch(0% 0 0 / 0.02);
+
+  --nf-color-state-open-bg: oklch(94.76% 0.012 259.82);
+  --nf-color-state-open-fg: oklch(48.89% 0.1009 261.5);
+  --nf-color-state-waiting-bg: oklch(95.19% 0.0273 83.54);
+  --nf-color-state-waiting-fg: oklch(50.23% 0.105 68.94);
+  --nf-color-state-review-bg: oklch(94.02% 0.021 342.54);
+  --nf-color-state-review-fg: oklch(48.08% 0.1176 343.98);
+  --nf-color-state-done-bg: oklch(94.29% 0.0182 155.81);
+  --nf-color-state-done-fg: oklch(50.57% 0.0946 158.32);
+  --nf-color-state-cancelled-bg: oklch(94.91% 0.008 357.8);
+  --nf-color-state-cancelled-fg: oklch(51.65% 0.0308 347.93);
+
+  /* A light spring haze on floating chrome, not frosted glass. */
+  --nf-surface-blur: 14px;
+  --nf-surface-saturation: 1.3;
+  --nf-atmosphere-opacity: 0.5;
+
+  /* Ink into rose within one hue, never a pink-to-purple sweep. */
+  --nf-gradient-wordmark: linear-gradient(
+    115deg,
+    oklch(26.05% 0.0261 349.45) 0%,
+    oklch(41.81% 0.1098 0.04) 50%,
+    oklch(56.74% 0.1631 3.71) 100%
+  );
+
+  /* A petal settling: unhurried, with a soft overshoot at rest. */
+  --nf-motion-duration: var(--nf-duration-slow);
+  --nf-motion-easing: var(--nf-ease-out);
+
+  --nf-font-sans:
+    "Zen Maru Gothic", "Hiragino Maru Gothic ProN", -apple-system, BlinkMacSystemFont,
+    "Hiragino Sans", sans-serif;
+  --nf-font-display: var(--nf-font-sans);
+  --nf-text-tracking: 0.01em;
+  --nf-control-case: none;
+  --nf-control-tracking: 0.02em;
+
+  /* Layers, top first: petals drifting from two corners, top light, blush ground. */
+  --nf-app-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'%3E%3Cdefs%3E%3Cpath id='p' d='M0 12C-7 7-10-1-7-7C-5-11-2-11 0-8C2-11 5-11 7-7C10-1 7 7 0 12Z'/%3E%3C/defs%3E%3Cg fill='%23d46a8f' fill-opacity='.2'%3E%3Cuse href='%23p' transform='translate(352 58) rotate(-24) scale(2.6)'/%3E%3Cuse href='%23p' opacity='.75' transform='translate(290 122) rotate(38) scale(2)'/%3E%3Cuse href='%23p' opacity='.6' transform='translate(382 172) rotate(-70) scale(1.7)'/%3E%3Cuse href='%23p' opacity='.5' transform='translate(220 52) rotate(12) scale(1.4)'/%3E%3Cuse href='%23p' opacity='.45' transform='translate(314 240) rotate(64) scale(1.2)'/%3E%3Cuse href='%23p' opacity='.35' transform='translate(196 170) rotate(-40)'/%3E%3Cuse href='%23p' opacity='.3' transform='translate(252 302) rotate(20) scale(.85)'/%3E%3Cuse href='%23p' opacity='.25' transform='translate(140 96) rotate(80) scale(.75)'/%3E%3C/g%3E%3C/svg%3E") right -4.5rem top -3rem / 27.5rem 27.5rem no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 420'%3E%3Cdefs%3E%3Cpath id='p' d='M0 12C-7 7-10-1-7-7C-5-11-2-11 0-8C2-11 5-11 7-7C10-1 7 7 0 12Z'/%3E%3C/defs%3E%3Cg fill='%23d46a8f' fill-opacity='.2'%3E%3Cuse href='%23p' transform='translate(352 58) rotate(-24) scale(2.6)'/%3E%3Cuse href='%23p' opacity='.75' transform='translate(290 122) rotate(38) scale(2)'/%3E%3Cuse href='%23p' opacity='.6' transform='translate(382 172) rotate(-70) scale(1.7)'/%3E%3Cuse href='%23p' opacity='.5' transform='translate(220 52) rotate(12) scale(1.4)'/%3E%3Cuse href='%23p' opacity='.45' transform='translate(314 240) rotate(64) scale(1.2)'/%3E%3Cuse href='%23p' opacity='.35' transform='translate(196 170) rotate(-40)'/%3E%3Cuse href='%23p' opacity='.3' transform='translate(252 302) rotate(20) scale(.85)'/%3E%3Cuse href='%23p' opacity='.25' transform='translate(140 96) rotate(80) scale(.75)'/%3E%3C/g%3E%3C/svg%3E") left -9.5rem bottom -8rem / 20rem 20rem no-repeat,
+    radial-gradient(120% 70% at 50% -10%, oklch(100% 0 0 / 0.75), transparent 60%),
+    oklch(96.65% 0.0111 3.49);
+
+  --nf-cal-task-color: oklch(56.74% 0.1631 3.71);
+  --nf-cal-task-subtle: oklch(56.74% 0.1631 3.71 / 0.12);
+  --nf-cal-task-fg: oklch(53.17% 0.1562 3.27);
+  --nf-cal-event-color: oklch(54.45% 0.1106 261.01);
+  --nf-cal-event-subtle: oklch(54.45% 0.1106 261.01 / 0.12);
+  --nf-cal-event-fg: oklch(48.89% 0.1009 261.5);
+  --nf-cal-block-color: oklch(68.05% 0.1341 73.91);
+  --nf-cal-block-subtle: oklch(68.05% 0.1341 73.91 / 0.12);
+  --nf-cal-block-fg: oklch(50.23% 0.105 68.94);
+  --nf-cal-free-color: oklch(53.03% 0.0997 157.77);
+  --nf-cal-free-subtle: oklch(53.03% 0.0997 157.77 / 0.12);
+  --nf-cal-free-fg: oklch(50.57% 0.0946 158.32);
+  --nf-cal-milestone-color: oklch(48.08% 0.1176 343.98);
+  --nf-cal-milestone-subtle: oklch(48.08% 0.1176 343.98 / 0.12);
+  --nf-cal-milestone-fg: oklch(48.08% 0.1176 343.98);
+
+  --nf-cal-color-1: oklch(62.31% 0.188 259.81);
+  --nf-cal-color-2: oklch(71.48% 0.1257 215.22);
+  --nf-cal-color-3: oklch(72.27% 0.192 149.58);
+  --nf-cal-color-4: oklch(76.86% 0.1647 70.08);
+  --nf-cal-color-5: oklch(70.49% 0.1867 47.6);
+  --nf-cal-color-6: oklch(63.68% 0.2078 25.33);
+  --nf-cal-color-7: oklch(65.59% 0.2118 354.31);
+  --nf-cal-color-8: oklch(62.68% 0.2325 303.9);
+  --nf-cal-color-9: oklch(55.1% 0.0234 264.36);
+  --nf-cal-color-10: oklch(37.29% 0.0306 259.73);
+}
