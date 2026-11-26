@@ -54,12 +54,9 @@ async function openCreateDialog(page: Page): Promise<void> {
   await expect(
     page.getByRole('heading', { level: 1, name: /^(Calendar|カレンダー)$/ }),
   ).toBeVisible({ timeout: 15_000 });
-  const today = new Date();
-  const day = today.getDate();
-  const cells = page.locator('[role="button"][title]').filter({
-    has: page.getByText(String(day), { exact: true }),
-  });
-  const cell = cells.first();
+  // The grid marks today's cell with aria-current="date"; only in-month
+  // days carry the button role and an aria-label ("<date>, N entries").
+  const cell = page.locator('[role="button"][aria-label][aria-current="date"]').first();
   await expect(cell).toBeVisible({ timeout: 10_000 });
   await cell.click({ position: { x: 8, y: 8 } });
   await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });

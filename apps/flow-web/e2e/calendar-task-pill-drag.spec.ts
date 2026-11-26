@@ -132,6 +132,12 @@ async function fetchDueOn(tenant: TestTenant, taskId: string): Promise<string | 
 test.describe('calendar month-grid drag', () => {
   // Each test seeds its own data so they can execute independently.
 
+  // The grid draws only as many pills as a cell's height holds, tasks
+  // first, and folds the rest into "+N more" where a pill cannot be
+  // dragged. A tall viewport keeps an event pill on the page when a task
+  // is due the same day.
+  test.use({ viewport: { width: 1280, height: 1200 } });
+
   let tenant: TestTenant;
   let calendarId: string;
 
