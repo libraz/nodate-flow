@@ -1,7 +1,7 @@
 {
   "repository": "git@github.com:libraz/nodate-time.git",
   "sourcePath": "sql/time",
-  "ref": "e35451e246c3058d2011caba244790b3d2ca3bb3",
+  "ref": "7ca0687a299a5fee52a4f584f997dc8354de3f87",
   "files": [
     {
       "path": "constraints/schedule_polls.sql",
@@ -9,7 +9,7 @@
     },
     {
       "path": "event-kinds.yaml",
-      "sha256": "1e36afcb53f8b6cbceba559cae3d9857d089b8b87cf90f5fdd1817433480216f"
+      "sha256": "2e4b3c03674f838fc63bd03b0b6ba04b573ba065c4ede0b7703c7ae3e8d22623"
     },
     {
       "path": "tables/album_photos.sql",
@@ -24,8 +24,16 @@
       "sha256": "1abc6df4de5dbc43f5796eb3708f72a723464f1c3d2d873e3da40ae0d5f56f96"
     },
     {
+      "path": "tables/calendar_event_labels.sql",
+      "sha256": "d5109f6f8364e001a7cbdd91ea694153888791e15516141ef597766156437968"
+    },
+    {
       "path": "tables/calendar_invites.sql",
       "sha256": "80bd370b0996635cf09ec09d64eb531343e48bee68786db6f9115f1614ccab86"
+    },
+    {
+      "path": "tables/calendar_labels.sql",
+      "sha256": "fab5b7d7fa2483c6280f09fdb07d9cb6928b2e455a3ae9240d6a8100cada4d38"
     },
     {
       "path": "tables/calendar_schedule_poll_answers.sql",
@@ -42,6 +50,14 @@
     {
       "path": "tables/calendar_schedule_polls.sql",
       "sha256": "5551341a6371cb7d94c3da9d8d07d79dc0d6f3f00ffa38b502a83863855098cf"
+    },
+    {
+      "path": "tables/dav_app_passwords.sql",
+      "sha256": "e6ea3c6fe6b080acb8c9bd1f2591d66d1d51a327a51f4ef898f6a0fe852ac530"
+    },
+    {
+      "path": "tables/dav_event_resources.sql",
+      "sha256": "3fb8e4dac9880f3e7944d3ba63c39913caaef380087b8a1fa6ca88368fb5d53c"
     },
     {
       "path": "tables/email_verifications.sql",
@@ -84,8 +100,16 @@
       "sha256": "338531aa0606f3c83b3df904a06ebced944e80b1271ed0a013784cf744262237"
     },
     {
+      "path": "upgrades/caldav.sql",
+      "sha256": "8f13a0e2a1f512113c85d0e50a9e11c16301057aefcaaeb71183dce6498f7fe4"
+    },
+    {
       "path": "upgrades/calendar-covers.sql",
       "sha256": "276fc2bb7cd6e5703993f2e2a95f4a67bbb9a9512cea6605581ced6fe582e9db"
+    },
+    {
+      "path": "upgrades/event-labels.sql",
+      "sha256": "581ac76d76d5d858a2c79c61c827eade4f6107e3818a415f0dd01a21e7e8c0a7"
     },
     {
       "path": "upgrades/from-v0.1.0.sql",

@@ -34,6 +34,9 @@ type Querier interface {
 	// carries it. IGNORE because the claim may already be there, which is the
 	// state this exists to reach.
 	CopyCalendarEventReminderClaim(ctx context.Context, arg CopyCalendarEventReminderClaimParams) error
+	// Number of labels a calendar holds. Called under LockCalendarForLabelWrite
+	// so the cap check and the insert that follows it cannot interleave.
+	CountCalendarLabels(ctx context.Context, calendarID uint32) (int64, error)
 	// Number of live members, used to pick the next colour from the palette.
 	CountCalendarMembers(ctx context.Context, arg CountCalendarMembersParams) (int64, error)
 	// Live owners of a calendar. Callers check this before demoting or
@@ -85,6 +88,9 @@ type Querier interface {
 	// trigger rejects a row carrying only one of recurrence_parent_id /
 	// recurrence_original_start, so both are required parameters.
 	CreateCalendarEventOverride(ctx context.Context, arg CreateCalendarEventOverrideParams) (int64, error)
+	// Insert a label. A duplicate (calendar_id, name) is rejected by
+	// uniq_calendar_labels_calendar_name.
+	CreateCalendarLabel(ctx context.Context, arg CreateCalendarLabelParams) (int64, error)
 	// Add a shared memo/to-do item to a calendar.
 	CreateCalendarMemo(ctx context.Context, arg CreateCalendarMemoParams) (int64, error)
 	// Subscribe a user to a calendar with display preferences.
@@ -108,6 +114,12 @@ type Querier interface {
 	// DeleteStorageObjectIfUnreferenced can free the storage object (FK is
 	// ON DELETE RESTRICT). Audit trail survives via events.
 	DeleteCalendarEventAttachment(ctx context.Context, arg DeleteCalendarEventAttachmentParams) (int64, error)
+	// Remove a label. The links to it go with it through the foreign key
+	// cascade. Zero rows means the label is not on this calendar.
+	DeleteCalendarLabel(ctx context.Context, arg DeleteCalendarLabelParams) (int64, error)
+	// Remove an event row's label link. Zero rows means the link was never there,
+	// which is the state the caller wants.
+	DeleteEventLabel(ctx context.Context, eventID uint32) (int64, error)
 	// Withdraw every publication of a calendar's events, across every share
 	// in the workspace. Run when the calendar itself is deleted.
 	//
@@ -319,6 +331,9 @@ type Querier interface {
 	//
 	// recurrence_parent_id is an internal id and must not reach an API response.
 	FindCalendarEventRecurrenceLink(ctx context.Context, arg FindCalendarEventRecurrenceLinkParams) (FindCalendarEventRecurrenceLinkRow, error)
+	// Resolve a label by UUID v7 within one calendar. Both keys are required so
+	// a label of another calendar is never picked up by its public id.
+	FindCalendarLabelByPublicId(ctx context.Context, arg FindCalendarLabelByPublicIdParams) (FindCalendarLabelByPublicIdRow, error)
 	// Resolve one user's access to a calendar. This is the query every
 	// calendar authorization check runs through; sql.ErrNoRows means no
 	// access, which callers map to a 404 rather than a 403 so the existence
@@ -346,6 +361,9 @@ type Querier interface {
 	// public render path. Returns only enabled rows; caller applies the
 	// expires_at gate so the 410 code path can be distinguished from 404.
 	FindPublicShareByTokenHash(ctx context.Context, tokenHash string) (FindPublicShareByTokenHashRow, error)
+	// The label an event row is filed under, by internal ids. sql.ErrNoRows
+	// means the event carries none.
+	GetEventLabel(ctx context.Context, eventID uint32) (uint32, error)
 	// Whether an event has any attendee row, enabled or not.
 	//
 	// An override row with any row of its own replaces its series' attendee
@@ -462,6 +480,13 @@ type Querier interface {
 	ListCalendarEventsAcrossCalendars(ctx context.Context, arg ListCalendarEventsAcrossCalendarsParams) ([]ListCalendarEventsAcrossCalendarsRow, error)
 	// List non-recurring events in a calendar within a time range.
 	ListCalendarEventsByRange(ctx context.Context, arg ListCalendarEventsByRangeParams) ([]ListCalendarEventsByRangeRow, error)
+	// Every label of a calendar, oldest first. The order matches nodate-time so
+	// both products list a calendar's labels the same way; sort_weight is not
+	// exposed yet and ties would break on id anyway.
+	ListCalendarLabels(ctx context.Context, calendarID uint32) ([]ListCalendarLabelsRow, error)
+	// Colours the live members of a calendar already hold, for picking one that
+	// is not yet taken.
+	ListCalendarMemberColors(ctx context.Context, arg ListCalendarMemberColorsParams) ([]string, error)
 	// List a calendar's members with the role and shared colour each holds.
 	ListCalendarMembers(ctx context.Context, arg ListCalendarMembersParams) ([]ListCalendarMembersRow, error)
 	// List memos for a calendar in display order.
@@ -491,6 +516,9 @@ type Querier interface {
 	// Owners must still be active workspace members so we don't surface
 	// calendars whose owner has left the workspace.
 	ListDiscoverableCalendarsInWorkspace(ctx context.Context, arg ListDiscoverableCalendarsInWorkspaceParams) ([]ListDiscoverableCalendarsInWorkspaceRow, error)
+	// Internal ids of a series' live overrides, so a label set on the series can
+	// be propagated to each of them.
+	ListEnabledOverrideIdsOfSeries(ctx context.Context, arg ListEnabledOverrideIdsOfSeriesParams) ([]uint32, error)
 	// Inbox query for /me/invites: active, unaccepted, non-expired invites
 	// addressed to the authenticated user's primary email. JOINs event,
 	// calendar, and workspace metadata so the handler can build a rich
@@ -610,6 +638,10 @@ type Querier interface {
 	// each write a list missing the other's entry, and a cancelled occurrence
 	// comes back.
 	LockCalendarEventSeries(ctx context.Context, arg LockCalendarEventSeriesParams) (LockCalendarEventSeriesRow, error)
+	// Serialise label writes on one calendar by locking its row. The label cap
+	// and name uniqueness are checked before the write, and two concurrent
+	// writers would both pass that check without this lock.
+	LockCalendarForLabelWrite(ctx context.Context, arg LockCalendarForLabelWriteParams) (uint32, error)
 	// Stamp accepted_at when the recipient clicks the magic link
 	// successfully.
 	MarkCalendarEventInviteAccepted(ctx context.Context, id uint32) error
@@ -718,6 +750,14 @@ type Querier interface {
 	// the cancellation it leaves behind belongs on the master: without it the
 	// master produces the occurrence again at its original slot.
 	SetCalendarEventSeriesExceptions(ctx context.Context, arg SetCalendarEventSeriesExceptionsParams) error
+	// File an event row under a label, replacing any label it already carries.
+	// event_id is the primary key, so an event holds at most one link.
+	SetEventLabel(ctx context.Context, arg SetEventLabelParams) error
+	// Advance updated_at without changing any other column. A label change is
+	// written to calendar_event_labels, not to the event row, so the event's
+	// revision stamp would otherwise not move. The caller resolved the event just
+	// before, so the row count is not consulted.
+	TouchCalendarEvent(ctx context.Context, arg TouchCalendarEventParams) error
 	// Grant or revoke edit permission on an attendee (by event owner).
 	//
 	// Same scope, same open outcome, but about the target rather than the actor:
@@ -755,6 +795,15 @@ type Querier interface {
 	// recurrence_parent_id IS NOT NULL confines the statement to override rows,
 	// so a public_id naming a master or an ordinary event matches nothing.
 	UpdateCalendarEventOverride(ctx context.Context, arg UpdateCalendarEventOverrideParams) (int64, error)
+	// Rename or recolour a label, addressed by internal id. The caller resolved
+	// the label with FindCalendarLabelByPublicId under the calendar lock, so a
+	// zero count (an unchanged name and colour) is not a missing row.
+	UpdateCalendarLabel(ctx context.Context, arg UpdateCalendarLabelParams) error
+	// Set a member's colour. Existence is settled by the FindCalendarMember the
+	// caller runs first, not by the row count: writing the colour a member
+	// already has matches the row yet changes nothing, so zero does not mean
+	// "no such member".
+	UpdateCalendarMemberColor(ctx context.Context, arg UpdateCalendarMemberColorParams) error
 	// Change a member's role. RowsAffected = 0 means the target holds no live
 	// membership, which the caller maps to a 404 rather than silently
 	// reporting success.

@@ -78,6 +78,27 @@ WHERE calendar_id = ?
   AND user_id = ?
   AND enabled = TRUE;
 
+-- name: UpdateCalendarMemberColor :exec
+-- Set a member's colour. Existence is settled by the FindCalendarMember the
+-- caller runs first, not by the row count: writing the colour a member
+-- already has matches the row yet changes nothing, so zero does not mean
+-- "no such member".
+UPDATE calendar_members
+SET member_color = ?
+WHERE calendar_id = ?
+  AND user_id = ?
+  AND enabled = TRUE;
+
+-- name: ListCalendarMemberColors :many
+-- Colours the live members of a calendar already hold, for picking one that
+-- is not yet taken.
+SELECT member_color
+FROM calendar_members
+WHERE calendar_id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE
+LIMIT 500;
+
 -- name: CountCalendarOwners :one
 -- Live owners of a calendar. Callers check this before demoting or
 -- removing an owner, so a calendar cannot be left with nobody able to

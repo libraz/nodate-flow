@@ -66,10 +66,18 @@ SELECT
   ce.recurrence_parent_id,
   ce.enabled,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.public_id = ?
   AND ce.calendar_id = ?
   AND ce.workspace_id = ?
@@ -114,11 +122,19 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < sqlc.arg(range_end)
@@ -187,11 +203,19 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
@@ -244,7 +268,11 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -262,6 +290,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < sqlc.arg(range_end)
@@ -333,7 +365,11 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -351,6 +387,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
@@ -426,7 +466,11 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -454,6 +498,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.recurrence_rule IS NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < sqlc.arg(range_end)
@@ -539,7 +587,11 @@ SELECT
       AND a.user_id = sqlc.arg(viewer_user_id)
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -567,6 +619,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
@@ -642,6 +698,16 @@ WHERE public_id = ?
   AND calendar_id = ?
   AND workspace_id = ?
   AND enabled = TRUE;
+
+-- name: TouchCalendarEvent :exec
+-- Advance updated_at without changing any other column. A label change is
+-- written to calendar_event_labels, not to the event row, so the event's
+-- revision stamp would otherwise not move. The caller resolved the event just
+-- before, so the row count is not consulted.
+UPDATE calendar_events
+SET updated_at = CURRENT_TIMESTAMP(3)
+WHERE id = ?
+  AND workspace_id = ?;
 
 -- name: DisableCalendarEvent :execrows
 -- Soft-delete a calendar event by clearing the enabled flag. enabled=FALSE
@@ -827,6 +893,7 @@ INSERT INTO calendar_events (
 -- reading a default off the master returns the occurrence to the values the
 -- override was created to leave behind.
 SELECT
+  ce.id,
   ce.public_id,
   ce.calendar_id,
   ce.recurrence_original_start,

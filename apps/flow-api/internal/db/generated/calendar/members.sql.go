@@ -128,6 +128,45 @@ func (q *Queries) FindCalendarMember(ctx context.Context, arg FindCalendarMember
 	return i, err
 }
 
+const listCalendarMemberColors = `-- name: ListCalendarMemberColors :many
+SELECT member_color
+FROM calendar_members
+WHERE calendar_id = ?
+  AND workspace_id = ?
+  AND enabled = TRUE
+LIMIT 500
+`
+
+type ListCalendarMemberColorsParams struct {
+	CalendarID  uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Colours the live members of a calendar already hold, for picking one that
+// is not yet taken.
+func (q *Queries) ListCalendarMemberColors(ctx context.Context, arg ListCalendarMemberColorsParams) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listCalendarMemberColors, arg.CalendarID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var member_color string
+		if err := rows.Scan(&member_color); err != nil {
+			return nil, err
+		}
+		items = append(items, member_color)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCalendarMembers = `-- name: ListCalendarMembers :many
 SELECT
   cm.public_id,
@@ -199,6 +238,29 @@ func (q *Queries) ListCalendarMembers(ctx context.Context, arg ListCalendarMembe
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateCalendarMemberColor = `-- name: UpdateCalendarMemberColor :exec
+UPDATE calendar_members
+SET member_color = ?
+WHERE calendar_id = ?
+  AND user_id = ?
+  AND enabled = TRUE
+`
+
+type UpdateCalendarMemberColorParams struct {
+	MemberColor string `json:"memberColor"`
+	CalendarID  uint32 `json:"-"`
+	UserID      uint32 `json:"-"`
+}
+
+// Set a member's colour. Existence is settled by the FindCalendarMember the
+// caller runs first, not by the row count: writing the colour a member
+// already has matches the row yet changes nothing, so zero does not mean
+// "no such member".
+func (q *Queries) UpdateCalendarMemberColor(ctx context.Context, arg UpdateCalendarMemberColorParams) error {
+	_, err := q.db.ExecContext(ctx, updateCalendarMemberColor, arg.MemberColor, arg.CalendarID, arg.UserID)
+	return err
 }
 
 const updateCalendarMemberRole = `-- name: UpdateCalendarMemberRole :execresult

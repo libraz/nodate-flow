@@ -38,11 +38,15 @@ DROP TABLE IF EXISTS `workspaces`;
 DROP TABLE IF EXISTS `album_photos`;
 DROP TABLE IF EXISTS `avatar_uploads`;
 DROP TABLE IF EXISTS `calendar_cover_images`;
+DROP TABLE IF EXISTS `calendar_event_labels`;
 DROP TABLE IF EXISTS `calendar_invites`;
+DROP TABLE IF EXISTS `calendar_labels`;
 DROP TABLE IF EXISTS `calendar_schedule_poll_answers`;
 DROP TABLE IF EXISTS `calendar_schedule_poll_members`;
 DROP TABLE IF EXISTS `calendar_schedule_poll_slots`;
 DROP TABLE IF EXISTS `calendar_schedule_polls`;
+DROP TABLE IF EXISTS `dav_app_passwords`;
+DROP TABLE IF EXISTS `dav_event_resources`;
 DROP TABLE IF EXISTS `email_verifications`;
 DROP TABLE IF EXISTS `oauth_provider_configs`;
 DROP TABLE IF EXISTS `password_resets`;
@@ -1602,6 +1606,18 @@ CREATE TABLE calendar_cover_images (
     FOREIGN KEY (storage_object_id) REFERENCES storage_objects(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Uploaded cover images for shared calendars';
 
+-- >>> calendar_event_labels.sql
+-- The label an event row is filed under; no row means none.
+CREATE TABLE calendar_event_labels (
+  event_id INT UNSIGNED NOT NULL PRIMARY KEY COMMENT 'Internal FK to calendar_events.id; one label per event row',
+  label_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendar_labels.id',
+
+  KEY idx_calendar_event_labels_label (label_id),
+
+  CONSTRAINT fk_calendar_event_labels_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_event_labels_label FOREIGN KEY (label_id) REFERENCES calendar_labels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Event-to-label links';
+
 -- >>> calendar_invites.sql
 -- ====================================
 -- calendar_invites
@@ -1641,6 +1657,28 @@ CREATE TABLE calendar_invites (
 
   CONSTRAINT chk_calendar_invites_uses CHECK (max_uses IS NULL OR use_count <= max_uses)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Join-by-link calendar invitations';
+
+-- >>> calendar_labels.sql
+-- Named colours a calendar's events can be filed under.
+CREATE TABLE calendar_labels (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  calendar_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to calendars.id; a label belongs to one calendar',
+
+  name VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NOT NULL COMMENT 'Display name, trimmed, unique within the calendar. Accent- and case-sensitive so kana that differ only by voicing or script stay distinct names.',
+  color CHAR(7) CHARACTER SET ascii NOT NULL COMMENT 'Upper-case #RRGGBB fill an event carrying this label is drawn in',
+
+  sort_weight INT NOT NULL DEFAULT 0 COMMENT 'Display order (not exposed yet; ties break on id)',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_calendar_labels_public_id (public_id),
+  UNIQUE KEY uniq_calendar_labels_calendar_name (calendar_id, name),
+
+  CONSTRAINT fk_calendar_labels_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_calendar_labels_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-calendar event labels';
 
 -- >>> calendar_schedule_poll_answers.sql
 CREATE TABLE calendar_schedule_poll_answers (
@@ -1716,6 +1754,59 @@ CREATE TABLE calendar_schedule_polls (
   KEY idx_calendar_schedule_polls_manager (workspace_id, manager_user_id, status),
   KEY idx_calendar_schedule_polls_calendar_id_id (calendar_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Private schedule poll lifecycle; only finalized events enter shared history';
+
+-- >>> dav_app_passwords.sql
+-- ====================================
+-- dav_app_passwords
+-- Per-device passwords for CalDAV clients, which cannot take part in the
+-- browser sign-in flow. Kept apart from the contract's personal_access_tokens:
+-- the other product lists, revokes and authenticates with that table as its
+-- own API tokens, so a row written here would surface there as a token.
+-- A revoked row stays, so its hash can never be issued again.
+-- ====================================
+CREATE TABLE dav_app_passwords (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT 'Internal PK, never exposed',
+  public_id BINARY(16) NOT NULL COMMENT 'UUID v7, the only externally visible ID',
+  workspace_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to workspaces.id',
+  user_id INT UNSIGNED NOT NULL COMMENT 'Internal FK to users.id',
+
+  name VARCHAR(100) NOT NULL COMMENT 'Label chosen by the user, usually the device',
+  token_hash CHAR(64) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'SHA-256 hex of the password. The plaintext is shown once at creation and never stored.',
+  token_prefix CHAR(8) CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL COMMENT 'Leading characters of the plaintext, shown in lists so a user can tell passwords apart',
+  last_used_at DATETIME(3) NULL COMMENT 'Last successful authentication; NULL = never used',
+  revoked_at DATETIME(3) NULL COMMENT 'Revocation time; a non-NULL value makes the password unusable',
+
+  enabled BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Enabled flag',
+  updated_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  UNIQUE KEY uniq_dav_app_passwords_public_id (public_id),
+  UNIQUE KEY uniq_dav_app_passwords_token_hash (token_hash),
+  KEY idx_dav_app_passwords_user (workspace_id, user_id),
+
+  CONSTRAINT fk_dav_app_passwords_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  CONSTRAINT fk_dav_app_passwords_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Per-device CalDAV passwords';
+
+-- >>> dav_event_resources.sql
+-- ====================================
+-- dav_event_resources
+-- The resource name and UID a CalDAV client gave an event it created. An
+-- event with no row here is served under a name derived from its public ID.
+-- The calendar is read through calendar_events, not stored, so an event
+-- that moves calendars cannot leave a stale copy behind.
+-- ====================================
+CREATE TABLE dav_event_resources (
+  event_id INT UNSIGNED NOT NULL PRIMARY KEY COMMENT 'Internal FK to calendar_events.id',
+  href_name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'Resource name chosen by the client; compared case-sensitively',
+  uid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'iCalendar UID chosen by the client; compared case-sensitively',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+  KEY idx_dav_event_resources_href_name (href_name),
+  KEY idx_dav_event_resources_uid (uid),
+
+  CONSTRAINT fk_dav_event_resources_event FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='CalDAV resource name and UID per event';
 
 -- >>> email_verifications.sql
 -- ====================================

@@ -3412,6 +3412,14 @@ type CalendarEventInvite struct {
 	CreatedAt time.Time    `json:"createdAt"`
 }
 
+// Event-to-label links
+type CalendarEventLabel struct {
+	// Internal FK to calendar_events.id; one label per event row
+	EventID uint32 `json:"-"`
+	// Internal FK to calendar_labels.id
+	LabelID uint32 `json:"-"`
+}
+
 // Sent-reminder claims, one per (event, occurrence). Replaces the single calendar_events.notified_at claim, which could only ever fire once per row.
 type CalendarEventReminder struct {
 	// Internal PK, never exposed
@@ -3424,6 +3432,26 @@ type CalendarEventReminder struct {
 	OccurrenceStart time.Time `json:"occurrenceStart"`
 	// When the claim was taken, which is also when the reminder was sent
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Per-calendar event labels
+type CalendarLabel struct {
+	// Internal PK, never exposed
+	ID uint32 `json:"-"`
+	// UUID v7, the only externally visible ID
+	PublicID types.PublicID `json:"publicId"`
+	// Internal FK to workspaces.id
+	WorkspaceID uint32 `json:"-"`
+	// Internal FK to calendars.id; a label belongs to one calendar
+	CalendarID uint32 `json:"-"`
+	// Display name, trimmed, unique within the calendar. Accent- and case-sensitive so kana that differ only by voicing or script stay distinct names.
+	Name string `json:"name"`
+	// Upper-case #RRGGBB fill an event carrying this label is drawn in
+	Color string `json:"color"`
+	// Display order (not exposed yet; ties break on id)
+	SortWeight int32        `json:"sortWeight"`
+	UpdatedAt  sql.NullTime `json:"updatedAt"`
+	CreatedAt  time.Time    `json:"createdAt"`
 }
 
 // Per-calendar access grants: which users may use a calendar and at what role. The ACL axis, unlike calendar_subscriptions, which holds private display preferences and grants nothing.

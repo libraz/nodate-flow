@@ -465,6 +465,8 @@ sql:
       - "flow/tables"
       - "flow/constraints"
       - "flow/views"
+      - "time/tables/calendar_labels.sql"
+      - "time/tables/calendar_event_labels.sql"
     gen:
       go:
         package: "calendar"

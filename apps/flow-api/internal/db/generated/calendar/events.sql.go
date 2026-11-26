@@ -432,10 +432,18 @@ SELECT
   ce.recurrence_parent_id,
   ce.enabled,
   ce.updated_at,
-  ce.created_at
+  ce.created_at,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.public_id = ?
   AND ce.calendar_id = ?
   AND ce.workspace_id = ?
@@ -482,6 +490,10 @@ type FindCalendarEventByPublicIdRow struct {
 	Enabled                      bool                      `json:"enabled"`
 	UpdatedAt                    sql.NullTime              `json:"updatedAt"`
 	CreatedAt                    time.Time                 `json:"createdAt"`
+	OwnerMemberColor             sql.NullString            `json:"ownerMemberColor"`
+	LabelPublicID                types.PublicID            `json:"labelPublicId"`
+	LabelName                    sql.NullString            `json:"labelName"`
+	LabelColor                   sql.NullString            `json:"labelColor"`
 }
 
 // Resolve a calendar event by UUID v7 within a calendar. The creator
@@ -527,12 +539,17 @@ func (q *Queries) FindCalendarEventByPublicId(ctx context.Context, arg FindCalen
 		&i.Enabled,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+		&i.OwnerMemberColor,
+		&i.LabelPublicID,
+		&i.LabelName,
+		&i.LabelColor,
 	)
 	return i, err
 }
 
 const findCalendarEventOverride = `-- name: FindCalendarEventOverride :one
 SELECT
+  ce.id,
   ce.public_id,
   ce.calendar_id,
   ce.recurrence_original_start,
@@ -566,6 +583,7 @@ type FindCalendarEventOverrideParams struct {
 }
 
 type FindCalendarEventOverrideRow struct {
+	ID                      uint32                    `json:"-"`
 	PublicID                types.PublicID            `json:"publicId"`
 	CalendarID              uint32                    `json:"-"`
 	RecurrenceOriginalStart sql.NullTime              `json:"recurrenceOriginalStart"`
@@ -608,6 +626,7 @@ func (q *Queries) FindCalendarEventOverride(ctx context.Context, arg FindCalenda
 	row := q.db.QueryRowContext(ctx, findCalendarEventOverride, arg.WorkspaceID, arg.RecurrenceParentID, arg.RecurrenceOriginalStart)
 	var i FindCalendarEventOverrideRow
 	err := row.Scan(
+		&i.ID,
 		&i.PublicID,
 		&i.CalendarID,
 		&i.RecurrenceOriginalStart,
@@ -870,7 +889,11 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -888,6 +911,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
@@ -948,6 +975,10 @@ type ListCalendarEventsAcrossCalendarsRow struct {
 	CreatedAt                 time.Time                       `json:"createdAt"`
 	IsAttendee                bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor          sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID             types.PublicID                  `json:"labelPublicId"`
+	LabelName                 sql.NullString                  `json:"labelName"`
+	LabelColor                sql.NullString                  `json:"labelColor"`
 }
 
 // Cross-calendar query: list events across multiple calendars for a user
@@ -993,6 +1024,10 @@ func (q *Queries) ListCalendarEventsAcrossCalendars(ctx context.Context, arg Lis
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -1044,11 +1079,19 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NULL
   AND ce.start_at < ?
@@ -1113,6 +1156,10 @@ type ListCalendarEventsByRangeRow struct {
 	CreatedAt                    time.Time                       `json:"createdAt"`
 	IsAttendee                   bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility    CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor             sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID                types.PublicID                  `json:"labelPublicId"`
+	LabelName                    sql.NullString                  `json:"labelName"`
+	LabelColor                   sql.NullString                  `json:"labelColor"`
 }
 
 // List non-recurring events in a calendar within a time range.
@@ -1161,6 +1208,10 @@ func (q *Queries) ListCalendarEventsByRange(ctx context.Context, arg ListCalenda
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -1217,7 +1268,11 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -1245,6 +1300,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.recurrence_rule IS NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
@@ -1314,6 +1373,10 @@ type ListMyCalendarEventsAcrossWorkspacesRow struct {
 	CreatedAt                    time.Time                       `json:"createdAt"`
 	IsAttendee                   bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility    CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor             sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID                types.PublicID                  `json:"labelPublicId"`
+	LabelName                    sql.NullString                  `json:"labelName"`
+	LabelColor                   sql.NullString                  `json:"labelColor"`
 }
 
 // Cross-workspace variant: list non-recurring events on every calendar
@@ -1379,6 +1442,10 @@ func (q *Queries) ListMyCalendarEventsAcrossWorkspaces(ctx context.Context, arg 
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -1439,7 +1506,11 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -1467,6 +1538,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.recurrence_rule IS NOT NULL
   AND ce.start_at IS NOT NULL
   AND ce.start_at < ?
@@ -1531,6 +1606,10 @@ type ListMyRecurringCalendarEventsAcrossWorkspacesRow struct {
 	CreatedAt                    time.Time                       `json:"createdAt"`
 	IsAttendee                   bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility    CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor             sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID                types.PublicID                  `json:"labelPublicId"`
+	LabelName                    sql.NullString                  `json:"labelName"`
+	LabelColor                   sql.NullString                  `json:"labelColor"`
 }
 
 // Cross-workspace recurring variant. Same membership guard as the
@@ -1596,6 +1675,10 @@ func (q *Queries) ListMyRecurringCalendarEventsAcrossWorkspaces(ctx context.Cont
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -1644,7 +1727,11 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 INNER JOIN calendars c
@@ -1662,6 +1749,10 @@ INNER JOIN calendar_members cm
       AND cs.enabled = TRUE
       AND cs.visible = FALSE
   )
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.workspace_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
@@ -1717,6 +1808,10 @@ type ListRecurringCalendarEventsAcrossCalendarsRow struct {
 	CreatedAt                 time.Time                       `json:"createdAt"`
 	IsAttendee                bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor          sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID             types.PublicID                  `json:"labelPublicId"`
+	LabelName                 sql.NullString                  `json:"labelName"`
+	LabelColor                sql.NullString                  `json:"labelColor"`
 }
 
 // Cross-calendar query: list recurring events across multiple calendars
@@ -1771,6 +1866,10 @@ func (q *Queries) ListRecurringCalendarEventsAcrossCalendars(ctx context.Context
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -1823,11 +1922,19 @@ SELECT
       AND a.user_id = ?
       AND a.enabled = TRUE
   ) AS is_attendee,
-  cvis.default_event_visibility AS calendar_default_visibility
+  cvis.default_event_visibility AS calendar_default_visibility,
+  om.member_color AS owner_member_color,
+  l.public_id AS label_public_id,
+  l.name AS label_name,
+  l.color AS label_color
 FROM calendar_events ce
 INNER JOIN calendars cvis ON cvis.id = ce.calendar_id
 LEFT JOIN users uc
   ON uc.id = ce.created_by_user_id
+LEFT JOIN calendar_members om
+  ON om.calendar_id = ce.calendar_id AND om.user_id = ce.owner_user_id AND om.enabled = TRUE
+LEFT JOIN calendar_event_labels el ON el.event_id = ce.id
+LEFT JOIN calendar_labels l ON l.id = el.label_id AND l.calendar_id = ce.calendar_id
 WHERE ce.calendar_id = ?
   AND ce.recurrence_rule IS NOT NULL
   AND ce.start_at < ?
@@ -1886,6 +1993,10 @@ type ListRecurringCalendarEventsByRangeRow struct {
 	CreatedAt                    time.Time                       `json:"createdAt"`
 	IsAttendee                   bool                            `json:"isAttendee"`
 	CalendarDefaultVisibility    CalendarsDefaultEventVisibility `json:"calendarDefaultVisibility"`
+	OwnerMemberColor             sql.NullString                  `json:"ownerMemberColor"`
+	LabelPublicID                types.PublicID                  `json:"labelPublicId"`
+	LabelName                    sql.NullString                  `json:"labelName"`
+	LabelColor                   sql.NullString                  `json:"labelColor"`
 }
 
 // List recurring events whose recurrence window overlaps the query range.
@@ -1936,6 +2047,10 @@ func (q *Queries) ListRecurringCalendarEventsByRange(ctx context.Context, arg Li
 			&i.CreatedAt,
 			&i.IsAttendee,
 			&i.CalendarDefaultVisibility,
+			&i.OwnerMemberColor,
+			&i.LabelPublicID,
+			&i.LabelName,
+			&i.LabelColor,
 		); err != nil {
 			return nil, err
 		}
@@ -2117,6 +2232,27 @@ func (q *Queries) ReparentCalendarEventOverridesFromStart(ctx context.Context, a
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const touchCalendarEvent = `-- name: TouchCalendarEvent :exec
+UPDATE calendar_events
+SET updated_at = CURRENT_TIMESTAMP(3)
+WHERE id = ?
+  AND workspace_id = ?
+`
+
+type TouchCalendarEventParams struct {
+	ID          uint32 `json:"-"`
+	WorkspaceID uint32 `json:"-"`
+}
+
+// Advance updated_at without changing any other column. A label change is
+// written to calendar_event_labels, not to the event row, so the event's
+// revision stamp would otherwise not move. The caller resolved the event just
+// before, so the row count is not consulted.
+func (q *Queries) TouchCalendarEvent(ctx context.Context, arg TouchCalendarEventParams) error {
+	_, err := q.db.ExecContext(ctx, touchCalendarEvent, arg.ID, arg.WorkspaceID)
+	return err
 }
 
 const updateCalendarEventOverride = `-- name: UpdateCalendarEventOverride :execrows
