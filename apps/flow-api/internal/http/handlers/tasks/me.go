@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
@@ -40,7 +41,13 @@ func ListMyTasks(deps Deps) func(context.Context, *ListMyTasksInput) (*ListMyTas
 		// no role gating because /me/tasks is inherently scoped to the
 		// caller's own actor rows. Fetches limit+1 so the (limit+1)-th
 		// row acts as a "has more" sentinel.
+		filtered := hasMyTasksFilters(in)
 		if in.Cursor != "" {
+			// A keyset cursor only encodes created_at order, so it cannot
+			// continue a filtered or re-sorted listing.
+			if filtered {
+				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
+			}
 			cursorAt, cursorPID, derr := handlerutil.DecodeCursor(in.Cursor)
 			if derr != nil {
 				return nil, httpErr(apierrors.ValidationQueryFieldInvalid)
@@ -65,6 +72,22 @@ func ListMyTasks(deps Deps) func(context.Context, *ListMyTasksInput) (*ListMyTas
 				last := rows[len(rows)-1]
 				nc := handlerutil.EncodeCursor(last.CreatedAt, last.PublicID)
 				out.Body.NextCursor = &nc
+			}
+			return out, nil
+		}
+
+		if filtered {
+			in.Limit = limit
+			rows, ferr := listMyTasksFiltered(ctx, deps.DB, profile.PublicID, in)
+			if ferr != nil {
+				slog.ErrorContext(ctx, "tasks: filtered /me/tasks query failed", "err", ferr)
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+			for _, r := range rows {
+				out.Body.Tasks = append(out.Body.Tasks, rowToMyTaskListItem(r))
+			}
+			if len(rows) > 0 {
+				out.Body.Total = totalAsInt64(rows[0].Total)
 			}
 			return out, nil
 		}

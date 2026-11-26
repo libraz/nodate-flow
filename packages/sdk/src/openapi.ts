@@ -1012,8 +1012,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List tasks assigned to the authenticated user across every workspace
-         * @description Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.
+         * List tasks where the authenticated user holds a role across every workspace
+         * @description Returns every task on which the caller holds a role (assignee, reviewer, approver or watcher) across every workspace they belong to, in any state unless narrowed with `state`, so the global My Tasks view can render without per-workspace round trips. Filter with q, state, priority, workspaceId and role; order with sort.
          */
         get: operations["me-tasks-list"];
         put?: never;
@@ -13552,7 +13552,19 @@ export interface operations {
     "me-tasks-list": {
         parameters: {
             query?: {
-                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. */
+                /** @description Case-insensitive substring match on title */
+                q?: string;
+                /** @description Filter by derived_state; comma-separate to OR multiple values (state=open,waiting) */
+                state?: string[] | null;
+                /** @description Filter by priority level; comma-separate to OR multiple values (priority=4,2) */
+                priority?: number[] | null;
+                /** @description Filter to a single workspace (workspace public id, UUID v7) */
+                workspaceId?: string;
+                /** @description Filter by the caller's role on the task (assignee, reviewer, approver, watcher); comma-separate to OR multiple values. Unknown values are ignored. */
+                role?: string[] | null;
+                /** @description Sort key; a leading '-' sorts descending. Omit for the default order. */
+                sort?: "dueOn" | "-dueOn" | "priority" | "-priority" | "updatedAt" | "-updatedAt" | "createdAt" | "-createdAt" | "title" | "-title";
+                /** @description Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with q, state, priority, workspaceId, role or sort. */
                 cursor?: string;
                 limit?: number;
                 offset?: number;

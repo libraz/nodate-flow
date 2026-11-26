@@ -43,8 +43,8 @@ func RegisterCollection(api huma.API, deps Deps) {
 		OperationID: "me-tasks-list",
 		Method:      http.MethodGet,
 		Path:        "/me/tasks",
-		Summary:     "List tasks assigned to the authenticated user across every workspace",
-		Description: "Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.",
+		Summary:     "List tasks where the authenticated user holds a role across every workspace",
+		Description: "Returns every task on which the caller holds a role (assignee, reviewer, approver or watcher) across every workspace they belong to, in any state unless narrowed with `state`, so the global My Tasks view can render without per-workspace round trips. Filter with q, state, priority, workspaceId and role; order with sort.",
 		Tags:        []string{"Tasks"},
 	}, ListMyTasks(deps))
 

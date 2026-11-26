@@ -324,7 +324,13 @@ type MyTaskListItem struct {
 // ListMyTasksGlobalKeyset and emits `nextCursor`; the OFFSET path
 // remains the default for backward compatibility.
 type ListMyTasksInput struct {
-	Cursor string `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end."`
+	Q           string   `query:"q" doc:"Case-insensitive substring match on title"`
+	State       []string `query:"state" doc:"Filter by derived_state; comma-separate to OR multiple values (state=open,waiting)"`
+	Priority    []int32  `query:"priority" minimum:"0" maximum:"4" doc:"Filter by priority level; comma-separate to OR multiple values (priority=4,2)"`
+	WorkspaceID string   `query:"workspaceId" doc:"Filter to a single workspace (workspace public id, UUID v7)"`
+	Role        []string `query:"role" doc:"Filter by the caller's role on the task (assignee, reviewer, approver, watcher); comma-separate to OR multiple values. Unknown values are ignored."`
+	Sort        string   `query:"sort" enum:"dueOn,-dueOn,priority,-priority,updatedAt,-updatedAt,createdAt,-createdAt,title,-title" doc:"Sort key; a leading '-' sorts descending. Omit for the default order."`
+	Cursor      string   `query:"cursor" doc:"Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with q, state, priority, workspaceId, role or sort."`
 	// Cross-workspace dashboard fan-out: power users span many workspaces; cap raised to 1000.
 	Limit  int32 `query:"limit" minimum:"1" maximum:"1000" default:"100"`
 	Offset int32 `query:"offset" minimum:"0" default:"0"`

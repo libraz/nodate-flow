@@ -17168,16 +17168,100 @@
     },
     "/me/tasks": {
       "get": {
-        "description": "Returns the caller's open assigned tasks across every workspace they belong to so the global My Tasks view can render without per-workspace round trips.",
+        "description": "Returns every task on which the caller holds a role (assignee, reviewer, approver or watcher) across every workspace they belong to, in any state unless narrowed with `state`, so the global My Tasks view can render without per-workspace round trips. Filter with q, state, priority, workspaceId and role; order with sort.",
         "operationId": "me-tasks-list",
         "parameters": [
           {
-            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+            "description": "Case-insensitive substring match on title",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "Case-insensitive substring match on title",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by derived_state; comma-separate to OR multiple values (state=open,waiting)",
+            "explode": false,
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "description": "Filter by derived_state; comma-separate to OR multiple values (state=open,waiting)",
+              "items": {
+                "type": "string"
+              },
+              "type": ["array", "null"]
+            }
+          },
+          {
+            "description": "Filter by priority level; comma-separate to OR multiple values (priority=4,2)",
+            "explode": false,
+            "in": "query",
+            "name": "priority",
+            "schema": {
+              "description": "Filter by priority level; comma-separate to OR multiple values (priority=4,2)",
+              "items": {
+                "format": "int32",
+                "maximum": 4,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": ["array", "null"]
+            }
+          },
+          {
+            "description": "Filter to a single workspace (workspace public id, UUID v7)",
+            "explode": false,
+            "in": "query",
+            "name": "workspaceId",
+            "schema": {
+              "description": "Filter to a single workspace (workspace public id, UUID v7)",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by the caller's role on the task (assignee, reviewer, approver, watcher); comma-separate to OR multiple values. Unknown values are ignored.",
+            "explode": false,
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "description": "Filter by the caller's role on the task (assignee, reviewer, approver, watcher); comma-separate to OR multiple values. Unknown values are ignored.",
+              "items": {
+                "type": "string"
+              },
+              "type": ["array", "null"]
+            }
+          },
+          {
+            "description": "Sort key; a leading '-' sorts descending. Omit for the default order.",
+            "explode": false,
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "description": "Sort key; a leading '-' sorts descending. Omit for the default order.",
+              "enum": [
+                "dueOn",
+                "-dueOn",
+                "priority",
+                "-priority",
+                "updatedAt",
+                "-updatedAt",
+                "createdAt",
+                "-createdAt",
+                "title",
+                "-title"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with q, state, priority, workspaceId, role or sort.",
             "explode": false,
             "in": "query",
             "name": "cursor",
             "schema": {
-              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end.",
+              "description": "Opaque cursor returned by previous page; pass to fetch next page. Empty when at end. Cannot be combined with q, state, priority, workspaceId, role or sort.",
               "type": "string"
             }
           },
@@ -17232,7 +17316,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List tasks assigned to the authenticated user across every workspace",
+        "summary": "List tasks where the authenticated user holds a role across every workspace",
         "tags": ["Tasks"]
       }
     },
