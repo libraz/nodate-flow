@@ -174,7 +174,7 @@ test.describe('calendar settings drawer — general tab', () => {
     await expect(activeSwatch).toHaveAttribute('data-color', initialColor);
   });
 
-  test('A2: the drawer offers General and Members tabs only, with no Sync tab', async ({
+  test('A2: the drawer offers General, Members and Labels tabs only, with no Sync tab', async ({
     page,
   }) => {
     tenant = await createTestTenant();
@@ -193,6 +193,7 @@ test.describe('calendar settings drawer — general tab', () => {
     await expect(drawer.getByRole('tab')).toHaveText([
       enCommon.calendar.settings.tab.general,
       enCommon.calendar.settings.tab.members,
+      enCommon.calendar.settings.tab.labels,
     ]);
     await expect(drawer.getByRole('tab', { name: /sync/i })).toHaveCount(0);
   });

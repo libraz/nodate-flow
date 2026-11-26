@@ -248,11 +248,10 @@ test.describe('calendar event dialog', () => {
     const pill = eventPill(page, title);
     await expect(pill).toBeVisible({ timeout: 10_000 });
 
-    // Block pills carry a diagonal-stripe backgroundImage (via inline
-    // style). This is the most reliable kind marker we have — the
-    // route's pillStyleForKind('block') only emits the stripe gradient
-    // for blocks. Free kind uses a dashed border; event/milestone omit
-    // backgroundImage entirely.
+    // Block pills carry a diagonal-stripe backgroundImage. It comes from
+    // the kind class (event-pill.module.css), not from the event colour,
+    // so it is the most reliable kind marker we have. Free kind uses a
+    // dashed border; event/milestone omit backgroundImage entirely.
     const bgImage = await pill.evaluate((el) => getComputedStyle(el).backgroundImage);
     expect(bgImage).toContain('repeating-linear-gradient');
 

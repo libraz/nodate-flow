@@ -12,6 +12,7 @@
  *   A. members tab lists current members with role badges.
  *   B. invite a new member by email → row appears with role badge.
  *   D. remove a member → confirm → row disappears.
+ *   F. every row carries a colour button named after the member.
  *
  * Cases C (role change) and E (last-owner guard) were intentionally
  * removed: the flow-api side is currently a no-op for those flows
@@ -48,6 +49,7 @@ const copy = {
   removeSuccess: enCommon.calendar.settings.members.remove_success,
   roleEditor: enCommon.calendar.settings.members.role.editor,
   roleOwner: enCommon.calendar.settings.members.role.owner,
+  colorChange: enCommon.calendar.settings.members.color_change,
 } as const;
 
 interface OwnedCalendar {
@@ -184,6 +186,25 @@ test.describe('calendar settings drawer — members tab', () => {
     // Role badge renders as <span> — narrow the locator to <span> so the
     // role <option> elements inside the role <select> are not also hit.
     await expect(actorRow.locator(`span:text-is("${copy.roleOwner}")`).first()).toBeVisible();
+  });
+
+  test('F: each member row has a colour button named after the member', async ({ page }) => {
+    tenant = await createTestTenant();
+    const cal = await getOwnedCalendar(tenant);
+
+    await injectAuth(page.context(), tenant);
+    await openCalendarWithRail(page);
+    await openMembersTab(page, cal.name);
+
+    const drawer = page.getByRole('dialog', { name: copy.drawerTitle });
+    const actorRow = drawer.getByRole('listitem').filter({ hasText: tenant.displayName });
+    await expect(actorRow).toBeVisible({ timeout: 10_000 });
+    // The owner may change their own colour, so the circle is a button.
+    await expect(
+      actorRow.getByRole('button', {
+        name: copy.colorChange.replace('{name}', tenant.displayName),
+      }),
+    ).toBeVisible();
   });
 
   test('B: invites a new member by email and the row appears', async ({ page }) => {

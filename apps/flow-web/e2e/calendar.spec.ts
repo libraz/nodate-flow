@@ -33,7 +33,7 @@ test.describe('calendar view', () => {
     await expect(page.getByText(taskTitle)).toBeVisible({ timeout: 15_000 });
 
     // Navigate to next month
-    const nextButton = page.getByRole('button', { name: /next|次|forward|>/i });
+    const nextButton = page.getByRole('button', { name: 'Next month', exact: true });
     await expect(nextButton).toBeVisible({ timeout: 5_000 });
     await nextButton.click();
 
@@ -41,7 +41,7 @@ test.describe('calendar view', () => {
     await expect(page.getByText(taskTitle)).not.toBeVisible({ timeout: 5_000 });
 
     // Navigate back to the previous month
-    const prevButton = page.getByRole('button', { name: /prev|前|back|</i });
+    const prevButton = page.getByRole('button', { name: 'Previous month', exact: true });
     await prevButton.click();
 
     // Task should be visible again.
