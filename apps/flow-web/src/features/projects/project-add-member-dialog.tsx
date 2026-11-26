@@ -83,7 +83,10 @@ function ProjectAddMemberDialogBody({
     const existing = new Set(projectMembers.map((m) => m.userId));
     return workspaceMembers
       .filter((m) => !existing.has(m.userId))
-      .map((m) => ({ value: m.userId, label: `${m.displayName} (${m.email})` }));
+      .map((m) => ({
+        value: m.userId,
+        label: m.email ? `${m.displayName} (${m.email})` : m.displayName,
+      }));
   }, [workspaceMembers, projectMembers]);
 
   const reset = (): void => {

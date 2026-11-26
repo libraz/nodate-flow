@@ -47,11 +47,11 @@ func rowToProjectFromList(r generated.ListProjectsForWorkspaceRow, workspacePubl
 	}
 }
 
-func rowToProjectMember(r generated.ListProjectMembersRow) ProjectMember {
+func rowToProjectMember(r generated.ListProjectMembersRow, emails handlerutil.EmailVisibility) ProjectMember {
 	return ProjectMember{
 		ID:          r.PublicID.String(),
 		UserID:      r.UserPublicID.String(),
-		Email:       r.Email,
+		Email:       emails.Of(r.UserPublicID, r.Email),
 		DisplayName: r.DisplayName,
 		AvatarURL:   handlerutil.AvatarURL(r.AvatarUrl, r.AvatarStorageObjectID, r.UserPublicID),
 		Role:        string(r.Role),

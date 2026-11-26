@@ -179,9 +179,10 @@ type TaskDependency struct {
 
 // TaskActor is the public DTO for a task_actors row.
 type TaskActor struct {
-	ID          string `json:"id"`
-	UserID      string `json:"userId"`
-	Email       string `json:"email"`
+	ID     string `json:"id"`
+	UserID string `json:"userId"`
+	// Email is omitted unless the caller owns the workspace or is this user.
+	Email       string `json:"email,omitempty"`
 	DisplayName string `json:"displayName"`
 	AvatarURL   string `json:"avatarUrl,omitempty"`
 	Role        string `json:"role"`

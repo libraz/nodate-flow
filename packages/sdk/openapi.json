@@ -9157,7 +9157,7 @@
             "type": "string"
           }
         },
-        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "required": ["id", "userId", "displayName", "role", "createdAt"],
         "type": "object"
       },
       "ProposeShiftBody": {
@@ -11424,7 +11424,7 @@
             "type": "string"
           }
         },
-        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "required": ["id", "userId", "displayName", "role", "createdAt"],
         "type": "object"
       },
       "TaskAgentActor": {
@@ -14006,7 +14006,7 @@
             "type": "string"
           }
         },
-        "required": ["id", "userId", "email", "displayName", "role", "createdAt"],
+        "required": ["id", "userId", "displayName", "role", "createdAt"],
         "type": "object"
       },
       "WorkspacePatchWorkspaceInputBody": {

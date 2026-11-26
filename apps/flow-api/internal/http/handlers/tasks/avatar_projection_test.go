@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"database/sql"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,8 +20,8 @@ func TestTaskMappersProjectAvatarStorageKeys(t *testing.T) {
 	stored := sql.NullString{String: key, Valid: true}
 	external := sql.NullString{String: "https://cdn.example/a.png", Valid: true}
 
-	require.Equal(t, want, rowToActor(generated.ListActorsForTaskRow{UserPublicID: userID, AvatarUrl: stored}).AvatarURL)
-	require.Equal(t, "https://cdn.example/a.png", rowToActor(generated.ListActorsForTaskRow{UserPublicID: userID, AvatarUrl: external}).AvatarURL)
+	require.Equal(t, want, rowToActor(generated.ListActorsForTaskRow{UserPublicID: userID, AvatarUrl: stored}, handlerutil.EmailVisibility{}).AvatarURL)
+	require.Equal(t, "https://cdn.example/a.png", rowToActor(generated.ListActorsForTaskRow{UserPublicID: userID, AvatarUrl: external}, handlerutil.EmailVisibility{}).AvatarURL)
 
 	require.Equal(t, want, rowToComment(generated.ListCommentsForTaskRow{AuthorPublicID: userID, AuthorAvatarUrl: stored}).AuthorAvatarURL)
 	require.Equal(t, want, rowToCommentKeyset(generated.ListCommentsForTaskKeysetRow{AuthorPublicID: userID, AuthorAvatarUrl: stored}).AuthorAvatarURL)

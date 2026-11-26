@@ -51,6 +51,6 @@ export function filterCandidates(
   return candidates.filter(
     (candidate) =>
       candidate.displayName.toLowerCase().includes(needle) ||
-      candidate.email.toLowerCase().includes(needle),
+      (candidate.email?.toLowerCase().includes(needle) ?? false),
   );
 }

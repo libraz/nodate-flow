@@ -42,10 +42,24 @@ func ListMembers(deps Deps) func(context.Context, *ListMembersInput) (*ListMembe
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		// Other members' addresses are for the workspace owner; everyone else
+		// reads only their own.
+		var self types.PublicID
+		allEmails := ws.Role == middleware.WorkspaceRoleOwner
+		if !allEmails {
+			actorID, _ := authn.ActorFromContext(ctx)
+			if self, err = deps.Queries.FindUserPublicIdById(ctx, actorID); err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
+		}
 		out := &ListMembersOutput{}
 		out.Body.Members = make([]WorkspaceMember, 0, len(rows))
 		for _, r := range rows {
-			out.Body.Members = append(out.Body.Members, rowToMember(r))
+			m := rowToMember(r)
+			if !allEmails && r.UserPublicID != self {
+				m.Email = ""
+			}
+			out.Body.Members = append(out.Body.Members, m)
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)

@@ -494,7 +494,8 @@
       "role_updated": "Role updated",
       "role_update_failed": "Failed to change the role",
       "role_hint": "Owner and admin can manage everything. Member can work on tasks. Guest can only view.",
-      "page_description": "People in this workspace and pending invites. Admins can change roles and send invites."
+      "page_description": "People in this workspace and pending invites. Admins can change roles and send invites.",
+      "member": "Member"
     },
     "invites": {
       "create": "Create invite link",
@@ -668,7 +669,8 @@
       "removed": "Member removed",
       "remove_failed": "Failed to remove the member",
       "remove_confirm": "Remove {name} from this project?",
-      "role_description": "Viewer can read. Commenter can also comment. Editor can also create and edit tasks. Lead can also decide who else has access."
+      "role_description": "Viewer can read. Commenter can also comment. Editor can also create and edit tasks. Lead can also decide who else has access.",
+      "member": "Member"
     },
     "roles": {
       "lead": "Lead",

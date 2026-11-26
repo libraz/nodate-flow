@@ -16,6 +16,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import MemberIdentity from '../../components/member-identity';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
 import { formatEpoch } from '../../lib/format';
@@ -43,7 +44,7 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
 
   const handleRemove = async (member: ProjectMember): Promise<void> => {
     const confirmed = await confirmAction({
-      message: t('projects.members.remove_confirm', { name: member.email }),
+      message: t('projects.members.remove_confirm', { name: member.displayName }),
       tone: 'danger',
     });
     if (!confirmed) return;
@@ -75,10 +76,12 @@ export default function ProjectMembersTable({ projectId }: ProjectMembersTablePr
 
   const columns: ColumnDef<ProjectMember, unknown>[] = [
     {
-      id: 'email',
-      accessorKey: 'email',
-      header: () => t('projects.members.email'),
-      cell: ({ row }) => <span title={row.original.email}>{row.original.email}</span>,
+      id: 'member',
+      accessorKey: 'displayName',
+      header: () => t('projects.members.member'),
+      cell: ({ row }) => (
+        <MemberIdentity displayName={row.original.displayName} email={row.original.email} />
+      ),
     },
     {
       id: 'role',

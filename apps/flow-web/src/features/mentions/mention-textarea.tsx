@@ -386,7 +386,7 @@ function MentionPopup({
               <MemberAvatar candidate={candidate} />
               <span className={styles.names}>
                 <span className={styles.displayName}>{candidate.displayName}</span>
-                <span className={styles.email}>{candidate.email}</span>
+                {candidate.email ? <span className={styles.email}>{candidate.email}</span> : null}
               </span>
             </li>
           ))

@@ -401,11 +401,11 @@ func rowToDependency(r generated.ListDependenciesForTaskRow) TaskDependency {
 	}
 }
 
-func rowToActor(r generated.ListActorsForTaskRow) TaskActor {
+func rowToActor(r generated.ListActorsForTaskRow, emails handlerutil.EmailVisibility) TaskActor {
 	return TaskActor{
 		ID:          r.PublicID.String(),
 		UserID:      r.UserPublicID.String(),
-		Email:       r.Email,
+		Email:       emails.Of(r.UserPublicID, r.Email),
 		DisplayName: r.DisplayName,
 		AvatarURL:   handlerutil.AvatarURL(r.AvatarUrl, r.AvatarStorageObjectID, r.UserPublicID),
 		Role:        string(r.Role),

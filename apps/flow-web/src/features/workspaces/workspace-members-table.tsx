@@ -15,6 +15,7 @@ import { type ReactElement, Suspense, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
 
+import MemberIdentity from '../../components/member-identity';
 import PageHelp from '../../components/page-help';
 import { formatApiError } from '../../lib/api-error';
 import { confirmAction } from '../../lib/confirm-action';
@@ -68,7 +69,7 @@ export default function WorkspaceMembersTable({
 
   const handleRemove = async (member: WorkspaceMember): Promise<void> => {
     const confirmed = await confirmAction({
-      message: t('workspaces.members.remove_confirm', { name: member.email }),
+      message: t('workspaces.members.remove_confirm', { name: member.displayName }),
       tone: 'danger',
     });
     if (!confirmed) return;
@@ -101,10 +102,12 @@ export default function WorkspaceMembersTable({
 
   const columns: ColumnDef<WorkspaceMember, unknown>[] = [
     {
-      id: 'email',
-      accessorKey: 'email',
-      header: () => t('workspaces.members.email'),
-      cell: ({ row }) => <span title={row.original.email}>{row.original.email}</span>,
+      id: 'member',
+      accessorKey: 'displayName',
+      header: () => t('workspaces.members.member'),
+      cell: ({ row }) => (
+        <MemberIdentity displayName={row.original.displayName} email={row.original.email} />
+      ),
     },
     {
       id: 'role',

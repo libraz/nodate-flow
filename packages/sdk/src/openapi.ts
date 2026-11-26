@@ -9398,7 +9398,7 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             displayName: string;
-            email: string;
+            email?: string;
             /** @description ProjectMember public id (UUID v7) */
             id: string;
             role: string;
@@ -10445,7 +10445,7 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             displayName: string;
-            email: string;
+            email?: string;
             id: string;
             role: string;
             /** Format: int64 */
@@ -11565,7 +11565,7 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             displayName: string;
-            email: string;
+            email?: string;
             /** @description Member public id (UUID v7) */
             id: string;
             /** Format: int64 */

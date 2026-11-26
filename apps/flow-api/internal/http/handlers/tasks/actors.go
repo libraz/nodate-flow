@@ -9,6 +9,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/taskactors"
@@ -71,9 +72,13 @@ func AddActor(deps Deps) func(context.Context, *AddTaskActorInput) (*AddTaskActo
 			if err != nil {
 				return nil, httpErr(apierrors.InternalUnexpected)
 			}
+			emails, err := handlerutil.NewEmailVisibility(ctx, deps.Queries, ws.Role, actorID)
+			if err != nil {
+				return nil, httpErr(apierrors.InternalUnexpected)
+			}
 			for _, r := range existing {
 				if r.UserPublicID == userPub && r.Role == role {
-					return &AddTaskActorOutput{Body: rowToActor(r)}, nil
+					return &AddTaskActorOutput{Body: rowToActor(r, emails)}, nil
 				}
 			}
 			return nil, httpErr(apierrors.InternalUnexpected)
@@ -125,10 +130,15 @@ func ListActors(deps Deps) func(context.Context, *ListTaskActorsInput) (*ListTas
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
+		emails, err := handlerutil.NewEmailVisibility(ctx, deps.Queries, ws.Role, actorID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		out := &ListTaskActorsOutput{}
 		out.Body.Actors = []TaskActor{}
 		for _, r := range rows {
-			out.Body.Actors = append(out.Body.Actors, rowToActor(r))
+			out.Body.Actors = append(out.Body.Actors, rowToActor(r, emails))
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)

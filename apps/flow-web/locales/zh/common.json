@@ -494,7 +494,8 @@
       "role_updated": "已更新角色",
       "role_update_failed": "修改角色失败",
       "role_hint": "所有者和管理员可管理一切，成员可处理任务，访客只能查看。",
-      "page_description": "此工作区的成员和待接受的邀请。管理员可以更改角色并发送邀请。"
+      "page_description": "此工作区的成员和待接受的邀请。管理员可以更改角色并发送邀请。",
+      "member": "成员"
     },
     "invites": {
       "create": "创建邀请链接",
@@ -668,7 +669,8 @@
       "removed": "已移除成员",
       "remove_failed": "移除成员失败",
       "remove_confirm": "将 {name} 从此项目移除？",
-      "role_description": "查看者只能阅读；评论者还可评论；编辑者还可创建和编辑任务；负责人还可管理其他成员的访问权限。"
+      "role_description": "查看者只能阅读；评论者还可评论；编辑者还可创建和编辑任务；负责人还可管理其他成员的访问权限。",
+      "member": "成员"
     },
     "roles": {
       "lead": "负责人",

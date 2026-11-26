@@ -44,9 +44,10 @@ type Project struct {
 
 // ProjectMember is the public DTO for a project_members row.
 type ProjectMember struct {
-	ID          string `json:"id" doc:"ProjectMember public id (UUID v7)"`
-	UserID      string `json:"userId"`
-	Email       string `json:"email"`
+	ID     string `json:"id" doc:"ProjectMember public id (UUID v7)"`
+	UserID string `json:"userId"`
+	// Email is omitted unless the caller owns the workspace or is this user.
+	Email       string `json:"email,omitempty"`
 	DisplayName string `json:"displayName"`
 	AvatarURL   string `json:"avatarUrl,omitempty"`
 	Role        string `json:"role"`

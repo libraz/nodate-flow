@@ -1,0 +1,17 @@
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.name,
+.email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+}

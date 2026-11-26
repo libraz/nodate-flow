@@ -8,6 +8,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/middleware"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/projectkit"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -52,10 +53,15 @@ func ListMembers(deps Deps) func(context.Context, *ListProjectMembersInput) (*Li
 		if err != nil {
 			return nil, httpErr(apierrors.InternalUnexpected)
 		}
+		actorID, _ := middleware.ActorFromContext(ctx)
+		emails, err := handlerutil.NewEmailVisibility(ctx, deps.Queries, ws.Role, actorID)
+		if err != nil {
+			return nil, httpErr(apierrors.InternalUnexpected)
+		}
 		out := &ListProjectMembersOutput{}
 		out.Body.Members = make([]ProjectMember, 0, len(rows))
 		for _, r := range rows {
-			out.Body.Members = append(out.Body.Members, rowToProjectMember(r))
+			out.Body.Members = append(out.Body.Members, rowToProjectMember(r, emails))
 		}
 		if len(rows) > 0 {
 			out.Body.Total = totalAsInt64(rows[0].Total)

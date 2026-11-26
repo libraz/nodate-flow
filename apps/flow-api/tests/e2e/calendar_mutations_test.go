@@ -103,6 +103,13 @@ func createEventMut(t *testing.T, owner *helpers.TestTenant, calID, title string
 // WorkspacePublicID/Slug are rewritten to point at the host workspace.
 func inviteAndJoinWorkspace(t *testing.T, host *helpers.TestTenant) *helpers.TestTenant {
 	t.Helper()
+	return joinWorkspaceAs(t, host, "member")
+}
+
+// joinWorkspaceAs bootstraps a fresh tenant and joins it to the host's
+// workspace with the given role through a single-use invite.
+func joinWorkspaceAs(t *testing.T, host *helpers.TestTenant, role string) *helpers.TestTenant {
+	t.Helper()
 
 	// Mint a single-use invite as the host owner.
 	var created struct {
@@ -114,7 +121,7 @@ func inviteAndJoinWorkspace(t *testing.T, host *helpers.TestTenant) *helpers.Tes
 	doJSON(t, http.MethodPost,
 		testServerURL+"/workspaces/"+host.WorkspacePublicID+"/invites",
 		host.AccessToken, map[string]any{
-			"role":      "member",
+			"role":      role,
 			"expiresIn": 86400,
 			"maxUses":   1,
 		}, &created)
@@ -135,7 +142,7 @@ func inviteAndJoinWorkspace(t *testing.T, host *helpers.TestTenant) *helpers.Tes
 		guest.AccessToken, nil, &accepted)
 	require.Equal(t, host.WorkspacePublicID, accepted.WorkspaceID,
 		"guest must land in the host workspace after accepting")
-	require.Equal(t, "member", accepted.Role)
+	require.Equal(t, role, accepted.Role)
 
 	// Pin the joined user to the host workspace for the caller's
 	// convenience. UserPublicID/Email/AccessToken stay tied to the guest

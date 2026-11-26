@@ -62,9 +62,10 @@ type Workspace struct {
 
 // WorkspaceMember is the public DTO for a workspace_members row.
 type WorkspaceMember struct {
-	ID          string `json:"id" doc:"Member public id (UUID v7)"`
-	UserID      string `json:"userId"`
-	Email       string `json:"email"`
+	ID     string `json:"id" doc:"Member public id (UUID v7)"`
+	UserID string `json:"userId"`
+	// Email is omitted unless the caller owns the workspace or is this member.
+	Email       string `json:"email,omitempty"`
 	DisplayName string `json:"displayName"`
 	AvatarURL   string `json:"avatarUrl,omitempty"`
 	Role        string `json:"role"`
