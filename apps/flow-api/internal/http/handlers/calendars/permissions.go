@@ -50,6 +50,22 @@ func roleFloorSpec(least calendar.CalendarMembersRole) *apierrors.Spec {
 	return apierrors.CalendarCalendarAccessDenied
 }
 
+// DecideCalendarLabelWrite is the refusal for changing a calendar's labels,
+// or nil when allowed: manager or above, and never a provider-fed system
+// calendar. The role floor is checked first. Membership is the caller's to
+// establish before asking; a caller with no membership passes the zero role
+// and is refused as below the floor.
+func DecideCalendarLabelWrite(role calendar.CalendarMembersRole, isSystem bool) *apierrors.APIError {
+	const floor = calendar.CalendarMembersRoleManager
+	if roleRank(role) < roleRank(floor) {
+		return apierrors.New(roleFloorSpec(floor))
+	}
+	if isSystem {
+		return apierrors.New(CalendarWriteRefusalSpec(CalendarWriteCalendarReadOnly))
+	}
+	return nil
+}
+
 // errRoleFloor is [roleFloorSpec] as the sentinel the resolvers return.
 func errRoleFloor(least calendar.CalendarMembersRole) error {
 	return httpErr(roleFloorSpec(least))

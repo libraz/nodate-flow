@@ -620,17 +620,17 @@ var roleFloorExemptOps = map[string]aclExemption{
 	},
 	"calendar-labels-create": {
 		via:    auth.EnforcedByHandlerCall,
-		checks: []string{"calendars.resolveCalendarAdmin"},
+		checks: []string{"calendars.DecideCalendarLabelWrite"},
 		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
 	},
 	"calendar-labels-update": {
 		via:    auth.EnforcedByHandlerCall,
-		checks: []string{"calendars.resolveCalendarAdmin"},
+		checks: []string{"calendars.DecideCalendarLabelWrite"},
 		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
 	},
 	"calendar-labels-delete": {
 		via:    auth.EnforcedByHandlerCall,
-		checks: []string{"calendars.resolveCalendarAdmin"},
+		checks: []string{"calendars.DecideCalendarLabelWrite"},
 		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
 	},
 	"members-remove": {
