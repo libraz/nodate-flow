@@ -1,8 +1,10 @@
 package calendars
 
 import (
+	"database/sql"
 	"encoding/json"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
@@ -31,7 +33,10 @@ import (
 //
 // createdByUserID is the row's creator, a party to the event beside its owner
 // and attendees; zero treats the creator as any member.
-func scrubEventDetailsForParty(visibility string, calendarDefault string, ownerUserID, createdByUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) {
+//
+// It returns the same decision (detailsVisible) so colour resolution
+// shares the one answer that decided the scrubbing.
+func scrubEventDetailsForParty(visibility string, calendarDefault string, ownerUserID, createdByUserID, viewerUserID uint32, isAttendee bool, location, memo, url **string) (detailsVisible bool) {
 	if eventacl.CanSeeDetails(
 		eventacl.Event{
 			Visibility:      eventacl.Visibility(visibility),
@@ -41,7 +46,7 @@ func scrubEventDetailsForParty(visibility string, calendarDefault string, ownerU
 		},
 		eventacl.Actor{UserID: viewerUserID, IsAttendee: isAttendee},
 	) {
-		return
+		return true
 	}
 	if location != nil {
 		*location = nil
@@ -52,6 +57,41 @@ func scrubEventDetailsForParty(visibility string, calendarDefault string, ownerU
 	if url != nil {
 		*url = nil
 	}
+	return false
+}
+
+// resolveRowColor resolves an event row's colour from the label and owner
+// member colour columns the event queries project.
+func resolveRowColor(detailsVisible bool, labelPublicID types.PublicID, labelName, labelColor, ownerMemberColor sql.NullString) calendarlabels.EventColor {
+	return calendarlabels.ResolveEventColor(detailsVisible, labelPublicID, labelName, labelColor, ownerMemberColor)
+}
+
+// labelIDString renders the resolved label's public id, nil when unlabelled
+// or hidden. Shared by every response type that carries the colour fields.
+func labelIDString(c calendarlabels.EventColor) *string {
+	if c.LabelID == nil {
+		return nil
+	}
+	s := c.LabelID.String()
+	return &s
+}
+
+// applyEventColor copies a resolved colour onto an EventResponse.
+func applyEventColor(resp *EventResponse, c calendarlabels.EventColor) {
+	resp.Color = c.Color
+	resp.OwnerColor = c.OwnerColor
+	resp.LabelID = labelIDString(c)
+	resp.LabelName = c.LabelName
+	resp.DetailsHidden = c.DetailsHidden
+}
+
+// eventViewer is what eventFromFullRow needs to know about the reader.
+// CanEdit is computed by the caller (canEditEvent) so the mapper does no I/O.
+type eventViewer struct {
+	UserID          uint32
+	IsAttendee      bool
+	CalendarDefault string
+	CanEdit         bool
 }
 
 // eventCommon captures the columns shared between every calendar_events
@@ -193,7 +233,8 @@ func eventFromRangeRow(r calendar.ListCalendarEventsByRangeRow, viewerUserID uin
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 	resp.NotificationOffset = dbtype.PtrFromNullInt32(r.NotificationOffset)
 	resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-	scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	applyEventColor(&resp, resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor))
 	return resp
 }
 
@@ -206,7 +247,8 @@ func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, vie
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
-	scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, viewerUserID, r.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	applyEventColor(&resp, resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor))
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw
@@ -224,13 +266,17 @@ func eventFromRecurringRow(r calendar.ListRecurringCalendarEventsByRangeRow, vie
 // eventFromFullRow converts a FindCalendarEventByPublicId row into the
 // public EventResponse DTO. Used by Get + Patch handlers after the row
 // has been read inside the same transaction so the response reflects
-// what was just persisted.
-func eventFromFullRow(r calendar.FindCalendarEventByPublicIdRow) EventResponse {
+// what was just persisted. It scrubs for the viewer, resolves the colour from
+// the same visibility decision and fills CanEdit.
+func eventFromFullRow(r calendar.FindCalendarEventByPublicIdRow, v eventViewer) EventResponse {
 	resp := baseEventResponse(fullEvent{r})
 	resp.Location = dbtype.PtrFromNullString(r.Location)
 	resp.Memo = dbtype.PtrFromNullString(r.Memo)
 	resp.URL = dbtype.PtrFromNullString(r.Url)
 	resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
+	visible := scrubEventDetailsForParty(string(r.Visibility), v.CalendarDefault, r.OwnerUserID, r.CreatedByUserID, v.UserID, v.IsAttendee, &resp.Location, &resp.Memo, &resp.URL)
+	applyEventColor(&resp, resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor))
+	resp.CanEdit = v.CanEdit
 	if r.RecurrenceRule != nil {
 		raw := json.RawMessage(r.RecurrenceRule)
 		resp.RecurrenceRule = &raw

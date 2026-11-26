@@ -13,7 +13,6 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/types"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
-	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/itemkit"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
 	"github.com/libraz/nodate-flow/packages/go-shared/apierr"
@@ -53,7 +52,7 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, sub, err := resolveCalendarWrite(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -156,21 +155,20 @@ func CreateEventFromTask(deps Deps) func(context.Context, *CreateEventFromTaskIn
 			return nil, httpErr(apierrors.CalendarTaskSyncStoreWriteInterrupted)
 		}
 
-		startUnix := startAt.Unix()
-		endUnix := endAt.Unix()
-		out := &CreateEventFromTaskOutput{}
-		out.Body = EventResponse{
-			ID:         eventPublicID.String(),
-			Kind:       string(calendar.CalendarEventsKindEvent),
-			Visibility: string(calendar.CalendarEventsVisibilityDefault),
-			ShowAs:     string(calendar.CalendarEventsShowAsBusy),
-			Title:      title,
-			AllDay:     false,
-			StartAt:    &startUnix,
-			EndAt:      &endUnix,
-			Timezone:   tz.Name(),
-			CreatedAt:  handlerutil.NowUnix(),
+		created, err := deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+			PublicID:    eventPublicID,
+			CalendarID:  cal.ID,
+			WorkspaceID: wsID,
+		})
+		if err != nil {
+			return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
 		}
+		out := &CreateEventFromTaskOutput{}
+		out.Body = eventFromFullRow(created, eventViewer{
+			UserID:          actorID,
+			CalendarDefault: string(cal.DefaultEventVisibility),
+			CanEdit:         canEditEvent(actorID, created, sub, nil),
+		})
 
 		// Audit only: itemkit.ScheduleTask emitted item.scheduled and the
 		// legacy calendar.event.created kind inside the transaction

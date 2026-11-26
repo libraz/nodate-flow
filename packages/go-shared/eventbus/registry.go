@@ -72,7 +72,8 @@ var declaredKinds = []Kind{
 	CalendarCreated, CalendarUpdated, CalendarDeleted,
 	CalendarSubscribed, CalendarSubscriptionUpdated,
 	CalEventCreated, CalEventUpdated, CalEventDeleted, CalEventRestored,
-	CalMemberAdded, CalMemberRemoved, CalMemberRoleChanged,
+	CalMemberAdded, CalMemberRemoved, CalMemberRoleChanged, CalMemberUpdated,
+	CalLabelCreated, CalLabelUpdated, CalLabelDeleted,
 	CalMemoCreated, CalMemoUpdated, CalMemoCompleted, CalMemoDeleted,
 	CalendarReminder,
 
@@ -285,9 +286,8 @@ type KindInfo struct {
 // coreKinds mirrors sql/core/event-kinds.yaml. TestCoreRegistry reads the
 // yaml and fails when the two differ.
 //
-// The keys are plain strings because calendar.member.updated and
-// calendar.event.attendee.updated are registered for readers but not
-// emitted here, so they have no constant.
+// The keys are plain strings because calendar.event.attendee.updated is
+// registered for readers but not emitted here, so it has no constant.
 var coreKinds = map[string]KindInfo{
 	"calendar.created":                  {FamilyCalendar, ""},
 	"calendar.updated":                  {FamilyCalendar, ""},

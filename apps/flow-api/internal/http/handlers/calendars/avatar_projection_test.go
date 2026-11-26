@@ -16,7 +16,7 @@ func TestEventMappersProjectCreatorAvatarStorageKey(t *testing.T) {
 	key := "avatars/" + creatorID.String() + "/0190abcd-1111-7000-8000-000000000000.jpg"
 	want := "/avatars/" + creatorID.String() + "?v=0190abcd"
 
-	full := eventFromFullRow(calendar.FindCalendarEventByPublicIdRow{CreatorPublicID: creatorID, CreatorAvatarUrl: nullStringOf(key)})
+	full := eventFromFullRow(calendar.FindCalendarEventByPublicIdRow{CreatorPublicID: creatorID, CreatorAvatarUrl: nullStringOf(key)}, eventViewer{})
 	require.NotNil(t, full.CreatorAvatarURL)
 	require.Equal(t, want, *full.CreatorAvatarURL)
 
@@ -24,7 +24,7 @@ func TestEventMappersProjectCreatorAvatarStorageKey(t *testing.T) {
 	require.NotNil(t, rng.CreatorAvatarURL)
 	require.Equal(t, want, *rng.CreatorAvatarURL)
 
-	ext := eventFromFullRow(calendar.FindCalendarEventByPublicIdRow{CreatorPublicID: creatorID, CreatorAvatarUrl: nullStringOf("https://cdn.example/a.png")})
+	ext := eventFromFullRow(calendar.FindCalendarEventByPublicIdRow{CreatorPublicID: creatorID, CreatorAvatarUrl: nullStringOf("https://cdn.example/a.png")}, eventViewer{})
 	require.Equal(t, "https://cdn.example/a.png", *ext.CreatorAvatarURL)
 }
 

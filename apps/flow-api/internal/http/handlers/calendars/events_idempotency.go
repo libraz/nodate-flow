@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -163,7 +164,7 @@ func createEventWithIdempotency(
 			if receipt.Hash != requestHash {
 				return httpErr(apierrors.CalendarEventIdempotencyKeyConflict)
 			}
-			err := replayCreateEventReceipt(ctx, calendarQueries, receipt.Result, currentCalendar,
+			err := replayCreateEventReceipt(ctx, calendarQueries, receipt.Result, currentCalendar, sub,
 				workspaceID, actorID, &out)
 			if err != nil && !isHTTPStatusError(err) {
 				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
@@ -179,9 +180,32 @@ func createEventWithIdempotency(
 			return ownerErr
 		}
 		params.OwnerUserID = currentOwnerID
-		if _, err := calendarQueries.CreateCalendarEvent(ctx, params); err != nil {
+		var labelID uint32
+		if input.Body.LabelID != nil && *input.Body.LabelID != "" {
+			id, refusal, rerr := calendarlabels.ResolveLabel(ctx, calendarQueries, currentCalendar.ID, *input.Body.LabelID)
+			if rerr != nil {
+				answered = httpErr(apierrors.CalendarEventStoreReadInterrupted)
+				return rerr
+			}
+			if refusal != nil {
+				answered = handlerutil.HTTPErrFromAPIError(refusal)
+				return refusal
+			}
+			labelID = id
+		}
+		newID, err := calendarQueries.CreateCalendarEvent(ctx, params)
+		if err != nil {
 			answered = httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 			return err
+		}
+		if labelID != 0 {
+			if _, refusal, lerr := calendarlabels.SetLink(ctx, calendarQueries, workspaceID, uint32(newID), labelID); refusal != nil { //#nosec G115 -- LastInsertId of an INT UNSIGNED key
+				answered = handlerutil.HTTPErrFromAPIError(refusal)
+				return refusal
+			} else if lerr != nil {
+				answered = httpErr(apierrors.CalendarEventStoreWriteInterrupted)
+				return lerr
+			}
 		}
 		created, err := calendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
 			PublicID:    params.PublicID,
@@ -193,11 +217,14 @@ func createEventWithIdempotency(
 			return err
 		}
 
-		snapshot := eventFromFullRow(created)
+		// The creator is a party to the event and may edit it.
+		snapshot := eventFromFullRow(created, eventViewer{
+			UserID:          actorID,
+			CalendarDefault: string(currentCalendar.DefaultEventVisibility),
+			CanEdit:         true,
+		})
 		normalizeCreatedEventResponse(&snapshot)
 		out.Body = snapshot
-		scrubEventDetailsForParty(string(created.Visibility), string(currentCalendar.DefaultEventVisibility),
-			created.OwnerUserID, created.CreatedByUserID, actorID, false, &out.Body.Location, &out.Body.Memo, &out.Body.URL)
 
 		payload := map[string]any{
 			"eventId":    created.PublicID.String(),
@@ -250,6 +277,7 @@ func replayCreateEventReceipt(
 	queries *calendar.Queries,
 	result json.RawMessage,
 	cal calendar.FindCalendarByPublicIdRow,
+	sub calendar.FindCalendarMemberRow,
 	workspaceID, actorID uint32,
 	out *CreateEventOutput,
 ) error {
@@ -273,10 +301,11 @@ func replayCreateEventReceipt(
 		return err
 	}
 
-	isAttendee, err := calendarEventAttendee(ctx, queries, actorID, evt.ID, evt.RecurrenceParentID)
+	attendee, err := findActorAttendee(ctx, queries, actorID, evt.ID, evt.RecurrenceParentID)
 	if err != nil {
 		return err
 	}
+	isAttendee := attendee != nil
 	if !eventacl.CanSee(
 		eventacl.Event{
 			Visibility:      eventacl.Visibility(evt.Visibility),
@@ -288,41 +317,11 @@ func replayCreateEventReceipt(
 	) {
 		return errEventNotFound
 	}
-	scrubEventDetailsForParty(string(evt.Visibility), string(cal.DefaultEventVisibility), evt.OwnerUserID, evt.CreatedByUserID, actorID, isAttendee,
+	visible := scrubEventDetailsForParty(string(evt.Visibility), string(cal.DefaultEventVisibility), evt.OwnerUserID, evt.CreatedByUserID, actorID, isAttendee,
 		&snapshot.Location, &snapshot.Memo, &snapshot.URL)
+	// Colour, label and edit rights are read now, not as stored at create.
+	applyEventColor(&snapshot, resolveRowColor(visible, evt.LabelPublicID, evt.LabelName, evt.LabelColor, evt.OwnerMemberColor))
+	snapshot.CanEdit = canEditEvent(actorID, evt, sub, attendee)
 	out.Body = snapshot
 	return nil
-}
-
-// calendarEventAttendee reports whether the actor is an enabled attendee
-// of this occurrence. An override that holds attendee rows of its own,
-// enabled or not, is judged on them alone; one with none reads its
-// series' rows.
-func calendarEventAttendee(
-	ctx context.Context,
-	queries *calendar.Queries,
-	actorID, eventID uint32,
-	recurrenceParentID sql.NullInt32,
-) (bool, error) {
-	target := handlerutil.NullInt32From(eventID)
-	if recurrenceParentID.Valid {
-		own, err := queries.HasCalendarEventAttendeeRows(ctx, target)
-		if err != nil {
-			return false, err
-		}
-		if !own {
-			target = recurrenceParentID
-		}
-	}
-	_, err := queries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
-		EventID: target,
-		UserID:  actorID,
-	})
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	return false, err
 }

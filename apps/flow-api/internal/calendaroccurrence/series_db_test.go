@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -215,4 +216,165 @@ func TestSplitSeriesCarriesOnlyCalendarMemberAttendees(t *testing.T) {
 	}
 	require.NoError(t, rows.Err())
 	require.Equal(t, []uint32{stays}, carried, "only the attendee who still holds the calendar is copied (departed=%d)", departed)
+}
+
+func seedLabel(t *testing.T, db *sql.DB, fx realignFixture, name string) uint32 {
+	t.Helper()
+	res, err := db.Exec(`INSERT INTO calendar_labels (public_id, workspace_id, calendar_id, name, color) VALUES (?, ?, ?, ?, '#112233')`,
+		types.New(), fx.wsID, fx.calendarID, name)
+	require.NoError(t, err)
+	id, err := res.LastInsertId()
+	require.NoError(t, err)
+	return uint32(id) //#nosec G115 -- LastInsertId in test seed, fits uint32
+}
+
+func linkOf(t *testing.T, db *sql.DB, eventID uint32) uint32 {
+	t.Helper()
+	got, err := calendarlabels.CurrentLabel(context.Background(), calendar.New(db), eventID)
+	require.NoError(t, err)
+	return got
+}
+
+func inTx(t *testing.T, db *sql.DB, fn func(q calendaroccurrence.Queries)) {
+	t.Helper()
+	tx, err := db.BeginTx(context.Background(), nil)
+	require.NoError(t, err)
+	fn(calendaroccurrence.Queries{Calendar: calendar.New(db).WithTx(tx), Core: generated.New(db).WithTx(tx)})
+	require.NoError(t, tx.Commit())
+}
+
+func writeOverride(t *testing.T, db *sql.DB, fx realignFixture, day int, change calendarlabels.Change) calendaroccurrence.Written {
+	t.Helper()
+	var written calendaroccurrence.Written
+	inTx(t, db, func(q calendaroccurrence.Queries) {
+		master := fx.read(t, calendar.New(db))
+		w, refusal, err := calendaroccurrence.WriteOverride(context.Background(), q, calendaroccurrence.Override{
+			WorkspaceID:   fx.wsID,
+			ActorID:       master.OwnerUserID,
+			CalendarID:    fx.calendarID,
+			Master:        master,
+			OriginalStart: realignAnchor.AddDate(0, 0, day),
+			Patch:         calendaroccurrence.Patch{Label: change},
+		})
+		require.Nil(t, refusal)
+		require.NoError(t, err)
+		written = w
+	})
+	return written
+}
+
+func set(id uint32) calendarlabels.Change {
+	return calendarlabels.Change{Mode: calendarlabels.ChangeSet, LabelID: id}
+}
+
+var clearLabel = calendarlabels.Change{Mode: calendarlabels.ChangeClear}
+
+func TestWriteOverrideLabelOnCreate(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	fx := seedRealignFixture(t, db)
+	seriesLabel, other := seedLabel(t, db, fx, "series"), seedLabel(t, db, fx, "other")
+	_, err := db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?)`, fx.masterID, seriesLabel)
+	require.NoError(t, err)
+
+	keep := writeOverride(t, db, fx, 0, calendarlabels.Change{})
+	require.Equal(t, seriesLabel, linkOf(t, db, keep.ID), "Keep copies the series' label")
+	set1 := writeOverride(t, db, fx, 1, set(other))
+	require.Equal(t, other, linkOf(t, db, set1.ID))
+	cleared := writeOverride(t, db, fx, 2, clearLabel)
+	require.Zero(t, linkOf(t, db, cleared.ID))
+	require.Equal(t, seriesLabel, linkOf(t, db, fx.masterID), "the series itself is untouched")
+}
+
+func TestWriteOverrideLabelOnExisting(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	fx := seedRealignFixture(t, db)
+	seriesLabel, own := seedLabel(t, db, fx, "series"), seedLabel(t, db, fx, "own")
+	_, err := db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?), (?, ?)`,
+		fx.masterID, seriesLabel, fx.overrideID, own)
+	require.NoError(t, err)
+
+	w := writeOverride(t, db, fx, 4, calendarlabels.Change{})
+	require.Equal(t, fx.overrideID, w.ID, "the update path answers with the row id")
+	require.Equal(t, own, linkOf(t, db, fx.overrideID), "Keep leaves an enabled override's own label")
+	writeOverride(t, db, fx, 4, set(seriesLabel))
+	require.Equal(t, seriesLabel, linkOf(t, db, fx.overrideID))
+	writeOverride(t, db, fx, 4, clearLabel)
+	require.Zero(t, linkOf(t, db, fx.overrideID))
+}
+
+func TestWriteOverrideRevivalDoesNotKeepOldLink(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	fx := seedRealignFixture(t, db)
+	seriesLabel, stale := seedLabel(t, db, fx, "series"), seedLabel(t, db, fx, "stale")
+	_, err := db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?), (?, ?)`,
+		fx.masterID, seriesLabel, fx.overrideID, stale)
+	require.NoError(t, err)
+
+	disable := func() {
+		_, err := db.Exec(`UPDATE calendar_events SET enabled = FALSE WHERE id = ?`, fx.overrideID)
+		require.NoError(t, err)
+	}
+	disable()
+	writeOverride(t, db, fx, 4, calendarlabels.Change{})
+	require.Equal(t, seriesLabel, linkOf(t, db, fx.overrideID), "Keep on a revived row takes the series' label")
+
+	disable()
+	writeOverride(t, db, fx, 4, clearLabel)
+	require.Zero(t, linkOf(t, db, fx.overrideID))
+
+	disable()
+	writeOverride(t, db, fx, 4, set(stale))
+	require.Equal(t, stale, linkOf(t, db, fx.overrideID))
+}
+
+func TestSplitSeriesLabel(t *testing.T) {
+	testhelpers.SkipUnlessIntegration(t)
+	db := helpers.StartShared(t).DB
+	ctx := context.Background()
+	fx := seedRealignFixture(t, db)
+	seriesLabel, other := seedLabel(t, db, fx, "series"), seedLabel(t, db, fx, "other")
+	_, err := db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?), (?, ?)`,
+		fx.masterID, seriesLabel, fx.overrideID, other)
+	require.NoError(t, err)
+
+	split := func(change calendarlabels.Change) uint32 {
+		var id uint32
+		inTx(t, db, func(q calendaroccurrence.Queries) {
+			master := fx.read(t, calendar.New(db))
+			w, refusal, err := calendaroccurrence.SplitSeries(ctx, q, calendaroccurrence.Split{
+				WorkspaceID: fx.wsID,
+				ActorID:     master.OwnerUserID,
+				CalendarID:  fx.calendarID,
+				Master:      master,
+				SplitStart:  realignAnchor.AddDate(0, 0, 2),
+				Patch:       calendaroccurrence.Patch{Label: change},
+			})
+			require.Nil(t, refusal)
+			require.NoError(t, err)
+			id = w.ID
+		})
+		return id
+	}
+
+	kept := split(calendarlabels.Change{})
+	require.Equal(t, seriesLabel, linkOf(t, db, kept), "Keep carries the series' label to the new master")
+	require.Equal(t, other, linkOf(t, db, fx.overrideID), "a reparented override keeps its own link")
+	require.Equal(t, seriesLabel, linkOf(t, db, fx.masterID))
+
+	fx2 := seedRealignFixture(t, db)
+	l2, l2other := seedLabel(t, db, fx2, "series"), seedLabel(t, db, fx2, "other")
+	_, err = db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?)`, fx2.masterID, l2)
+	require.NoError(t, err)
+	fx = fx2
+	require.Equal(t, l2other, linkOf(t, db, split(set(l2other))))
+
+	fx3 := seedRealignFixture(t, db)
+	l3 := seedLabel(t, db, fx3, "series")
+	_, err = db.Exec(`INSERT INTO calendar_event_labels (event_id, label_id) VALUES (?, ?)`, fx3.masterID, l3)
+	require.NoError(t, err)
+	fx = fx3
+	require.Zero(t, linkOf(t, db, split(clearLabel)))
 }

@@ -158,6 +158,11 @@ type MyCalendarEventResponse struct {
 	OverriddenStarts     []string         `json:"overriddenStarts,omitempty" doc:"Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only."`
 	UpdatedAt            *int64           `json:"updatedAt,omitempty"`
 	CreatedAt            int64            `json:"createdAt"`
+	Color                string           `json:"color"`
+	OwnerColor           string           `json:"ownerColor"`
+	LabelID              *string          `json:"labelId"`
+	LabelName            *string          `json:"labelName"`
+	DetailsHidden        bool             `json:"detailsHidden"`
 }
 
 // ListMyCalendarEventsOutput is the response for GET /me/calendar-events.
@@ -255,7 +260,9 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.CreatorAvatarURL = handlerutil.AvatarURLPtr(r.CreatorAvatarUrl, r.CreatorAvatarStorageObjectID, r.CreatorPublicID)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			c := resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor)
+			resp.Color, resp.OwnerColor, resp.LabelID, resp.LabelName, resp.DetailsHidden = c.Color, c.OwnerColor, labelIDString(c), c.LabelName, c.DetailsHidden
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -295,7 +302,9 @@ func ListMyCalendarEvents(deps Deps) func(context.Context, *ListMyCalendarEvents
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			c := resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor)
+			resp.Color, resp.OwnerColor, resp.LabelID, resp.LabelName, resp.DetailsHidden = c.Color, c.OwnerColor, labelIDString(c), c.LabelName, c.DetailsHidden
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

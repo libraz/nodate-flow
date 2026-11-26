@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -124,7 +125,21 @@ func WriteOverride(ctx context.Context, q Queries, in Override) (Written, *apier
 		}); err != nil {
 			return Written{}, nil, err
 		}
-		return Written{PublicID: existing.PublicID, CalendarID: existing.CalendarID}, nil, nil
+		// A revived override must not keep the link it held when it was
+		// withdrawn, so Keep re-reads the series' label for it.
+		change := in.Patch.Label
+		if change.Mode == calendarlabels.ChangeKeep && !existing.Enabled {
+			change = calendarlabels.Change{}
+			if err := seriesLabelChange(ctx, q, in.Master.ID, &change); err != nil {
+				return Written{}, nil, err
+			}
+		}
+		if change.Mode != calendarlabels.ChangeKeep {
+			if _, refusal, err := calendarlabels.SetLink(ctx, q.Calendar, in.WorkspaceID, existing.ID, change.Value()); err != nil || refusal != nil {
+				return Written{}, refusal, err
+			}
+		}
+		return Written{ID: existing.ID, PublicID: existing.PublicID, CalendarID: existing.CalendarID}, nil, nil
 	}
 
 	pub := types.New()
@@ -157,6 +172,17 @@ func WriteOverride(ctx context.Context, q Queries, in Override) (Written, *apier
 		return Written{}, nil, err
 	}
 	id := rowID(lastID)
+
+	// The occurrence keeps the series' label unless the edit says otherwise.
+	change := in.Patch.Label
+	if change.Mode == calendarlabels.ChangeKeep {
+		if err := seriesLabelChange(ctx, q, in.Master.ID, &change); err != nil {
+			return Written{}, nil, err
+		}
+	}
+	if _, refusal, err := calendarlabels.SetLink(ctx, q.Calendar, in.WorkspaceID, id, change.Value()); err != nil || refusal != nil {
+		return Written{}, refusal, err
+	}
 
 	// A reminder the series already sent for this occurrence stays sent.
 	// The override carries the occurrence under its own id, and the
@@ -358,6 +384,15 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 	if err := carrySeriesChildren(ctx, q, in.WorkspaceID, in.Master.CalendarID, in.Master.ID, newID); err != nil {
 		return Written{}, nil, err
 	}
+	change := in.Patch.Label
+	if change.Mode == calendarlabels.ChangeKeep {
+		if err := seriesLabelChange(ctx, q, in.Master.ID, &change); err != nil {
+			return Written{}, nil, err
+		}
+	}
+	if _, refusal, err := calendarlabels.SetLink(ctx, q.Calendar, in.WorkspaceID, newID, change.Value()); err != nil || refusal != nil {
+		return Written{}, refusal, err
+	}
 	// Only occurrences still to come can be reminded, so the claims worth
 	// carrying are the ones from the later of the split and now. A claim
 	// lands on the new master at the instant it was sent for: an
@@ -373,6 +408,21 @@ func SplitSeries(ctx context.Context, q Queries, in Split) (Written, *apierrors.
 	}
 
 	return Written{ID: newID, PublicID: newPublicID, CalendarID: in.CalendarID}, nil, nil
+}
+
+// seriesLabelChange turns c into a Set of the series' current label, or a
+// Clear when it has none.
+func seriesLabelChange(ctx context.Context, q Queries, masterID uint32, c *calendarlabels.Change) error {
+	id, err := calendarlabels.CurrentLabel(ctx, q.Calendar, masterID)
+	if err != nil {
+		return err
+	}
+	if id == 0 {
+		*c = calendarlabels.Change{Mode: calendarlabels.ChangeClear}
+	} else {
+		*c = calendarlabels.Change{Mode: calendarlabels.ChangeSet, LabelID: id}
+	}
+	return nil
 }
 
 // EndSeries stops a series at an occurrence: the master keeps the

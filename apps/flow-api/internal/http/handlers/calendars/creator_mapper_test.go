@@ -32,7 +32,7 @@ func TestEventFromFullRow_PopulatesCreator(t *testing.T) {
 		CreatorAvatarUrl:   nullStringOf("https://cdn.example/ada.png"),
 	}
 
-	resp := eventFromFullRow(row)
+	resp := eventFromFullRow(row, eventViewer{})
 	if resp.CreatorID != creatorID.String() {
 		t.Fatalf("CreatorID = %q, want %q", resp.CreatorID, creatorID.String())
 	}
@@ -60,7 +60,7 @@ func TestEventFromFullRow_NullAvatar(t *testing.T) {
 		CreatorAvatarUrl:   sql.NullString{},
 	}
 
-	resp := eventFromFullRow(row)
+	resp := eventFromFullRow(row, eventViewer{})
 	if resp.CreatorAvatarURL != nil {
 		t.Fatalf("CreatorAvatarURL = %v, want nil", *resp.CreatorAvatarURL)
 	}

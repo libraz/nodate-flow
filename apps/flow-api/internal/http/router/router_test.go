@@ -613,6 +613,26 @@ var roleFloorExemptOps = map[string]aclExemption{
 		checks: []string{"calendars.resolveCalendarAdmin"},
 		note:   "deciding who reaches the calendar needs manager or above",
 	},
+	"calendar-member-color-update": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveMemberColorWriter"},
+		note:   "a member may pick their own colour at any role and on any calendar kind; changing another member's needs manager or above, decided per target rather than as a floor on the route",
+	},
+	"calendar-labels-create": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
+	},
+	"calendar-labels-update": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
+	},
+	"calendar-labels-delete": {
+		via:    auth.EnforcedByHandlerCall,
+		checks: []string{"calendars.resolveCalendarAdmin"},
+		note:   "labels are shared by every member of the calendar, so managing them needs manager or above",
+	},
 	"members-remove": {
 		via:    auth.EnforcedByHandlerCall,
 		checks: []string{"calendars.resolveCalendar", "calendars.roleRank"},

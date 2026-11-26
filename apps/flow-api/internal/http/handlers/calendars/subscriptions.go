@@ -79,7 +79,7 @@ type PatchOwnSubscriptionInput struct {
 	CalID string `path:"calId" doc:"Calendar public ID"`
 	Body  struct {
 		Visible      *bool   `json:"visible,omitempty" required:"false" doc:"Whether events from this calendar are rendered for the caller"`
-		DisplayColor *string `json:"displayColor,omitempty" required:"false" maxLength:"7" doc:"Caller-specific display color (hex)"`
+		DisplayColor *string `json:"displayColor,omitempty" required:"false" maxLength:"7" pattern:"^#[0-9A-Fa-f]{6}$" doc:"Caller-specific display color (hex)"`
 		SortWeight   *int    `json:"sortWeight,omitempty" required:"false" doc:"Caller-specific sort weight in the right-rail list"`
 	}
 }
@@ -172,16 +172,12 @@ func SelfSubscribe(deps Deps) func(context.Context, *SelfSubscribeInput) (*SelfS
 			return nil, httpErr(apierrors.CalendarMemberStoreReadInterrupted)
 		}
 
-		// Same colour rotation as AddMember, so members fan out
-		// predictably however they joined.
-		count, err := deps.CalendarQueries.CountCalendarMembers(ctx, calendar.CountCalendarMembersParams{
-			CalendarID:  cal.ID,
-			WorkspaceID: wsID,
-		})
+		// Same palette pick as AddMember, so members fan out predictably
+		// however they joined.
+		color, err := nextMemberColor(ctx, deps.CalendarQueries, wsID, cal.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
-		color := memberColors[int(count)%len(memberColors)]
 
 		// Self-service joining grants the least privilege that makes the
 		// calendar useful. Anything more would let a workspace member vote

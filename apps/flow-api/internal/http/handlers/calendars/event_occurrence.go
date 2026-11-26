@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
@@ -165,7 +166,7 @@ func requireOccurrenceScope(
 // a pair or not at all — an invariant settled before the handler reaches
 // here, so a sent start implies a sent end and a request that sends
 // neither keeps the occurrence's own window.
-func occurrencePatch(input *PatchEventInput, cleared clearableEventFields) calendaroccurrence.Patch {
+func occurrencePatch(input *PatchEventInput, cleared clearableEventFields, label calendarlabels.Change) calendaroccurrence.Patch {
 	p := calendaroccurrence.Patch{
 		Kind:               input.Body.Kind,
 		Visibility:         input.Body.Visibility,
@@ -179,6 +180,7 @@ func occurrencePatch(input *PatchEventInput, cleared clearableEventFields) calen
 		URL:                input.Body.URL,
 		BlockLabel:         input.Body.BlockLabel,
 		NotificationOffset: input.Body.NotificationOffset,
+		Label:              label,
 		Clear: calendaroccurrence.Clears{
 			Location:           cleared.location == 1,
 			Memo:               cleared.memo == 1,
@@ -219,12 +221,13 @@ func patchEventOccurrence(
 	master calendar.FindCalendarEventByPublicIdRow,
 	input *PatchEventInput,
 	originalStart time.Time,
+	label calendarlabels.Change,
 ) (calendar.FindCalendarEventByPublicIdRow, error) {
 	cleared, err := parseClearFields(input.Body.Clear)
 	if err != nil {
 		return calendar.FindCalendarEventByPublicIdRow{}, err
 	}
-	patch := occurrencePatch(input, cleared)
+	patch := occurrencePatch(input, cleared, label)
 
 	var written calendar.FindCalendarEventByPublicIdRow
 	var answered error
@@ -281,6 +284,7 @@ func patchEventFollowing(
 	master calendar.FindCalendarEventByPublicIdRow,
 	input *PatchEventInput,
 	splitStart time.Time,
+	label calendarlabels.Change,
 ) (calendar.FindCalendarEventByPublicIdRow, error) {
 	cleared, err := parseClearFields(input.Body.Clear)
 	if err != nil {
@@ -307,7 +311,7 @@ func patchEventFollowing(
 		CalendarID:  cal.ID,
 		Master:      master,
 		SplitStart:  splitStart,
-		Patch:       occurrencePatch(input, cleared),
+		Patch:       occurrencePatch(input, cleared, label),
 		Series:      series,
 	}
 

@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
@@ -266,6 +267,9 @@ type Patch struct {
 	BlockLabel         *string
 	NotificationOffset *int32
 	Clear              Clears
+	// Label is the label instruction, already resolved by the transport.
+	// The zero value keeps the label.
+	Label calendarlabels.Change
 }
 
 // Apply folds the patch over the values the occurrence falls back to, and

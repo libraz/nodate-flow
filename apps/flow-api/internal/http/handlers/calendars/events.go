@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -76,6 +79,12 @@ type EventResponse struct {
 	NotificationOffset   *int32           `json:"notificationOffset,omitempty"`
 	UpdatedAt            *int64           `json:"updatedAt,omitempty"`
 	CreatedAt            int64            `json:"createdAt"`
+	Color                string           `json:"color"`
+	OwnerColor           string           `json:"ownerColor"`
+	LabelID              *string          `json:"labelId"`
+	LabelName            *string          `json:"labelName"`
+	DetailsHidden        bool             `json:"detailsHidden"`
+	CanEdit              bool             `json:"canEdit"`
 }
 
 // ListEventsOutput is the response for the list events endpoint.
@@ -120,6 +129,7 @@ type CreateEventInput struct {
 		RecurrenceRule     *json.RawMessage `json:"recurrenceRule,omitempty" required:"false" doc:"RFC 5545 recurrence rule as JSON"`
 		RecurrenceEnd      *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		NotificationOffset *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset in minutes"`
+		LabelID            *string          `json:"labelId,omitempty" required:"false" doc:"Calendar label public ID; empty means no label"`
 	}
 }
 
@@ -182,6 +192,7 @@ type PatchEventInput struct {
 		RecurrenceEnd        *int64           `json:"recurrenceEnd,omitempty" required:"false" doc:"Recurrence end as unix seconds (UTC)"`
 		RecurrenceExceptions *json.RawMessage `json:"recurrenceExceptions,omitempty" required:"false" doc:"Array of ISO 8601 dates/times to exclude from recurrence"`
 		NotificationOffset   *int32           `json:"notificationOffset,omitempty" required:"false" doc:"Notification offset"`
+		LabelID              *string          `json:"labelId,omitempty" required:"false" doc:"Calendar label public ID to file the event under"`
 		// Clear names the nullable fields to set back to nothing.
 		//
 		// A PATCH that carries only values cannot express removal: the
@@ -195,7 +206,7 @@ type PatchEventInput struct {
 		// recurrenceExceptions with it: they describe a series, and
 		// leaving them on a row that no longer has one keeps state
 		// nothing reads and the next writer has to reason about.
-		Clear []string `json:"clear,omitempty" required:"false" enum:"location,memo,url,blockLabel,recurrenceRule,recurrenceEnd,recurrenceExceptions,notificationOffset" doc:"Nullable fields to clear. Takes precedence over a value sent for the same field in this request."`
+		Clear []string `json:"clear,omitempty" required:"false" enum:"location,memo,url,blockLabel,recurrenceRule,recurrenceEnd,recurrenceExceptions,notificationOffset,labelId" doc:"Nullable fields to clear. Takes precedence over a value sent for the same field in this request."`
 		// Scope says which occurrences of a recurring series the patch
 		// reaches, and OccurrenceStart says which occurrence it starts
 		// from.
@@ -219,6 +230,7 @@ type clearableEventFields struct {
 	recurrenceEnd        int64
 	recurrenceExceptions int64
 	notificationOffset   int64
+	labelID              int64
 }
 
 // parseClearFields reads the Clear list. An unknown name is rejected
@@ -245,6 +257,8 @@ func parseClearFields(names []string) (clearableEventFields, error) {
 			out.recurrenceExceptions = 1
 		case "notificationOffset":
 			out.notificationOffset = 1
+		case "labelId":
+			out.labelID = 1
 		default:
 			return clearableEventFields{}, httpErr(apierrors.ValidationBodyFieldInvalid)
 		}
@@ -323,6 +337,11 @@ type CrossCalendarEventResponse struct {
 	OverriddenStarts     []string         `json:"overriddenStarts,omitempty" doc:"Occurrence starts a separate override row already stands in for (RFC 3339 UTC). Recurring masters only."`
 	UpdatedAt            *int64           `json:"updatedAt,omitempty"`
 	CreatedAt            int64            `json:"createdAt"`
+	Color                string           `json:"color"`
+	OwnerColor           string           `json:"ownerColor"`
+	LabelID              *string          `json:"labelId"`
+	LabelName            *string          `json:"labelName"`
+	DetailsHidden        bool             `json:"detailsHidden"`
 }
 
 // ListCalendarEventsOutput is the response for the cross-calendar event list endpoint.
@@ -704,8 +723,22 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 			return createEventWithIdempotency(ctx, deps, input, wsID, actorID, cal, params)
 		}
 
-		_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, params)
+		if input.Body.LabelID != nil && *input.Body.LabelID != "" {
+			labelID, refusal, rerr := calendarlabels.ResolveLabel(ctx, deps.CalendarQueries, cal.ID, *input.Body.LabelID)
+			if rerr != nil {
+				return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
+			if refusal != nil {
+				return nil, handlerutil.HTTPErrFromAPIError(refusal)
+			}
+			err = createEventWithLabel(ctx, deps, wsID, params, labelID)
+		} else {
+			_, err = deps.CalendarQueries.CreateCalendarEvent(ctx, params)
+		}
 		if err != nil {
+			if isHTTPStatusError(err) {
+				return nil, err
+			}
 			return nil, httpErr(apierrors.CalendarEventStoreWriteInterrupted)
 		}
 
@@ -722,7 +755,12 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 		}
 
 		out := &CreateEventOutput{}
-		out.Body = eventFromFullRow(created)
+		// The creator is a party to the event and may edit it.
+		out.Body = eventFromFullRow(created, eventViewer{
+			UserID:          actorID,
+			CalendarDefault: string(cal.DefaultEventVisibility),
+			CanEdit:         true,
+		})
 
 		payload := map[string]any{
 			"eventId":    eventPublicID.String(),
@@ -747,6 +785,30 @@ func CreateEvent(deps Deps) func(context.Context, *CreateEventInput) (*CreateEve
 	}
 }
 
+// createEventWithLabel inserts the event and its label link in one
+// transaction, so a link refused at write time leaves no event behind.
+func createEventWithLabel(ctx context.Context, deps Deps, wsID uint32, params calendar.CreateCalendarEventParams, labelID uint32) error {
+	var answered error
+	err := dbretry.InTx(ctx, deps.DB, "calendars.CreateEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
+		answered = nil
+		cq := deps.CalendarQueries.WithTx(tx.RawTx())
+		id, err := cq.CreateCalendarEvent(ctx, params)
+		if err != nil {
+			return err
+		}
+		_, refusal, err := calendarlabels.SetLink(ctx, cq, wsID, uint32(id), labelID) //#nosec G115 -- LastInsertId of an INT UNSIGNED key
+		if refusal != nil {
+			answered = handlerutil.HTTPErrFromAPIError(refusal)
+			return refusal
+		}
+		return err
+	})
+	if answered != nil {
+		return answered
+	}
+	return err
+}
+
 // GetEvent returns a single event by its public ID.
 func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput, error) {
 	return func(ctx context.Context, input *GetEventInput) (*GetEventOutput, error) {
@@ -754,7 +816,7 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 		if err != nil {
 			return nil, err
 		}
-		cal, _, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
+		cal, sub, err := resolveCalendar(ctx, deps.CalendarQueries, wsID, actorID, input.CalID)
 		if err != nil {
 			return nil, err
 		}
@@ -804,13 +866,13 @@ func GetEvent(deps Deps) func(context.Context, *GetEventInput) (*GetEventOutput,
 			return nil, errEventNotFound
 		}
 
-		resp := eventFromFullRow(evt)
-		scrubEventDetailsForParty(string(evt.Visibility), string(cal.DefaultEventVisibility),
-			evt.OwnerUserID, evt.CreatedByUserID, actorID, isAttendee,
-			&resp.Location, &resp.Memo, &resp.URL)
-
 		out := &GetEventOutput{}
-		out.Body = resp
+		out.Body = eventFromFullRow(evt, eventViewer{
+			UserID:          actorID,
+			IsAttendee:      isAttendee,
+			CalendarDefault: string(cal.DefaultEventVisibility),
+			CanEdit:         canEditEvent(actorID, evt, sub, attendanceRow),
+		})
 		return out, nil
 	}
 }
@@ -855,6 +917,14 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 		if !canEditEvent(actorID, evt, sub, attendee) {
 			return nil, httpErr(apierrors.CalendarEventEditPermissionRequired)
+		}
+		patchViewer := func(row calendar.FindCalendarEventByPublicIdRow, att *calendar.FindCalendarEventAttendeeRow) eventViewer {
+			return eventViewer{
+				UserID:          actorID,
+				IsAttendee:      att != nil,
+				CalendarDefault: string(cal.DefaultEventVisibility),
+				CanEdit:         canEditEvent(actorID, row, sub, att),
+			}
 		}
 
 		// Pair invariant: explicit partial start_at without end_at (or
@@ -908,6 +978,11 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			return nil, err
 		}
 
+		labelChange, err := resolvePatchLabel(ctx, deps, wsID, actorID, cal, evt, attendee, scope, input)
+		if err != nil {
+			return nil, err
+		}
+
 		if scope != scopeSeries {
 			// The rule a "this and following" edit carries into the
 			// continuing series is checked before any write, so a
@@ -924,16 +999,20 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 			var written calendar.FindCalendarEventByPublicIdRow
 			var scopeErr error
 			if scope == scopeOccurrence {
-				written, scopeErr = patchEventOccurrence(ctx, deps, wsID, actorID, cal, evt, input, originalStart)
+				written, scopeErr = patchEventOccurrence(ctx, deps, wsID, actorID, cal, evt, input, originalStart, labelChange)
 			} else {
-				written, scopeErr = patchEventFollowing(ctx, deps, wsID, actorID, cal, evt, input, originalStart)
+				written, scopeErr = patchEventFollowing(ctx, deps, wsID, actorID, cal, evt, input, originalStart, labelChange)
 			}
 			if scopeErr != nil {
 				return nil, scopeErr
 			}
 
+			writtenAttendee, aerr := findActorAttendee(ctx, deps.CalendarQueries, actorID, written.ID, written.RecurrenceParentID)
+			if aerr != nil {
+				return nil, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
 			out := &PatchEventOutput{}
-			out.Body = eventFromFullRow(written)
+			out.Body = eventFromFullRow(written, patchViewer(written, writtenAttendee))
 			recordOccurrencePatch(ctx, deps, wsID, actorID, input, scope, written, cal.ID)
 			return out, nil
 		}
@@ -1112,12 +1191,15 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		// transaction, so an itemkit invariant is not reported as a
 		// generic write failure.
 		var answered error
+		// labelChanged says whether the label link moved in the committed attempt.
+		var labelChanged bool
 		// renamed carries the linked task's text out of the transaction
 		// so its search embedding is refreshed once the rename has
 		// committed.
 		var renamed itemkit.RenamedTask
 		txErr := dbretry.InTx(ctx, deps.DB, "calendars.PatchEvent", nil, func(ctx context.Context, tx *dbretry.Tx) error {
 			answered = nil
+			labelChanged = false
 			renamed = itemkit.RenamedTask{}
 			cqtx := deps.CalendarQueries.WithTx(tx.RawTx())
 
@@ -1176,6 +1258,18 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				return err
 			}
 
+			if labelChange.Mode != calendarlabels.ChangeKeep {
+				changed, refusal, lerr := calendarlabels.ApplyToSeries(ctx, cqtx, wsID, evt.ID, labelChange)
+				if refusal != nil {
+					answered = handlerutil.HTTPErrFromAPIError(refusal)
+					return refusal
+				}
+				if lerr != nil {
+					return lerr
+				}
+				labelChanged = changed
+			}
+
 			// Re-read inside the tx so the response reflects what itemkit
 			// + sqlc jointly wrote.
 			var rerr error
@@ -1217,13 +1311,22 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 		}
 
 		out := &PatchEventOutput{}
-		out.Body = eventFromFullRow(updated)
+		out.Body = eventFromFullRow(updated, patchViewer(updated, attendee))
+
+		// A request whose only content is a label that is already in place
+		// writes and records nothing.
+		if labelChange.Mode != calendarlabels.ChangeKeep && !labelChanged && patchIsLabelOnly(input) {
+			return out, nil
+		}
 
 		payload := map[string]any{
 			"eventId":    input.EvtID,
 			"calendarId": input.CalID,
 		}
-		if isLinked {
+		// itemkit emits the update event for a title or time change; a
+		// label change on its own has to record it here.
+		itemkitEmitted := isLinked && (titleChanged || timeChanged)
+		if isLinked && !(labelChanged && !itemkitEmitted) {
 			// itemkit fired item.rescheduled / item.renamed inside the
 			// transaction above and dual-emitted the legacy
 			// calendar.event.updated kind with it, so the event row is
@@ -1237,9 +1340,9 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 				CallSite:     "calendars.PatchEvent",
 			})
 		} else {
-			// An unlinked event has no itemkit write behind it, so the
-			// existing kind is emitted here to keep webhook subscribers
-			// working.
+			// An unlinked event has no itemkit write behind it (nor does a
+			// linked event's label-only change), so the existing kind is
+			// emitted here to keep webhook subscribers working.
 			recordCalendarEventChange(ctx, deps, wsID, cal.ID, actorID, updated.PublicID, updated.Title, mutationlog.Mutation{
 				EventType:    eventbus.CalEventUpdated,
 				AuditAction:  "calendar.event.update",
@@ -1252,6 +1355,90 @@ func PatchEvent(deps Deps) func(context.Context, *PatchEventInput) (*PatchEventO
 
 		return out, nil
 	}
+}
+
+// patchIsLabelOnly reports whether the request carries nothing but a label
+// change: no other member, and no clear entry other than labelId.
+func patchIsLabelOnly(input *PatchEventInput) bool {
+	body := input.Body
+	body.LabelID = nil
+	body.Scope = nil
+	body.OccurrenceStart = nil
+	body.Clear = nil
+	for _, name := range input.Body.Clear {
+		if name != "labelId" {
+			return false
+		}
+	}
+	return reflect.ValueOf(body).IsZero()
+}
+
+// resolvePatchLabel turns the request's label members into a Change, in the
+// order the MCP tools use: the viewer must be able to see the target row's
+// details, then the label must belong to the calendar. Clear wins over a
+// value. The target is the override for an occurrence scope when one
+// exists, else the series.
+func resolvePatchLabel(
+	ctx context.Context,
+	deps Deps,
+	wsID, actorID uint32,
+	cal calendar.FindCalendarByPublicIdRow,
+	evt calendar.FindCalendarEventByPublicIdRow,
+	evtAttendee *calendar.FindCalendarEventAttendeeRow,
+	scope occurrenceScope,
+	input *PatchEventInput,
+) (calendarlabels.Change, error) {
+	clearLabel := slices.Contains(input.Body.Clear, "labelId")
+	if input.Body.LabelID == nil && !clearLabel {
+		return calendarlabels.Change{}, nil
+	}
+	target, targetAttendee := evt, evtAttendee
+	if scope == scopeOccurrence {
+		ov, err := deps.CalendarQueries.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
+			WorkspaceID:             wsID,
+			RecurrenceParentID:      handlerutil.NullInt32From(evt.ID),
+			RecurrenceOriginalStart: sql.NullTime{Time: handlerutil.UnixToTime(*input.Body.OccurrenceStart), Valid: true},
+		})
+		switch {
+		case err == nil:
+			target, err = deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+				PublicID:    ov.PublicID,
+				CalendarID:  ov.CalendarID,
+				WorkspaceID: wsID,
+			})
+			if err == nil {
+				targetAttendee, err = findActorAttendee(ctx, deps.CalendarQueries, actorID, target.ID, target.RecurrenceParentID)
+			}
+			if err != nil {
+				return calendarlabels.Change{}, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+			}
+		case !errors.Is(err, sql.ErrNoRows):
+			return calendarlabels.Change{}, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+		}
+	}
+	visible := eventacl.CanSeeDetails(
+		eventacl.Event{
+			Visibility:      eventacl.Visibility(target.Visibility),
+			OwnerUserID:     target.OwnerUserID,
+			CreatedByUserID: target.CreatedByUserID,
+			CalendarDefault: eventacl.Visibility(cal.DefaultEventVisibility),
+		},
+		eventacl.Actor{UserID: actorID, IsAttendee: targetAttendee != nil},
+	)
+	if refusal := calendarlabels.RequireDetailsVisible(visible); refusal != nil {
+		return calendarlabels.Change{}, handlerutil.HTTPErrFromAPIError(refusal)
+	}
+	if clearLabel {
+		return calendarlabels.Change{Mode: calendarlabels.ChangeClear}, nil
+	}
+	id, refusal, err := calendarlabels.ResolveLabel(ctx, deps.CalendarQueries, cal.ID, *input.Body.LabelID)
+	if err != nil {
+		return calendarlabels.Change{}, httpErr(apierrors.CalendarEventStoreReadInterrupted)
+	}
+	if refusal != nil {
+		return calendarlabels.Change{}, handlerutil.HTTPErrFromAPIError(refusal)
+	}
+	return calendarlabels.Change{Mode: calendarlabels.ChangeSet, LabelID: id}, nil
 }
 
 // translateItemkitError maps itemkit invariant / generic errors to the
@@ -1499,7 +1686,9 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 			resp.Location = dbtype.PtrFromNullString(r.Location)
 			resp.BlockLabel = dbtype.PtrFromNullString(r.BlockLabel)
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			c := resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor)
+			resp.Color, resp.OwnerColor, resp.LabelID, resp.LabelName, resp.DetailsHidden = c.Color, c.OwnerColor, labelIDString(c), c.LabelName, c.DetailsHidden
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 
@@ -1531,7 +1720,9 @@ func ListCalendarEvents(deps Deps) func(context.Context, *ListCalendarEventsInpu
 				resp.RecurrenceExceptions = &raw
 			}
 			resp.UpdatedAt = dbtype.UnixSecondsFromNullTime(r.UpdatedAt)
-			scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			visible := scrubEventDetailsForParty(string(r.Visibility), string(r.CalendarDefaultVisibility), r.OwnerUserID, r.CreatedByUserID, actorID, r.IsAttendee, &resp.Location, nil, nil)
+			c := resolveRowColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor)
+			resp.Color, resp.OwnerColor, resp.LabelID, resp.LabelName, resp.DetailsHidden = c.Color, c.OwnerColor, labelIDString(c), c.LabelName, c.DetailsHidden
 			out.Body.Events = append(out.Body.Events, resp)
 		}
 

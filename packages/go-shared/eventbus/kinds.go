@@ -272,6 +272,12 @@ const (
 	CalMemberAdded       Kind = "calendar.member.added"
 	CalMemberRemoved     Kind = "calendar.member.removed"
 	CalMemberRoleChanged Kind = "calendar.member.role_changed"
+	CalMemberUpdated     Kind = "calendar.member.updated"
+
+	// Calendar labels are the per-calendar tags an event can carry.
+	CalLabelCreated Kind = "calendar.label.created"
+	CalLabelUpdated Kind = "calendar.label.updated"
+	CalLabelDeleted Kind = "calendar.label.deleted"
 
 	CalMemoCreated   Kind = "calendar.memo.created"
 	CalMemoUpdated   Kind = "calendar.memo.updated"

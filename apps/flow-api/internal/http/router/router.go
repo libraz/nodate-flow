@@ -1300,6 +1300,49 @@ func buildAuthenticatedAPI(r chi.Router, deps Deps, shared *sharedDeps, authMW f
 			Description: "Removes the named member from the calendar. Their subscription rows are tombstoned. Refuses to remove the last admin.",
 			Tags:        []string{"Calendar"},
 		}, calendars.RemoveMember(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendar-member-color-update",
+			Method:      http.MethodPut,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/members/{userId}/color",
+			Summary:     "Set a member's colour on a calendar",
+			Description: "Sets the colour a calendar member is drawn in. A member may change their own colour at any role; changing another member's needs calendar manager or above. Sending the colour the member already has changes nothing.",
+			Tags:        []string{"Calendar"},
+		}, calendars.UpdateMemberColor(shared.calDeps))
+
+		// Calendar labels.
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendar-labels-list",
+			Method:      http.MethodGet,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/labels",
+			Summary:     "List a calendar's labels",
+			Description: "Returns every label of the calendar in creation order. Any calendar member may read them.",
+			Tags:        []string{"Calendar"},
+		}, calendars.ListCalendarLabels(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID:   "calendar-labels-create",
+			Method:        http.MethodPost,
+			Path:          "/workspaces/{wsId}/calendars/{calId}/labels",
+			Summary:       "Create a calendar label",
+			Description:   "Adds a label (name and colour) to the calendar. Requires calendar manager or above and a non-system calendar. A calendar holds at most 50 labels, and names are unique within it.",
+			Tags:          []string{"Calendar"},
+			DefaultStatus: http.StatusCreated,
+		}, calendars.CreateCalendarLabel(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendar-labels-update",
+			Method:      http.MethodPatch,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/labels/{labelId}",
+			Summary:     "Update a calendar label",
+			Description: "Renames or recolours a label. Requires calendar manager or above and a non-system calendar. A request that changes nothing returns the current label.",
+			Tags:        []string{"Calendar"},
+		}, calendars.UpdateCalendarLabel(shared.calDeps))
+		huma.Register(subAPI, huma.Operation{
+			OperationID: "calendar-labels-delete",
+			Method:      http.MethodDelete,
+			Path:        "/workspaces/{wsId}/calendars/{calId}/labels/{labelId}",
+			Summary:     "Delete a calendar label",
+			Description: "Removes a label; events that carried it fall back to their owner's colour. Requires calendar manager or above and a non-system calendar.",
+			Tags:        []string{"Calendar"},
+		}, calendars.DeleteCalendarLabel(shared.calDeps))
 
 		// Event attendees.
 		huma.Register(subAPI, huma.Operation{

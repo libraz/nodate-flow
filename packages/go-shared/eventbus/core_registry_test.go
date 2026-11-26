@@ -11,7 +11,6 @@ import (
 // registeredOnly are core kinds a reader must resolve but this module does
 // not emit, so kinds.go declares no constant for them.
 var registeredOnly = map[string]bool{
-	"calendar.member.updated":         true,
 	"calendar.event.attendee.updated": true,
 }
 
@@ -24,7 +23,12 @@ type yamlKind struct {
 // the same subset every other tool reads, so no YAML parser is involved.
 func readCoreYAML(t *testing.T) map[string]yamlKind {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "sql", "core", "event-kinds.yaml"))
+	return readKindYAML(t, "core")
+}
+
+func readKindYAML(t *testing.T, layer string) map[string]yamlKind {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "sql", layer, "event-kinds.yaml"))
 	if err != nil {
 		t.Fatalf("read registry: %v", err)
 	}
@@ -113,17 +117,21 @@ func TestCoreRegistryResolvesFamilies(t *testing.T) {
 }
 
 // TestCoreRegistryCoversCalendarAndWorkspaceConstants proves no Go
-// calendar.* or workspace.* kind is missing from the yaml.
+// calendar.* or workspace.* kind is missing from the union of the core and
+// time registries, the same union the conformance runner checks.
 func TestCoreRegistryCoversCalendarAndWorkspaceConstants(t *testing.T) {
 	t.Parallel()
 
 	yaml := readCoreYAML(t)
+	for kind, y := range readKindYAML(t, "time") {
+		yaml[kind] = y
+	}
 	for name, value := range declaredKindConstants(t) {
 		if !strings.HasPrefix(value, "calendar.") && !strings.HasPrefix(value, "workspace.") {
 			continue
 		}
 		if _, ok := yaml[value]; !ok {
-			t.Errorf("%s = %q is a Go kind missing from sql/core/event-kinds.yaml", name, value)
+			t.Errorf("%s = %q is a Go kind missing from the core and time event-kinds.yaml", name, value)
 		}
 	}
 }

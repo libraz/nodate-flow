@@ -46,12 +46,6 @@ func ensureCalendarOwnerRemains(ctx context.Context, tx *dbretry.Tx, calendarID,
 	return nil, err
 }
 
-var memberColors = []string{
-	"#4285F4", "#EA4335", "#FBBC04", "#34A853",
-	"#FF6D01", "#46BDC6", "#7BAAF7", "#F07B72",
-	"#FCD04F", "#57BB8A", "#FF8A65", "#80CBC4",
-}
-
 // --- Input/Output types ---
 
 // AddMemberInput is the input for adding a member to a calendar.
@@ -154,16 +148,10 @@ func AddMember(deps Deps) func(context.Context, *AddMemberInput) (*AddMemberOutp
 			return nil, httpErr(apierrors.CalendarMemberAlreadySubscribed)
 		}
 
-		// Pick the next colour off the palette by member count, so members
-		// added in order are visually distinct until the palette wraps.
-		count, err := deps.CalendarQueries.CountCalendarMembers(ctx, calendar.CountCalendarMembersParams{
-			CalendarID:  cal.ID,
-			WorkspaceID: wsID,
-		})
+		color, err := nextMemberColor(ctx, deps.CalendarQueries, wsID, cal.ID)
 		if err != nil {
 			return nil, httpErr(apierrors.CalendarMemberListQueryInterrupted)
 		}
-		color := memberColors[int(count)%len(memberColors)]
 
 		memberPublicID := types.New()
 		_, err = deps.CalendarQueries.UpsertCalendarMember(ctx, calendar.UpsertCalendarMemberParams{

@@ -191,6 +191,11 @@ export const CalendarErrors = {
     status: 422,
     message: "Could not parse date or datetime parameter",
   },
+  CALENDAR_EVENT_DETAILS_HIDDEN: {
+    code: "CALENDAR.EVENT.DETAILS_HIDDEN",
+    status: 403,
+    message: "This event's details are hidden from you, so its label cannot be changed",
+  },
   CALENDAR_EVENT_EDIT_PERMISSION_REQUIRED: {
     code: "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",
     status: 403,
@@ -205,6 +210,11 @@ export const CalendarErrors = {
     code: "CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT",
     status: 409,
     message: "This idempotency key has already been used for a different event request",
+  },
+  CALENDAR_EVENT_LABEL_UNKNOWN: {
+    code: "CALENDAR.EVENT.LABEL_UNKNOWN",
+    status: 422,
+    message: "The label does not exist on this event's calendar",
   },
   CALENDAR_EVENT_LIST_QUERY_INTERRUPTED: {
     code: "CALENDAR.EVENT.LIST_QUERY_INTERRUPTED",
@@ -325,6 +335,41 @@ export const CalendarErrors = {
     code: "CALENDAR.INVITE.TOKEN_GENERATE_INTERRUPTED",
     status: 500,
     message: "Could not generate invite token",
+  },
+  CALENDAR_LABEL_LIMIT_REACHED: {
+    code: "CALENDAR.LABEL.LIMIT_REACHED",
+    status: 409,
+    message: "This calendar already has the maximum number of labels",
+  },
+  CALENDAR_LABEL_LIST_QUERY_INTERRUPTED: {
+    code: "CALENDAR.LABEL.LIST_QUERY_INTERRUPTED",
+    status: 500,
+    message: "Labels could not be loaded",
+  },
+  CALENDAR_LABEL_NAME_TAKEN: {
+    code: "CALENDAR.LABEL.NAME_TAKEN",
+    status: 409,
+    message: "Another label on this calendar already has this name",
+  },
+  CALENDAR_LABEL_NOT_FOUND: {
+    code: "CALENDAR.LABEL.NOT_FOUND",
+    status: 404,
+    message: "Label not found",
+  },
+  CALENDAR_LABEL_STORE_DELETE_INTERRUPTED: {
+    code: "CALENDAR.LABEL.STORE_DELETE_INTERRUPTED",
+    status: 500,
+    message: "The label could not be deleted",
+  },
+  CALENDAR_LABEL_STORE_READ_INTERRUPTED: {
+    code: "CALENDAR.LABEL.STORE_READ_INTERRUPTED",
+    status: 500,
+    message: "The label could not be read",
+  },
+  CALENDAR_LABEL_STORE_WRITE_INTERRUPTED: {
+    code: "CALENDAR.LABEL.STORE_WRITE_INTERRUPTED",
+    status: 500,
+    message: "The label could not be saved",
   },
   CALENDAR_MEMBER_ALREADY_SUBSCRIBED: {
     code: "CALENDAR.MEMBER.ALREADY_SUBSCRIBED",

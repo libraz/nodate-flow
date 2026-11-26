@@ -55,7 +55,7 @@ type CreateCalendarInput struct {
 		Kind        string  `json:"kind" enum:"personal,system" doc:"Calendar kind"`
 		Name        string  `json:"name" minLength:"1" maxLength:"255" doc:"Calendar name"`
 		Description *string `json:"description,omitempty" required:"false" maxLength:"10000" doc:"Calendar description"`
-		Color       string  `json:"color" minLength:"1" maxLength:"7" doc:"Display color (hex)"`
+		Color       string  `json:"color" minLength:"1" maxLength:"7" pattern:"^#[0-9A-Fa-f]{6}$" doc:"Display color (hex)"`
 		CoverURL    *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048" doc:"Cover image URL"`
 		SystemSlug  *string `json:"systemSlug,omitempty" required:"false" maxLength:"100" doc:"System calendar slug"`
 	}
@@ -84,7 +84,7 @@ type PatchCalendarInput struct {
 	Body  struct {
 		Name        *string `json:"name,omitempty" required:"false" maxLength:"255" doc:"Calendar name"`
 		Description *string `json:"description,omitempty" required:"false" maxLength:"10000" doc:"Calendar description"`
-		Color       *string `json:"color,omitempty" required:"false" maxLength:"7" doc:"Display color"`
+		Color       *string `json:"color,omitempty" required:"false" maxLength:"7" pattern:"^#[0-9A-Fa-f]{6}$" doc:"Display color"`
 		CoverURL    *string `json:"coverUrl,omitempty" required:"false" maxLength:"2048" doc:"Cover image URL"`
 	}
 }
