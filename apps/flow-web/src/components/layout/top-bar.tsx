@@ -16,14 +16,12 @@ import {
 } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
-import AiCostMeter from '../../features/ai-providers/cost-meter';
 import { authStore, selectUser, useAuth } from '../../features/auth/auth-store';
 import NotificationBell from '../../features/notifications/notification-bell';
 import { accountsWebUrl } from '../../lib/accounts-web-url';
 import { authApiRequest } from '../../lib/api';
 import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { clearActiveWorkspaceId } from '../../lib/use-current-workspace';
-import { isWorkspaceAdmin, useCurrentWorkspaceRole } from '../../lib/use-current-workspace-role';
 import { OPEN_SHORTCUTS_HELP_EVENT } from '../page-help';
 import { useCommandPaletteStore } from './command-palette-store';
 import { paletteShortcutLabel } from './palette-shortcut';
@@ -85,7 +83,6 @@ export default function TopBar(): ReactElement {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const openPalette = useCommandPaletteStore((state) => state.openPalette);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const showCostMeter = isWorkspaceAdmin(useCurrentWorkspaceRole());
   const user = useAuth(selectUser);
   const initials = initialsFrom(user?.displayName);
   const avatarUrl = resolveAvatarUrl(user?.avatarUrl);
@@ -205,11 +202,6 @@ export default function TopBar(): ReactElement {
           </div>
         </div>
         <div className={styles.right}>
-          {showCostMeter ? (
-            <div className={styles.costSlot}>
-              <AiCostMeter />
-            </div>
-          ) : null}
           <div className={styles.inlineNotificationBell}>
             <Suspense fallback={null}>
               <NotificationBell />

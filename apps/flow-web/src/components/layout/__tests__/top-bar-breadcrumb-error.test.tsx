@@ -17,7 +17,6 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: ReactNode }) => <a href="/">{children}</a>,
 }));
 
-vi.mock('../../../features/ai-providers/cost-meter', () => ({ default: () => null }));
 vi.mock('../../../features/notifications/notification-bell', () => ({ default: () => null }));
 vi.mock('../command-palette', () => ({ default: () => null }));
 

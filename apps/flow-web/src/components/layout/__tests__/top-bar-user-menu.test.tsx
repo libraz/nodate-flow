@@ -14,7 +14,6 @@ vi.mock('@tanstack/react-router', () => ({
     select({ location: { pathname: '/today' } }),
 }));
 
-vi.mock('../../../features/ai-providers/cost-meter', () => ({ default: () => null }));
 vi.mock('../../../features/notifications/notification-bell', () => ({ default: () => null }));
 vi.mock('../top-bar-breadcrumb', () => ({ default: () => null }));
 

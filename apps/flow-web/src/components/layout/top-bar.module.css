@@ -214,11 +214,6 @@
 
 /* Focus ring supplied by the global `.nf-focus-ring` utility (added in JSX). */
 
-/* Wrapper for the AI cost chip so the ultra breakpoint can drop it. */
-.costSlot {
-  display: contents;
-}
-
 .avatarTrigger {
   display: inline-flex;
   align-items: center;
@@ -462,16 +457,9 @@
   }
 }
 
-/*
- * Ultra (<480px): drop the AI cost chip, the lowest-priority item, so the
- * bell keeps showing the unread count.
- */
+/* Ultra (<480px): tighten the bar's inline-end padding and gap. */
 /* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
 @container header (max-width: 479px) {
-  .costSlot {
-    display: none;
-  }
-
   .topBar {
     /*
      * Keep the inline-start hamburger clearance from the mobile media

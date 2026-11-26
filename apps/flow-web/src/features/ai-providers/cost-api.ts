@@ -1,5 +1,5 @@
 /**
- * AI cost-today feature — non-suspense query for the topbar cost meter.
+ * AI cost-today feature — non-suspense query backing the AI activity settings summary.
  *
  * Degrades silently when AI is not configured: errors are swallowed by
  * TanStack Query and the caller renders nothing on `data === undefined`.
@@ -31,7 +31,7 @@ export const aiCostKeys = {
  * instead of UTC. The tz is included in the query key so the cache busts
  * when the browser tz changes (travel, VM clock fix, etc.).
  *
- * "What day is it where the person looking at the meter is" is genuinely
+ * "What day is it where the person looking at the summary is" is genuinely
  * a reader-zone question, so this keeps using the browser zone — but via
  * [Zone.browser], which guarantees a real IANA name. Read straight off
  * `Intl` it can come back empty on a runtime with no zone database, and

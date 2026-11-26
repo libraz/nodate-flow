@@ -26,7 +26,6 @@ vi.mock('../command-palette', () => ({
 vi.mock('../sidebar', () => ({ default: () => null }));
 vi.mock('../top-bar-breadcrumb', () => ({ default: () => null }));
 vi.mock('../../../features/timeboxes/active-timebox-bar', () => ({ default: () => null }));
-vi.mock('../../../features/ai-providers/cost-meter', () => ({ default: () => null }));
 vi.mock('../../../features/notifications/notification-bell', () => ({ default: () => null }));
 vi.mock('../../../lib/use-current-workspace-role', () => ({
   useCurrentWorkspaceRole: () => null,

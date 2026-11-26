@@ -1,0 +1,42 @@
+/*
+ * CostTodaySummary — one-row strip at the top of the AI activity settings
+ * page: label and date on the inline-start, today's amount on the inline-end.
+ */
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nf-space-4);
+  padding-block: 0 var(--nf-space-4);
+  border-block-end: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-sm);
+  font-weight: var(--nf-weight-medium);
+}
+
+.date {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+}
+
+.amount {
+  color: var(--nf-color-fg);
+  font-size: var(--nf-text-xl);
+  font-weight: var(--nf-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.skeleton {
+  /* nf-token-override: reserves the loaded strip's height so the list does not jump */
+  block-size: 3.5rem;
+}

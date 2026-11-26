@@ -55,7 +55,6 @@ for (const locale of ['en', 'ja'] as const) {
       const breadcrumbName = locale === 'ja' ? 'パンくずリスト' : 'Breadcrumb';
       const breadcrumb = page.getByRole('navigation', { name: breadcrumbName });
       const searchButton = page.locator('[data-search-trigger]');
-      const aiCostMeter = page.locator('header a[href*="/settings/ai-activity"]');
       const avatarButton = page.locator('header button[aria-haspopup="menu"]');
       const rightCluster = page.locator('header > div').last();
 
@@ -66,13 +65,11 @@ for (const locale of ['en', 'ja'] as const) {
         await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
         await expect(breadcrumb).toContainText(LONG_WORKSPACE_NAME);
         await expect(searchButton).toBeVisible();
-        await expect(aiCostMeter).toBeVisible({ timeout: 15_000 });
         await expect(avatarButton).toBeVisible();
         await expect(rightCluster).toBeVisible();
 
         const breadcrumbBox = requireBox(await breadcrumb.boundingBox(), 'breadcrumb');
         const searchBox = requireBox(await searchButton.boundingBox(), 'search button');
-        const aiBox = requireBox(await aiCostMeter.boundingBox(), 'AI cost meter');
         const avatarBox = requireBox(await avatarButton.boundingBox(), 'avatar button');
         const rightBox = requireBox(await rightCluster.boundingBox(), 'right action cluster');
 
@@ -80,12 +77,10 @@ for (const locale of ['en', 'ja'] as const) {
         expect(searchBox.width).toBeGreaterThanOrEqual(32);
         expect(avatarBox.width).toBeGreaterThanOrEqual(32);
         expect(overlaps(breadcrumbBox, searchBox), 'breadcrumb overlaps search').toBe(false);
-        expect(overlaps(breadcrumbBox, aiBox), 'breadcrumb overlaps AI cost meter').toBe(false);
         expect(overlaps(breadcrumbBox, rightBox), 'breadcrumb overlaps right action cluster').toBe(
           false,
         );
         expect(overlaps(searchBox, rightBox), 'search overlaps right action cluster').toBe(false);
-        expect(aiBox.x + aiBox.width).toBeLessThanOrEqual(width);
         expect(avatarBox.x + avatarBox.width).toBeLessThanOrEqual(width);
         expect(rightBox.x + rightBox.width).toBeLessThanOrEqual(width);
         expect(

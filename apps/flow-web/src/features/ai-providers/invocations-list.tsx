@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import PageHeader from '../../components/page-header';
 import { formatEpochDateTime } from '../../lib/format';
 import ui from '../settings/settings-ui.module.css';
+import CostTodaySummary from './cost-today-summary';
 import { type AiInvocation, useAiInvocationsQuery } from './invocations-api';
 import styles from './invocations-list.module.css';
 
@@ -71,6 +72,7 @@ export default function InvocationsList({ workspaceId }: { workspaceId: string }
         description={t('ai_activity.description')}
         help="workspace-settings-ai-activity"
       />
+      <CostTodaySummary workspaceId={workspaceId} />
       {data.length === 0 ? (
         <EmptyState titleAs="p" title={t('ai_activity.empty')} className={ui.empty} />
       ) : (
