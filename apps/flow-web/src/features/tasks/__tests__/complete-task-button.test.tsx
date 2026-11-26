@@ -22,9 +22,10 @@ vi.mock('@nodate-flow/ui/primitives/toast', () => ({
   toaster: { show: mocks.show },
 }));
 
-import { calendarEventKeys } from '../../events/api';
-import type { MyTaskListItem, TaskDerivedState } from '../api';
+import { type MyTaskListItem, myTasksKey, type TaskDerivedState } from '../api';
 import CompleteTaskButton from '../complete-task-button';
+
+const MY_TASKS_KEY = myTasksKey({ sort: 'dueOn' });
 
 function task(derivedState: TaskDerivedState) {
   return { id: 't1', title: 'Write report', derivedState, projectId: 'p1' };
@@ -196,7 +197,7 @@ describe('<CompleteTaskButton> undo', () => {
     gateLast?: Promise<unknown>,
   ): Promise<ReturnType<typeof renderWithProviders>> {
     const view = renderWithProviders(<CompleteTaskButton task={task(from)} />);
-    view.queryClient.setQueryData(calendarEventKeys.myTasks, [row(from)]);
+    view.queryClient.setQueryData(MY_TASKS_KEY, [row(from)]);
     mocks.post.mockImplementation(() => ok());
     fireEvent.click(screen.getByRole('button', { name: 'today.complete_task' }));
     await waitFor(() => {
@@ -246,7 +247,7 @@ describe('<CompleteTaskButton> undo', () => {
       await waitFor(() => {
         expect(transitions()).toHaveLength(3);
       });
-      const rows = view.queryClient.getQueryData<MyTaskListItem[]>(calendarEventKeys.myTasks);
+      const rows = view.queryClient.getQueryData<MyTaskListItem[]>(MY_TASKS_KEY);
       expect(rows?.[0]?.derivedState).toBe(back);
       gate.resolve(await ok(back));
     },

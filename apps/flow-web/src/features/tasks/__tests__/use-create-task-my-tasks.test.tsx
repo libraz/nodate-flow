@@ -17,16 +17,17 @@ vi.mock('../../../lib/sdk', () => ({
 }));
 
 import { calendarEventKeys } from '../../events/api';
-import { useCreateTask } from '../api';
+import { myTasksKey, useCreateTask } from '../api';
 import { useApplySmartTask } from '../smart-create-api';
 
+const MY_TASKS_KEY = myTasksKey({ sort: 'dueOn' });
 const CALENDAR_KEY = [...calendarEventKeys.meTasks, '2026-01-01', '2026-01-31'] as const;
 
 function buildClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  client.setQueryData(calendarEventKeys.myTasks, []);
+  client.setQueryData(MY_TASKS_KEY, []);
   client.setQueryData(CALENDAR_KEY, { tasks: [] });
   return client;
 }
@@ -59,7 +60,7 @@ describe('my-tasks invalidation on create', () => {
     });
 
     await waitFor(() => {
-      expect(client.getQueryState(calendarEventKeys.myTasks)?.isInvalidated).toBe(true);
+      expect(client.getQueryState(MY_TASKS_KEY)?.isInvalidated).toBe(true);
     });
     expect(client.getQueryState(CALENDAR_KEY)?.isInvalidated).toBe(true);
   });
@@ -84,7 +85,7 @@ describe('my-tasks invalidation on create', () => {
     });
 
     await waitFor(() => {
-      expect(client.getQueryState(calendarEventKeys.myTasks)?.isInvalidated).toBe(true);
+      expect(client.getQueryState(MY_TASKS_KEY)?.isInvalidated).toBe(true);
     });
     expect(client.getQueryState(CALENDAR_KEY)?.isInvalidated).toBe(true);
   });

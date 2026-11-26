@@ -30,8 +30,8 @@ vi.mock('../../../lib/use-effective-timezone', async () => {
 });
 
 import { Route } from '../../../routes/_authenticated.today';
-import { calendarEventKeys } from '../../events/api';
-import type { MyTaskListItem } from '../api';
+import { type MyTaskListItem, myTasksKey } from '../api';
+import { DEFAULT_MY_TASK_FILTERS } from '../use-my-task-filters';
 
 const TodayRoute = Route.options.component as () => ReactElement;
 
@@ -52,7 +52,7 @@ function renderToday(rows: MyTaskListItem[]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, throwOnError: false } },
   });
-  queryClient.setQueryData(calendarEventKeys.myTasks, rows);
+  queryClient.setQueryData(myTasksKey({ filters: DEFAULT_MY_TASK_FILTERS, sort: 'dueOn' }), rows);
   return renderWithProviders(
     <Suspense fallback={null}>
       <TodayRoute />

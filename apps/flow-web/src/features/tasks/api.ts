@@ -42,9 +42,10 @@
  * manually reorderable.
  */
 
-import type { components } from '@nodate-flow/sdk';
+import type { components, operations } from '@nodate-flow/sdk';
 import {
   type InfiniteData,
+  type QueryKey,
   type UseMutationResult,
   type UseQueryResult,
   type UseSuspenseInfiniteQueryResult,
@@ -75,6 +76,7 @@ export type TransitionInput = components['schemas']['TransitionTaskBody'];
 export type TransitionName = TransitionInput['transition'];
 export type AddCommentInput = components['schemas']['AddTaskCommentBody'];
 export type AddActorInput = components['schemas']['AddTaskActorBody'];
+export type TaskActorRole = AddActorInput['role'];
 export type PresignUploadInput = components['schemas']['PresignUploadBody'];
 export type PresignUploadResult = components['schemas']['PresignUploadOutputBody'];
 export type DownloadAttachmentResult = components['schemas']['DownloadAttachmentOutputBody'];
@@ -96,6 +98,46 @@ export type TaskPriority = 0 | 1 | 2 | 3 | 4;
 
 /** Ordered list of all priority levels for filter rendering. */
 export const TASK_PRIORITIES: readonly TaskPriority[] = [0, 1, 2, 3, 4] as const;
+
+/** The caller's roles on a task, in display order. */
+export const TASK_ACTOR_ROLES: readonly TaskActorRole[] = [
+  'assignee',
+  'reviewer',
+  'approver',
+  'watcher',
+] as const;
+
+/** `sort` values accepted by `GET /me/tasks`; a leading `-` sorts descending. */
+export type MyTaskSort = NonNullable<
+  NonNullable<operations['me-tasks-list']['parameters']['query']>['sort']
+>;
+
+/** Sort options in the order the picker lists them. */
+export const MY_TASK_SORTS: readonly MyTaskSort[] = [
+  'dueOn',
+  '-dueOn',
+  '-priority',
+  'priority',
+  '-updatedAt',
+  'updatedAt',
+  '-createdAt',
+  'createdAt',
+  'title',
+  '-title',
+] as const;
+
+export interface MyTaskFilters {
+  search?: string;
+  states?: readonly TaskDerivedState[];
+  priority?: readonly TaskPriority[];
+  workspaceId?: string;
+  roles?: readonly TaskActorRole[];
+}
+
+export interface MyTasksParams {
+  filters?: MyTaskFilters;
+  sort?: MyTaskSort;
+}
 
 export interface TaskFilters {
   search?: string;
@@ -482,19 +524,51 @@ function dedupeMyTasks(rows: MyTaskListItem[]): MyTaskListItem[] {
   return [...byId.values()];
 }
 
+interface MyTasksQuery {
+  q?: string;
+  state?: TaskDerivedState[];
+  priority?: TaskPriority[];
+  workspaceId?: string;
+  role?: TaskActorRole[];
+  sort?: MyTaskSort;
+}
+
+/** The query actually sent (minus paging); empty fields are left out. */
+function toMyTasksQuery(params: MyTasksParams | undefined): MyTasksQuery {
+  const query: MyTasksQuery = {};
+  const filters = params?.filters;
+  const q = filters?.search?.trim();
+  if (q) query.q = q;
+  if (filters?.states?.length) query.state = [...filters.states];
+  if (filters?.priority?.length) query.priority = [...filters.priority];
+  if (filters?.workspaceId) query.workspaceId = filters.workspaceId;
+  if (filters?.roles?.length) query.role = [...filters.roles];
+  if (params?.sort) query.sort = params.sort;
+  return query;
+}
+
+/** Cache key for one `GET /me/tasks` variant; `calendarEventKeys.myTasks` is its prefix. */
+export function myTasksKey(params?: MyTasksParams): readonly unknown[] {
+  return [...calendarEventKeys.myTasks, toMyTasksQuery(params)];
+}
+
 /**
  * GET /me/tasks as one deduplicated flat list (Today, home summary).
  *
- * Shares `calendarEventKeys.myTasks` with the calendar aggregates, so the
- * cache holds the raw rows and `select` collapses them on read.
+ * Shares the `calendarEventKeys.myTasks` prefix with the calendar
+ * aggregates, so the cache holds the raw rows and `select` collapses them
+ * on read. Called without params it asks for every state in the server's
+ * default order.
  */
-export function useMyTasksQuery(): UseSuspenseQueryResult<MyTaskListItem[]> {
+export function useMyTasksQuery(params?: MyTasksParams): UseSuspenseQueryResult<MyTaskListItem[]> {
+  const query = toMyTasksQuery(params);
   return useSuspenseQuery({
-    queryKey: calendarEventKeys.myTasks,
+    queryKey: myTasksKey(params),
     staleTime: 30_000,
     queryFn: async (): Promise<MyTaskListItem[]> => {
       const data = await apiRequest(
-        (client) => client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0 } } }),
+        (client) =>
+          client.GET('/me/tasks', { params: { query: { limit: 200, offset: 0, ...query } } }),
         'Failed to load assigned tasks',
       );
       return data.tasks ?? [];
@@ -924,15 +998,19 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
       }
       await qc.cancelQueries({ queryKey: tasksKeys.detail(vars.id) });
       await qc.cancelQueries({ queryKey: calendarEventKeys.myTasks });
-      const myTasksSnapshot = qc.getQueryData<MyTaskListItem[]>(calendarEventKeys.myTasks);
-      if (vars.optimisticState && myTasksSnapshot) {
+      // Every cached My Tasks variant (one per filter/sort) is updated.
+      const myTasksSnapshots = qc.getQueriesData<MyTaskListItem[]>({
+        queryKey: calendarEventKeys.myTasks,
+      });
+      if (vars.optimisticState) {
         const nextState = vars.optimisticState;
-        qc.setQueryData<MyTaskListItem[]>(
-          calendarEventKeys.myTasks,
-          myTasksSnapshot.map((row) =>
-            row.id === vars.id ? { ...row, derivedState: nextState } : row,
-          ),
-        );
+        for (const [key, rows] of myTasksSnapshots) {
+          if (!rows) continue;
+          qc.setQueryData<MyTaskListItem[]>(
+            key,
+            rows.map((row) => (row.id === vars.id ? { ...row, derivedState: nextState } : row)),
+          );
+        }
       }
       // The list prefix mixes two cache shapes: the flat `TaskListItem[]`
       // produced by `useTasksQuery` and the `InfiniteData<TasksPage>`
@@ -972,7 +1050,7 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
           });
         }
       }
-      return { listSnapshots, detailSnapshot, myTasksSnapshot };
+      return { listSnapshots, detailSnapshot, myTasksSnapshots };
     },
     onError: (_err, vars, ctx) => {
       // `listSnapshots` holds either flat `TaskListItem[]` or
@@ -983,12 +1061,12 @@ export function useTransitionTask(): UseMutationResult<Task, ApiError, Transitio
         | {
             listSnapshots: [readonly unknown[], unknown][];
             detailSnapshot: Task | undefined;
-            myTasksSnapshot: MyTaskListItem[] | undefined;
+            myTasksSnapshots: [QueryKey, MyTaskListItem[] | undefined][];
           }
         | undefined;
       if (!snap) return;
-      if (snap.myTasksSnapshot) {
-        qc.setQueryData(calendarEventKeys.myTasks, snap.myTasksSnapshot);
+      for (const [key, rows] of snap.myTasksSnapshots) {
+        if (rows) qc.setQueryData(key, rows);
       }
       for (const [key, value] of snap.listSnapshots) {
         qc.setQueryData(key, value);

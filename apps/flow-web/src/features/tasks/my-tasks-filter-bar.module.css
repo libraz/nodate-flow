@@ -1,0 +1,116 @@
+/*
+ * MyTasksFilterBar — one toolbar row (search / Filters / sort) with the
+ * filter controls in a popover and a chip summary row only while filtering.
+ * Tokens only.
+ */
+
+.bar {
+  --nf-control-height: var(--nf-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--nf-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Text inputs carry more block padding than the control row allows. */
+.toolbar input {
+  padding-block: var(--nf-space-1);
+}
+
+.searchInput {
+  flex: 1;
+  min-inline-size: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: 22rem;
+}
+
+.filtersButton {
+  gap: var(--nf-space-2);
+}
+
+.filtersButton[data-active] {
+  border-color: var(--nf-color-accent);
+}
+
+.count {
+  min-inline-size: 1.25em;
+  justify-content: center;
+  font-size: var(--nf-text-supporting);
+}
+
+.sortField {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  margin-inline-start: auto;
+}
+
+.groupLabel {
+  color: var(--nf-color-fg-muted);
+  font-size: var(--nf-text-supporting);
+  font-weight: var(--nf-weight-medium);
+  white-space: nowrap;
+}
+
+/* Wider than Popover's default cap so each chip group stays on one line. */
+.popoverPanel {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: min(34rem, calc(100vw - 2 * var(--nf-space-2)));
+  /* nf-token-override: component dimension, not a spacing step */
+  max-inline-size: min(34rem, calc(100vw - 2 * var(--nf-space-2)));
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-4);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-2);
+}
+
+.toggleGroup {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+}
+
+.panelFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding-block-start: var(--nf-space-3);
+  border-block-start: var(--nf-space-px) solid var(--nf-color-border);
+}
+
+.chipsRow {
+  display: flex;
+  gap: var(--nf-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.clearButton {
+  margin-inline-start: auto;
+}
+
+/* Narrow: search takes its own line; Filters and sort share the next. */
+/* nf-token-override: breakpoint, and custom properties do not work in at-rule conditions */
+@media (max-width: 639px) {
+  .searchInput {
+    flex-basis: 100%;
+    max-inline-size: none;
+  }
+
+  .sortField > .groupLabel {
+    display: none;
+  }
+}

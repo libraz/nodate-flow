@@ -17,8 +17,10 @@ vi.mock('../../../lib/sdk', () => ({
 }));
 
 import { calendarEventKeys } from '../../events/api';
-import { type MyTaskListItem, type TaskDerivedState, useTransitionTask } from '../api';
+import { type MyTaskListItem, myTasksKey, type TaskDerivedState, useTransitionTask } from '../api';
 
+const MY_TASKS_KEY = myTasksKey({ sort: 'dueOn' });
+const FILTERED_KEY = myTasksKey({ filters: { priority: [4] }, sort: '-priority' });
 const CALENDAR_KEY = [...calendarEventKeys.meTasks, '2026-01-01', '2026-01-31'] as const;
 
 function myRow(id: string, derivedState: TaskDerivedState): MyTaskListItem {
@@ -58,7 +60,8 @@ function buildClient(): QueryClient {
       mutations: { retry: false, throwOnError: false },
     },
   });
-  client.setQueryData(calendarEventKeys.myTasks, [myRow('a', 'open'), myRow('b', 'open')]);
+  client.setQueryData(MY_TASKS_KEY, [myRow('a', 'open'), myRow('b', 'open')]);
+  client.setQueryData(FILTERED_KEY, [myRow('a', 'open')]);
   client.setQueryData(CALENDAR_KEY, { tasks: [] });
   return client;
 }
@@ -69,10 +72,12 @@ function wrapperFor(client: QueryClient): (props: { children: ReactNode }) => Re
   };
 }
 
-function stateOf(client: QueryClient, id: string): string | undefined {
-  return client
-    .getQueryData<MyTaskListItem[]>(calendarEventKeys.myTasks)
-    ?.find((row) => row.id === id)?.derivedState;
+function stateOf(
+  client: QueryClient,
+  id: string,
+  key: readonly unknown[] = MY_TASKS_KEY,
+): string | undefined {
+  return client.getQueryData<MyTaskListItem[]>(key)?.find((row) => row.id === id)?.derivedState;
 }
 
 function invalidated(client: QueryClient): {
@@ -80,7 +85,7 @@ function invalidated(client: QueryClient): {
   calendar: boolean | undefined;
 } {
   return {
-    mine: client.getQueryState(calendarEventKeys.myTasks)?.isInvalidated,
+    mine: client.getQueryState(MY_TASKS_KEY)?.isInvalidated,
     calendar: client.getQueryState(CALENDAR_KEY)?.isInvalidated,
   };
 }
@@ -132,6 +137,34 @@ describe('useTransitionTask — my tasks cache', () => {
     ).rejects.toBeDefined();
 
     expect(stateOf(client, 'a')).toBe('open');
+  });
+
+  it('updates every cached my-tasks variant and rolls all of them back on failure', async () => {
+    const gate = deferred<unknown>();
+    sdkMocks.post.mockImplementation(() => gate.promise);
+    const client = buildClient();
+    const { result } = renderHook(() => useTransitionTask(), { wrapper: wrapperFor(client) });
+
+    const pending = result.current.mutateAsync({
+      id: 'a',
+      transition: 'complete',
+      projectId: 'prj-1',
+      optimisticState: 'done',
+    });
+    await waitFor(() => {
+      expect(stateOf(client, 'a')).toBe('done');
+    });
+    expect(stateOf(client, 'a', FILTERED_KEY)).toBe('done');
+
+    gate.resolve({
+      data: undefined,
+      error: { type: 'about:blank', title: 'Internal Server Error', status: 500 },
+      response: new Response(null, { status: 400 }),
+    });
+    await expect(pending).rejects.toBeDefined();
+
+    expect(stateOf(client, 'a')).toBe('open');
+    expect(stateOf(client, 'a', FILTERED_KEY)).toBe('open');
   });
 
   it('leaves the rows alone without an optimistic state', async () => {

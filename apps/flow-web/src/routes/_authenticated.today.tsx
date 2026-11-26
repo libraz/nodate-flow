@@ -19,7 +19,7 @@ import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { Day } from '@nodate-flow/ui/time';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CheckCircle } from 'lucide-react';
-import { type CSSProperties, type ReactElement, useMemo } from 'react';
+import { type CSSProperties, type ReactElement, useDeferredValue, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OPEN_CREATE_TASK_EVENT } from '../components/layout/glass-dock';
 import PageFrame from '../components/page-frame';
@@ -32,7 +32,14 @@ import {
 } from '../features/tasks/api';
 import CompleteTaskButton from '../features/tasks/complete-task-button';
 import { PRIORITY_KEY, PRIORITY_TONE, STATE_COLOR } from '../features/tasks/constants';
+import MyTasksFilterBar from '../features/tasks/my-tasks-filter-bar';
 import rowStyles from '../features/tasks/task-row.module.css';
+import {
+  isDefaultMyTaskFilters,
+  resetMyTaskFilters,
+  useMyTaskFilters,
+  useMyTaskSort,
+} from '../features/tasks/use-my-task-filters';
 import { formatDueDate } from '../lib/format-date';
 import { useEffectiveZone } from '../lib/use-effective-timezone';
 import styles from './_authenticated.today.module.css';
@@ -59,6 +66,15 @@ const SECTION_ORDER: readonly SectionKey[] = [
   'noDue',
 ];
 
+const SECTION_ORDER_DESC: readonly SectionKey[] = [
+  'later',
+  'thisWeek',
+  'tomorrow',
+  'today',
+  'overdue',
+  'noDue',
+];
+
 /**
  * Which section a due date belongs to, relative to `today`.
  *
@@ -79,7 +95,7 @@ function classifyDue(dueOn: string | undefined, today: Day): SectionKey {
 
 interface TodayListProps {
   items: AssignedTask[];
-  isOverdue: boolean;
+  isOverdue: (task: AssignedTask) => boolean;
   stagger: (index: number) => CSSProperties | undefined;
   locale: string;
 }
@@ -99,7 +115,7 @@ function TodayList({ items, isOverdue, stagger, locale }: TodayListProps): React
         return (
           <PresenceItem key={key} as="li" present={present} onExited={() => onExited(key)}>
             <div
-              className={cx(motion.enter, rowStyles.item, isOverdue && rowStyles.itemOverdue)}
+              className={cx(motion.enter, rowStyles.item, isOverdue(task) && rowStyles.itemOverdue)}
               style={
                 {
                   ...stagger(index),
@@ -151,7 +167,25 @@ function TodayRoute(): ReactElement {
   // the grid still shows it on today.
   const zone = useEffectiveZone();
 
-  const { data: tasks } = useMyTasksQuery();
+  const filters = useMyTaskFilters();
+  const sort = useMyTaskSort();
+  const live = useMemo(() => ({ filters, sort }), [filters, sort]);
+  // A filter change keeps the previous rows on screen while the new ones
+  // load, instead of dropping to the Suspense fallback on every keystroke.
+  const params = useDeferredValue(live);
+  const pending = params !== live;
+  const { data: tasks } = useMyTasksQuery(params);
+
+  const grouped = params.sort === 'dueOn' || params.sort === '-dueOn';
+  const today = Day.today(zone);
+  const isOverdue = (task: AssignedTask): boolean => classifyDue(task.dueOn, today) === 'overdue';
+
+  const visible = useMemo(() => {
+    const states = params.filters.states ?? [];
+    return states.length === 0
+      ? tasks
+      : tasks.filter((task) => states.some((state) => state === task.derivedState));
+  }, [tasks, params.filters.states]);
 
   const sections = useMemo<Record<SectionKey, AssignedTask[]>>(() => {
     const empty: Record<SectionKey, AssignedTask[]> = {
@@ -162,70 +196,74 @@ function TodayRoute(): ReactElement {
       later: [],
       noDue: [],
     };
-    const today = Day.today(zone);
-    for (const task of tasks) {
-      // Hide closed states from the daily focus view.
-      if (task.derivedState === 'done' || task.derivedState === 'cancelled') continue;
-      empty[classifyDue(task.dueOn, today)].push(task);
-    }
-    // Sort each section: overdue ascending (oldest first), no_due by
-    // priority desc, others ascending by due date then priority desc.
-    const byDueAsc = (a: AssignedTask, b: AssignedTask): number => {
-      const ad = a.dueOn ?? '';
-      const bd = b.dueOn ?? '';
-      if (ad !== bd) return ad < bd ? -1 : 1;
-      return b.priority - a.priority;
-    };
-    const byPriorityDesc = (a: AssignedTask, b: AssignedTask): number => b.priority - a.priority;
-    for (const key of SECTION_ORDER) {
-      empty[key].sort(key === 'noDue' ? byPriorityDesc : byDueAsc);
-    }
+    if (!grouped) return empty;
+    const day = Day.today(zone);
+    // Rows keep the order the server returned them in.
+    for (const task of visible) empty[classifyDue(task.dueOn, day)].push(task);
     return empty;
-  }, [tasks, zone]);
+  }, [visible, grouped, zone]);
 
   const stagger = useFirstLoadStagger();
 
-  const totalCount = SECTION_ORDER.reduce((sum, k) => sum + sections[k].length, 0);
+  const sectionOrder = params.sort === '-dueOn' ? SECTION_ORDER_DESC : SECTION_ORDER;
+  const defaultFilters = isDefaultMyTaskFilters(params.filters);
 
   return (
     <PageFrame>
       <PageHeader title={t('today.title')} description={t('today.subtitle')} help="my-tasks" />
+      <MyTasksFilterBar />
 
-      {totalCount === 0 ? (
-        <EmptyState
-          className={styles.empty}
-          icon={<CheckCircle size={40} strokeWidth={1.25} aria-hidden="true" />}
-          title={t('today.empty')}
-          titleAs="p"
-          action={
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => {
-                window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
-              }}
-            >
-              {t('dock.command_palette.create_task')}
-            </Button>
-          }
-        />
-      ) : null}
+      <div className={styles.list} aria-busy={pending ? 'true' : undefined}>
+        {visible.length === 0 ? (
+          <EmptyState
+            className={styles.empty}
+            icon={<CheckCircle size={40} strokeWidth={1.25} aria-hidden="true" />}
+            title={defaultFilters ? t('today.empty') : t('today.filters.no_match')}
+            titleAs="p"
+            action={
+              defaultFilters ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => {
+                    window.dispatchEvent(new Event(OPEN_CREATE_TASK_EVENT));
+                  }}
+                >
+                  {t('dock.command_palette.create_task')}
+                </Button>
+              ) : (
+                <Button type="button" variant="default" onClick={resetMyTaskFilters}>
+                  {t('tasks.filters.clear')}
+                </Button>
+              )
+            }
+          />
+        ) : null}
 
-      {SECTION_ORDER.map((key) => {
-        const items = sections[key];
-        if (items.length === 0) return null;
-        const isOverdue = key === 'overdue';
-        const label = t(SECTION_LABEL_KEY[key]);
-        return (
-          <section key={key} aria-label={label} className={styles.section}>
-            <h2 className={cx(styles.sectionTitle, isOverdue && styles.sectionTitleOverdue)}>
-              {label}
-              <span className={styles.sectionCount}>({items.length})</span>
-            </h2>
-            <TodayList items={items} isOverdue={isOverdue} stagger={stagger} locale={locale} />
+        {grouped ? (
+          sectionOrder.map((key) => {
+            const items = sections[key];
+            if (items.length === 0) return null;
+            const overdueSection = key === 'overdue';
+            const label = t(SECTION_LABEL_KEY[key]);
+            return (
+              <section key={key} aria-label={label} className={styles.section}>
+                <h2
+                  className={cx(styles.sectionTitle, overdueSection && styles.sectionTitleOverdue)}
+                >
+                  {label}
+                  <span className={styles.sectionCount}>({items.length})</span>
+                </h2>
+                <TodayList items={items} isOverdue={isOverdue} stagger={stagger} locale={locale} />
+              </section>
+            );
+          })
+        ) : visible.length > 0 ? (
+          <section aria-label={t('today.title')} className={styles.section}>
+            <TodayList items={visible} isOverdue={isOverdue} stagger={stagger} locale={locale} />
           </section>
-        );
-      })}
+        ) : null}
+      </div>
     </PageFrame>
   );
 }
