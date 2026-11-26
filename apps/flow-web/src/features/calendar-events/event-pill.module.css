@@ -1,0 +1,96 @@
+/**
+ * Shared event-pill treatment. Colour says whose / which label an event
+ * is; line and pattern say its kind. Text colour is never touched, so
+ * every theme keeps its own contrast.
+ */
+
+.pill {
+  background-color: color-mix(in oklch, var(--evt) 14%, transparent);
+  border: 1px solid color-mix(in oklch, var(--evt) 40%, transparent);
+}
+
+.kindEvent {
+  border-style: solid;
+}
+
+/* The hatch is mixed from the theme foreground so it darkens a light
+   canvas and lightens a dark one. */
+.kindBlock {
+  border-style: solid;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in oklch, var(--nf-color-fg) 4%, transparent) 6px 8px
+  );
+}
+
+.kindFree {
+  border-style: dashed;
+}
+
+.kindMilestone {
+  border-style: solid;
+  border-width: 2px;
+}
+
+.marker {
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 0.5rem;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 0.5rem;
+  flex-shrink: 0;
+  transform: rotate(45deg);
+  background: var(--evt);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+}
+
+.preview {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-1);
+  min-inline-size: 0;
+  padding: var(--nf-space-1) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+  font-size: var(--nf-text-xs);
+  color: var(--nf-color-fg);
+}
+
+.previewTitle {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Kind legend swatch: drawn from the foreground, never from --evt. */
+.kindSample {
+  display: inline-block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 14px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 10px;
+  border-radius: var(--nf-radius-sm);
+  background-color: color-mix(in oklch, var(--nf-color-fg) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--nf-color-fg) 45%, transparent);
+}
+
+.kindSample[data-kind="block"] {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 3px,
+    color-mix(in oklch, var(--nf-color-fg) 30%, transparent) 3px 4px
+  );
+}
+
+.kindSample[data-kind="free"] {
+  border-style: dashed;
+}
+
+.kindSample[data-kind="milestone"] {
+  border-width: 2px;
+}

@@ -7,6 +7,7 @@
  *   - {@link useAddCalendarMemberMutation}   POST   .../members
  *   - {@link useUpdateCalendarMemberRoleMutation} PATCH  .../members/{userId}
  *   - {@link useRemoveCalendarMemberMutation}      DELETE .../members/{userId}
+ *   - {@link useUpdateMemberColor}           PUT    .../members/{userId}/color
  *
  * Cache invalidation policy
  * -------------------------
@@ -25,6 +26,7 @@
  */
 
 import type { components } from '@nodate-flow/sdk';
+import { toaster } from '@nodate-flow/ui/primitives/toast';
 import {
   type UseMutationResult,
   type UseSuspenseQueryResult,
@@ -32,8 +34,10 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { apiRequest } from '../../lib/api';
 import type { ApiError } from '../../lib/api-error';
+import { calendarEventKeys, eventDetailKeys } from '../events/api';
 
 export type CalendarMember = components['schemas']['MemberResponse'];
 
@@ -163,6 +167,62 @@ export function useRemoveCalendarMemberMutation(): UseMutationResult<
     },
     onSuccess: (_void, { wsId, calId }) => {
       invalidate(qc, wsId, calId);
+    },
+  });
+}
+
+export interface UpdateMemberColorArgs {
+  wsId: string;
+  calId: string;
+  userId: string;
+  color: string;
+}
+
+interface UpdateMemberColorContext {
+  previous: CalendarMember[] | undefined;
+}
+
+/**
+ * PUT .../members/{userId}/color — set a member's colour. The member list
+ * is updated optimistically and restored on failure. Event colours derive
+ * from member colours, so a success also refreshes every event cache.
+ */
+export function useUpdateMemberColor(): UseMutationResult<
+  CalendarMember,
+  ApiError,
+  UpdateMemberColorArgs,
+  UpdateMemberColorContext
+> {
+  const qc = useQueryClient();
+  const { t } = useTranslation('common');
+  return useMutation<CalendarMember, ApiError, UpdateMemberColorArgs, UpdateMemberColorContext>({
+    mutationFn: ({ wsId, calId, userId, color }): Promise<CalendarMember> =>
+      apiRequest(
+        (client) =>
+          client.PUT('/workspaces/{wsId}/calendars/{calId}/members/{userId}/color', {
+            params: { path: { wsId, calId, userId } },
+            body: { color },
+          }),
+        'Failed to update member color',
+      ),
+    onMutate: async ({ wsId, calId, userId, color }) => {
+      const key = calendarMembersKeys.list(wsId, calId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<CalendarMember[]>(key);
+      qc.setQueryData<CalendarMember[]>(key, (list) =>
+        list?.map((m) => (m.userId === userId ? { ...m, memberColor: color } : m)),
+      );
+      return { previous };
+    },
+    onError: (_err, { wsId, calId }, context) => {
+      qc.setQueryData(calendarMembersKeys.list(wsId, calId), context?.previous);
+      toaster.show({ tone: 'danger', message: t('calendar.settings.members.color_error') });
+    },
+    onSuccess: (_data, { wsId, calId }) => {
+      void qc.invalidateQueries({ queryKey: calendarMembersKeys.list(wsId, calId) });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.all });
+      void qc.invalidateQueries({ queryKey: calendarEventKeys.meEvents });
+      void qc.invalidateQueries({ queryKey: eventDetailKeys.all });
     },
   });
 }

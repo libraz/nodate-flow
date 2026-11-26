@@ -2,10 +2,11 @@
  * CalendarSettingsDrawer — host for per-calendar admin operations.
  *
  * Mounts as a right-side drawer triggered from the calendars rail's
- * row menu. The drawer is split into two tabs:
+ * row menu. The drawer is split into three tabs:
  *
  *   - General: rename, change color, edit description, delete.
  *   - Members: Calendar Members manager.
+ *   - Labels: event label list, editor and preview.
  *
  * The drawer manages tab state internally and lazily mounts each
  * tab's body so a slow query in one panel doesn't block the others.
@@ -22,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import CalendarMembersTab from './calendar-members-tab';
 import styles from './calendar-settings-drawer.module.css';
 import GeneralTab from './general-tab';
+import LabelsTab from './labels-tab';
 
 export interface CalendarSettingsDrawerProps {
   workspaceId: string;
@@ -73,6 +75,15 @@ export default function CalendarSettingsDrawer({
               content: (
                 <Suspense fallback={fallback}>
                   <CalendarMembersTab workspaceId={workspaceId} calendarId={calendarId} />
+                </Suspense>
+              ),
+            },
+            {
+              value: 'labels',
+              label: t('calendar.settings.tab.labels'),
+              content: (
+                <Suspense fallback={fallback}>
+                  <LabelsTab workspaceId={workspaceId} calendarId={calendarId} />
                 </Suspense>
               ),
             },

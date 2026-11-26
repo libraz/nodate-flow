@@ -72,6 +72,10 @@ function workspaceCalendarMemberPrefix(workspaceId: string): QueryKeyPrefix {
   return calendarMembersKeys.list(workspaceId, '').slice(0, 3);
 }
 
+function workspaceCalendarLabelPrefix(workspaceId: string): QueryKeyPrefix {
+  return ['calendars', 'labels', workspaceId];
+}
+
 function workspaceCalendarDetailPrefix(workspaceId: string): QueryKeyPrefix {
   return calendarSettingsKeys.detail(workspaceId, '').slice(0, 3);
 }
@@ -91,6 +95,7 @@ function calendarPrefixes(workspaceId: string): readonly QueryKeyPrefix[] {
     workspaceCalendarCountPrefix(workspaceId),
     workspaceMemoPrefix(workspaceId),
     workspaceCalendarMemberPrefix(workspaceId),
+    workspaceCalendarLabelPrefix(workspaceId),
     publicSharesKeys.list(workspaceId),
   ];
 }

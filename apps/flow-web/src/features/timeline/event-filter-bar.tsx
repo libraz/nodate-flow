@@ -135,6 +135,9 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
       chip('calendar.deleted'),
       chip('calendar.subscribed'),
       chip('calendar.subscription.updated'),
+      chip('calendar.label.created'),
+      chip('calendar.label.updated'),
+      chip('calendar.label.deleted'),
       chip('calendar.reminder'),
     ],
   },
@@ -148,6 +151,7 @@ export const KIND_GROUPS: readonly { key: string; chips: readonly KindChip[] }[]
       chip('calendar.member.added'),
       chip('calendar.member.removed'),
       chip('calendar.member.role_changed'),
+      chip('calendar.member.updated'),
     ],
   },
   {

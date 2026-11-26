@@ -1,0 +1,84 @@
+/*
+ * Member colour circle + palette popover. The colour itself is runtime data
+ * passed through `--member-color`; everything else is tokens.
+ */
+
+.circle {
+  display: inline-block;
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 20px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 20px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--member-color);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+}
+
+.circleButton {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.circleButton:focus-visible {
+  outline: 2px solid var(--nf-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: var(--nf-space-2);
+  justify-content: start;
+}
+
+.cell {
+  display: inline-flex;
+}
+
+.swatch {
+  position: relative;
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 28px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 28px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--member-color);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+}
+
+.swatch[aria-pressed="true"] {
+  outline: 2px solid var(--nf-color-fg);
+  outline-offset: 2px;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid var(--nf-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.inUse {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 8px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 8px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg-elevated);
+  border: var(--nf-space-px) solid var(--nf-color-fg);
+}

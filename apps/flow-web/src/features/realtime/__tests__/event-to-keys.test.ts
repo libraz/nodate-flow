@@ -136,6 +136,7 @@ const registeredEventCaches: ReadonlyArray<{
       eventDetailKeys.detail('ws-1', 'calendar-1', 'event-1'),
       calendarMemosKeys.list('ws-1', 'calendar-1'),
       calendarMembersKeys.list('ws-1', 'calendar-1'),
+      ['calendars', 'labels', 'ws-1', 'calendar-1'],
       calendarSettingsKeys.detail('ws-1', 'calendar-1'),
       calendarSettingsKeys.eventCount('ws-1', 'calendar-1'),
       calendarsRailKeys.discoverable('ws-1'),
@@ -165,12 +166,14 @@ describe('keysForEvent', () => {
       eventDetailKeys.detail('ws-1', 'cal-1', 'evt-1'),
       calendarMemosKeys.list('ws-1', 'cal-1'),
       calendarMembersKeys.list('ws-1', 'cal-1'),
+      ['calendars', 'labels', 'ws-1', 'cal-1'],
       calendarSettingsKeys.detail('ws-1', 'cal-1'),
       calendarSettingsKeys.eventCount('ws-1', 'cal-1'),
       calendarsRailKeys.discoverable('ws-1'),
       publicSharesKeys.list('ws-1'),
     ];
     expect(await invalidatedStates('calendar.changed', registeredKeys)).toEqual([
+      true,
       true,
       true,
       true,

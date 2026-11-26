@@ -22,11 +22,12 @@ import { toaster } from '@nodate-flow/ui/primitives/toast';
 import motion from '@nodate-flow/ui/styles/list-motion.module.css';
 import { type ChangeEvent, type FormEvent, type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { formatApiError } from '../../lib/api-error';
 import { resolveAvatarUrl } from '../../lib/avatar-url';
 import { confirmAction } from '../../lib/confirm-action';
+import { selectUser, useAuth } from '../auth/auth-store';
 import styles from './calendar-members-tab.module.css';
+import MemberColorPopover from './member-color-popover';
 import {
   type AddableRole,
   type CalendarMember,
@@ -58,6 +59,10 @@ export default function CalendarMembersTab({
   const updateRole = useUpdateCalendarMemberRoleMutation();
   const removeMember = useRemoveCalendarMemberMutation();
   const addMember = useAddCalendarMemberMutation();
+
+  const currentUserId = useAuth(selectUser)?.id;
+  const viewerRole = members.find((m) => m.userId === currentUserId)?.role;
+  const viewerIsManager = viewerRole === 'owner' || viewerRole === 'manager';
 
   const { entries, onExited } = usePresenceList(members, (m) => m.userId);
   const [email, setEmail] = useState('');
@@ -164,6 +169,13 @@ export default function CalendarMembersTab({
                     </Badge>
                   </div>
                   <div className={styles.actions}>
+                    <MemberColorPopover
+                      workspaceId={workspaceId}
+                      calendarId={calendarId}
+                      member={member}
+                      members={members}
+                      canChange={viewerIsManager || member.userId === currentUserId}
+                    />
                     <Select
                       value={member.role}
                       onChange={(e: ChangeEvent<HTMLSelectElement>) => {

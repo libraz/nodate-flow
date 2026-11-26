@@ -1,0 +1,172 @@
+/**
+ * Labels tab — list, inline form and preview inside the calendar
+ * settings drawer. Tokens only; label colours arrive as --evt.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+}
+
+.skeletonRow {
+  block-size: var(--nf-space-8);
+}
+
+.loadFailed,
+.notice,
+.supporting {
+  margin: 0;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg-muted);
+}
+
+.loadFailed {
+  color: var(--nf-color-danger-fg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nf-space-2);
+}
+
+.count {
+  font-size: var(--nf-text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nf-color-fg-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--nf-space-2);
+  padding: var(--nf-space-1) var(--nf-space-2);
+  border-radius: var(--nf-radius-sm);
+}
+
+.row:hover,
+.row:focus-within {
+  background: var(--nf-color-surface-hover);
+}
+
+.dot {
+  flex-shrink: 0;
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 14px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 14px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--evt);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+}
+
+.name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nf-text-sm);
+  color: var(--nf-color-fg);
+}
+
+.actions {
+  display: inline-flex;
+  gap: var(--nf-space-1);
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity var(--nf-duration-fast) var(--nf-ease-standard);
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-3);
+  padding: var(--nf-space-3);
+  border: 1px solid var(--nf-color-border-strong);
+  border-radius: var(--nf-radius-md);
+  background: var(--nf-color-surface);
+}
+
+.colorField,
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nf-space-1);
+}
+
+.fieldLabel {
+  font-size: var(--nf-text-xs);
+  font-weight: var(--nf-weight-medium);
+  color: var(--nf-color-fg-muted);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: var(--nf-space-1);
+}
+
+.swatch {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  aspect-ratio: 1;
+  min-inline-size: 0;
+  border-radius: var(--nf-radius-pill);
+  background: var(--evt);
+  box-shadow: inset 0 0 0 var(--nf-space-px)
+    color-mix(in oklch, var(--nf-color-fg) 12%, transparent);
+  cursor: pointer;
+}
+
+.swatch:focus-visible {
+  box-shadow: var(--nf-shadow-focus);
+}
+
+.swatch[aria-checked="true"] {
+  outline: var(--nf-space-0-5) solid var(--nf-color-fg);
+  outline-offset: var(--nf-space-0-5);
+}
+
+.inUse {
+  position: absolute;
+  inset-block-end: var(--nf-space-px);
+  inset-inline-end: var(--nf-space-px);
+  /* nf-token-override: component dimension, not a spacing step */
+  inline-size: 5px;
+  /* nf-token-override: component dimension, not a spacing step */
+  block-size: 5px;
+  border-radius: var(--nf-radius-pill);
+  background: var(--nf-color-bg);
+  box-shadow: 0 0 0 var(--nf-space-px) var(--nf-color-fg);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nf-space-2);
+}

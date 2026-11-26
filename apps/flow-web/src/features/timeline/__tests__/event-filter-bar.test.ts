@@ -75,12 +75,16 @@ describe('KIND_GROUPS', () => {
       'calendar.deleted',
       'calendar.subscribed',
       'calendar.subscription.updated',
+      'calendar.label.created',
+      'calendar.label.updated',
+      'calendar.label.deleted',
       'calendar.reminder',
     ]);
     expect(byKey.calendar_member).toEqual([
       'calendar.member.added',
       'calendar.member.removed',
       'calendar.member.role_changed',
+      'calendar.member.updated',
     ]);
     expect(byKey.calendar_event).toEqual([
       'calendar.event.created',
