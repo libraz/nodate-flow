@@ -55,6 +55,7 @@ test.describe('profile page', () => {
       p.theme_glass,
       p.theme_modern,
       p.theme_washi,
+      p.theme_sakura,
       p.theme_classic,
       p.theme_nothing,
     ]);

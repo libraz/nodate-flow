@@ -50,7 +50,7 @@ describe('ThemeAppearance', () => {
 
     const families = screen.getByRole('radiogroup', { name: enAuth.profile.theme });
     const modes = screen.getByRole('radiogroup', { name: enAuth.profile.color_mode });
-    expect(families.querySelectorAll('[role="radio"]')).toHaveLength(5);
+    expect(families.querySelectorAll('[role="radio"]')).toHaveLength(6);
     expect(modes.querySelectorAll('[role="radio"]')).toHaveLength(3);
     expect(screen.getByRole('radio', { name: 'Glass' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: 'System' }).getAttribute('aria-checked')).toBe('true');

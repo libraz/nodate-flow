@@ -22,6 +22,7 @@ export default function ThemeAppearance(): ReactElement {
     { id: 'glass', label: t('profile.theme_glass'), preview: DEFAULT_THEME_PREVIEWS.glass },
     { id: 'modern', label: t('profile.theme_modern'), preview: DEFAULT_THEME_PREVIEWS.modern },
     { id: 'washi', label: t('profile.theme_washi'), preview: DEFAULT_THEME_PREVIEWS.washi },
+    { id: 'sakura', label: t('profile.theme_sakura'), preview: DEFAULT_THEME_PREVIEWS.sakura },
     { id: 'classic', label: t('profile.theme_classic'), preview: DEFAULT_THEME_PREVIEWS.classic },
     { id: 'nothing', label: t('profile.theme_nothing'), preview: DEFAULT_THEME_PREVIEWS.nothing },
   ];

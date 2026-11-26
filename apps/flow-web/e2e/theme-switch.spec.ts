@@ -25,11 +25,11 @@ import {
   type TestTenant,
 } from './fixtures/tenant';
 
-type Family = 'glass' | 'modern' | 'washi' | 'classic' | 'nothing';
+type Family = 'glass' | 'modern' | 'washi' | 'sakura' | 'classic' | 'nothing';
 type Mode = 'light' | 'dark';
 type ThemeId = `${Family}-${Mode}`;
 
-const FAMILIES: readonly Family[] = ['glass', 'modern', 'washi', 'classic', 'nothing'];
+const FAMILIES: readonly Family[] = ['glass', 'modern', 'washi', 'sakura', 'classic', 'nothing'];
 
 const ALL_THEMES: ThemeId[] = FAMILIES.flatMap((f) => [`${f}-light`, `${f}-dark`] as ThemeId[]);
 
