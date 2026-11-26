@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/duedate"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/generated/calendar"
 	apierrors "github.com/libraz/nodate-flow/apps/flow-api/internal/errors"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 	"github.com/libraz/nodate-flow/packages/go-shared/recurrence"
 	"github.com/libraz/nodate-flow/packages/go-shared/region"
 )
@@ -268,12 +270,17 @@ func recurringRowAsPlain(r calendar.ListRecurringCalendarEventsAcrossCalendarsRo
 		Timezone:                  r.Timezone,
 		Location:                  r.Location,
 		OwnerUserID:               r.OwnerUserID,
+		CreatedByUserID:           r.CreatedByUserID,
 		BlockLabel:                r.BlockLabel,
 		TaskID:                    r.TaskID,
 		UpdatedAt:                 r.UpdatedAt,
 		CreatedAt:                 r.CreatedAt,
 		IsAttendee:                r.IsAttendee,
 		CalendarDefaultVisibility: r.CalendarDefaultVisibility,
+		OwnerMemberColor:          r.OwnerMemberColor,
+		LabelPublicID:             r.LabelPublicID,
+		LabelName:                 r.LabelName,
+		LabelColor:                r.LabelColor,
 	}
 }
 func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.RawMessage) (any, error) {
@@ -327,14 +334,36 @@ func runListCalendarEvents(ctx context.Context, deps Deps, s *session, raw json.
 	items := make([]map[string]any, 0, len(occurrences))
 	for _, occ := range occurrences {
 		r := occ.row
+		visible := eventacl.CanSeeDetails(
+			eventacl.Event{
+				Visibility:      eventacl.Visibility(r.Visibility),
+				OwnerUserID:     r.OwnerUserID,
+				CreatedByUserID: r.CreatedByUserID,
+				CalendarDefault: eventacl.Visibility(r.CalendarDefaultVisibility),
+			},
+			eventacl.Actor{UserID: s.userID, IsAttendee: r.IsAttendee},
+		)
+		c := calendarlabels.ResolveEventColor(visible, r.LabelPublicID, r.LabelName, r.LabelColor, r.OwnerMemberColor)
+		var labelID, labelName any
+		if c.LabelID != nil {
+			labelID = c.LabelID.String()
+		}
+		if c.LabelName != nil {
+			labelName = *c.LabelName
+		}
 		item := map[string]any{
-			"id":          r.PublicID.String(),
-			"calendarId":  r.CalendarPublicID.String(),
-			"kind":        string(r.Kind),
-			"showAs":      string(r.ShowAs),
-			"flexibility": string(r.Flexibility),
-			"title":       r.Title,
-			"allDay":      r.AllDay,
+			"id":            r.PublicID.String(),
+			"calendarId":    r.CalendarPublicID.String(),
+			"kind":          string(r.Kind),
+			"showAs":        string(r.ShowAs),
+			"flexibility":   string(r.Flexibility),
+			"title":         r.Title,
+			"allDay":        r.AllDay,
+			"color":         c.Color,
+			"ownerColor":    c.OwnerColor,
+			"labelId":       labelID,
+			"labelName":     labelName,
+			"detailsHidden": c.DetailsHidden,
 		}
 		// Each occurrence carries its own times. A series is reported as
 		// the meetings it produces in the window rather than as one row

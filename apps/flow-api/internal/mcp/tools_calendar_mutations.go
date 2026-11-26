@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/ai/embed"
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -37,6 +38,7 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		Location    string `json:"location"`
 		Memo        string `json:"memo"`
 		BlockLabel  string `json:"blockLabel"`
+		LabelID     string `json:"labelId"`
 	}
 	if err := parseArgs(raw, &in); err != nil {
 		return nil, err
@@ -151,10 +153,27 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	// the ones REST resolves against: the caller, not the owner named.
 	zone := resolveUserTimezone(ctx, deps, s.workspaceID, s.userID)
 
+	// The label must belong to the event's calendar; the creator is a party
+	// to the event, so the details-hidden refusal cannot arise here.
+	var labelID uint32
+	if in.LabelID != "" {
+		id, refusal, lerr := calendarlabels.ResolveLabel(ctx, deps.CalendarQueries, calID, in.LabelID)
+		if lerr != nil {
+			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, lerr)
+		}
+		if refusal != nil {
+			return nil, refusal
+		}
+		labelID = id
+	}
+
 	pub := newPublicID()
 	calID64 := int64(calID)
+	var answered error
 	if err := dbretry.InTx(ctx, deps.DB, "mcp.create_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-		if _, err := deps.CalendarQueries.WithTx(tx.RawTx()).CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
+		answered = nil
+		cq := deps.CalendarQueries.WithTx(tx.RawTx())
+		newID, err := cq.CreateCalendarEvent(ctx, calendar.CreateCalendarEventParams{
 			PublicID:           pub,
 			WorkspaceID:        s.workspaceID,
 			CalendarID:         calID,
@@ -177,8 +196,17 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			RecurrenceEnd:      sql.NullTime{},
 			NotificationOffset: sql.NullInt32{},
 			TaskID:             sql.NullInt32{},
-		}); err != nil {
+		})
+		if err != nil {
 			return err
+		}
+		if labelID != 0 {
+			if _, refusal, lerr := calendarlabels.SetLink(ctx, cq, s.workspaceID, uint32(newID), labelID); refusal != nil { //#nosec G115 -- LastInsertId of an INT UNSIGNED key
+				answered = refusal
+				return refusal
+			} else if lerr != nil {
+				return lerr
+			}
 		}
 		return recorder(deps).RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
 			EventType:       eventbus.CalEventCreated,
@@ -199,10 +227,14 @@ func runCreateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			CallSite: "mcp.create_calendar_event",
 		})
 	}); err != nil {
+		if answered != nil {
+			return nil, answered
+		}
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 	}
 	out := map[string]any{
 		"id":          pub.String(),
+		"eventId":     pub.String(),
 		"title":       in.Title,
 		"kind":        string(kind),
 		"showAs":      string(showAs),
@@ -238,6 +270,9 @@ type updateCalendarEventArgs struct {
 	Location    *string `json:"location"`
 	Memo        *string `json:"memo"`
 	BlockLabel  *string `json:"blockLabel"`
+	// LabelID is a calendar label's public id; an empty string clears the
+	// label, as it does for the other nullable columns.
+	LabelID *string `json:"labelId"`
 	// Scope and OccurrenceStart say which occurrences of a recurring
 	// series the update reaches, and which one it starts from. An empty
 	// Scope is the whole series.
@@ -302,6 +337,10 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	}
 	if scope != scopeSeries {
 		return updateCalendarEventOccurrences(ctx, deps, s, scope, owner.CalendarID, eventPub, evt, &in)
+	}
+	label, err := resolveEventLabelChange(ctx, deps, s, scope, owner.CalendarID, evt, &in)
+	if err != nil {
+		return nil, err
 	}
 
 	params := calendar.PatchCalendarEventParams{
@@ -451,7 +490,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			eventTitle = *in.Title
 		}
 		if err := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event", nil, func(ctx context.Context, tx *dbretry.Tx) error {
-			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries); err != nil {
+			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries, label); err != nil {
 				return err
 			}
 			// This branch never reaches itemkit, so nothing else appends
@@ -471,9 +510,12 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 				CallSite: "mcp.update_calendar_event",
 			})
 		}); err != nil {
+			if refusal := labelRefusal(err); refusal != nil {
+				return nil, refusal
+			}
 			return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
 		}
-		return map[string]any{"success": true}, nil
+		return map[string]any{"success": true, "eventId": eventPub.String()}, nil
 	}
 
 	// itemkit owns the title and time columns for a linked event, so they
@@ -496,7 +538,8 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		params.Flexibility.Valid || params.Visibility.Valid ||
 		params.Location != nil || params.Memo != nil || params.BlockLabel != nil ||
 		params.ClearLocation == 1 || params.ClearMemo == 1 || params.ClearBlockLabel == 1 ||
-		params.StartAt.Valid || params.EndAt.Valid
+		params.StartAt.Valid || params.EndAt.Valid ||
+		label.Mode != calendarlabels.ChangeKeep
 
 	// answered holds a response-shaped error decided inside the
 	// transaction, so an itemkit invariant is not reported as a generic
@@ -535,7 +578,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 			}
 		}
 		if patchRemaining || realignSeries {
-			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries); err != nil {
+			if err := patchCalendarSeries(ctx, deps, tx, s, evt, params, realignSeries, label); err != nil {
 				return err
 			}
 		}
@@ -543,6 +586,9 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 	})
 	if answered != nil {
 		return nil, answered
+	}
+	if refusal := labelRefusal(txErr); refusal != nil {
+		return nil, refusal
 	}
 	if txErr != nil {
 		return nil, apierrors.Wrap(apierrors.McpToolExecutionFailed, txErr)
@@ -566,7 +612,7 @@ func runUpdateCalendarEvent(ctx context.Context, deps Deps, s *session, raw json
 		},
 		CallSite: "mcp.update_calendar_event",
 	})
-	return map[string]any{"success": true}, nil
+	return map[string]any{"success": true, "eventId": eventPub.String()}, nil
 }
 
 // patchCalendarSeries writes a whole-series patch and, when realign is set,
@@ -582,6 +628,7 @@ func patchCalendarSeries(
 	evt calendar.FindCalendarEventByPublicIdRow,
 	params calendar.PatchCalendarEventParams,
 	realign bool,
+	label calendarlabels.Change,
 ) error {
 	q := seriesQueries(deps, tx)
 	var before calendaroccurrence.SeriesState
@@ -602,6 +649,15 @@ func patchCalendarSeries(
 	// reports zero. The event was read before the transaction.
 	if _, err := q.Calendar.PatchCalendarEvent(ctx, params); err != nil {
 		return err
+	}
+	if label.Mode != calendarlabels.ChangeKeep {
+		_, refusal, err := calendarlabels.ApplyToSeries(ctx, q.Calendar, s.workspaceID, evt.ID, label)
+		if refusal != nil {
+			return refusal
+		}
+		if err != nil {
+			return err
+		}
 	}
 	if !realign {
 		return nil

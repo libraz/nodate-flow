@@ -6,6 +6,7 @@ import (
 	stderrors "errors"
 	"time"
 
+	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarlabels"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendaroccurrence"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/calendarrules"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/db/dbretry"
@@ -15,6 +16,7 @@ import (
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/eventbus"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/http/handlers/handlerutil"
 	"github.com/libraz/nodate-flow/apps/flow-api/internal/mutationlog"
+	"github.com/libraz/nodate-flow/packages/go-shared/eventacl"
 )
 
 // The scope vocabulary, the fallback bases, the argument merge, the
@@ -146,6 +148,10 @@ func updateCalendarEventOccurrences(
 	if err := requireOccurrenceScope(scope, in.OccurrenceStart, evt, parentID); err != nil {
 		return nil, err
 	}
+	label, err := resolveEventLabelChange(ctx, deps, s, scope, calendarID, evt, in)
+	if err != nil {
+		return nil, err
+	}
 
 	// A task-linked event cannot be reached here: the projection guard
 	// forbids a recurrence rule on a projected row, and the refusal above
@@ -158,7 +164,9 @@ func updateCalendarEventOccurrences(
 		eventTitle = *in.Title
 	}
 	// record commits the trail with the write, inside its transaction.
+	var writtenPub types.PublicID
 	record := func(ctx context.Context, tx *dbretry.Tx, written types.PublicID) error {
+		writtenPub = written
 		rec := recorder(deps)
 		if err := rec.RecordInTx(ctx, tx, mutationActor(s), mutationlog.Mutation{
 			EventType:       eventbus.CalEventUpdated,
@@ -204,14 +212,152 @@ func updateCalendarEventOccurrences(
 	}
 	var scopeErr error
 	if scope == scopeOccurrence {
-		scopeErr = patchCalendarEventOccurrence(ctx, deps, s, calendarID, evt, in, originalStart, record)
+		scopeErr = patchCalendarEventOccurrence(ctx, deps, s, calendarID, evt, in, originalStart, label, record)
 	} else {
-		scopeErr = patchCalendarEventFollowing(ctx, deps, s, calendarID, evt, in, originalStart, record)
+		scopeErr = patchCalendarEventFollowing(ctx, deps, s, calendarID, evt, in, originalStart, label, record)
 	}
 	if scopeErr != nil {
 		return nil, scopeErr
 	}
-	return map[string]any{"success": true}, nil
+	// eventId is the row the write landed on: the override for one
+	// occurrence, the continuing series for a split.
+	return map[string]any{"success": true, "eventId": writtenPub.String()}, nil
+}
+
+// resolveEventLabelChange turns the labelId argument into a Change, in the
+// order REST uses: the caller must be able to see the target row's details,
+// then the label must belong to the calendar. An empty string clears. The
+// target is the override for an occurrence scope when one exists, else the
+// series. A call without labelId resolves to ChangeKeep.
+func resolveEventLabelChange(
+	ctx context.Context,
+	deps Deps,
+	s *session,
+	scope occurrenceScope,
+	calendarID uint32,
+	evt calendar.FindCalendarEventByPublicIdRow,
+	in *updateCalendarEventArgs,
+) (calendarlabels.Change, error) {
+	if in.LabelID == nil {
+		return calendarlabels.Change{}, nil
+	}
+	target := evt
+	if scope == scopeOccurrence {
+		ov, err := deps.CalendarQueries.FindCalendarEventOverride(ctx, calendar.FindCalendarEventOverrideParams{
+			WorkspaceID:             s.workspaceID,
+			RecurrenceParentID:      handlerutil.NullInt32From(evt.ID),
+			RecurrenceOriginalStart: sql.NullTime{Time: handlerutil.UnixToTime(in.OccurrenceStart), Valid: true},
+		})
+		switch {
+		case err == nil:
+			target, err = deps.CalendarQueries.FindCalendarEventByPublicId(ctx, calendar.FindCalendarEventByPublicIdParams{
+				PublicID:    ov.PublicID,
+				CalendarID:  ov.CalendarID,
+				WorkspaceID: s.workspaceID,
+			})
+			if err != nil {
+				return calendarlabels.Change{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+			}
+		case !stderrors.Is(err, sql.ErrNoRows):
+			return calendarlabels.Change{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+	}
+	attendee, err := actorIsAttendee(ctx, deps, s, target)
+	if err != nil {
+		return calendarlabels.Change{}, err
+	}
+	calDefault, err := calendarDefaultVisibility(ctx, deps, s, calendarID)
+	if err != nil {
+		return calendarlabels.Change{}, err
+	}
+	visible := eventacl.CanSeeDetails(
+		eventacl.Event{
+			Visibility:      eventacl.Visibility(target.Visibility),
+			OwnerUserID:     target.OwnerUserID,
+			CreatedByUserID: target.CreatedByUserID,
+			CalendarDefault: eventacl.Visibility(calDefault),
+		},
+		eventacl.Actor{UserID: s.userID, IsAttendee: attendee},
+	)
+	if refusal := calendarlabels.RequireDetailsVisible(visible); refusal != nil {
+		return calendarlabels.Change{}, refusal
+	}
+	if *in.LabelID == "" {
+		return calendarlabels.Change{Mode: calendarlabels.ChangeClear}, nil
+	}
+	id, refusal, err := calendarlabels.ResolveLabel(ctx, deps.CalendarQueries, calendarID, *in.LabelID)
+	if err != nil {
+		return calendarlabels.Change{}, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	if refusal != nil {
+		return calendarlabels.Change{}, refusal
+	}
+	return calendarlabels.Change{Mode: calendarlabels.ChangeSet, LabelID: id}, nil
+}
+
+// actorIsAttendee reports whether the session user is an attendee of the
+// row. An override with no attendee rows of its own reads its series'.
+func actorIsAttendee(ctx context.Context, deps Deps, s *session, row calendar.FindCalendarEventByPublicIdRow) (bool, error) {
+	source := handlerutil.NullInt32From(row.ID)
+	if row.RecurrenceParentID.Valid {
+		own, err := deps.CalendarQueries.HasCalendarEventAttendeeRows(ctx, source)
+		if err != nil {
+			return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		if !own {
+			source = row.RecurrenceParentID
+		}
+	}
+	_, err := deps.CalendarQueries.FindCalendarEventAttendee(ctx, calendar.FindCalendarEventAttendeeParams{
+		EventID: source,
+		UserID:  s.userID,
+	})
+	if stderrors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	return true, nil
+}
+
+// calendarDefaultVisibility reads the calendar's default event visibility,
+// which an event whose own visibility is 'default' resolves to. The calendar
+// is found through the caller's own calendar list, the way
+// [requireCalendarWritable] finds it.
+func calendarDefaultVisibility(ctx context.Context, deps Deps, s *session, calendarID uint32) (calendar.CalendarsDefaultEventVisibility, error) {
+	rows, err := deps.CalendarQueries.ListCalendarsForUser(ctx, calendar.ListCalendarsForUserParams{
+		UserID:      s.userID,
+		WorkspaceID: s.workspaceID,
+	})
+	if err != nil {
+		return "", apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+	}
+	for _, row := range rows {
+		if row.ID != calendarID {
+			continue
+		}
+		cal, err := deps.CalendarQueries.FindCalendarByPublicId(ctx, calendar.FindCalendarByPublicIdParams{
+			PublicID:    row.PublicID,
+			WorkspaceID: s.workspaceID,
+		})
+		if err != nil {
+			return "", apierrors.Wrap(apierrors.McpToolExecutionFailed, err)
+		}
+		return cal.DefaultEventVisibility, nil
+	}
+	return "", apierrors.New(apierrors.CalendarEventNotFound)
+}
+
+// labelRefusal returns the label refusal a transaction failed with, nil when
+// it failed for any other reason. The link write answers it from inside the
+// transaction, which hands it back wrapped.
+func labelRefusal(err error) *apierrors.APIError {
+	var ae *apierrors.APIError
+	if stderrors.As(err, &ae) && ae.Spec == apierrors.CalendarEventLabelUnknown {
+		return ae
+	}
+	return nil
 }
 
 // deleteCalendarEventOccurrences carries a delete_calendar_event call
@@ -417,12 +563,14 @@ func patchCalendarEventOccurrence(
 	master calendar.FindCalendarEventByPublicIdRow,
 	in *updateCalendarEventArgs,
 	originalStart time.Time,
+	label calendarlabels.Change,
 	record func(context.Context, *dbretry.Tx, types.PublicID) error,
 ) error {
 	patch, err := occurrencePatch(in, master.AllDay, string(master.Kind))
 	if err != nil {
 		return err
 	}
+	patch.Label = label
 
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event.occurrence", nil, func(ctx context.Context, tx *dbretry.Tx) error {
@@ -469,12 +617,14 @@ func patchCalendarEventFollowing(
 	master calendar.FindCalendarEventByPublicIdRow,
 	in *updateCalendarEventArgs,
 	splitStart time.Time,
+	label calendarlabels.Change,
 	record func(context.Context, *dbretry.Tx, types.PublicID) error,
 ) error {
 	patch, err := occurrencePatch(in, master.AllDay, string(master.Kind))
 	if err != nil {
 		return err
 	}
+	patch.Label = label
 
 	var answered error
 	txErr := dbretry.InTx(ctx, deps.DB, "mcp.update_calendar_event.following", nil, func(ctx context.Context, tx *dbretry.Tx) error {

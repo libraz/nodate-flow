@@ -55,11 +55,30 @@ func TestPublicIDPropertiesHavePattern(t *testing.T) {
 				toolName, path)
 			return
 		}
-		if pat != publicIDPattern {
-			t.Errorf("tool %q property %q has pattern %q, want %q",
-				toolName, path, pat, publicIDPattern)
+		if pat != publicIDPattern && pat != publicIDOrEmptyPattern {
+			t.Errorf("tool %q property %q has pattern %q, want %q or %q",
+				toolName, path, pat, publicIDPattern, publicIDOrEmptyPattern)
 		}
 	})
+}
+
+// TestPublicIDOrEmptyPattern pins the clearable-id pattern: "" and both
+// id forms pass, anything else is refused.
+func TestPublicIDOrEmptyPattern(t *testing.T) {
+	re := compilePattern(publicIDOrEmptyPattern)
+	if re == nil {
+		t.Fatal("publicIDOrEmptyPattern does not compile")
+	}
+	for _, ok := range []string{"", "0190f2a4-7b1c-7d2e-8f3a-4b5c6d7e8f90", "0190f2a47b1c7d2e8f3a4b5c6d7e8f90"} {
+		if !re.MatchString(ok) {
+			t.Errorf("publicIDOrEmptyPattern rejects %q", ok)
+		}
+	}
+	for _, bad := range []string{"x", "not-a-uuid", " "} {
+		if re.MatchString(bad) {
+			t.Errorf("publicIDOrEmptyPattern accepts %q", bad)
+		}
+	}
 }
 
 func TestNoComingSoonToolsRegistered(t *testing.T) {

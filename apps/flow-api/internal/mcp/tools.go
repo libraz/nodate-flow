@@ -422,6 +422,7 @@ func registerTools(h *Handler) {
 			// tool accepts has to be one the other accepts too.
 			"memo":       stringSchema("Event memo/notes.", Constraints{MaxLength: intPtr(10000)}),
 			"blockLabel": stringSchema("Label for block-type events.", Constraints{MaxLength: intPtr(100)}),
+			"labelId":    stringSchema("Label public id on the event's calendar; an empty string clears it.", Constraints{Pattern: publicIDOrEmptyPattern}),
 		}, []string{"calendarId", "title"}),
 		run: runCreateCalendarEvent,
 	})
@@ -443,6 +444,7 @@ func registerTools(h *Handler) {
 			"location":    stringSchema("New location; an empty string clears it.", Constraints{MaxLength: intPtr(500)}),
 			"memo":        stringSchema("New memo/notes; an empty string clears it.", Constraints{MaxLength: intPtr(10000)}),
 			"blockLabel":  stringSchema("New block label; an empty string clears it.", Constraints{MaxLength: intPtr(100)}),
+			"labelId":     stringSchema("Label public id on the event's calendar; an empty string clears it.", Constraints{Pattern: publicIDOrEmptyPattern}),
 			// The same two arguments the REST patch route takes, under the
 			// same names and with the same closed set of values: a
 			// recurring series is one master row, so without them every
@@ -790,6 +792,9 @@ var (
 // [TestPublicIDPatternMatchesEmittedIDs] ties it to a real generated id
 // so the next edit cannot drift from the type again.
 const publicIDPattern = `^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32})$`
+
+// publicIDOrEmptyPattern is publicIDPattern for a clearable field, where "" means none.
+const publicIDOrEmptyPattern = `^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{32})?$`
 
 // errTransitionRejected rolls a transition transaction back when the
 // state machine refuses the move. The caller answers from the returned
