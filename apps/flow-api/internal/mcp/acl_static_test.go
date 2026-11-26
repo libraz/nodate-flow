@@ -130,6 +130,10 @@ var writeToolsWithoutProjectGate = map[string]string{
 	"update_calendar_event": "calendar write; gated by calendar_members plus canEditCalendarEvent",
 	"delete_calendar_event": "calendar write; gated by calendar_members plus canEditCalendarEvent",
 	"toggle_calendar_memo":  "calendar write; gated by the calendar_members grant",
+
+	"create_calendar_label": "calendar write; gated by the calendar_members role through calendars.DecideCalendarLabelWrite",
+	"update_calendar_label": "calendar write; gated by the calendar_members role through calendars.DecideCalendarLabelWrite",
+	"delete_calendar_label": "calendar write; gated by the calendar_members role through calendars.DecideCalendarLabelWrite",
 }
 
 // TestMCPWriteToolsPassProjectRoleGate walks the registered tool table and

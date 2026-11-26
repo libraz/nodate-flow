@@ -26,6 +26,10 @@ var calendarMembershipGates = map[string]bool{
 	"resolveCalendar":         true,
 	"resolveCalendarWrite":    true,
 	"requireCalendarWritable": true,
+
+	// The label write gate resolves the calendar through authorizeCalendar,
+	// which checks membership, and then applies the manager floor.
+	"resolveCalendarLabelWrite": true,
 }
 
 // calendarEventEditGates are the resolvers that apply the shared
@@ -44,6 +48,9 @@ var calendarWriteTools = map[string]bool{
 	"update_calendar_event": true,
 	"delete_calendar_event": true,
 	"toggle_calendar_memo":  false,
+	"create_calendar_label": false,
+	"update_calendar_label": false,
+	"delete_calendar_label": false,
 }
 
 // TestMCPCalendarWriteToolsReachTheirGates proves the calendar tools

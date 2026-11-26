@@ -572,6 +572,21 @@ func checkCalendarWrite(kind calendar.CalendarsKind, role calendar.CalendarMembe
 	return specErr(calendars.CalendarWriteRefusalSpec(calendars.DecideCalendarWrite(kind, role)))
 }
 
+// resolveCalendarLabelWrite is [resolveCalendar] plus the decision REST
+// makes for every label write: manager or above, and never a provider-fed
+// system calendar. The decision is [calendars.DecideCalendarLabelWrite]
+// itself, so both transports answer a caller below the floor alike.
+func resolveCalendarLabelWrite(ctx context.Context, deps Deps, s *session, publicID string) (uint32, error) {
+	access, err := authorizeCalendar(ctx, deps, s, publicID)
+	if err != nil {
+		return 0, err
+	}
+	if refusal := calendars.DecideCalendarLabelWrite(access.member.Role, access.cal.Kind == calendar.CalendarsKindSystem); refusal != nil {
+		return 0, refusal
+	}
+	return access.cal.ID, nil
+}
+
 // specErr turns a refusal spec into the error this transport returns, and
 // a nil spec into no error, so the shared "refused / allowed" answer can
 // be propagated without each call site re-deciding what nil means.

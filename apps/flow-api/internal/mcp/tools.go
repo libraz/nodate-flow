@@ -428,7 +428,7 @@ func registerTools(h *Handler) {
 	})
 	h.register(auth.FloorWorkspaceMember, tool{
 		name:          "update_calendar_event",
-		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events. For a recurring event, scope says how much of the series the change reaches; omitting it changes the whole series.",
+		description:   "Update mutable fields of a calendar event. Times are unix seconds since epoch (startAt/endAt); use startDate/endDate (YYYY-MM-DD) for all-day events. For a recurring event, scope says how much of the series the change reaches; omitting it changes the whole series. Setting or clearing location, memo or labelId is refused (CALENDAR.EVENT.DETAILS_HIDDEN) on an event whose details are hidden from the caller.",
 		requiredScope: "write:workspace",
 		inputSchema: objectSchema(map[string]any{
 			"eventId":     stringSchema("Event public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
@@ -507,6 +507,48 @@ func registerTools(h *Handler) {
 			"done":       boolSchema("Set to true to mark done, false to unmark."),
 		}, []string{"memoId", "calendarId", "done"}),
 		run: runToggleCalendarMemo,
+	})
+	h.register(auth.FloorWorkspaceMember, tool{
+		name:          "list_calendar_labels",
+		description:   "List the labels of a calendar, oldest first. Any member of the calendar may list them. Each label's id is what an event's labelId takes.",
+		requiredScope: "read:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+		}, []string{"calendarId"}),
+		run: runListCalendarLabels,
+	})
+	h.register(auth.FloorWorkspaceMember, tool{
+		name:          "create_calendar_label",
+		description:   "Create a label on a calendar. Requires calendar manager or above and a non-system calendar. A calendar holds at most 50 labels and names are unique within it.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"name":       stringSchema("Label name; surrounding whitespace is trimmed.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(calendarLabelNameLimit)}),
+			"color":      stringSchema("Label colour as #RRGGBB.", Constraints{Pattern: calendarLabelColorPattern, MaxLength: intPtr(7)}),
+		}, []string{"calendarId", "name", "color"}),
+		run: runCreateCalendarLabel,
+	})
+	h.register(auth.FloorWorkspaceMember, tool{
+		name:          "update_calendar_label",
+		description:   "Rename or recolour a calendar label. Requires calendar manager or above and a non-system calendar. A call that changes nothing returns the current label.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"labelId":    stringSchema("Label public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"name":       stringSchema("New label name; surrounding whitespace is trimmed.", Constraints{MinLength: intPtr(1), MaxLength: intPtr(calendarLabelNameLimit)}),
+			"color":      stringSchema("New label colour as #RRGGBB.", Constraints{Pattern: calendarLabelColorPattern, MaxLength: intPtr(7)}),
+		}, []string{"calendarId", "labelId"}),
+		run: runUpdateCalendarLabel,
+	})
+	h.register(auth.FloorWorkspaceMember, tool{
+		name:          "delete_calendar_label",
+		description:   "Delete a calendar label; events that carried it fall back to their owner's colour. Requires calendar manager or above and a non-system calendar.",
+		requiredScope: "write:workspace",
+		inputSchema: objectSchema(map[string]any{
+			"calendarId": stringSchema("Calendar public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+			"labelId":    stringSchema("Label public id (UUID v7).", Constraints{Pattern: publicIDPattern}),
+		}, []string{"calendarId", "labelId"}),
+		run: runDeleteCalendarLabel,
 	})
 	// Label & archive tools.
 	h.register(auth.FloorWorkspaceMember, tool{
@@ -918,3 +960,9 @@ const (
 	pageTitleLimit  = 500
 	eventTitleLimit = 500
 )
+
+// calendarLabelNameLimit is the width of calendar_labels.name in characters,
+// the same bound the REST label inputs declare. It is a literal here because
+// the column-bound check reads this file's constants by value;
+// [TestCalendarLabelNameLimitMatchesRules] ties it to the rule's own constant.
+const calendarLabelNameLimit = 50

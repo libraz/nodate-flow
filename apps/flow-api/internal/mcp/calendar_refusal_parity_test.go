@@ -66,15 +66,14 @@ func specCode(spec *apierrors.Spec) string {
 	return spec.Code
 }
 
-// The role codes a client can actually receive from this transport.
+// The role codes a client can actually receive from the shared write rule.
 //
-// The write floor is editor, so no MCP path can answer the manager or
-// owner code: there is no calendar-administration tool, and a floor above
-// editor has nothing here to be applied by. That is the parity statement
-// for the two higher floors — REST answers them on endpoints that change
-// the calendar itself or its membership, and MCP offers no such endpoint
-// to disagree on. If one is ever added it must take its refusal from the
-// calendars package too, and this test will start failing until it does.
+// The write floor is editor, so checkCalendarWrite never answers the manager
+// or owner code. The one tool family with a higher floor, the calendar label
+// tools, does not use it: resolveCalendarLabelWrite takes its refusal from
+// calendars.DecideCalendarLabelWrite, the function REST applies. Any other
+// tool that needs a higher floor must take its refusal from the calendars
+// package too, and this test will start failing until it does.
 func TestMCPCalendarPathsApplyNoFloorAboveEditor(t *testing.T) {
 	t.Parallel()
 

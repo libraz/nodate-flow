@@ -104,6 +104,10 @@ var mcpRESTCounterparts = map[string]string{
 	"create_event_from_task": "events-from-task",
 	"list_calendar_memos":    "memos-list",
 	"toggle_calendar_memo":   "memos-update",
+	"list_calendar_labels":   "calendar-labels-list",
+	"create_calendar_label":  "calendar-labels-create",
+	"update_calendar_label":  "calendar-labels-update",
+	"delete_calendar_label":  "calendar-labels-delete",
 }
 
 // mcpToolsWithoutRESTOperation lists the tools that answer for no REST
