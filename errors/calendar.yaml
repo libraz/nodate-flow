@@ -347,11 +347,11 @@ resources:
       details_hidden:
         code: CALENDAR.EVENT.DETAILS_HIDDEN
         status: 403
-        message: "This event's details are hidden from you, so its label cannot be changed"
-        message_ja: "この予定の詳細は表示されないため、ラベルを変更できません"
-        message_zh: "此事件的详情对您不可见，因此无法更改其标签"
-        description: "Returned when the actor can see only that the time is busy on an event whose details are hidden from them, and the request tries to change that event's label."
-        userAction: "Ask the event owner or a calendar manager to change the label."
+        message: "This event's details are hidden from you, so its label, location, memo and URL cannot be changed"
+        message_ja: "この予定の詳細は表示されないため、ラベル・場所・メモ・URL は変更できません"
+        message_zh: "此事件的详情对您不可见，因此无法更改其标签、地点、备注和 URL"
+        description: "Returned when the actor can see only that the time is busy on an event whose details are hidden from them, and the request tries to change that event's label, location, memo or URL."
+        userAction: "Ask the event owner or a calendar manager to make the change."
 
   label:
     breadcrumb: "Calendar > Label"

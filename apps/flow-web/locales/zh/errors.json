@@ -111,7 +111,7 @@
   "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE": "此事件已是对单次日程的替代，无法再进一步拆分",
   "CALENDAR.EVENT.DATE_RANGE_INVALID": "结束日期必须晚于开始日期",
   "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE": "无法解析日期或时间参数",
-  "CALENDAR.EVENT.DETAILS_HIDDEN": "此事件的详情对您不可见，因此无法更改其标签",
+  "CALENDAR.EVENT.DETAILS_HIDDEN": "此事件的详情对您不可见，因此无法更改其标签、地点、备注和 URL",
   "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED": "您没有编辑此事件的权限",
   "CALENDAR.EVENT.END_BEFORE_START": "endAt 必须不早于 startAt",
   "CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT": "此幂等键已用于其他日历事件请求",

@@ -194,7 +194,7 @@ export const CalendarErrors = {
   CALENDAR_EVENT_DETAILS_HIDDEN: {
     code: "CALENDAR.EVENT.DETAILS_HIDDEN",
     status: 403,
-    message: "This event's details are hidden from you, so its label cannot be changed",
+    message: "This event's details are hidden from you, so its label, location, memo and URL cannot be changed",
   },
   CALENDAR_EVENT_EDIT_PERMISSION_REQUIRED: {
     code: "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED",

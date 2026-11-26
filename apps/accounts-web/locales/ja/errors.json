@@ -111,7 +111,7 @@
   "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE": "このイベントは既に個別の回を置き換えたものであり、さらに分割できません",
   "CALENDAR.EVENT.DATE_RANGE_INVALID": "終了日は開始日より後にしてください",
   "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE": "日付または日時パラメータを解析できませんでした",
-  "CALENDAR.EVENT.DETAILS_HIDDEN": "この予定の詳細は表示されないため、ラベルを変更できません",
+  "CALENDAR.EVENT.DETAILS_HIDDEN": "この予定の詳細は表示されないため、ラベル・場所・メモ・URL は変更できません",
   "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED": "このイベントを編集する権限がありません",
   "CALENDAR.EVENT.END_BEFORE_START": "endAt は startAt 以降にしてください",
   "CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT": "この冪等性キーは別の予定作成リクエストで使用済みです",

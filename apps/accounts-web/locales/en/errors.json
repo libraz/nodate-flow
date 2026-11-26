@@ -111,7 +111,7 @@
   "CALENDAR.EVENT.ALREADY_OCCURRENCE_OVERRIDE": "This event already replaces a single occurrence and cannot be divided further",
   "CALENDAR.EVENT.DATE_RANGE_INVALID": "endDate must be after startDate",
   "CALENDAR.EVENT.DATE_RANGE_UNPARSEABLE": "Could not parse date or datetime parameter",
-  "CALENDAR.EVENT.DETAILS_HIDDEN": "This event's details are hidden from you, so its label cannot be changed",
+  "CALENDAR.EVENT.DETAILS_HIDDEN": "This event's details are hidden from you, so its label, location, memo and URL cannot be changed",
   "CALENDAR.EVENT.EDIT_PERMISSION_REQUIRED": "You do not have permission to edit this event",
   "CALENDAR.EVENT.END_BEFORE_START": "endAt must be at or after startAt",
   "CALENDAR.EVENT.IDEMPOTENCY_KEY_CONFLICT": "This idempotency key has already been used for a different event request",
