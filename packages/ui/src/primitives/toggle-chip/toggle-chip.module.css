@@ -4,7 +4,9 @@
  * Consumers may pass an accent color via `style={{ --chip-color: <value> }}`
  * (the TSX maps the `color` prop to that custom property). When pressed the
  * chip is filled with that color; otherwise it is an outlined pill showing
- * a small color dot on the leading edge.
+ * a small color dot on the leading edge. `data-tone="tint"` swaps the
+ * pressed fill for a translucent wash of the color (event-pill language) so
+ * arbitrary user colors keep readable text.
  *
  * All colors / radii / spacing / durations resolve to design tokens — no
  * hardcoded values. Hairline borders use `--nf-space-px` (the hairline
@@ -101,6 +103,18 @@
 .root[data-pressed="true"] .dot {
   background: currentColor;
   opacity: 0.65;
+}
+
+/* Tint tone: translucent wash + tinted border, regular foreground, full-strength dot. */
+.root[data-pressed="true"][data-tone="tint"] {
+  background-color: color-mix(in oklch, var(--chip-color, var(--nf-color-accent)) 20%, transparent);
+  border-color: color-mix(in oklch, var(--chip-color, var(--nf-color-accent)) 60%, transparent);
+  color: var(--nf-color-fg);
+}
+
+.root[data-pressed="true"][data-tone="tint"] .dot {
+  background: var(--chip-color, var(--nf-color-accent));
+  opacity: 1;
 }
 
 /* Icons track the label's line box so they never grow the control. */

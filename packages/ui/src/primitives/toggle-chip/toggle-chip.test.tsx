@@ -134,6 +134,21 @@ describe.each(THEMES)('ToggleChip [%s]', (theme) => {
     expect(hidden).not.toBeNull();
   });
 
+  it('defaults data-tone to solid and honours tone="tint"', () => {
+    const { rerender } = render(
+      <ToggleChip pressed={true} onPressedChange={() => undefined}>
+        Tasks
+      </ToggleChip>,
+    );
+    expect(screen.getByRole('button', { name: 'Tasks' }).getAttribute('data-tone')).toBe('solid');
+    rerender(
+      <ToggleChip pressed={true} onPressedChange={() => undefined} tone="tint" color="#2ECC87">
+        Tasks
+      </ToggleChip>,
+    );
+    expect(screen.getByRole('button', { name: 'Tasks' }).getAttribute('data-tone')).toBe('tint');
+  });
+
   it('respects an explicit `label` over string children', () => {
     render(
       <ToggleChip pressed={false} onPressedChange={() => undefined} label="explicit">

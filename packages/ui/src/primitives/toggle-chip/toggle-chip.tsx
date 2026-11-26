@@ -8,6 +8,12 @@
  * The optional `color` prop is mapped to a CSS custom property
  * (`--chip-color`). Pass a token such as `var(--nf-cal-task-color)` or a
  * raw CSS color; do not mix tokens with hardcoded values in new call sites.
+ *
+ * `tone` selects the pressed paint: `'solid'` (default) fills with the chip
+ * color and uses on-accent text, suited to fixed tokens; `'tint'` uses a
+ * translucent wash, a tinted border and regular text with a full-strength
+ * dot, suited to arbitrary user-chosen colors. Unpressed looks the same in
+ * both. Exposed as `data-tone`.
  */
 
 import {
@@ -36,6 +42,8 @@ export interface ToggleChipProps
    * falls back to the accent token and no dot is rendered.
    */
   color?: string;
+  /** Pressed-state paint; see the component doc. Defaults to `'solid'`. */
+  tone?: 'solid' | 'tint';
   /**
    * Accessible name. When omitted and `children` is a string, it defaults to
    * that string. Required if `children` is not a plain string.
@@ -62,6 +70,7 @@ const ToggleChip = forwardRef<HTMLButtonElement, ToggleChipProps>(
       pressed,
       onPressedChange,
       color,
+      tone = 'solid',
       label,
       disabled,
       className,
@@ -86,6 +95,7 @@ const ToggleChip = forwardRef<HTMLButtonElement, ToggleChipProps>(
         aria-pressed={pressed}
         aria-label={resolvedLabel}
         data-pressed={pressed ? 'true' : 'false'}
+        data-tone={tone}
         disabled={disabled}
         className={cx(styles.root, className)}
         style={mergedStyle}
