@@ -8739,7 +8739,7 @@ export interface components {
             notifEmailMention: boolean;
             notifWebPush: boolean;
             /** @enum {string} */
-            themePreference: "glass-light" | "glass-dark" | "modern-light" | "modern-dark" | "washi-light" | "washi-dark" | "classic-light" | "classic-dark" | "nothing-light" | "nothing-dark" | "system";
+            themePreference: "glass-light" | "glass-dark" | "modern-light" | "modern-dark" | "washi-light" | "washi-dark" | "sakura-light" | "sakura-dark" | "classic-light" | "classic-dark" | "nothing-light" | "nothing-dark" | "system";
             timezone: string;
             /** @enum {string} */
             weekStart: "mon" | "sun" | "sat";
@@ -9238,7 +9238,7 @@ export interface components {
             notifEmailMention?: boolean;
             notifWebPush?: boolean;
             /** @enum {string} */
-            themePreference?: "glass-light" | "glass-dark" | "modern-light" | "modern-dark" | "washi-light" | "washi-dark" | "classic-light" | "classic-dark" | "nothing-light" | "nothing-dark" | "system";
+            themePreference?: "glass-light" | "glass-dark" | "modern-light" | "modern-dark" | "washi-light" | "washi-dark" | "sakura-light" | "sakura-dark" | "classic-light" | "classic-dark" | "nothing-light" | "nothing-dark" | "system";
             timezone?: string;
             /** @enum {string} */
             weekStart?: "mon" | "sun" | "sat";
