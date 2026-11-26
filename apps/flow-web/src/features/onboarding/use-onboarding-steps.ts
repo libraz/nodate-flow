@@ -1,8 +1,10 @@
 /**
  * Completion state for the getting-started checklist, derived from the
- * queries the product already runs. Every query here is non-suspense: a
- * failed lookup (an invite list is admin-only and may answer 403) leaves
- * its step incomplete instead of taking the home page down.
+ * queries the product already runs. Every query here is non-suspense and
+ * opts out of the SDK-wide `throwOnError: true`: a failed lookup (an invite
+ * list is admin-only and may answer 403), including one another screen left
+ * in the shared cache, leaves its step incomplete instead of taking the home
+ * page down.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -47,6 +49,7 @@ export function useOnboardingSteps(): OnboardingState {
   const projectsQuery = useQuery({
     queryKey: projectsKeys.list(wsId),
     enabled: hasWorkspace && isAdmin,
+    throwOnError: false,
     queryFn: async (): Promise<Project[]> => {
       const data = await apiRequest(
         (client) => client.GET('/workspaces/{wsId}/projects', { params: { path: { wsId } } }),
@@ -61,6 +64,7 @@ export function useOnboardingSteps(): OnboardingState {
   const tasksQuery = useQuery({
     queryKey: [...tasksKeys.all, 'list', firstProjectId ?? '', 'onboarding-probe'] as const,
     enabled: projectDone,
+    throwOnError: false,
     select: (count: number) => count > 0,
     queryFn: async (): Promise<number> => {
       const data = await apiRequest(
@@ -77,12 +81,14 @@ export function useOnboardingSteps(): OnboardingState {
   const membersQuery = useQuery({
     queryKey: workspacesKeys.members(wsId),
     enabled: hasWorkspace && isAdmin,
+    throwOnError: false,
     select: (members) => members.length >= 2,
     queryFn: () => fetchWorkspaceMembers(wsId),
   });
   const invitesQuery = useQuery({
     queryKey: inviteKeys.list(wsId),
     enabled: hasWorkspace && isAdmin,
+    throwOnError: false,
     select: (invites: WorkspaceInvite[]) => invites.some(isLiveInvite),
     queryFn: async (): Promise<WorkspaceInvite[]> => {
       const data = await authApiRequest(

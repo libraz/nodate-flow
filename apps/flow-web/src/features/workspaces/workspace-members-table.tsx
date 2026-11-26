@@ -222,11 +222,14 @@ export default function WorkspaceMembersTable({
         style={{ minBlockSize: '16rem' }}
       />
 
-      <ErrorBoundary fallback={null}>
-        <Suspense fallback={null}>
-          <WorkspaceInvitesList workspaceId={workspaceId} />
-        </Suspense>
-      </ErrorBoundary>
+      {/* The invite list is admin-only; other roles would only be refused. */}
+      {isAdmin ? (
+        <ErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <WorkspaceInvitesList workspaceId={workspaceId} />
+          </Suspense>
+        </ErrorBoundary>
+      ) : null}
 
       <WorkspaceAddMemberDialog
         workspaceId={workspaceId}

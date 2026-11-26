@@ -3,6 +3,7 @@
  * that a failing invite lookup leaves the card standing.
  */
 
+import { createQueryClient } from '@nodate-flow/sdk';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '@tests/helpers/render';
 import { Suspense } from 'react';
@@ -45,11 +46,15 @@ vi.mock('../../auth/auth-store', () => ({
   useAuth: (select: (s: { user: { id: string } }) => unknown) => select({ user: { id: 'u1' } }),
 }));
 
+import { inviteKeys } from '../../workspaces/invite-api';
 import OnboardingChecklist from '../onboarding-checklist';
 
 const project = { id: 'p1', name: 'P', slug: 'p', identifier: 'P', isArchived: false };
 
-function setup(overrides: Record<string, () => unknown> = {}): void {
+function setup(
+  overrides: Record<string, () => unknown> = {},
+  queryClient?: ReturnType<typeof createQueryClient>,
+): void {
   h.handlers = {
     '/workspaces': () => ({ workspaces: [{ id: 'ws-1', name: 'Acme' }] }),
     '/workspaces/{wsId}/projects': () => ({ projects: [] }),
@@ -62,6 +67,7 @@ function setup(overrides: Record<string, () => unknown> = {}): void {
     <Suspense fallback={null}>
       <OnboardingChecklist />
     </Suspense>,
+    queryClient ? { queryClient } : {},
   );
 }
 
@@ -137,5 +143,20 @@ describe('OnboardingChecklist', () => {
       expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('3');
     });
     expect(screen.getByRole('link', { name: 'onboarding.steps.invite.title' })).not.toBeNull();
+  });
+
+  it('survives a refused invite list another screen left in the cache', async () => {
+    // The app's own client throws query errors to the boundary by default.
+    const queryClient = createQueryClient();
+    await queryClient.prefetchQuery({
+      queryKey: inviteKeys.list('ws-1'),
+      retry: false,
+      queryFn: () => Promise.reject(new Error('403')),
+    });
+    expect(queryClient.getQueryState(inviteKeys.list('ws-1'))?.status).toBe('error');
+    h.role = 'member';
+    expect(() => setup({}, queryClient)).not.toThrow();
+    await settle();
+    expect(screen.queryByRole('progressbar')).toBeNull();
   });
 });
