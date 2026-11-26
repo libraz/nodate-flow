@@ -21,7 +21,8 @@
     "github": "GitHub",
     "slack": "Slack",
     "email": "Email",
-    "webhook": "Webhook"
+    "webhook": "Webhook",
+    "discord": "Discord"
   },
   "filter": {
     "workspace_label": "Workspace",

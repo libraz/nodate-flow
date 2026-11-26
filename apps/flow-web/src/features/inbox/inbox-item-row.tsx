@@ -3,6 +3,7 @@
  * linked task, relative receivedAt, and Archive / Snooze actions.
  */
 
+import { lookupSignalKind } from '@nodate-flow/sdk';
 import Icon from '@nodate-flow/ui/icon';
 import { cx } from '@nodate-flow/ui/lib/cx';
 import Badge from '@nodate-flow/ui/primitives/badge';
@@ -43,9 +44,10 @@ const SOURCE_ICON: Record<string, LucideIcon> = {
   webhook: Webhook,
 };
 
-type SourceKey = 'github' | 'slack' | 'email' | 'manual' | 'webhook';
+type SourceKey = 'discord' | 'github' | 'slack' | 'email' | 'manual' | 'webhook';
 
 const SOURCE_LABEL_KEY: Record<SourceKey, string> = {
+  discord: 'source.discord',
   github: 'source.github',
   slack: 'source.slack',
   email: 'source.email',
@@ -53,7 +55,7 @@ const SOURCE_LABEL_KEY: Record<SourceKey, string> = {
   webhook: 'source.webhook',
 };
 
-/** Item kinds with a translated label; any other kind is shown as sent. */
+/** Item kinds outside the signal-kind registry that carry their own label. */
 const KIND_LABEL_KEY: Record<string, string> = {
   'agent.task.handoff_to_user': 'kind.agent_task_handoff_to_user',
 };
@@ -102,18 +104,30 @@ export default function InboxItemRow({
   onArchive,
   onSnooze,
 }: InboxItemRowProps): ReactElement {
-  const { t, i18n } = useTranslation('inbox');
+  const { t, i18n } = useTranslation(['inbox', 'signal-kinds']);
   const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
   const locale = i18n.resolvedLanguage ?? 'en';
   const icon = SOURCE_ICON[item.source] ?? InboxIcon;
   const sourceLabel = isKnownSource(item.source) ? t(SOURCE_LABEL_KEY[item.source]) : item.source;
   const kindKey = KIND_LABEL_KEY[item.kind];
-  const kindLabel = kindKey ? t(kindKey) : item.kind;
+  const signalKind = lookupSignalKind(item.kind);
+  // A kind neither table names is shown as sent.
+  let kindLabel = item.kind;
+  if (kindKey) kindLabel = t(kindKey);
+  else if (signalKind) {
+    kindLabel = t(`signal-kinds:${signalKind.i18nKey}.label`, { keySeparator: false });
+  }
+  const kindTranslated = kindLabel !== item.kind;
   const zone = useEffectiveZone();
   const absoluteTime = formatEpochDateTime(item.receivedAt, locale, zone);
   // The kind stands in as the headline when the row has no task or source title.
-  const itemTitle = item.taskId ? item.taskTitle : item.sourceDetail?.title;
+  // The API falls back to the kind when a source has no title of its own.
+  const sourceTitle = item.sourceDetail?.title === item.kind ? undefined : item.sourceDetail?.title;
+  const itemTitle = item.taskId ? item.taskTitle : sourceTitle;
   const hasTitle = Boolean(itemTitle);
+  // A source with nothing of its own to read has nothing to review.
+  const canReview =
+    !item.taskId && Boolean(sourceTitle || item.sourceDetail?.body || item.sourceDetail?.sourceUrl);
   const headline = itemTitle || kindLabel;
 
   const handleArchive = (): void => {
@@ -148,7 +162,7 @@ export default function InboxItemRow({
           <div className={styles.meta}>
             <Badge tone="neutral">{sourceLabel}</Badge>
             {hasTitle ? (
-              <span className={kindKey ? styles.kindLabel : styles.kind}>{kindLabel}</span>
+              <span className={kindTranslated ? styles.kindLabel : styles.kind}>{kindLabel}</span>
             ) : null}
           </div>
           <span className={styles.time} title={absoluteTime ?? undefined}>
@@ -156,7 +170,7 @@ export default function InboxItemRow({
           </span>
         </div>
         <div className={styles.actions}>
-          {item.sourceDetail?.title && !item.taskId ? (
+          {canReview ? (
             <Tooltip content={t('sourceIntake.review_hint')}>
               <Button type="button" size="sm" onClick={() => setSourceDialogOpen(true)}>
                 {t('sourceIntake.review')}

@@ -21,7 +21,8 @@
     "github": "GitHub",
     "slack": "Slack",
     "email": "邮件",
-    "webhook": "Webhook"
+    "webhook": "Webhook",
+    "discord": "Discord"
   },
   "filter": {
     "workspace_label": "工作区",

@@ -45,6 +45,50 @@ describe('<InboxItemRow>', () => {
     expect(link.getAttribute('href')).toContain('task-abc');
   });
 
+  it('labels a registry signal kind and its source instead of echoing the raw kind', () => {
+    const kind = 'discord.presence';
+    renderWithProviders(
+      <InboxItemRow
+        item={
+          {
+            ...anInboxItem({ source: 'discord', kind }),
+            taskId: undefined,
+            taskTitle: undefined,
+            // The API echoes the kind when the source has no title.
+            sourceDetail: { title: kind },
+          } as unknown as InboxItem
+        }
+        onArchive={() => {}}
+        onSnooze={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('source.discord')).toBeDefined();
+    expect(screen.getByText('signalKinds.discord.presence.label')).toBeDefined();
+    expect(screen.queryByText(kind)).toBeNull();
+    // Nothing of its own to read, so there is nothing to review.
+    expect(screen.queryByRole('button', { name: 'sourceIntake.review' })).toBeNull();
+  });
+
+  it('offers review for an unlinked item that has a title of its own', () => {
+    renderWithProviders(
+      <InboxItemRow
+        item={
+          {
+            ...anInboxItem(),
+            taskId: undefined,
+            taskTitle: undefined,
+            sourceDetail: { title: 'Login fails on Safari' },
+          } as unknown as InboxItem
+        }
+        onArchive={() => {}}
+        onSnooze={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'sourceIntake.review' })).toBeDefined();
+  });
+
   it('renders relative time for receivedAt', () => {
     const { container } = renderWithProviders(
       <InboxItemRow
