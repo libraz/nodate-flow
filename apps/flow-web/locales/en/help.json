@@ -76,12 +76,12 @@
   },
   "my-tasks": {
     "title": "My tasks",
-    "summary": "Every open task where you hold a role, across all workspaces, grouped by when it is due.",
+    "summary": "Every task where you hold a role, across all workspaces, with filters and sorting.",
     "tips": {
-      "t1": "Sections run Overdue, Today, Tomorrow, This week, Later and No due date. Done and cancelled tasks are hidden.",
-      "t2": "Tasks show up when you are added as assignee, reviewer or approver. Rows are sorted by due date, then priority.",
+      "t1": "Sorted by due date, tasks are grouped into Overdue, Today, Tomorrow, This week, Later and No due date. Any other sort shows one ungrouped list.",
+      "t2": "Tasks show up when you are added as assignee, reviewer, approver or watcher. Filter by status, priority, workspace, your role or title. Done and cancelled tasks are hidden until you select those statuses.",
       "t3": "Each row shows the priority, workspace, project and due date. Click a row to open the task. The round button at the start of a row completes a task you are assigned to, and the toast that follows offers Undo.",
-      "t4": "Up to 200 tasks are loaded. Press G then T from anywhere to come back to this page."
+      "t4": "Up to 200 tasks that match the filters are loaded. Press G then T from anywhere to come back to this page."
     }
   },
   "notifications": {

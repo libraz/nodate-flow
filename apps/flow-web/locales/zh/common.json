@@ -207,8 +207,8 @@
   },
   "today": {
     "title": "我的任务",
-    "subtitle": "你在所有工作区中负责的任务，按截止日期分组。",
-    "empty": "你还没有被指派任务。当你被添加为负责人、评审人或审批人时，任务会出现在这里。",
+    "subtitle": "您在所有工作区中担任角色的任务。",
+    "empty": "尚未分配给您任何任务。当您被添加为负责人、审核人、审批人或关注者时，任务会显示在这里。",
     "loading": "正在加载你的任务…",
     "error": "加载任务失败。",
     "sections": {
@@ -218,6 +218,36 @@
       "thisWeek": "本周",
       "later": "稍后",
       "noDue": "无截止日期"
+    },
+    "sort": {
+      "label": "排序",
+      "options": {
+        "due_asc": "截止日期（最早优先）",
+        "due_desc": "截止日期（最晚优先）",
+        "priority_desc": "优先级（从高到低）",
+        "priority_asc": "优先级（从低到高）",
+        "updated_desc": "最近更新",
+        "updated_asc": "最早更新",
+        "created_desc": "最新创建",
+        "created_asc": "最早创建",
+        "title_asc": "标题（升序）",
+        "title_desc": "标题（降序）"
+      }
+    },
+    "filters": {
+      "search_hint": "搜索所有工作区中您的任务标题。",
+      "workspace": "工作区",
+      "workspace_all": "所有工作区",
+      "role": "我的角色",
+      "roles": {
+        "assignee": "负责人",
+        "reviewer": "审核人",
+        "approver": "审批人",
+        "watcher": "关注者"
+      },
+      "chip_workspace": "工作区: {value}",
+      "chip_role": "角色: {value}",
+      "no_match": "没有符合筛选条件的任务。"
     },
     "in_workspace": "{workspace}",
     "no_due_label": "无截止日期",

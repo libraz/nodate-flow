@@ -207,8 +207,8 @@
   },
   "today": {
     "title": "My tasks",
-    "subtitle": "Tasks assigned to you across all workspaces, grouped by due date.",
-    "empty": "Nothing is assigned to you yet. Tasks appear here when you are added as assignee, reviewer or approver.",
+    "subtitle": "Tasks where you hold a role, across all workspaces.",
+    "empty": "Nothing is assigned to you yet. Tasks appear here when you are added as assignee, reviewer, approver or watcher.",
     "loading": "Loading your tasks…",
     "error": "Failed to load your tasks.",
     "sections": {
@@ -218,6 +218,36 @@
       "thisWeek": "This week",
       "later": "Later",
       "noDue": "No due date"
+    },
+    "sort": {
+      "label": "Sort",
+      "options": {
+        "due_asc": "Due date (earliest first)",
+        "due_desc": "Due date (latest first)",
+        "priority_desc": "Priority (highest first)",
+        "priority_asc": "Priority (lowest first)",
+        "updated_desc": "Recently updated",
+        "updated_asc": "Least recently updated",
+        "created_desc": "Newest first",
+        "created_asc": "Oldest first",
+        "title_asc": "Title (A to Z)",
+        "title_desc": "Title (Z to A)"
+      }
+    },
+    "filters": {
+      "search_hint": "Searches the titles of your tasks across all workspaces.",
+      "workspace": "Workspace",
+      "workspace_all": "All workspaces",
+      "role": "My role",
+      "roles": {
+        "assignee": "Assignee",
+        "reviewer": "Reviewer",
+        "approver": "Approver",
+        "watcher": "Watcher"
+      },
+      "chip_workspace": "Workspace: {value}",
+      "chip_role": "Role: {value}",
+      "no_match": "No tasks match these filters."
     },
     "in_workspace": "{workspace}",
     "no_due_label": "No due date",

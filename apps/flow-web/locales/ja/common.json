@@ -207,8 +207,8 @@
   },
   "today": {
     "title": "マイタスク",
-    "subtitle": "あなたが担当しているタスクを期日で横断表示します。",
-    "empty": "担当しているタスクはまだありません。担当・レビュー・承認として追加されたタスクがここに表示されます。",
+    "subtitle": "すべてのワークスペースで自分が役割を持つタスクです。",
+    "empty": "まだ何も割り当てられていません。担当・レビュー・承認・ウォッチとして追加されると、ここに表示されます。",
     "loading": "担当タスクを読み込み中…",
     "error": "担当タスクを読み込めませんでした。",
     "sections": {
@@ -218,6 +218,36 @@
       "thisWeek": "今週",
       "later": "今後",
       "noDue": "期日なし"
+    },
+    "sort": {
+      "label": "並び替え",
+      "options": {
+        "due_asc": "期日が近い順",
+        "due_desc": "期日が遠い順",
+        "priority_desc": "優先度が高い順",
+        "priority_asc": "優先度が低い順",
+        "updated_desc": "更新が新しい順",
+        "updated_asc": "更新が古い順",
+        "created_desc": "作成が新しい順",
+        "created_asc": "作成が古い順",
+        "title_asc": "タイトル順（昇順）",
+        "title_desc": "タイトル順（降順）"
+      }
+    },
+    "filters": {
+      "search_hint": "すべてのワークスペースの自分のタスクのタイトルを検索します。",
+      "workspace": "ワークスペース",
+      "workspace_all": "すべてのワークスペース",
+      "role": "自分の役割",
+      "roles": {
+        "assignee": "担当",
+        "reviewer": "レビュー",
+        "approver": "承認",
+        "watcher": "ウォッチ"
+      },
+      "chip_workspace": "ワークスペース: {value}",
+      "chip_role": "役割: {value}",
+      "no_match": "条件に合うタスクはありません。"
     },
     "in_workspace": "{workspace}",
     "no_due_label": "期日なし",
